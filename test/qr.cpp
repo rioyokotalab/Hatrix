@@ -8,11 +8,9 @@ using namespace Hatrix;
 int main() {
   //Full QR
   Matrix A(8, 4), Q(8, 4), R(4, 4);
-  Matrix A_copy(8, 4);
   Matrix QR(8,4);
-  QR = 0.0;
-  Q = 0.0;
-  R = 0.0;
+  A = 4.0;
+  Matrix A_copy(A);
   qr(A, Q, R);
   gemm(Q, R, QR);
   
