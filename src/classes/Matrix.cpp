@@ -11,7 +11,7 @@ Matrix::~Matrix() { std::free(data_); }
 Matrix::Matrix(int rows, int cols) : rows(rows), cols(cols) {
   data_ = (double*)std::malloc(rows*cols*sizeof(double));
   for (int i=0; i<rows; ++i) for (int j=0; j<cols; ++j)
-    (*this)(i, j) = i*cols+j;
+    (*this)(i, j) = 0;
 }
 
 Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
