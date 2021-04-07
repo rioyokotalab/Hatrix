@@ -5,15 +5,25 @@ project(NewStructure
   VERSION 1.0
 )
 
-find_package(CBLAS REQUIRED)
-find_package(LAPACKE REQUIRED)
+option(USE_MKL "Use Intel Math Kernel Libraries (MKL)" OFF)
+
+if(${USE_MKL})
+  set(BLA_VENDOR Intel10_64lp)
+  find_package(BLAS REQUIRED)
+  find_package(LAPACK REQUIRED)
+  set(Hatrix_BLAS_LIBS ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+else()
+  find_package(CBLAS REQUIRED)
+  find_package(LAPACKE REQUIRED)
+  set(Hatrix_BLAS_LIBS cblas lapacke)
+endif()
 
 add_library(Hatrix
   src/classes/Matrix.cpp
   src/functions/blas.cpp
   src/functions/lapack.cpp
 )
-target_link_libraries(Hatrix cblas lapacke)
+target_link_libraries(Hatrix ${Hatrix_BLAS_LIBS})
 
 target_include_directories(Hatrix
   PUBLIC
