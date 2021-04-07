@@ -1,5 +1,6 @@
 #include "Hatrix/classes/Matrix.h"
 
+#include <cassert>
 #include <cstdlib>
 #include <cstring>
 
@@ -28,5 +29,18 @@ const double* Matrix::operator&() const { return data_; }
 
 double& Matrix::operator()(int i, int j) { return data_[i*cols+j]; }
 const double& Matrix::operator()(int i, int j) const { return data_[i*cols+j]; }
+
+void Matrix::shrink(int new_rows, int new_cols) {
+  assert(new_rows <= rows);
+  assert(new_cols <= cols);
+  for (int i=0; i<new_rows; ++i) {
+    for (int j=0; j<new_cols; ++j) {
+      data_[i*new_cols+j] = (*this)(i, j);
+    }
+  }
+  rows = new_rows;
+  cols = new_cols;
+  data_ = (double*)std::realloc(data_, rows*cols*sizeof(double));
+}
 
 } // namespace Hatrix

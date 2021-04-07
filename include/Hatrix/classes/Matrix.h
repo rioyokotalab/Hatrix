@@ -20,6 +20,8 @@ class Matrix {
 
   double& operator()(int i, int j);
   const double& operator()(int i, int j) const;
+
+  void shrink(int rows, int cols);
 };
 
 } // namespace Hatrix

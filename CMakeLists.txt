@@ -31,8 +31,12 @@ target_include_directories(Hatrix
     $<INSTALL_INTERFACE:include>
 )
 
+add_executable(Matrix_test test/Matrix.cpp)
+target_link_libraries(Matrix_test Hatrix)
+
 add_executable(gemm_test test/gemm.cpp)
 target_link_libraries(gemm_test Hatrix)
+
 add_executable(getrf_test test/getrf.cpp)
 target_link_libraries(getrf_test Hatrix)
 
