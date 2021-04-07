@@ -35,7 +35,7 @@ void Matrix::shrink(int new_rows, int new_cols) {
   assert(new_cols <= cols);
   for (int i=0; i<new_rows; ++i) {
     for (int j=0; j<new_cols; ++j) {
-      data_[i*new_cols+j] = (*this)(i, j);
+      data_[j*new_rows+i] = (*this)(i, j);
     }
   }
   rows = new_rows;
