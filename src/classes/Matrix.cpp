@@ -19,6 +19,11 @@ Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
   std::memcpy(data_, A.data_, rows*cols*sizeof(double));
 }
 
+const Matrix& Matrix::operator=(const double a) {
+  for (int i=0; i<rows; ++i) for (int j=0; j<cols; ++j)
+    (*this)(i, j) = a;
+}
+
 double* Matrix::operator&() { return data_; }
 const double* Matrix::operator&() const { return data_; }
 
