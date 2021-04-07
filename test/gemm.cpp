@@ -6,8 +6,11 @@
 
 int main() {
   Hatrix::Matrix A(8, 4), B(4, 8), C(8, 8);
+  A = 2;
+  B = 4;
+  C = 1;
   Hatrix::Matrix A_check(A), B_check(B), C_check(C);
-  Hatrix::gemm(A, B, C);
+  Hatrix::gemm(A, B, C, 'N', 'N', 1., 1.);
 
   // Manual gemm
   for (int i=0; i<A.rows; ++i) {

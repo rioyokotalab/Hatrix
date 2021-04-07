@@ -1,32 +1,42 @@
 #include "Hatrix/classes/Matrix.h"
 
 #include "mkl.h"
+
 #include <algorithm>
+#include <vector>
+
 
 namespace Hatrix {
 
 void getrf(Matrix& A) {
-
-  int *ipiv = new int[std::min(A.rows, A.cols)];
-  LAPACKE_dgetrf(LAPACK_ROW_MAJOR, A.rows, A.cols, &A, A.cols, ipiv);
-  delete[] ipiv;
+  std::vector<int> ipiv(std::min(A.rows, A.cols));
+  int info;
+  dgetrf(&A.rows, &A.cols, A.data_, &A.rows, ipiv.data(), &info);
 }
 
-void qr(Matrix& A, Matrix& Q, Matrix& R) {
+void qr(const Matrix& A, Matrix& Q, Matrix& R) {
   int k = std::min(A.rows, A.cols);
-  double *tau = new double[k];
-  LAPACKE_dgeqrf(LAPACK_ROW_MAJOR, A.rows, A.cols, &A, A.cols, tau);
-  for(int i=0; i<std::min(Q.rows, Q.cols); i++) Q(i, i) = 1.0;
-  for(int i=0; i<A.rows; i++) {
-    for(int j=0; j<A.cols; j++) {
-      if(j >= i)
-        R(i, j) = A(i, j);
-      else
-        Q(i, j) = A(i, j);
-    }
+  std::vector<double> tau(k);
+
+  int l = A.rows * A.cols, one = 1;
+  int lwork = A.cols * 64, info;
+  std::vector<double> work(lwork);
+
+  dcopy(&l, A.data_, &one, Q.data_, &one);
+  dgeqrf(
+    &Q.rows, &Q.cols, Q.data_, &Q.rows,
+    tau.data(), work.data(), &lwork, &info
+  );
+
+  for (int i = 0; i < R.cols; i++) {
+    int nr = i + 1;
+    dcopy(&nr, Q.data_ + i * Q.rows, &one, R.data_ + i * R.rows, &one);
   }
-  LAPACKE_dorgqr(LAPACK_ROW_MAJOR, Q.rows, Q.cols, k, &Q, Q.cols, tau);
-  delete[] tau;
+  dorgqr(
+    &Q.rows, &Q.cols, &Q.cols,
+    Q.data_, &Q.rows,
+    tau.data(), work.data(), &lwork, &info
+  );
 }
 
 } // namespace Hatrix

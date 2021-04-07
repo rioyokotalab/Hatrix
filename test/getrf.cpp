@@ -6,41 +6,34 @@
 
 int main() {
   Hatrix::Matrix A(8, 8);
+  A = 0.5;
   //set a large value on the diagonal to avoid pivoting
   int d = 100;
   for (int i=0; i<8; ++i){
-    A(i,i) = d--;
+    A(i,i) += d--;
   }
   Hatrix::Matrix L(8, 8), U(8, 8), A_check(8, 8);
   Hatrix::Matrix B(A);
   Hatrix::getrf(B);
 
-  for (int i=0; i<A.rows; ++i) {
-    for (int j=0; j<A.cols; ++j) {
-        L(j,i) = 0;
-        U(j,i) = 0;
-        A_check(j,i) = 0;
-    }
-    }
-
   int idag = A.cols<A.rows?A.cols:A.rows;
   for (int i=0; i<idag; i++){
-      L(i,i) = 1;
+    L(i, i) = 1;
   }
 
   // extract L and U
   for (int i=0; i<A.rows; ++i) {
     for (int j=0; j<A.cols; ++j) {
-        if (j<i){
-            L(i, j) = B(i, j);
-        }
-        else {
-            U(i, j) = B(i, j);
-        }
+      if (j<i){
+        L(i, j) = B(i, j);
+      }
+      else {
+        U(i, j) = B(i, j);
+      }
     }
   }
 
-  Hatrix::gemm(L, U, A_check);
+  Hatrix::gemm(L, U, A_check, 'N', 'N', 1, 0);
 
   bool correct = true;
   // Check result

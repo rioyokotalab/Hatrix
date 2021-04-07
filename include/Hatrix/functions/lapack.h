@@ -4,6 +4,6 @@ class Matrix;
 
 void getrf(Matrix& A);
 
-void qr(Matrix& A, Matrix& Q, Matrix& R);
+void qr(const Matrix& A, Matrix& Q, Matrix& R);
 
 } // namespace Hatrix
