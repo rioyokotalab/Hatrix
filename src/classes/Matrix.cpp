@@ -27,8 +27,8 @@ const Matrix& Matrix::operator=(const double a) {
 double* Matrix::operator&() { return data_; }
 const double* Matrix::operator&() const { return data_; }
 
-double& Matrix::operator()(int i, int j) { return data_[i*cols+j]; }
-const double& Matrix::operator()(int i, int j) const { return data_[i*cols+j]; }
+double& Matrix::operator()(int i, int j) { return data_[j*rows+i]; }
+const double& Matrix::operator()(int i, int j) const { return data_[j*rows+i]; }
 
 void Matrix::shrink(int new_rows, int new_cols) {
   assert(new_rows <= rows);

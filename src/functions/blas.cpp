@@ -1,6 +1,6 @@
 #include "Hatrix/classes/Matrix.h"
 
-#include "cblas.h"
+#include "mkl.h"
 
 #include <cassert>
 #include <cstdlib>
@@ -9,11 +9,9 @@
 namespace Hatrix {
 
 void gemm(const Matrix& A, const Matrix& B, Matrix& C) {
-  cblas_dgemm(
-    CblasRowMajor,
-    CblasNoTrans, CblasNoTrans,
-    A.rows, B.cols, A.cols, 1.0, &A, A.cols, &B, B.cols, 1.0, &C, C.cols
-  );
+  char N = 'N';
+  double alpha = 1., beta = 1.;
+  dgemm(&N, &N, &C.rows, &C.cols, &A.cols, &alpha, A.data_, &A.rows, B.data_, &B.rows, &beta, C.data_, &C.rows);
 };
 
 void trsm(const Matrix& A, Matrix& B, const char& uplo, const char& lr) {
