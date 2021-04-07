@@ -33,3 +33,6 @@ target_include_directories(Hatrix
 
 add_executable(gemm_test test/gemm.cpp)
 target_link_libraries(gemm_test Hatrix)
+
+add_executable(qr_test test/qr.cpp)
+target_link_libraries(qr_test Hatrix)

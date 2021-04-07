@@ -13,6 +13,8 @@ class Matrix {
 
   Matrix(const Matrix& A);
 
+  const Matrix& operator=(const double a);
+
   double* operator&();
   const double* operator&() const;
 

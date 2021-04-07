@@ -2,6 +2,9 @@
 
 #include "cblas.h"
 
+#include <cassert>
+#include <cstdlib>
+
 
 namespace Hatrix {
 
@@ -13,8 +16,10 @@ void gemm(const Matrix& A, const Matrix& B, Matrix& C) {
   );
 };
 
-void trsm(const Matrix& A, Matrix& B, const char& uplo) {
+void trsm(const Matrix& A, Matrix& B, const char& uplo, const char& lr) {
   switch(uplo) {
+  case 'l':
+    switch(lr) {
     case 'l':
       cblas_dtrsm(
         CblasRowMajor,
@@ -23,7 +28,23 @@ void trsm(const Matrix& A, Matrix& B, const char& uplo) {
         B.rows, B.cols, 1, &A, A.cols, &B, B.cols
       );
       break;
-    case 'u':
+    case 'r':
+      std::abort();
+      break;
+    }
+    break;
+  case 'u':
+    switch(lr) {
+    case 'l':
+      assert(B.cols == 1);
+      cblas_dtrsm(
+        CblasRowMajor,
+        CblasLeft, CblasUpper,
+        CblasNoTrans, CblasNonUnit,
+        B.rows, B.cols, 1, &A, A.cols, &B, B.cols
+      );
+      break;
+    case 'r':
       cblas_dtrsm(
         CblasRowMajor,
         CblasRight, CblasUpper,
@@ -31,6 +52,8 @@ void trsm(const Matrix& A, Matrix& B, const char& uplo) {
         B.rows, B.cols, 1, &A, A.cols, &B, B.cols
       );
       break;
+    }
+    break;
   }
 }
 
