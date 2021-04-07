@@ -9,9 +9,7 @@ namespace Hatrix {
 Matrix::~Matrix() { std::free(data_); }
 
 Matrix::Matrix(int rows, int cols) : rows(rows), cols(cols) {
-  data_ = (double*)std::malloc(rows*cols*sizeof(double));
-  for (int i=0; i<rows; ++i) for (int j=0; j<cols; ++j)
-    (*this)(i, j) = 0;
+  data_ = (double*)std::calloc(rows*cols, sizeof(double));
 }
 
 Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
@@ -22,6 +20,7 @@ Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
 const Matrix& Matrix::operator=(const double a) {
   for (int i=0; i<rows; ++i) for (int j=0; j<cols; ++j)
     (*this)(i, j) = a;
+  return *this;
 }
 
 double* Matrix::operator&() { return data_; }
