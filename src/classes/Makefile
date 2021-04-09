@@ -1,14 +1,14 @@
 TOPSRCDIR = ../..
 include $(TOPSRCDIR)/make.inc
 
-.PHONY: clean
 
-.SUFFIXES: .cpp .cu
-all: classes
+lib_classes := lib_classes.a
+SOURCES     := Matrix.cpp
+OBJECTS     := $(subst .cpp,.o,$(SOURCES)) 
 
-CLASSES = Matrix.o
+$(lib_classes): $(OBJECTS)
+	$(AR) $(ARFLAGS) $@ $^
 
-classes: $(CLASSES)
-
-clean:
-	$(RM) -f $(CLASSES)
+# .PHONY: clean
+# clean:
+# 	$(RM) -f $(CLASSES)

@@ -1,23 +1,22 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
-.SUFFIXES: .cpp .cu
 DIRS := src/classes src/functions test
-GEMM := gemm
-OBJLIBS := src/classes/Matrix.o src/functions/blas.o src/functions/lapack.o \
-test/gemm.o
-TEST_DIR := test
+# OBJLIBS := $(DIRS:=.o)
 
-.PHONY: all $(GEMM) $(DIRS)
+# .PHONY: gemm dirs $(DIRS)
+# all: gemm
 
-all: $(GEMM)
+dirs: $(DIRS)
 
-$(GEMM) $(DIRS):
-	$(MAKE) --directory=$@
+$(DIRS):
+	$(MAKE) -C $@
 
-$(GEMM): $(DIRS)
-	$(CXX) $(LDFLAGS) $(OBJLIBS)  -o $(GEMM) 
+gemm: $(DIRS)
+	$(CXX) $(LDFLAGS) $(OBJLIBS)  -o $@
 
-clean: $(GEMM) $(DIRS)
-	$(MAKE) --directory=$@ clean
+.PHONY: clean
+clean: $(DIRS)
+	$(MAKE) -C $@
+	rm *.a *.o gemm
 

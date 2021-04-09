@@ -1,14 +1,13 @@
 TOPSRCDIR = ..
 include $(TOPSRCDIR)/make.inc
 
+lib_test = lib_test.a
+SOURCES = gemm.cpp
+OBJECTS = $(subst .cpp,.o,$(SOURCES))
+
+$(lib_test): $(OBJECTS)
+	$(AR) $(ARFLAGS) $@ $^
+
 .PHONY: clean
-
-.SUFFIXES: .cpp .cu
-all: functions
-
-TEST = gemm.o
-
-functions: $(TEST)
-
 clean:
-	$(RM) -f $(TEST)
+	$(RM) -f $(OBJECTS) $(lib_test)
