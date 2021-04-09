@@ -1,10 +1,12 @@
 #include "Hatrix/Hatrix.h"
 
+#include "gtest/gtest.h"
+
 #include <algorithm>
 #include <iostream>
 
 
-int main() {
+TEST(BLASTests, gemm) {
   Hatrix::Matrix A(8, 4), B(4, 8), C(8, 8);
   A = 2;
   B = 4;
@@ -21,17 +23,10 @@ int main() {
     }
   }
 
-  bool correct = true;
   // Check result
   for (int i=0; i<C.rows; ++i) {
     for (int j=0; j<C.cols; ++j) {
-      if (std::abs(C(i, j) - C_check(i, j)) > 10e-8) {
-        correct = false;
-        std::cout << i << " " << j << ": ";
-        std::cout << C(i, j) << " vs " << C_check(i, j) << "\n";
-      }
-      break;
+      ASSERT_FLOAT_EQ(C(i, j), C_check(i, j));
     }
   }
-  return correct ? 0 : 1;
 }

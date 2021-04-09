@@ -5,6 +5,8 @@ project(NewStructure
   VERSION 1.0
 )
 
+option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
+
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
@@ -25,14 +27,10 @@ target_include_directories(Hatrix
     $ENV{MKLROOT}/include
 )
 
-add_executable(Matrix_test test/Matrix.cpp)
-target_link_libraries(Matrix_test Hatrix)
-
-add_executable(gemm_test test/gemm.cpp)
-target_link_libraries(gemm_test Hatrix)
-
-add_executable(getrf_test test/getrf.cpp)
-target_link_libraries(getrf_test Hatrix)
-
-add_executable(qr_test test/qr.cpp)
-target_link_libraries(qr_test Hatrix)
+if (${Hatrix_BUILD_TESTS})
+  enable_testing()
+  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+  include(find_or_download)
+  find_or_download(GTest)
+  add_subdirectory(test)
+endif()

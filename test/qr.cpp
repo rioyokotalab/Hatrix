@@ -1,28 +1,23 @@
 #include "Hatrix/Hatrix.h"
 
+#include "gtest/gtest.h"
+
 #include <algorithm>
 #include <iostream>
 
-using namespace Hatrix;
-
-int main() {
+TEST(LAPACKTests, qr) {
   //Full QR
-  Matrix A(8, 4), Q(8, 4), R(4, 4);
-  Matrix QR(8, 4);
+  Hatrix::Matrix A(8, 4), Q(8, 4), R(4, 4);
+  Hatrix::Matrix QR(8, 4);
   A = 4.0;
-  Matrix A_copy(A);
-  qr(A, Q, R);
-  gemm(Q, R, QR, 'N', 'N', 1., 0.);
+  Hatrix::Matrix A_copy(A);
+  Hatrix::qr(A, Q, R);
+  Hatrix::gemm(Q, R, QR, 'N', 'N', 1., 0.);
 
   // Check result
   for (int i=0; i<QR.rows; i++) {
     for (int j=0; j<QR.cols; j++) {
-      if (std::abs(QR(i, j) - A_copy(i, j)) > 10e-8) {
-        std::cout << i << " " << j << ": ";
-        std::cout << QR(i, j) << " vs " << A_copy(i, j) << "\n";
-        return 1;
-      }
+      ASSERT_FLOAT_EQ(QR(i, j), A_copy(i, j));
     }
   }
-  return 0;
 }

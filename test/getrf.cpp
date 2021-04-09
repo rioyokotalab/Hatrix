@@ -1,10 +1,12 @@
 #include "Hatrix/Hatrix.h"
 
+#include "gtest/gtest.h"
+
 #include <algorithm>
 #include <iostream>
 
 
-int main() {
+TEST(LAPACKTests, getrf) {
   Hatrix::Matrix A(8, 8);
   A = 0.5;
   //set a large value on the diagonal to avoid pivoting
@@ -35,17 +37,10 @@ int main() {
 
   Hatrix::gemm(L, U, A_check, 'N', 'N', 1, 0);
 
-  bool correct = true;
   // Check result
   for (int i=0; i<A.rows; ++i) {
     for (int j=0; j<A.cols; ++j) {
-      if (std::abs(A(i, j) - A_check(i, j)) > 10e-8) {
-        correct = false;
-        std::cout << i << " " << j << ": ";
-        std::cout << A(i, j) << " vs " << A_check(i, j) << "\n";
-      }
-      break;
+      ASSERT_FLOAT_EQ(A(i, j), A_check(i, j));
     }
   }
-  return correct ? 0 : 1;
 }
