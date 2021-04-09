@@ -40,7 +40,7 @@ TEST(LAPACKTests, getrf) {
   // Check result
   for (int i=0; i<A.rows; ++i) {
     for (int j=0; j<A.cols; ++j) {
-      ASSERT_FLOAT_EQ(A(i, j), A_check(i, j));
+      EXPECT_DOUBLE_EQ(A(i, j), A_check(i, j));
     }
   }
 }

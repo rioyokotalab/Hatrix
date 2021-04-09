@@ -10,7 +10,7 @@ TEST(MatrixTests, Constructor) {
   Hatrix::Matrix A(block_size, block_size);
 
   for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
-    ASSERT_EQ(A(i, j), 0);
+    EXPECT_EQ(0, A(i, j));
   }
 }
 
@@ -23,7 +23,7 @@ TEST(MatrixTests, CopyConstructor) {
   Hatrix::Matrix A_copy(A);
 
   for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
-    ASSERT_EQ(A(i, j), A_copy(i, j));
+    EXPECT_EQ(A(i, j), A_copy(i, j));
   }
 }
 
@@ -33,13 +33,13 @@ TEST(MatrixTests, shrink) {
   for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
     A(i, j) = i*block_size+j;
   }
-  Hatrix::Matrix A_copy(A);
+  Hatrix::Matrix A_shrink(A);
 
   int shrunk_size = 8;
-  A.shrink(shrunk_size, shrunk_size);
+  A_shrink.shrink(shrunk_size, shrunk_size);
 
   // Check result
   for (int i=0; i<shrunk_size; ++i) for (int j=0; j<shrunk_size; ++j) {
-    ASSERT_EQ(A(i, j), A_copy(i, j));
+    EXPECT_EQ(A(i, j), A_shrink(i, j));
   }
 }

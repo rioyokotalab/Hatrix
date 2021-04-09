@@ -26,7 +26,7 @@ TEST(BLASTests, gemm) {
   // Check result
   for (int i=0; i<C.rows; ++i) {
     for (int j=0; j<C.cols; ++j) {
-      ASSERT_FLOAT_EQ(C(i, j), C_check(i, j));
+      EXPECT_DOUBLE_EQ(C_check(i, j), C(i, j));
     }
   }
 }
