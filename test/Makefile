@@ -5,9 +5,11 @@ lib_test = lib_test.a
 SOURCES = gemm.cpp
 OBJECTS = $(subst .cpp,.o,$(SOURCES))
 
-.PHONY: $(lib_test)
+all: $(lib_test)
+
+# .PHONY: $(lib_test)
 $(lib_test): $(OBJECTS)
-	$(AR) $(ARFLAGS) $@ $^
+	$(AR) $(ARFLAGS) $@ $^	
 
 .PHONY: clean
 clean:

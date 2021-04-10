@@ -2,7 +2,9 @@ TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
 DIRS := src/classes src/functions test
+OBJLIBS := lib_classes.a lib_functions.a lib_test.a
 
+.PHONY: dirs $(DIRS)
 dirs: $(DIRS)
 
 $(DIRS):
