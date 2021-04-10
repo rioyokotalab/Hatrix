@@ -2,10 +2,6 @@ TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
 DIRS := src/classes src/functions test
-# OBJLIBS := $(DIRS:=.o)
-
-# .PHONY: gemm dirs $(DIRS)
-# all: gemm
 
 dirs: $(DIRS)
 
@@ -16,7 +12,7 @@ gemm: $(DIRS)
 	$(CXX) $(LDFLAGS) $(OBJLIBS)  -o $@
 
 .PHONY: clean
-clean: $(DIRS)
-	$(MAKE) -C $@
-	rm *.a *.o gemm
-
+clean:
+	for dir in $(DIRS); do \
+		$(MAKE) -C $$dir -f Makefile $@; \
+	done
