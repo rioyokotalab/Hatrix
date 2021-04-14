@@ -14,21 +14,29 @@ all: $(EXECUTABLES)
 $(DIRS):
 	$(MAKE) -C $@
 
-gemm: test/gemm.o dirs
+gemm: $(TEST)/gemm.o dirs
 	$(CXX) test/$@.o $(OBJLIBS) $(LDFLAGS)  -o $@
+	mkdir -p bin
+	$(MV) $@ bin/
 
-getrf: test/getrf.o dirs
+getrf: $(TEST)/getrf.o dirs
 	$(CXX) $(TEST)/$@.o $(OBJLIBS) $(LDFLAGS)  -o $@
+	mkdir -p bin
+	$(MV) $@ bin/
 
 qr: $(TEST)/qr.o dirs
 	$(CXX) $(TEST)/$@.o $(OBJLIBS) $(LDFLAGS)  -o $@
+	mkdir -p bin
+	$(MV) $@ bin/
 
 block_dense_lu: $(TEST)/block_dense_lu.o dirs
 	$(CXX) $(TEST)/$@.o $(OBJLIBS) $(LDFLAGS)  -o $@
+	mkdir -p bin
+	$(MV) $@ bin/
 
 .PHONY: clean
 clean:
 	for dir in $(DIRS) test; do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
-	$(RM) $(OBJLIBS) $(EXECUTABLES)
+	$(RM) $(OBJLIBS) bin/
