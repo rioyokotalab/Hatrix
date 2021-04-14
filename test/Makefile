@@ -1,6 +1,4 @@
 TOPSRCDIR = ..
-include $(TOPSRCDIR)/make.inc
+SOURCES := gemm.cpp getrf.cpp qr.cpp block_dense_lu.cpp
 
-.PHONY: clean
-clean:
-	$(RM) -f $(OBJECTS)
+include $(TOPSRCDIR)/common.mk
