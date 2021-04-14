@@ -10,5 +10,4 @@ RM           = rm
 AR           = ar
 ARFLAGS      = -rv
 
-.SUFFIXES: .cpp .cu
-
+.SUFFIXES: .cpp

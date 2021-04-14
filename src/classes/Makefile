@@ -8,7 +8,6 @@ OBJECTS     := $(subst .cpp,.o,$(SOURCES))
 
 all: $(lib_classes)
 
-# .PHONY: $(lib_classes)
 $(lib_classes): $(OBJECTS)
 	$(AR) $(ARFLAGS) $@ $^
 
