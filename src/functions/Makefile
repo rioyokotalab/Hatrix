@@ -1,7 +1,7 @@
 TOPSRCDIR = ../..
 include $(TOPSRCDIR)/make.inc
 
-lib_functions = lib_functions.a
+lib_functions = libfunctions.a
 SOURCES = blas.cpp lapack.cpp
 OBJECTS = $(subst .cpp,.o,$(SOURCES))
 

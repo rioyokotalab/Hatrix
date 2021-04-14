@@ -2,7 +2,7 @@ TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
 DIRS := src/classes src/functions test
-OBJLIBS := lib_classes.a lib_functions.a
+OBJLIBS := src/classes/libclasses.a src/functions/libfunctions.a
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -11,7 +11,7 @@ $(DIRS):
 	$(MAKE) -C $@
 
 gemm: test/gemm.o $(DIRS)
-	$(CXX) $(LDFLAGS) $(OBJLIBS)  -o $@
+	$(CXX)  test/gemm.o $(OBJLIBS) $(LDFLAGS)  -o $@
 
 .PHONY: clean
 clean:

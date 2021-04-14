@@ -2,7 +2,7 @@ TOPSRCDIR = ../..
 include $(TOPSRCDIR)/make.inc
 
 
-lib_classes := lib_classes.a
+lib_classes := libclasses.a
 SOURCES     := Matrix.cpp
 OBJECTS     := $(subst .cpp,.o,$(SOURCES))
 
