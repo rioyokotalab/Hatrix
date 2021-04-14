@@ -1,14 +1,6 @@
 TOPSRCDIR = ../..
-include $(TOPSRCDIR)/make.inc
+sublib  := libfunctions.a
+SOURCES := blas.cpp lapack.cpp
 
-lib_functions = libfunctions.a
-SOURCES = blas.cpp lapack.cpp
-OBJECTS = $(subst .cpp,.o,$(SOURCES))
+include $(TOPSRCDIR)/common.mk
 
-$(lib_functions): $(OBJECTS)
-	$(AR) $(ARFLAGS) $@ $^
-	$(MV) $@ $(TOPSRCDIR)/$@
-
-.PHONY: clean
-clean:
-	$(RM) -f $(OBJECTS) $(lib_functions)
