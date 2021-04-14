@@ -14,25 +14,21 @@ all: $(EXECUTABLES)
 $(DIRS):
 	$(MAKE) -C $@
 
-gemm: $(TEST)/gemm.o dirs
-	$(CXX) test/$@.o $(OBJLIBS) $(LDFLAGS)  -o $@
-	mkdir -p bin
+LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS)  -o $@; \
+	mkdir -p bin; \
 	$(MV) $@ bin/
+
+gemm: $(TEST)/gemm.o dirs
+	$(LINK_EXECUTABLE)
 
 getrf: $(TEST)/getrf.o dirs
-	$(CXX) $(TEST)/$@.o $(OBJLIBS) $(LDFLAGS)  -o $@
-	mkdir -p bin
-	$(MV) $@ bin/
+	$(LINK_EXECUTABLE)
 
 qr: $(TEST)/qr.o dirs
-	$(CXX) $(TEST)/$@.o $(OBJLIBS) $(LDFLAGS)  -o $@
-	mkdir -p bin
-	$(MV) $@ bin/
+	$(LINK_EXECUTABLE)
 
 block_dense_lu: $(TEST)/block_dense_lu.o dirs
-	$(CXX) $(TEST)/$@.o $(OBJLIBS) $(LDFLAGS)  -o $@
-	mkdir -p bin
-	$(MV) $@ bin/
+	$(LINK_EXECUTABLE)
 
 .PHONY: clean
 clean:
