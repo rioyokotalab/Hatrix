@@ -10,6 +10,7 @@ all: $(lib_classes)
 
 $(lib_classes): $(OBJECTS)
 	$(AR) $(ARFLAGS) $@ $^
+	$(MV) $@ $(TOPSRCDIR)/$@
 
 .PHONY: clean
 clean:

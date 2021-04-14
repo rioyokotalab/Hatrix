@@ -7,6 +7,7 @@ OBJECTS = $(subst .cpp,.o,$(SOURCES))
 
 $(lib_functions): $(OBJECTS)
 	$(AR) $(ARFLAGS) $@ $^
+	$(MV) $@ $(TOPSRCDIR)/$@
 
 .PHONY: clean
 clean:
