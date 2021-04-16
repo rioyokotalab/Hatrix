@@ -11,7 +11,6 @@ namespace Hatrix {
 
 void getrf(Matrix& A, Matrix& L, Matrix& U) {
   std::vector<int> ipiv(std::min(A.rows, A.cols));
-  int n = A.rows * A.cols;
 
   LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, ipiv.data());
 
