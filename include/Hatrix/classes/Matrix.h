@@ -22,6 +22,7 @@ class Matrix {
   const double& operator()(int i, int j) const;
 
   void shrink(int rows, int cols);
+  int min_dim();
 };
 
 } // namespace Hatrix

@@ -42,20 +42,24 @@ TEST(BlockDense, getrf) {
   Hatrix::gemm(A[1][1], x1, b1, 'N', 'N', 1, 1);
 
   // Block LU
-  Hatrix::getrf(A[0][0]);
-  Hatrix::trsm(A[0][0], A[0][1], 'L', 'L', 'N', 'U', 1);
-  Hatrix::trsm(A[0][0], A[1][0], 'R', 'U', 'N', 'N', 1);
+  Hatrix::Matrix L0(block_size, block_size);
+  Hatrix::Matrix U0(block_size, block_size);
+  Hatrix::getrf(A[0][0], L0, U0);
+  Hatrix::trsm(L0, A[0][1], 'L', 'L', 'N', 'U', 1);
+  Hatrix::trsm(U0, A[1][0], 'R', 'U', 'N', 'N', 1);
   Hatrix::gemm(A[1][0], A[0][1], A[1][1], 'N', 'N', -1, 1);
-  Hatrix::getrf(A[1][1]);
+  Hatrix::Matrix L1(block_size, block_size);
+  Hatrix::Matrix U1(block_size, block_size);
+  Hatrix::getrf(A[1][1], L1, U1);
 
   // Forward substitution
-  Hatrix::trsm(A[0][0], b0, 'L', 'L', 'N', 'U', 1);
+  Hatrix::trsm(L0, b0, 'L', 'L', 'N', 'U', 1);
   Hatrix::gemm(A[1][0], b0, b1, 'N', 'N', -1, 1);
-  Hatrix::trsm(A[1][1], b1, 'L', 'L', 'N', 'U', 1);
+  Hatrix::trsm(L1, b1, 'L', 'L', 'N', 'U', 1);
   // Backward substitution
-  Hatrix::trsm(A[1][1], b1, 'L', 'U', 'N', 'N', 1);
+  Hatrix::trsm(U1, b1, 'L', 'U', 'N', 'N', 1);
   Hatrix::gemm(A[0][1], b1, b0, 'N', 'N', -1, 1);
-  Hatrix::trsm(A[0][0], b0, 'L', 'U', 'N', 'N', 1);
+  Hatrix::trsm(U0, b0, 'L', 'U', 'N', 'N', 1);
 
   // Check result
   for (int i=0; i<block_size; ++i) {
