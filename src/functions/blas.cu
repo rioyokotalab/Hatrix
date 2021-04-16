@@ -12,17 +12,13 @@ namespace Hatrix {
   cusolverDnHandle_t solvH = nullptr;
 
   void init() {
-    if (blasH == nullptr)
-      cublasCreate(&blasH);
-    if (solvH == nullptr)
-      cusolverDnCreate(&solvH);
+    cublasCreate(&blasH);
+    cusolverDnCreate(&solvH);
   }
 
   void terminate() {
-    if (blasH != nullptr)
-    { cublasDestroy(blasH); blasH = 0; }
-    if (solvH != nullptr)
-    { cusolverDnDestroy(solvH); blasH = 0; }
+    cublasDestroy(blasH); blasH = 0;
+    cusolverDnDestroy(solvH); blasH = 0;
   }
 
 void matmul(

@@ -49,6 +49,7 @@ TEST_P(MatMulTests, matmul) {
       EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
     }
   }
+  Hatrix::terminate();
 }
 
 INSTANTIATE_TEST_SUITE_P(
