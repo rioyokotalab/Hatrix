@@ -12,7 +12,7 @@ TEST(LAPACKTests, qr) {
   A = 4.0;
   Hatrix::Matrix A_copy(A);
   Hatrix::qr(A_copy, Q, R);
-  Hatrix::gemm(Q, R, QR, false, false, 1., 0.);
+  Hatrix::matmul(Q, R, QR, false, false, 1., 0.);
 
   // Check result
   for (int i=0; i<QR.rows; i++) {

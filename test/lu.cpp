@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <iostream>
 
-void test_getrf(int m, int n, double value) {
+void test_lu(int m, int n, double value) {
   Hatrix::Matrix A(m, n);
   A = value;
 
@@ -18,9 +18,9 @@ void test_getrf(int m, int n, double value) {
   Hatrix::Matrix A_copy(A);
 
   Hatrix::Matrix L(m, n_diag), U(n_diag, n), A_rebuilt(m, n);
-  Hatrix::getrf(A, L, U);
+  Hatrix::lu(A, L, U);
 
-  Hatrix::gemm(L, U, A_rebuilt, false, false, 1, 0);
+  Hatrix::matmul(L, U, A_rebuilt, false, false, 1, 0);
 
   // Check result
   for (int i=0; i<A.rows; ++i) {
@@ -30,8 +30,8 @@ void test_getrf(int m, int n, double value) {
   }
 }
 
-TEST(LAPACKTests, getrf) {
-  test_getrf(8, 8, 0.5);
-  test_getrf(4, 8, -2.3);
-  test_getrf(10, 4, 11);
+TEST(LAPACKTests, lu) {
+  test_lu(8, 8, 0.5);
+  test_lu(4, 8, -2.3);
+  test_lu(10, 4, 11);
 }

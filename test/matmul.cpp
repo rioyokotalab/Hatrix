@@ -2,13 +2,12 @@
 
 #include "gtest/gtest.h"
 
-#include <algorithm>
-#include <iostream>
+#include <tuple>
 
 
-class GEMMTests : public testing::TestWithParam<std::tuple<int, int, int>> {};
+class MatMulTests : public testing::TestWithParam<std::tuple<int, int, int>> {};
 
-TEST_P(GEMMTests, gemm) {
+TEST_P(MatMulTests, matmul) {
   int m, n, k;
   std::tie(m, n, k) = GetParam();
   Hatrix::Matrix A(m, k), B(k, n), C(m, n);
@@ -16,9 +15,9 @@ TEST_P(GEMMTests, gemm) {
   B = 4;
   C = 1;
   Hatrix::Matrix A_check(A), B_check(B), C_check(C);
-  Hatrix::gemm(A, B, C, false, false, 1., 1.);
+  Hatrix::matmul(A, B, C, false, false, 1., 1.);
 
-  // Manual gemm
+  // Manual matmul
   for (int i=0; i<m; ++i) {
     for (int j=0; j<n; ++j) {
       for (int k_=0; k_<k; ++k_) {
@@ -36,13 +35,13 @@ TEST_P(GEMMTests, gemm) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-  BLAS, GEMMTests,
+  BLAS, MatMulTests,
   testing::Combine(
     testing::Values(16, 32, 64),
     testing::Values(16, 32),
     testing::Values(16, 32, 64)
   ),
-  [](const testing::TestParamInfo<GEMMTests::ParamType>& info) {
+  [](const testing::TestParamInfo<MatMulTests::ParamType>& info) {
     std::string name = (
       "m" + std::to_string(std::get<0>(info.param))
       + "k" + std::to_string(std::get<1>(info.param))

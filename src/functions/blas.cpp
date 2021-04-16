@@ -7,7 +7,7 @@
 
 namespace Hatrix {
 
-void gemm(
+void matmul(
   const Matrix& A, const Matrix& B, Matrix& C,
   bool transA, bool transB, double alpha, double beta
 ) {
@@ -20,9 +20,9 @@ void gemm(
   );
 };
 
-void trsm(
+void solve_triangular(
   const Matrix& A, Matrix& B,
-  int side, int uplo, bool transA, bool diag, double alpha
+  int side, int uplo, bool diag, bool transA, double alpha
 ) {
   cblas_dtrsm(
     CblasColMajor,

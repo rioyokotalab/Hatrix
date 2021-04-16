@@ -9,14 +9,14 @@ enum {
 
 class Matrix;
 
-void gemm(
+void matmul(
   const Matrix& A, const Matrix& B, Matrix& C,
-  bool transA, bool transB, double alpha, double beta
+  bool transA=false, bool transB=false, double alpha=1.0, double beta=1.0
 );
 
-void trsm(
+void solve_triangular(
   const Matrix& A, Matrix& B,
-  int side, int uplo, bool transA, bool diag, double alpha
+  int side, int uplo, bool diag, bool transA=false, double alpha=1.0
 );
 
 } // namespace Hatrix
