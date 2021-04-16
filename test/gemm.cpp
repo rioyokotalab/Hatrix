@@ -6,8 +6,12 @@
 #include <iostream>
 
 
-TEST(BLASTests, gemm) {
-  Hatrix::Matrix A(8, 4), B(4, 8), C(8, 8);
+class GEMMTests : public testing::TestWithParam<std::tuple<int, int, int>> {};
+
+TEST_P(GEMMTests, gemm) {
+  int m, n, k;
+  std::tie(m, n, k) = GetParam();
+  Hatrix::Matrix A(m, k), B(k, n), C(m, n);
   A = 2;
   B = 4;
   C = 1;
@@ -15,18 +19,35 @@ TEST(BLASTests, gemm) {
   Hatrix::gemm(A, B, C, false, false, 1., 1.);
 
   // Manual gemm
-  for (int i=0; i<A.rows; ++i) {
-    for (int j=0; j<B.cols; ++j) {
-      for (int k=0; k<A.cols; ++k) {
-        C_check(i, j) += A_check(i, k) * B_check(k, j);
+  for (int i=0; i<m; ++i) {
+    for (int j=0; j<n; ++j) {
+      for (int k_=0; k_<k; ++k_) {
+        C_check(i, j) += A_check(i, k_) * B_check(k_, j);
       }
     }
   }
 
   // Check result
-  for (int i=0; i<C.rows; ++i) {
-    for (int j=0; j<C.cols; ++j) {
+  for (int i=0; i<m; ++i) {
+    for (int j=0; j<n; ++j) {
       EXPECT_DOUBLE_EQ(C_check(i, j), C(i, j));
     }
   }
 }
+
+INSTANTIATE_TEST_SUITE_P(
+  BLAS, GEMMTests,
+  testing::Combine(
+    testing::Values(16, 32, 64),
+    testing::Values(16, 32),
+    testing::Values(16, 32, 64)
+  ),
+  [](const testing::TestParamInfo<GEMMTests::ParamType>& info) {
+    std::string name = (
+      "m" + std::to_string(std::get<0>(info.param))
+      + "k" + std::to_string(std::get<1>(info.param))
+      + "n" + std::to_string(std::get<2>(info.param))
+    );
+    return name;
+  }
+);
