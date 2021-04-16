@@ -14,7 +14,7 @@ void matmul(
   cblas_dgemm(
     CblasColMajor,
     transA ? CblasTrans : CblasNoTrans, transB ? CblasTrans : CblasNoTrans,
-    A.rows, C.cols, A.cols,
+    C.rows, C.cols, transA ? A.rows : A.cols,
     alpha, &A, A.rows, &B, B.rows,
     beta, &C, C.rows
   );

@@ -35,14 +35,18 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 void qr(const Matrix& A, Matrix& Q, Matrix& R) {
   int k = std::min(A.rows, A.cols);
   std::vector<double> tau(k);
-  int l = A.rows * A.cols;
-
-  cblas_dcopy(l, &A, 1, &Q, 1);
-  LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.rows, tau.data());
-
+  Matrix A_copy(A);
+  LAPACKE_dgeqrf(
+    LAPACK_COL_MAJOR, A_copy.rows, A_copy.cols, &A_copy, A_copy.rows, tau.data()
+  );
+  //Copy upper triangular (or trapezoidal) part of A_copy to R
   for (int j = 0; j < R.cols; j++) {
-    int nr = j + 1;
-    cblas_dcopy(nr, &Q(0, j), 1, &R(0, j), 1);
+    cblas_dcopy(std::min(j+1, R.rows), &A_copy(0, j), 1, &R(0, j), 1);
+  }
+  //Copy lower triangular of A_copy to Q
+  for (int j = 0; j < Q.cols; j++) {
+    Q(j,j) = 1.0;
+    cblas_dcopy(Q.rows-j-1, &A_copy(j+1, j), 1, &Q(j+1, j), 1);
   }
   LAPACKE_dorgqr(
     LAPACK_COL_MAJOR, Q.rows, Q.cols, Q.cols, &Q, Q.rows, tau.data()
