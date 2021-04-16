@@ -31,8 +31,6 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 
   // L: set diagonal to 1 and upper triangular matrix to 0
   LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.rows);
-
-  // U: set lower triangular to 0?
 }
 
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
