@@ -2,6 +2,7 @@
 
 #include "Hatrix/handle.h"
 #include "cusolverDn.h"
+#include <algorithm>
 
 namespace Hatrix {
 

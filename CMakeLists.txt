@@ -30,17 +30,13 @@ else()
 endif()
 
 if(USE_CUDA)
-  add_library(Hatrix_gpu src/classes/Matrix.cu)
+  add_library(Hatrix_gpu src/classes/Matrix.cu src/functions/blas.cu src/functions/lapack.cu)
   set_target_properties(Hatrix_gpu PROPERTIES CUDA_ARCHITECTURES 60 70 75)
   target_link_libraries(Hatrix_gpu cublas cusolver)
   target_include_directories(Hatrix_gpu 
     PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> 
     $<INSTALL_INTERFACE:include>)
-
-  add_executable(CUDA_hello_world src/hello_world.cu)
-  set_target_properties(CUDA_hello_world PROPERTIES CUDA_ARCHITECTURES 60 70 75)
-  target_link_libraries(CUDA_hello_world ${CUDA_CUBLAS_LIBRARIES})
 endif()
 
 find_package(BLAS REQUIRED)
