@@ -6,3 +6,4 @@ dependencies
 gemm
 *.a
 bin/
+hatrix_deps.sh
