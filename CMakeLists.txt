@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.9)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(policies)
+set_policies()
 
 project(NewStructure
   LANGUAGES CXX
@@ -11,6 +14,7 @@ include(CheckLanguage)
 check_language(CUDA)
 if(CMAKE_CUDA_COMPILER)
   enable_language(CUDA)
+  find_package(CUDA)
   message(STATUS "CUDA ${CUDA_VERSION} detected - compiling GPU code.")
   set(USE_CUDA ON)
 else()
@@ -19,6 +23,8 @@ endif()
 
 if(USE_CUDA)
   add_executable(CUDA_hello_world src/hello_world.cu)
+  set_target_properties(CUDA_hello_world PROPERTIES CUDA_ARCHITECTURES 60 70 75)
+  target_link_libraries(CUDA_hello_world ${CUDA_CUBLAS_LIBRARIES})
 endif()
 
 set(BLA_VENDOR Intel10_64lp)
@@ -43,7 +49,6 @@ target_include_directories(Hatrix
 
 if (${Hatrix_BUILD_TESTS})
   enable_testing()
-  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
   include(find_or_download)
   find_or_download(GTest)
   add_subdirectory(test)
