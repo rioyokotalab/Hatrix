@@ -7,6 +7,20 @@ project(NewStructure
 
 option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
 
+include(CheckLanguage)
+check_language(CUDA)
+if(CMAKE_CUDA_COMPILER)
+  enable_language(CUDA)
+  message(STATUS "CUDA ${CUDA_VERSION} detected - compiling GPU code.")
+  set(USE_CUDA ON)
+else()
+  message(STATUS "No CUDA support")
+endif()
+
+if(USE_CUDA)
+  add_executable(CUDA_hello_world src/hello_world.cu)
+endif()
+
 set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
