@@ -113,4 +113,18 @@ double calc_norm(const Matrix& A, Norm norm){
   return LAPACKE_dlange(LAPACK_COL_MAJOR, static_cast<int>(norm), A.rows, A.cols, &A, A.rows);
 }
 
+void geqrt(Matrix& A, Matrix& T) {
+  LAPACKE_dgeqrt3(
+    LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, &T, T.rows
+  );
+}
+
+void larfb(const Matrix& V, const Matrix& T, Matrix& C, bool trans) {
+  LAPACKE_dlarfb(
+    LAPACK_COL_MAJOR, 'L', trans ? 'T' : 'N', 'F', 'C',
+    C.rows, C.cols, T.cols,
+    &V, V.rows, &T, T.rows, &C, C.rows
+  );
+}
+
 } // namespace Hatrix

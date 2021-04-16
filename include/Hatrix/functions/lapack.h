@@ -24,4 +24,8 @@ double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
 double calc_norm(const Matrix& A, Norm norm);
 
+void geqrt(Matrix& A, Matrix& T);
+
+void larfb(const Matrix& V, const Matrix& T, Matrix& C, bool trans);
+
 } // namespace Hatrix
