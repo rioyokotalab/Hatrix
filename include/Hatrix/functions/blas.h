@@ -1,10 +1,10 @@
 namespace Hatrix {
 
 enum {
-  TRSMLeft,
-  TRSMRight,
-  TRSMUpper,
-  TRSMLower
+  Left,
+  Right,
+  Upper,
+  Lower
 };
 
 class Matrix;

@@ -26,8 +26,8 @@ void solve_triangular(
 ) {
   cblas_dtrsm(
     CblasColMajor,
-    side == TRSMLeft ? CblasLeft :  CblasRight,
-    uplo == TRSMUpper ? CblasUpper :  CblasLower,
+    side == Left ? CblasLeft :  CblasRight,
+    uplo == Upper ? CblasUpper :  CblasLower,
     transA ? CblasTrans : CblasNoTrans, diag ? CblasUnit : CblasNonUnit,
     B.rows, B.cols,
     alpha, &A, A.rows, &B, B.rows
