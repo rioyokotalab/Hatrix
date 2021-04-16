@@ -14,6 +14,9 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 
   LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, ipiv.data());
 
+  // U: set lower triangular matrix to 0
+  LAPACKE_dlaset(LAPACK_COL_MAJOR, 'L', U.rows, U.cols, 0, 0, &L, U.rows);
+
   // copy out U and L
   int n_diag = U.min_dim();
   for (int j = 0; j < n_diag; ++j) {
