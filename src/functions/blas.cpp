@@ -1,30 +1,36 @@
+#include "Hatrix/functions/blas.h"
+
 #include "Hatrix/classes/Matrix.h"
 
-#include "mkl.h"
+#include "mkl_cblas.h"
 
 
 namespace Hatrix {
 
 void gemm(
   const Matrix& A, const Matrix& B, Matrix& C,
-  char transa, char transb, double alpha, double beta
+  bool transA, bool transB, double alpha, double beta
 ) {
-  dgemm(
-    &transa, &transb,
-    &C.rows, &C.cols, &A.cols,
-    &alpha, A.data_, &A.rows, B.data_, &B.rows,
-    &beta, C.data_, &C.rows
+  cblas_dgemm(
+    CblasColMajor,
+    transA ? CblasTrans : CblasNoTrans, transB ? CblasTrans : CblasNoTrans,
+    A.rows, C.cols, A.cols,
+    alpha, &A, A.rows, &B, B.rows,
+    beta, &C, C.rows
   );
 };
 
 void trsm(
   const Matrix& A, Matrix& B,
-  char side, char uplo, char transa, char diag, double alpha
+  int side, int uplo, bool transA, bool diag, double alpha
 ) {
-  dtrsm(
-    &side, &uplo, &transa, &diag,
-    &B.rows, &B.cols, &alpha,
-    A.data_, &A.rows, B.data_, &B.rows
+  cblas_dtrsm(
+    CblasColMajor,
+    side == TRSMLeft ? CblasLeft :  CblasRight,
+    uplo == TRSMUpper ? CblasUpper :  CblasLower,
+    transA ? CblasTrans : CblasNoTrans, diag ? CblasUnit : CblasNonUnit,
+    B.rows, B.cols,
+    alpha, &A, A.rows, &B, B.rows
   );
 }
 

@@ -15,19 +15,20 @@ void test_getrf(int m, int n, double value) {
   for (int i=0; i<n_diag; ++i){
     A(i,i) += d--;
   }
-  Hatrix::Matrix L(m, n_diag), U(n_diag, n), A_check(m, n);
+  Hatrix::Matrix A_copy(A);
+
+  Hatrix::Matrix L(m, n_diag), U(n_diag, n), A_rebuilt(m, n);
   Hatrix::getrf(A, L, U);
 
-  Hatrix::gemm(L, U, A_check, 'N', 'N', 1, 0);
+  Hatrix::gemm(L, U, A_rebuilt, false, false, 1, 0);
 
   // Check result
   for (int i=0; i<A.rows; ++i) {
     for (int j=0; j<A.cols; ++j) {
-      EXPECT_DOUBLE_EQ(A(i, j), A_check(i, j));
+      EXPECT_DOUBLE_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }
 }
-
 
 TEST(LAPACKTests, getrf) {
   test_getrf(8, 8, 0.5);

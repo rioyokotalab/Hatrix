@@ -36,30 +36,30 @@ TEST(BlockDense, getrf) {
     x1(i, 0) = block_size+i+1;
   }
   Hatrix::Matrix b0(block_size, 1), b1(block_size, 1);
-  Hatrix::gemm(A[0][0], x0, b0, 'N', 'N', 1, 0);
-  Hatrix::gemm(A[0][1], x1, b0, 'N', 'N', 1, 1);
-  Hatrix::gemm(A[1][0], x0, b1, 'N', 'N', 1, 0);
-  Hatrix::gemm(A[1][1], x1, b1, 'N', 'N', 1, 1);
+  Hatrix::gemm(A[0][0], x0, b0, false, false, 1, 0);
+  Hatrix::gemm(A[0][1], x1, b0, false, false, 1, 1);
+  Hatrix::gemm(A[1][0], x0, b1, false, false, 1, 0);
+  Hatrix::gemm(A[1][1], x1, b1, false, false, 1, 1);
 
   // Block LU
   Hatrix::Matrix L0(block_size, block_size);
   Hatrix::Matrix U0(block_size, block_size);
   Hatrix::getrf(A[0][0], L0, U0);
-  Hatrix::trsm(L0, A[0][1], 'L', 'L', 'N', 'U', 1);
-  Hatrix::trsm(U0, A[1][0], 'R', 'U', 'N', 'N', 1);
-  Hatrix::gemm(A[1][0], A[0][1], A[1][1], 'N', 'N', -1, 1);
+  Hatrix::trsm(L0, A[0][1], Hatrix::TRSMLeft, Hatrix::TRSMLower, false, true, 1);
+  Hatrix::trsm(U0, A[1][0], Hatrix::TRSMRight, Hatrix::TRSMUpper, false, false, 1);
+  Hatrix::gemm(A[1][0], A[0][1], A[1][1], false, false, -1, 1);
   Hatrix::Matrix L1(block_size, block_size);
   Hatrix::Matrix U1(block_size, block_size);
   Hatrix::getrf(A[1][1], L1, U1);
 
   // Forward substitution
-  Hatrix::trsm(L0, b0, 'L', 'L', 'N', 'U', 1);
-  Hatrix::gemm(A[1][0], b0, b1, 'N', 'N', -1, 1);
-  Hatrix::trsm(L1, b1, 'L', 'L', 'N', 'U', 1);
+  Hatrix::trsm(L0, b0, Hatrix::TRSMLeft, Hatrix::TRSMLower, false, true, 1);
+  Hatrix::gemm(A[1][0], b0, b1, false, false, -1, 1);
+  Hatrix::trsm(L1, b1, Hatrix::TRSMLeft, Hatrix::TRSMLower, false, true, 1);
   // Backward substitution
-  Hatrix::trsm(U1, b1, 'L', 'U', 'N', 'N', 1);
-  Hatrix::gemm(A[0][1], b1, b0, 'N', 'N', -1, 1);
-  Hatrix::trsm(U0, b0, 'L', 'U', 'N', 'N', 1);
+  Hatrix::trsm(U1, b1, Hatrix::TRSMLeft, Hatrix::TRSMUpper, false, false, 1);
+  Hatrix::gemm(A[0][1], b1, b0, false, false, -1, 1);
+  Hatrix::trsm(U0, b0, Hatrix::TRSMLeft, Hatrix::TRSMUpper, false, false, 1);
 
   // Check result
   for (int i=0; i<block_size; ++i) {

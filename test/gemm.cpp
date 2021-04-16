@@ -12,7 +12,7 @@ TEST(BLASTests, gemm) {
   B = 4;
   C = 1;
   Hatrix::Matrix A_check(A), B_check(B), C_check(C);
-  Hatrix::gemm(A, B, C, 'N', 'N', 1., 1.);
+  Hatrix::gemm(A, B, C, false, false, 1., 1.);
 
   // Manual gemm
   for (int i=0; i<A.rows; ++i) {

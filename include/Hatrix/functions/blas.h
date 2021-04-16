@@ -1,15 +1,22 @@
 namespace Hatrix {
 
+enum {
+  TRSMLeft,
+  TRSMRight,
+  TRSMUpper,
+  TRSMLower
+};
+
 class Matrix;
 
 void gemm(
   const Matrix& A, const Matrix& B, Matrix& C,
-  char transa, char transb, double alpha, double beta
+  bool transA, bool transB, double alpha, double beta
 );
 
 void trsm(
   const Matrix& A, Matrix& B,
-  char side, char uplo, char transa, char diag, double alpha
+  int side, int uplo, bool transA, bool diag, double alpha
 );
 
 } // namespace Hatrix
