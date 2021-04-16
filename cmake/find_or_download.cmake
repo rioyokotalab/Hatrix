@@ -1,4 +1,4 @@
-macro(find_or_download PACKAGE)
+function(find_or_download PACKAGE)
   set(options EXACT PKG_CONFIG INSTALL_WITH_Hatrix)
   set(oneValueArgs VERSION)
   cmake_parse_arguments(ARGS
@@ -95,4 +95,4 @@ macro(find_or_download PACKAGE)
     endif()
     message(STATUS "Using ${PACKAGE} from ${DEPENDENCY_INSTALL_PREFIX}.")
   endif()
-endmacro()
+endfunction()
