@@ -55,4 +55,14 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
   );
 }
 
+void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V){
+  std::vector<double> Sdiag(S.rows);
+  std::vector<double> work(S.rows-1);
+  LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', A.rows, A.cols, &A, A.rows, Sdiag.data(), &U, U.rows, &V, V.rows, work.data());
+  S = 0;
+  for(int i=0; i<S.rows; i++){
+    S(i, i) = Sdiag[i];
+  }
+}
+
 } // namespace Hatrix
