@@ -5,11 +5,17 @@
 
 #include <algorithm>
 #include <vector>
+#include <cassert>
 
 
 namespace Hatrix {
 
 void lu(Matrix& A, Matrix& L, Matrix& U) {
+  // check dimensions
+  assert(L.rows == A.rows);
+  assert(L.cols == U.rows && L.cols == A.min_dim());
+  assert(U.cols == A.cols);
+
   std::vector<int> ipiv(std::min(A.rows, A.cols));
 
   LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, ipiv.data());
@@ -34,6 +40,11 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 }
 
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
+  // check dimensions
+  assert(Q.rows == A.rows);
+  assert(Q.cols == R.rows);
+  assert(R.cols == A.cols);
+
   int k = std::min(A.rows, A.cols);
   std::vector<double> tau(k);
   LAPACKE_dgeqrf(
@@ -54,6 +65,12 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
 }
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V){
+    // check dimensions
+  assert(U.rows == A.rows);
+  assert(S.cols == S.rows && S.cols == A.min_dim());
+  assert(U.cols == S.cols && V.rows == S.rows);
+  assert(V.cols == A.cols);
+
   std::vector<double> Sdiag(S.rows);
   std::vector<double> work(S.rows-1);
   LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', A.rows, A.cols, &A, A.rows, Sdiag.data(), &U, U.rows, &V, V.rows, work.data());
