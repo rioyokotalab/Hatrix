@@ -2,18 +2,19 @@
 
 #include <cassert>
 #include <cuda.h>
+#include <cuda_runtime_api.h>
 
 namespace Hatrix {
 
 Matrix::~Matrix() { cudaFree(data_); }
 
 Matrix::Matrix(int rows, int cols) : rows(rows), cols(cols) {
-  cudaMallocManaged(reinterpret_cast<void**>(data_), rows*cols*sizeof(double));
+  cudaMallocManaged(reinterpret_cast<void**>(&data_), rows*cols*sizeof(double));
   cudaMemset(data_, 0, rows*cols*sizeof(double));
 }
 
 Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
-  cudaMallocManaged(reinterpret_cast<void**>(data_), rows*cols*sizeof(double));
+  cudaMallocManaged(reinterpret_cast<void**>(&data_), rows*cols*sizeof(double));
   cudaMemcpy(data_, A.data_, rows*cols*sizeof(double), cudaMemcpyDefault);
 }
 
@@ -41,7 +42,7 @@ void Matrix::shrink(int new_rows, int new_cols) {
   cols = new_cols;
 
   double* new_data_;
-  cudaMallocManaged(reinterpret_cast<void**>(new_data_), rows*cols*sizeof(double));
+  cudaMallocManaged(reinterpret_cast<void**>(&new_data_), rows*cols*sizeof(double));
   cudaMemcpy(new_data_, data_, rows*cols*sizeof(double), cudaMemcpyDefault);
   cudaFree(data_);
   data_ = new_data_;
