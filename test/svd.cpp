@@ -5,10 +5,9 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include <random>
-#include <iostream>
 
 class SVDTests : public testing::TestWithParam<std::tuple<int, int>>{};
+class truncSVDTests : public testing::TestWithParam<std::tuple<int, int, int>>{};
 
 void check_frobenius_norm(
   Hatrix::Matrix& A, Hatrix::Matrix& B, double tolerance
@@ -24,8 +23,9 @@ void check_frobenius_norm(
   EXPECT_NEAR(norm_diff, tolerance, 10e-14);
 }
 
-TEST(SVDTests, truncated_svd) {
-  int m = 50, n = 50, rank = 7;
+TEST_P(truncSVDTests, truncatedSVD) {
+  int m, n, rank;
+  std::tie(m, n, rank) = GetParam();
   Hatrix::Matrix A(m, n);
   for (int i=0; i<m; ++i) {
     for (int j=0; j<n; ++j) {
@@ -33,10 +33,11 @@ TEST(SVDTests, truncated_svd) {
     }
   }
 
+  int dmin = A.min_dim();
   Hatrix::Matrix A_check(A);
-  Hatrix::Matrix U(m, std::min(m, n));
-  Hatrix::Matrix S(std::min(m, n), std::min(m, n));
-  Hatrix::Matrix V(std::min(m, n), n);
+  Hatrix::Matrix U(m, dmin);
+  Hatrix::Matrix S(dmin, dmin);
+  Hatrix::Matrix V(dmin, n);
   double tolerance = Hatrix::truncated_svd(A, U, S, V, rank);
 
   Hatrix::Matrix UxS(m, rank);
@@ -46,7 +47,7 @@ TEST(SVDTests, truncated_svd) {
 }
 
 
-TEST_P(SVDTests, svd){
+TEST_P(SVDTests, SVD){
   int m, n;
   std::tie(m, n) = GetParam();
 
@@ -79,6 +80,24 @@ INSTANTIATE_TEST_SUITE_P(
     std::string name = (
       "m" + std::to_string(std::get<0>(info.param))
       + "n" + std::to_string(std::get<1>(info.param))
+    );
+    return name;
+  }
+);
+
+INSTANTIATE_TEST_SUITE_P(
+  LAPACK, truncSVDTests,
+  testing::Values(
+    std::make_tuple(50, 50, 7),
+    std::make_tuple(100, 80, 10),
+    std::make_tuple(90, 120, 14),
+    std::make_tuple(100, 100, 5)
+   ),
+  [](const testing::TestParamInfo<truncSVDTests::ParamType>& info) {
+    std::string name = (
+      "m" + std::to_string(std::get<0>(info.param))
+      + "n" + std::to_string(std::get<1>(info.param))
+      + "k" + std::to_string(std::get<2>(info.param))
     );
     return name;
   }
