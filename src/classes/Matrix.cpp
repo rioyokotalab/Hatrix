@@ -74,6 +74,7 @@ void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
   data_ = (double*)std::realloc(data_, rows*cols*sizeof(double));
 }
 
-int64_t Matrix::min_dim() { return std::min(rows, cols); }
+int64_t Matrix::min_dim() const { return std::min(rows, cols); }
+int64_t Matrix::max_dim() const { return std::max(rows, cols); }
 
 } // namespace Hatrix

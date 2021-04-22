@@ -33,7 +33,9 @@ class Matrix {
   const double& operator()(int64_t i, int64_t j) const;
 
   void shrink(int64_t rows, int64_t cols);
-  int64_t min_dim();
+
+  int64_t min_dim() const;
+  int64_t max_dim() const;
 };
 
 } // namespace Hatrix
