@@ -26,6 +26,7 @@ Matrix& Matrix::operator=(const Matrix& A) {
   cols = A.cols;
   data_ = (double*)std::malloc(rows*cols*sizeof(double));
   std::memcpy(data_, A.data_, rows*cols*sizeof(double));
+  return *this;
 }
 
 Matrix::Matrix(Matrix&& A) : rows(std::move(A.rows)), cols(std::move(A.cols)) {
