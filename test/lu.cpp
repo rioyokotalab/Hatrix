@@ -4,20 +4,23 @@
 
 #include <algorithm>
 #include <iostream>
+#include <cstdint>
+using std::uint64_t;
 
-class LUTests : public testing::TestWithParam<std::tuple<int, int>>{};
+
+class LUTests : public testing::TestWithParam<std::tuple<uint64_t, uint64_t>>{};
 
 TEST_P(LUTests, lu){
-  int m, n;
+  uint64_t m, n;
   std::tie(m, n) = GetParam();
 
   Hatrix::Matrix A(m, n);
   A = 1.5;
 
   //set a large value on the diagonal to avoid pivoting
-  int d = m * n;
-  int n_diag = A.min_dim();
-  for (int i=0; i<n_diag; ++i){
+  uint64_t d = m * n;
+  uint64_t n_diag = A.min_dim();
+  for (uint64_t i=0; i<n_diag; ++i){
     A(i,i) += d--;
   }
 
@@ -27,8 +30,8 @@ TEST_P(LUTests, lu){
   Hatrix::matmul(L, U, A_rebuilt, false, false, 1, 0);
 
     // Check result
-  for (int i=0; i<A.rows; ++i) {
-    for (int j=0; j<A.cols; ++j) {
+  for (uint64_t i=0; i<A.rows; ++i) {
+    for (uint64_t j=0; j<A.cols; ++j) {
       EXPECT_DOUBLE_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }

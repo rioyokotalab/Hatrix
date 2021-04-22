@@ -1,4 +1,6 @@
 #pragma once
+#include <cstdint>
+using std::uint64_t;
 
 
 namespace Hatrix {
@@ -11,6 +13,6 @@ void qr(Matrix& A, Matrix& Q, Matrix& R);
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
 
-double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int rank);
+double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, uint64_t rank);
 
 } // namespace Hatrix

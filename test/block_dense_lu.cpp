@@ -3,11 +3,13 @@
 #include "gtest/gtest.h"
 
 #include <iostream>
+#include <cstdint>
+using std::uint64_t;
 #include <vector>
 
 
 TEST(BlockDense, lu) {
-  int block_size = 4;
+  uint64_t block_size = 4;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
   A[0] = std::vector<Hatrix::Matrix>{
     Hatrix::Matrix(block_size, block_size),
@@ -18,20 +20,20 @@ TEST(BlockDense, lu) {
     Hatrix::Matrix(block_size, block_size)
   };
   // Initialize to non-singular matrix
-  for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
+  for (uint64_t i=0; i<block_size; ++i) for (uint64_t j=0; j<block_size; ++j) {
     A[0][0](i, j) = i*2*block_size + j;
     A[0][1](i, j) = i*2*block_size + block_size + j;
     A[1][0](i, j) = (i+block_size)*2*block_size + j;
     A[1][1](i, j) = (i+block_size)*2*block_size + block_size + j;
   }
-  for (int i=0; i<block_size; ++i) {
+  for (uint64_t i=0; i<block_size; ++i) {
     A[0][0](i, i) += 100;
     A[1][1](i, i) += 100;
   }
 
   // b = A*x
   Hatrix::Matrix x0(block_size, 1), x1(block_size, 1);
-  for (int i=0; i<block_size; ++i) {
+  for (uint64_t i=0; i<block_size; ++i) {
     x0(i, 0) = i+1;
     x1(i, 0) = block_size+i+1;
   }
@@ -62,10 +64,10 @@ TEST(BlockDense, lu) {
   Hatrix::solve_triangular(U0, b0, Hatrix::Left, Hatrix::Upper, false);
 
   // Check result
-  for (int i=0; i<block_size; ++i) {
+  for (uint64_t i=0; i<block_size; ++i) {
     EXPECT_DOUBLE_EQ(x0(i, 0), b0(i, 0));
   }
-  for (int i=0; i<block_size; ++i) {
+  for (uint64_t i=0; i<block_size; ++i) {
     EXPECT_DOUBLE_EQ(x1(i, 0), b1(i, 0));
   }
 }

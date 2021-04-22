@@ -1,16 +1,20 @@
 #pragma once
+#include <cstdint>
+using std::uint64_t;
+
+
 namespace Hatrix {
 
 class Matrix {
  public:
   double* data_;
-  int rows, cols;
+  uint64_t rows, cols;
 
   Matrix() = delete;
 
   ~Matrix();
 
-  Matrix(int rows, int cols);
+  Matrix(uint64_t rows, uint64_t cols);
 
   Matrix(const Matrix& A);
 
@@ -25,11 +29,11 @@ class Matrix {
   double* operator&();
   const double* operator&() const;
 
-  double& operator()(int i, int j);
-  const double& operator()(int i, int j) const;
+  double& operator()(uint64_t i, uint64_t j);
+  const double& operator()(uint64_t i, uint64_t j) const;
 
-  void shrink(int rows, int cols);
-  int min_dim();
+  void shrink(uint64_t rows, uint64_t cols);
+  uint64_t min_dim();
 };
 
 } // namespace Hatrix
