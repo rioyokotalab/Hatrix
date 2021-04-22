@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-using std::uint64_t;
+using std::int64_t;
 
 
 namespace Hatrix {
@@ -8,13 +8,13 @@ namespace Hatrix {
 class Matrix {
  public:
   double* data_;
-  uint64_t rows, cols;
+  int64_t rows, cols;
 
   Matrix() = delete;
 
   ~Matrix();
 
-  Matrix(uint64_t rows, uint64_t cols);
+  Matrix(int64_t rows, int64_t cols);
 
   Matrix(const Matrix& A);
 
@@ -29,11 +29,11 @@ class Matrix {
   double* operator&();
   const double* operator&() const;
 
-  double& operator()(uint64_t i, uint64_t j);
-  const double& operator()(uint64_t i, uint64_t j) const;
+  double& operator()(int64_t i, int64_t j);
+  const double& operator()(int64_t i, int64_t j) const;
 
-  void shrink(uint64_t rows, uint64_t cols);
-  uint64_t min_dim();
+  void shrink(int64_t rows, int64_t cols);
+  int64_t min_dim();
 };
 
 } // namespace Hatrix

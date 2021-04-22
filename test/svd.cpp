@@ -6,8 +6,9 @@
 #include <cassert>
 #include <iostream>
 
-class SVDTests : public testing::TestWithParam<std::tuple<int, int>>{};
-class truncSVDTests : public testing::TestWithParam<std::tuple<int, int, int>>{};
+class SVDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>>{};
+class truncSVDTests
+: public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>>{};
 
 void check_frobenius_norm(
   Hatrix::Matrix& A, Hatrix::Matrix& B, double tolerance
@@ -15,8 +16,8 @@ void check_frobenius_norm(
   assert(A.rows == B.rows);
   assert(A.cols == B.cols);
   double norm_diff = 0;
-  for (int i=0; i<A.rows; ++i) {
-    for (int j=0; j<A.cols; ++j) {
+  for (int64_t i=0; i<A.rows; ++i) {
+    for (int64_t j=0; j<A.cols; ++j) {
       norm_diff += (A(i, j) - B(i, j)) * (A(i, j) - B(i, j));
     }
   }
@@ -24,16 +25,16 @@ void check_frobenius_norm(
 }
 
 TEST_P(truncSVDTests, truncatedSVD) {
-  int m, n, rank;
+  int64_t m, n, rank;
   std::tie(m, n, rank) = GetParam();
   Hatrix::Matrix A(m, n);
-  for (int i=0; i<m; ++i) {
-    for (int j=0; j<n; ++j) {
+  for (int64_t i=0; i<m; ++i) {
+    for (int64_t j=0; j<n; ++j) {
       A(i, j) = 1./std::abs(i - j+n);
     }
   }
 
-  int dmin = A.min_dim();
+  int64_t dmin = A.min_dim();
   Hatrix::Matrix A_check(A);
   Hatrix::Matrix U(m, dmin);
   Hatrix::Matrix S(dmin, dmin);
@@ -48,13 +49,13 @@ TEST_P(truncSVDTests, truncatedSVD) {
 
 
 TEST_P(SVDTests, SVD){
-  int m, n;
+  int64_t m, n;
   std::tie(m, n) = GetParam();
 
   Hatrix::Matrix A(m, n);
   A = 5.5;
 
-  int s_dim = A.min_dim();
+  int64_t s_dim = A.min_dim();
   Hatrix::Matrix A_copy(A);
   Hatrix::Matrix U(m, s_dim), S(s_dim, s_dim), V(s_dim, n), A_rebuilt(m, n);
   Hatrix::svd(A, U, S, V);
@@ -63,8 +64,8 @@ TEST_P(SVDTests, SVD){
   Hatrix::matmul(temp, V, A_rebuilt, false, false, 1, 0);
 
     // Check result
-  for (int i=0; i<A.rows; ++i) {
-    for (int j=0; j<A.cols; ++j) {
+  for (int64_t i=0; i<A.rows; ++i) {
+    for (int64_t j=0; j<A.cols; ++j) {
       EXPECT_DOUBLE_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }

@@ -3,18 +3,18 @@
 #include "gtest/gtest.h"
 
 #include <cstdint>
-using std::uint64_t;
+using std::int64_t;
 #include <iomanip>
 #include <sstream>
 #include <tuple>
 
 
 class MatMulTests : public testing::TestWithParam<
-  std::tuple<uint64_t, uint64_t, uint64_t, bool, bool, double, double>
+  std::tuple<int64_t, int64_t, int64_t, bool, bool, double, double>
 > {};
 
 TEST_P(MatMulTests, matmul) {
-  uint64_t M, N, K;
+  int64_t M, N, K;
   bool transA, transB;
   double alpha, beta;
   std::tie(M, K, N, transA, transB, alpha, beta) = GetParam();
@@ -28,13 +28,13 @@ TEST_P(MatMulTests, matmul) {
   Hatrix::matmul(A, B, C, transA, transB, alpha, beta);
 
   // Manual matmul
-  for (uint64_t i=0; i<M; ++i) {
-    for (uint64_t j=0; j<N; ++j) {
+  for (int64_t i=0; i<M; ++i) {
+    for (int64_t j=0; j<N; ++j) {
       C_check(i, j) = (
         beta*C_check(i, j) +
         alpha * (transA ? A(0, i) : A(i, 0)) * (transB ? B(j, 0) : B(0, j))
       );
-      for (uint64_t k=1; k<K; ++k) {
+      for (int64_t k=1; k<K; ++k) {
         C_check(i, j) += (
           alpha * (transA ? A(k, i) : A(i, k)) * (transB ? B(j, k) : B(k, j))
         );
@@ -43,8 +43,8 @@ TEST_P(MatMulTests, matmul) {
   }
 
   // Check result
-  for (uint64_t i=0; i<M; ++i) {
-    for (uint64_t j=0; j<N; ++j) {
+  for (int64_t i=0; i<M; ++i) {
+    for (int64_t j=0; j<N; ++j) {
       ASSERT_DOUBLE_EQ(C_check(i, j), C(i, j));
       // EXPECT_DOUBLE_EQ(C_check(i, j), C(i, j));
     }
