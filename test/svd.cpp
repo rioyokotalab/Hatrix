@@ -31,7 +31,9 @@ TEST(SVDTests, truncated_svd) {
 
   Hatrix::matmul(A, B, C, false, false, 1, 0);
   Hatrix::Matrix C_copy(C);
-  Hatrix::Matrix U(m, m), S(m, m), V(m, n);
+  Hatrix::Matrix U(m, std::min(m, n));
+  Hatrix::Matrix S(std::min(m, n), std::min(m, n));
+  Hatrix::Matrix V(std::min(m, n), n);
   Hatrix::svd(C, U, S, V);
 
   U.shrink(m, k);
