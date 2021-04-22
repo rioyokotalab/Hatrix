@@ -18,7 +18,7 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
   assert(L.cols == U.rows && L.cols == A.min_dim());
   assert(U.cols == A.cols);
 
-  std::vector<int> ipiv(std::min(A.rows, A.cols));
+  std::vector<int> ipiv(A.min_dim());
 
   LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, ipiv.data());
 
@@ -47,7 +47,7 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
   assert(Q.cols == R.rows);
   assert(R.cols == A.cols);
 
-  uint64_t k = std::min(A.rows, A.cols);
+  uint64_t k = A.min_dim();
   std::vector<double> tau(k);
   LAPACKE_dgeqrf(
     LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, tau.data()
