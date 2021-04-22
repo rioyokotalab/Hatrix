@@ -4,7 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
-#include <iostream>
+#include <tuple>
 
 class SVDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>>{};
 class truncSVDTests
@@ -30,7 +30,7 @@ TEST_P(truncSVDTests, truncatedSVD) {
   Hatrix::Matrix A(m, n);
   for (int64_t i=0; i<m; ++i) {
     for (int64_t j=0; j<n; ++j) {
-      A(i, j) = 1./std::abs(i - j+n);
+      A(i, j) = 1.0 / std::abs(i - j + n);
     }
   }
 
