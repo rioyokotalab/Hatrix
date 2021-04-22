@@ -43,6 +43,7 @@ add_library(Hatrix
   src/util/matrix_generators.cpp
   src/util/norms.cpp
 )
+target_compile_features(Hatrix PUBLIC cxx_std_17)
 
 target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 
@@ -53,6 +54,8 @@ target_include_directories(Hatrix
   PRIVATE
     $ENV{MKLROOT}/include
 )
+
+add_subdirectory(examples)
 
 if (${Hatrix_BUILD_TESTS})
   enable_testing()

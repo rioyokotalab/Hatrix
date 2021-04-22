@@ -1,0 +1,2 @@
+add_executable(construct_BLR_matrix construct_BLR_matrix.cpp)
+target_link_libraries(construct_BLR_matrix Hatrix)

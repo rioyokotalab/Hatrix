@@ -7,10 +7,11 @@ namespace Hatrix {
 
 class Matrix {
  public:
-  double* data_;
-  int64_t rows, cols;
+  double* data_ = nullptr;
+  int64_t rows = 0;
+  int64_t cols = 0;
 
-  Matrix() = delete;
+  Matrix() = default;
 
   ~Matrix();
 
