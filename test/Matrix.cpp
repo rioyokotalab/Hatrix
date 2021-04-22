@@ -65,11 +65,11 @@ TEST(MatrixTests, MoveAssignment) {
   for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
     A(i, j) = i*block_size+j;
   }
-  Hatrix::Matrix A_copy(A);
+  Hatrix::Matrix A_copy(A), A_move(A);
 
-  Hatrix::Matrix A_move = std::move(A);
+  A_move = std::move(A);
   // Check result
   for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
     EXPECT_EQ(A_copy(i, j), A_move(i, j));
-  }  
+  }
 }

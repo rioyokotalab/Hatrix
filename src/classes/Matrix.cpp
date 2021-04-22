@@ -19,6 +19,13 @@ Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
   std::memcpy(data_, A.data_, rows*cols*sizeof(double));
 }
 
+Matrix& Matrix::operator=(const Matrix& A) {
+  rows = A.rows;
+  cols = A.cols;
+  data_ = (double*)std::malloc(rows*cols*sizeof(double));
+  std::memcpy(data_, A.data_, rows*cols*sizeof(double));
+}
+
 Matrix::Matrix(Matrix&& A) : rows(std::move(A.rows)),
                              cols(std::move(A.cols)) {
   data_ = A.data_;
@@ -26,11 +33,9 @@ Matrix::Matrix(Matrix&& A) : rows(std::move(A.rows)),
 }
 
 Matrix& Matrix::operator=(Matrix&& A) {
-  rows = A.rows;
-  cols = A.cols;
+  std::swap(rows, A.rows);
+  std::swap(cols, A.cols);
   std::swap(data_, A.data_);
-  A.data_ = nullptr;
-
   return *this;
 }
 
