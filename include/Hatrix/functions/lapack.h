@@ -1,3 +1,6 @@
+#pragma once
+
+
 namespace Hatrix {
 
 class Matrix;

@@ -1,3 +1,4 @@
+#pragma once
 #include "classes/Matrix.h"
 
 #include "functions/blas.h"
