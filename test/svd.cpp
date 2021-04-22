@@ -34,20 +34,12 @@ TEST(SVDTests, truncated_svd) {
   Hatrix::Matrix U(m, m), S(m, m), V(m, n);
   Hatrix::svd(C, U, S, V);
 
-  Hatrix::Matrix truncU(m, k), truncS(k, k), truncV(k, n);
-  for (int i=0; i<m; ++i) {
-    for (int j=0; j<k; ++j) {
-      truncU(i,j) = U(i,j);
-      truncV(j,i) = V(j,i);
-    }
-  }
-  for (int i=0; i<k; ++i) {
-    truncS(i,i) = S(i,i);
-  }
-
+  U.shrink(m, k);
+  S.shrink(k, k);
+  V.shrink(k, n);
   Hatrix::Matrix temp(m,k), C_rec(m,n);
-  Hatrix::matmul(truncU, truncS, temp, false, false, 1, 0);
-  Hatrix::matmul(temp, truncV, C_rec, false, false, 1, 0);
+  Hatrix::matmul(U, S, temp, false, false, 1, 0);
+  Hatrix::matmul(temp, V, C_rec, false, false, 1, 0);
 
   for (int i=0; i<m; ++i) {
     for (int j=0; j<n; ++j) {
@@ -55,6 +47,7 @@ TEST(SVDTests, truncated_svd) {
     }
   }
 }
+
 
 TEST_P(SVDTests, svd){
   int m, n;
