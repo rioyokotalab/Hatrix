@@ -43,3 +43,33 @@ TEST(MatrixTests, shrink) {
     EXPECT_EQ(A(i, j), A_shrink(i, j));
   }
 }
+
+TEST(MatrixTests, MoveConstructor) {
+  int block_size = 16;
+  Hatrix::Matrix A(block_size, block_size);
+  for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
+    A(i, j) = i*block_size+j;
+  }
+  Hatrix::Matrix A_copy = A;
+
+  Hatrix::Matrix A_move(std::move(A));
+  // Check result
+  for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
+    EXPECT_EQ(A_copy(i, j), A_move(i, j));
+  }
+}
+
+TEST(MatrixTests, MoveAssignment) {
+  int block_size = 16;
+  Hatrix::Matrix A(block_size, block_size);
+  for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
+    A(i, j) = i*block_size+j;
+  }
+  Hatrix::Matrix A_copy(A);
+
+  Hatrix::Matrix A_move = std::move(A);
+  // Check result
+  for (int i=0; i<block_size; ++i) for (int j=0; j<block_size; ++j) {
+    EXPECT_EQ(A_copy(i, j), A_move(i, j));
+  }  
+}
