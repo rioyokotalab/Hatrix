@@ -4,8 +4,57 @@
 
 #include <algorithm>
 #include <iostream>
+#include <random>
+#include <iostream>
 
 class SVDTests : public testing::TestWithParam<std::tuple<int, int>>{};
+
+TEST(SVDTests, truncated_svd) {
+  int m, n, k;
+  m = n = 50;
+  k = 5;
+
+  Hatrix::Matrix A(m,k);
+  Hatrix::Matrix B(k,n);
+  Hatrix::Matrix C(m,n);
+
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  gen.seed(0);
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+  for (int i=0; i<m; ++i) {
+    for (int j=0; j<k; ++j) {
+      A(i,j) = dist(gen);
+      B(j,i) = dist(gen);
+    }
+  }
+
+  Hatrix::matmul(A, B, C, false, false, 1, 0);
+  Hatrix::Matrix C_copy(C);
+  Hatrix::Matrix U(m, m), S(m, m), V(m, n);
+  Hatrix::svd(C, U, S, V);
+
+  Hatrix::Matrix truncU(m, k), truncS(k, k), truncV(k, n);
+  for (int i=0; i<m; ++i) {
+    for (int j=0; j<k; ++j) {
+      truncU(i,j) = U(i,j);
+      truncV(j,i) = V(j,i);
+    }
+  }
+  for (int i=0; i<k; ++i) {
+    truncS(i,i) = S(i,i);
+  }
+
+  Hatrix::Matrix temp(m,k), C_rec(m,n);
+  Hatrix::matmul(truncU, truncS, temp, false, false, 1, 0);
+  Hatrix::matmul(temp, truncV, C_rec, false, false, 1, 0);
+
+  for (int i=0; i<m; ++i) {
+    for (int j=0; j<n; ++j) {
+      EXPECT_NEAR(C_copy(i, j), C_rec(i, j), 10e-14);
+    }
+  }
+}
 
 TEST_P(SVDTests, svd){
   int m, n;
