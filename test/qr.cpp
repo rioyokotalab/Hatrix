@@ -14,16 +14,16 @@ class QRTests
 TEST_P(QRTests, qr) {
   int64_t m, n, k;
   std::tie(m, n, k) = GetParam();
-  Hatrix::Matrix A(m, n), Q(m, k), R(k, n);
-  Hatrix::Matrix QR(m, n);
-  A = 4.0;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix Q(m, k), R(k, n);
   Hatrix::Matrix A_copy(A);
   Hatrix::qr(A, Q, R);
+  Hatrix::Matrix QR(m, n);
   Hatrix::matmul(Q, R, QR, false, false, 1., 0.);
   // Check accuracy
   for (int64_t i=0; i<QR.rows; i++) {
     for (int64_t j=0; j<QR.cols; j++) {
-      EXPECT_NEAR(A_copy(i, j), QR(i, j), 10e-14);
+      EXPECT_FLOAT_EQ(A_copy(i, j), QR(i, j));
     }
   }
   // Check orthogonality

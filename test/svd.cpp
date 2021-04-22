@@ -27,12 +27,7 @@ void check_frobenius_norm(
 TEST_P(truncSVDTests, truncatedSVD) {
   int64_t m, n, rank;
   std::tie(m, n, rank) = GetParam();
-  Hatrix::Matrix A(m, n);
-  for (int64_t i=0; i<m; ++i) {
-    for (int64_t j=0; j<n; ++j) {
-      A(i, j) = 1.0 / std::abs(i - j + n);
-    }
-  }
+  Hatrix::Matrix A = Hatrix::generate_low_rank_matrix(m, n);
 
   int64_t dmin = A.min_dim();
   Hatrix::Matrix A_check(A);
@@ -52,21 +47,20 @@ TEST_P(SVDTests, SVD){
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
-  Hatrix::Matrix A(m, n);
-  A = 5.5;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
 
   int64_t s_dim = A.min_dim();
   Hatrix::Matrix A_copy(A);
   Hatrix::Matrix U(m, s_dim), S(s_dim, s_dim), V(s_dim, n), A_rebuilt(m, n);
   Hatrix::svd(A, U, S, V);
-  Hatrix::Matrix temp(m, s_dim);
-  Hatrix::matmul(U, S, temp, false, false, 1, 0);
-  Hatrix::matmul(temp, V, A_rebuilt, false, false, 1, 0);
+  Hatrix::Matrix UxS(m, s_dim);
+  Hatrix::matmul(U, S, UxS, false, false, 1, 0);
+  Hatrix::matmul(UxS, V, A_rebuilt, false, false, 1, 0);
 
     // Check result
   for (int64_t i=0; i<A.rows; ++i) {
     for (int64_t j=0; j<A.cols; ++j) {
-      EXPECT_DOUBLE_EQ(A_rebuilt(i, j), A_copy(i, j));
+      EXPECT_FLOAT_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }
 }

@@ -3,3 +3,5 @@
 
 #include "functions/blas.h"
 #include "functions/lapack.h"
+
+#include "util/matrix_generators.h"

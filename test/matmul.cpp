@@ -18,12 +18,13 @@ TEST_P(MatMulTests, matmul) {
   bool transA, transB;
   double alpha, beta;
   std::tie(M, K, N, transA, transB, alpha, beta) = GetParam();
-  Hatrix::Matrix A(transA ? K : M, transA ? M : K);
-  Hatrix::Matrix B(transB ? N : K, transB ? K : N);
-  Hatrix::Matrix C(M, N);
-  A = 2;
-  B = 4;
-  C = 1;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(
+    transA ? K : M, transA ? M : K
+  );
+  Hatrix::Matrix B = Hatrix::generate_random_matrix(
+    transB ? N : K, transB ? K : N
+  );
+  Hatrix::Matrix C = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix C_check(C);
   Hatrix::matmul(A, B, C, transA, transB, alpha, beta);
 
@@ -45,8 +46,7 @@ TEST_P(MatMulTests, matmul) {
   // Check result
   for (int64_t i=0; i<M; ++i) {
     for (int64_t j=0; j<N; ++j) {
-      ASSERT_DOUBLE_EQ(C_check(i, j), C(i, j));
-      // EXPECT_DOUBLE_EQ(C_check(i, j), C(i, j));
+      EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
     }
   }
 }

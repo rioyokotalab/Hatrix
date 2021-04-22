@@ -14,8 +14,7 @@ TEST_P(LUTests, lu){
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
-  Hatrix::Matrix A(m, n);
-  A = 1.5;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
 
   //set a large value on the diagonal to avoid pivoting
   int64_t d = m * n;
@@ -32,7 +31,7 @@ TEST_P(LUTests, lu){
     // Check result
   for (int64_t i=0; i<A.rows; ++i) {
     for (int64_t j=0; j<A.cols; ++j) {
-      EXPECT_DOUBLE_EQ(A_rebuilt(i, j), A_copy(i, j));
+      EXPECT_FLOAT_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }
 }

@@ -40,6 +40,7 @@ add_library(Hatrix
   src/classes/Matrix.cpp
   src/functions/blas.cpp
   src/functions/lapack.cpp
+  src/util/matrix_generators.cpp
 )
 
 target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})

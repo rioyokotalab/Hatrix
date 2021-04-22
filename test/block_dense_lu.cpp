@@ -8,34 +8,28 @@ using std::int64_t;
 
 
 TEST(BlockDense, lu) {
-  int64_t block_size = 4;
+  int64_t block_size = 16;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
   A[0] = std::vector<Hatrix::Matrix>{
-    Hatrix::Matrix(block_size, block_size),
-    Hatrix::Matrix(block_size, block_size)
+    Hatrix::generate_random_matrix(block_size, block_size),
+    Hatrix::generate_random_matrix(block_size, block_size)
   };
   A[1] = std::vector<Hatrix::Matrix>{
-    Hatrix::Matrix(block_size, block_size),
-    Hatrix::Matrix(block_size, block_size)
+    Hatrix::generate_random_matrix(block_size, block_size),
+    Hatrix::generate_random_matrix(block_size, block_size)
   };
-  // Initialize to non-singular matrix
-  for (int64_t i=0; i<block_size; ++i) for (int64_t j=0; j<block_size; ++j) {
-    A[0][0](i, j) = i*2*block_size + j;
-    A[0][1](i, j) = i*2*block_size + block_size + j;
-    A[1][0](i, j) = (i+block_size)*2*block_size + j;
-    A[1][1](i, j) = (i+block_size)*2*block_size + block_size + j;
+  // Add Large values to diagonal to assure no pivoting
+  double d = 4*block_size * block_size;
+  for (int64_t i=0; i<block_size; ++i) {
+    A[0][0](i, i) += d--;
   }
   for (int64_t i=0; i<block_size; ++i) {
-    A[0][0](i, i) += 100;
-    A[1][1](i, i) += 100;
+    A[1][1](i, i) += d--;
   }
 
   // b = A*x
-  Hatrix::Matrix x0(block_size, 1), x1(block_size, 1);
-  for (int64_t i=0; i<block_size; ++i) {
-    x0(i, 0) = i+1;
-    x1(i, 0) = block_size+i+1;
-  }
+  Hatrix::Matrix x0 = Hatrix::generate_random_matrix(block_size, 1);
+  Hatrix::Matrix x1 = Hatrix::generate_random_matrix(block_size, 1);
   Hatrix::Matrix b0(block_size, 1), b1(block_size, 1);
   Hatrix::matmul(A[0][0], x0, b0, false, false, 1, 0);
   Hatrix::matmul(A[0][1], x1, b0, false, false, 1, 1);
@@ -64,9 +58,9 @@ TEST(BlockDense, lu) {
 
   // Check result
   for (int64_t i=0; i<block_size; ++i) {
-    EXPECT_DOUBLE_EQ(x0(i, 0), b0(i, 0));
+    EXPECT_FLOAT_EQ(x0(i, 0), b0(i, 0));
   }
   for (int64_t i=0; i<block_size; ++i) {
-    EXPECT_DOUBLE_EQ(x1(i, 0), b1(i, 0));
+    EXPECT_FLOAT_EQ(x1(i, 0), b1(i, 0));
   }
 }
