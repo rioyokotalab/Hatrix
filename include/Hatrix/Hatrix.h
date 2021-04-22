@@ -5,3 +5,4 @@
 #include "functions/lapack.h"
 
 #include "util/matrix_generators.h"
+#include "util/norms.h"

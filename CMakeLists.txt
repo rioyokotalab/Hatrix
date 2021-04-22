@@ -41,6 +41,7 @@ add_library(Hatrix
   src/functions/blas.cpp
   src/functions/lapack.cpp
   src/util/matrix_generators.cpp
+  src/util/norms.cpp
 )
 
 target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})

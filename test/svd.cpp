@@ -10,20 +10,6 @@ class SVDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>>{};
 class truncSVDTests
 : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>>{};
 
-void check_frobenius_norm(
-  Hatrix::Matrix& A, Hatrix::Matrix& B, double tolerance
-) {
-  assert(A.rows == B.rows);
-  assert(A.cols == B.cols);
-  double norm_diff = 0;
-  for (int64_t i=0; i<A.rows; ++i) {
-    for (int64_t j=0; j<A.cols; ++j) {
-      norm_diff += (A(i, j) - B(i, j)) * (A(i, j) - B(i, j));
-    }
-  }
-  EXPECT_NEAR(norm_diff, tolerance, 10e-14);
-}
-
 TEST_P(truncSVDTests, truncatedSVD) {
   int64_t m, n, rank;
   std::tie(m, n, rank) = GetParam();
@@ -39,7 +25,8 @@ TEST_P(truncSVDTests, truncatedSVD) {
   Hatrix::Matrix UxS(m, rank);
   Hatrix::matmul(U, S, UxS, false, false, 1, 0);
   Hatrix::matmul(UxS, V, A, false, false, 1, 0);
-  check_frobenius_norm(A_check, A, tolerance);
+  double norm_diff = frobenius_norm_diff(A_check, A);
+  EXPECT_NEAR(norm_diff, tolerance, 10e-14);
 }
 
 
