@@ -3,51 +3,46 @@
 #include "gtest/gtest.h"
 
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 #include <random>
 #include <iostream>
 
 class SVDTests : public testing::TestWithParam<std::tuple<int, int>>{};
 
+void check_frobenius_norm(
+  Hatrix::Matrix& A, Hatrix::Matrix& B, double tolerance
+) {
+  assert(A.rows == B.rows);
+  assert(A.cols == B.cols);
+  double norm_diff = 0;
+  for (int i=0; i<A.rows; ++i) {
+    for (int j=0; j<A.cols; ++j) {
+      norm_diff += (A(i, j) - B(i, j)) * (A(i, j) - B(i, j));
+    }
+  }
+  EXPECT_NEAR(norm_diff, tolerance, 10e-14);
+}
+
 TEST(SVDTests, truncated_svd) {
-  int m, n, k;
-  m = n = 50;
-  k = 5;
-
-  Hatrix::Matrix A(m,k);
-  Hatrix::Matrix B(k,n);
-  Hatrix::Matrix C(m,n);
-
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  gen.seed(0);
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
+  int m = 50, n = 50, rank = 7;
+  Hatrix::Matrix A(m, n);
   for (int i=0; i<m; ++i) {
-    for (int j=0; j<k; ++j) {
-      A(i,j) = dist(gen);
-      B(j,i) = dist(gen);
+    for (int j=0; j<n; ++j) {
+      A(i, j) = 1./std::abs(i - j+n);
     }
   }
 
-  Hatrix::matmul(A, B, C, false, false, 1, 0);
-  Hatrix::Matrix C_copy(C);
+  Hatrix::Matrix A_check(A);
   Hatrix::Matrix U(m, std::min(m, n));
   Hatrix::Matrix S(std::min(m, n), std::min(m, n));
   Hatrix::Matrix V(std::min(m, n), n);
-  Hatrix::svd(C, U, S, V);
+  double tolerance = Hatrix::truncated_svd(A, U, S, V, rank);
 
-  U.shrink(m, k);
-  S.shrink(k, k);
-  V.shrink(k, n);
-  Hatrix::Matrix temp(m,k), C_rec(m,n);
-  Hatrix::matmul(U, S, temp, false, false, 1, 0);
-  Hatrix::matmul(temp, V, C_rec, false, false, 1, 0);
-
-  for (int i=0; i<m; ++i) {
-    for (int j=0; j<n; ++j) {
-      EXPECT_NEAR(C_copy(i, j), C_rec(i, j), 10e-14);
-    }
-  }
+  Hatrix::Matrix UxS(m, rank);
+  Hatrix::matmul(U, S, UxS, false, false, 1, 0);
+  Hatrix::matmul(UxS, V, A, false, false, 1, 0);
+  check_frobenius_norm(A_check, A, tolerance);
 }
 
 
