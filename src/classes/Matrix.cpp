@@ -33,8 +33,8 @@ const double& Matrix::operator()(int i, int j) const { return data_[j*rows+i]; }
 void Matrix::shrink(int new_rows, int new_cols) {
   assert(new_rows <= rows);
   assert(new_cols <= cols);
-  for (int i=0; i<new_rows; ++i) {
-    for (int j=0; j<new_cols; ++j) {
+  for (int j=0; j<new_cols; ++j) {
+    for (int i=0; i<new_rows; ++i) {
       data_[j*new_rows+i] = (*this)(i, j);
     }
   }
