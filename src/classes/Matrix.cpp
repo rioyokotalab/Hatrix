@@ -50,8 +50,14 @@ const Matrix& Matrix::operator=(const double a) {
 double* Matrix::operator&() { return data_; }
 const double* Matrix::operator&() const { return data_; }
 
-double& Matrix::operator()(uint64_t i, uint64_t j) { return data_[j*rows+i]; }
+double& Matrix::operator()(uint64_t i, uint64_t j) {
+  assert(i < rows);
+  assert(j < cols);
+  return data_[j*rows+i];
+}
 const double& Matrix::operator()(uint64_t i, uint64_t j) const {
+  assert(i < rows);
+  assert(j < cols);
   return data_[j*rows+i];
 }
 
