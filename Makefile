@@ -4,7 +4,7 @@ include $(TOPSRCDIR)/make.inc
 DIRS := src/classes src/functions
 OBJLIBS := libclasses.a libfunctions.a
 TEST := test
-EXECUTABLES := gemm getrf qr block_dense_lu
+EXECUTABLES := matmul lu qr block_dense_lu Matrix
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -18,13 +18,16 @@ LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS)  -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-gemm: $(TEST)/gemm.o dirs
+matmul: $(TEST)/matmul.o dirs
 	$(LINK_EXECUTABLE)
 
-getrf: $(TEST)/getrf.o dirs
+lu: $(TEST)/lu.o dirs
 	$(LINK_EXECUTABLE)
 
 qr: $(TEST)/qr.o dirs
+	$(LINK_EXECUTABLE)
+
+Matrix: $(TEST)/Matrix.o dirs
 	$(LINK_EXECUTABLE)
 
 block_dense_lu: $(TEST)/block_dense_lu.o dirs
