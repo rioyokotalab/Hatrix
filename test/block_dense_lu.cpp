@@ -2,7 +2,6 @@
 
 #include "gtest/gtest.h"
 
-#include <iostream>
 #include <cstdint>
 using std::uint64_t;
 #include <vector>

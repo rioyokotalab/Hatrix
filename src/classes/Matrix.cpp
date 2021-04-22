@@ -1,11 +1,11 @@
 #include "Hatrix/classes/Matrix.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 using std::uint64_t;
 #include <cstdlib>
 #include <cstring>
-#include <algorithm>
 
 
 namespace Hatrix {
@@ -28,8 +28,7 @@ Matrix& Matrix::operator=(const Matrix& A) {
   std::memcpy(data_, A.data_, rows*cols*sizeof(double));
 }
 
-Matrix::Matrix(Matrix&& A) : rows(std::move(A.rows)),
-                             cols(std::move(A.cols)) {
+Matrix::Matrix(Matrix&& A) : rows(std::move(A.rows)), cols(std::move(A.cols)) {
   data_ = A.data_;
   A.data_ = nullptr;
 }

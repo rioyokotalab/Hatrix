@@ -4,10 +4,10 @@
 #include "mkl_lapacke.h"
 
 #include <algorithm>
-#include <vector>
 #include <cassert>
 #include <cstdint>
 using std::uint64_t;
+#include <vector>
 
 
 namespace Hatrix {

@@ -2,10 +2,10 @@
 
 #include "gtest/gtest.h"
 
-#include <algorithm>
-#include <iostream>
 #include <cstdint>
 using std::uint64_t;
+#include <iostream>
+#include <tuple>
 
 
 class QRTests
