@@ -56,10 +56,9 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
   for (int64_t j=0; j<R.cols; j++) {
     cblas_dcopy(std::min(j+1, R.rows), &A(0, j), 1, &R(0, j), 1);
   }
-  //Copy lower triangular of A_copy to Q
-  for (int64_t j=0; j<Q.cols; j++) {
-    Q(j,j) = 1.0;
-    cblas_dcopy(Q.rows-j-1, &A(j+1, j), 1, &Q(j+1, j), 1);
+  //Copy lower triangular of A to Q
+  for (int64_t j=0; j<std::min(A.cols, Q.cols); j++) {
+    cblas_dcopy(Q.rows-j, &A(j, j), 1, &Q(j, j), 1);
   }
   LAPACKE_dorgqr(
     LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.rows, tau.data()
