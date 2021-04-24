@@ -1,7 +1,12 @@
 #include "Hatrix/classes/Matrix.h"
 
+#ifdef USE_MKL
 #include "mkl_cblas.h"
 #include "mkl_lapacke.h"
+#else
+#include "cblas.h"
+#include "lapacke.h"
+#endif
 
 #include <algorithm>
 #include <cassert>
