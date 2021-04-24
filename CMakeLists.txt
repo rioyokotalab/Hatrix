@@ -45,7 +45,7 @@ add_library(Hatrix
   src/util/matrix_generators.cpp
   src/util/norms.cpp
 )
-target_compile_features(Hatrix PUBLIC cxx_std_14)
+target_compile_features(Hatrix PUBLIC cxx_std_11)
 
 target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 
