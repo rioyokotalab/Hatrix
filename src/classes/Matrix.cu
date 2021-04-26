@@ -1,14 +1,16 @@
 #include "Hatrix/classes/Matrix.h"
 
+#include <cstdint>
 #include <cassert>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
+#include <stdio.h>
 
 namespace Hatrix {
 
 Matrix::~Matrix() { cudaFree(data_); }
 
-Matrix::Matrix(int rows, int cols) : rows(rows), cols(cols) {
+Matrix::Matrix(int64_t rows, int64_t cols) : rows(rows), cols(cols) {
   cudaMallocManaged(reinterpret_cast<void**>(&data_), rows*cols*sizeof(double));
   cudaMemset(data_, 0, rows*cols*sizeof(double));
 }
@@ -19,7 +21,7 @@ Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
 }
 
 const Matrix& Matrix::operator=(const double a) {
-  for (int i=0; i<rows; ++i) for (int j=0; j<cols; ++j)
+  for (int i = 0; i < rows; ++i) for (int j = 0; j < cols; ++j)
     (*this)(i, j) = a;
   return *this;
 }
@@ -27,10 +29,10 @@ const Matrix& Matrix::operator=(const double a) {
 double* Matrix::operator&() { return data_; }
 const double* Matrix::operator&() const { return data_; }
 
-double& Matrix::operator()(int i, int j) { return data_[j*rows+i]; }
-const double& Matrix::operator()(int i, int j) const { return data_[j*rows+i]; }
+double& Matrix::operator()(int64_t i, int64_t j) { return data_[j*rows+i]; }
+const double& Matrix::operator()(int64_t i, int64_t j) const { return data_[j*rows+i]; }
 
-void Matrix::shrink(int new_rows, int new_cols) {
+void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
   assert(new_rows <= rows);
   assert(new_cols <= cols);
   for (int i=0; i<new_rows; ++i) {
@@ -48,6 +50,7 @@ void Matrix::shrink(int new_rows, int new_cols) {
   data_ = new_data_;
 }
 
-int Matrix::min_dim() { return rows > cols ? cols : rows; }
+int64_t Matrix::min_dim() const { return rows > cols ? cols : rows; }
+int64_t Matrix::max_dim() const { return rows > cols ? rows : cols; }
 
 } // namespace Hatrix

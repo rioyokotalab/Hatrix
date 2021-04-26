@@ -2,24 +2,14 @@
 
 #include "Hatrix/classes/Matrix.h"
 
-#include "Hatrix/handle.h"
+#include "Hatrix/util/handle.h"
 #include "cublas_v2.h"
 #include "cusolverDn.h"
 
 namespace Hatrix {
 
-  cublasHandle_t blasH = nullptr;
-  cusolverDnHandle_t solvH = nullptr;
-
-  void init() {
-    cublasCreate(&blasH);
-    cusolverDnCreate(&solvH);
-  }
-
-  void terminate() {
-    cublasDestroy(blasH); blasH = 0;
-    cusolverDnDestroy(solvH); blasH = 0;
-  }
+  extern cublasHandle_t blasH;
+  extern cusolverDnHandle_t solvH;
 
 void matmul(
   const Matrix& A, const Matrix& B, Matrix& C,

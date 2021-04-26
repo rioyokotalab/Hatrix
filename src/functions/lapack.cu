@@ -1,6 +1,6 @@
 #include "Hatrix/classes/Matrix.h"
 
-#include "Hatrix/handle.h"
+#include "Hatrix/util/handle.h"
 #include "cusolverDn.h"
 #include <algorithm>
 

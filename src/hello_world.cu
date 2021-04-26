@@ -17,7 +17,7 @@ int main() {
 
   cudaDeviceSynchronize();
 
-  // Manual matmul
+  //Manual matmul
   for (int i = 0; i < m; ++i) {
     for (int j = 0; j < n; ++j) {
       for (int k_ = 0; k_ < k; ++k_) {
