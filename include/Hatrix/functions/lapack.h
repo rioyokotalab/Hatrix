@@ -17,6 +17,6 @@ void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
-void gesv_IR(Matrix &A, Matrix &b, int64_t max_iter);
+double norm(const Matrix& A, char norm);
 
 } // namespace Hatrix

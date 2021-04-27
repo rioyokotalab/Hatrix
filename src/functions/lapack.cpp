@@ -147,4 +147,8 @@ double truncated_svd(
   return std::sqrt(expected_err);
 }
 
+double norm(const Matrix& A, char norm){
+  return LAPACKE_dlange(LAPACK_COL_MAJOR, norm, A.rows, A.cols, &A, A.rows);
+}
+
 } // namespace Hatrix
