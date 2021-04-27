@@ -60,11 +60,8 @@ int main() {
       // TODO: Check something for dense blocks?
       continue;
     } else {
-      Hatrix::Matrix UxS(N, rank);
-      Hatrix::matmul(U[i], S[{i, j}], UxS, false, false, 1.0, 0.0);
-      Hatrix::Matrix UxSxV(N, N);
-      Hatrix::matmul(UxS, V[j], UxSxV, false, false, 1.0, 0.0);
-      double norm_diff = Hatrix::frobenius_norm_diff(UxSxV, A[{i, j}]);
+      double norm_diff = Hatrix::frobenius_norm_diff(
+        U[i] * S[{i, j}] * V[j], A[{i, j}]);
       std::cout << tolerances[{i, j}] << " = " << norm_diff << " ?\n";
     }
   }
