@@ -44,7 +44,7 @@ TEST_P(SVDTests, SVD){
   Hatrix::matmul(U, S, UxS, false, false, 1, 0);
   Hatrix::matmul(UxS, V, A_rebuilt, false, false, 1, 0);
 
-    // Check result
+  // Check result
   for (int64_t i=0; i<A.rows; ++i) {
     for (int64_t j=0; j<A.cols; ++j) {
       EXPECT_FLOAT_EQ(A_rebuilt(i, j), A_copy(i, j));
