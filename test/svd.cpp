@@ -11,6 +11,7 @@ class truncSVDTests
 : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>>{};
 
 TEST_P(truncSVDTests, truncatedSVD) {
+  Hatrix::init();
   int64_t m, n, rank;
   std::tie(m, n, rank) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_low_rank_matrix(m, n);
@@ -24,13 +25,17 @@ TEST_P(truncSVDTests, truncatedSVD) {
 
   Hatrix::Matrix UxS(m, rank);
   Hatrix::matmul(U, S, UxS, false, false, 1, 0);
+  Hatrix::sync();
   Hatrix::matmul(UxS, V, A, false, false, 1, 0);
+  Hatrix::sync();
   double norm_diff = frobenius_norm_diff(A_check, A);
   EXPECT_NEAR(norm_diff, tolerance, 10e-14);
+  Hatrix::terminate();
 }
 
 
 TEST_P(SVDTests, SVD){
+  Hatrix::init();
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
@@ -42,7 +47,9 @@ TEST_P(SVDTests, SVD){
   Hatrix::svd(A, U, S, V);
   Hatrix::Matrix UxS(m, s_dim);
   Hatrix::matmul(U, S, UxS, false, false, 1, 0);
+  Hatrix::sync();
   Hatrix::matmul(UxS, V, A_rebuilt, false, false, 1, 0);
+  Hatrix::sync();
 
   // Check result
   for (int64_t i=0; i<A.rows; ++i) {
@@ -50,6 +57,7 @@ TEST_P(SVDTests, SVD){
       EXPECT_FLOAT_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }
+  Hatrix::terminate();
 }
 
 INSTANTIATE_TEST_SUITE_P(
