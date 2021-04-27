@@ -17,7 +17,8 @@ struct hash<std::tuple<int64_t, int64_t>> {
     std::tie(first, second) = pair;
     size_t first_hash = hash<int64_t>()(first);
     first_hash ^= (
-      hash<int64_t>()(second) + 0x9e3779b9 + (first_hash << 6) + (first_hash >> 2)
+      hash<int64_t>()(second) + 0x9e3779b97f4a7c17
+       + (first_hash << 6) + (first_hash >> 2)
     );
     return first_hash;
   }
