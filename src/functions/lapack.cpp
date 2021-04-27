@@ -47,6 +47,46 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
   LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.rows);
 }
 
+void lup(Matrix& A, Matrix& L, Matrix& U, Matrix& P) {
+  // check dimensions
+  assert(L.rows == A.rows);
+  assert(L.cols == U.rows && L.cols == A.min_dim());
+  assert(U.cols == A.cols);
+  assert(P.rows == A.rows && P.cols == A.rows);
+
+  std::vector<int> ipiv(A.min_dim());
+
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, ipiv.data());
+
+  // U: set lower triangular matrix to 0
+  LAPACKE_dlaset(LAPACK_COL_MAJOR, 'L', U.rows, U.cols, 0, 0, &L, U.rows);
+
+  // copy out U and L
+  int64_t n_diag = U.min_dim();
+  for (int64_t j=0; j<n_diag; ++j) {
+    cblas_dcopy(j + 1, &A(0, j), 1, &U(0, j), 1);
+    cblas_dcopy(A.rows - j, &A(j, j), 1, &L(j, j), 1);
+  }
+
+  // copy out the rest of U if trapezoidal
+  if (U.cols > U.rows){
+    cblas_dcopy((U.cols - U.rows) * U.rows, &A(0, n_diag), 1, &U(0, n_diag), 1);
+  }
+
+  // L: set diagonal to 1 and upper triangular matrix to 0
+  LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.rows);
+
+  // create permutation matrix P
+  P = 0;
+  for (size_t i=0; i<ipiv.size(); ++i)
+    P(ipiv[i] - 1 ,i) = 1;
+
+  if (P.rows > ipiv.size()){
+    for (int64_t i=ipiv.size(); i<P.rows; ++i)
+      P(i, i) = 1;
+  }
+}
+
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
   // check dimensions
   assert(Q.rows == A.rows);
@@ -105,6 +145,18 @@ double truncated_svd(
   S.shrink(rank, rank);
   V.shrink(rank, V.cols);
   return std::sqrt(expected_err);
+}
+
+void gesv_IR(Matrix &A, Matrix &b, int64_t max_iter){
+  assert(A.rows == b.rows);
+
+  int64_t mdim = A.min_dim();
+  Matrix L(A.rows, mdim);
+  Matrix U(mdim, A.cols);
+  lu(A, L, U);
+
+
+
 }
 
 } // namespace Hatrix
