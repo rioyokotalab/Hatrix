@@ -39,16 +39,17 @@ int main() {
 
   // Also store tolerances to check against later
   std::unordered_map<std::tuple<int64_t, int64_t>, double> tolerances;
+  std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> A_lr_blocks;
   for (int64_t i=0; i<2; ++i) for (int64_t j=0; j<2; ++j) {
     if (i == j) {
       A[{i, j}] = Hatrix::generate_random_matrix(N, N);
     } else {
-      A[{i, j}] = Hatrix::generate_low_rank_matrix(N, N);
+      A_lr_blocks[{i, j}] = Hatrix::generate_low_rank_matrix(N, N);
       S[{i, j}] = Hatrix::Matrix(N, N);
       U[i] = Hatrix::Matrix(N, N);
       V[j] = Hatrix::Matrix(N, N);
       // Make copy so we can compare norms later
-      Hatrix::Matrix A_work(A[{i, j}]);
+      Hatrix::Matrix A_work(A_lr_blocks[{i, j}]);
       tolerances[{i, j}] = Hatrix::truncated_svd(
         A_work, U[i], S[{i, j}], V[j], rank
       );
@@ -61,7 +62,7 @@ int main() {
       continue;
     } else {
       double norm_diff = Hatrix::frobenius_norm_diff(
-        U[i] * S[{i, j}] * V[j], A[{i, j}]);
+        U[i] * S[{i, j}] * V[j], A_lr_blocks[{i, j}]);
       std::cout << tolerances[{i, j}] << " = " << norm_diff << " ?\n";
     }
   }
