@@ -92,6 +92,21 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
   return blr;
 }
 
+std::tuple<Hatrix::Matrix, Hatrix::Matrix> apply_blr(
+  const BLR_2x2& blr, Hatrix::Matrix& b0, Hatrix::Matrix& b1
+) {
+  Hatrix::Matrix z0(b0.rows, 1), z1(b1.rows, 1);
+  Hatrix::matmul(blr.A(0, 0), b0, z0, false, false, 1, 0);
+  Hatrix::matmul(
+    blr.U(0) * blr.S(0, 1) * blr.V(1), b1, z0, false, false, 1, 1
+  );
+  Hatrix::matmul(
+    blr.U(1) * blr.S(1, 0) * blr.V(0), b0, z1, false, false, 1, 0
+  );
+  Hatrix::matmul(blr.A(1, 1), b1, z1, false, false, 1, 1);
+  return {std::move(z0), std::move(z1)};
+}
+
 std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
   BLR_2x2 blr_check(blr);
   // Factorize input blr into L and U. blr is destroyed in the process
@@ -158,6 +173,26 @@ std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
   return {std::move(L), std::move(U)};
 }
 
+void solve_2x2_BLR(
+  const BLR_2x2& L, const BLR_2x2& U,
+  Hatrix::Matrix& z0, Hatrix::Matrix& z1,
+  const Hatrix::Matrix& b0, const Hatrix::Matrix& b1
+) {
+  // Forward substitution
+  Hatrix::solve_triangular(L.A(0, 0), z0, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::matmul(L.U(1) * L.S(1, 0) * L.V(0), z0, z1, false, false, -1, 1);
+  Hatrix::solve_triangular(L.A(1, 1), z1, Hatrix::Left, Hatrix::Lower, true);
+  // Backward substitution
+  Hatrix::solve_triangular(U.A(1, 1), z1, Hatrix::Left, Hatrix::Upper, false);
+  Hatrix::matmul(U.U(0) * U.S(0, 1) * U.V(1), z1, z0, false, false, -1, 1);
+  Hatrix::solve_triangular(U.A(0, 0), z0, Hatrix::Left, Hatrix::Upper, false);
+
+  double error = (
+    Hatrix::frobenius_norm_diff(b0, z0) + Hatrix::frobenius_norm_diff(b1, z1)
+  );
+  std::cout << "Solution error: " << error << " small?\n";
+}
+
 
 int main() {
   int64_t N = 16;
@@ -166,9 +201,17 @@ int main() {
   // Build 2x2 BLR and check result
   BLR_2x2 blr = construct_2x2_BLR(N, rank);
 
+  // Apply 2x2 BLR to vector for later error checking
+  Hatrix::Matrix b0 = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Matrix b1 = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Matrix z0, z1;
+  std::tie(z0, z1) = apply_blr(blr, b0, b1);
+
   // Factorize 2x2 BLR
   BLR_2x2 L, U;
   std::tie(L, U) = factorize_2x2_BLR(blr);
+
+  solve_2x2_BLR(L, U, z0, z1, b0, b1);
 
   return 0;
 }
