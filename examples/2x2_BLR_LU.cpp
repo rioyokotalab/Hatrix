@@ -78,17 +78,20 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
     }
   }
 
+  double error = 0, expected = 0;
   for (int64_t i=0; i<2; ++i) for (int64_t j=0; j<2; ++j) {
     if (i == j) {
       // TODO: Check something for dense blocks?
       continue;
     } else {
-      double norm_diff = Hatrix::frobenius_norm_diff(
+      error += Hatrix::frobenius_norm_diff(
         blr.U(i) * blr.S(i, j) * blr.V(j), blr.A(i, j)
       );
-      std::cout << tolerances[{i, j}] << " = " << norm_diff << " ?\n";
+      expected += tolerances[{i, j}];
     }
   }
+  std::cout << "Construction error: " << error << "  (expected: ";
+  std::cout << expected << ")\n\n";
   return blr;
 }
 
@@ -148,27 +151,28 @@ std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
   Hatrix::lu(blr.A(1, 1), L.A(1, 1), U.A(1, 1));
 
   // Check result by multiplying L and U and comparing with the copy we made
+  std::cout << "Factorization errors: \n";
   double top_left_diff = Hatrix::frobenius_norm_diff(
     L.A(0, 0) * U.A(0, 0), blr_check.A(0, 0)
   );
-  std::cout << "Top left error: " << top_left_diff << " small?\n";
+  std::cout << "Top left error: " << top_left_diff << "\n";
 
   double top_right_diff = Hatrix::frobenius_norm_diff(
     L.A(0, 0) * U.U(0) * U.S(0, 1) * U.V(1), blr_check.A(0, 1)
   );
-  std::cout << "Top right error: " << top_right_diff << " small?\n";
+  std::cout << "Top right error: " << top_right_diff << "\n";
 
   double bottom_left_diff = Hatrix::frobenius_norm_diff(
     L.U(1) * L.S(1, 0) * L.V(0) * U.A(0, 0), blr_check.A(1, 0)
   );
-  std::cout << "Bottom left error: " << bottom_left_diff << " small?\n";
+  std::cout << "Bottom left error: " << bottom_left_diff << "\n";
 
   double bottom_right = Hatrix::frobenius_norm_diff(
     L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1)
     + L.A(1, 1) * U.A(1, 1),
     blr_check.A(1, 1)
   );
-  std::cout << "Bottom right error: " << bottom_right << " small?\n";
+  std::cout << "Bottom right error: " << bottom_right << "\n\n";
 
   return {std::move(L), std::move(U)};
 }
@@ -190,7 +194,7 @@ void solve_2x2_BLR(
   double error = (
     Hatrix::frobenius_norm_diff(b0, z0) + Hatrix::frobenius_norm_diff(b1, z1)
   );
-  std::cout << "Solution error: " << error << " small?\n";
+  std::cout << "Solution error: " << error << "\n";
 }
 
 
