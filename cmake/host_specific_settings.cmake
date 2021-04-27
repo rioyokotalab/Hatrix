@@ -1,0 +1,18 @@
+function(host_specific_settings)
+  cmake_host_system_information(RESULT HOST_NAME QUERY FQDN)
+  # Fugaku settings
+  if(${HOST_NAME} MATCHES "^fn01sv[0-9][0-9]$")
+    message(STATUS "Fugaku supercomputer detected.")
+    # message(STATUS "Using Fujitsu compilers (FCC).")
+    set(CMAKE_C_COMPILER $ENV{FJSVXTCLANGA}/bin/fccpx PARENT_SCOPE)
+    set(CMAKE_CXX_COMPILER $ENV{FJSVXTCLANGA}/bin/FCCpx PARENT_SCOPE)
+    set(BLA_VENDOR Fujitsu_SSL2 PARENT_SCOPE)
+    set(BLAS_INCLUDE_DIR $ENV{FJSVXTCLANGA}/include PARENT_SCOPE)
+    return()
+  endif()
+  # Default fallback. Note that all if-functions above call return()
+  set(BLA_VENDOR Intel10_64lp PARENT_SCOPE)
+  set(BLAS_INCLUDE_DIR $ENV{MKLROOT}/include PARENT_SCOPE)
+  add_definitions(-DUSE_MKL)
+
+endfunction()

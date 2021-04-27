@@ -3,6 +3,9 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(policies)
 set_policies()
 
+include(host_specific_settings)
+host_specific_settings()
+
 project(NewStructure
   LANGUAGES CXX
   VERSION 1.0
@@ -32,7 +35,6 @@ if(USE_CUDA)
   target_link_libraries(CUDA_hello_world ${CUDA_CUBLAS_LIBRARIES})
 endif()
 
-set(BLA_VENDOR Intel10_64lp)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
@@ -43,7 +45,7 @@ add_library(Hatrix
   src/util/matrix_generators.cpp
   src/util/norms.cpp
 )
-target_compile_features(Hatrix PUBLIC cxx_std_17)
+target_compile_features(Hatrix PUBLIC cxx_std_11)
 
 target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 
@@ -52,12 +54,12 @@ target_include_directories(Hatrix
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   PRIVATE
-    $ENV{MKLROOT}/include
+    ${BLAS_INCLUDE_DIR}
 )
 
 add_subdirectory(examples)
 
-if (${Hatrix_BUILD_TESTS})
+if(${Hatrix_BUILD_TESTS})
   enable_testing()
   include(find_or_download)
   find_or_download(GTest)

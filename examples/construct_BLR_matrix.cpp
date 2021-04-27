@@ -13,7 +13,8 @@ namespace std {
 template<>
 struct hash<std::tuple<int64_t, int64_t>> {
   size_t operator()(const std::tuple<int64_t, int64_t>& pair) const {
-    auto [first, second] = pair;
+    int64_t first, second;
+    std::tie(first, second) = pair;
     size_t first_hash = hash<int64_t>()(first);
     first_hash ^= (
       hash<int64_t>()(second) + 0x9e3779b9 + (first_hash << 6) + (first_hash >> 2)
