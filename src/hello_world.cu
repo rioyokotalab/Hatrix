@@ -32,7 +32,7 @@ int main() {
     }
   }
 
-  printf("%f\n", err);
+  //printf("%f\n", err);
 
   m = 100;
   Hatrix::Matrix test = Hatrix::generate_random_matrix(m, m);
@@ -41,17 +41,19 @@ int main() {
   Hatrix::Matrix U(m, m), S(m, m), V(m, m);
   Hatrix::svd(test2, U, S, V);
 
+
   err = 0.;
-  for (int i = 0; i < m; i++)
+  for (int i = 0; i < m; i++) {
     for (int j = 0; j < m; j++) {
       double a = 0.;
       for (int k = 0; k < m; k++) {
         a += U(i, k) * S(k, k) * V(k, j);
       }
-      printf("%f %f\n", a, test(i, j));
+      //printf("%f %f\n", a, test(i, j));
       double e = a - test(i, j);
       err += e * e;
     }
+  }
 
   printf("\n%f", err);
 

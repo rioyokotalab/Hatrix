@@ -60,26 +60,32 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
 
 }
 
-void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
-  
-  int Lwork;
-  cusolverDnDgesvd_bufferSize(solvH, A.rows, A.cols, &Lwork);
-  double* work, *s;
+#include <cassert>
 
+#include <stdio.h>
+
+void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
+
+  double* work, *s;
+  cudaMallocManaged(reinterpret_cast<void**>(&s), std::min(S.rows, S.cols) * sizeof(double));
+  
+  int Lwork = 10000;
+
+  cusolverDnDgesvd_bufferSize(solvH, A.rows, A.cols, &Lwork);
   cudaMalloc(reinterpret_cast<void**>(&work), Lwork);
-  cudaMalloc(reinterpret_cast<void**>(&s), std::min(A.rows, A.cols) * sizeof(double));
-  cusolverDnDgesvd(solvH, 'S', 'S', A.rows, A.cols, &A, A.rows, s, &U, U.rows, &V, V.rows, work, Lwork, nullptr, nullptr);
+
+  cusolverDnDgesvd(solvH, 'A', 'A', A.rows, A.cols, &A, A.rows, s, &U, U.rows, &V, V.rows, work, Lwork, nullptr, nullptr);
 
   cudaDeviceSynchronize();
-  for (int i = std::min(S.rows, S.cols); i >= 0; i--) {
-    cudaMemcpy(&S + i * S.rows + i, s + i, sizeof(double), cudaMemcpyDeviceToDevice);
+
+  for (int i = 0; i < std::min(S.rows, S.cols); i++) {
+    S(i, i) = s[i];
   }
 
   cudaFree(s);
   cudaFree(work);
 }
 
-#include <cassert>
 
 double truncated_svd(
   Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank

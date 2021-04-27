@@ -30,7 +30,7 @@ const Matrix& Matrix::operator=(const double a) {
 Matrix& Matrix::operator=(const Matrix& A) {
   rows = A.rows;
   cols = A.cols;
-  data_ = (double*)std::malloc(rows * cols * sizeof(double));
+  cudaMallocManaged(reinterpret_cast<void**>(&data_), rows * cols * sizeof(double));
   cudaMemcpy(data_, A.data_, rows * cols * sizeof(double), cudaMemcpyDefault);
   return *this;
 }
