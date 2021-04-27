@@ -1,11 +1,11 @@
 #include "Hatrix/Hatrix.h"
 
 #include <cstdint>
+using std::int64_t;
+#include <iostream>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
-
-#include <iostream>
 
 
 namespace std {
