@@ -34,4 +34,12 @@ Matrix generate_low_rank_matrix(int64_t rows, int64_t cols) {
   return out;
 }
 
+Matrix generate_identity_matrix(int64_t rows, int64_t cols) {
+  Matrix out(rows, cols);
+  for (int64_t i=0; i<out.min_dim(); ++i) {
+    out(i, i) = 1.;
+  }
+  return out;
+}
+
 } // namespace Hatrix
