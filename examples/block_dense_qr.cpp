@@ -1,7 +1,5 @@
 #include "Hatrix/Hatrix.h"
 
-#include "gtest/gtest.h"
-
 #include <iostream>
 #include <vector>
 
@@ -34,7 +32,7 @@ void apply_block_trapezoidal_reflector(
 }
 
 
-TEST(BlockDense, qr) {
+int main() {
   int64_t block_size = 4;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
   A[0] = std::vector<Hatrix::Matrix>{
@@ -127,19 +125,11 @@ TEST(BlockDense, qr) {
   // Check accuracy and orthogonality
   Hatrix::Matrix Dense_QR(2*block_size, 2*block_size);
   Hatrix::matmul(Dense_Q, Dense_R, Dense_QR, false, false, 1., 0.);
-  // Check accuracy
-  for (int64_t i=0; i<Dense_QR.rows; i++) {
-    for (int64_t j=0; j<Dense_QR.cols; j++) {
-      EXPECT_NEAR(Dense_A(i, j), Dense_QR(i, j), 10e-14);
-    }
-  }
-  // Check orthogonality
+  std::cout <<"norm(A-Q*R) = " <<Hatrix::frobenius_norm_diff(Dense_A, Dense_QR) <<std::endl;
+  
   Hatrix::Matrix Dense_QTQ(Dense_Q.cols, Dense_Q.cols);
   Hatrix::matmul(Dense_Q, Dense_Q, Dense_QTQ, true, false, 1., 0.);
-  for (int64_t i=0; i<Dense_QTQ.rows; i++) {
-    for (int64_t j=0; j<Dense_QTQ.cols; j++) {
-      if(i == j) EXPECT_NEAR(Dense_QTQ(i, j), 1.0, 10e-14);
-      else EXPECT_NEAR(Dense_QTQ(i, j), 0.0, 10e-14);
-    }
-  }
+  Hatrix::Matrix Id = Hatrix::generate_identity_matrix(Dense_QTQ.rows, Dense_QTQ.cols);
+  std::cout <<"norm(I-Q^T*Q) = " <<Hatrix::frobenius_norm_diff(Id, Dense_QTQ) <<std::endl;
+  return 0;
 }

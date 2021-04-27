@@ -1,6 +1,6 @@
 include(GoogleTest)
 
-list(APPEND GTEST_TESTS Matrix arithmetics matmul lu qr block_dense_lu block_dense_qr svd norms)
+list(APPEND GTEST_TESTS Matrix arithmetics matmul lu qr block_dense_lu svd norms)
 
 foreach(TEST ${GTEST_TESTS})
   add_executable(${TEST}_test ${TEST}.cpp)
