@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdint>
 using std::int64_t;
+#include <cmath>
 #include <vector>
 
 
@@ -103,7 +104,7 @@ double truncated_svd(
   U.shrink(U.rows, rank);
   S.shrink(rank, rank);
   V.shrink(rank, V.cols);
-  return expected_err;
+  return std::sqrt(expected_err);
 }
 
 } // namespace Hatrix
