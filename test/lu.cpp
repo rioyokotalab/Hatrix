@@ -36,7 +36,7 @@ TEST_P(LUTests, lu){
   }
 }
 
-TEST_P(LUTests, lup){
+TEST_P(LUTests, lup) {
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
