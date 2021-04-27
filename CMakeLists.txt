@@ -30,7 +30,7 @@ else()
 endif()
 
 if(USE_CUDA)
-  add_library(Hatrix_gpu src/classes/Matrix.cu src/functions/blas.cu src/functions/lapack.cu)
+  add_library(Hatrix_gpu src/classes/Matrix.cu src/functions/blas.cu src/functions/lapack.cu src/util/handle.cu src/util/norms.cpp src/util/matrix_generators.cpp)
   set_target_properties(Hatrix_gpu PROPERTIES CUDA_ARCHITECTURES 60 70 75)
   target_link_libraries(Hatrix_gpu cublas cusolver)
   target_include_directories(Hatrix_gpu 
