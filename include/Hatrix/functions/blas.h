@@ -21,6 +21,4 @@ void solve_triangular(
   int side, int uplo, bool diag, bool transA=false, double alpha=1.0
 );
 
-Matrix operator*(const Matrix& A, const Matrix& B);
-
 } // namespace Hatrix
