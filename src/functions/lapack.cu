@@ -35,22 +35,22 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 
 }
 
-void qr(const Matrix& A, Matrix& Q, Matrix& R) {
+void qr(Matrix& A, Matrix& Q, Matrix& R) {
 
-  int Lwork, k = std::min(A.rows, A.cols);
+  int Lwork, k = Q.cols;
   double* tau, * work;
 
-  cudaMemcpy(&Q, &A, A.rows * A.cols * sizeof(double), cudaMemcpyDeviceToDevice);
-  cusolverDnDgeqrf_bufferSize(solvH, Q.rows, Q.cols, &Q, Q.rows, &Lwork);
+  cusolverDnDgeqrf_bufferSize(solvH, A.rows, A.cols, &A, A.rows, &Lwork);
 
   cudaMalloc(reinterpret_cast<void**>(&work), Lwork);
   cudaMalloc(reinterpret_cast<void**>(&tau), k * sizeof(double));
-  cusolverDnDgeqrf(solvH, Q.rows, Q.cols, &Q, Q.rows, tau, work, Lwork, nullptr);
+  cusolverDnDgeqrf(solvH, A.rows, A.cols, &A, A.rows, tau, work, Lwork, nullptr);
 
   cudaDeviceSynchronize();
+  cudaMemcpy(&Q, &A, Q.rows * Q.cols * sizeof(double), cudaMemcpyDeviceToDevice);
 
   for (int i = 0; i < Q.cols; i++) {
-    cudaMemcpy(&R + i * R.rows, &Q + i * Q.rows, std::min(i + 1, (int)Q.rows) * sizeof(double), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&R + i * R.rows, &A + i * A.rows, std::min(i + 1, (int)A.rows) * sizeof(double), cudaMemcpyDeviceToDevice);
   }
   cusolverDnDorgqr(solvH, Q.rows, Q.cols, k, &Q, Q.rows, tau, work, Lwork, nullptr);
 
