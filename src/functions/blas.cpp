@@ -33,6 +33,9 @@ void triangular_matmul(
   const Matrix& A, Matrix& B,
   int side, int uplo, bool transA, bool diag, double alpha
 ) {
+  assert(side == Left ?
+	 (transA ? A.rows == B.rows : A.cols == B.rows) :
+	 (transA ? B.cols == A.cols : B.cols == A.rows));
   cblas_dtrmm(
     CblasColMajor,
     side == Left ? CblasLeft : CblasRight,
