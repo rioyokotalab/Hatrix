@@ -44,7 +44,6 @@ void qr(const Matrix& A, Matrix& Q, Matrix& R) {
   cudaMalloc(reinterpret_cast<void**>(&tau), k * sizeof(double));
   cusolverDnDgeqrf(solvH, Q.rows, Q.cols, &Q, Q.rows, tau, work, Lwork, nullptr);
 
-  double one = 1, zero = 0;
   cudaDeviceSynchronize();
 
   for (int i = 0; i < Q.cols; i++) {

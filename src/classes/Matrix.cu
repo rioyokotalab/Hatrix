@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cassert>
+#include <memory>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <stdio.h>
@@ -23,6 +24,26 @@ Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
 const Matrix& Matrix::operator=(const double a) {
   for (int i = 0; i < rows; ++i) for (int j = 0; j < cols; ++j)
     (*this)(i, j) = a;
+  return *this;
+}
+
+Matrix& Matrix::operator=(const Matrix& A) {
+  rows = A.rows;
+  cols = A.cols;
+  data_ = (double*)std::malloc(rows * cols * sizeof(double));
+  cudaMemcpy(data_, A.data_, rows * cols * sizeof(double), cudaMemcpyDefault);
+  return *this;
+}
+
+Matrix::Matrix(Matrix&& A) : rows(std::move(A.rows)), cols(std::move(A.cols)) {
+  data_ = A.data_;
+  A.data_ = nullptr;
+}
+
+Matrix& Matrix::operator=(Matrix&& A) {
+  std::swap(rows, A.rows);
+  std::swap(cols, A.cols);
+  std::swap(data_, A.data_);
   return *this;
 }
 

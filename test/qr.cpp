@@ -16,6 +16,7 @@ class ApplyBlockReflectorTests
 : public testing::TestWithParam<std::tuple<int64_t, int64_t, int, bool>> {};
 
 TEST_P(QRTests, qr) {
+  Hatrix::init();
   int64_t m, n, k;
   std::tie(m, n, k) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
@@ -24,6 +25,7 @@ TEST_P(QRTests, qr) {
   Hatrix::qr(A, Q, R);
   Hatrix::Matrix QR(m, n);
   Hatrix::matmul(Q, R, QR, false, false, 1., 0.);
+  Hatrix::sync();
   // Check accuracy
   for (int64_t i=0; i<QR.rows; i++) {
     for (int64_t j=0; j<QR.cols; j++) {
@@ -39,6 +41,8 @@ TEST_P(QRTests, qr) {
       else EXPECT_NEAR(QTQ(i, j), 0.0, 10e-14);
     }
   }
+
+  Hatrix::terminate();
 }
 
 TEST_P(HouseholderQRCompactWYTests, HouseholderQRCompactWY) {

@@ -11,6 +11,7 @@ using std::int64_t;
 class LUTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>>{};
 
 TEST_P(LUTests, lu){
+  Hatrix::init();
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
@@ -27,6 +28,7 @@ TEST_P(LUTests, lu){
   Hatrix::Matrix L(m, n_diag), U(n_diag, n), A_rebuilt(m, n);
   Hatrix::lu(A, L, U);
   Hatrix::matmul(L, U, A_rebuilt, false, false, 1, 0);
+  Hatrix::sync();
 
   // Check result
   for (int64_t i=0; i<A.rows; ++i) {
@@ -34,6 +36,8 @@ TEST_P(LUTests, lu){
       EXPECT_FLOAT_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }
+
+  Hatrix::terminate();
 }
 
 INSTANTIATE_TEST_SUITE_P(
