@@ -24,8 +24,7 @@ void apply_block_trapezoidal_reflector(
   Hatrix::triangular_matmul(
     Y00, YC, Hatrix::Left, Hatrix::Lower, false, true, 1.
   ); //YC = Y00 * C
-  Hatrix::Matrix identity(YC.rows, YC.rows);
-  for(int64_t i = 0; i < identity.rows; i++) identity(i, i) = 1.;
+  Hatrix::Matrix identity = Hatrix::generate_identity_matrix(YC.rows, YC.rows);
   Hatrix::matmul(
     identity, YC, A00, false, false, -1., 1.
   ); // A00 = A00 - YC
@@ -39,32 +38,22 @@ TEST(BlockDense, qr) {
   int64_t block_size = 4;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
   A[0] = std::vector<Hatrix::Matrix>{
-    Hatrix::Matrix(block_size, block_size),
-    Hatrix::Matrix(block_size, block_size)
+    Hatrix::generate_random_matrix(block_size, block_size),
+    Hatrix::generate_random_matrix(block_size, block_size)
   };
   A[1] = std::vector<Hatrix::Matrix>{
-    Hatrix::Matrix(block_size, block_size),
-    Hatrix::Matrix(block_size, block_size)
+    Hatrix::generate_random_matrix(block_size, block_size),
+    Hatrix::generate_random_matrix(block_size, block_size)
   };
+  // Create big Dense A for accuracy evaluation
   Hatrix::Matrix Dense_A(2*block_size, 2*block_size);
-  // Initialize to non-singular matrix
   for (int64_t i=0; i<block_size; ++i)
     for (int64_t j=0; j<block_size; ++j) {
-      A[0][0](i, j) = 1;
-      A[0][1](i, j) = 2;
-      A[1][0](i, j) = 3;
-      A[1][1](i, j) = 4;
-      Dense_A(i, j) = 1;
-      Dense_A(i, j+block_size) = 2;
-      Dense_A(i+block_size, j) = 3;
-      Dense_A(i+block_size, j+block_size) = 4;
+      Dense_A(i, j) = A[0][0](i, j);
+      Dense_A(i, j+block_size) = A[0][1](i, j);
+      Dense_A(i+block_size, j) = A[1][0](i, j);
+      Dense_A(i+block_size, j+block_size) = A[1][1](i, j);
     }
-  for (int64_t i=0; i<block_size; ++i) {
-    A[0][0](i, i) += 100;
-    A[1][1](i, i) += 100;
-    Dense_A(i, i) += 100;
-    Dense_A(i+block_size, i+block_size) += 100;
-  }
 
   // Block QR
   // QR(A[*][0]) = Q0 ( R00 )
