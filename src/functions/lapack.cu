@@ -22,11 +22,14 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
   cudaDeviceSynchronize();
   cudaFree(work);
 
-  for (int i = 0; i < A.cols; i++) {
+  for (int i = 0; i < L.cols && i < A.cols; i++) {
     double one = 1;
     cudaMemcpy(&L + i * L.rows + i, &one, sizeof(double), cudaMemcpyHostToDevice);
     if (i + 1 < A.rows)
       cudaMemcpy(&L + i * L.rows + i + 1, &A + i * A.rows + i + 1, (A.rows - i - 1) * sizeof(double), cudaMemcpyDeviceToDevice);
+  }
+
+  for (int i = 0; i < A.cols; i++) {
     cudaMemcpy(&U + i * U.rows, &A + i * A.rows, std::min(i + 1, (int)A.rows) * sizeof(double), cudaMemcpyDeviceToDevice);
   }
 
