@@ -64,20 +64,21 @@ void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
   
   int Lwork;
   cusolverDnDgesvd_bufferSize(solvH, A.rows, A.cols, &Lwork);
-  double* work;
+  double* work, *s;
 
   cudaMalloc(reinterpret_cast<void**>(&work), Lwork);
-  cusolverDnDgesvd(solvH, 'A', 'A', A.rows, A.cols, &A, A.rows, &S, &U, U.rows, &V, V.rows, work, Lwork, nullptr, nullptr);
+  cusolverDnDgesvd(solvH, 'A', 'A', A.rows, A.cols, &A, A.rows, s, &U, U.rows, &V, V.rows, work, Lwork, nullptr, nullptr);
 
   cudaDeviceSynchronize();
-  for (int i = std::min(S.rows, S.cols); i > 0; i--) {
-    double zero = 0;
-    cudaMemcpy(&S + i * S.rows + i, &S + i, sizeof(double), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(&S + i, &zero, sizeof(double), cudaMemcpyHostToDevice);
+  for (int i = std::min(S.rows, S.cols); i >= 0; i--) {
+    cudaMemcpy(&S + i * S.rows + i, s + i, sizeof(double), cudaMemcpyDeviceToDevice);
   }
 
+  cudaFree(s);
   cudaFree(work);
 }
+
+#include <cassert>
 
 double truncated_svd(
   Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank

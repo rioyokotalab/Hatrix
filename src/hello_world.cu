@@ -34,28 +34,26 @@ int main() {
 
   printf("%f\n", err);
 
-  C.print();
+  m = 100;
+  Hatrix::Matrix test = Hatrix::generate_random_matrix(m, m);
+  Hatrix::Matrix test2(test);
 
-  Hatrix::Matrix test(3, 3);
-  test.data_[0] = 1;
-  test.data_[1] = 2;
-  test.data_[2] = 3;
-  test.data_[3] = 2;
-  test.data_[4] = 5;
-  test.data_[5] = 10;
-  test.data_[6] = 3;
-  test.data_[7] = 7;
-  test.data_[8] = 1;
+  Hatrix::Matrix U(m, m), S(m, m), V(m, m);
+  Hatrix::svd(test2, U, S, V);
 
-  test.print();
+  err = 0.;
+  for (int i = 0; i < m; i++)
+    for (int j = 0; j < m; j++) {
+      double a = 0.;
+      for (int k = 0; k < m; k++) {
+        a += U(i, k) * S(k, k) * V(k, j);
+      }
+      printf("%f %f\n", a, test(i, j));
+      double e = a - test(i, j);
+      err += e * e;
+    }
 
-  Hatrix::Matrix L(3, 3), U(3, 3), S(3, 3);
-  Hatrix::svd(test, L, S, U);
-
-  test.print();
-  L.print();
-  S.print();
-  U.print();
+  printf("\n%f", err);
 
 	Hatrix::terminate();
 	return 0;

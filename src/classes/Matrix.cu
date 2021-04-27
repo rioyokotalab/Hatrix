@@ -56,8 +56,8 @@ const double& Matrix::operator()(int64_t i, int64_t j) const { return data_[j*ro
 void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
   assert(new_rows <= rows);
   assert(new_cols <= cols);
-  for (int i=0; i<new_rows; ++i) {
-    for (int j=0; j<new_cols; ++j) {
+  for (int j=0; j<new_cols; ++j) {
+    for (int i=0; i<new_rows; ++i) {
       data_[j*new_rows+i] = (*this)(i, j);
     }
   }
