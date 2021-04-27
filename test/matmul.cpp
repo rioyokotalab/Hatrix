@@ -12,6 +12,9 @@ using std::int64_t;
 class MatMulTests : public testing::TestWithParam<
   std::tuple<int64_t, int64_t, int64_t, bool, bool, double, double>
 > {};
+class MatMulOperatorTests : public testing::TestWithParam<
+  std::tuple<int64_t, int64_t, int64_t>
+> {};
 
 TEST_P(MatMulTests, matmul) {
   int64_t M, N, K;
@@ -47,6 +50,23 @@ TEST_P(MatMulTests, matmul) {
   for (int64_t i=0; i<M; ++i) {
     for (int64_t j=0; j<N; ++j) {
       EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
+    }
+  }
+}
+
+TEST_P(MatMulOperatorTests, matmul) {
+  int64_t M, N, K;
+  std::tie(M, K, N) = GetParam();
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(M, K);
+  Hatrix::Matrix B = Hatrix::generate_random_matrix(K, N);
+  Hatrix::Matrix C(M, N);
+  Hatrix::Matrix C_check = A * B;
+  Hatrix::matmul(A, B, C, false, false, 1, 0);
+
+  // Check result
+  for (int64_t i=0; i<M; ++i) {
+    for (int64_t j=0; j<N; ++j) {
+      EXPECT_FLOAT_EQ(C_check(i, j), C(i, j));
     }
   }
 }
@@ -97,6 +117,23 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Values(1)
   ),
   [](const testing::TestParamInfo<MatMulTests::ParamType>& info) {
+    std::string name = (
+      "M" + std::to_string(std::get<0>(info.param))
+      + "K" + std::to_string(std::get<1>(info.param))
+      + "N" + std::to_string(std::get<2>(info.param))
+    );
+    return name;
+  }
+);
+
+INSTANTIATE_TEST_SUITE_P(
+  Operator, MatMulOperatorTests,
+  testing::Combine(
+    testing::Values(16, 32, 64),
+    testing::Values(16, 32, 64),
+    testing::Values(16, 32, 64)
+  ),
+  [](const testing::TestParamInfo<MatMulOperatorTests::ParamType>& info) {
     std::string name = (
       "M" + std::to_string(std::get<0>(info.param))
       + "K" + std::to_string(std::get<1>(info.param))
