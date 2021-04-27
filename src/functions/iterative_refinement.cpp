@@ -13,11 +13,12 @@ void gesv_IR(Matrix &A, Matrix &b, int64_t max_iter){
   assert(A.rows == b.rows);
 
   int64_t mdim = A.min_dim();
-  Matrix L(A.rows, mdim), U(mdim, A.cols), P(A.rows, A.rows), x(b.rows, 1);
+  Matrix L(A.rows, mdim), U(mdim, A.cols), P(A.rows, A.rows);
   lup(A, L, U, P);
-  matmul(P, b, x, false, false, 1, 0);
+  Matrix x = P * b;
   solve_triangular(L, x, Left, Lower, true);
   solve_triangular(U, x, Right, Upper, false);
+  double res = b - (A * x);
 }
 
 } // namespace Hatrix
