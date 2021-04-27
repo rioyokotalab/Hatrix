@@ -9,7 +9,6 @@ using std::int64_t;
 
 
 class LUTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>>{};
-class LUPTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>>{};
 
 TEST_P(LUTests, lu){
   int64_t m, n;
@@ -37,7 +36,7 @@ TEST_P(LUTests, lu){
   }
 }
 
-TEST_P(LUPTests, lup){
+TEST_P(LUTests, lup){
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
@@ -71,21 +70,6 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Values(8, 16, 32)
   ),
   [](const testing::TestParamInfo<LUTests::ParamType>& info) {
-    std::string name = (
-      "m" + std::to_string(std::get<0>(info.param))
-      + "n" + std::to_string(std::get<1>(info.param))
-    );
-    return name;
-  }
-);
-
-INSTANTIATE_TEST_SUITE_P(
-  LAPACK, LUPTests,
-  testing::Combine(
-    testing::Values(8, 16, 32),
-    testing::Values(8, 16, 32)
-  ),
-  [](const testing::TestParamInfo<LUPTests::ParamType>& info) {
     std::string name = (
       "m" + std::to_string(std::get<0>(info.param))
       + "n" + std::to_string(std::get<1>(info.param))
