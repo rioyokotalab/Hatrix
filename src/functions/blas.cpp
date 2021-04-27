@@ -43,4 +43,11 @@ void solve_triangular(
   );
 }
 
+Matrix operator*(const Matrix& A, const Matrix& B){
+  Matrix C(A.rows, B.cols);
+  matmul(A, B, C, false, false, 1, 0);
+
+  return C;
+}
+
 } // namespace Hatrix

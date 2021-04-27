@@ -147,16 +147,4 @@ double truncated_svd(
   return std::sqrt(expected_err);
 }
 
-void gesv_IR(Matrix &A, Matrix &b, int64_t max_iter){
-  assert(A.rows == b.rows);
-
-  int64_t mdim = A.min_dim();
-  Matrix L(A.rows, mdim);
-  Matrix U(mdim, A.cols);
-  lu(A, L, U);
-
-
-
-}
-
 } // namespace Hatrix
