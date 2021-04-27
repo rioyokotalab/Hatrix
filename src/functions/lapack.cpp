@@ -1,3 +1,5 @@
+#include "Hatrix/functions/lapack.h"
+
 #include "Hatrix/classes/Matrix.h"
 
 #ifdef USE_MKL
@@ -105,6 +107,24 @@ double truncated_svd(
   S.shrink(rank, rank);
   V.shrink(rank, V.cols);
   return std::sqrt(expected_err);
+}
+
+double norm(const Matrix& A, int normtype){
+  char norm;
+  switch(normtype){
+    case MaxNorm :
+      norm = 'M';
+      break;
+    case OneNorm :
+      norm = 'O';
+      break;
+    case InfinityNorm : 
+      norm = 'I';
+      break;
+    default : 
+      norm = 'F';
+  }
+  return LAPACKE_dlange(LAPACK_COL_MAJOR, norm, A.rows, A.cols, &A, A.rows);
 }
 
 } // namespace Hatrix
