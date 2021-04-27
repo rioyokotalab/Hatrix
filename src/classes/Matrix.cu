@@ -53,4 +53,13 @@ void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
 int64_t Matrix::min_dim() const { return rows > cols ? cols : rows; }
 int64_t Matrix::max_dim() const { return rows > cols ? rows : cols; }
 
+void Matrix::print() const {
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++)
+      printf("%f ", data_[j * rows + i]);
+    printf("\n");
+  }
+  printf("\n");
+}
+
 } // namespace Hatrix

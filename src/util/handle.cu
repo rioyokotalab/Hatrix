@@ -18,5 +18,9 @@ namespace Hatrix {
     cusolverDnDestroy(solvH); blasH = 0;
   }
 
+  void sync() {
+    cudaDeviceSynchronize();
+  }
+
 
 } // namespace Hatrix

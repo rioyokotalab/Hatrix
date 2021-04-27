@@ -11,6 +11,7 @@ namespace Hatrix {
 
   void init();
   void terminate();
+  void sync();
 
 }
 

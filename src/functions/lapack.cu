@@ -19,16 +19,16 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 
   cusolverDnDgetrf(solvH, A.rows, A.cols, &A, A.rows, work, nullptr, nullptr);
 
-  // copy out U and L
-
-  // copy out the rest of U if trapezoidal
-
-  // L: set diagonal to 1 and upper triangular matrix to 0
-
-  // U: set lower triangular to 0?
-
   cudaDeviceSynchronize();
   cudaFree(work);
+
+  for (int i = 0; i < A.cols; i++) {
+    double one = 1;
+    cudaMemcpy(&L + i * L.rows + i, &one, sizeof(double), cudaMemcpyHostToDevice);
+    if (i + 1 < A.rows)
+      cudaMemcpy(&L + i * L.rows + i + 1, &A + i * A.rows + i + 1, (A.rows - i - 1) * sizeof(double), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&U + i * U.rows, &A + i * A.rows, std::min(i + 1, (int)A.rows) * sizeof(double), cudaMemcpyDeviceToDevice);
+  }
 
 }
 
@@ -37,7 +37,7 @@ void qr(const Matrix& A, Matrix& Q, Matrix& R) {
   int Lwork, k = std::min(A.rows, A.cols);
   double* tau, * work;
 
-  cublasDcopy(blasH, A.rows * A.cols, &A, 1, &Q, 1);
+  cudaMemcpy(&Q, &A, A.rows * A.cols * sizeof(double), cudaMemcpyDeviceToDevice);
   cusolverDnDgeqrf_bufferSize(solvH, Q.rows, Q.cols, &Q, Q.rows, &Lwork);
 
   cudaMalloc(reinterpret_cast<void**>(&work), Lwork);
@@ -45,13 +45,41 @@ void qr(const Matrix& A, Matrix& Q, Matrix& R) {
   cusolverDnDgeqrf(solvH, Q.rows, Q.cols, &Q, Q.rows, tau, work, Lwork, nullptr);
 
   double one = 1, zero = 0;
-  cublasDgeam(blasH, CUBLAS_OP_N, CUBLAS_OP_N, Q.rows, Q.cols, &one, &Q, Q.rows, &zero, &R, R.rows, &R, R.rows);
+  cudaDeviceSynchronize();
+
+  for (int i = 0; i < Q.cols; i++) {
+    cudaMemcpy(&R + i * R.rows, &Q + i * Q.rows, std::min(i + 1, (int)Q.rows) * sizeof(double), cudaMemcpyDeviceToDevice);
+  }
   cusolverDnDorgqr(solvH, Q.rows, Q.cols, k, &Q, Q.rows, tau, work, Lwork, nullptr);
 
   cudaDeviceSynchronize();
   cudaFree(tau);
   cudaFree(work);
 
+}
+
+void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
+  
+  int Lwork;
+  cusolverDnDgesvd_bufferSize(solvH, A.rows, A.cols, &Lwork);
+  double* work;
+
+  cudaMalloc(reinterpret_cast<void**>(&work), Lwork);
+  cusolverDnDgesvd(solvH, 'A', 'A', A.rows, A.cols, &A, A.rows, &S, &U, U.rows, &V, V.rows, work, Lwork, nullptr, nullptr);
+
+  cudaDeviceSynchronize();
+  for (int i = std::min(S.rows, S.cols); i > 0; i--) {
+    double zero = 0;
+    cudaMemcpy(&S + i * S.rows + i, &S + i, sizeof(double), cudaMemcpyDeviceToDevice);
+    cudaMemcpy(&S + i, &zero, sizeof(double), cudaMemcpyHostToDevice);
+  }
+
+  cudaFree(work);
+}
+
+double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank) {
+
+  return 0;
 }
 
 } // namespace Hatrix
