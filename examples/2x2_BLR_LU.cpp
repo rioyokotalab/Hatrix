@@ -27,12 +27,29 @@ struct hash<std::tuple<int64_t, int64_t>> {
 } // namespace std
 
 
-struct BLR_2x2 {
+class BLR_2x2 {
+ private:
   // BLR stored in set of maps
-  std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> A;
-  std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> S;
-  std::unordered_map<int64_t, Hatrix::Matrix> U;
-  std::unordered_map<int64_t, Hatrix::Matrix> V;
+  std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> A_;
+  std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> S_;
+  std::unordered_map<int64_t, Hatrix::Matrix> U_;
+  std::unordered_map<int64_t, Hatrix::Matrix> V_;
+ public:
+  Hatrix::Matrix& S(int64_t row, int64_t col) { return S_[{row, col}]; }
+  const Hatrix::Matrix& S(int64_t row, int64_t col) const {
+    return S_.at({row ,col});
+  }
+
+  Hatrix::Matrix& A(int64_t row, int64_t col) { return A_[{row, col}]; }
+  const Hatrix::Matrix& A(int64_t row, int64_t col) const {
+    return A_.at({row ,col});
+  }
+
+  Hatrix::Matrix& U(int64_t row) { return U_[row]; }
+  const Hatrix::Matrix& U(int64_t row) const { return U_.at(row); }
+
+  Hatrix::Matrix& V(int64_t row) { return V_[row]; }
+  const Hatrix::Matrix& V(int64_t row) const { return V_.at(row); }
 };
 
 BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
@@ -47,16 +64,16 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       for (int64_t i=0; i<diag.min_dim(); ++i) {
         diag(i, i) += diag_add--;
       }
-      blr.A[{i, j}] = std::move(diag);
+      blr.A(i, j) = std::move(diag);
     } else {
-      blr.A[{i, j}] = Hatrix::generate_low_rank_matrix(N, N);
-      blr.S[{i, j}] = Hatrix::Matrix(N, N);
-      blr.U[i] = Hatrix::Matrix(N, N);
-      blr.V[j] = Hatrix::Matrix(N, N);
+      blr.A(i, j) = Hatrix::generate_low_rank_matrix(N, N);
+      blr.S(i, j) = Hatrix::Matrix(N, N);
+      blr.U(i) = Hatrix::Matrix(N, N);
+      blr.V(j) = Hatrix::Matrix(N, N);
       // Make copy so we can compare norms later
-      Hatrix::Matrix A_work(blr.A[{i, j}]);
+      Hatrix::Matrix A_work(blr.A(i, j));
       tolerances[{i, j}] = Hatrix::truncated_svd(
-        A_work, blr.U[i], blr.S[{i, j}], blr.V[j], rank
+        A_work, blr.U(i), blr.S(i, j), blr.V(j), rank
       );
     }
   }
@@ -67,7 +84,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       continue;
     } else {
       double norm_diff = Hatrix::frobenius_norm_diff(
-        blr.U[i] * blr.S[{i, j}] * blr.V[j], blr.A[{i, j}]
+        blr.U(i) * blr.S(i, j) * blr.V(j), blr.A(i, j)
       );
       std::cout << tolerances[{i, j}] << " = " << norm_diff << " ?\n";
     }
@@ -80,61 +97,61 @@ std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
   // Factorize input blr into L and U. blr is destroyed in the process
   // LU of top left
   BLR_2x2 L, U;
-  L.A[{0, 0}] = Hatrix::Matrix(blr.A[{0, 0}].rows, blr.A[{0, 0}].cols);
-  U.A[{0, 0}] = Hatrix::Matrix(blr.A[{0, 0}].rows, blr.A[{0, 0}].cols);
-  Hatrix::lu(blr.A[{0, 0}], L.A[{0, 0}], U.A[{0, 0}]);
+  L.A(0, 0) = Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols);
+  U.A(0, 0) = Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols);
+  Hatrix::lu(blr.A(0, 0), L.A(0, 0), U.A(0, 0));
 
   // TRSMs
   // Move over bottem left block to L, top right block to U
-  L.U[1] = std::move(blr.U[1]);
-  L.S[{1, 0}] = std::move(blr.S[{1, 0}]);
-  L.V[0] = std::move(blr.V[0]);
-  U.U[0] = std::move(blr.U[0]);
-  U.S[{0, 1}] = std::move(blr.S[{0, 1}]);
-  U.V[1] = std::move(blr.V[1]);
+  L.U(1) = std::move(blr.U(1));
+  L.S(1, 0) = std::move(blr.S(1, 0));
+  L.V(0) = std::move(blr.V(0));
+  U.U(0) = std::move(blr.U(0));
+  U.S(0, 1) = std::move(blr.S(0, 1));
+  U.V(1) = std::move(blr.V(1));
   Hatrix::solve_triangular(
-    L.A[{0, 0}], U.U[0], Hatrix::Left, Hatrix::Lower, true
+    L.A(0, 0), U.U(0), Hatrix::Left, Hatrix::Lower, true
   );
   Hatrix::solve_triangular(
-    U.A[{0, 0}], L.V[0], Hatrix::Right, Hatrix::Upper, false
+    U.A(0, 0), L.V(0), Hatrix::Right, Hatrix::Upper, false
   );
 
   // Schur complement into bottom right
-  Hatrix::Matrix VxU(L.V[0].rows, U.U[0].cols);
-  Hatrix::matmul(L.V[0], U.U[0], VxU);
-  Hatrix::Matrix SxVxU(L.S[{1, 0}].rows, VxU.cols);
-  Hatrix::matmul(L.S[{1, 0}], VxU, SxVxU);
-  Hatrix::Matrix SxVxUxS(SxVxU.rows, U.S[{0, 1}].cols);
-  Hatrix::matmul(SxVxU, U.S[{0, 1}], SxVxUxS);
-  Hatrix::Matrix UxSxVxUxS(L.U[1].rows, SxVxUxS.cols);
-  Hatrix::matmul(L.U[1], SxVxUxS, UxSxVxUxS);
-  Hatrix::matmul(UxSxVxUxS, U.V[1], blr.A[{1, 1}], false, false, -1);
+  Hatrix::Matrix VxU(L.V(0).rows, U.U(0).cols);
+  Hatrix::matmul(L.V(0), U.U(0), VxU);
+  Hatrix::Matrix SxVxU(L.S(1, 0).rows, VxU.cols);
+  Hatrix::matmul(L.S(1, 0), VxU, SxVxU);
+  Hatrix::Matrix SxVxUxS(SxVxU.rows, U.S(0, 1).cols);
+  Hatrix::matmul(SxVxU, U.S(0, 1), SxVxUxS);
+  Hatrix::Matrix UxSxVxUxS(L.U(1).rows, SxVxUxS.cols);
+  Hatrix::matmul(L.U(1), SxVxUxS, UxSxVxUxS);
+  Hatrix::matmul(UxSxVxUxS, U.V(1), blr.A(1, 1), false, false, -1);
 
   // LU of bottom right
-  L.A[{1, 1}] = Hatrix::Matrix(blr.A[{1, 1}].rows, blr.A[{1, 1}].cols);
-  U.A[{1, 1}] = Hatrix::Matrix(blr.A[{1, 1}].rows, blr.A[{1, 1}].cols);
-  Hatrix::lu(blr.A[{1, 1}], L.A[{1, 1}], U.A[{1, 1}]);
+  L.A(1, 1) = Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols);
+  U.A(1, 1) = Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols);
+  Hatrix::lu(blr.A(1, 1), L.A(1, 1), U.A(1, 1));
 
   // Check result by multiplying L and U and comparing with the copy we made
   double top_left_diff = Hatrix::frobenius_norm_diff(
-    L.A[{0, 0}] * U.A[{0, 0}], blr_check.A[{0, 0}]
+    L.A(0, 0) * U.A(0, 0), blr_check.A(0, 0)
   );
   std::cout << "Top left error: " << top_left_diff << " small?\n";
 
   double top_right_diff = Hatrix::frobenius_norm_diff(
-    L.A[{0, 0}] * U.U[0] * U.S[{0, 1}] * U.V[1], blr_check.A[{0, 1}]
+    L.A(0, 0) * U.U(0) * U.S(0, 1) * U.V(1), blr_check.A(0, 1)
   );
   std::cout << "Top right error: " << top_right_diff << " small?\n";
 
   double bottom_left_diff = Hatrix::frobenius_norm_diff(
-    L.U[1] * L.S[{1, 0}] * L.V[0] * U.A[{0, 0}], blr_check.A[{1, 0}]
+    L.U(1) * L.S(1, 0) * L.V(0) * U.A(0, 0), blr_check.A(1, 0)
   );
   std::cout << "Bottom left error: " << bottom_left_diff << " small?\n";
 
   double bottom_right = Hatrix::frobenius_norm_diff(
-    L.U[1] * L.S[{1, 0}] * L.V[0] * U.U[0] * U.S[{0, 1}] * U.V[1]
-    + L.A[{1, 1}] * U.A[{1, 1}],
-    blr_check.A[{1, 1}]
+    L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1)
+    + L.A(1, 1) * U.A(1, 1),
+    blr_check.A(1, 1)
   );
   std::cout << "Bottom right error: " << bottom_right << " small?\n";
 
