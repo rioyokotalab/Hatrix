@@ -38,6 +38,7 @@ find_package(LAPACK REQUIRED)
 
 add_library(Hatrix
   src/classes/Matrix.cpp
+  src/functions/arithmetics.cpp
   src/functions/blas.cpp
   src/functions/lapack.cpp
   src/util/matrix_generators.cpp
