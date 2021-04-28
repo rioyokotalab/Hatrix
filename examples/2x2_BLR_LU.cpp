@@ -128,15 +128,7 @@ void factorize_2x2_BLR(BLR_2x2& blr, BLR_2x2& L, BLR_2x2& U) {
   );
 
   // Schur complement into bottom right
-  Hatrix::Matrix VxU(L.V(0).rows, U.U(0).cols);
-  Hatrix::matmul(L.V(0), U.U(0), VxU);
-  Hatrix::Matrix SxVxU(L.S(1, 0).rows, VxU.cols);
-  Hatrix::matmul(L.S(1, 0), VxU, SxVxU);
-  Hatrix::Matrix SxVxUxS(SxVxU.rows, U.S(0, 1).cols);
-  Hatrix::matmul(SxVxU, U.S(0, 1), SxVxUxS);
-  Hatrix::Matrix UxSxVxUxS(L.U(1).rows, SxVxUxS.cols);
-  Hatrix::matmul(L.U(1), SxVxUxS, UxSxVxUxS);
-  Hatrix::matmul(UxSxVxUxS, U.V(1), blr.A(1, 1), false, false, -1);
+  blr.A(1, 1) -= L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1);
 
   // LU of bottom right
   L.insert_A(1, 1, Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols));
