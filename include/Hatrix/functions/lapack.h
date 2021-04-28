@@ -5,11 +5,11 @@ using std::int64_t;
 
 namespace Hatrix {
 
-enum {
-  MaxNorm,
-  OneNorm,
-  InfinityNorm,
-  FrobeniusNorm
+enum class Norm {
+  MaxNorm = 'M',
+  OneNorm = 'O',
+  InfinityNorm  = 'I',
+  FrobeniusNorm = 'F'
 };
 
 class Matrix;
@@ -24,6 +24,6 @@ void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
-double norm(const Matrix& A, int norm);
+double calc_norm(const Matrix& A, Norm norm);
 
 } // namespace Hatrix

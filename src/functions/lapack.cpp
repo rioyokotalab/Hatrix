@@ -149,18 +149,8 @@ double truncated_svd(
   return std::sqrt(expected_err);
 }
 
-double norm(const Matrix& A, int normtype){
-  char norm;
-  switch(normtype){
-    case MaxNorm : norm = 'M';
-                   break;
-    case OneNorm : norm = 'O';
-                   break;
-    case InfinityNorm : norm = 'I';
-                   break;
-    default : norm = 'F';
-  }
-  return LAPACKE_dlange(LAPACK_COL_MAJOR, norm, A.rows, A.cols, &A, A.rows);
+double calc_norm(const Matrix& A, Norm norm){
+  return LAPACKE_dlange(LAPACK_COL_MAJOR, static_cast<int>(norm), A.rows, A.cols, &A, A.rows);
 }
 
 } // namespace Hatrix
