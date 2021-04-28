@@ -30,6 +30,19 @@ struct hash<std::tuple<int64_t, int64_t>> {
 class BLR_2x2 {
  private:
   // BLR stored in set of maps
+  /*
+    ＊ ＊ ＊ ＊ ＊ | ＊ 　 ＊ ＊ ＊
+    ＊ ＊ ＊ ＊ ＊ |
+    ＊ ＊ ＊ ＊ ＊ | ＊
+    ＊ ＊ ＊ ＊ ＊ | ＊
+    ＊ ＊ ＊ ＊ ＊ | ＊
+    ーーーーーーーー ーーーーーーーー
+    ＊  　＊ ＊ ＊ | ＊ ＊ ＊ ＊ ＊
+    　  　        | ＊ ＊ ＊ ＊ ＊
+    ＊  　        | ＊ ＊ ＊ ＊ ＊
+    ＊  　        | ＊ ＊ ＊ ＊ ＊
+    ＊  　        | ＊ ＊ ＊ ＊ ＊
+  */
   std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> D_;
   std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> S_;
   std::unordered_map<int64_t, Hatrix::Matrix> U_;
