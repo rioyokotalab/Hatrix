@@ -65,7 +65,7 @@ class BLR_2x2 {
 };
 
 BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
-  BLR_2x2 blr;
+  BLR_2x2 A;
   // Also store expected errors to check against later
   std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
   for (int64_t i=0; i<2; ++i) for (int64_t j=0; j<2; ++j) {
@@ -73,16 +73,16 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       Hatrix::Matrix diag = Hatrix::generate_random_matrix(N, N);
       // Prevent pivoting
       for (int64_t i=0; i<diag.min_dim(); ++i) diag(i, i) += 2;
-      blr.insert_D(i, j, std::move(diag));
+      A.insert_D(i, j, std::move(diag));
     } else {
-      blr.insert_D(i, j, Hatrix::generate_low_rank_matrix(N, N));
-      blr.insert_S(i, j, Hatrix::Matrix(N, N));
-      blr.insert_U(i, Hatrix::Matrix(N, N));
-      blr.insert_V(j, Hatrix::Matrix(N, N));
+      A.insert_D(i, j, Hatrix::generate_low_rank_matrix(N, N));
+      A.insert_S(i, j, Hatrix::Matrix(N, N));
+      A.insert_U(i, Hatrix::Matrix(N, N));
+      A.insert_V(j, Hatrix::Matrix(N, N));
       // Make copy so we can compare norms later
-      Hatrix::Matrix A_work(blr.D(i, j));
+      Hatrix::Matrix A_work(A.D(i, j));
       expected_err[{i, j}] = Hatrix::truncated_svd(
-        A_work, blr.U(i), blr.S(i, j), blr.V(j), rank
+        A_work, A.U(i), A.S(i, j), A.V(j), rank
       );
     }
   }
@@ -94,32 +94,32 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       continue;
     } else {
       error += Hatrix::frobenius_norm_diff(
-        blr.U(i) * blr.S(i, j) * blr.V(j), blr.D(i, j)
+        A.U(i) * A.S(i, j) * A.V(j), A.D(i, j)
       );
       expected += expected_err[{i, j}];
     }
   }
   std::cout << "Construction error: " << error << "  (expected: ";
   std::cout << expected << ")\n\n";
-  return blr;
+  return A;
 }
 
-void factorize_2x2_BLR(BLR_2x2& blr, BLR_2x2& L, BLR_2x2& U) {
-  BLR_2x2 blr_check(blr);
-  // Factorize input blr into L and U. blr is destroyed in the process
+void factorize_2x2_BLR(BLR_2x2& A, BLR_2x2& L, BLR_2x2& U) {
+  BLR_2x2 A_check(A);
+  // Factorize input A into L and U. A is destroyed in the process
   // LU of top left
-  L.insert_D(0, 0, Hatrix::Matrix(blr.D(0, 0).rows, blr.D(0, 0).cols));
-  U.insert_D(0, 0, Hatrix::Matrix(blr.D(0, 0).rows, blr.D(0, 0).cols));
-  Hatrix::lu(blr.D(0, 0), L.D(0, 0), U.D(0, 0));
+  L.insert_D(0, 0, Hatrix::Matrix(A.D(0, 0).rows, A.D(0, 0).cols));
+  U.insert_D(0, 0, Hatrix::Matrix(A.D(0, 0).rows, A.D(0, 0).cols));
+  Hatrix::lu(A.D(0, 0), L.D(0, 0), U.D(0, 0));
 
   // TRSMs
-  // Move over bottem left block to L, top right block to U
-  L.insert_U(1, std::move(blr.U(1)));
-  L.insert_S(1, 0, std::move(blr.S(1, 0)));
-  L.insert_V(0, std::move(blr.V(0)));
-  U.insert_U(0, std::move(blr.U(0)));
-  U.insert_S(0, 1, std::move(blr.S(0, 1)));
-  U.insert_V(1, std::move(blr.V(1)));
+  // Move bottom left block of A to L, top right block of A to U
+  L.insert_U(1, std::move(A.U(1)));
+  L.insert_S(1, 0, std::move(A.S(1, 0)));
+  L.insert_V(0, std::move(A.V(0)));
+  U.insert_U(0, std::move(A.U(0)));
+  U.insert_S(0, 1, std::move(A.S(0, 1)));
+  U.insert_V(1, std::move(A.V(1)));
   Hatrix::solve_triangular(
     L.D(0, 0), U.U(0), Hatrix::Left, Hatrix::Lower, true
   );
@@ -128,34 +128,34 @@ void factorize_2x2_BLR(BLR_2x2& blr, BLR_2x2& L, BLR_2x2& U) {
   );
 
   // Schur complement into bottom right
-  blr.D(1, 1) -= L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1);
+  A.D(1, 1) -= L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1);
 
   // LU of bottom right
-  L.insert_D(1, 1, Hatrix::Matrix(blr.D(1, 1).rows, blr.D(1, 1).cols));
-  U.insert_D(1, 1, Hatrix::Matrix(blr.D(1, 1).rows, blr.D(1, 1).cols));
-  Hatrix::lu(blr.D(1, 1), L.D(1, 1), U.D(1, 1));
+  L.insert_D(1, 1, Hatrix::Matrix(A.D(1, 1).rows, A.D(1, 1).cols));
+  U.insert_D(1, 1, Hatrix::Matrix(A.D(1, 1).rows, A.D(1, 1).cols));
+  Hatrix::lu(A.D(1, 1), L.D(1, 1), U.D(1, 1));
 
   // Check result by multiplying L and U and comparing with the copy we made
   std::cout << "Factorization errors: \n";
   double top_left_diff = Hatrix::frobenius_norm_diff(
-    L.D(0, 0) * U.D(0, 0), blr_check.D(0, 0)
+    L.D(0, 0) * U.D(0, 0), A_check.D(0, 0)
   );
   std::cout << "Top left error: " << top_left_diff << "\n";
 
   double top_right_diff = Hatrix::frobenius_norm_diff(
-    L.D(0, 0) * U.U(0) * U.S(0, 1) * U.V(1), blr_check.D(0, 1)
+    L.D(0, 0) * U.U(0) * U.S(0, 1) * U.V(1), A_check.D(0, 1)
   );
   std::cout << "Top right error: " << top_right_diff << "\n";
 
   double bottom_left_diff = Hatrix::frobenius_norm_diff(
-    L.U(1) * L.S(1, 0) * L.V(0) * U.D(0, 0), blr_check.D(1, 0)
+    L.U(1) * L.S(1, 0) * L.V(0) * U.D(0, 0), A_check.D(1, 0)
   );
   std::cout << "Bottom left error: " << bottom_left_diff << "\n";
 
   double bottom_right = Hatrix::frobenius_norm_diff(
     L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1)
     + L.D(1, 1) * U.D(1, 1),
-    blr_check.D(1, 1)
+    A_check.D(1, 1)
   );
   std::cout << "Bottom right error: " << bottom_right << "\n\n";
 }
@@ -186,17 +186,17 @@ int main() {
   int64_t rank = 6;
 
   // Build 2x2 BLR and check result
-  BLR_2x2 blr = construct_2x2_BLR(N, rank);
+  BLR_2x2 A = construct_2x2_BLR(N, rank);
 
   // Apply 2x2 BLR to vector for later error checking
   Hatrix::Matrix b0 = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix b1 = Hatrix::generate_random_matrix(N, 1);
-  Hatrix::Matrix z0 = blr.D(0, 0) * b0 + blr.U(0) * blr.S(0, 1) * blr.V(1) * b1;
-  Hatrix::Matrix z1 = blr.U(1) * blr.S(1, 0) * blr.V(0) * b0 + blr.D(1, 1) * b1;
+  Hatrix::Matrix z0 = A.D(0, 0) * b0 + A.U(0) * A.S(0, 1) * A.V(1) * b1;
+  Hatrix::Matrix z1 = A.U(1) * A.S(1, 0) * A.V(0) * b0 + A.D(1, 1) * b1;
 
   // Factorize 2x2 BLR
   BLR_2x2 L, U;
-  factorize_2x2_BLR(blr, L, U);
+  factorize_2x2_BLR(A, L, U);
 
   solve_2x2_BLR(L, U, z0, z1, b0, b1);
 
