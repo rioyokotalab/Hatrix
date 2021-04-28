@@ -104,11 +104,10 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
   return blr;
 }
 
-std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
+void factorize_2x2_BLR(BLR_2x2& blr, BLR_2x2& L, BLR_2x2& U) {
   BLR_2x2 blr_check(blr);
   // Factorize input blr into L and U. blr is destroyed in the process
   // LU of top left
-  BLR_2x2 L, U;
   L.insert_A(0, 0, Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols));
   U.insert_A(0, 0, Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols));
   Hatrix::lu(blr.A(0, 0), L.A(0, 0), U.A(0, 0));
@@ -167,8 +166,6 @@ std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
     blr_check.A(1, 1)
   );
   std::cout << "Bottom right error: " << bottom_right << "\n\n";
-
-  return {std::move(L), std::move(U)};
 }
 
 void solve_2x2_BLR(
@@ -207,7 +204,7 @@ int main() {
 
   // Factorize 2x2 BLR
   BLR_2x2 L, U;
-  std::tie(L, U) = factorize_2x2_BLR(blr);
+  factorize_2x2_BLR(blr, L, U);
 
   solve_2x2_BLR(L, U, z0, z1, b0, b1);
 
