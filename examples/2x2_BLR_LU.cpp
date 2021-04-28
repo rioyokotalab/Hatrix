@@ -104,21 +104,6 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
   return blr;
 }
 
-void apply_blr(
-  const BLR_2x2& blr,
-  const Hatrix::Matrix& b0, const Hatrix::Matrix& b1,
-  Hatrix::Matrix& z0, Hatrix::Matrix& z1
-) {
-  Hatrix::matmul(blr.A(0, 0), b0, z0, false, false, 1, 0);
-  Hatrix::matmul(
-    blr.U(0) * blr.S(0, 1) * blr.V(1), b1, z0, false, false, 1, 1
-  );
-  Hatrix::matmul(
-    blr.U(1) * blr.S(1, 0) * blr.V(0), b0, z1, false, false, 1, 0
-  );
-  Hatrix::matmul(blr.A(1, 1), b1, z1, false, false, 1, 1);
-}
-
 std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
   BLR_2x2 blr_check(blr);
   // Factorize input blr into L and U. blr is destroyed in the process
@@ -217,8 +202,8 @@ int main() {
   // Apply 2x2 BLR to vector for later error checking
   Hatrix::Matrix b0 = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix b1 = Hatrix::generate_random_matrix(N, 1);
-  Hatrix::Matrix z0(N, 1), z1(N, 1);
-  apply_blr(blr, b0, b1, z0, z1);
+  Hatrix::Matrix z0 = blr.A(0, 0) * b0 + blr.U(0) * blr.S(0, 1) * blr.V(1) * b1;
+  Hatrix::Matrix z1 = blr.U(1) * blr.S(1, 0) * blr.V(0) * b0 + blr.A(1, 1) * b1;
 
   // Factorize 2x2 BLR
   BLR_2x2 L, U;
