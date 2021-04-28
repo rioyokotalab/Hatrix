@@ -16,7 +16,7 @@ TEST_P(LUTests, lu){
 
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
 
-  //set a large value on the diagonal to avoid pivoting
+  // Set a large value on the diagonal to avoid pivoting
   int64_t d = m * n;
   int64_t n_diag = A.min_dim();
   for (int64_t i=0; i<n_diag; ++i){
@@ -28,7 +28,7 @@ TEST_P(LUTests, lu){
   Hatrix::lu(A, L, U);
   Hatrix::matmul(L, U, A_rebuilt, false, false, 1, 0);
 
-    // Check result
+  // Check result
   for (int64_t i=0; i<A.rows; ++i) {
     for (int64_t j=0; j<A.cols; ++j) {
       EXPECT_FLOAT_EQ(A_rebuilt(i, j), A_copy(i, j));
