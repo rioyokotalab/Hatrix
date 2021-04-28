@@ -131,7 +131,11 @@ void factorize_2x2_BLR(BLR_2x2& A, BLR_2x2& L, BLR_2x2& U) {
     U.D(0, 0), L.V(0), Hatrix::Right, Hatrix::Upper, false
   );
   // Schur complement into bottom right
-  A.D(1, 1) -= L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1);
+  Hatrix::Matrix SxVxUxSxV = (
+    (L.S(1, 0) * (L.V(0) * U.U(0)) * U.S(0, 1)) * U.V(1)
+  );
+  // Use matmul here for fused-multiply-add
+  Hatrix::matmul(L.U(1), SxVxUxSxV, A.D(1, 1), false, false, -1, 1);
   // LU of bottom right
   Hatrix::lu(A.D(1, 1), L.D(1, 1), U.D(1, 1));
   // Factorization finished
