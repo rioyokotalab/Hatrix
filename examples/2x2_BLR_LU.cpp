@@ -120,10 +120,9 @@ void factorize_2x2_BLR(BLR_2x2& A, BLR_2x2& L, BLR_2x2& U) {
   U.insert_S(0, 1, std::move(A.S(0, 1)));
   U.insert_V(1, std::move(A.V(1)));
 
-  // Factorize input A into L and U. A is destroyed in the process
+  // Factorize input A into L and U
   // LU of top left
   Hatrix::lu(A.D(0, 0), L.D(0, 0), U.D(0, 0));
-
   // TRSMs
   Hatrix::solve_triangular(
     L.D(0, 0), U.U(0), Hatrix::Left, Hatrix::Lower, true
@@ -131,12 +130,11 @@ void factorize_2x2_BLR(BLR_2x2& A, BLR_2x2& L, BLR_2x2& U) {
   Hatrix::solve_triangular(
     U.D(0, 0), L.V(0), Hatrix::Right, Hatrix::Upper, false
   );
-
   // Schur complement into bottom right
   A.D(1, 1) -= L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1);
-
   // LU of bottom right
   Hatrix::lu(A.D(1, 1), L.D(1, 1), U.D(1, 1));
+  // Factorization finished
 
   // Check result by multiplying L and U and comparing with the copy we made
   std::cout << "Factorization errors: \n";
