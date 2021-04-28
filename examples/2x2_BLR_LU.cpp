@@ -167,20 +167,20 @@ void factorize_2x2_BLR(BLR_2x2& A, BLR_2x2& L, BLR_2x2& U) {
 
 void solve_2x2_BLR(
   const BLR_2x2& L, const BLR_2x2& U,
-  Hatrix::Matrix& z0, Hatrix::Matrix& z1,
+  Hatrix::Matrix& x0, Hatrix::Matrix& x1,
   const Hatrix::Matrix& b0, const Hatrix::Matrix& b1
 ) {
   // Forward substitution
-  Hatrix::solve_triangular(L.D(0, 0), z0, Hatrix::Left, Hatrix::Lower, true);
-  Hatrix::matmul(L.U(1) * L.S(1, 0) * L.V(0), z0, z1, false, false, -1, 1);
-  Hatrix::solve_triangular(L.D(1, 1), z1, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::solve_triangular(L.D(0, 0), x0, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::matmul(L.U(1) * L.S(1, 0) * L.V(0), x0, x1, false, false, -1, 1);
+  Hatrix::solve_triangular(L.D(1, 1), x1, Hatrix::Left, Hatrix::Lower, true);
   // Backward substitution
-  Hatrix::solve_triangular(U.D(1, 1), z1, Hatrix::Left, Hatrix::Upper, false);
-  Hatrix::matmul(U.U(0) * U.S(0, 1) * U.V(1), z1, z0, false, false, -1, 1);
-  Hatrix::solve_triangular(U.D(0, 0), z0, Hatrix::Left, Hatrix::Upper, false);
+  Hatrix::solve_triangular(U.D(1, 1), x1, Hatrix::Left, Hatrix::Upper, false);
+  Hatrix::matmul(U.U(0) * U.S(0, 1) * U.V(1), x1, x0, false, false, -1, 1);
+  Hatrix::solve_triangular(U.D(0, 0), x0, Hatrix::Left, Hatrix::Upper, false);
 
   double error = (
-    Hatrix::frobenius_norm_diff(b0, z0) + Hatrix::frobenius_norm_diff(b1, z1)
+    Hatrix::frobenius_norm_diff(b0, x0) + Hatrix::frobenius_norm_diff(b1, x1)
   );
   std::cout << "Solution error: " << error << "\n";
 }
@@ -196,14 +196,14 @@ int main() {
   // Apply 2x2 BLR to vector for later error checking
   Hatrix::Matrix b0 = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix b1 = Hatrix::generate_random_matrix(N, 1);
-  Hatrix::Matrix z0 = A.D(0, 0) * b0 + A.U(0) * A.S(0, 1) * A.V(1) * b1;
-  Hatrix::Matrix z1 = A.U(1) * A.S(1, 0) * A.V(0) * b0 + A.D(1, 1) * b1;
+  Hatrix::Matrix x0 = A.D(0, 0) * b0 + A.U(0) * A.S(0, 1) * A.V(1) * b1;
+  Hatrix::Matrix x1 = A.U(1) * A.S(1, 0) * A.V(0) * b0 + A.D(1, 1) * b1;
 
   // Factorize 2x2 BLR
   BLR_2x2 L, U;
   factorize_2x2_BLR(A, L, U);
 
-  solve_2x2_BLR(L, U, z0, z1, b0, b1);
+  solve_2x2_BLR(L, U, x0, x1, b0, b1);
 
   return 0;
 }
