@@ -2,6 +2,7 @@
 
 #include "Hatrix/classes/Matrix.h"
 #include "Hatrix/functions/arithmetics.h"
+#include "Hatrix/functions/lapack.h"
 
 #include <cassert>
 #include <cstdint>
@@ -14,13 +15,19 @@ using std::int64_t;
 namespace Hatrix {
 
 double frobenius_norm(const Matrix& A) {
-  double norm = 0;
-  for (int64_t i=0; i<A.rows; ++i) {
-    for (int64_t j=0; j<A.cols; ++j) {
-      norm += A(i, j) * A(i, j);
-    }
-  }
-  return std::sqrt(norm);
+  return calc_norm(A, Norm::FrobeniusNorm);
+}
+
+double one_norm(const Matrix& A) {
+  return calc_norm(A, Norm::OneNorm);
+}
+
+double max_norm(const Matrix& A) {
+  return calc_norm(A, Norm::MaxNorm);
+}
+
+double infinity_norm(const Matrix& A) {
+  return calc_norm(A, Norm::InfinityNorm);
 }
 
 double frobenius_norm_diff(const Matrix& A, const Matrix& B) {
