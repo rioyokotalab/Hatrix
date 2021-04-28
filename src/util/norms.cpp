@@ -15,19 +15,19 @@ using std::int64_t;
 namespace Hatrix {
 
 double frobenius_norm(const Matrix& A) {
-  return norm(A, FrobeniusNorm);
+  return calc_norm(A, Norm::FrobeniusNorm);
 }
 
 double one_norm(const Matrix& A) {
-  return norm(A, OneNorm);
+  return calc_norm(A, Norm::OneNorm);
 }
 
 double max_norm(const Matrix& A) {
-  return norm(A, MaxNorm);
+  return calc_norm(A, Norm::MaxNorm);
 }
 
 double infinity_norm(const Matrix& A) {
-  return norm(A, InfinityNorm);
+  return calc_norm(A, Norm::InfinityNorm);
 }
 
 double frobenius_norm_diff(const Matrix& A, const Matrix& B) {

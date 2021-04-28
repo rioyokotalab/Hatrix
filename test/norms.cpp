@@ -28,7 +28,7 @@ TEST_P(NormTests, OneNorm){
       norm = sum;
   }
 
-  EXPECT_FLOAT_EQ(norm, Hatrix::norm(A, Hatrix::OneNorm));
+  EXPECT_FLOAT_EQ(norm, Hatrix::calc_norm(A, Hatrix::Norm::OneNorm));
   EXPECT_FLOAT_EQ(norm, Hatrix::one_norm(A));
 }
 
@@ -48,7 +48,7 @@ TEST_P(NormTests, MaxNorm){
     }
   }
   
-  EXPECT_FLOAT_EQ(norm, Hatrix::norm(A, Hatrix::MaxNorm));
+  EXPECT_FLOAT_EQ(norm, Hatrix::calc_norm(A, Hatrix::Norm::MaxNorm));
   EXPECT_FLOAT_EQ(norm, Hatrix::max_norm(A));
 }
 
@@ -68,7 +68,7 @@ TEST_P(NormTests, InfNorm){
       norm = sum;
   }
   
-  EXPECT_FLOAT_EQ(norm, Hatrix::norm(A, Hatrix::InfinityNorm));
+  EXPECT_FLOAT_EQ(norm, Hatrix::calc_norm(A, Hatrix::Norm::InfinityNorm));
   EXPECT_FLOAT_EQ(norm, Hatrix::infinity_norm(A));
 }
 
@@ -86,7 +86,7 @@ TEST_P(NormTests, FrobNorm){
   }
   norm = std::sqrt(norm);
 
-  EXPECT_FLOAT_EQ(norm, Hatrix::norm(A, Hatrix::FrobeniusNorm));
+  EXPECT_FLOAT_EQ(norm, Hatrix::calc_norm(A, Hatrix::Norm::FrobeniusNorm));
   EXPECT_FLOAT_EQ(norm, Hatrix::frobenius_norm(A));
 }
 
