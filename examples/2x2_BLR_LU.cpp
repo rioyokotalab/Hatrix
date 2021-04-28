@@ -30,7 +30,7 @@ struct hash<std::tuple<int64_t, int64_t>> {
 class BLR_2x2 {
  private:
   // BLR stored in set of maps
-  std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> A_;
+  std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> D_;
   std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> S_;
   std::unordered_map<int64_t, Hatrix::Matrix> U_;
   std::unordered_map<int64_t, Hatrix::Matrix> V_;
@@ -43,12 +43,12 @@ class BLR_2x2 {
     return S_.at({row ,col});
   }
 
-  void insert_A(int64_t row, int64_t col, Hatrix::Matrix&& A) {
-    A_.emplace(std::make_tuple(row, col), std::move(A));
+  void insert_D(int64_t row, int64_t col, Hatrix::Matrix&& D) {
+    D_.emplace(std::make_tuple(row, col), std::move(D));
   }
-  Hatrix::Matrix& A(int64_t row, int64_t col) { return A_.at({row, col}); }
-  const Hatrix::Matrix& A(int64_t row, int64_t col) const {
-    return A_.at({row ,col});
+  Hatrix::Matrix& D(int64_t row, int64_t col) { return D_.at({row, col}); }
+  const Hatrix::Matrix& D(int64_t row, int64_t col) const {
+    return D_.at({row ,col});
   }
 
   void insert_U(int64_t row, Hatrix::Matrix&& U) {
@@ -73,14 +73,14 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       Hatrix::Matrix diag = Hatrix::generate_random_matrix(N, N);
       // Prevent pivoting
       for (int64_t i=0; i<diag.min_dim(); ++i) diag(i, i) += 2;
-      blr.insert_A(i, j, std::move(diag));
+      blr.insert_D(i, j, std::move(diag));
     } else {
-      blr.insert_A(i, j, Hatrix::generate_low_rank_matrix(N, N));
+      blr.insert_D(i, j, Hatrix::generate_low_rank_matrix(N, N));
       blr.insert_S(i, j, Hatrix::Matrix(N, N));
       blr.insert_U(i, Hatrix::Matrix(N, N));
       blr.insert_V(j, Hatrix::Matrix(N, N));
       // Make copy so we can compare norms later
-      Hatrix::Matrix A_work(blr.A(i, j));
+      Hatrix::Matrix A_work(blr.D(i, j));
       expected_err[{i, j}] = Hatrix::truncated_svd(
         A_work, blr.U(i), blr.S(i, j), blr.V(j), rank
       );
@@ -94,7 +94,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       continue;
     } else {
       error += Hatrix::frobenius_norm_diff(
-        blr.U(i) * blr.S(i, j) * blr.V(j), blr.A(i, j)
+        blr.U(i) * blr.S(i, j) * blr.V(j), blr.D(i, j)
       );
       expected += expected_err[{i, j}];
     }
@@ -108,9 +108,9 @@ void factorize_2x2_BLR(BLR_2x2& blr, BLR_2x2& L, BLR_2x2& U) {
   BLR_2x2 blr_check(blr);
   // Factorize input blr into L and U. blr is destroyed in the process
   // LU of top left
-  L.insert_A(0, 0, Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols));
-  U.insert_A(0, 0, Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols));
-  Hatrix::lu(blr.A(0, 0), L.A(0, 0), U.A(0, 0));
+  L.insert_D(0, 0, Hatrix::Matrix(blr.D(0, 0).rows, blr.D(0, 0).cols));
+  U.insert_D(0, 0, Hatrix::Matrix(blr.D(0, 0).rows, blr.D(0, 0).cols));
+  Hatrix::lu(blr.D(0, 0), L.D(0, 0), U.D(0, 0));
 
   // TRSMs
   // Move over bottem left block to L, top right block to U
@@ -121,41 +121,41 @@ void factorize_2x2_BLR(BLR_2x2& blr, BLR_2x2& L, BLR_2x2& U) {
   U.insert_S(0, 1, std::move(blr.S(0, 1)));
   U.insert_V(1, std::move(blr.V(1)));
   Hatrix::solve_triangular(
-    L.A(0, 0), U.U(0), Hatrix::Left, Hatrix::Lower, true
+    L.D(0, 0), U.U(0), Hatrix::Left, Hatrix::Lower, true
   );
   Hatrix::solve_triangular(
-    U.A(0, 0), L.V(0), Hatrix::Right, Hatrix::Upper, false
+    U.D(0, 0), L.V(0), Hatrix::Right, Hatrix::Upper, false
   );
 
   // Schur complement into bottom right
-  blr.A(1, 1) -= L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1);
+  blr.D(1, 1) -= L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1);
 
   // LU of bottom right
-  L.insert_A(1, 1, Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols));
-  U.insert_A(1, 1, Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols));
-  Hatrix::lu(blr.A(1, 1), L.A(1, 1), U.A(1, 1));
+  L.insert_D(1, 1, Hatrix::Matrix(blr.D(1, 1).rows, blr.D(1, 1).cols));
+  U.insert_D(1, 1, Hatrix::Matrix(blr.D(1, 1).rows, blr.D(1, 1).cols));
+  Hatrix::lu(blr.D(1, 1), L.D(1, 1), U.D(1, 1));
 
   // Check result by multiplying L and U and comparing with the copy we made
   std::cout << "Factorization errors: \n";
   double top_left_diff = Hatrix::frobenius_norm_diff(
-    L.A(0, 0) * U.A(0, 0), blr_check.A(0, 0)
+    L.D(0, 0) * U.D(0, 0), blr_check.D(0, 0)
   );
   std::cout << "Top left error: " << top_left_diff << "\n";
 
   double top_right_diff = Hatrix::frobenius_norm_diff(
-    L.A(0, 0) * U.U(0) * U.S(0, 1) * U.V(1), blr_check.A(0, 1)
+    L.D(0, 0) * U.U(0) * U.S(0, 1) * U.V(1), blr_check.D(0, 1)
   );
   std::cout << "Top right error: " << top_right_diff << "\n";
 
   double bottom_left_diff = Hatrix::frobenius_norm_diff(
-    L.U(1) * L.S(1, 0) * L.V(0) * U.A(0, 0), blr_check.A(1, 0)
+    L.U(1) * L.S(1, 0) * L.V(0) * U.D(0, 0), blr_check.D(1, 0)
   );
   std::cout << "Bottom left error: " << bottom_left_diff << "\n";
 
   double bottom_right = Hatrix::frobenius_norm_diff(
     L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1)
-    + L.A(1, 1) * U.A(1, 1),
-    blr_check.A(1, 1)
+    + L.D(1, 1) * U.D(1, 1),
+    blr_check.D(1, 1)
   );
   std::cout << "Bottom right error: " << bottom_right << "\n\n";
 }
@@ -166,13 +166,13 @@ void solve_2x2_BLR(
   const Hatrix::Matrix& b0, const Hatrix::Matrix& b1
 ) {
   // Forward substitution
-  Hatrix::solve_triangular(L.A(0, 0), z0, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::solve_triangular(L.D(0, 0), z0, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::matmul(L.U(1) * L.S(1, 0) * L.V(0), z0, z1, false, false, -1, 1);
-  Hatrix::solve_triangular(L.A(1, 1), z1, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::solve_triangular(L.D(1, 1), z1, Hatrix::Left, Hatrix::Lower, true);
   // Backward substitution
-  Hatrix::solve_triangular(U.A(1, 1), z1, Hatrix::Left, Hatrix::Upper, false);
+  Hatrix::solve_triangular(U.D(1, 1), z1, Hatrix::Left, Hatrix::Upper, false);
   Hatrix::matmul(U.U(0) * U.S(0, 1) * U.V(1), z1, z0, false, false, -1, 1);
-  Hatrix::solve_triangular(U.A(0, 0), z0, Hatrix::Left, Hatrix::Upper, false);
+  Hatrix::solve_triangular(U.D(0, 0), z0, Hatrix::Left, Hatrix::Upper, false);
 
   double error = (
     Hatrix::frobenius_norm_diff(b0, z0) + Hatrix::frobenius_norm_diff(b1, z1)
@@ -191,8 +191,8 @@ int main() {
   // Apply 2x2 BLR to vector for later error checking
   Hatrix::Matrix b0 = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix b1 = Hatrix::generate_random_matrix(N, 1);
-  Hatrix::Matrix z0 = blr.A(0, 0) * b0 + blr.U(0) * blr.S(0, 1) * blr.V(1) * b1;
-  Hatrix::Matrix z1 = blr.U(1) * blr.S(1, 0) * blr.V(0) * b0 + blr.A(1, 1) * b1;
+  Hatrix::Matrix z0 = blr.D(0, 0) * b0 + blr.U(0) * blr.S(0, 1) * blr.V(1) * b1;
+  Hatrix::Matrix z1 = blr.U(1) * blr.S(1, 0) * blr.V(0) * b0 + blr.D(1, 1) * b1;
 
   // Factorize 2x2 BLR
   BLR_2x2 L, U;
