@@ -35,21 +35,33 @@ class BLR_2x2 {
   std::unordered_map<int64_t, Hatrix::Matrix> U_;
   std::unordered_map<int64_t, Hatrix::Matrix> V_;
  public:
-  Hatrix::Matrix& S(int64_t row, int64_t col) { return S_[{row, col}]; }
+  void insert_S(int64_t row, int64_t col, Hatrix::Matrix&& S) {
+    S_.emplace(std::make_tuple(row, col), std::move(S));
+  }
+  Hatrix::Matrix& S(int64_t row, int64_t col) { return S_.at({row, col}); }
   const Hatrix::Matrix& S(int64_t row, int64_t col) const {
     return S_.at({row ,col});
   }
 
-  Hatrix::Matrix& A(int64_t row, int64_t col) { return A_[{row, col}]; }
+  void insert_A(int64_t row, int64_t col, Hatrix::Matrix&& A) {
+    A_.emplace(std::make_tuple(row, col), std::move(A));
+  }
+  Hatrix::Matrix& A(int64_t row, int64_t col) { return A_.at({row, col}); }
   const Hatrix::Matrix& A(int64_t row, int64_t col) const {
     return A_.at({row ,col});
   }
 
-  Hatrix::Matrix& U(int64_t row) { return U_[row]; }
+  void insert_U(int64_t row, Hatrix::Matrix&& U) {
+    U_.emplace(row, std::move(U));
+  }
+  Hatrix::Matrix& U(int64_t row) { return U_.at(row); }
   const Hatrix::Matrix& U(int64_t row) const { return U_.at(row); }
 
-  Hatrix::Matrix& V(int64_t row) { return V_[row]; }
-  const Hatrix::Matrix& V(int64_t row) const { return V_.at(row); }
+  void insert_V(int64_t col, Hatrix::Matrix&& V) {
+    V_.emplace(col, std::move(V));
+  }
+  Hatrix::Matrix& V(int64_t col) { return V_.at(col); }
+  const Hatrix::Matrix& V(int64_t col) const { return V_.at(col); }
 };
 
 BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
@@ -64,12 +76,12 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       for (int64_t i=0; i<diag.min_dim(); ++i) {
         diag(i, i) += diag_add--;
       }
-      blr.A(i, j) = std::move(diag);
+      blr.insert_A(i, j, std::move(diag));
     } else {
-      blr.A(i, j) = Hatrix::generate_low_rank_matrix(N, N);
-      blr.S(i, j) = Hatrix::Matrix(N, N);
-      blr.U(i) = Hatrix::Matrix(N, N);
-      blr.V(j) = Hatrix::Matrix(N, N);
+      blr.insert_A(i, j, Hatrix::generate_low_rank_matrix(N, N));
+      blr.insert_S(i, j, Hatrix::Matrix(N, N));
+      blr.insert_U(i, Hatrix::Matrix(N, N));
+      blr.insert_V(j, Hatrix::Matrix(N, N));
       // Make copy so we can compare norms later
       Hatrix::Matrix A_work(blr.A(i, j));
       tolerances[{i, j}] = Hatrix::truncated_svd(
@@ -95,10 +107,11 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
   return blr;
 }
 
-std::tuple<Hatrix::Matrix, Hatrix::Matrix> apply_blr(
-  const BLR_2x2& blr, Hatrix::Matrix& b0, Hatrix::Matrix& b1
+void apply_blr(
+  const BLR_2x2& blr,
+  const Hatrix::Matrix& b0, const Hatrix::Matrix& b1,
+  Hatrix::Matrix& z0, Hatrix::Matrix& z1
 ) {
-  Hatrix::Matrix z0(b0.rows, 1), z1(b1.rows, 1);
   Hatrix::matmul(blr.A(0, 0), b0, z0, false, false, 1, 0);
   Hatrix::matmul(
     blr.U(0) * blr.S(0, 1) * blr.V(1), b1, z0, false, false, 1, 1
@@ -107,7 +120,6 @@ std::tuple<Hatrix::Matrix, Hatrix::Matrix> apply_blr(
     blr.U(1) * blr.S(1, 0) * blr.V(0), b0, z1, false, false, 1, 0
   );
   Hatrix::matmul(blr.A(1, 1), b1, z1, false, false, 1, 1);
-  return {std::move(z0), std::move(z1)};
 }
 
 std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
@@ -115,18 +127,18 @@ std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
   // Factorize input blr into L and U. blr is destroyed in the process
   // LU of top left
   BLR_2x2 L, U;
-  L.A(0, 0) = Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols);
-  U.A(0, 0) = Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols);
+  L.insert_A(0, 0, Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols));
+  U.insert_A(0, 0, Hatrix::Matrix(blr.A(0, 0).rows, blr.A(0, 0).cols));
   Hatrix::lu(blr.A(0, 0), L.A(0, 0), U.A(0, 0));
 
   // TRSMs
   // Move over bottem left block to L, top right block to U
-  L.U(1) = std::move(blr.U(1));
-  L.S(1, 0) = std::move(blr.S(1, 0));
-  L.V(0) = std::move(blr.V(0));
-  U.U(0) = std::move(blr.U(0));
-  U.S(0, 1) = std::move(blr.S(0, 1));
-  U.V(1) = std::move(blr.V(1));
+  L.insert_U(1, std::move(blr.U(1)));
+  L.insert_S(1, 0, std::move(blr.S(1, 0)));
+  L.insert_V(0, std::move(blr.V(0)));
+  U.insert_U(0, std::move(blr.U(0)));
+  U.insert_S(0, 1, std::move(blr.S(0, 1)));
+  U.insert_V(1, std::move(blr.V(1)));
   Hatrix::solve_triangular(
     L.A(0, 0), U.U(0), Hatrix::Left, Hatrix::Lower, true
   );
@@ -146,8 +158,8 @@ std::tuple<BLR_2x2, BLR_2x2> factorize_2x2_BLR(BLR_2x2& blr) {
   Hatrix::matmul(UxSxVxUxS, U.V(1), blr.A(1, 1), false, false, -1);
 
   // LU of bottom right
-  L.A(1, 1) = Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols);
-  U.A(1, 1) = Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols);
+  L.insert_A(1, 1, Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols));
+  U.insert_A(1, 1, Hatrix::Matrix(blr.A(1, 1).rows, blr.A(1, 1).cols));
   Hatrix::lu(blr.A(1, 1), L.A(1, 1), U.A(1, 1));
 
   // Check result by multiplying L and U and comparing with the copy we made
@@ -208,8 +220,8 @@ int main() {
   // Apply 2x2 BLR to vector for later error checking
   Hatrix::Matrix b0 = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix b1 = Hatrix::generate_random_matrix(N, 1);
-  Hatrix::Matrix z0, z1;
-  std::tie(z0, z1) = apply_blr(blr, b0, b1);
+  Hatrix::Matrix z0(N, 1), z1(N, 1);
+  apply_blr(blr, b0, b1, z0, z1);
 
   // Factorize 2x2 BLR
   BLR_2x2 L, U;
