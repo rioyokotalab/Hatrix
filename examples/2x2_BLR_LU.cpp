@@ -66,16 +66,13 @@ class BLR_2x2 {
 
 BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
   BLR_2x2 blr;
-  // Also store tolerances to check against later
-  std::unordered_map<std::tuple<int64_t, int64_t>, double> tolerances;
-  double diag_add = 2*N * 2*N;
+  // Also store expected errors to check against later
+  std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
   for (int64_t i=0; i<2; ++i) for (int64_t j=0; j<2; ++j) {
     if (i == j) {
       Hatrix::Matrix diag = Hatrix::generate_random_matrix(N, N);
       // Prevent pivoting
-      for (int64_t i=0; i<diag.min_dim(); ++i) {
-        diag(i, i) += diag_add--;
-      }
+      for (int64_t i=0; i<diag.min_dim(); ++i) diag(i, i) += 2;
       blr.insert_A(i, j, std::move(diag));
     } else {
       blr.insert_A(i, j, Hatrix::generate_low_rank_matrix(N, N));
@@ -84,7 +81,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       blr.insert_V(j, Hatrix::Matrix(N, N));
       // Make copy so we can compare norms later
       Hatrix::Matrix A_work(blr.A(i, j));
-      tolerances[{i, j}] = Hatrix::truncated_svd(
+      expected_err[{i, j}] = Hatrix::truncated_svd(
         A_work, blr.U(i), blr.S(i, j), blr.V(j), rank
       );
     }
@@ -99,7 +96,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       error += Hatrix::frobenius_norm_diff(
         blr.U(i) * blr.S(i, j) * blr.V(j), blr.A(i, j)
       );
-      expected += tolerances[{i, j}];
+      expected += expected_err[{i, j}];
     }
   }
   std::cout << "Construction error: " << error << "  (expected: ";
