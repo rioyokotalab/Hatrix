@@ -68,6 +68,19 @@ TEST_P(ArithmeticTests, MinusEqualsOperator) {
   }
 }
 
+
+TEST_P(ArithmeticTests, abs) {
+  int64_t m, n;
+  std::tie(m, n) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_check = abs(A);
+
+  for (int64_t i=0; i<A.rows; ++i) for (int64_t j=0; j<A.cols; ++j) {
+    EXPECT_EQ(A_check(i, j), A(i, j) < 0 ? -A(i, j) : A(i, j));
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(
   LAPACK, ArithmeticTests,
   testing::Values(
