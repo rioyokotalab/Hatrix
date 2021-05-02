@@ -11,6 +11,7 @@ list(APPEND GTEST_TESTS
   svd
   matrix_generators
   norms
+  errors
   scale
 )
 
