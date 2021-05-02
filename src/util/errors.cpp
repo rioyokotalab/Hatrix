@@ -28,12 +28,11 @@ double comp_bw_error(const Matrix& residual, const Matrix& A, const Matrix& x, c
   assert (A.rows == residual.rows && A.rows == b.rows);
   assert (A.cols == x.rows);
 
-  Matrix temp = abs(A) * abs(x) + abs(b);
-  Matrix abs_residual = abs(residual);
+  Matrix temp = abs(A) * abs(x);
 
   double comp_error, error = 0;
   for (int64_t i=0; i<residual.rows; ++i){
-    comp_error = abs_residual(i, 0) / temp(i, 0);
+    comp_error = std::abs(residual(i, 0)) / (temp(i, 0) + std::abs(b(i, 0)));
     if (comp_error > error)
       error = comp_error;
   }
