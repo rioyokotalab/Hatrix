@@ -46,6 +46,7 @@ add_library(Hatrix
   src/functions/arithmetics.cpp
   src/util/matrix_generators.cpp
   src/util/norms.cpp
+  src/util/errors.cpp
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
 
