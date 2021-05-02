@@ -14,7 +14,6 @@ class MatrixGeneratorTests : public testing::TestWithParam<std::tuple<int64_t, i
 TEST(MatrixGeneratorTests, from_csv1_no_params){
   const int64_t N = 5;
 
-  //TODO change to relative path somehow
   Hatrix::Matrix A = Hatrix::generate_from_csv("../test/testdata/readCSV1.csv");
   EXPECT_EQ(A.rows, N);
   EXPECT_EQ(A.cols, N);
@@ -37,7 +36,6 @@ TEST(MatrixGeneratorTests, from_csv1_no_params){
 TEST(MatrixGeneratorTests, from_csv2_no_params){
   const int64_t N = 5;
 
-  //TODO change to relative path somehow
   Hatrix::Matrix A = Hatrix::generate_from_csv("../test/testdata/readCSV2.csv");
   EXPECT_EQ(A.rows, N);
   EXPECT_EQ(A.cols, N);
@@ -62,7 +60,6 @@ TEST_P(MatrixGeneratorTests, from_csv1){
   const int64_t N = 5;
   std::tie(m, n) = GetParam();
 
-  //TODO change to relative path somehow
   Hatrix::Matrix A = Hatrix::generate_from_csv("../test/testdata/readCSV1.csv", ',', m, n);
   EXPECT_EQ(A.rows, m);
   EXPECT_EQ(A.cols, n);
@@ -90,7 +87,6 @@ TEST_P(MatrixGeneratorTests, from_csv2){
   const int64_t N = 5;
   std::tie(m, n) = GetParam();
 
-  //TODO change to relative path somehow
   Hatrix::Matrix A = Hatrix::generate_from_csv("../test/testdata/readCSV2.csv", ',', m, n);
   EXPECT_EQ(A.rows, m);
   EXPECT_EQ(A.cols, n);
