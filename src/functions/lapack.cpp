@@ -16,6 +16,7 @@
 using std::int64_t;
 #include <cmath>
 #include <vector>
+#include <iostream>
 
 
 namespace Hatrix {
@@ -78,15 +79,18 @@ void lup(Matrix& A, Matrix& L, Matrix& U, Matrix& P) {
   // L: set diagonal to 1 and upper triangular matrix to 0
   LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.rows);
 
+  // create proper pivot vector
+  std::vector<int64_t> pivots(A.rows);
+  for (size_t i=0; i<pivots.size(); ++i)
+    pivots[i] = i;
+  // exchange rows
+  for (size_t i=0; i<ipiv.size(); ++i){
+    std::swap(pivots[ipiv[i]-1], pivots[i]);}
+  
   // create permutation matrix P
   P = 0;
-  for (size_t i=0; i<ipiv.size(); ++i)
-    P(ipiv[i] - 1 ,i) = 1;
-
-  if (P.rows > ipiv.size()){
-    for (int64_t i=ipiv.size(); i<P.rows; ++i)
-      P(i, i) = 1;
-  }
+  for (size_t i=0; i<pivots.size(); ++i)
+    P(i, pivots[i]) = 1;
 }
 
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
