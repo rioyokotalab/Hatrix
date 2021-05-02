@@ -44,6 +44,7 @@ add_library(Hatrix
   src/functions/blas.cpp
   src/functions/lapack.cpp
   src/functions/arithmetics.cpp
+  src/functions/iterative_refinement.cpp
   src/util/matrix_generators.cpp
   src/util/norms.cpp
   src/util/errors.cpp
