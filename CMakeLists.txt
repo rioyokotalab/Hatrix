@@ -42,10 +42,11 @@ add_library(Hatrix
   src/classes/Matrix.cpp
   src/functions/arithmetics.cpp
   src/functions/blas.cpp
+  src/functions/iterative_refinement.cpp
   src/functions/lapack.cpp
+  src/util/errors.cpp
   src/util/matrix_generators.cpp
   src/util/norms.cpp
-  src/util/errors.cpp
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
 
