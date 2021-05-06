@@ -7,7 +7,6 @@ using std::int64_t;
 #include <string>
 #include <tuple>
 #include <cmath>
-#include <iostream>
 
 
 class NormTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>>{};
