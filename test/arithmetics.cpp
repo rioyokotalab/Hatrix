@@ -13,6 +13,9 @@ class ArithmeticTests : public testing::TestWithParam<std::tuple<int64_t, int64_
 class MatMulOperatorTests : public testing::TestWithParam<
   std::tuple<int64_t, int64_t, int64_t>
 > {};
+class ScalarMulOperatorTests : public testing::TestWithParam<
+  std::tuple<int64_t, int64_t, double>
+> {};
 
 TEST_P(ArithmeticTests, PlusOperator) {
   int64_t m, n;
@@ -67,7 +70,6 @@ TEST_P(ArithmeticTests, MinusEqualsOperator) {
     EXPECT_EQ(A_check(i, j) - B(i, j), A(i, j));
   }
 }
-
 
 TEST_P(ArithmeticTests, abs) {
   int64_t m, n;
@@ -126,6 +128,40 @@ INSTANTIATE_TEST_SUITE_P(
       "M" + std::to_string(std::get<0>(info.param))
       + "K" + std::to_string(std::get<1>(info.param))
       + "N" + std::to_string(std::get<2>(info.param))
+    );
+    return name;
+  }
+);
+
+TEST_P(ScalarMulOperatorTests, ScalarMultiplicationOperator) {
+  int64_t M, N;
+  double alpha;
+  std::tie(M, N, alpha) = GetParam();
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
+  Hatrix::Matrix B = A * alpha;
+  Hatrix::Matrix C = alpha * A;
+  Hatrix::scale(A, alpha);
+
+  // Check result
+  for (int64_t i=0; i<M; ++i) {
+    for (int64_t j=0; j<N; ++j) {
+      EXPECT_EQ(A(i, j), C(i, j));
+      EXPECT_EQ(A(i, j), B(i, j));
+    }
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+  Operator, ScalarMulOperatorTests,
+  testing::Values(
+    std::make_tuple(5, 5, 7.9834),
+    std::make_tuple(11, 21, -4),
+    std::make_tuple(18, 5, 1/8)
+   ),
+  [](const testing::TestParamInfo<ScalarMulOperatorTests::ParamType>& info) {
+    std::string name = (
+      "M" + std::to_string(std::get<0>(info.param))
+      + "N" + std::to_string(std::get<1>(info.param))
     );
     return name;
   }
