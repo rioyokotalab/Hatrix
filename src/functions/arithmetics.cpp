@@ -47,6 +47,18 @@ Matrix operator*(const Matrix& A, const Matrix& B) {
   return C;
 }
 
+Matrix operator*(const Matrix& A, double alpha) {
+  Matrix C(A);
+  Hatrix::scale(C, alpha);
+  return C;
+}
+
+Matrix operator*(double alpha, const Matrix& A) {
+  Matrix C(A);
+  Hatrix::scale(C, alpha);
+  return C;
+}
+
 Matrix abs(const Matrix& A) {
   Matrix A_abs(A.rows, A.cols);
   for (int64_t j=0; j<A.cols; ++j)
