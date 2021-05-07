@@ -33,10 +33,4 @@ ctest
 printf "#### Done\n\n"
 cd ..
 
-#################### Final cleanup                          ####################
-printf "#### Cleanup... "
-cd ..
-rm -rf Hatrix
-printf "Done\n"
-
 exit 0
