@@ -1,6 +1,6 @@
 #!/bin/bash
 #!/bin/bash
-#YBATCH -r any
+#YBATCH -r any_1
 #SBATCH -N 1
 #SBATCH -J TEST_HATRIX
 #SBATCH --time=01:00:00
