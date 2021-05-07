@@ -1,4 +1,12 @@
 #!/bin/bash
+#!/bin/bash
+#YBATCH -r epyc-7502_8
+#SBATCH -N 1
+#SBATCH -J TEST_HATRIX
+#SBATCH --time=10:00:00
+#SBATCH --mail-user=deshmukh.s.aa@m.titech.ac.jp
+#SBATCH --mail-type=ALL
+
 set -e
 
 if [ $1 == "" ]; then
@@ -11,10 +19,7 @@ printf "#### Setting up environment... "
 source /etc/profile.d/modules.sh
 printf "Done\n"
 
-printf "#### Cloning Hatrix to ~/dev/sandbox/Hatrix... \n"
-cd dev/sandbox
-git clone --depth 1 --branch $HATRIX_BRANCH git@github.com:rioyokotalab/Hatrix.git
-cd Hatrix
+cd $HOME/dev/sandbox/Hatrix
 printf "#### Done\n"
 
 #################### CPU only build                         ####################
