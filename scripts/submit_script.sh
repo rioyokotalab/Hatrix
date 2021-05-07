@@ -1,7 +1,7 @@
 rm -rf $HOME/dev/sandbox
 mkdir -p $HOME/dev/sandbox
 cd $HOME/dev/sandbox
-git clone --depth 1 --branch feature/SC_automation git@github.com:rioyokotalab/Hatrix.git
+git clone --depth 1 --branch dev git@github.com:rioyokotalab/Hatrix.git
 cd Hatrix
 
 echo `pwd`
