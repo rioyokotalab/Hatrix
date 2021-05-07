@@ -11,7 +11,7 @@ class Matrix {
   int64_t rows = 0;
   int64_t cols = 0;
 
-  Matrix() = default;
+  Matrix() = delete;
 
   ~Matrix();
 

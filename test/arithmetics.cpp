@@ -13,6 +13,9 @@ class ArithmeticTests : public testing::TestWithParam<std::tuple<int64_t, int64_
 class MatMulOperatorTests : public testing::TestWithParam<
   std::tuple<int64_t, int64_t, int64_t>
 > {};
+class ScalarMulOperatorTests : public testing::TestWithParam<
+  std::tuple<int64_t, int64_t, double>
+> {};
 
 TEST_P(ArithmeticTests, PlusOperator) {
   int64_t m, n;
@@ -68,6 +71,18 @@ TEST_P(ArithmeticTests, MinusEqualsOperator) {
   }
 }
 
+TEST_P(ArithmeticTests, abs) {
+  int64_t m, n;
+  std::tie(m, n) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_check = abs(A);
+
+  for (int64_t i=0; i<A.rows; ++i) for (int64_t j=0; j<A.cols; ++j) {
+    EXPECT_EQ(A_check(i, j), A(i, j) < 0 ? -A(i, j) : A(i, j));
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(
   LAPACK, ArithmeticTests,
   testing::Values(
@@ -117,3 +132,69 @@ INSTANTIATE_TEST_SUITE_P(
     return name;
   }
 );
+
+TEST_P(ScalarMulOperatorTests, ScalarMultiplicationOperator) {
+  int64_t M, N;
+  double alpha;
+  std::tie(M, N, alpha) = GetParam();
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
+  Hatrix::Matrix B = A * alpha;
+  Hatrix::Matrix C = alpha * A;
+  Hatrix::scale(A, alpha);
+
+  // Check result
+  for (int64_t i=0; i<M; ++i) {
+    for (int64_t j=0; j<N; ++j) {
+      EXPECT_EQ(A(i, j), C(i, j));
+      EXPECT_EQ(A(i, j), B(i, j));
+    }
+  }
+}
+
+TEST_P(ScalarMulOperatorTests, ScalarMultiplicationEqualsOperator) {
+  int64_t M, N;
+  double alpha;
+  std::tie(M, N, alpha) = GetParam();
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
+  Hatrix::Matrix A_copy(A);
+  A *= alpha;
+
+  // Check result
+  for (int64_t i=0; i<M; ++i) {
+    for (int64_t j=0; j<N; ++j) {
+      EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
+    }
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+  Operator, ScalarMulOperatorTests,
+  testing::Values(
+    std::make_tuple(5, 5, 7.9834),
+    std::make_tuple(11, 21, -4),
+    std::make_tuple(18, 5, 1/8)
+   ),
+  [](const testing::TestParamInfo<ScalarMulOperatorTests::ParamType>& info) {
+    std::string name = (
+      "M" + std::to_string(std::get<0>(info.param))
+      + "N" + std::to_string(std::get<1>(info.param))
+    );
+    return name;
+  }
+);
+
+TEST_P(ArithmeticTests, Transpose) {
+  int64_t m, n;
+  std::tie(m, n) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_trans = transpose(A);
+
+  EXPECT_EQ(A_trans.rows, n);
+  EXPECT_EQ(A_trans.cols, m);
+  for (int64_t i=0; i<m; ++i) {
+    for (int64_t j=0; j<n; ++j) {
+      EXPECT_EQ(A(i, j), A_trans(j, i));
+    }
+  }
+}
