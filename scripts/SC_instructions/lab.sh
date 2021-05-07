@@ -1,26 +1,45 @@
 #!/bin/bash
 #!/bin/bash
-#YBATCH -r any_1
+#YBATCH -r epyc-7502_8
 #SBATCH -N 1
 #SBATCH -J TEST_HATRIX
-#SBATCH --time=01:00:00
-#SBATCH --output TEST_HATRIX.out
-#SBATCH --error TEST_HATRIX.err
+#SBATCH --time=10:00:00
+#SBATCH --mail-user=deshmukh.s.aa@m.titech.ac.jp
+#SBATCH --mail-type=ALL
 
+set -e
 
-export PATH=$PATH:/home/sameer.deshmukh/gitrepos/jobscheduler2slack
-
-source /etc/profile.d/modules.sh
+if [ $1 == "" ]; then
+  exit 1
+else
+  HATRIX_BRANCH=$1
+fi
 
 printf "#### Setting up environment... "
-printf "#### Done\n"
-#################### CPU only build                         ####################
-module load intel/2020
+source /etc/profile.d/modules.sh
+printf "Done\n"
 
 cd $HOME/dev/sandbox/Hatrix
-source $PWD/scripts/SC_instructions/run_cmake_tests.sh
+printf "#### Done\n"
 
-post_message "OUTPUT FILE"
-post_message "$(cat /home/sameer.deshmukh/dev/sandbox/Hatrix/scripts/SC_instructions/TEST_HATRIX.out)"
-post_message "ERROR FILE"
-post_message "$(cat /home/sameer.deshmukh/dev/sandbox/Hatrix/scripts/SC_instructions/TEST_HATRIX.err)"
+#################### CPU only build                         ####################
+printf "#### Building without CUDA... \n"
+# Necessary modules
+module load intel/2020
+
+# Build
+mkdir build
+cd build
+cmake ..
+make -j4
+ctest
+printf "#### Done\n\n"
+cd ..
+
+#################### Final cleanup                          ####################
+printf "#### Cleanup... "
+cd ..
+rm -rf Hatrix
+printf "Done\n"
+
+exit 0

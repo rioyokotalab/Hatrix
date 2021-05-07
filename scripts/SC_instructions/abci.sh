@@ -7,15 +7,35 @@
 #$ -o HATRIX_TEST_out.log
 #$ -e HATRIX_TEST_err.log
 #$ -m ea
-#$ -M ${MY_EMAIL}
+#$ -M deshmukh.s.aa@m.titech.ac.jp
 
 set -e
 
 printf "#### Setting up environment... "
 source /etc/profile.d/modules.sh
-#################### CPU only build                         ####################
-module load cmake/3.19 gcc intel-mkl
+printf "Done\n"
+
 cd $HOME/dev/sandbox/Hatrix
+printf "#### Done\n"
+
+#################### CPU only build                         ####################
+printf "#### Building without CUDA... \n"
+# Necessary modules
+# module load intel/2020
 
 # Build
-source $PWD/scripts/SC_instructions/run_cmake_tests.sh
+mkdir build
+cd build
+cmake ..
+make -j4
+ctest
+printf "#### Done\n\n"
+cd ..
+
+#################### Final cleanup                          ####################
+printf "#### Cleanup... "
+cd ..
+rm -rf Hatrix
+printf "Done\n"
+
+exit 0
