@@ -1,4 +1,5 @@
 .vscode
+.dir-locals.el
 
 build
 dependencies
