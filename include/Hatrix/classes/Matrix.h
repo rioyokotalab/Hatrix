@@ -1,7 +1,5 @@
 #pragma once
 #include <cstdint>
-using std::int64_t;
-
 
 namespace Hatrix {
 
@@ -41,4 +39,4 @@ class Matrix {
   void print() const;
 };
 
-} // namespace Hatrix
+}  // namespace Hatrix

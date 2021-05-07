@@ -1,29 +1,25 @@
-#include "Hatrix/Hatrix.h"
-
 #include <cstdint>
-using std::int64_t;
 #include <iostream>
 #include <vector>
 
+#include "Hatrix/Hatrix.h"
 
 int main() {
   Hatrix::init();
   int64_t block_size = 16;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
   A[0] = std::vector<Hatrix::Matrix>{
-    Hatrix::generate_random_matrix(block_size, block_size),
-    Hatrix::generate_random_matrix(block_size, block_size)
-  };
+      Hatrix::generate_random_matrix(block_size, block_size),
+      Hatrix::generate_random_matrix(block_size, block_size)};
   A[1] = std::vector<Hatrix::Matrix>{
-    Hatrix::generate_random_matrix(block_size, block_size),
-    Hatrix::generate_random_matrix(block_size, block_size)
-  };
+      Hatrix::generate_random_matrix(block_size, block_size),
+      Hatrix::generate_random_matrix(block_size, block_size)};
   // Add Large values to diagonal to assure no pivoting
-  double d = 4*block_size * block_size;
-  for (int64_t i=0; i<block_size; ++i) {
+  double d = 4 * block_size * block_size;
+  for (int64_t i = 0; i < block_size; ++i) {
     A[0][0](i, i) += d--;
   }
-  for (int64_t i=0; i<block_size; ++i) {
+  for (int64_t i = 0; i < block_size; ++i) {
     A[1][1](i, i) += d--;
   }
 
@@ -57,9 +53,8 @@ int main() {
   Hatrix::solve_triangular(U0, b0, Hatrix::Left, Hatrix::Upper, false);
 
   // Check accuracy
-  double error = (
-    Hatrix::frobenius_norm_diff(b0, x0) + Hatrix::frobenius_norm_diff(b1, x1)
-  );
+  double error = (Hatrix::frobenius_norm_diff(b0, x0) +
+                  Hatrix::frobenius_norm_diff(b1, x1));
   std::cout << "Solution error: " << error << "\n";
   Hatrix::terminate();
   return 0;
