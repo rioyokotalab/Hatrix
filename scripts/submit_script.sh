@@ -5,7 +5,7 @@ git clone --depth 1 --branch feature/SC_automation git@github.com:rioyokotalab/H
 cd Hatrix
 
 if [[ $(uname -n) = "login" ]]; then
-    yrun scripts/SC_instructions/lab.sh
+    ybatch scripts/SC_instructions/lab.sh
 elif [[ $(uname -n) == *abci.local ]]; then
     qsub -g gcc50609 scripts/SC_instructions/abci.sh
 elif [[ $(uname -n) = "login0" ]]; then
