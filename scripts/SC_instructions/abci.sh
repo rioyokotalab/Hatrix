@@ -30,5 +30,4 @@ cmake ..
 make -j
 ctest
 
-
 exit 0
