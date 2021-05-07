@@ -16,4 +16,4 @@ printf "#### Done\n"
 #################### CPU only build                         ####################
 module load intel/2020
 
-source run_cmake_tests.sh
+source $PWD/scripts/run_cmake_tests.sh
