@@ -1,5 +1,7 @@
 #include "Hatrix/Hatrix.h"
 
+#include <cstdint>
+using std::int64_t;
 #include <iostream>
 #include <vector>
 
