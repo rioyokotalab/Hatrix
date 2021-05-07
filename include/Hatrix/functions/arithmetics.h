@@ -11,6 +11,7 @@ Matrix& operator-=(Matrix& A, const Matrix& B);
 Matrix operator-(const Matrix& A, const Matrix& B);
 
 Matrix operator*(const Matrix& A, const Matrix& B);
+Matrix& operator*=(Matrix& A, double alpha);
 Matrix operator*(const Matrix& A, double alpha);
 Matrix operator*(double alpha, const Matrix& A);
 

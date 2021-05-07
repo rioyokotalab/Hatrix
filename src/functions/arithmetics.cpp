@@ -47,15 +47,20 @@ Matrix operator*(const Matrix& A, const Matrix& B) {
   return C;
 }
 
+Matrix& operator*=(Matrix& A, double alpha) {
+  Hatrix::scale(A, alpha);
+  return A;
+}
+
 Matrix operator*(const Matrix& A, double alpha) {
   Matrix C(A);
-  Hatrix::scale(C, alpha);
+  C *= alpha;
   return C;
 }
 
 Matrix operator*(double alpha, const Matrix& A) {
   Matrix C(A);
-  Hatrix::scale(C, alpha);
+  C *= alpha;
   return C;
 }
 
