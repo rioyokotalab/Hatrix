@@ -10,13 +10,12 @@
 #$ -M deshmukh.s.aa@m.titech.ac.jp
 
 set -e
-cd $HOME/dev/sandbox/Hatrix
 
-printf "#### Building without CUDA... \n"
 printf "#### Setting up environment... "
 source /etc/profile.d/modules.sh
 #################### CPU only build                         ####################
 module load cmake/3.19 gcc intel-mkl
+cd $HOME/dev/sandbox/Hatrix
 
 # Build
-source $PWD/scripts/run_cmake_tests.sh
+source $PWD/scripts/SC_instructions/run_cmake_tests.sh
