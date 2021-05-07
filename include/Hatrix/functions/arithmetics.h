@@ -16,5 +16,6 @@ Matrix operator*(const Matrix& A, double alpha);
 Matrix operator*(double alpha, const Matrix& A);
 
 Matrix abs(const Matrix& A);
+Matrix transpose(const Matrix& A);
 
 } // namespace Hatrix

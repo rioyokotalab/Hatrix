@@ -73,4 +73,12 @@ Matrix abs(const Matrix& A) {
   return A_abs;
 }
 
+Matrix transpose(const Matrix& A) {
+  Matrix A_trans(A.cols, A.rows);
+  for (int64_t i=0; i<A_trans.rows; i++)
+    for (int64_t j=0; j<A_trans.cols; j++)
+      A_trans(i, j) = A(j, i);
+  return A_trans;
+}
+
 } // namespace Hatrix
