@@ -14,6 +14,7 @@ class MatMulTests : public testing::TestWithParam<
 > {};
 
 TEST_P(MatMulTests, matmul) {
+  Hatrix::init();
   int64_t M, N, K;
   bool transA, transB;
   double alpha, beta;
@@ -27,6 +28,7 @@ TEST_P(MatMulTests, matmul) {
   Hatrix::Matrix C = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix C_check(C);
   Hatrix::matmul(A, B, C, transA, transB, alpha, beta);
+  Hatrix::sync();
 
   // Manual matmul
   for (int64_t i=0; i<M; ++i) {
@@ -49,6 +51,7 @@ TEST_P(MatMulTests, matmul) {
       EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
     }
   }
+  Hatrix::terminate();
 }
 
 INSTANTIATE_TEST_SUITE_P(

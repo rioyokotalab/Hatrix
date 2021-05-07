@@ -1,6 +1,24 @@
 include(GoogleTest)
 
-list(APPEND GTEST_TESTS Matrix arithmetics matmul triangular_matmul lu qr svd norms scale)
+if(USE_CUDA)
+  list(APPEND GTEST_TESTS
+    Matrix
+    matmul
+    lu
+  )
+else()
+  list(APPEND GTEST_TESTS
+    Matrix
+    arithmetics
+    matmul
+    triangular_matmul
+    lu
+    qr
+    svd
+    norms
+    scale
+  )
+endif()
 
 foreach(TEST ${GTEST_TESTS})
   add_executable(${TEST}_test ${TEST}.cpp)

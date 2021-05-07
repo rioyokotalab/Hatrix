@@ -7,6 +7,7 @@ using std::int64_t;
 
 
 int main() {
+  Hatrix::init();
   int64_t block_size = 16;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
   A[0] = std::vector<Hatrix::Matrix>{
@@ -60,5 +61,6 @@ int main() {
     Hatrix::frobenius_norm_diff(b0, x0) + Hatrix::frobenius_norm_diff(b1, x1)
   );
   std::cout << "Solution error: " << error << "\n";
+  Hatrix::terminate();
   return 0;
 }

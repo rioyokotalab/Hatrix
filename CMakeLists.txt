@@ -21,7 +21,6 @@ else()
   check_language(CUDA)
   if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
-    find_package(CUDA)
     message(STATUS "CUDA ${CUDA_VERSION} detected - compiling GPU code.")
     set(USE_CUDA ON)
   else()
@@ -29,27 +28,11 @@ else()
   endif()
 endif()
 
-if(USE_CUDA)
-  add_executable(CUDA_hello_world src/hello_world.cu)
-  set_target_properties(CUDA_hello_world PROPERTIES CUDA_ARCHITECTURES 60 70 75)
-  target_link_libraries(CUDA_hello_world ${CUDA_CUBLAS_LIBRARIES})
-endif()
-
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
-
 add_library(Hatrix
-  src/classes/Matrix.cpp
-  src/functions/arithmetics.cpp
-  src/functions/blas.cpp
-  src/functions/lapack.cpp
-  src/util/matrix_generators.cpp
   src/util/norms.cpp
+  src/util/matrix_generators.cpp
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
-
-target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
-
 target_include_directories(Hatrix
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
@@ -57,6 +40,28 @@ target_include_directories(Hatrix
   PRIVATE
     ${BLAS_INCLUDE_DIR}
 )
+
+if(USE_CUDA)
+  find_package(CUDA REQUIRED)
+  target_sources(Hatrix PRIVATE
+    src/classes/Matrix.cu
+    src/functions/blas.cu
+    src/functions/lapack.cu
+    src/util/handle.cu
+  )
+  set_target_properties(Hatrix PROPERTIES CUDA_ARCHITECTURES 60 70 75)
+  target_link_libraries(Hatrix cublas cusolver)
+else()
+  find_package(BLAS REQUIRED)
+  find_package(LAPACK REQUIRED)
+  target_sources(Hatrix PRIVATE
+    src/classes/Matrix.cpp
+    src/functions/arithmetics.cpp
+    src/functions/blas.cpp
+    src/functions/lapack.cpp
+  )
+  target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+endif()
 
 add_subdirectory(examples)
 
