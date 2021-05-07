@@ -79,7 +79,6 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
             Hatrix::truncated_svd(A_work, A.U(i), A.S(i, j), A.V(j), rank);
       }
     }
-  }
 
   double error = 0, expected = 0;
   for (int64_t i = 0; i < 2; ++i) {
@@ -92,7 +91,6 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
         expected += expected_err[{i, j}];
       }
     }
-  }
   std::cout << "Construction error: " << error << "  (expected: ";
   std::cout << expected << ")\n\n";
   return A;
