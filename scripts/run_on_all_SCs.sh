@@ -15,7 +15,7 @@ set -e
 # done
 
 
-for server in abci; do
+for server in lab; do
     ssh  $server 'bash -l -s' < submit_script.sh
 done
 
