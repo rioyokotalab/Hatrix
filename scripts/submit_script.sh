@@ -8,4 +8,6 @@ if [[ $(uname -n) = "login" ]]; then
     yrun scripts/SC_instructions/lab.sh
 elif [[ $(uname -n) == *abci.local ]]; then
     qsub -g gcc50609 scripts/SC_instructions/abci.sh
+elif [[ $(uname -n) = "login0" ]]; then
+    qsub -g scripts/SC_instructions/tsubame.sh
 fi
