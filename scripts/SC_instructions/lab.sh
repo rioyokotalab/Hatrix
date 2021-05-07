@@ -10,10 +10,11 @@
 set -e
 
 source /etc/profile.d/modules.sh
-cd $HOME/dev/sandbox/Hatrix
+
 printf "#### Setting up environment... "
 printf "#### Done\n"
 #################### CPU only build                         ####################
 module load intel/2020
 
-source $PWD/scripts/run_cmake_tests.sh
+cd $HOME/dev/sandbox/Hatrix
+source $PWD/scripts/SC_instructions/run_cmake_tests.sh
