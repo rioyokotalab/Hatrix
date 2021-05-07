@@ -7,7 +7,7 @@
 
 int main() {
 
-	using namespace shimo::gpu;
+	using namespace Hatrix::gpu;
 
 	const int m = 5, n = 5, min_mn = 5, rank = 5;
 

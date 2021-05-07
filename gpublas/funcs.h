@@ -4,7 +4,7 @@
 
 #include <handle.h>
 
-namespace shimo {
+namespace Hatrix {
   namespace gpu {
 
     void dalloc(Stream& s, double** a_ptr, int m, int n, int lda, int value = 0);

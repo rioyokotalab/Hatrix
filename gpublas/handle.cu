@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <cuda_runtime_api.h>
 
-using namespace shimo::gpu;
+using namespace Hatrix::gpu;
 
 Stream::Stream(size_t Lwork, size_t Lwork_host) {
   Stream::Lwork = Lwork;

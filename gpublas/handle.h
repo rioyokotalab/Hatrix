@@ -6,7 +6,7 @@
 #include <cublas_v2.h>
 #include <cusolverDn.h>
 
-namespace shimo {
+namespace Hatrix {
   namespace gpu {
 
     constexpr size_t DEFAULT_LWORK = 0x01000000;
