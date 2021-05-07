@@ -1,4 +1,7 @@
-#include "Hatrix/util/handle.h"
+#include "Hatrix/util/context.h"
+
+#include "cublas_v2.h"
+#include "cusolverDn.h"
 
 #include "Hatrix/classes/Matrix.h"
 

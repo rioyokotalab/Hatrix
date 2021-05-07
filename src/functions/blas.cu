@@ -4,7 +4,6 @@
 #include "cusolverDn.h"
 
 #include "Hatrix/classes/Matrix.h"
-#include "Hatrix/util/handle.h"
 
 namespace Hatrix {
 

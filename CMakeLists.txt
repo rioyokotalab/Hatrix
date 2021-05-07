@@ -47,7 +47,7 @@ if(USE_CUDA)
     src/classes/Matrix.cu
     src/functions/blas.cu
     src/functions/lapack.cu
-    src/util/handle.cu
+    src/util/context.cu
   )
   set_target_properties(Hatrix PROPERTIES CUDA_ARCHITECTURES 60 70 75)
   target_link_libraries(Hatrix cublas cusolver)
@@ -59,6 +59,7 @@ else()
     src/functions/arithmetics.cpp
     src/functions/blas.cpp
     src/functions/lapack.cpp
+    src/util/context.cpp
   )
   target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 endif()
