@@ -4,4 +4,6 @@ cmake ..
 make -j
 ctest
 
-exit 0
+if [[ $(SYSTEM_NAME) =~ "YOKOTA_LAB"  ]]; then
+    exit 0
+fi
