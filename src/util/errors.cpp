@@ -40,5 +40,4 @@ double comp_bw_error(const Matrix& residual, const Matrix& A, const Matrix& x, c
   return error;
 }
 
-
 } // namespace Hatrix

@@ -17,7 +17,6 @@
 using std::int64_t;
 #include <cmath>
 #include <vector>
-#include <iostream>
 
 
 namespace Hatrix {
@@ -87,7 +86,7 @@ void lup(Matrix& A, Matrix& L, Matrix& U, Matrix& P) {
   // exchange rows
   for (size_t i=0; i<ipiv.size(); ++i){
     std::swap(pivots[ipiv[i]-1], pivots[i]);}
-  
+
   // create permutation matrix P
   P = 0;
   for (size_t i=0; i<pivots.size(); ++i)
