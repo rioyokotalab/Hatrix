@@ -22,15 +22,13 @@ printf "#### Done\n"
 printf "#### Building without CUDA... \n"
 # Necessary modules
 module load cmake/3.19 gcc intel-mkl
-# module load intel/2020
 
 # Build
 mkdir build
 cd build
 cmake ..
-make -j4
+make -j
 ctest
-printf "#### Done\n\n"
-cd ..
+
 
 exit 0
