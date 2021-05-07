@@ -21,6 +21,7 @@ printf "#### Done\n"
 #################### CPU only build                         ####################
 printf "#### Building without CUDA... \n"
 # Necessary modules
+module load cmake/3.19
 # module load intel/2020
 
 # Build
