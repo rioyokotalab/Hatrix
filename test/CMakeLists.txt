@@ -9,11 +9,8 @@ list(APPEND GTEST_TESTS
   qr
   block_dense_lu
   svd
-  matrix_generators
   norms
-  errors
   scale
-  iterative_refinement
 )
 
 foreach(TEST ${GTEST_TESTS})
