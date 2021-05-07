@@ -19,4 +19,4 @@ source /etc/profile.d/modules.sh
 module load cmake/3.19 gcc intel-mkl
 
 # Build
-source run_cmake_tests.sh
+source $PWD/scripts/run_cmake_tests.sh
