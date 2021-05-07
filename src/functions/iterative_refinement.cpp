@@ -27,10 +27,9 @@ void gesv_IR(Matrix &A, Matrix &b, int64_t max_iter){
   solve_triangular(L, x, Left, Lower, true);
   solve_triangular(U, x, Left, Upper, false);
 
-  Matrix res;
   std::vector<double> nbe;
   std::vector<double> cbe;
-  Matrix d (x.rows, 1);
+  Matrix d(x.rows, 1);
   //x has only about 5 accurate digits when compared to matlab
   //for (int64_t i=0; i<b.rows; ++i)
     //std::cout<<std::setprecision(17)<<x(i,0)<<std::endl;
@@ -38,7 +37,7 @@ void gesv_IR(Matrix &A, Matrix &b, int64_t max_iter){
 
   for (int64_t i=0; i<max_iter; ++i){
     //compute residual
-    res = b - (A_orig * x);
+    Matrix res = b - (A_orig * x);
     nbe.push_back(norm_bw_error(res, A, x, b));
     cbe.push_back(comp_bw_error(res, A, x, b));
 
