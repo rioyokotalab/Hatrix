@@ -72,7 +72,7 @@ void lup(Matrix& A, Matrix& L, Matrix& U, Matrix& P) {
   }
 
   // copy out the rest of U if trapezoidal
-  if (U.cols > U.rows){
+  if (U.cols > U.rows) {
     cblas_dcopy((U.cols - U.rows) * U.rows, &A(0, n_diag), 1, &U(0, n_diag), 1);
   }
 
@@ -81,16 +81,13 @@ void lup(Matrix& A, Matrix& L, Matrix& U, Matrix& P) {
 
   // create proper pivot vector
   std::vector<int64_t> pivots(A.rows);
-  for (size_t i=0; i<pivots.size(); ++i)
-    pivots[i] = i;
+  for (size_t i=0; i<pivots.size(); ++i) pivots[i] = i;
   // exchange rows
-  for (size_t i=0; i<ipiv.size(); ++i){
-    std::swap(pivots[ipiv[i]-1], pivots[i]);}
+  for (size_t i=0; i<ipiv.size(); ++i) std::swap(pivots[ipiv[i]-1], pivots[i]);
 
   // create permutation matrix P
   P = 0;
-  for (size_t i=0; i<pivots.size(); ++i)
-    P(i, pivots[i]) = 1;
+  for (size_t i=0; i<pivots.size(); ++i) P(i, pivots[i]) = 1;
 }
 
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
