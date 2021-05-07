@@ -29,6 +29,23 @@ void matmul(
   );
 };
 
+void triangular_matmul(
+  const Matrix& A, Matrix& B,
+  int side, int uplo, bool transA, bool diag, double alpha
+) {
+  assert(side == Left ?
+	 (transA ? A.rows == B.rows : A.cols == B.rows) :
+	 (transA ? B.cols == A.cols : B.cols == A.rows));
+  cblas_dtrmm(
+    CblasColMajor,
+    side == Left ? CblasLeft : CblasRight,
+    uplo == Upper ? CblasUpper : CblasLower,
+    transA ? CblasTrans : CblasNoTrans,
+    diag ? CblasUnit : CblasNonUnit,
+    B.rows, B.cols, alpha, &A, A.rows, &B, B.rows
+  );
+}
+
 void solve_triangular(
   const Matrix& A, Matrix& B,
   int side, int uplo, bool diag, bool transA, double alpha

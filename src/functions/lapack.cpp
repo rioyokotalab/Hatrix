@@ -1,6 +1,7 @@
 #include "Hatrix/functions/lapack.h"
 
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/functions/blas.h"
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -111,6 +112,30 @@ double truncated_svd(
 
 double calc_norm(const Matrix& A, Norm norm){
   return LAPACKE_dlange(LAPACK_COL_MAJOR, static_cast<int>(norm), A.rows, A.cols, &A, A.rows);
+}
+
+void householder_qr_compact_wy(Matrix& A, Matrix& T) {
+  assert(T.rows == T.cols);
+  assert(T.cols == A.cols);
+  LAPACKE_dgeqrt3(
+    LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, &T, T.rows
+  );
+}
+
+void apply_block_reflector(
+  const Matrix& V, const Matrix& T, Matrix& C,
+  int side, bool trans
+) {
+  assert(V.cols == T.rows);
+  assert(T.rows == T.cols);
+  assert(V.rows == (side == Left ? C.rows : C.cols));
+  LAPACKE_dlarfb(
+    LAPACK_COL_MAJOR,
+    side == Left ? 'L' : 'R',
+    trans ? 'T' : 'N', 'F', 'C',
+    C.rows, C.cols, T.cols,
+    &V, V.rows, &T, T.rows, &C, C.rows
+  );
 }
 
 } // namespace Hatrix

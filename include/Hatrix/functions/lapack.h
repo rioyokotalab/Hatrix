@@ -24,4 +24,11 @@ double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
 double calc_norm(const Matrix& A, Norm norm);
 
+void householder_qr_compact_wy(Matrix& A, Matrix& T);
+
+void apply_block_reflector(
+  const Matrix& V, const Matrix& T, Matrix& C,
+  int side, bool trans
+);
+
 } // namespace Hatrix

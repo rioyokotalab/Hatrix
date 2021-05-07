@@ -1,2 +1,5 @@
 add_executable(2x2_BLR_LU 2x2_BLR_LU.cpp)
 target_link_libraries(2x2_BLR_LU Hatrix)
+
+add_executable(2x2_BlockDense_QR 2x2_BlockDense_QR.cpp)
+target_link_libraries(2x2_BlockDense_QR Hatrix)
