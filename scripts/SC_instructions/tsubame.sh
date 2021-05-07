@@ -6,7 +6,7 @@
 #$ -o HATRIX_TSUBAME_out.log
 #$ -e HATRIX_TSUBAME_err.log
 #$ -m ea
-#$ -M deshmukh.s.aa@m.titech.ac.jp
+#$ -M ${MY_EMAIL}
 
 set -e
 
