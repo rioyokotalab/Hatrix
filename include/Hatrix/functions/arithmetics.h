@@ -1,7 +1,6 @@
 #pragma once
 #include "Hatrix/classes/Matrix.h"
 
-
 namespace Hatrix {
 
 Matrix& operator+=(Matrix& A, const Matrix& B);
@@ -18,4 +17,4 @@ Matrix operator*(double alpha, const Matrix& A);
 Matrix abs(const Matrix& A);
 Matrix transpose(const Matrix& A);
 
-} // namespace Hatrix
+}  // namespace Hatrix

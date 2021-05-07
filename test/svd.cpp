@@ -1,14 +1,13 @@
-#include "Hatrix/Hatrix.h"
-
-#include "gtest/gtest.h"
-
 #include <algorithm>
 #include <cassert>
 #include <tuple>
 
-class SVDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>>{};
+#include "Hatrix/Hatrix.h"
+#include "gtest/gtest.h"
+
+class SVDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {};
 class truncSVDTests
-: public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>>{};
+    : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>> {};
 
 TEST_P(truncSVDTests, truncatedSVD) {
   Hatrix::init();
@@ -33,8 +32,7 @@ TEST_P(truncSVDTests, truncatedSVD) {
   Hatrix::terminate();
 }
 
-
-TEST_P(SVDTests, SVD){
+TEST_P(SVDTests, SVD) {
   Hatrix::init();
   int64_t m, n;
   std::tie(m, n) = GetParam();
@@ -52,8 +50,8 @@ TEST_P(SVDTests, SVD){
   Hatrix::sync();
 
   // Check result
-  for (int64_t i=0; i<A.rows; ++i) {
-    for (int64_t j=0; j<A.cols; ++j) {
+  for (int64_t i = 0; i < A.rows; ++i) {
+    for (int64_t j = 0; j < A.cols; ++j) {
       EXPECT_FLOAT_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }
@@ -61,34 +59,21 @@ TEST_P(SVDTests, SVD){
 }
 
 INSTANTIATE_TEST_SUITE_P(
-  LAPACK, SVDTests,
-  testing::Combine(
-    testing::Values(8, 16),
-    testing::Values(8, 16)
-  ),
-  [](const testing::TestParamInfo<SVDTests::ParamType>& info) {
-    std::string name = (
-      "m" + std::to_string(std::get<0>(info.param))
-      + "n" + std::to_string(std::get<1>(info.param))
-    );
-    return name;
-  }
-);
+    LAPACK, SVDTests,
+    testing::Combine(testing::Values(8, 16), testing::Values(8, 16)),
+    [](const testing::TestParamInfo<SVDTests::ParamType>& info) {
+      std::string name = ("m" + std::to_string(std::get<0>(info.param)) + "n" +
+                          std::to_string(std::get<1>(info.param)));
+      return name;
+    });
 
 INSTANTIATE_TEST_SUITE_P(
-  LAPACK, truncSVDTests,
-  testing::Values(
-    std::make_tuple(50, 50, 7),
-    std::make_tuple(100, 80, 10),
-    std::make_tuple(90, 120, 14),
-    std::make_tuple(100, 100, 5)
-   ),
-  [](const testing::TestParamInfo<truncSVDTests::ParamType>& info) {
-    std::string name = (
-      "m" + std::to_string(std::get<0>(info.param))
-      + "n" + std::to_string(std::get<1>(info.param))
-      + "k" + std::to_string(std::get<2>(info.param))
-    );
-    return name;
-  }
-);
+    LAPACK, truncSVDTests,
+    testing::Values(std::make_tuple(50, 50, 7), std::make_tuple(100, 80, 10),
+                    std::make_tuple(90, 120, 14), std::make_tuple(100, 100, 5)),
+    [](const testing::TestParamInfo<truncSVDTests::ParamType>& info) {
+      std::string name = ("m" + std::to_string(std::get<0>(info.param)) + "n" +
+                          std::to_string(std::get<1>(info.param)) + "k" +
+                          std::to_string(std::get<2>(info.param)));
+      return name;
+    });
