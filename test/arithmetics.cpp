@@ -151,6 +151,22 @@ TEST_P(ScalarMulOperatorTests, ScalarMultiplicationOperator) {
   }
 }
 
+TEST_P(ScalarMulOperatorTests, ScalarMultiplicationEqualsOperator) {
+  int64_t M, N;
+  double alpha;
+  std::tie(M, N, alpha) = GetParam();
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
+  Hatrix::Matrix A_copy(A);
+  A *= alpha;
+
+  // Check result
+  for (int64_t i=0; i<M; ++i) {
+    for (int64_t j=0; j<N; ++j) {
+      EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
+    }
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(
   Operator, ScalarMulOperatorTests,
   testing::Values(
