@@ -7,7 +7,7 @@
 #$ -o HATRIX_TEST_out.log
 #$ -e HATRIX_TEST_err.log
 #$ -m ea
-#$ -M deshmukh.s.aa@m.titech.ac.jp
+#$ -M ${MY_EMAIL}
 
 set -e
 
