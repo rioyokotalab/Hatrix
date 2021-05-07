@@ -13,6 +13,7 @@ list(APPEND GTEST_TESTS
   norms
   errors
   scale
+  iterative_refinement
 )
 
 foreach(TEST ${GTEST_TESTS})
