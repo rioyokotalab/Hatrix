@@ -182,3 +182,19 @@ INSTANTIATE_TEST_SUITE_P(
     return name;
   }
 );
+
+TEST_P(ArithmeticTests, Transpose) {
+  int64_t m, n;
+  std::tie(m, n) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_trans = transpose(A);
+
+  EXPECT_EQ(A_trans.rows, n);
+  EXPECT_EQ(A_trans.cols, m);
+  for (int64_t i=0; i<m; ++i) {
+    for (int64_t j=0; j<n; ++j) {
+      EXPECT_EQ(A(i, j), A_trans(j, i));
+    }
+  }
+}
