@@ -26,4 +26,6 @@ void solve_triangular(
   int side, int uplo, bool diag, bool transA=false, double alpha=1.0
 );
 
+void scale(Matrix& A, double alpha);
+
 } // namespace Hatrix

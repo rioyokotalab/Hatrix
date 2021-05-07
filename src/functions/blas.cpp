@@ -60,4 +60,8 @@ void solve_triangular(
   );
 }
 
+void scale(Matrix& A, double alpha) {
+  cblas_dscal(A.rows * A.cols, alpha, &A, 1);
+}
+
 } // namespace Hatrix
