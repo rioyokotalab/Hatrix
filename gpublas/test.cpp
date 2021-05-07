@@ -53,8 +53,8 @@ int main() {
 		const double AbsErr = fabs(lambda_ref - lambda_gpu);
 		const double RelErr = AbsErr / lambda_ref;
 
-		max_err = std::max(max_err, AbsErr) ? max_err : AbsErr;
-		max_relerr = std::max(max_relerr, RelErr) ? max_relerr : RelErr;
+		max_err = max_err > AbsErr ? max_err : AbsErr;
+		max_relerr = max_relerr > RelErr ? max_relerr : RelErr;
 
 		printf("S_ref[%d]=%f  S_gpu=[%d]=%f  AbsErr=%E  RelErr=%E\n",
 			i, lambda_ref, i, lambda_gpu, AbsErr, RelErr);
