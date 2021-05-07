@@ -1,8 +1,10 @@
-add_executable(2x2_BLR_LU 2x2_BLR_LU.cpp)
-target_link_libraries(2x2_BLR_LU Hatrix)
+if(USE_CUDA)
+  list(APPEND HATRIX_EXAMPLES)
+else()
+  list(APPEND HATRIX_EXAMPLES 2x2_BLR_LU 2x2_BlockDense_LU 2x2_BlockDense_QR)
+endif()
 
-add_executable(2x2_BlockDense_LU 2x2_BlockDense_LU.cpp)
-target_link_libraries(2x2_BlockDense_LU Hatrix)
-
-add_executable(2x2_BlockDense_QR 2x2_BlockDense_QR.cpp)
-target_link_libraries(2x2_BlockDense_QR Hatrix)
+foreach(EXAMPLE ${HATRIX_EXAMPLES})
+  add_executable(${EXAMPLE} ${EXAMPLE}.cpp)
+  target_link_libraries(${EXAMPLE} Hatrix)
+endforeach()

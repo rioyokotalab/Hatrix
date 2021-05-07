@@ -6,7 +6,7 @@ using std::int64_t;
 #include <vector>
 
 
-TEST(BlockDense, lu) {
+int main() {
   Hatrix::init();
   int64_t block_size = 16;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
