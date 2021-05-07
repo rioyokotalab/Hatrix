@@ -28,12 +28,12 @@ TEST_P(TriangularMatMulTests, triangular_matmul) {
   Hatrix::Matrix B_copy(B);
   Hatrix::Matrix A_tri(A);
   // Construct triangular A_tri
-  for(int64_t j=0; j<A_tri.cols; j++) {
+  for (int64_t j=0; j<A_tri.cols; j++) {
     A_tri(j, j) = diag ? 1. : A(j, j);
     if(uplo == Hatrix::Lower)
-      for(int i=0; i<j; i++) A_tri(i, j) = 0.;
+      for (int i=0; i<j; i++) A_tri(i, j) = 0.;
     else
-      for(int i=j+1; i<A_tri.rows; i++) A_tri(i, j) = 0.;
+      for (int i=j+1; i<A_tri.rows; i++) A_tri(i, j) = 0.;
   }
   
   Hatrix::triangular_matmul(A, B, side, uplo, transA, diag, alpha);
@@ -41,21 +41,22 @@ TEST_P(TriangularMatMulTests, triangular_matmul) {
   // Manual matmul
   // B_check = A_tri*B_copy or B_copy*A_tri
   Hatrix::Matrix B_check(M, N);
-  for(int64_t i=0; i<M; i++)
-    for(int64_t j=0; j<N; j++) {
-      if(side == Hatrix::Left) {
-	for(int64_t k=0; k<M; k++) {
-	   if(transA) B_check(i, j) += alpha * A_tri(k, i) * B_copy(k, j);
+  for (int64_t i=0; i<M; i++) {
+    for (int64_t j=0; j<N; j++) {
+      if (side == Hatrix::Left) {
+	for (int64_t k=0; k<M; k++) {
+	   if (transA) B_check(i, j) += alpha * A_tri(k, i) * B_copy(k, j);
 	   else B_check(i, j) += alpha * A_tri(i, k) * B_copy(k, j);
 	}
       }
       else {
-	for(int64_t k=0; k<N; k++) {
+	for (int64_t k=0; k<N; k++) {
 	  if(transA) B_check(i, j) += alpha * B_copy(i, k) * A_tri(j, k);
 	  else B_check(i, j) += alpha * B_copy(i, k) * A_tri(k, j);
 	}
       }
     }
+  }
   
   // Check result
   for (int64_t i=0; i<M; ++i) {

@@ -27,7 +27,7 @@ TEST_P(QRTests, qr) {
   // Check accuracy
   for (int64_t i=0; i<QR.rows; i++) {
     for (int64_t j=0; j<QR.cols; j++) {
-      EXPECT_FLOAT_EQ(A_copy(i, j), QR(i, j));
+      EXPECT_NEAR(A_copy(i, j), QR(i, j), 10e-14);
     }
   }
   // Check orthogonality
@@ -53,14 +53,14 @@ TEST_P(HouseholderQRCompactWYTests, HouseholderQRCompactWY) {
   // Separate A into Y\R
   Hatrix::Matrix R(m, n);
   Hatrix::Matrix Y(m, A.min_dim());
-  for(int64_t j=0; j<n; j++) {
-    for(int64_t i=0; i<=std::min(j, m-1); i++) {
+  for (int64_t j=0; j<n; j++) {
+    for (int64_t i=0; i<=std::min(j, m-1); i++) {
       R(i, j) = A(i, j);
     }
   }
-  for(int64_t j=0; j<A.min_dim(); j++) {
+  for (int64_t j=0; j<A.min_dim(); j++) {
     Y(j, j) = 1.0;
-    for(int64_t i=j+1; i<m; i++) {
+    for (int64_t i=j+1; i<m; i++) {
       Y(i, j) = A(i, j);
     }
   }
@@ -71,12 +71,11 @@ TEST_P(HouseholderQRCompactWYTests, HouseholderQRCompactWY) {
   Hatrix::Matrix Q = Hatrix::generate_identity_matrix(m, m);
   Hatrix::matmul(YT, Y, Q, false, true, -1., 1.);
 
-  Hatrix::Matrix QR(m, n);
-  Hatrix::matmul(Q, R, QR, false, false, 1., 0.);
+  Hatrix::Matrix QR = Q * R;
   // Check accuracy
   for (int64_t i=0; i<QR.rows; i++) {
     for (int64_t j=0; j<QR.cols; j++) {
-      EXPECT_FLOAT_EQ(A_copy(i, j), QR(i, j));
+      EXPECT_NEAR(A_copy(i, j), QR(i, j), 10e-14);
     }
   }
   // Check orthogonality
@@ -107,9 +106,9 @@ TEST_P(ApplyBlockReflectorTests, ApplyBlockReflector) {
 
   // Take Y from elements below diagonal of A
   Hatrix::Matrix Y(A.rows, A.min_dim());
-  for(int64_t j=0; j<A.min_dim(); j++) {
+  for (int64_t j=0; j<A.min_dim(); j++) {
     Y(j, j) = 1.0;
-    for(int64_t i=j+1; i<A.rows; i++) {
+    for (int64_t i=j+1; i<A.rows; i++) {
       Y(i, j) = A(i, j);
     }
   }
@@ -119,18 +118,12 @@ TEST_P(ApplyBlockReflectorTests, ApplyBlockReflector) {
   Hatrix::Matrix H = Hatrix::generate_identity_matrix(A.rows, A.rows);
   Hatrix::matmul(YT, Y, H, false, true, -1., 1.);
   // Multiply H or H^T to C
-  Hatrix::Matrix C_check(m, n);
-  if(side == Hatrix::Left) {
-    Hatrix::matmul(H, C_copy, C_check, false, false, 1., 0.);
-  }
-  else {
-    Hatrix::matmul(C_copy, H, C_check, false, false, 1., 0.);
-  }
+  Hatrix::Matrix C_check = side == Hatrix::Left ? H*C_copy : C_copy*H;
 
   // Check result
   for (int64_t i=0; i<m; i++) {
     for (int64_t j=0; j<n; j++) {
-      EXPECT_FLOAT_EQ(C(i, j), C_check(i, j));
+      EXPECT_NEAR(C(i, j), C_check(i, j), 10e-14);
     }
   }
 }

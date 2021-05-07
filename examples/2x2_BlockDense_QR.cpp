@@ -22,13 +22,8 @@ void apply_block_trapezoidal_reflector(
   Hatrix::triangular_matmul(
     Y00, YC, Hatrix::Left, Hatrix::Lower, false, true, 1.
   ); //YC = Y00 * C
-  Hatrix::Matrix identity = Hatrix::generate_identity_matrix(YC.rows, YC.rows);
-  Hatrix::matmul(
-    identity, YC, A00, false, false, -1., 1.
-  ); // A00 = A00 - YC
-  Hatrix::matmul(
-    Y10, C, A10, false, false, -1., 1.
-  ); // A10 = A10 - Y10 * C
+  A00 -= YC;
+  A10 -= Y10*C;
 }
 
 
@@ -45,33 +40,34 @@ int main() {
   };
   // Create big Dense A for accuracy evaluation
   Hatrix::Matrix Dense_A(2*block_size, 2*block_size);
-  for (int64_t i=0; i<block_size; ++i)
+  for (int64_t i=0; i<block_size; ++i) {
     for (int64_t j=0; j<block_size; ++j) {
       Dense_A(i, j) = A[0][0](i, j);
       Dense_A(i, j+block_size) = A[0][1](i, j);
       Dense_A(i+block_size, j) = A[1][0](i, j);
       Dense_A(i+block_size, j+block_size) = A[1][1](i, j);
     }
+  }
 
   // Block QR
   // QR(A[*][0]) = Q0 ( R00 )
   //                  (  0  )
   Hatrix::Matrix T0(block_size, block_size);
   Hatrix::Matrix A0(2*block_size, block_size);
-  for(int64_t j=0; j<block_size; j++) {
-    for(int64_t i=0; i<block_size; i++) {
+  for (int64_t j=0; j<block_size; j++) {
+    for (int64_t i=0; i<block_size; i++) {
       A0(i, j) = A[0][0](i, j);
     }
-    for(int64_t i=0; i<block_size; i++) {
+    for (int64_t i=0; i<block_size; i++) {
       A0(block_size+i, j) = A[1][0](i, j);
     }
   }
   Hatrix::householder_qr_compact_wy(A0, T0);
-  for(int64_t j=0; j<block_size; j++) {
-    for(int64_t i=0; i<block_size; i++) {
+  for (int64_t j=0; j<block_size; j++) {
+    for (int64_t i=0; i<block_size; i++) {
       A[0][0](i, j) = A0(i, j);
     }
-    for(int64_t i=0; i<block_size; i++) {
+    for (int64_t i=0; i<block_size; i++) {
       A[1][0](i, j) = A0(block_size+i, j);
     }
   }
@@ -92,7 +88,7 @@ int main() {
     Hatrix::Matrix(block_size, block_size),
     Hatrix::Matrix(block_size, block_size)
   };
-  for(int64_t i=0; i<block_size; ++i) {
+  for (int64_t i=0; i<block_size; ++i) {
     Q[0][0](i, i) = 1.;
     Q[1][1](i, i) = 1.;
   }
@@ -105,15 +101,16 @@ int main() {
 
   // Convert Q, R to Dense
   Hatrix::Matrix Dense_Q(2*block_size, 2*block_size);
-  for(int64_t i=0; i<block_size; i++)
-    for(int64_t j=0; j<block_size; j++) {
+  for (int64_t i=0; i<block_size; i++) {
+    for (int64_t j=0; j<block_size; j++) {
       Dense_Q(i, j) = Q[0][0](i, j);
       Dense_Q(i, j+block_size) = Q[0][1](i, j);
       Dense_Q(i+block_size, j) = Q[1][0](i, j);
       Dense_Q(i+block_size, j+block_size) = Q[1][1](i, j);
     }
+  }
   Hatrix::Matrix Dense_R(2*block_size, 2*block_size);
-  for(int64_t i=0; i<block_size; i++)
+  for(int64_t i=0; i<block_size; i++) {
     for(int64_t j=0; j<block_size; j++) {
       if(i <= j) {
 	Dense_R(i, j) = A[0][0](i, j);
@@ -121,10 +118,10 @@ int main() {
       }
       Dense_R(i, j+block_size) = A[0][1](i, j);      
     }
+  }
   
   // Check accuracy and orthogonality
-  Hatrix::Matrix Dense_QR(2*block_size, 2*block_size);
-  Hatrix::matmul(Dense_Q, Dense_R, Dense_QR, false, false, 1., 0.);
+  Hatrix::Matrix Dense_QR = Dense_Q * Dense_R;
   std::cout <<"norm(A-Q*R) = " <<Hatrix::frobenius_norm_diff(Dense_A, Dense_QR) <<std::endl;
   
   Hatrix::Matrix Dense_QTQ(Dense_Q.cols, Dense_Q.cols);
