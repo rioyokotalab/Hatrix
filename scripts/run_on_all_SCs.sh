@@ -16,8 +16,7 @@ set -e
 
 
 for server in abci lab tsubame; do
-
-    ssh -v $server 'bash -l -s' < submit_script.sh
+    ssh  $server 'bash -l -s' < submit_script.sh
 done
 
 echo "Submitted batch scripts for all machines!"
