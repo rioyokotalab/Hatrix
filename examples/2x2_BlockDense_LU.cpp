@@ -1,13 +1,10 @@
 #include "Hatrix/Hatrix.h"
 
-#include "gtest/gtest.h"
-
-#include <cstdint>
-using std::int64_t;
+#include <iostream>
 #include <vector>
 
 
-TEST(BlockDense, lu) {
+int main() {
   int64_t block_size = 16;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
   A[0] = std::vector<Hatrix::Matrix>{
@@ -56,11 +53,10 @@ TEST(BlockDense, lu) {
   Hatrix::matmul(A[0][1], b1, b0, false, false, -1, 1);
   Hatrix::solve_triangular(U0, b0, Hatrix::Left, Hatrix::Upper, false);
 
-  // Check result
-  for (int64_t i=0; i<block_size; ++i) {
-    EXPECT_FLOAT_EQ(x0(i, 0), b0(i, 0));
-  }
-  for (int64_t i=0; i<block_size; ++i) {
-    EXPECT_FLOAT_EQ(x1(i, 0), b1(i, 0));
-  }
+  // Check accuracy
+  double error = (
+    Hatrix::frobenius_norm_diff(b0, x0) + Hatrix::frobenius_norm_diff(b1, x1)
+  );
+  std::cout << "Solution error: " << error << "\n";
+  return 0;
 }
