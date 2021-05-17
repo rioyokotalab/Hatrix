@@ -23,7 +23,7 @@ void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
               C.rows);
 };
 
-void triangular_matmul(const Matrix& A, Matrix& B, int side, int uplo,
+void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
                        bool transA, bool diag, double alpha) {
   assert(side == Left ? (transA ? A.rows == B.rows : A.cols == B.rows)
                       : (transA ? B.cols == A.cols : B.cols == A.rows));
@@ -34,8 +34,8 @@ void triangular_matmul(const Matrix& A, Matrix& B, int side, int uplo,
               A.rows, &B, B.rows);
 }
 
-void solve_triangular(const Matrix& A, Matrix& B, int side, int uplo, bool diag,
-                      bool transA, double alpha) {
+void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
+                      bool diag, bool transA, double alpha) {
   cblas_dtrsm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
