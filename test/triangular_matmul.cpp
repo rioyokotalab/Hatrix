@@ -9,12 +9,14 @@
 #include "gtest/gtest.h"
 
 class TriangularMatMulTests
-    : public testing::TestWithParam<
-          std::tuple<int64_t, int64_t, int, int, bool, bool, double> > {};
+    : public testing::TestWithParam<std::tuple<
+          int64_t, int64_t, Hatrix::Side, Hatrix::Mode, bool, bool, double> > {
+};
 
 TEST_P(TriangularMatMulTests, triangular_matmul) {
   int64_t M, N;
-  int side, uplo;
+  Hatrix::Side side;
+  Hatrix::Mode uplo;
   bool transA, diag;
   double alpha;
   std::tie(M, N, side, uplo, transA, diag, alpha) = GetParam();
