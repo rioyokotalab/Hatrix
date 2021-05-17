@@ -89,4 +89,8 @@ void Matrix::print() const {
   printf("\n");
 }
 
+void Matrix::fetchCPU() {
+  cudaMemPrefetchAsync((void*)data_, rows * cols * sizeof(double), cudaCpuDeviceId);
+}
+
 }  // namespace Hatrix

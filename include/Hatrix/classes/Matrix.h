@@ -37,6 +37,8 @@ class Matrix {
   int64_t max_dim() const;
 
   void print() const;
+
+  void fetchCPU();
 };
 
 }  // namespace Hatrix

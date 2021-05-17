@@ -3,6 +3,7 @@ include(GoogleTest)
 if(USE_CUDA)
   list(APPEND GTEST_TESTS
     Matrix
+    arithmetics
     matmul
     lu
   )
