@@ -77,7 +77,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
   BLR_2x2 A;
   // Also store expected errors to check against later
   std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
-  for (int64_t i = 0; i < 2; ++i)
+  for (int64_t i = 0; i < 2; ++i) {
     for (int64_t j = 0; j < 2; ++j) {
       if (i == j) {
         Hatrix::Matrix diag = Hatrix::generate_random_matrix(N, N);
@@ -95,9 +95,10 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
             Hatrix::truncated_svd(A_work, A.U(i), A.S(i, j), A.V(j), rank);
       }
     }
+  }
 
   double error = 0, expected = 0;
-  for (int64_t i = 0; i < 2; ++i)
+  for (int64_t i = 0; i < 2; ++i) {
     for (int64_t j = 0; j < 2; ++j) {
       if (i == j) {
         // TODO: Check something for dense blocks?
@@ -108,6 +109,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
         expected += expected_err[{i, j}];
       }
     }
+  }
   std::cout << "Construction error: " << error << "  (expected: ";
   std::cout << expected << ")\n\n";
   return A;
