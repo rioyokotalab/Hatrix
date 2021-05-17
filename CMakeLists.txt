@@ -45,6 +45,7 @@ if(USE_CUDA)
   find_package(CUDA REQUIRED)
   target_sources(Hatrix PRIVATE
     src/classes/Matrix.cu
+    src/functions/arithmetics.cpp
     src/functions/blas.cu
     src/functions/lapack.cu
     src/util/context.cu

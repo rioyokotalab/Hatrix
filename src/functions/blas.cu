@@ -31,4 +31,9 @@ void solve_triangular(const Matrix &A, Matrix &B, int side, int uplo, bool diag,
   cudaDeviceSynchronize();
 }
 
+void scale(Matrix& A, double alpha) {
+  cublasDscal(blasH, A.rows * A.cols, &alpha, &A, 1);
+  cudaDeviceSynchronize();
+}
+
 } // namespace Hatrix

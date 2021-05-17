@@ -26,6 +26,10 @@ TEST_P(MatMulTests, matmul) {
   Hatrix::matmul(A, B, C, transA, transB, alpha, beta);
   Hatrix::sync();
 
+  A.fetchCPU();
+  B.fetchCPU();
+  C.fetchCPU();
+
   // Manual matmul
   for (int64_t i = 0; i < M; ++i) {
     for (int64_t j = 0; j < N; ++j) {
