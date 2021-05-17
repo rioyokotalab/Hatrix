@@ -6,6 +6,7 @@ if(USE_CUDA)
     arithmetics
     matmul
     lu
+    scale
   )
 else()
   list(APPEND GTEST_TESTS

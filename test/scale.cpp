@@ -12,7 +12,7 @@ TEST_P(ScaleTests, Scaling) {
   int64_t m, n;
   double alpha;
   std::tie(m, n, alpha) = GetParam();
-
+  Hatrix::init();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
   Hatrix::Matrix A_copy(A);
 
@@ -22,6 +22,7 @@ TEST_P(ScaleTests, Scaling) {
       EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
     }
   }
+  Hatrix::terminate();
 }
 
 INSTANTIATE_TEST_SUITE_P(
