@@ -88,8 +88,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
         // TODO: Check something for dense blocks?
         continue;
       } else {
-        error +=
-            Hatrix::norm_diff(A.U(i) * A.S(i, j) * A.V(j), A.D(i, j));
+        error += Hatrix::norm_diff(A.U(i) * A.S(i, j) * A.V(j), A.D(i, j));
         expected += expected_err[{i, j}];
       }
     }
@@ -165,8 +164,7 @@ void solve_2x2_BLR(const BLR_2x2& L, const BLR_2x2& U, Hatrix::Matrix& x0,
   Hatrix::matmul(U.U(0) * U.S(0, 1) * U.V(1), x1, x0, false, false, -1, 1);
   Hatrix::solve_triangular(U.D(0, 0), x0, Hatrix::Left, Hatrix::Upper, false);
 
-  double error = (Hatrix::norm_diff(b0, x0) +
-                  Hatrix::norm_diff(b1, x1));
+  double error = Hatrix::norm_diff(b0, x0) + Hatrix::norm_diff(b1, x1);
   std::cout << "Solution error: " << error << "\n";
 }
 

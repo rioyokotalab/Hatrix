@@ -1,7 +1,6 @@
 #pragma once
 #include "Hatrix/classes/IndexedMap.h"
 
-
 namespace Hatrix {
 
 class BLR {
@@ -11,5 +10,4 @@ class BLR {
   ColMap V;
 };
 
-} // namespace Hatrix
-
+}  // namespace Hatrix
