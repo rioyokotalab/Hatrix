@@ -40,9 +40,7 @@ Matrix operator-(const Matrix& A, const Matrix& B) {
 }
 
 Matrix operator*(const Matrix& A, const Matrix& B) {
-  Matrix C(A.rows, B.cols);
-  Hatrix::matmul(A, B, C, false, false, 1, 0);
-  return C;
+  return Hatrix::matmul(A, B, false, false, 1);
 }
 
 Matrix& operator*=(Matrix& A, double alpha) {

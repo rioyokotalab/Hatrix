@@ -23,6 +23,13 @@ void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
               C.rows);
 };
 
+Matrix matmul(const Matrix& A, const Matrix& B, bool transA, bool transB,
+              double alpha) {
+  Matrix C(transA ? A.cols : A.rows, transB ? B.rows : B.cols);
+  matmul(A, B, C, transA, transB, alpha, 0);
+  return C;
+}
+
 void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
                        bool transA, bool diag, double alpha) {
   assert(side == Left ? (transA ? A.rows == B.rows : A.cols == B.rows)
