@@ -93,15 +93,33 @@ void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
 }
 
 double truncated_svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V, int64_t rank) {
-  assert(rank < A.min_dim());
-  svd(A, U, S, V);
-  double expected_err = 0;
-  for (int64_t k = rank; k < A.min_dim(); ++k)
-    expected_err += S(k, k) * S(k, k);
-  U.shrink(U.rows, rank);
-  S.shrink(rank, rank);
-  V.shrink(rank, V.cols);
-  return expected_err;
+  char jobu = 'S', jobv = 'S';
+  int64_t m = A.rows, n = A.cols, iters = 2;
+  int64_t lda = A.rows, ldu = U.rows, ldv = V.rows;
+
+  rank = rank > m ? m : rank;
+  rank = rank > n ? n : rank;
+  p = p < 0 ? 0 : p;
+  p = p + rank > m ? m - rank : p;
+  p = p + rank > n ? n - rank : p;
+
+  cusolverDnParams_t params_gesvdr;
+  cusolverDnCreateParams(&params_gesvdr);
+
+  size_t workspaceInBytesOnDevice_gesvdr, workspaceInBytesOnHost_gesvdr;
+  cusolverDnXgesvdr_bufferSize(solvH, params_gesvdr, jobu, jobv, m, n, rank, p, iters, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S,
+    CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, &workspaceInBytesOnDevice_gesvdr, &workspaceInBytesOnHost_gesvdr);
+  
+  double* Work_host = (double*)malloc(workspaceInBytesOnHost_gesvdr), *Work_dev;
+  cudaMalloc(reinterpret_cast<void **>(&Work_dev), Lwork);
+
+  cusolverDnXgesvdr(solvH, params_gesvdr, jobu, jobv, m, n, rank, p, iters, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S, 
+    CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, Work_dev, workspaceInBytesOnDevice_gesvdr, Work_host, workspaceInBytesOnHost_gesvdr, nullptr);
+
+  free(Work_host);
+  cudaFree(Work_dev);
+  cusolverDnDestroyParams(params_gesvdr);
+  return 0.;
 }
 
 double norm(const Matrix& A) {
