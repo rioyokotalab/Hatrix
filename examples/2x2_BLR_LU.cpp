@@ -104,7 +104,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
         continue;
       } else {
         error +=
-            Hatrix::frobenius_norm_diff(A.U(i) * A.S(i, j) * A.V(j), A.D(i, j));
+            Hatrix::norm_diff(A.U(i) * A.S(i, j) * A.V(j), A.D(i, j));
         expected += expected_err[{i, j}];
       }
     }
@@ -149,18 +149,18 @@ void factorize_2x2_BLR(BLR_2x2& A, BLR_2x2& L, BLR_2x2& U) {
   // Check result by multiplying L and U and comparing with the copy we made
   std::cout << "Factorization errors: \n";
   double top_left_diff =
-      Hatrix::frobenius_norm_diff(L.D(0, 0) * U.D(0, 0), A_check.D(0, 0));
+      Hatrix::norm_diff(L.D(0, 0) * U.D(0, 0), A_check.D(0, 0));
   std::cout << "Top left error: " << top_left_diff << "\n";
 
-  double top_right_diff = Hatrix::frobenius_norm_diff(
+  double top_right_diff = Hatrix::norm_diff(
       L.D(0, 0) * U.U(0) * U.S(0, 1) * U.V(1), A_check.D(0, 1));
   std::cout << "Top right error: " << top_right_diff << "\n";
 
-  double bottom_left_diff = Hatrix::frobenius_norm_diff(
+  double bottom_left_diff = Hatrix::norm_diff(
       L.U(1) * L.S(1, 0) * L.V(0) * U.D(0, 0), A_check.D(1, 0));
   std::cout << "Bottom left error: " << bottom_left_diff << "\n";
 
-  double bottom_right = Hatrix::frobenius_norm_diff(
+  double bottom_right = Hatrix::norm_diff(
       L.U(1) * L.S(1, 0) * L.V(0) * U.U(0) * U.S(0, 1) * U.V(1) +
           L.D(1, 1) * U.D(1, 1),
       A_check.D(1, 1));
@@ -179,8 +179,8 @@ void solve_2x2_BLR(const BLR_2x2& L, const BLR_2x2& U, Hatrix::Matrix& x0,
   Hatrix::matmul(U.U(0) * U.S(0, 1) * U.V(1), x1, x0, false, false, -1, 1);
   Hatrix::solve_triangular(U.D(0, 0), x0, Hatrix::Left, Hatrix::Upper, false);
 
-  double error = (Hatrix::frobenius_norm_diff(b0, x0) +
-                  Hatrix::frobenius_norm_diff(b1, x1));
+  double error = (Hatrix::norm_diff(b0, x0) +
+                  Hatrix::norm_diff(b1, x1));
   std::cout << "Solution error: " << error << "\n";
 }
 

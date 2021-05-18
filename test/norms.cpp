@@ -9,64 +9,7 @@
 class NormTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {
 };
 
-TEST_P(NormTests, OneNorm) {
-  int64_t m, n;
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-
-  double norm = A(0, 0);
-  for (int64_t j = 0; j < A.cols; ++j) {
-    double sum = 0;
-    for (int64_t i = 0; i < A.rows; ++i) {
-      sum += std::abs(A(i, j));
-    }
-    if (sum > norm) norm = sum;
-  }
-
-  EXPECT_FLOAT_EQ(norm, Hatrix::calc_norm(A, Hatrix::Norm::OneNorm));
-  EXPECT_FLOAT_EQ(norm, Hatrix::one_norm(A));
-}
-
-TEST_P(NormTests, MaxNorm) {
-  int64_t m, n;
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-
-  double norm = A(0, 0);
-  double absVal;
-  for (int64_t j = 0; j < A.cols; ++j) {
-    for (int64_t i = 0; i < A.rows; ++i) {
-      absVal = std::abs(A(i, j));
-      if (absVal > norm) norm = absVal;
-    }
-  }
-
-  EXPECT_FLOAT_EQ(norm, Hatrix::calc_norm(A, Hatrix::Norm::MaxNorm));
-  EXPECT_FLOAT_EQ(norm, Hatrix::max_norm(A));
-}
-
-TEST_P(NormTests, InfNorm) {
-  int64_t m, n;
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-
-  double norm = A(0, 0);
-  for (int64_t i = 0; i < A.rows; ++i) {
-    double sum = 0;
-    for (int64_t j = 0; j < A.cols; ++j) {
-      sum += std::abs(A(i, j));
-    }
-    if (sum > norm) norm = sum;
-  }
-
-  EXPECT_FLOAT_EQ(norm, Hatrix::calc_norm(A, Hatrix::Norm::InfinityNorm));
-  EXPECT_FLOAT_EQ(norm, Hatrix::infinity_norm(A));
-}
-
-TEST_P(NormTests, FrobNorm) {
+TEST_P(NormTests, norm) {
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
@@ -80,8 +23,7 @@ TEST_P(NormTests, FrobNorm) {
   }
   norm = std::sqrt(norm);
 
-  EXPECT_FLOAT_EQ(norm, Hatrix::calc_norm(A, Hatrix::Norm::FrobeniusNorm));
-  EXPECT_FLOAT_EQ(norm, Hatrix::frobenius_norm(A));
+  EXPECT_FLOAT_EQ(norm, Hatrix::norm(A));
 }
 
 INSTANTIATE_TEST_SUITE_P(
