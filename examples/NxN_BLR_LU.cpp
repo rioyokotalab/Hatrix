@@ -73,9 +73,9 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
 std::vector<Hatrix::Matrix> multiply_BLR(const Hatrix::BLR& A,
                                          const std::vector<Hatrix::Matrix>& x,
                                          int64_t n_blocks,
-                                         bool compare_compressed) {
+                                         bool multiply_compressed) {
   std::vector<Hatrix::Matrix> b(n_blocks);
-  if (compare_compressed) {
+  if (multiply_compressed) {
     std::vector<Hatrix::Matrix> Vx;
     for (int64_t i = 0; i < n_blocks; ++i) {
       Vx.push_back(A.V[i] * x[i]);
