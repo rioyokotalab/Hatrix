@@ -48,6 +48,39 @@ TEST_P(MatMulTests, matmul) {
   Hatrix::terminate();
 }
 
+TEST_P(MatMulTests, matmulReturn) {
+  Hatrix::init();
+  int64_t M, N, K;
+  bool transA, transB;
+  double alpha, _;
+  std::tie(M, K, N, transA, transB, alpha, _) = GetParam();
+  Hatrix::Matrix A =
+      Hatrix::generate_random_matrix(transA ? K : M, transA ? M : K);
+  Hatrix::Matrix B =
+      Hatrix::generate_random_matrix(transB ? N : K, transB ? K : N);
+  Hatrix::Matrix C = Hatrix::matmul(A, B, transA, transB, alpha);
+  Hatrix::sync();
+
+  // Manual matmul
+  Hatrix::Matrix C_check(C.rows, C.cols);
+  for (int64_t i = 0; i < M; ++i) {
+    for (int64_t j = 0; j < N; ++j) {
+      for (int64_t k = 0; k < K; ++k) {
+        C_check(i, j) += (alpha * (transA ? A(k, i) : A(i, k)) *
+                          (transB ? B(j, k) : B(k, j)));
+      }
+    }
+  }
+
+  // Check result
+  for (int64_t i = 0; i < M; ++i) {
+    for (int64_t j = 0; j < N; ++j) {
+      EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
+    }
+  }
+  Hatrix::terminate();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     Params, MatMulTests,
     testing::Combine(testing::Values(13), testing::Values(47),
