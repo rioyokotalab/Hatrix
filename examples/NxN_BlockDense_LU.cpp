@@ -8,22 +8,6 @@
 
 #include "Hatrix/Hatrix.h"
 
-namespace std {
-
-template <>
-struct hash<std::tuple<int64_t, int64_t>> {
-  size_t operator()(const std::tuple<int64_t, int64_t>& pair) const {
-    int64_t first, second;
-    std::tie(first, second) = pair;
-    size_t first_hash = hash<int64_t>()(first);
-    first_hash ^= (hash<int64_t>()(second) + 0x9e3779b97f4a7c17 +
-                   (first_hash << 6) + (first_hash >> 2));
-    return first_hash;
-  }
-};
-
-}  // namespace std
-
 class BlockDense {
  private:
   std::unordered_map<std::tuple<int64_t, int64_t>, Hatrix::Matrix> data;
