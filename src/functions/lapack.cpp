@@ -97,8 +97,8 @@ double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank) {
   return std::sqrt(expected_err);
 }
 
-double calc_norm(const Matrix& A, Norm norm) {
-  return LAPACKE_dlange(LAPACK_COL_MAJOR, static_cast<int>(norm), A.rows,
+double norm(const Matrix& A) {
+  return LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', A.rows,
                         A.cols, &A, A.rows);
 }
 

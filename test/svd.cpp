@@ -27,7 +27,7 @@ TEST_P(truncSVDTests, truncatedSVD) {
   Hatrix::sync();
   Hatrix::matmul(UxS, V, A, false, false, 1, 0);
   Hatrix::sync();
-  double norm_diff = frobenius_norm_diff(A_check, A);
+  double norm_diff = Hatrix::norm_diff(A_check, A);
   EXPECT_NEAR(norm_diff, tolerance, 10e-14);
   Hatrix::terminate();
 }
