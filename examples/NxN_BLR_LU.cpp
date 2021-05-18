@@ -199,7 +199,7 @@ int main() {
   int64_t block_size = 32;
   int64_t n_blocks = 4;
   int64_t rank = 8;
-  bool compare_compressed = false;
+  bool multiply_compressed = false;
   Hatrix::BLR A = construct_BLR(block_size, n_blocks, rank);
 
   std::vector<Hatrix::Matrix> x;
@@ -208,7 +208,7 @@ int main() {
   }
 
   std::vector<Hatrix::Matrix> b =
-      multiply_BLR(A, x, n_blocks, compare_compressed);
+      multiply_BLR(A, x, n_blocks, multiply_compressed);
 
   Hatrix::BLR L, U;
   factorize_BLR(A, L, U, n_blocks);
