@@ -1,9 +1,10 @@
 #pragma once
 #include <cstdint>
+#include <tuple>
+
+#include "Hatrix/classes/Matrix.h"
 
 namespace Hatrix {
-
-class Matrix;
 
 void lu(Matrix& A, Matrix& L, Matrix& U);
 
@@ -12,6 +13,9 @@ void qr(Matrix& A, Matrix& Q, Matrix& R);
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
+
+std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
+                                                         int64_t rank);
 
 double norm(const Matrix& A);
 
