@@ -109,7 +109,7 @@ void factorize(BlockDense& A, BlockDense& L, BlockDense& U, int64_t n_blocks) {
       for (int64_t k = 0; k <= std::min(i, j); ++k) {
         Hatrix::matmul(L(i, k), U(k, j), LU);
       }
-      error += Hatrix::frobenius_norm_diff(LU, A_check(i, j));
+      error += Hatrix::norm_diff(LU, A_check(i, j));
     }
   }
   std::cout << "Total factorization error: " << error << "\n";
@@ -135,7 +135,7 @@ void solve(const BlockDense& L, const BlockDense& U,
   // Check result
   double error = 0;
   for (int64_t i = 0; i < n_blocks; ++i) {
-    error += Hatrix::frobenius_norm_diff(x[i], b[i]);
+    error += Hatrix::norm_diff(x[i], b[i]);
   }
   std::cout << "Total solution error: " << error << "\n";
 }
