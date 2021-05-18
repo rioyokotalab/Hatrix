@@ -6,6 +6,7 @@ else()
     2x2_BlockDense_LU
     2x2_BlockDense_QR
     NxN_BlockDense_LU
+    NxN_BLR_LU
   )
 endif()
 
