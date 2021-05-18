@@ -55,6 +55,7 @@ else()
   find_package(BLAS REQUIRED)
   find_package(LAPACK REQUIRED)
   target_sources(Hatrix PRIVATE
+    src/classes/IndexedMap.cpp
     src/classes/Matrix.cpp
     src/functions/arithmetics.cpp
     src/functions/blas.cpp
