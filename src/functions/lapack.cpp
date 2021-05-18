@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <tuple>
 #include <vector>
 
 #ifdef USE_MKL
@@ -95,6 +96,15 @@ double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank) {
   S.shrink(rank, rank);
   V.shrink(rank, V.cols);
   return std::sqrt(expected_err);
+}
+
+std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
+                                                         int64_t rank) {
+  Matrix U(A.rows, A.min_dim());
+  Matrix S(A.min_dim(), A.min_dim());
+  Matrix V(A.min_dim(), A.cols);
+  double expected_err = truncated_svd(A, U, S, V, rank);
+  return {std::move(U), std::move(S), std::move(V), expected_err};
 }
 
 double norm(const Matrix& A) {
