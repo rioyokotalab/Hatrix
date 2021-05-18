@@ -2,6 +2,7 @@
 
 #include "cublas_v2.h"
 #include "cusolverDn.h"
+#include <cassert>
 
 #include "Hatrix/classes/Matrix.h"
 
@@ -19,6 +20,17 @@ void matmul(const Matrix &A, const Matrix &B, Matrix &C, bool transA,
 
   cudaDeviceSynchronize();
 };
+
+void triangular_matmul(const Matrix& A, Matrix& B, int side, int uplo,
+                       bool transA, bool diag, double alpha) {
+  assert(side == Left ? (transA ? A.rows == B.rows : A.cols == B.rows)
+                      : (transA ? B.cols == A.cols : B.cols == A.rows));
+  cublasDtrmm(blasH, side == Left ? CUBLAS_SIDE_LEFT : CUBLAS_SIDE_RIGHT,
+              uplo == Upper ? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER,
+	      transA ? CUBLAS_OP_T : CUBLAS_OP_N, 
+	      diag ? CUBLAS_DIAG_UNIT : CUBLAS_DIAG_NON_UNIT, B.rows, B.cols, &alpha, 
+	      &A, A.rows, &B, B.rows, &B, B.rows);
+}
 
 void solve_triangular(const Matrix &A, Matrix &B, int side, int uplo, bool diag,
                       bool transA, double alpha) {

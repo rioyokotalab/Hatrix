@@ -5,6 +5,7 @@ if(USE_CUDA)
     Matrix
     arithmetics
     matmul
+    triangular_matmul
     lu
     scale
   )
