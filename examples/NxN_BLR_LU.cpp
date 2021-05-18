@@ -62,7 +62,7 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
         A.S.insert(i, j,
                    Hatrix::matmul(Hatrix::matmul(A.U[i], A.D(i, j), true),
                                   A.V[j], false, true));
-        error += Hatrix::norm_diff(A.U[i] * A.S(i, j) * A.V[j], A.D(i, j));
+        error += Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j] - A.D(i, j));
       }
     }
   }
@@ -160,7 +160,7 @@ void factorize_BLR(Hatrix::BLR& A, Hatrix::BLR& L, Hatrix::BLR& U,
       for (int64_t k = 0; k < std::min(i, j); ++k) {
         result += L.U[i] * L.S(i, k) * L.V[k] * U.U[k] * U.S(k, j) * U.V[j];
       }
-      error += Hatrix::norm_diff(result, A_check.D(i, j));
+      error += Hatrix::norm(result - A_check.D(i, j));
     }
   }
   std::cout << "Total factorization error: " << error << "\n";
@@ -190,7 +190,7 @@ void solve_BLR(const Hatrix::BLR& L, const Hatrix::BLR& U,
 
 int main() {
   int64_t block_size = 32;
-  int64_t n_blocks = 4;
+  int64_t n_blocks = 8;
   int64_t rank = 8;
   bool multiply_compressed = false;
   Hatrix::BLR A = construct_BLR(block_size, n_blocks, rank);
@@ -210,7 +210,7 @@ int main() {
 
   double error = 0;
   for (int64_t i = 0; i < n_blocks; ++i) {
-    error += Hatrix::norm_diff(b[i], x[i]);
+    error += Hatrix::norm(b[i] - x[i]);
   }
   std::cout << "Solution error: " << error << "\n";
 }

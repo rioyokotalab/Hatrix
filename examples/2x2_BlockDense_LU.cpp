@@ -53,7 +53,7 @@ int main() {
   Hatrix::solve_triangular(U0, b0, Hatrix::Left, Hatrix::Upper, false);
 
   // Check accuracy
-  double error = Hatrix::norm_diff(b0, x0) + Hatrix::norm_diff(b1, x1);
+  double error = Hatrix::norm(b0 - x0) + Hatrix::norm(b1 - x1);
   std::cout << "Solution error: " << error << "\n";
   Hatrix::Context::finalize();
   return 0;

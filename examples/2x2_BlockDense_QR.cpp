@@ -116,14 +116,13 @@ int main() {
 
   // Check accuracy and orthogonality
   Hatrix::Matrix Dense_QR = Dense_Q * Dense_R;
-  std::cout << "norm(A-Q*R) = " << Hatrix::norm_diff(Dense_A, Dense_QR)
+  std::cout << "norm(A-Q*R) = " << Hatrix::norm(Dense_A - Dense_QR)
             << std::endl;
 
   Hatrix::Matrix Dense_QTQ(Dense_Q.cols, Dense_Q.cols);
   Hatrix::matmul(Dense_Q, Dense_Q, Dense_QTQ, true, false, 1., 0.);
   Hatrix::Matrix Id =
       Hatrix::generate_identity_matrix(Dense_QTQ.rows, Dense_QTQ.cols);
-  std::cout << "norm(I-Q^T*Q) = " << Hatrix::norm_diff(Id, Dense_QTQ)
-            << std::endl;
+  std::cout << "norm(I-Q^T*Q) = " << Hatrix::norm(Id - Dense_QTQ) << std::endl;
   return 0;
 }
