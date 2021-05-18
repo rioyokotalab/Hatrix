@@ -108,8 +108,7 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
 }
 
 double norm(const Matrix& A) {
-  return LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', A.rows,
-                        A.cols, &A, A.rows);
+  return LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', A.rows, A.cols, &A, A.rows);
 }
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T) {
