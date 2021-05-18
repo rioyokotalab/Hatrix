@@ -19,6 +19,7 @@ TEST_P(TriangularMatMulTests, triangular_matmul) {
   Hatrix::Mode uplo;
   bool transA, diag;
   double alpha;
+  Hatrix::init();
   std::tie(M, N, side, uplo, transA, diag, alpha) = GetParam();
   Hatrix::Matrix B = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix A = Hatrix::generate_random_matrix(
@@ -65,6 +66,7 @@ TEST_P(TriangularMatMulTests, triangular_matmul) {
       EXPECT_NEAR(B_check(i, j), B(i, j), 10e-14);
     }
   }
+  Hatrix::terminate();
 }
 
 INSTANTIATE_TEST_SUITE_P(
