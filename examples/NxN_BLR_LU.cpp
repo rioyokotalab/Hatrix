@@ -8,10 +8,7 @@
 
 #include "Hatrix/Hatrix.h"
 
-int n_blocks = 4;
-bool compare_compressed = false;
-
-Hatrix::BLR construct_BLR(int64_t block_size, int64_t rank) {
+Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
   Hatrix::BLR A;
   for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {
@@ -74,7 +71,9 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t rank) {
 }
 
 std::vector<Hatrix::Matrix> multiply_BLR(const Hatrix::BLR& A,
-                                         const std::vector<Hatrix::Matrix>& x) {
+                                         const std::vector<Hatrix::Matrix>& x,
+                                         int64_t n_blocks,
+                                         bool compare_compressed) {
   std::vector<Hatrix::Matrix> b(n_blocks);
   if (compare_compressed) {
     std::vector<Hatrix::Matrix> Vx;
@@ -92,6 +91,7 @@ std::vector<Hatrix::Matrix> multiply_BLR(const Hatrix::BLR& A,
     }
   } else {
     for (int64_t i = 0; i < n_blocks; ++i) {
+      b[i] = Hatrix::Matrix(x[0].rows, 1);
       for (int64_t j = 0; j < n_blocks; ++j) {
         Hatrix::matmul(A.D(i, j), x[j], b[i]);
       }
@@ -100,7 +100,8 @@ std::vector<Hatrix::Matrix> multiply_BLR(const Hatrix::BLR& A,
   return b;
 }
 
-void factorize_BLR(Hatrix::BLR& A, Hatrix::BLR& L, Hatrix::BLR& U) {
+void factorize_BLR(Hatrix::BLR& A, Hatrix::BLR& L, Hatrix::BLR& U,
+                   int64_t n_blocks) {
   Hatrix::BLR A_check(A);
 
   for (int64_t diag = 0; diag < n_blocks; ++diag) {
@@ -173,7 +174,7 @@ void factorize_BLR(Hatrix::BLR& A, Hatrix::BLR& L, Hatrix::BLR& U) {
 }
 
 void solve_BLR(const Hatrix::BLR& L, const Hatrix::BLR& U,
-               std::vector<Hatrix::Matrix>& b) {
+               std::vector<Hatrix::Matrix>& b, int64_t n_blocks) {
   // Foward substitution
   for (int64_t i = 0; i < n_blocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
@@ -195,21 +196,24 @@ void solve_BLR(const Hatrix::BLR& L, const Hatrix::BLR& U,
 }
 
 int main() {
-  int block_size = 32;
-  int rank = 8;
-  Hatrix::BLR A = construct_BLR(block_size, rank);
+  int64_t block_size = 32;
+  int64_t n_blocks = 4;
+  int64_t rank = 8;
+  bool compare_compressed = false;
+  Hatrix::BLR A = construct_BLR(block_size, n_blocks, rank);
 
   std::vector<Hatrix::Matrix> x;
   for (int64_t i = 0; i < n_blocks; ++i) {
     x.push_back(Hatrix::generate_random_matrix(block_size, 1));
   }
 
-  std::vector<Hatrix::Matrix> b = multiply_BLR(A, x);
+  std::vector<Hatrix::Matrix> b =
+      multiply_BLR(A, x, n_blocks, compare_compressed);
 
   Hatrix::BLR L, U;
-  factorize_BLR(A, L, U);
+  factorize_BLR(A, L, U, n_blocks);
 
-  solve_BLR(L, U, b);
+  solve_BLR(L, U, b, n_blocks);
 
   double error = 0;
   for (int64_t i = 0; i < n_blocks; ++i) {
