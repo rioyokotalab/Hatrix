@@ -7,6 +7,8 @@ if(USE_CUDA)
     matmul
     triangular_matmul
     lu
+    svd
+    norms
     scale
   )
 else()
