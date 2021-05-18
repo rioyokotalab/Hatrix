@@ -1,4 +1,6 @@
 #pragma once
+#include "classes/BLR.h"
+#include "classes/IndexedMap.h"
 #include "classes/Matrix.h"
 #include "functions/arithmetics.h"
 #include "functions/blas.h"
