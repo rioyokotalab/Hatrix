@@ -110,25 +110,18 @@ void factorize_BLR(Hatrix::BLR& A, Hatrix::BLR& L, Hatrix::BLR& U,
     L.D.insert(diag, diag, Hatrix::Matrix(A_diag.rows, A_diag.cols));
     U.D.insert(diag, diag, Hatrix::Matrix(A_diag.rows, A_diag.cols));
     // Initialize off-diagonal blocks of L, U
-    // Copy basis to L and U (using move instead of copy where possible)
-    if (diag == 0) {
-      L.V.insert(diag, std::move(A.V[diag]));
-      U.U.insert(diag, std::move(A.U[diag]));
-    } else if (diag == n_blocks - 1) {
-      L.U.insert(diag, std::move(A.U[diag]));
-      U.V.insert(diag, std::move(A.V[diag]));
-    } else {
-      L.U.insert(diag, Hatrix::Matrix(A.U[diag]));
-      L.V.insert(diag, Hatrix::Matrix(A.V[diag]));
-      U.U.insert(diag, std::move(A.U[diag]));
-      U.V.insert(diag, std::move(A.V[diag]));
-    }
+    // Copy basis to L
+    L.U.insert(diag, Hatrix::Matrix(A.U[diag]));
     for (int64_t i_c = diag + 1; i_c < n_blocks; ++i_c) {
       L.S.insert(i_c, diag, std::move(A.S(i_c, diag)));
     }
+    L.V.insert(diag, Hatrix::Matrix(A.V[diag]));
+    // Copy basis to U (using move instead of copy)
+    U.U.insert(diag, std::move(A.U[diag]));
     for (int64_t j = diag + 1; j < n_blocks; ++j) {
       U.S.insert(diag, j, std::move(A.S(diag, j)));
     }
+    U.V.insert(diag, std::move(A.V[diag]));
 
     // Left looking LU
     // TODO We can be more efficient here by storing V*U somehow!
