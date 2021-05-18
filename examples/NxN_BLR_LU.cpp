@@ -27,7 +27,7 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
   // Also store expected errors to check against later
   std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
   int64_t oversampling = 5;
-  Hatrix::Matrix _, __, basis;
+  Hatrix::Matrix U, S, V;
   double error;
   std::vector<Hatrix::Matrix> Y;
   for (int64_t i = 0; i < n_blocks; ++i) {
@@ -40,8 +40,8 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
       if (i == j) continue;
       Hatrix::matmul(A.D(i, j), Y[j], AY);
     }
-    std::tie(basis, _, __, error) = Hatrix::truncated_svd(AY, rank);
-    A.U.insert(i, std::move(basis));
+    std::tie(U, S, V, error) = Hatrix::truncated_svd(AY, rank);
+    A.U.insert(i, std::move(U));
   }
   for (int64_t j = 0; j < n_blocks; ++j) {
     Hatrix::Matrix YtA(rank + oversampling, block_size);
@@ -49,8 +49,8 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
       if (j == i) continue;
       Hatrix::matmul(Y[i], A.D(i, j), YtA, true);
     }
-    std::tie(__, _, basis, error) = Hatrix::truncated_svd(YtA, rank);
-    A.V.insert(j, std::move(basis));
+    std::tie(U, S, V, error) = Hatrix::truncated_svd(YtA, rank);
+    A.V.insert(j, std::move(V));
   }
 
   error = 0;
