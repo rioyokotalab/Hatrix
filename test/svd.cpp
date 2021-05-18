@@ -27,7 +27,7 @@ TEST_P(truncSVDTests, truncatedSVD) {
   Hatrix::Context::join();
   Hatrix::matmul(UxS, V, A, false, false, 1, 0);
   Hatrix::Context::join();
-  double norm_diff = Hatrix::norm_diff(A_check, A);
+  double norm_diff = Hatrix::norm(A_check - A);
   EXPECT_NEAR(norm_diff, tolerance, 10e-14);
   Hatrix::Context::finalize();
 }
@@ -47,7 +47,7 @@ TEST_P(truncSVDTests, truncatedSVDReturn) {
   Hatrix::Context::join();
   Hatrix::matmul(UxS, V, A, false, false, 1, 0);
   Hatrix::Context::join();
-  double norm_diff = Hatrix::norm_diff(A_check, A);
+  double norm_diff = Hatrix::norm(A_check - A);
   EXPECT_NEAR(norm_diff, tolerance, 10e-14);
   Hatrix::Context::finalize();
 }

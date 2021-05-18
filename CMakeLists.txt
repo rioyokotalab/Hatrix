@@ -29,7 +29,6 @@ else()
 endif()
 
 add_library(Hatrix
-  src/util/error_checking.cpp
   src/util/matrix_generators.cpp
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
