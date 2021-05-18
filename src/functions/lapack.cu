@@ -1,6 +1,7 @@
 #include "Hatrix/functions/lapack.h"
 
 #include <algorithm>
+#include <cassert>
 
 #include "cusolverDn.h"
 
@@ -68,10 +69,6 @@ void qr(Matrix &A, Matrix &Q, Matrix &R) {
   cudaFree(work);
 }
 
-#include <stdio.h>
-
-#include <cassert>
-
 void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
   double *work, *s;
   cudaMallocManaged(reinterpret_cast<void **>(&s),
@@ -105,6 +102,13 @@ double truncated_svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V, int64_t rank) {
   S.shrink(rank, rank);
   V.shrink(rank, V.cols);
   return expected_err;
+}
+
+double norm(const Matrix& A) {
+  double result;
+  cublasDnrm2(blasH, A.rows * A.cols, &A, 1, &result);
+  cudaDeviceSynchronize();
+  return result;
 }
 
 }  // namespace Hatrix
