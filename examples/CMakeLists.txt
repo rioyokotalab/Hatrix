@@ -1,7 +1,12 @@
 if(USE_CUDA)
   list(APPEND HATRIX_EXAMPLES)
 else()
-  list(APPEND HATRIX_EXAMPLES 2x2_BLR_LU 2x2_BlockDense_LU 2x2_BlockDense_QR)
+  list(APPEND HATRIX_EXAMPLES
+    2x2_BLR_LU
+    2x2_BlockDense_LU
+    2x2_BlockDense_QR
+    NxN_BlockDense_LU
+  )
 endif()
 
 foreach(EXAMPLE ${HATRIX_EXAMPLES})
