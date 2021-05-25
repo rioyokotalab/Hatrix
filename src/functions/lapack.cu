@@ -3,126 +3,87 @@
 #include <algorithm>
 #include <cassert>
 
+#include "cublas_v2.h"
 #include "cusolverDn.h"
+#include "cuda_runtime_api.h"
 
 #include "Hatrix/classes/Matrix.h"
 
 namespace Hatrix {
 
-extern cublasHandle_t blasH;
-extern cusolverDnHandle_t solvH;
+void dgetrf(double* a, int64_t m, int64_t n, int64_t lda, int64_t* ipiv) {
+  void* args[7];
+  runtime_args(args, arg_t::SOLV);
+  cusolverDnHandle_t handle = reinterpret_cast<cusolverDnHandle_t>(args[0]);
+  cusolverDnParams_t params = reinterpret_cast<cusolverDnParams_t>(args[1]);
+  void* work = args[2], * work_host = args[4];
+  size_t Lwork = *reinterpret_cast<size_t*>(args[3]), Lwork_host = *reinterpret_cast<size_t*>(args[5]);
+  int* dev_info = reinterpret_cast<int*>(args[6]);
+
+  size_t workspaceInBytesOnDevice_getrf, workspaceInBytesOnHost_getrf;
+  cusolverDnXgetrf_bufferSize(handle, params, m, n, CUDA_R_64F, a, lda, CUDA_R_64F, &workspaceInBytesOnDevice_getrf, &workspaceInBytesOnHost_getrf);
+  if (workspaceInBytesOnDevice_getrf <= Lwork && workspaceInBytesOnHost_getrf <= Lwork_host)
+    cusolverDnXgetrf(handle, params, m, n, CUDA_R_64F, a, lda, ipiv, CUDA_R_64F, work, Lwork, work_host, Lwork_host, dev_info);
+  else
+    fprintf(stderr, "Insufficient work for DGETRF. %zu, %zu\n", workspaceInBytesOnDevice_getrf, workspaceInBytesOnHost_getrf);
+}
+
+void dtricpy(int kind, int uplo, int diag, int64_t m, int64_t n, double* dst, int64_t ldd, const double* src, int64_t lds) {
+  void* args[1];
+  runtime_args(args, arg_t::STREAM);
+  cudaStream_t stream = reinterpret_cast<cudaStream_t>(args[0]);
+
+  lds = lds == 0 ? ldd : lds;
+  bool diag_unit = static_cast<cublasDiagType_t>(diag) == CUBLAS_DIAG_UNIT;
+
+  if (static_cast<cublasFillMode_t>(uplo) == CUBLAS_FILL_MODE_LOWER) {
+    int64_t n_col = m - diag_unit;
+    for (int64_t i = 0; i < n && n_col > 0; i++) {
+      int offset = m - n_col;
+      cudaMemcpyAsync(dst + i * ldd + offset, src + i * lds + offset, n_col * sizeof(double), static_cast<cudaMemcpyKind>(kind), stream);
+      n_col--;
+    }
+  }
+  else if (static_cast<cublasFillMode_t>(uplo) == CUBLAS_FILL_MODE_UPPER) {
+    int64_t n_col = 1;
+    for (int64_t i = diag_unit; i < n; i++) {
+      cudaMemcpyAsync(dst + i * ldd, src + i * lds, n_col * sizeof(double), static_cast<cudaMemcpyKind>(kind), stream);
+      n_col = n_col == m ? m : n_col + 1;
+    }
+  }
+
+  if (diag_unit) {
+    double one = 1;
+    for (int i = 0; i < m && i < n; i++)
+      cudaMemcpyAsync(dst + i * ldd + i, &one, sizeof(double), cudaMemcpyHostToDevice, stream);
+  }
+}
 
 void lu(Matrix &A, Matrix &L, Matrix &U) {
-  int Lwork;
-  cusolverDnDgetrf_bufferSize(solvH, A.rows, A.cols, &A, A.rows, &Lwork);
-
-  double *work;
-  cudaMalloc(reinterpret_cast<void **>(&work), Lwork);
-
-  cusolverDnDgetrf(solvH, A.rows, A.cols, &A, A.rows, work, nullptr, nullptr);
-
-  cudaDeviceSynchronize();
-  cudaFree(work);
-
-  for (int i = 0; i < L.cols && i < A.cols; i++) {
-    double one = 1;
-    cudaMemcpy(&L + i * L.rows + i, &one, sizeof(double),
-               cudaMemcpyHostToDevice);
-    if (i + 1 < A.rows)
-      cudaMemcpy(&L + i * L.rows + i + 1, &A + i * A.rows + i + 1,
-                 (A.rows - i - 1) * sizeof(double), cudaMemcpyDeviceToDevice);
-  }
-
-  for (int i = 0; i < A.cols; i++) {
-    cudaMemcpy(&U + i * U.rows, &A + i * A.rows,
-               std::min(i + 1, (int)A.rows) * sizeof(double),
-               cudaMemcpyDeviceToDevice);
-  }
+  mode_t old = parallel_mode(mode_t::SERIAL);
+  dgetrf(&A, A.rows, A.cols, A.rows, nullptr);
+  dtricpy(cudaMemcpyDefault, CUBLAS_FILL_MODE_LOWER, CUBLAS_DIAG_UNIT, A.rows, A.cols, &L, L.rows, &A, A.rows);
+  parallel_mode(old);
+  dtricpy(cudaMemcpyDefault, CUBLAS_FILL_MODE_UPPER, CUBLAS_DIAG_NON_UNIT, A.rows, A.cols, &U, U.rows, &A, A.rows);
 }
 
 void qr(Matrix &A, Matrix &Q, Matrix &R) {
-  int Lwork;
-  double *tau, *work;
 
-  cusolverDnDgeqrf_bufferSize(solvH, A.rows, A.cols, &A, A.rows, &Lwork);
-
-  cudaMalloc(reinterpret_cast<void **>(&work), Lwork);
-  cudaMalloc(reinterpret_cast<void **>(&tau),
-             std::min(A.rows, A.cols) * sizeof(double));
-  cusolverDnDgeqrf(solvH, A.rows, A.cols, &A, A.rows, tau, work, Lwork,
-                   nullptr);
-
-  cudaDeviceSynchronize();
-  cudaMemcpy(&Q, &A, Q.rows * std::min(A.cols, Q.cols) * sizeof(double),
-             cudaMemcpyDeviceToDevice);
-
-  for (int i = 0; i < A.cols; i++) {
-    cudaMemcpy(&R + i * R.rows, &A + i * A.rows,
-               std::min(i + 1, (int)A.rows) * sizeof(double),
-               cudaMemcpyDeviceToDevice);
-  }
-  cusolverDnDorgqr(solvH, Q.rows, Q.cols, Q.cols, &Q, Q.rows, tau, work, Lwork,
-                   nullptr);
-
-  cudaDeviceSynchronize();
-  cudaFree(tau);
-  cudaFree(work);
 }
 
 void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
-  double *work, *s;
-  cudaMallocManaged(reinterpret_cast<void **>(&s),
-                    std::min(S.rows, S.cols) * sizeof(double));
-
-  int Lwork;
-
-  cusolverDnDgesvd_bufferSize(solvH, A.rows, A.cols, &Lwork);
-  cudaMalloc(reinterpret_cast<void **>(&work), Lwork);
-
-  cusolverDnDgesvd(solvH, 'S', 'S', A.rows, A.cols, &A, A.rows, s, &U, U.rows,
-                   &V, V.rows, work, Lwork, nullptr, nullptr);
-
-  cudaDeviceSynchronize();
-
-  for (int i = 0; i < std::min(S.rows, S.cols); i++) {
-    S(i, i) = s[i];
-  }
-
-  cudaFree(s);
-  cudaFree(work);
+  
 }
 
 double truncated_svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V, int64_t rank) {
-  char jobu = 'S', jobv = 'S';
-  int64_t m = A.rows, n = A.cols, iters = 2;
-  int64_t lda = A.rows, ldu = U.rows, ldv = V.rows;
-
-  rank = rank > m ? m : rank;
-  rank = rank > n ? n : rank;
-  p = p < 0 ? 0 : p;
-  p = p + rank > m ? m - rank : p;
-  p = p + rank > n ? n - rank : p;
-
-  cusolverDnParams_t params_gesvdr;
-  cusolverDnCreateParams(&params_gesvdr);
-
-  size_t workspaceInBytesOnDevice_gesvdr, workspaceInBytesOnHost_gesvdr;
-  cusolverDnXgesvdr_bufferSize(solvH, params_gesvdr, jobu, jobv, m, n, rank, p, iters, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S,
-    CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, &workspaceInBytesOnDevice_gesvdr, &workspaceInBytesOnHost_gesvdr);
   
-  double* Work_host = (double*)malloc(workspaceInBytesOnHost_gesvdr), *Work_dev;
-  cudaMalloc(reinterpret_cast<void **>(&Work_dev), Lwork);
-
-  cusolverDnXgesvdr(solvH, params_gesvdr, jobu, jobv, m, n, rank, p, iters, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S, 
-    CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, Work_dev, workspaceInBytesOnDevice_gesvdr, Work_host, workspaceInBytesOnHost_gesvdr, nullptr);
-
-  free(Work_host);
-  cudaFree(Work_dev);
-  cusolverDnDestroyParams(params_gesvdr);
-  return 0.;
 }
 
 double norm(const Matrix& A) {
+  void* args[1];
+  runtime_args(args, arg_t::BLAS);
+  cublasHandle_t blasH = reinterpret_cast<cublasHandle_t>(args[0]);
+  
   double result;
   cublasDnrm2(blasH, A.rows * A.cols, &A, 1, &result);
   cudaDeviceSynchronize();
