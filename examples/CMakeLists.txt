@@ -1,5 +1,7 @@
 if(USE_CUDA)
-  list(APPEND HATRIX_EXAMPLES)
+  list(APPEND HATRIX_EXAMPLES
+    NxN_BlockDense_LU
+  )
 else()
   list(APPEND HATRIX_EXAMPLES
     2x2_BLR_LU
