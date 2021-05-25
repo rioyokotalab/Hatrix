@@ -33,7 +33,7 @@ TEST_P(truncSVDTests, truncatedSVD) {
 }
 
 TEST_P(truncSVDTests, truncatedSVDReturn) {
-  Hatrix::init();
+  Hatrix::init(1);
   int64_t m, n, rank;
   std::tie(m, n, rank) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_low_rank_matrix(m, n);
@@ -49,7 +49,7 @@ TEST_P(truncSVDTests, truncatedSVDReturn) {
   Hatrix::sync();
   double norm_diff = Hatrix::norm_diff(A_check, A);
   EXPECT_NEAR(norm_diff, tolerance, 10e-14);
-  Hatrix::terminate();
+  Hatrix::term();
 }
 
 TEST_P(SVDTests, SVD) {
