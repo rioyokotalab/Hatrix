@@ -1,27 +1,44 @@
 #pragma once
 #include <cstdint>
+#include <memory>
+#include <vector>
+#ifdef USE_CUDA
+// Include thrust
+#endif
 
 namespace Hatrix {
 
 class Matrix {
  public:
-  double* data_ = nullptr;
   int64_t rows = 0;
   int64_t cols = 0;
+  int64_t stride = 0;
 
+ private:
+  std::shared_ptr<
+#ifdef USE_CUDA
+      thrust::vector<double>
+#else
+      std::vector<double>
+#endif
+      >
+      data;
+  double* data_ptr = nullptr;
+
+ public:
   Matrix() = default;
 
-  ~Matrix();
-
-  Matrix(int64_t rows, int64_t cols);
+  ~Matrix() = default;
 
   Matrix(const Matrix& A);
 
   Matrix& operator=(const Matrix& A);
 
-  Matrix(Matrix&& other);
+  Matrix(Matrix&& A) = default;
 
-  Matrix& operator=(Matrix&& A);
+  Matrix& operator=(Matrix&& A) = default;
+
+  Matrix(int64_t rows, int64_t cols);
 
   const Matrix& operator=(const double a);
 
