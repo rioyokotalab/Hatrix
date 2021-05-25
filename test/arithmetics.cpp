@@ -103,6 +103,7 @@ TEST_P(MatMulOperatorTests, MultiplicationOperator) {
   Hatrix::Matrix C(M, N);
   Hatrix::Matrix C_check = A * B;
   Hatrix::matmul(A, B, C, false, false, 1, 0);
+  Hatrix::sync();
 
   // Check result
   for (int64_t i = 0; i < M; ++i) {
