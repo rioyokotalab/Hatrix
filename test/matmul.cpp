@@ -49,7 +49,7 @@ TEST_P(MatMulTests, matmul) {
 }
 
 TEST_P(MatMulTests, matmulReturn) {
-  Hatrix::init();
+  Hatrix::init(1);
   int64_t M, N, K;
   bool transA, transB;
   double alpha, _;
@@ -78,7 +78,7 @@ TEST_P(MatMulTests, matmulReturn) {
       EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
     }
   }
-  Hatrix::terminate();
+  Hatrix::term();
 }
 
 INSTANTIATE_TEST_SUITE_P(
