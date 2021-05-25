@@ -153,8 +153,16 @@ void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
 }
 
 double truncated_svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V, int64_t rank) {
-  
-  return 0.;
+  assert(rank < A.min_dim());
+  svd(A, U, S, V);
+  sync();
+  double expected_err = 0;
+  for (int64_t k = rank; k < A.min_dim(); ++k)
+    expected_err += S(k, k) * S(k, k);
+  U.shrink(U.rows, rank);
+  S.shrink(rank, rank);
+  V.shrink(rank, V.cols);
+  return std::sqrt(expected_err);
 }
 
 double norm(const Matrix& A) {
