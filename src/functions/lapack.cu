@@ -74,8 +74,7 @@ void qr(Matrix &A, Matrix &Q, Matrix &R) {
 
 }
 
-void dgesvdr(char jobu, char jobv, int64_t m, int64_t n, int64_t rank, int64_t p, int64_t iters, double* A, int64_t lda,
-  double* S, double* U, int64_t ldu, double* V, int64_t ldv) {
+void dgesvd(int64_t m, int64_t n, double* A, int64_t lda, double* S, double* U, int64_t ldu, double* V, int64_t ldv) {
   void* args[7];
   runtime_args(args, arg_t::SOLV);
   cusolverDnHandle_t handle = reinterpret_cast<cusolverDnHandle_t>(args[0]);
@@ -84,22 +83,17 @@ void dgesvdr(char jobu, char jobv, int64_t m, int64_t n, int64_t rank, int64_t p
   size_t Lwork = *reinterpret_cast<size_t*>(args[3]), Lwork_host = *reinterpret_cast<size_t*>(args[5]);
   int* dev_info = reinterpret_cast<int*>(args[6]);
 
-  jobu = jobu == 'S' ? 'S' : 'N';
-  jobv = jobv == 'S' ? 'S' : 'N';
+  auto jobz = CUSOLVER_EIGMODE_VECTOR;
+  int econ = 1;
+  double h_err_sigma;
 
-  rank = rank > m ? m : rank;
-  rank = rank > n ? n : rank;
-  p = p < 0 ? 0 : p;
-  p = p + rank > m ? m - rank : p;
-  p = p + rank > n ? n - rank : p;
+  size_t workspaceInBytesOnDevice_gesvd, workspaceInBytesOnHost_gesvd;
+  cusolverDnXgesvdp_bufferSize(handle, params, jobz, econ, m, n, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S,
+    CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, &workspaceInBytesOnDevice_gesvd, &workspaceInBytesOnHost_gesvd);
 
-  size_t workspaceInBytesOnDevice_gesvdr, workspaceInBytesOnHost_gesvdr;
-  cusolverDnXgesvdr_bufferSize(handle, params, jobu, jobv, m, n, rank, p, iters, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S,
-    CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, &workspaceInBytesOnDevice_gesvdr, &workspaceInBytesOnHost_gesvdr);
-
-  if (workspaceInBytesOnDevice_gesvdr <= Lwork && workspaceInBytesOnHost_gesvdr <= Lwork_host)
-    cusolverDnXgesvdr(handle, params, jobu, jobv, m, n, rank, p, iters, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S, 
-      CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, work, Lwork, work_host, Lwork_host, dev_info);
+  if (workspaceInBytesOnDevice_gesvd <= Lwork && workspaceInBytesOnHost_gesvd <= Lwork_host)
+    cusolverDnXgesvdp(handle, params, jobz, econ, m, n, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S, 
+      CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, work, Lwork, work_host, Lwork_host, dev_info, &h_err_sigma);
   else
     fprintf(stderr, "Insufficient work for DGESVDR. %zu, %zu\n", workspaceInBytesOnDevice_gesvdr, workspaceInBytesOnHost_gesvdr);
 }
@@ -147,7 +141,7 @@ void dvt2v(double* vt, int64_t m, int64_t n, int64_t ldvt, int64_t ldv) {
 void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
   mode_t old = parallel_mode(mode_t::SERIAL);
   int64_t r = A.rows > A.cols ? A.cols : A.rows;
-  dgesvdr('S', 'S', A.rows, A.cols, r, 2000, 5, &A, A.rows, &S, &U, U.rows, &V, V.cols);
+  dgesvd(A.rows, A.cols, &A, A.rows, &S, &U, U.rows, &V, V.cols);
   dsv2m(&S, S.rows, S.cols, S.rows);
   parallel_mode(old);
   dvt2v(&V, V.cols, V.rows, V.cols, V.rows);
