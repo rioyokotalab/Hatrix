@@ -13,7 +13,7 @@ class ApplyBlockReflectorTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, int, bool>> {};
 
 TEST_P(QRTests, qr) {
-  Hatrix::init();
+  Hatrix::init(1);
   int64_t m, n, k;
   std::tie(m, n, k) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
@@ -41,7 +41,7 @@ TEST_P(QRTests, qr) {
     }
   }
 
-  Hatrix::terminate();
+  Hatrix::term();
 }
 
 TEST_P(HouseholderQRCompactWYTests, HouseholderQRCompactWY) {

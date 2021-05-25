@@ -2,8 +2,10 @@
 
 namespace Hatrix {
 
-void init() {}
-void terminate() {}
-void sync() {}
+void init(int nstream, size_t Lwork, size_t Lwork_host) {}
+
+void term() {}
+
+void sync(int stream) {}
 
 }  // namespace Hatrix

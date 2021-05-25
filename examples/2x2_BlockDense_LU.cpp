@@ -5,7 +5,7 @@
 #include "Hatrix/Hatrix.h"
 
 int main() {
-  Hatrix::init();
+  Hatrix::init(1);
   int64_t block_size = 16;
   std::vector<std::vector<Hatrix::Matrix>> A(2);
   A[0] = std::vector<Hatrix::Matrix>{
@@ -55,6 +55,6 @@ int main() {
   // Check accuracy
   double error = Hatrix::norm_diff(b0, x0) + Hatrix::norm_diff(b1, x1);
   std::cout << "Solution error: " << error << "\n";
-  Hatrix::terminate();
+  Hatrix::term();
   return 0;
 }
