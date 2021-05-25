@@ -1,10 +1,6 @@
 #pragma once
 #include <cstdint>
 #include <memory>
-#include <vector>
-#ifdef USE_CUDA
-// Include thrust
-#endif
 
 namespace Hatrix {
 
@@ -15,14 +11,8 @@ class Matrix {
   int64_t stride = 0;
 
  private:
-  std::shared_ptr<
-#ifdef USE_CUDA
-      thrust::vector<double>
-#else
-      std::vector<double>
-#endif
-      >
-      data;
+  class DataHandler;
+  std::shared_ptr<DataHandler> data;
   double* data_ptr = nullptr;
 
  public:
