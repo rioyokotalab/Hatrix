@@ -12,7 +12,7 @@ class NormTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {
 TEST_P(NormTests, norm) {
   int64_t m, n;
   std::tie(m, n) = GetParam();
-  Hatrix::init();
+  Hatrix::init(1);
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
 
   double norm = 0;
@@ -24,7 +24,7 @@ TEST_P(NormTests, norm) {
   norm = std::sqrt(norm);
 
   EXPECT_FLOAT_EQ(norm, Hatrix::norm(A));
-  Hatrix::terminate();
+  Hatrix::term();
 }
 
 INSTANTIATE_TEST_SUITE_P(

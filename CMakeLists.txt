@@ -51,7 +51,7 @@ if(USE_CUDA)
     src/util/context.cu
   )
   set_target_properties(Hatrix PROPERTIES CUDA_ARCHITECTURES 60 70 75)
-  target_link_libraries(Hatrix cublas cusolver)
+  target_link_libraries(Hatrix cublas cusolver curand)
 else()
   find_package(BLAS REQUIRED)
   find_package(LAPACK REQUIRED)

@@ -8,7 +8,7 @@
 class LUTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {};
 
 TEST_P(LUTests, lu) {
-  Hatrix::init();
+  Hatrix::init(1);
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
@@ -34,7 +34,7 @@ TEST_P(LUTests, lu) {
     }
   }
 
-  Hatrix::terminate();
+  Hatrix::term();
 }
 
 INSTANTIATE_TEST_SUITE_P(
