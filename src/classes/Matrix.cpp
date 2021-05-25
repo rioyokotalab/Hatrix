@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -90,5 +91,15 @@ void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
 
 int64_t Matrix::min_dim() const { return std::min(rows, cols); }
 int64_t Matrix::max_dim() const { return std::max(rows, cols); }
+
+void Matrix::print() const {
+  for (int i = 0; i < rows; i++) {
+    for (int j = 0; j < cols; j++) {
+      std::cout << (*this)(i, j) << " ";
+    }
+    std::cout << "\n";
+  }
+  std::cout << "\n";
+}
 
 }  // namespace Hatrix
