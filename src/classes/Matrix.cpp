@@ -28,13 +28,6 @@ class Matrix::DataHandler {
   void resize(int64_t size) { data_.resize(size); }
 };
 
-Matrix::Matrix(int64_t rows, int64_t cols)
-    : rows(rows),
-      cols(cols),
-      stride(rows),
-      data(std::make_shared<DataHandler>(rows * cols, 0)),
-      data_ptr(data->get_ptr()) {}
-
 Matrix::Matrix(const Matrix& A)
     : rows(A.rows),
       cols(A.cols),
@@ -51,6 +44,13 @@ Matrix& Matrix::operator=(const Matrix& A) {
   data_ptr = data->get_ptr();
   return *this;
 }
+
+Matrix::Matrix(int64_t rows, int64_t cols)
+    : rows(rows),
+      cols(cols),
+      stride(rows),
+      data(std::make_shared<DataHandler>(rows * cols, 0)),
+      data_ptr(data->get_ptr()) {}
 
 const Matrix& Matrix::operator=(const double a) {
   for (int64_t i = 0; i < rows; ++i)
