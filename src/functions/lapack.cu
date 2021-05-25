@@ -2,12 +2,14 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
 
 #include "cublas_v2.h"
 #include "cusolverDn.h"
 #include "cuda_runtime_api.h"
 
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/util/context.h"
 
 namespace Hatrix {
 

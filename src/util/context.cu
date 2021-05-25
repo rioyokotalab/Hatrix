@@ -160,11 +160,11 @@ namespace Hatrix {
     { fprintf(stderr, "Lib is not initialized.\n"); assert(0); return; }
     Stream& s = *lib[run()];
     switch (type) {
-    case::arg_t::STREAM:
+    case arg_t::STREAM:
       args[0] = s.stream; break;
-    case::arg_t::BLAS:
+    case arg_t::BLAS:
       args[0] = s.cublasH; break;
-    case::arg_t::SOLV:
+    case arg_t::SOLV:
       args[0] = s.cusolverH;
       args[1] = s.cusolverParams;
       args[2] = s.Workspace;
@@ -173,7 +173,7 @@ namespace Hatrix {
       args[5] = &s.Lwork_host;
       args[6] = s.info;
       break;
-    case::arg_t::BLAS_SOL:
+    case arg_t::BLAS_SOL:
       args[0] = s.cublasH;
       args[1] = s.cusolverH;
       args[2] = s.cusolverParams;
@@ -183,7 +183,7 @@ namespace Hatrix {
       args[6] = &s.Lwork_host;
       args[7] = s.info;
       break;
-    case::arg_t::RAND:
+    case arg_t::RAND:
       args[0] = s.curandH; break;
     default:
       break;

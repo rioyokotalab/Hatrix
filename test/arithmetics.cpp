@@ -96,7 +96,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(MatMulOperatorTests, MultiplicationOperator) {
   int64_t M, N, K;
-  Hatrix::init();
+  Hatrix::init(1);
   std::tie(M, K, N) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(M, K);
   Hatrix::Matrix B = Hatrix::generate_random_matrix(K, N);
@@ -110,7 +110,7 @@ TEST_P(MatMulOperatorTests, MultiplicationOperator) {
       EXPECT_FLOAT_EQ(C_check(i, j), C(i, j));
     }
   }
-  Hatrix::terminate();
+  Hatrix::term();
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -127,7 +127,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(ScalarMulOperatorTests, ScalarMultiplicationOperator) {
   int64_t M, N;
   double alpha;
-  Hatrix::init();
+  Hatrix::init(1);
   std::tie(M, N, alpha) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix B = A * alpha;
@@ -141,13 +141,13 @@ TEST_P(ScalarMulOperatorTests, ScalarMultiplicationOperator) {
       EXPECT_EQ(A(i, j), B(i, j));
     }
   }
-  Hatrix::terminate();
+  Hatrix::term();
 }
 
 TEST_P(ScalarMulOperatorTests, ScalarMultiplicationEqualsOperator) {
   int64_t M, N;
   double alpha;
-  Hatrix::init();
+  Hatrix::init(1);
   std::tie(M, N, alpha) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix A_copy(A);
@@ -159,7 +159,7 @@ TEST_P(ScalarMulOperatorTests, ScalarMultiplicationEqualsOperator) {
       EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
     }
   }
-  Hatrix::terminate();
+  Hatrix::term();
 }
 
 INSTANTIATE_TEST_SUITE_P(
