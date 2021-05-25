@@ -161,7 +161,10 @@ namespace Hatrix {
     Stream& s = *lib[run()];
     switch (type) {
     case arg_t::STREAM:
-      args[0] = s.stream; break;
+      args[0] = s.stream;
+      args[1] = s.Workspace;
+      args[2] = &s.Lwork;
+      break;
     case arg_t::BLAS:
       args[0] = s.cublasH; break;
     case arg_t::SOLV:

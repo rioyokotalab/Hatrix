@@ -31,7 +31,7 @@ void dgetrf(double* a, int64_t m, int64_t n, int64_t lda, int64_t* ipiv) {
 }
 
 void dtricpy(int kind, int uplo, int diag, int64_t m, int64_t n, double* dst, int64_t ldd, const double* src, int64_t lds) {
-  void* args[1];
+  void* args[3];
   runtime_args(args, arg_t::STREAM);
   cudaStream_t stream = reinterpret_cast<cudaStream_t>(args[0]);
 
@@ -41,7 +41,7 @@ void dtricpy(int kind, int uplo, int diag, int64_t m, int64_t n, double* dst, in
   if (static_cast<cublasFillMode_t>(uplo) == CUBLAS_FILL_MODE_LOWER) {
     int64_t n_col = m - diag_unit;
     for (int64_t i = 0; i < n && n_col > 0; i++) {
-      int offset = m - n_col;
+      int64_t offset = m - n_col;
       cudaMemcpyAsync(dst + i * ldd + offset, src + i * lds + offset, n_col * sizeof(double), static_cast<cudaMemcpyKind>(kind), stream);
       n_col--;
     }
@@ -73,19 +73,95 @@ void qr(Matrix &A, Matrix &Q, Matrix &R) {
 
 }
 
+void dgesvdr(char jobu, char jobv, int64_t m, int64_t n, int64_t rank, int64_t p, int64_t iters, double* A, int64_t lda,
+  double* S, double* U, int64_t ldu, double* V, int64_t ldv) {
+  void* args[7];
+  runtime_args(args, arg_t::SOLV);
+  cusolverDnHandle_t handle = reinterpret_cast<cusolverDnHandle_t>(args[0]);
+  cusolverDnParams_t params = reinterpret_cast<cusolverDnParams_t>(args[1]);
+  void* work = args[2], * work_host = args[4];
+  size_t Lwork = *reinterpret_cast<size_t*>(args[3]), Lwork_host = *reinterpret_cast<size_t*>(args[5]);
+  int* dev_info = reinterpret_cast<int*>(args[6]);
+
+  jobu = jobu == 'S' ? 'S' : 'N';
+  jobv = jobv == 'S' ? 'S' : 'N';
+
+  rank = rank > m ? m : rank;
+  rank = rank > n ? n : rank;
+  p = p < 0 ? 0 : p;
+  p = p + rank > m ? m - rank : p;
+  p = p + rank > n ? n - rank : p;
+
+  size_t workspaceInBytesOnDevice_gesvdr, workspaceInBytesOnHost_gesvdr;
+  cusolverDnXgesvdr_bufferSize(handle, params, jobu, jobv, m, n, rank, p, iters, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S,
+    CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, &workspaceInBytesOnDevice_gesvdr, &workspaceInBytesOnHost_gesvdr);
+
+  if (workspaceInBytesOnDevice_gesvdr <= Lwork && workspaceInBytesOnHost_gesvdr <= Lwork_host)
+    cusolverDnXgesvdr(handle, params, jobu, jobv, m, n, rank, p, iters, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S, 
+      CUDA_R_64F, U, ldu, CUDA_R_64F, V, ldv, CUDA_R_64F, work, Lwork, work_host, Lwork_host, dev_info);
+  else
+    fprintf(stderr, "Insufficient work for DGESVDR. %zu, %zu\n", workspaceInBytesOnDevice_gesvdr, workspaceInBytesOnHost_gesvdr);
+}
+
+void dsv2m(double* s, int64_t m, int64_t n, int64_t lds) {
+  void* args[3];
+  runtime_args(args, arg_t::STREAM);
+  cudaStream_t stream = reinterpret_cast<cudaStream_t>(args[0]);
+  double* work = reinterpret_cast<double*>(args[1]);
+  size_t Lwork = *reinterpret_cast<size_t*>(args[2]);
+
+  int64_t r = m > n ? n : m;
+  if (Lwork >= r * sizeof(double)) {
+    cudaMemcpyAsync(work, s, r * sizeof(double), cudaMemcpyDeviceToDevice, stream);
+    cudaMemsetAsync(s, 0, sizeof(double) * lds * n, stream);
+    for (int64_t i = 0; i < r; i++)
+      cudaMemcpyAsync(s + i * lds + i, work + i, sizeof(double), cudaMemcpyDeviceToDevice, stream);
+  }
+  else
+    fprintf(stderr, "Insufficient work for extending singular vector to matrix. %zu\n", r * sizeof(double));
+}
+
+void dvt2v(double* vt, int64_t m, int64_t n, int64_t ldvt, int64_t ldv) {
+  void* args[3];
+  runtime_args(args, arg_t::STREAM);
+  cudaStream_t stream = reinterpret_cast<cudaStream_t>(args[0]);
+  double* work = reinterpret_cast<double*>(args[1]);
+  size_t Lwork = *reinterpret_cast<size_t*>(args[2]);
+
+  ldvt = ldvt < m ? m : ldvt;
+  ldv = ldv < n ? n : ldv;
+
+  if (Lwork >= sizeof(double) * m * n) {
+    for (int64_t i = 0; i < n; i++)
+      for (int64_t j = 0; j < m; j++)
+        cudaMemcpyAsync(work + j * n + i, vt + i * ldvt + j, sizeof(double), cudaMemcpyDeviceToDevice, stream);
+
+    cudaMemcpy2DAsync(vt, sizeof(double) * ldv, work, sizeof(double) * n, sizeof(double) * n, m, cudaMemcpyDeviceToDevice, stream);
+  }
+  else
+    fprintf(stderr, "Insufficient work for tranposing vt to v. %zu\n", sizeof(double) * m * n);
+}
+
+
 void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
-  
+  mode_t old = parallel_mode(mode_t::SERIAL);
+  int64_t r = A.rows > A.cols ? A.cols : A.rows;
+  dgesvdr('S', 'S', A.rows, A.cols, r, 2000, 2, &A, A.rows, &S, &U, U.rows, &V, V.cols);
+  dsv2m(&S, S.rows, S.cols, S.rows);
+  parallel_mode(old);
+  dvt2v(&V, V.cols, V.rows, V.cols, V.rows);
 }
 
 double truncated_svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V, int64_t rank) {
   
+  return 0.;
 }
 
 double norm(const Matrix& A) {
   void* args[1];
   runtime_args(args, arg_t::BLAS);
   cublasHandle_t blasH = reinterpret_cast<cublasHandle_t>(args[0]);
-  
+
   double result;
   cublasDnrm2(blasH, A.rows * A.cols, &A, 1, &result);
   cudaDeviceSynchronize();
