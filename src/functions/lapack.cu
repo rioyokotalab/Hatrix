@@ -136,7 +136,7 @@ void dvt2v(double* vt, int64_t m, int64_t n, int64_t ldvt, int64_t ldv) {
 
 void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
   mode_t old = parallel_mode(mode_t::SERIAL);
-  if (m >= n) {
+  if (A.rows >= A.cols) {
     dgesvd(A.rows, A.cols, &A, A.rows, &S, &U, U.rows, &V, V.rows);
     parallel_mode(old);
     dsv2m(&S, S.rows, S.cols, S.rows);
