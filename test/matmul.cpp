@@ -12,7 +12,7 @@ class MatMulTests
 };
 
 TEST_P(MatMulTests, matmul) {
-  Hatrix::init(1);
+  Hatrix::Context::init();
   int64_t M, N, K;
   bool transA, transB;
   double alpha, beta;
