@@ -11,219 +11,128 @@
 #include "curand.h"
 
 namespace Hatrix {
-
-  class Stream {
-  public:
-    cudaStream_t stream;
-    cublasHandle_t cublasH;
-    cusolverDnHandle_t cusolverH;
-    cusolverDnParams_t cusolverParams;
-    curandGenerator_t curandH;
   
-    void* Workspace;
-    size_t Lwork;
+  size_t Context::nStreams = 0;
+  size_t Context::workspaceInBytesOnDevice = 0;
+  size_t Context::workspaceInBytesOnHost = 0;
   
-    void* Work_host;
-    size_t Lwork_host;
-    int* info;
+  cudaStream_t* Context::stream = nullptr;
+  cublasHandle_t* Context::cublasH = nullptr;
+  cusolverDnHandle_t* Context::cusolverH = nullptr;
+  cusolverDnParams_t* Context::cusolverParams = nullptr;
+  curandGenerator_t* Context::curandH = nullptr;
   
-    cudaEvent_t ev1, ev2;
+  void** Context::bufferOnDevice = nullptr;
+  void** Context::bufferOnHost = nullptr;
+  int* Context::info = nullptr;
+  size_t Context::sid = 0;
+  bool Context::forking = false;
   
-    Stream(size_t Lwork, size_t Lwork_host) {
-      Stream::Lwork = Lwork;
-      Stream::Lwork_host = Lwork_host;
+  void Context::init(int argc, const char** argv) {
+    if (nStreams > 0)
+      Context::finalize();
   
-      cudaStreamCreateWithFlags(&stream, cudaStreamDefault);
-      cublasCreate(&cublasH);
-      cublasSetStream(cublasH, stream);
-      cudaMalloc(reinterpret_cast<void**>(&Workspace), Lwork);
-      cudaMalloc(reinterpret_cast<void**>(&info), sizeof(int));
-      Work_host = (Lwork_host > 0) ? (void*)malloc(Lwork_host) : nullptr;
+    Context::nStreams = (size_t)(argc > 0 ? strtoull(argv[0], nullptr, 0) : 1);
+    Context::workspaceInBytesOnDevice = (size_t)(argc > 1 ? strtoull(argv[1], nullptr, 0) : DEFAULT_LWORK);
+    Context::workspaceInBytesOnHost = (size_t)(argc > 2 ? strtoull(argv[2], nullptr, 0) : DEFAULT_LWORK_HOST);
   
-      //cublasSetWorkspace(cublasH, Workspace, Lwork);
-      cusolverDnCreate(&cusolverH);
-      cusolverDnSetStream(cusolverH, stream);
-      cusolverDnCreateParams(&cusolverParams);
+    Context::stream = new cudaStream_t [Context::nStreams];
+    Context::cublasH = new cublasHandle_t [Context::nStreams];
+    Context::cusolverH = new cusolverDnHandle_t [Context::nStreams];
+    Context::cusolverParams = new cusolverDnParams_t [Context::nStreams];
+    Context::curandH = new curandGenerator_t [Context::nStreams];
   
-      curandCreateGenerator(&curandH, CURAND_RNG_PSEUDO_DEFAULT);
-      curandSetStream(curandH, stream);
+    Context::bufferOnHost = new void* [Context::nStreams];
+    Context::bufferOnDevice = new void* [Context::nStreams];
   
-      ev1 = nullptr;
-      ev2 = nullptr;
+    for (size_t i = 0; i < Context::nStreams; i++) {
+      cudaStreamCreateWithFlags(Context::stream + i, cudaStreamDefault);
+      cublasCreate(Context::cublasH + i);
+      cublasSetStream(Context::cublasH[i], Context::stream[i]);
   
+      if (Context::workspaceInBytesOnDevice)
+        cudaMalloc(reinterpret_cast<void**>(Context::bufferOnDevice + i), Context::workspaceInBytesOnDevice);
+      if (Context::workspaceInBytesOnHost)
+        Context::bufferOnHost[i] = (void*)malloc(Context::workspaceInBytesOnHost);
+  
+      cusolverDnCreate(Context::cusolverH + i);
+      cusolverDnSetStream(Context::cusolverH[i], Context::stream[i]);
+      cusolverDnCreateParams(Context::cusolverParams + i);
+  
+      curandCreateGenerator(Context::curandH + i, CURAND_RNG_PSEUDO_DEFAULT);
+      curandSetStream(Context::curandH[i], Context::stream[i]);
     }
   
-    ~Stream() {
-      if (info)
-        cudaFree(info);
-      if (Workspace)
-        cudaFree(Workspace);
-      if (Work_host)
-        free(Work_host);
-      if (cusolverParams)
-        cusolverDnDestroyParams(cusolverParams);
-      if (cusolverH)
-        cusolverDnDestroy(cusolverH);
-      if (cublasH)
-        cublasDestroy(cublasH);
-      if (stream)
-        cudaStreamDestroy(stream);
-      if (curandH)
-        curandDestroyGenerator(curandH);
-      if (ev1)
-        cudaEventDestroy(ev1);
-      if (ev2)
-        cudaEventDestroy(ev2);
+    cudaMalloc(reinterpret_cast<void**>(&Context::info), Context::nStreams * sizeof(int));
+    Context::sid = 0;
+    Context::forking = false;
+  }
+  
+  void Context::finalize() {
+    for (size_t i = 0; i < Context::nStreams; i++) {
+      if (Context::stream)
+        cudaStreamDestroy(Context::stream[i]);
+      if (Context::cublasH)
+        cublasDestroy(Context::cublasH[i]);
+      if (Context::cusolverH)
+        cusolverDnDestroy(Context::cusolverH[i]);
+      if (Context::cusolverParams[i])
+        cusolverDnDestroyParams(Context::cusolverParams[i]);
+      if (Context::curandH)
+        curandDestroyGenerator(Context::curandH[i]);
+      if (Context::bufferOnDevice[i])
+        cudaFree(Context::bufferOnDevice[i]);
+      if (Context::bufferOnHost[i])
+        free(Context::bufferOnHost[i]);
     }
   
-    void sync() const {
-      cudaStreamSynchronize(stream);
-    }
+    Context::nStreams = 0;
+    Context::workspaceInBytesOnDevice = 0;
+    Context::workspaceInBytesOnHost = 0;
   
-    void createEventOne() {
-      if (ev1)
-        cudaEventDestroy(ev1);
-      cudaEventCreate(&ev1);
-      cudaEventRecord(ev1, stream);
-    }
+    if (Context::stream)
+      delete[] Context::stream;
+    if (Context::cublasH)
+      delete[] Context::cublasH;
+    if (Context::cusolverH)
+      delete[] Context::cusolverH;
+    if (Context::cusolverParams)
+      delete[] Context::cusolverParams;
+    if (Context::curandH)
+      delete[] Context::curandH;
   
-    void createEventTwo() {
-      if (ev2)
-        cudaEventDestroy(ev2);
-      cudaEventCreate(&ev2);
-      cudaEventRecord(ev2, stream);
-    }
+    Context::stream = nullptr;
+    Context::cublasH = nullptr;
+    Context::cusolverH = nullptr;
+    Context::cusolverParams = nullptr;
+    Context::curandH = nullptr;
   
-    float getElapsedTime() const {
-      if (ev1 && ev2) {
-        float ms;
-        cudaEventElapsedTime(&ms, ev1, ev2);
-        return ms;
-      }
-      return 0.;
-    }
+    if (Context::bufferOnDevice)
+      delete[] Context::bufferOnDevice;
+    if (Context::bufferOnHost)
+      delete[] Context::bufferOnHost;
+    if (Context::info)
+      cudaFree(Context::info);
   
-    int Info() const {
-      int i;
-      cudaMemcpy(&i, info, sizeof(int), cudaMemcpyDeviceToHost);
-      return i;
-    }
-  
-  };
-  
-  Stream** lib = nullptr;
-  int n_lib = 0;
-  mode_t lib_mode = mode_t::SERIAL;
-  int lib_ptr = 0;
-  
-  void init(int nstream, size_t Lwork, size_t Lwork_host) {
-    term();
-    lib = new Stream * [nstream];
-    for (int i = 0; i < nstream; i++)
-      lib[i] = new Stream(Lwork, Lwork_host);
-    n_lib = nstream;
+    bufferOnDevice = nullptr;
+    bufferOnHost = nullptr;
+    info = nullptr;
   }
   
-  void term() {
-    if (lib) {
-      for (int i = 0; i < n_lib; i++)
-        delete lib[i];
-      delete[] lib;
-      lib = nullptr;
-    }
-    n_lib = 0;
-    lib_ptr = 0;
+  void Context::join() {
+    Context::sid = 0;
+    Context::forking = false;
+    cudaDeviceSynchronize();
   }
   
-  void sync(int stream) {
-    if (stream == -1)
-      cudaDeviceSynchronize();
-    else if (stream < n_lib)
-      lib[stream]->sync();
+  void Context::fork() {
+    Context::forking = true;
   }
   
-  mode_t parallel_mode(mode_t mode) {
-    mode_t old = lib_mode;
-    lib_mode = mode;
-    return old;
+  void Context::iterate() {
+    if (Context::forking)
+      Context::sid = Context::sid == Context::nStreams - 1 ? 0 : Context::sid + 1;
   }
   
-  int run() {
-    int old = lib_ptr;
-    lib_ptr += static_cast<int>(lib_mode);
-    lib_ptr = lib_ptr >= n_lib ? 0 : lib_ptr;
-    return old;
-  }
-  
-  void runtime_args(void** args, arg_t type) {
-    if (lib == nullptr)
-    { fprintf(stderr, "Lib is not initialized.\n"); assert(0); return; }
-    Stream& s = *lib[run()];
-    switch (type) {
-    case arg_t::STREAM:
-      args[0] = s.stream;
-      args[1] = s.Workspace;
-      args[2] = &s.Lwork;
-      break;
-    case arg_t::BLAS:
-      args[0] = s.cublasH; break;
-    case arg_t::SOLV:
-      args[0] = s.cusolverH;
-      args[1] = s.cusolverParams;
-      args[2] = s.Workspace;
-      args[3] = &s.Lwork;
-      args[4] = s.Work_host;
-      args[5] = &s.Lwork_host;
-      args[6] = s.info;
-      break;
-    case arg_t::BLAS_SOL:
-      args[0] = s.cublasH;
-      args[1] = s.cusolverH;
-      args[2] = s.cusolverParams;
-      args[3] = s.Workspace;
-      args[4] = &s.Lwork;
-      args[5] = s.Work_host;
-      args[6] = &s.Lwork_host;
-      args[7] = s.info;
-      break;
-    case arg_t::RAND:
-      args[0] = s.curandH; break;
-    default:
-      break;
-    }
-  }
-  
-  void generator_seed(long long unsigned int seed) {
-    for (int i = 0; i < n_lib; i++)
-      curandSetPseudoRandomGeneratorSeed(lib[i]->curandH, seed);
-  }
-  
-  void time_start(int stream) {
-    if (lib == nullptr)
-    { fprintf(stderr, "Lib is not initialized.\n"); assert(0); return; }
-    stream = stream == -1 ? lib_ptr : stream;
-    if (stream < n_lib)
-      lib[stream]->createEventOne();
-  }
-  
-  void time_end(int stream) {
-    if (lib == nullptr)
-    { fprintf(stderr, "Lib is not initialized.\n"); assert(0); return; }
-    stream = stream == -1 ? lib_ptr : stream;
-    if (stream < n_lib)
-      lib[stream]->createEventTwo();
-  }
-  
-  float get_time(int stream) {
-    if (lib == nullptr)
-    { fprintf(stderr, "Lib is not initialized.\n"); assert(0); return 0.; }
-    stream = stream == -1 ? lib_ptr : stream;
-    if (stream < n_lib)
-      return lib[stream]->getElapsedTime();
-    return 0.;
-  }
-  
-  
-
 
 }  // namespace Hatrix
