@@ -51,7 +51,6 @@ void solve_triangular(const Matrix &A, Matrix &B, Side side, Mode uplo, bool dia
 }
 
 void scale(Matrix& A, double alpha) {
-  void* args[1];
   cublasHandle_t handle = Context::cublasH[Context::sid];
   Context::iterate();
   cublasDscal(handle, A.rows * A.cols, &alpha, &A, 1);

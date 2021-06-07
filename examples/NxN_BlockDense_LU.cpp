@@ -65,38 +65,29 @@ void factorize(BlockDense& A, BlockDense& L, BlockDense& U, int64_t n_blocks) {
       U.insert(diag, i, std::move(A(diag, i)));
     }
 
-    Hatrix::parallel_mode(Hatrix::mode_t::SERIAL);
     // Left looking LU
     for (int64_t k = 0; k < diag; ++k) {
       Hatrix::matmul(L(diag, k), U(k, diag), A_diag, false, false, -1, 1);
     }
-    Hatrix::parallel_mode(Hatrix::mode_t::PARALLEL);
     Hatrix::lu(A_diag, L(diag, diag), U(diag, diag));
-    Hatrix::sync();
 
     for (int64_t j = diag + 1; j < n_blocks; ++j) {
-      Hatrix::parallel_mode(Hatrix::mode_t::SERIAL);
       for (int64_t k = 0; k < diag; ++k) {
         Hatrix::matmul(L(diag, k), U(k, j), U(diag, j), false, false, -1, 1);
       }
-      Hatrix::parallel_mode(Hatrix::mode_t::PARALLEL);
       Hatrix::solve_triangular(L(diag, diag), U(diag, j), Hatrix::Left,
                                Hatrix::Lower, true);
     }
 
     for (int64_t i = diag + 1; i < n_blocks; ++i) {
-      Hatrix::parallel_mode(Hatrix::mode_t::SERIAL);
       for (int64_t k = 0; k < diag; ++k) {
         Hatrix::matmul(L(i, k), U(k, diag), L(i, diag), false, false, -1, 1);
       }
-      Hatrix::parallel_mode(Hatrix::mode_t::PARALLEL);
       Hatrix::solve_triangular(U(diag, diag), L(i, diag), Hatrix::Right,
                                Hatrix::Upper, false);
     }
-    Hatrix::sync();
   }
 
-  Hatrix::parallel_mode(Hatrix::mode_t::SERIAL);
   // Check result
   double error = 0;
   for (int64_t i = 0; i < n_blocks; ++i) {
@@ -141,7 +132,8 @@ void solve(const BlockDense& L, const BlockDense& U,
 int main() {
   int64_t block_size = 32;
   int64_t n_blocks = 16;
-  Hatrix::init(16);
+  auto N = "1";
+  Hatrix::Context::init(1, &N);
 
   BlockDense A = build_matrix(block_size, n_blocks);
 
@@ -164,7 +156,7 @@ int main() {
 
   std::cout << "fac time: " << (double)elapse / 1.e3 << " ms."<< std::endl;
 
-  Hatrix::parallel_mode(Hatrix::mode_t::SERIAL);
+  Hatrix::Context::join();
   solve(L, U, x, b, n_blocks);
-  Hatrix::term();
+  Hatrix::Context::finalize();
 }
