@@ -70,22 +70,29 @@ void factorize(BlockDense& A, BlockDense& L, BlockDense& U, int64_t n_blocks) {
       Hatrix::matmul(L(diag, k), U(k, diag), A_diag, false, false, -1, 1);
     }
     Hatrix::lu(A_diag, L(diag, diag), U(diag, diag));
+    Hatrix::Context::join();
 
     for (int64_t j = diag + 1; j < n_blocks; ++j) {
+      Hatrix::Context::forking = false;
       for (int64_t k = 0; k < diag; ++k) {
         Hatrix::matmul(L(diag, k), U(k, j), U(diag, j), false, false, -1, 1);
       }
+      Hatrix::Context::fork();
       Hatrix::solve_triangular(L(diag, diag), U(diag, j), Hatrix::Left,
                                Hatrix::Lower, true);
     }
 
     for (int64_t i = diag + 1; i < n_blocks; ++i) {
+      Hatrix::Context::forking = false;
       for (int64_t k = 0; k < diag; ++k) {
         Hatrix::matmul(L(i, k), U(k, diag), L(i, diag), false, false, -1, 1);
       }
+      Hatrix::Context::fork();
       Hatrix::solve_triangular(U(diag, diag), L(i, diag), Hatrix::Right,
                                Hatrix::Upper, false);
     }
+
+    Hatrix::Context::join();
   }
 
   // Check result
@@ -129,11 +136,10 @@ void solve(const BlockDense& L, const BlockDense& U,
 
 #include <sys/time.h>
 
-int main() {
+int main(int argc, char** argv) {
   int64_t block_size = 32;
   int64_t n_blocks = 16;
-  auto N = "1";
-  Hatrix::Context::init(1, &N);
+  Hatrix::Context::init(argc, argv);
 
   BlockDense A = build_matrix(block_size, n_blocks);
 
