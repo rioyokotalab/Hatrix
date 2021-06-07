@@ -1,36 +1,50 @@
 #pragma once
 
 #include <cstddef>
+#ifdef __CUDACC__
+#include <cublas_v2.h>
+#include <cusolverDn.h>
+#include <curand.h>
+#endif
 
 namespace Hatrix {
 
     constexpr size_t DEFAULT_LWORK = 0x80000000ULL;
     constexpr size_t DEFAULT_LWORK_HOST = 0x4000000ULL;
 
-    enum class mode_t : int {
-      SERIAL = 0, PARALLEL = 1
+    class Context {
+    private:
+      Context() {};
+
+    public:
+#ifdef __CUDACC__
+      static size_t nStreams;
+      static size_t workspaceInBytesOnDevice;
+      static size_t workspaceInBytesOnHost;
+
+      static cudaStream_t* stream;
+      static cublasHandle_t* cublasH;
+      static cusolverDnHandle_t* cusolverH;
+      static cusolverDnParams_t* cusolverParams;
+      static curandGenerator_t* curandH;
+
+      static void** bufferOnDevice;
+      static void** bufferOnHost;
+      static int* info;
+      static size_t sid;
+      static bool forking;
+#endif
+
+      static void init(int argc = 0, const char** argv = nullptr);
+
+      static void finalize();
+
+      static void join();
+
+      static void fork();
+
+      static void iterate();
+
     };
-
-    enum class arg_t : int {
-      STREAM = 0, BLAS = 1, SOLV = 2, RAND = 3, BLAS_SOL = 4
-    };
-
-    void init(int nstream, size_t Lwork = DEFAULT_LWORK, size_t Lwork_host = DEFAULT_LWORK_HOST);
-
-    void term();
-
-    void sync(int stream = -1);
-
-    mode_t parallel_mode(mode_t mode);
-
-    void runtime_args(void** args, arg_t type);
-
-    void generator_seed(long long unsigned int seed);
-
-    void time_start(int stream = -1);
-
-    void time_end(int stream = -1);
-
-    float get_time(int stream = -1);
 
 }  // namespace Hatrix
