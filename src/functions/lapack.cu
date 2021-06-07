@@ -93,7 +93,7 @@ void dgesvd(int64_t m, int64_t n, double* A, int64_t lda, double* S, double* U, 
 }
 
 void dsv2m(double* s, int64_t m, int64_t n, int64_t lds) {
-  cublasHandle_t handle = Context::cublasH[Context::sid];
+  cudaStream_t stream = Context::stream[Context::sid];
   double* work = (double*)Context::bufferOnDevice[Context::sid];
   size_t Lwork = Context::workspaceInBytesOnDevice;
   Context::iterate();
@@ -110,7 +110,7 @@ void dsv2m(double* s, int64_t m, int64_t n, int64_t lds) {
 }
 
 void dvt2v(double* vt, int64_t m, int64_t n, int64_t ldvt, int64_t ldv) {
-  cublasHandle_t handle = Context::cublasH[Context::sid];
+  cudaStream_t stream = Context::stream[Context::sid];
   double* work = (double*)Context::bufferOnDevice[Context::sid];
   size_t Lwork = Context::workspaceInBytesOnDevice;
   Context::iterate();
@@ -140,7 +140,6 @@ void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
     dvt2v(&A, A.rows, A.cols, A.rows, A.cols);
     dgesvd(A.cols, A.rows, &A, A.cols, &S, &V, V.cols, &U, U.cols);
     dvt2v(&U, U.cols, U.rows, U.cols, U.rows);
-    parallel_mode(old);
     dvt2v(&V, V.cols, V.rows, V.cols, V.rows);
   }
   Context::forking = forking;
@@ -170,12 +169,10 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
 }
 
 double norm(const Matrix& A) {
-  void* args[1];
-  runtime_args(args, arg_t::BLAS);
-  cublasHandle_t blasH = reinterpret_cast<cublasHandle_t>(args[0]);
+  cublasHandle_t handle = Context::cublasH[Context::sid];
 
   double result;
-  cublasDnrm2(blasH, A.rows * A.cols, &A, 1, &result);
+  cublasDnrm2(handle, A.rows * A.cols, &A, 1, &result);
   cudaDeviceSynchronize();
   return result;
 }

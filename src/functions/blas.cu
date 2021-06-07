@@ -10,7 +10,6 @@ namespace Hatrix {
 
 void matmul(const Matrix &A, const Matrix &B, Matrix &C, bool transA,
             bool transB, double alpha, double beta) {
-  void* args[1];
   cublasHandle_t handle = Context::cublasH[Context::sid];
   Context::iterate();
   cublasDgemm(handle, transA ? CUBLAS_OP_T : CUBLAS_OP_N,
