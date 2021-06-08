@@ -79,9 +79,12 @@ void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
   assert(new_cols <= cols);
   assert(data->size() == rows * cols);
   assert(data->get_ptr() == data_ptr);
-  for (int64_t j = 0; j < new_cols; ++j) {
-    for (int64_t i = 0; i < new_rows; ++i) {
-      data_ptr[j * new_rows + i] = (*this)(i, j);
+  // Only need to reorganize if the number of rows (leading dim) is reduced
+  if (new_rows < rows) {
+    for (int64_t j = 0; j < new_cols; ++j) {
+      for (int64_t i = 0; i < new_rows; ++i) {
+        data_ptr[j * new_rows + i] = (*this)(i, j);
+      }
     }
   }
   rows = new_rows;
