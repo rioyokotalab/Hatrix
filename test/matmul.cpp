@@ -8,8 +8,7 @@
 
 class MatMulTests
     : public testing::TestWithParam<
-          std::tuple<int64_t, int64_t, int64_t, bool, bool, double, double> > {
-};
+          std::tuple<int64_t, int64_t, int64_t, bool, bool, double, double>> {};
 
 TEST_P(MatMulTests, matmul) {
   Hatrix::Context::init();
