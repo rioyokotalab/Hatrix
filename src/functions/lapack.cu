@@ -15,13 +15,12 @@
 namespace Hatrix {
 
 void dgetrf(double* a, int64_t m, int64_t n, int64_t lda, int64_t* ipiv) {
-  void* args[7];
-  runtime_args(args, arg_t::SOLV);
-  cusolverDnHandle_t handle = reinterpret_cast<cusolverDnHandle_t>(args[0]);
-  cusolverDnParams_t params = reinterpret_cast<cusolverDnParams_t>(args[1]);
-  void* work = args[2], * work_host = args[4];
-  size_t Lwork = *reinterpret_cast<size_t*>(args[3]), Lwork_host = *reinterpret_cast<size_t*>(args[5]);
-  int* dev_info = reinterpret_cast<int*>(args[6]);
+  cusolverDnHandle_t handle = Context::cusolverH[Context::sid];
+  cusolverDnParams_t params = Context::cusolverParams[Context::sid];
+  void* work = Context::bufferOnDevice[Context::sid], * work_host = Context::bufferOnHost[Context::sid];
+  size_t Lwork = Context::workspaceInBytesOnDevice, Lwork_host = Context::workspaceInBytesOnHost;
+  int* dev_info = Context::info + Context::sid;
+  Context::iterate();
 
   size_t workspaceInBytesOnDevice_getrf, workspaceInBytesOnHost_getrf;
   cusolverDnXgetrf_bufferSize(handle, params, m, n, CUDA_R_64F, a, lda, CUDA_R_64F, &workspaceInBytesOnDevice_getrf, &workspaceInBytesOnHost_getrf);
@@ -32,9 +31,8 @@ void dgetrf(double* a, int64_t m, int64_t n, int64_t lda, int64_t* ipiv) {
 }
 
 void dtricpy(int kind, int uplo, int diag, int64_t m, int64_t n, double* dst, int64_t ldd, const double* src, int64_t lds) {
-  void* args[3];
-  runtime_args(args, arg_t::STREAM);
-  cudaStream_t stream = reinterpret_cast<cudaStream_t>(args[0]);
+  cudaStream_t stream = Context::stream[Context::sid];
+  Context::iterate();
 
   lds = lds == 0 ? ldd : lds;
   bool diag_unit = static_cast<cublasDiagType_t>(diag) == CUBLAS_DIAG_UNIT;
@@ -63,10 +61,11 @@ void dtricpy(int kind, int uplo, int diag, int64_t m, int64_t n, double* dst, in
 }
 
 void lu(Matrix &A, Matrix &L, Matrix &U) {
-  mode_t old = parallel_mode(mode_t::SERIAL);
+  bool forking = Context::forking;
+  Context::forking = false;
   dgetrf(&A, A.rows, A.cols, A.rows, nullptr);
   dtricpy(cudaMemcpyDefault, CUBLAS_FILL_MODE_LOWER, CUBLAS_DIAG_UNIT, A.rows, A.cols, &L, L.rows, &A, A.rows);
-  parallel_mode(old);
+  Context::forking = forking;
   dtricpy(cudaMemcpyDefault, CUBLAS_FILL_MODE_UPPER, CUBLAS_DIAG_NON_UNIT, A.rows, A.cols, &U, U.rows, &A, A.rows);
 }
 
@@ -75,13 +74,12 @@ void qr(Matrix &A, Matrix &Q, Matrix &R) {
 }
 
 void dgesvd(int64_t m, int64_t n, double* A, int64_t lda, double* S, double* U, int64_t ldu, double* V, int64_t ldv) {
-  void* args[7];
-  runtime_args(args, arg_t::SOLV);
-  cusolverDnHandle_t handle = reinterpret_cast<cusolverDnHandle_t>(args[0]);
-  cusolverDnParams_t params = reinterpret_cast<cusolverDnParams_t>(args[1]);
-  void* work = args[2], * work_host = args[4];
-  size_t Lwork = *reinterpret_cast<size_t*>(args[3]), Lwork_host = *reinterpret_cast<size_t*>(args[5]);
-  int* dev_info = reinterpret_cast<int*>(args[6]);
+  cusolverDnHandle_t handle = Context::cusolverH[Context::sid];
+  cusolverDnParams_t params = Context::cusolverParams[Context::sid];
+  void* work = Context::bufferOnDevice[Context::sid], * work_host = Context::bufferOnHost[Context::sid];
+  size_t Lwork = Context::workspaceInBytesOnDevice, Lwork_host = Context::workspaceInBytesOnHost;
+  int* dev_info = Context::info + Context::sid;
+  Context::iterate();
 
   size_t workspaceInBytesOnDevice_gesvd, workspaceInBytesOnHost_gesvd;
   cusolverDnXgesvd_bufferSize(handle, params, 'S', 'S', m, n, CUDA_R_64F, (void*)A, lda, CUDA_R_64F, S,
@@ -95,11 +93,10 @@ void dgesvd(int64_t m, int64_t n, double* A, int64_t lda, double* S, double* U, 
 }
 
 void dsv2m(double* s, int64_t m, int64_t n, int64_t lds) {
-  void* args[3];
-  runtime_args(args, arg_t::STREAM);
-  cudaStream_t stream = reinterpret_cast<cudaStream_t>(args[0]);
-  double* work = reinterpret_cast<double*>(args[1]);
-  size_t Lwork = *reinterpret_cast<size_t*>(args[2]);
+  cudaStream_t stream = Context::stream[Context::sid];
+  double* work = (double*)Context::bufferOnDevice[Context::sid];
+  size_t Lwork = Context::workspaceInBytesOnDevice;
+  Context::iterate();
 
   int64_t r = m > n ? n : m;
   if (Lwork >= r * sizeof(double)) {
@@ -113,11 +110,10 @@ void dsv2m(double* s, int64_t m, int64_t n, int64_t lds) {
 }
 
 void dvt2v(double* vt, int64_t m, int64_t n, int64_t ldvt, int64_t ldv) {
-  void* args[3];
-  runtime_args(args, arg_t::STREAM);
-  cudaStream_t stream = reinterpret_cast<cudaStream_t>(args[0]);
-  double* work = reinterpret_cast<double*>(args[1]);
-  size_t Lwork = *reinterpret_cast<size_t*>(args[2]);
+  cudaStream_t stream = Context::stream[Context::sid];
+  double* work = (double*)Context::bufferOnDevice[Context::sid];
+  size_t Lwork = Context::workspaceInBytesOnDevice;
+  Context::iterate();
 
   ldvt = ldvt < m ? m : ldvt;
   ldv = ldv < n ? n : ldv;
@@ -135,26 +131,25 @@ void dvt2v(double* vt, int64_t m, int64_t n, int64_t ldvt, int64_t ldv) {
 
 
 void svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V) {
-  mode_t old = parallel_mode(mode_t::SERIAL);
+  bool forking = Context::forking;
+  Context::forking = false;
   if (A.rows >= A.cols) {
     dgesvd(A.rows, A.cols, &A, A.rows, &S, &U, U.rows, &V, V.rows);
-    parallel_mode(old);
-    dsv2m(&S, S.rows, S.cols, S.rows);
   }
   else {
     dvt2v(&A, A.rows, A.cols, A.rows, A.cols);
     dgesvd(A.cols, A.rows, &A, A.cols, &S, &V, V.cols, &U, U.cols);
-    dsv2m(&S, S.rows, S.cols, S.rows);
     dvt2v(&U, U.cols, U.rows, U.cols, U.rows);
-    parallel_mode(old);
     dvt2v(&V, V.cols, V.rows, V.cols, V.rows);
   }
+  Context::forking = forking;
+  dsv2m(&S, S.rows, S.cols, S.rows);
 }
 
 double truncated_svd(Matrix &A, Matrix &U, Matrix &S, Matrix &V, int64_t rank) {
   assert(rank < A.min_dim());
   svd(A, U, S, V);
-  sync();
+  Context::join();
   double expected_err = 0;
   for (int64_t k = rank; k < A.min_dim(); ++k)
     expected_err += S(k, k) * S(k, k);
@@ -174,12 +169,10 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
 }
 
 double norm(const Matrix& A) {
-  void* args[1];
-  runtime_args(args, arg_t::BLAS);
-  cublasHandle_t blasH = reinterpret_cast<cublasHandle_t>(args[0]);
+  cublasHandle_t handle = Context::cublasH[Context::sid];
 
   double result;
-  cublasDnrm2(blasH, A.rows * A.cols, &A, 1, &result);
+  cublasDnrm2(handle, A.rows * A.cols, &A, 1, &result);
   cudaDeviceSynchronize();
   return result;
 }

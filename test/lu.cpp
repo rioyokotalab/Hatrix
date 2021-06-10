@@ -8,7 +8,7 @@
 class LUTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {};
 
 TEST_P(LUTests, lu) {
-  Hatrix::init(1);
+  Hatrix::Context::init();
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
@@ -25,7 +25,7 @@ TEST_P(LUTests, lu) {
   Hatrix::Matrix L(m, n_diag), U(n_diag, n), A_rebuilt(m, n);
   Hatrix::lu(A, L, U);
   Hatrix::matmul(L, U, A_rebuilt, false, false, 1, 0);
-  Hatrix::sync();
+  Hatrix::Context::join();
 
   // Check result
   for (int64_t i = 0; i < A.rows; ++i) {
@@ -34,7 +34,7 @@ TEST_P(LUTests, lu) {
     }
   }
 
-  Hatrix::term();
+  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(
