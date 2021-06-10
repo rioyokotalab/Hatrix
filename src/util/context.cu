@@ -32,9 +32,9 @@ namespace Hatrix {
     if (nStreams > 0)
       Context::finalize();
   
-    Context::nStreams = (size_t)(argc > 0 ? strtoull(argv[0], nullptr, 0) : 1);
-    Context::workspaceInBytesOnDevice = (size_t)(argc > 1 ? strtoull(argv[1], nullptr, 0) : DEFAULT_LWORK);
-    Context::workspaceInBytesOnHost = (size_t)(argc > 2 ? strtoull(argv[2], nullptr, 0) : DEFAULT_LWORK_HOST);
+    Context::nStreams = (size_t)(argc > 1 ? strtoull(argv[1], nullptr, 0) : 1);
+    Context::workspaceInBytesOnDevice = (size_t)(argc > 2 ? strtoull(argv[2], nullptr, 0) : DEFAULT_LWORK);
+    Context::workspaceInBytesOnHost = (size_t)(argc > 3 ? strtoull(argv[3], nullptr, 0) : DEFAULT_LWORK_HOST);
   
     Context::stream = new cudaStream_t [Context::nStreams];
     Context::cublasH = new cublasHandle_t [Context::nStreams];
@@ -127,6 +127,10 @@ namespace Hatrix {
   
   void Context::fork() {
     Context::forking = true;
+  }
+
+  void Context::critical() {
+    Context::forking = false;
   }
   
   void Context::iterate() {
