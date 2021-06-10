@@ -12,7 +12,7 @@ class MatMulTests
 };
 
 TEST_P(MatMulTests, matmul) {
-  Hatrix::init(1);
+  Hatrix::Context::init();
   int64_t M, N, K;
   bool transA, transB;
   double alpha, beta;
@@ -24,7 +24,7 @@ TEST_P(MatMulTests, matmul) {
   Hatrix::Matrix C = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix C_check(C);
   Hatrix::matmul(A, B, C, transA, transB, alpha, beta);
-  Hatrix::sync();
+  Hatrix::Context::join();
 
   // Manual matmul
   for (int64_t i = 0; i < M; ++i) {
@@ -45,11 +45,11 @@ TEST_P(MatMulTests, matmul) {
       EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
     }
   }
-  Hatrix::term();
+  Hatrix::Context::finalize();
 }
 
 TEST_P(MatMulTests, matmulReturn) {
-  Hatrix::init(1);
+  Hatrix::Context::init();
   int64_t M, N, K;
   bool transA, transB;
   double alpha, _;
@@ -59,7 +59,7 @@ TEST_P(MatMulTests, matmulReturn) {
   Hatrix::Matrix B =
       Hatrix::generate_random_matrix(transB ? N : K, transB ? K : N);
   Hatrix::Matrix C = Hatrix::matmul(A, B, transA, transB, alpha);
-  Hatrix::sync();
+  Hatrix::Context::join();
 
   // Manual matmul
   Hatrix::Matrix C_check(C.rows, C.cols);
@@ -78,7 +78,7 @@ TEST_P(MatMulTests, matmulReturn) {
       EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
     }
   }
-  Hatrix::term();
+  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(
