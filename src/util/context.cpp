@@ -2,10 +2,16 @@
 
 namespace Hatrix {
 
-void init(int nstream, size_t Lwork, size_t Lwork_host) {}
+void Context::init(int argc, const char** argv) {}
 
-void term() {}
+void Context::finalize() {}
 
-void sync(int stream) {}
+void Context::fork() {}
+
+void Context::join() {}
+
+void Context::critical() {}
+
+void Context::iterate() {}
 
 }  // namespace Hatrix
