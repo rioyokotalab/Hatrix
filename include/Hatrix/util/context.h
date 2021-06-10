@@ -9,8 +9,8 @@
 
 namespace Hatrix {
 
-    constexpr size_t DEFAULT_LWORK = 0x80000000ULL;
-    constexpr size_t DEFAULT_LWORK_HOST = 0x4000000ULL;
+    constexpr size_t DEFAULT_LWORK = 0x800000ULL;
+    constexpr size_t DEFAULT_LWORK_HOST = 0x40000ULL;
 
     class Context {
     private:
@@ -42,6 +42,8 @@ namespace Hatrix {
       static void join();
 
       static void fork();
+
+      static void critical();
 
       static void iterate();
 

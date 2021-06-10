@@ -73,7 +73,7 @@ void factorize(BlockDense& A, BlockDense& L, BlockDense& U, int64_t n_blocks) {
     Hatrix::Context::join();
 
     for (int64_t j = diag + 1; j < n_blocks; ++j) {
-      Hatrix::Context::forking = false;
+      Hatrix::Context::critical();
       for (int64_t k = 0; k < diag; ++k) {
         Hatrix::matmul(L(diag, k), U(k, j), U(diag, j), false, false, -1, 1);
       }
@@ -83,7 +83,7 @@ void factorize(BlockDense& A, BlockDense& L, BlockDense& U, int64_t n_blocks) {
     }
 
     for (int64_t i = diag + 1; i < n_blocks; ++i) {
-      Hatrix::Context::forking = false;
+      Hatrix::Context::critical();
       for (int64_t k = 0; k < diag; ++k) {
         Hatrix::matmul(L(i, k), U(k, diag), L(i, diag), false, false, -1, 1);
       }
@@ -136,7 +136,7 @@ void solve(const BlockDense& L, const BlockDense& U,
 
 #include <sys/time.h>
 
-int main(int argc, char** argv) {
+int main(int argc, const char** argv) {
   int64_t block_size = 32;
   int64_t n_blocks = 16;
   Hatrix::Context::init(argc, argv);
