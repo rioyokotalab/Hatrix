@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <tuple>
@@ -53,20 +54,29 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
     A.V.insert(j, std::move(V));
   }
 
-  error = 0;
+  double norm_diff = 0;
+  double norm = 0;
   for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {
+      norm += std::pow(Hatrix::norm(A.D(i, j)), 2);
       if (i == j)
         continue;
       else {
         A.S.insert(i, j,
                    Hatrix::matmul(Hatrix::matmul(A.U[i], A.D(i, j), true),
                                   A.V[j], false, true));
-        error += Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j] - A.D(i, j));
+        norm_diff +=
+            std::pow(Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j] - A.D(i, j)), 2);
+        std::cout << i << ", " << j << ": "
+                  << std::pow(
+                         Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j] - A.D(i, j)),
+                         2)
+                  << "\n";
       }
     }
   }
-  std::cout << "Total construction error: " << error << "\n";
+  double l2_error = std::sqrt(norm_diff) / std::sqrt(norm);
+  std::cout << "Total construction L2 error: " << l2_error << "\n";
   return A;
 }
 
