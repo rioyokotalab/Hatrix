@@ -87,7 +87,7 @@ void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
 }
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank) {
-  assert(rank < A.min_dim());
+  assert(rank <= A.min_dim());
   svd(A, U, S, V);
   double expected_err = 0;
   for (int64_t k = rank; k < A.min_dim(); ++k)
