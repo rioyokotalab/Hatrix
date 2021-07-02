@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "Hatrix/Hatrix.h"
 #include "gtest/gtest.h"
@@ -20,6 +21,24 @@ TEST_P(ScaleTests, Scaling) {
   for (int64_t j = 0; j < A.cols; ++j) {
     for (int64_t i = 0; i < A.rows; ++i) {
       EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
+    }
+  }
+  Hatrix::Context::finalize();
+}
+
+TEST_P(ScaleTests, ScalingPart) {
+  int64_t m, n;
+  double alpha;
+  std::tie(m, n, alpha) = GetParam();
+  Hatrix::Context::init();
+  Hatrix::Matrix A_big = Hatrix::generate_random_matrix(2*m, 2*n);
+  std::vector<Hatrix::Matrix> A_split = A_big.split(2, 2);
+  Hatrix::Matrix A_copy(A_split[0]);
+
+  Hatrix::scale(A_split[0], alpha);
+  for (int64_t j = 0; j < A_split[0].cols; ++j) {
+    for (int64_t i = 0; i < A_split[0].rows; ++i) {
+      EXPECT_EQ(A_big(i, j), A_copy(i, j) * alpha);
     }
   }
   Hatrix::Context::finalize();
