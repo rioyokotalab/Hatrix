@@ -19,8 +19,8 @@ void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
   assert(transA ? A.rows : A.cols == transB ? B.cols : B.rows);
   cblas_dgemm(CblasColMajor, transA ? CblasTrans : CblasNoTrans,
               transB ? CblasTrans : CblasNoTrans, C.rows, C.cols,
-              transA ? A.rows : A.cols, alpha, &A, A.rows, &B, B.rows, beta, &C,
-              C.rows);
+              transA ? A.rows : A.cols, alpha, &A, A.stride, &B, B.stride, beta,
+              &C, C.stride);
 };
 
 Matrix matmul(const Matrix& A, const Matrix& B, bool transA, bool transB,
@@ -38,7 +38,7 @@ void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
               diag ? CblasUnit : CblasNonUnit, B.rows, B.cols, alpha, &A,
-              A.rows, &B, B.rows);
+              A.stride, &B, B.stride);
 }
 
 void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
@@ -47,11 +47,13 @@ void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
               diag ? CblasUnit : CblasNonUnit, B.rows, B.cols, alpha, &A,
-              A.rows, &B, B.rows);
+              A.stride, &B, B.stride);
 }
 
 void scale(Matrix& A, double alpha) {
-  cblas_dscal(A.rows * A.cols, alpha, &A, 1);
+  for (int64_t j=0; j<A.cols; ++j) {
+    cblas_dscal(A.rows, alpha, &A(0, j), 1);
+  }
 }
 
 }  // namespace Hatrix
