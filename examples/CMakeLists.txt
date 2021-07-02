@@ -11,6 +11,7 @@ else()
     NxN_BLR_weak_GEMM
     NxN_BlockDense_LU
     NxN_BLR_LU
+    NxN_BLR_strong_LU
   )
 endif()
 
