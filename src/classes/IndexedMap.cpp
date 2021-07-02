@@ -12,6 +12,12 @@ void RowMap::insert(int64_t key, Matrix&& matrix) {
   map.insert({key, std::move(matrix)});
 }
 
+Matrix RowMap::extract(int64_t key) {
+  Matrix out = std::move(map[key]);
+  map.erase(key);
+  return out;
+}
+
 Matrix& RowColMap::operator()(int64_t row, int64_t col) {
   return map.at({row, col});
 }
@@ -30,9 +36,20 @@ const Matrix& RowColMap::operator[](
 void RowColMap::insert(int64_t row, int64_t col, Matrix&& matrix) {
   map.insert({{row, col}, std::move(matrix)});
 }
-void RowColMap::insert(const std::tuple<int64_t, int64_t> key,
+void RowColMap::insert(const std::tuple<int64_t, int64_t>& key,
                        Matrix&& matrix) {
   map.insert({key, std::move(matrix)});
+}
+
+Matrix RowColMap::extract(int64_t row, int64_t col) {
+  Matrix out = std::move(map[{row, col}]);
+  map.erase({row, col});
+  return out;
+}
+Matrix RowColMap::extract(const std::tuple<int64_t, int64_t>& key) {
+  Matrix out = std::move(map[key]);
+  map.erase(key);
+  return out;
 }
 
 }  // namespace Hatrix

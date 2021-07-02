@@ -35,6 +35,8 @@ class RowMap {
   const Matrix& operator()(int64_t key) const;
 
   void insert(int64_t key, Matrix&& matrix);
+
+  Matrix extract(int64_t key);
 };
 typedef RowMap ColMap;
 
@@ -50,7 +52,10 @@ class RowColMap {
   const Matrix& operator[](const std::tuple<int64_t, int64_t>& key) const;
 
   void insert(int64_t row, int64_t col, Matrix&& matrix);
-  void insert(const std::tuple<int64_t, int64_t> key, Matrix&& matrix);
+  void insert(const std::tuple<int64_t, int64_t>& key, Matrix&& matrix);
+
+  Matrix extract(int64_t row, int64_t col);
+  Matrix extract(const std::tuple<int64_t, int64_t>& key);
 };
 
 }  // namespace Hatrix
