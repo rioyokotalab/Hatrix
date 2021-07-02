@@ -28,10 +28,10 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 
   std::vector<int> ipiv(A.min_dim());
 
-  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, ipiv.data());
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
 
   // U: set lower triangular matrix to 0
-  LAPACKE_dlaset(LAPACK_COL_MAJOR, 'L', U.rows, U.cols, 0, 0, &L, U.rows);
+  LAPACKE_dlaset(LAPACK_COL_MAJOR, 'L', U.rows, U.cols, 0, 0, &L, U.stride);
 
   // copy out U and L
   int64_t n_diag = U.min_dim();
@@ -46,7 +46,7 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
   }
 
   // L: set diagonal to 1 and upper triangular matrix to 0
-  LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.rows);
+  LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.stride);
 }
 
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
@@ -57,7 +57,7 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
 
   int64_t k = A.min_dim();
   std::vector<double> tau(k);
-  LAPACKE_dgeqrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, tau.data());
+  LAPACKE_dgeqrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, tau.data());
   // Copy upper triangular (or trapezoidal) part of A to R
   for (int64_t j = 0; j < R.cols; j++) {
     cblas_dcopy(std::min(j + 1, R.rows), &A(0, j), 1, &R(0, j), 1);
@@ -66,7 +66,7 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
   for (int64_t j = 0; j < std::min(A.cols, Q.cols); j++) {
     cblas_dcopy(Q.rows - j, &A(j, j), 1, &Q(j, j), 1);
   }
-  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.rows, tau.data());
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
 }
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
@@ -78,8 +78,8 @@ void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
 
   std::vector<double> Sdiag(S.rows);
   std::vector<double> work(S.rows - 1);
-  LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', A.rows, A.cols, &A, A.rows,
-                 Sdiag.data(), &U, U.rows, &V, V.rows, work.data());
+  LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', A.rows, A.cols, &A, A.stride,
+                 Sdiag.data(), &U, U.stride, &V, V.stride, work.data());
   S = 0;
   for (int64_t i = 0; i < S.rows; i++) {
     S(i, i) = Sdiag[i];
@@ -108,13 +108,13 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
 }
 
 double norm(const Matrix& A) {
-  return LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', A.rows, A.cols, &A, A.rows);
+  return LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', A.rows, A.cols, &A, A.stride);
 }
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T) {
   assert(T.rows == T.cols);
   assert(T.cols == A.cols);
-  LAPACKE_dgeqrt3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.rows, &T, T.rows);
+  LAPACKE_dgeqrt3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, &T, T.stride);
 }
 
 void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
@@ -123,8 +123,8 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
   assert(T.rows == T.cols);
   assert(V.rows == (side == Left ? C.rows : C.cols));
   LAPACKE_dlarfb(LAPACK_COL_MAJOR, side == Left ? 'L' : 'R', trans ? 'T' : 'N',
-                 'F', 'C', C.rows, C.cols, T.cols, &V, V.rows, &T, T.rows, &C,
-                 C.rows);
+                 'F', 'C', C.rows, C.cols, T.cols, &V, V.stride, &T, T.stride,
+                 &C, C.stride);
 }
 
 }  // namespace Hatrix
