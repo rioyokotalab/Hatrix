@@ -4,9 +4,11 @@ if(USE_CUDA)
   )
 else()
   list(APPEND HATRIX_EXAMPLES
+    2x2_BLR_weak_GEMM
     2x2_BLR_LU
     2x2_BlockDense_LU
     2x2_BlockDense_QR
+    NxN_BLR_weak_GEMM
     NxN_BlockDense_LU
     NxN_BLR_LU
   )
