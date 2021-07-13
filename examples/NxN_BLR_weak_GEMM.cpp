@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <cmath>
 #include <iostream>
 #include <tuple>
 #include <unordered_map>
@@ -8,24 +9,32 @@
 
 #include "Hatrix/Hatrix.h"
 
+std::vector<double> equallySpacedVector(int64_t N, double minVal, double maxVal) {
+  std::vector<double> res(N, 0.0);
+  double rnge = maxVal - minVal;
+  for(int64_t i=0; i<N; i++) {
+    res[i] = minVal + ((double)i/(double)rnge);
+  }
+  return res;
+}
+
 Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
+  // Random points for laplace kernel
+  std::vector<std::vector<double>> randpts;
+  randpts.push_back(equallySpacedVector(n_blocks * block_size, 0.0, 1.0)); //1D
+  
   Hatrix::BLR A;
   for (int i = 0; i < n_blocks; ++i) {
-    for (int j = 0; j < n_blocks; ++j) {
-      if (i == j) {
-        Hatrix::Matrix diag =
-            Hatrix::generate_random_matrix(block_size, block_size);
-        // Prevent pivoting
-        for (int64_t i = 0; i < diag.min_dim(); ++i) diag(i, i) += 10;
-        A.D.insert(i, j, std::move(diag));
-      } else {
-        A.D.insert(i, j,
-                   Hatrix::generate_low_rank_matrix(block_size, block_size));
-      }
+    for (int j = 0; j < n_blocks; ++j) {      
+      A.D.insert(i, j,
+		 Hatrix::generate_laplacend_matrix(randpts,
+						   block_size, block_size,
+						   i*block_size, j*block_size));
     }
   }
   // Also store expected errors to check against later
   std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
+  
   int64_t oversampling = 5;
   Hatrix::Matrix U, S, V;
   double error;
@@ -52,21 +61,30 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
     std::tie(U, S, V, error) = Hatrix::truncated_svd(YtA, rank);
     A.V.insert(j, std::move(V));
   }
-
-  error = 0;
   for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {
-      if (i == j)
-        continue;
-      else {
+      if (i != j) {
         A.S.insert(i, j,
                    Hatrix::matmul(Hatrix::matmul(A.U[i], A.D(i, j), true),
                                   A.V[j], false, true));
-        error += Hatrix::norm_diff(A.U[i] * A.S(i, j) * A.V[j], A.D(i, j));
       }
     }
   }
-  std::cout << "Total construction error: " << error << "\n";
+
+  double diff = 0, norm = 0, fnorm, fdiff;
+  for (int i = 0; i < n_blocks; ++i) {
+    for (int j = 0; j < n_blocks; ++j) {
+      fnorm = Hatrix::norm(A.D(i, j));
+      norm += fnorm * fnorm;
+      if (i == j)
+        continue;
+      else {
+	fdiff = Hatrix::norm_diff(A.U[i] * A.S(i, j) * A.V[j], A.D(i, j));
+	diff += fdiff * fdiff;
+      }
+    }
+  }
+  std::cout << "BLR construction error (rel): " << std::sqrt(diff/norm) << "\n";
   return A;
 }
 
@@ -77,7 +95,7 @@ void matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
     for(int j = 0; j < n_blocks; j++) {
       if(i == j) {
 	C.D(i, j) *= beta;
-	Hatrix::Matrix S_ij(A.U[i].cols, B.V[j].rows);
+	Hatrix::Matrix S_ij(C.U[i].cols, C.V[j].rows);
 	for(int k = 0; k < n_blocks; k++) {
 	  if(i == k && j == k) {
 	    Hatrix::matmul(A.D(k, k), B.D(k, k), C.D(i, j), false, false, alpha);
@@ -89,7 +107,7 @@ void matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
 	  Hatrix::matmul(A.D(i, k), B.D(k, j), C_check.D(i, j),
 			 false, false, alpha, k == 0 ? beta : 1.0);
 	}
-	Hatrix::matmul(A.U[i], S_ij * B.V[j], C.D(i, j), false, false, alpha);
+	Hatrix::matmul(C.U[i], S_ij * C.V[j], C.D(i, j), false, false, alpha);
       }
       else {
 	C.S(i, j) *= beta;
@@ -118,18 +136,21 @@ void matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
       }
     }
   }
-  double norm = 0, diff = 0;
+  double norm = 0, diff = 0, fnorm, fdiff;
   for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {
-      norm += Hatrix::norm(C_check.D(i, j));
-      if (i == j)
-        diff += Hatrix::norm_diff(C.D(i, j), C_check.D(i, j));
-      else {
-        diff += Hatrix::norm_diff(C.U[i] * C.S(i, j) * C.V[j], C_check.D(i, j));
+      fnorm = Hatrix::norm(C_check.D(i, j));
+      norm += fnorm * fnorm;
+      if (i == j) {
+	fdiff = Hatrix::norm_diff(C.D(i, j), C_check.D(i, j));
+      } else {
+        fdiff = Hatrix::norm_diff(C.U[i] * C.S(i, j) * C.V[j], C_check.D(i, j));
       }
+      diff += fdiff * fdiff;
+      std::cout <<"diff(" <<i <<"," <<j <<"): " <<fdiff * fdiff <<"\n";
     }
   }
-  std::cout << "Approximate Matmul error: " << diff/norm << "\n";
+  std::cout << "Approximate matmul error (Rel): " <<std::sqrt(diff/norm) <<"\n";
 }
 
 Hatrix::BLR matmul_BLR_out(Hatrix::BLR& A, Hatrix::BLR& B,
@@ -152,17 +173,15 @@ Hatrix::BLR matmul_BLR_out(Hatrix::BLR& A, Hatrix::BLR& B,
   return C;
 }
 
-int main() {
-  int64_t block_size = 32;
-  int64_t n_blocks = 4;
-  int64_t rank = 8;
+int main(int argc, char** argv) {
+  int64_t N = argc > 1 ? atoi(argv[1]) : 256;
+  int64_t block_size = argc > 2 ? atoi(argv[2]) : 32;
+  int64_t rank = argc > 3 ? atoi(argv[3]) : 8;
+  int64_t n_blocks = N/block_size;
+  
   Hatrix::BLR A = construct_BLR(block_size, n_blocks, rank);
   Hatrix::BLR B = construct_BLR(block_size, n_blocks, rank);
-
-  Hatrix::BLR C = construct_BLR(block_size, n_blocks, rank);
-  matmul_BLR(A, B, C, 1, 1, n_blocks);
-
-  // Hatrix::BLR C = matmul_BLR_out(A, B, 1, 1, n_blocks);
-
+  Hatrix::BLR C = matmul_BLR_out(A, B, 1, 1, n_blocks);
+  
   return 0;
 }
