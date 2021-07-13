@@ -40,4 +40,21 @@ Matrix generate_identity_matrix(int64_t rows, int64_t cols) {
   return out;
 }
 
+Matrix generate_laplacend_matrix(std::vector<std::vector<double>>& x,
+				 int64_t rows, int64_t cols,				   
+				 int64_t row_start, int64_t col_start) {
+  Matrix out(rows, cols);
+  for(int64_t i = 0; i < rows; i++) {
+    for(int64_t j = 0; j < cols; j++) {
+      double rij = 0.0;
+      for(int64_t k = 0; k < x.size(); k++) {
+	rij += ((x[k][i+row_start] - x[k][j+col_start]) *
+		(x[k][i+row_start] - x[k][j+col_start]));
+      }
+      out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
+    }
+  }
+  return out;
+}
+
 }  // namespace Hatrix
