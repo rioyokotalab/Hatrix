@@ -79,7 +79,7 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
       if (i == j)
         continue;
       else {
-	fdiff = Hatrix::norm_diff(A.U[i] * A.S(i, j) * A.V[j], A.D(i, j));
+	fdiff = Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j] - A.D(i, j));
 	diff += fdiff * fdiff;
       }
     }
@@ -142,9 +142,9 @@ void matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
       fnorm = Hatrix::norm(C_check.D(i, j));
       norm += fnorm * fnorm;
       if (i == j) {
-	fdiff = Hatrix::norm_diff(C.D(i, j), C_check.D(i, j));
+	fdiff = Hatrix::norm(C.D(i, j) - C_check.D(i, j));
       } else {
-        fdiff = Hatrix::norm_diff(C.U[i] * C.S(i, j) * C.V[j], C_check.D(i, j));
+        fdiff = Hatrix::norm(C.U[i] * C.S(i, j) * C.V[j] - C_check.D(i, j));
       }
       diff += fdiff * fdiff;
       std::cout <<"diff(" <<i <<"," <<j <<"): " <<fdiff * fdiff <<"\n";

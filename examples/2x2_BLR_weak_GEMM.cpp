@@ -99,7 +99,7 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       if (i == j) {
         continue;
       } else {
-	fdiff = Hatrix::norm_diff(A.U(i) * A.S(i, j) * A.V(j), A.D(i, j));
+	fdiff = Hatrix::norm(A.U(i) * A.S(i, j) * A.V(j) - A.D(i, j));
         diff += fdiff * fdiff;
       }
     }
@@ -163,9 +163,9 @@ BLR_2x2 matmul_2x2_BLR(BLR_2x2& A, BLR_2x2& B) {
       fnorm = Hatrix::norm(C_check.D(i, j));
       norm += fnorm * fnorm;
       if (i == j) {
-	fdiff = Hatrix::norm_diff(C.D(i, j), C_check.D(i, j));
+	fdiff = Hatrix::norm(C.D(i, j) - C_check.D(i, j));
       } else {
-        fdiff = Hatrix::norm_diff(C.U(i) * C.S(i, j) * C.V(j), C_check.D(i, j));
+        fdiff = Hatrix::norm(C.U(i) * C.S(i, j) * C.V(j) - C_check.D(i, j));
       }
       diff += fdiff * fdiff;
       std::cout <<"diff(" <<i <<"," <<j <<"): " <<fdiff * fdiff <<"\n";
