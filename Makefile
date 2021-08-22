@@ -1,10 +1,11 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
-DIRS := src/classes src/functions
-OBJLIBS := libclasses.a libfunctions.a
+DIRS := src/classes src/functions src/util
+OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
-EXECUTABLES := matmul lu qr block_dense_lu Matrix
+EXAMPLES := examples
+EXECUTABLES := matmul lu qr Matrix QSPARSE_weak
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -30,7 +31,7 @@ qr: $(TEST)/qr.o dirs
 Matrix: $(TEST)/Matrix.o dirs
 	$(LINK_EXECUTABLE)
 
-block_dense_lu: $(TEST)/block_dense_lu.o dirs
+QSPARSE_weak: $(EXAMPLES)/QSPARSE_weak.o dirs
 	$(LINK_EXECUTABLE)
 
 .PHONY: clean
