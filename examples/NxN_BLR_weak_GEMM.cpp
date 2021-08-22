@@ -119,9 +119,44 @@ void recompress_BLR(Hatrix::BLR& A, double rank, int64_t n_blocks) {
   }
 }
 
+void dense_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR &C,
+		      double alpha, double beta, int64_t n_blocks) {
+  for (int i = 0; i < n_blocks; i++) {
+    for(int j = 0; j < n_blocks; j++) {
+      for(int k = 0; k < n_blocks; k++) {
+	Hatrix::matmul(A.D(i, k), B.D(k, j), C.D(i, j),
+		       false, false, alpha, k == 0 ? beta : 1.0);
+      }
+    }
+  }
+}
+
+Hatrix::BLR dense_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
+  Hatrix::BLR C;
+  for(int i = 0; i < n_blocks; i++) {
+    for(int j = 0; j < n_blocks; j++) {
+      C.D.insert(i, j, Hatrix::Matrix(A.D(i, j).rows, B.D(i, j).cols));
+    }
+  }
+  dense_matmul_BLR(A, B, C, 1, 0, n_blocks);
+  return C;
+}
+
 void projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
-		double alpha, double beta, int64_t n_blocks) {
-  Hatrix::BLR C_check(C);
+			  double alpha, double beta, int64_t n_blocks) {
+  //Precompute
+  std::vector<Hatrix::Matrix> UCTxAxUB, VAxBxVCT;
+  std::vector<Hatrix::Matrix> UCTxUA, VBxVCT;
+  std::vector<Hatrix::Matrix> VAxUB;
+  for(int k = 0; k < n_blocks; k++) {
+    UCTxAxUB.push_back(Hatrix::matmul(C.U[k], A.D(k, k) * B.U[k], true, false));
+    VAxBxVCT.push_back(Hatrix::matmul(A.V[k] * B.D(k, k), C.V[k], false, true));
+
+    UCTxUA.push_back(Hatrix::matmul(C.U[k], A.U[k], true, false));
+    VBxVCT.push_back(Hatrix::matmul(B.V[k], C.V[k], false, true));
+
+    VAxUB.push_back(A.V[k] * B.U[k]);
+  }
   for (int i = 0; i < n_blocks; i++) {
     for(int j = 0; j < n_blocks; j++) {
       if(i == j) {
@@ -132,11 +167,8 @@ void projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
 	    Hatrix::matmul(A.D(k, k), B.D(k, k), C.D(i, j), false, false, alpha);
 	  }
 	  else {
-	    S_ij += A.S(i, k) * (A.V[k] * B.U[k]) * B.S(k, j);
+	    S_ij += A.S(i, k) * VAxUB[k] * B.S(k, j);
 	  }
-	  // Multiply dense part for error checking
-	  Hatrix::matmul(A.D(i, k), B.D(k, j), C_check.D(i, j),
-			 false, false, alpha, k == 0 ? beta : 1.0);
 	}
 	Hatrix::matmul(C.U[i], S_ij * C.V[j], C.D(i, j), false, false, alpha);
       }
@@ -144,43 +176,25 @@ void projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
 	C.S(i, j) *= beta;
 	for(int k = 0; k < n_blocks; k++) {
 	  if(i == k && j != k) { //D x LR
-	    Hatrix::matmul(Hatrix::matmul(C.U[i], A.D(i, k) * B.U[k], true),
-			   B.S(k, j) * Hatrix::matmul(B.V[j], C.V[j], false, true),
+	    Hatrix::matmul(UCTxAxUB[i],
+			   B.S(k, j) * VBxVCT[j],
 			   C.S(i, j), false, false, alpha);
 	  }
 	  else if(i != k && j == k) { //LR x D
-	    Hatrix::matmul(Hatrix::matmul(C.U[i], A.U[i], true),
-			   A.S(i, k) * Hatrix::matmul(A.V[k] * B.D(k, j), C.V[j],
-						      false, true),
+	    Hatrix::matmul(UCTxUA[i],
+			   A.S(i, k) * VAxBxVCT[j],
 			   C.S(i, j), false, false, alpha);
 	  }
 	  else { //LR x LR
-	    Hatrix::matmul(Hatrix::matmul(C.U[i], A.U[i], true),
-			   A.S(i, k) * (A.V[k] * B.U[k]) * B.S(k, j) *
-			   Hatrix::matmul(B.V[j], C.V[j], false, true),
+	    Hatrix::matmul(UCTxUA[i],
+			   A.S(i, k) * VAxUB[k] * B.S(k, j) *
+			   VBxVCT[j],
 			   C.S(i, j), false, false, alpha);
 	  }
-	  // Multiply dense part for error checking
-	  Hatrix::matmul(A.D(i, k), B.D(k, j), C_check.D(i, j),
-			 false, false, alpha, k == 0 ? beta : 1.0);
 	}
       }
     }
   }
-  double norm = 0, diff = 0, fnorm, fdiff;
-  for (int i = 0; i < n_blocks; ++i) {
-    for (int j = 0; j < n_blocks; ++j) {
-      fnorm = Hatrix::norm(C_check.D(i, j));
-      norm += fnorm * fnorm;
-      if (i == j) {
-	fdiff = Hatrix::norm(C.D(i, j) - C_check.D(i, j));
-      } else {
-        fdiff = Hatrix::norm(C.U[i] * C.S(i, j) * C.V[j] - C_check.D(i, j));
-      }
-      diff += fdiff * fdiff;
-    }
-  }
-  std::cout << "Projected matmul error (Rel): " <<std::sqrt(diff/norm) <<"\n";
 }
 
 Hatrix::BLR projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
@@ -204,7 +218,7 @@ Hatrix::BLR projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_block
 
 Hatrix::BLR exact_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
   int row_start, col_start;
-  Hatrix::BLR M, tmp;
+  Hatrix::BLR M;
   double rankA, rankB; //Assume uniform rank
   
   //Construct induced product bases
@@ -213,17 +227,17 @@ Hatrix::BLR exact_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
   //U and V bases
   for(int k = 0; k < n_blocks; k++) {
     M.U.insert(k, Hatrix::Matrix(A.U[k].rows, rankA + rankB));
-    tmp.U.insert(k, A.D(k, k) * B.U[k]);
+    Hatrix::Matrix AxUB = A.D(k, k) * B.U[k];
     for(int j = 0; j < M.U[k].cols; j++) {
       for(int i = 0; i < M.U[k].rows; i++) {
-	M.U[k](i, j) = (j < rankA ? A.U[k](i, j) : tmp.U[k](i, j-rankA));
+	M.U[k](i, j) = (j < rankA ? A.U[k](i, j) : AxUB(i, j-rankA));
       }
     }
     M.V.insert(k, Hatrix::Matrix(rankA + rankB, B.V[k].cols));
-    tmp.V.insert(k, A.V[k] * B.D(k, k));
+    Hatrix::Matrix VAxB = A.V[k] * B.D(k, k);
     for(int j = 0; j < M.V[k].cols; j++) {
       for(int i = 0; i < M.V[k].rows; i++) {
-	M.V[k](i, j) = (i < rankB ? B.V[k](i, j) : tmp.V[k](i-rankB, j));
+	M.V[k](i, j) = (i < rankB ? B.V[k](i, j) : VAxB(i-rankB, j));
       }
     }
   }
@@ -234,18 +248,12 @@ Hatrix::BLR exact_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
       else M.S.insert(i, j, Hatrix::Matrix(M.U[i].cols, M.V[j].rows));
     }
   }
-
-  //For error checking
-  Hatrix::BLR M_check(M);
-  for(int i = 0; i < n_blocks; i++) {
-    for(int j = 0; j < n_blocks; j++) {
-      if(i != j) {
-	M_check.D.insert(i, j,
-			 Hatrix::Matrix(M_check.U[i].rows, M_check.V[j].cols));
-      }
-    }
+  //Precompute VAxUB
+  std::vector<Hatrix::Matrix> VAxUB;
+  for(int k = 0; k < n_blocks; k++) {
+    VAxUB.push_back(A.V[k] * B.U[k]);
   }
-
+  //Multiplication
   for (int i = 0; i < n_blocks; i++) {
     for(int j = 0; j < n_blocks; j++) {
       if(i == j) { //M(i, j) is non-admissible
@@ -255,10 +263,8 @@ Hatrix::BLR exact_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
 	    Hatrix::matmul(A.D(k, k), B.D(k, k), M.D(i, j));
 	  }
 	  else {
-	    S_ij += A.S(i, k) * (A.V[k] * B.U[k]) * B.S(k, j);
+	    S_ij += A.S(i, k) * VAxUB[k] * B.S(k, j);
 	  }
-	  // Multiply dense part for error checking
-	  Hatrix::matmul(A.D(i, k), B.D(k, j), M_check.D(i, j));
 	}
 	Hatrix::matmul(A.U[i], S_ij * B.V[j], M.D(i, j));
       }
@@ -285,12 +291,8 @@ Hatrix::BLR exact_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
 	  }
 	  else { //LR x LR
 	    //Accumulate S
-	    Hatrix::matmul(A.S(i, k),
-			   (A.V[k] * B.U[k]) * B.S(k, j),
-			   S_ij);
+	    Hatrix::matmul(A.S(i, k), VAxUB[k] * B.S(k, j), S_ij);
 	  }
-	  // Multiply dense part for error checking
-	  Hatrix::matmul(A.D(i, k), B.D(k, j), M_check.D(i, j));
 	}
 	//Fill topleft of M.S
 	row_start = 0; col_start = 0;
@@ -302,35 +304,7 @@ Hatrix::BLR exact_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
       }
     }
   }
-  double norm = 0, diff = 0, fnorm, fdiff;
-  for (int i = 0; i < n_blocks; ++i) {
-    for (int j = 0; j < n_blocks; ++j) {
-      fnorm = Hatrix::norm(M_check.D(i, j));
-      norm += fnorm * fnorm;
-      if (i == j) {
-	fdiff = Hatrix::norm(M.D(i, j) - M_check.D(i, j));
-      } else {
-        fdiff = Hatrix::norm(M.U[i] * M.S(i, j) * M.V[j] - M_check.D(i, j));
-      }
-      diff += fdiff * fdiff;
-    }
-  }
-  std::cout << "Exact matmul error before recompression (Rel): " <<std::sqrt(diff/norm) <<"\n";
   recompress_BLR(M, rankA, n_blocks);
-  norm = 0, diff = 0;
-  for (int i = 0; i < n_blocks; ++i) {
-    for (int j = 0; j < n_blocks; ++j) {
-      fnorm = Hatrix::norm(M_check.D(i, j));
-      norm += fnorm * fnorm;
-      if (i == j) {
-	fdiff = Hatrix::norm(M.D(i, j) - M_check.D(i, j));
-      } else {
-        fdiff = Hatrix::norm(M.U[i] * M.S(i, j) * M.V[j] - M_check.D(i, j));
-      }
-      diff += fdiff * fdiff;
-    }
-  }
-  std::cout << "Exact matmul error after recompression (Rel): " <<std::sqrt(diff/norm) <<"\n";
   return M;
 }
 
@@ -342,8 +316,40 @@ int main(int argc, char** argv) {
   
   Hatrix::BLR A = construct_BLR(block_size, n_blocks, rank);
   Hatrix::BLR B = construct_BLR(block_size, n_blocks, rank);
-  Hatrix::BLR C = projected_matmul_BLR(A, B, n_blocks);
-  Hatrix::BLR M = exact_matmul_BLR(A, B, n_blocks);
+  Hatrix::BLR C_dense = dense_matmul_BLR(A, B, n_blocks);
+  Hatrix::BLR C_proj = projected_matmul_BLR(A, B, n_blocks);
+  Hatrix::BLR C_exact = exact_matmul_BLR(A, B, n_blocks);
+
+  //Projected Matmul Error
+  double norm = 0, diff = 0, fnorm, fdiff;
+  for (int i = 0; i < n_blocks; ++i) {
+    for (int j = 0; j < n_blocks; ++j) {
+      fnorm = Hatrix::norm(C_dense.D(i, j));
+      norm += fnorm * fnorm;
+      if (i == j) {
+	fdiff = Hatrix::norm(C_proj.D(i, j) - C_dense.D(i, j));
+      } else {
+        fdiff = Hatrix::norm(C_proj.U[i] * C_proj.S(i, j) * C_proj.V[j] - C_dense.D(i, j));
+      }
+      diff += fdiff * fdiff;
+    }
+  }
+  std::cout << "Projected Matmul Relative Error: " << std::sqrt(diff/norm) << "\n";
   
+  //Exact Matmul Error
+  norm = 0; diff = 0;
+  for (int i = 0; i < n_blocks; ++i) {
+    for (int j = 0; j < n_blocks; ++j) {
+      fnorm = Hatrix::norm(C_dense.D(i, j));
+      norm += fnorm * fnorm;
+      if (i == j) {
+	fdiff = Hatrix::norm(C_exact.D(i, j) - C_dense.D(i, j));
+      } else {
+        fdiff = Hatrix::norm(C_exact.U[i] * C_exact.S(i, j) * C_exact.V[j] - C_dense.D(i, j));
+      }
+      diff += fdiff * fdiff;
+    }
+  }
+  std::cout << "Exact Matmul Relative Error: " << std::sqrt(diff/norm) << "\n";  
   return 0;
 }
