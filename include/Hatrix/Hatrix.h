@@ -1,4 +1,5 @@
 #pragma once
+#include "classes/HSS.h"
 #include "classes/BLR.h"
 #include "classes/IndexedMap.h"
 #include "classes/Matrix.h"

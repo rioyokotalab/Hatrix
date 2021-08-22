@@ -2,7 +2,7 @@ TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
 DIRS := src/classes src/functions src/util
-OBJLIBS := libclasses.a libfunctions.a libutil.a
+OBJLIBS := libutil.a libclasses.a libfunctions.a
 TEST := test
 EXAMPLES := examples
 EXECUTABLES := matmul lu qr Matrix QSPARSE_weak
