@@ -7,6 +7,9 @@
 
 #include "Hatrix/Hatrix.h"
 
+// Generate an HSS matrix represented by a 3 level tree. There is a layer of leaf nodes
+// at the bottom most level and another layer of transfer matrices above it.
+
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   std::vector<double> res(N, 0.0);
   double rnge = maxVal - minVal;
@@ -30,7 +33,7 @@ Hatrix::HSS construct_HSS_matrix(int N, int rank, int height) {
 
   std::vector<std::vector<double> > randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0));
-
+  generate_leaf_nodes(A, N, rank, height);
   return A;
 }
 
@@ -38,6 +41,10 @@ Hatrix::Matrix construct_dense_matrix(int N) {
   std::vector<std::vector<double> > randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0));
   return Hatrix::generate_laplacend_matrix(randvec, N, N, 0, 0);
+}
+
+void verify_hss_construction(Hatrix::HSS& A, Hatrix::Matrix& A_dense) {
+
 }
 
 int main(int argc, char *argv[]) {
@@ -49,6 +56,8 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::HSS A = construct_HSS_matrix(N, rank, height);
   Hatrix::Matrix A_dense = construct_dense_matrix(N);
+
+  verify_hss_construction(A, A_dense);
 
   Hatrix::Context::finalize();
 }
