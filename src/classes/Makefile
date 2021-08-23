@@ -1,5 +1,5 @@
 TOPSRCDIR = ../..
 sublib  := libclasses.a
-SOURCES := Matrix.cpp HSS.cpp
+SOURCES := Matrix.cpp
 
 include $(TOPSRCDIR)/common.mk
