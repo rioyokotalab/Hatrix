@@ -3,9 +3,14 @@
 
 namespace Hatrix {
   class HSS {
-  public:
+  private:
+    int N, rank, height;
     RowColLevelMap D, S;
-    RowLevelMap U;
-    ColLevelMap V;
+    RowLevelMap U, U_generators;
+    ColLevelMap V, V_generators;
+
+    void generate_leaf_nodes();
+  public:
+    HSS(int _N, int _rank, int _height);
   };
 } // namespace Hatrix

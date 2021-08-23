@@ -6,7 +6,7 @@
 
 #include "Hatrix/Hatrix.h"
 
-Hatrix::HSS construct_HSS_matrix(int N, int rank, int height) {
+void check_HSS_matrix_generation(Hatrix::HSS& hss) {
 
 }
 
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::init();
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
-  Hatrix::HSS A = construct_HSS_matrix(N, rank, height);
+  Hatrix::HSS A(N, rank, height);
 
   Hatrix::Context::finalize();
 }
