@@ -22,24 +22,32 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-void generate_leaf_nodes(Hatrix::HSS& A, randvec_t& randvec, int N, int rank, int height) {
+std::pair<Hatrix::RowLevelMap, Hatrix::RowLevelMap>
+generate_leaf_nodes(
+                    Hatrix::HSS& A, randvec_t& randvec, int N, int rank, int height) {
   int level = height - 1;
   int nleaf_nodes = pow(2, level);
   int block = std::floor(N/nleaf_nodes);
+  Hatrix::RowLevelMap U_generators, V_generators;
+
   for (int node = 0; node < nleaf_nodes; ++node) {
-    // Generate diagonal dense blocks
     int leaf_size = node == nleaf_nodes - 1 ?
       std::min(block, N - block * (nleaf_nodes-1)) : block;
 
+    // Generate diagonal dense blocks
     A.D.insert(node, node, level,
                Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                                  block * node, block * node));
+
   }
+
+  return {U_generators, V_generators};
 }
 
 Hatrix::HSS construct_HSS_matrix(int N, int rank, int height, randvec_t& randvec) {
   Hatrix::HSS A;
-  generate_leaf_nodes(A, randvec, N, rank, height);
+  Hatrix::RowLevelMap U_generators, V_generators;
+  std::tie(U_generators, V_generators) = generate_leaf_nodes(A, randvec, N, rank, height);
   return A;
 }
 
