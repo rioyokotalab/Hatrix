@@ -23,15 +23,19 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
 }
 
 std::tuple<Hatrix::Matrix, Hatrix::Matrix>
-generate_column_bases(int node, randvec_t& randvec, int leaf_size, int rank) {
-  Hatrix::Matrix U_big, U_generator;
+generate_column_bases(int node, randvec_t& randvec, int N,
+  int leaf_size, int rank) {
+  Hatrix::Matrix col_slice(N-leaf_size, leaf_size);
+  Hatrix::Matrix U_big(leaf_size, rank), U_generator(rank, col_slice.rows);
+
 
   return {U_big, U_generator};
 }
 
 std::tuple<Hatrix::Matrix, Hatrix::Matrix>
-generate_row_bases(int node, randvec_t& randvec, int leaf_size, int rank) {
-  Hatrix::Matrix V_big, V_generator;
+generate_row_bases(int node, randvec_t& randvec, int N, int leaf_size, int rank) {
+  Hatrix::Matrix row_slice(leaf_size, N - leaf_size);
+  Hatrix::Matrix V_big(leaf_size, rank), V_generator(rank, row_slice.cols);
 
   return {V_big, V_generator};
 }
@@ -54,12 +58,14 @@ generate_leaf_nodes(
                                                  block * node, block * node));
 
     Hatrix::Matrix U_big, U_generator;
-    std::tie(U_big, U_generator) = generate_column_bases(node, randvec, leaf_size, rank);
+    std::tie(U_big, U_generator) = generate_column_bases(node, randvec,
+      N, leaf_size, rank);
     A.U.insert(node, level, std::move(U_big));
     U_generators.insert(node, level, std::move(U_generator));
 
     Hatrix::Matrix V_big, V_generator;
-    std::tie(V_big, V_generator) = generate_row_bases(node, randvec, leaf_size, rank);
+    std::tie(V_big, V_generator) = generate_row_bases(node, randvec,
+      N, leaf_size, rank);
     A.V.insert(node, level, std::move(V_big));
     V_generators.insert(node, level, std::move(V_generator));
   }
