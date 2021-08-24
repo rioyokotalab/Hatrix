@@ -22,7 +22,15 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-std::pair<Hatrix::RowLevelMap, Hatrix::RowLevelMap>
+std::tuple<Hatrix::Matrix, Hatrix::Matrix>
+generate_column_bases(int node, randvec_t& randvec, int leaf_size, int rank) {
+  Hatrix::Matrix U_big, U_generator;
+
+  return {U_big, U_generator};
+}
+
+
+std::tuple<Hatrix::RowLevelMap, Hatrix::RowLevelMap>
 generate_leaf_nodes(
                     Hatrix::HSS& A, randvec_t& randvec, int N, int rank, int height) {
   int level = height - 1;
@@ -38,6 +46,11 @@ generate_leaf_nodes(
     A.D.insert(node, node, level,
                Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                                  block * node, block * node));
+
+    Hatrix::Matrix U_big, U_generator;
+    std::tie(U_big, U_generator) = generate_column_bases(node, randvec, leaf_size, rank);
+    A.U.insert(node, level, std::move(U_big));
+    U_generators.insert(node, level, std::move(U_generator));
 
   }
 
