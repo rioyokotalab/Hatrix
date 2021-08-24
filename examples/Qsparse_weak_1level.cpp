@@ -89,6 +89,16 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank, in
   return A;
 }
 
+void qsparse_factorize(Hatrix::BLR& A, int N, int rank) {
+
+}
+
+Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& b) {
+  Hatrix::Matrix x(b.rows, 1);
+
+  return x;
+}
+
 int main(int argc, char *argv[]) {
   int N = atoi(argv[1]);
   int rank = atoi(argv[2]);
@@ -98,6 +108,8 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::BLR A = construct_BLR(block_size, nblocks, rank, 0);
+  qsparse_factorize(A, N, rank);
+  Hatrix::Matrix x = qsparse_substitute(A, b);
 
   Hatrix::Context::finalize();
 }
