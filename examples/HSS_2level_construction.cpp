@@ -29,6 +29,12 @@ generate_column_bases(int node, randvec_t& randvec, int leaf_size, int rank) {
   return {U_big, U_generator};
 }
 
+std::tuple<Hatrix::Matrix, Hatrix::Matrix>
+generate_row_bases(int node, randvec_t& randvec, int leaf_size, int rank) {
+  Hatrix::Matrix V_big, V_generator;
+
+  return {V_big, V_generator};
+}
 
 std::tuple<Hatrix::RowLevelMap, Hatrix::RowLevelMap>
 generate_leaf_nodes(
@@ -52,6 +58,10 @@ generate_leaf_nodes(
     A.U.insert(node, level, std::move(U_big));
     U_generators.insert(node, level, std::move(U_generator));
 
+    Hatrix::Matrix V_big, V_generator;
+    std::tie(V_big, V_generator) = generate_row_bases(node, randvec, leaf_size, rank);
+    A.V.insert(node, level, std::move(V_big));
+    V_generators.insert(node, level, std::move(V_generator));
   }
 
   return {U_generators, V_generators};
