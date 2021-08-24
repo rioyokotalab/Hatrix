@@ -8,9 +8,6 @@
 
 #include "Hatrix/Hatrix.h"
 
-// Generate an HSS matrix represented by a 3 level tree. There is a layer of leaf nodes
-// at the bottom most level and another layer of transfer matrices above it.
-
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -22,12 +19,16 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
+// Generate an HSS matrix represented by a 3 level tree. There is a layer of leaf nodes
+// at the bottom most level and another layer of transfer matrices above it.
+
 std::tuple<Hatrix::Matrix, Hatrix::Matrix>
 generate_column_bases(int node, randvec_t& randvec, int N,
   int leaf_size, int rank) {
   Hatrix::Matrix col_slice(N-leaf_size, leaf_size);
   Hatrix::Matrix U_big(leaf_size, rank), U_generator(rank, col_slice.rows);
 
+  // Generate slices of the columns and concat them together.
 
   return {U_big, U_generator};
 }
