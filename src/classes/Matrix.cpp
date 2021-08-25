@@ -165,4 +165,16 @@ size_t Matrix::shared_memory_used() const {
   return data->size() * sizeof(double);
 }
 
+Matrix Matrix::transpose() const {
+  Matrix T(cols, rows);
+
+  for (int i = 0; i < rows; ++i) {
+    for (int j = 0; j < cols; ++j) {
+      T(j, i) = (*this)(i, j);
+    }
+  }
+
+  return T;
+}
+
 }  // namespace Hatrix
