@@ -122,18 +122,51 @@ Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
 }
 
 Hatrix::Matrix make_complement(Hatrix::Matrix& Q) {
-  Hatrix::Matrix Q_F = full_qr(Q);
+  Hatrix::Matrix Q_F(Q.rows, Q.rows);
+  Hatrix::Matrix Q_full = full_qr(Q);
+
+  for (int i = 0; i < Q_F.rows; ++i) {
+    for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+      Q_F(i, j) = Q_full(i, j + Q.cols);
+    }
+  }
+
+  for (int i = 0; i < Q_F.rows; ++i) {
+    for (int j = 0; j < Q.cols; ++j) {
+      Q_F(i, j + (Q_F.cols - Q.cols)) = Q_full(i, j);
+    }
+  }
 
   return Q_F;
 }
 
 void left_and_right_multiply_dense_block(const Hatrix::Matrix& U_F,
-                                         const Hatrix::Matrix& V_F, Hatrix::Matrix& D) {
-
+  const Hatrix::Matrix& V_F, Hatrix::Matrix& D) {
+  Hatrix::Matrix temp(U_F.cols, D.cols);
+  Hatrix::matmul(U_F, D, temp, true, false, 1.0, 0.0);
+  Hatrix::matmul(temp, V_F, D, false, false, 1.0, 0.0);
 }
 
-void partial_lu(Hatrix::Matrix& D) {
+void partial_lu(Hatrix::Matrix& D, int rank) {
+  int c = D.rows - rank;
+  const double alpha = 1.0;
+  double * upper_left = &D;
+  double * lower_left = upper_left + c;
+  double * upper_right = upper_left + c * D.stride;
+  double * lower_right = upper_left + c * D.stride + c;
 
+  std::vector<int> ipiv(c);
+
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, c, c, upper_left, D.stride, ipiv.data());
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
+              c, rank, alpha, upper_left, D.stride, upper_right, D.stride);
+
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasUpper, CblasNoTrans, CblasNonUnit,
+              rank, c, alpha, upper_left, D.stride, lower_left, D.stride);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, rank, c, -1.0,
+              lower_left, D.stride, upper_right, D.stride, -1.0, lower_right, D.stride);
 }
 
 void qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
@@ -143,8 +176,9 @@ void qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
 
     left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
 
-    partial_lu(A.D(node, node));
+    partial_lu(A.D(node, node), rank);
   }
+
 }
 
 Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& b) {

@@ -6,6 +6,7 @@
 
 namespace Hatrix {
 
+// Compute the LU factorization of A and store in L and U. Over-writes A.
 void lu(Matrix& A, Matrix& L, Matrix& U);
 
 void qr(Matrix& A, Matrix& Q, Matrix& R);
