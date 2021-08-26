@@ -13,7 +13,7 @@ void lu(Matrix& A, Matrix& L, Matrix& U);
 std::vector<int> lu(Matrix& A);
 
 // Use getrs for solving dense matrix A w.r.t RHS b.
-Matrix lu_solve(Matrix& A, Matrix& b);
+Matrix lu_solve(Matrix& A, const Matrix& b);
 
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 

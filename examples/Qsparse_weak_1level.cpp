@@ -118,9 +118,10 @@ Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
   return Q;
 }
 
-Hatrix::Matrix make_complement(Hatrix::Matrix& Q) {
+Hatrix::Matrix make_complement(const Hatrix::Matrix& Q) {
+  Hatrix::Matrix Q_copy(Q);
   Hatrix::Matrix Q_F(Q.rows, Q.rows);
-  Hatrix::Matrix Q_full = full_qr(Q);
+  Hatrix::Matrix Q_full = full_qr(Q_copy);
 
   for (int i = 0; i < Q_F.rows; ++i) {
     for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
@@ -182,7 +183,7 @@ Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
       else {
         for (int irow = 0; irow < rank; ++irow) {
           for (int icol = 0; icol < rank; ++icol) {
-            M(i * rank + irow, i * rank + icol) = A.S(i, j)(irow, icol);
+            M(i * rank + irow, j * rank + icol) = A.S(i, j)(irow, icol);
           }
         }
       }
@@ -208,9 +209,55 @@ Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
   return M;
 }
 
+void permute_forward(Hatrix::Matrix& x, int rank, int nblocks, int block_size) {
+  Hatrix::Matrix x_copy(x.rows, x.cols);
+  int c = block_size - rank;
+  int offset = c * nblocks;
+
+  for (int block = 0; block < nblocks; ++block) {
+    // Copy the c part to the top of the copy vector.
+    for (int i = 0; i < c; ++i) {
+      x_copy(block * c + i, 0) = x(block_size * block + i, 0);
+    }
+
+    // Copy the rank part to the bottom of the copy vector
+    for (int i = 0; i < rank; ++i) {
+      x_copy(offset + block * rank + i, 0) = x(block_size * block + c + i, 0);
+    }
+  }
+
+  x = std::move(x_copy);
+}
+
 Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const Hatrix::Matrix& b,
-  int nblocks, int rank) {
+  int nblocks, int block_size, int rank) {
   Hatrix::Matrix x(b.rows, 1);
+  double * x_temp;
+
+  // Forward substitution.
+  for (int node = 0; node < nblocks; ++node) {
+    Hatrix::Matrix U_F = make_complement(A.U[node]);
+    Hatrix::Matrix& D = A.D(node, node);
+    x_temp = &x + node * block_size;
+
+    std::vector<double> result(block_size);
+    cblas_dgemv(CblasColMajor, CblasTrans, U_F.cols, U_F.rows, 1.0, &U_F, U_F.stride,
+      x_temp, 1, 0.0, result.data(), 1);
+
+    for (int i = 0; i < result.size(); ++i) {
+      x_temp[i] = result[i];
+    }
+
+    int c = block_size - rank;
+    cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
+      c, 1, 1.0, &D, D.stride, x_temp, x.stride);
+
+    cblas_dgemv(CblasColMajor, CblasNoTrans, rank, c, -1.0, &D + c, D.stride,
+      x_temp, 1, 1.0, x_temp + c, 1);
+  }
+
+  permute_forward(x, rank, nblocks, block_size);
+
 
   return x;
 }
@@ -228,10 +275,13 @@ int main(int argc, char *argv[]) {
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
   Hatrix::Matrix last_lu = qsparse_factorize(A, N, nblocks, rank);
-  Hatrix::Matrix x = qsparse_substitute(A, last_lu, b, nblocks, rank);
+  Hatrix::Matrix x = qsparse_substitute(A, last_lu, b, nblocks, block_size, rank);
 
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
+
+  double error = Hatrix::norm(x - x_dense);
+  std::cout << "solution error: " << error << std::endl;
 
   Hatrix::Context::finalize();
 }
