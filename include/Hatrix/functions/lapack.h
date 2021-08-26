@@ -10,7 +10,10 @@ namespace Hatrix {
 void lu(Matrix& A, Matrix& L, Matrix& U);
 
 // Compute the in-place LU factorization of A.
-void lu(Matrix& A);
+std::vector<int> lu(Matrix& A);
+
+// Use getrs for solving dense matrix A w.r.t RHS b.
+Matrix lu_solve(Matrix& A, Matrix& b);
 
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 

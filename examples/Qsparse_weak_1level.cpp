@@ -30,11 +30,8 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank, int64_t admis) {
+Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_blocks, int64_t rank, int64_t admis) {
   // Random points for laplace kernel
-  std::vector<std::vector<double>> randpts;
-  randpts.push_back(equally_spaced_vector(n_blocks * block_size, 0.0, 1.0));
-  randpts.push_back(equally_spaced_vector(n_blocks * block_size, 0.0, 1.0)); //2D
 
   Hatrix::BLR A;
   for (int i = 0; i < n_blocks; ++i) {
@@ -195,7 +192,7 @@ Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
   return M;
 }
 
-void qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
+Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
@@ -206,10 +203,13 @@ void qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
   }
 
   Hatrix::Matrix M = merge_null_spaces(A, nblocks, rank);
+  lu(M);
 
+  return M;
 }
 
-Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& b) {
+Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const Hatrix::Matrix& b,
+  int nblocks, int rank) {
   Hatrix::Matrix x(b.rows, 1);
 
   return x;
@@ -221,11 +221,17 @@ int main(int argc, char *argv[]) {
   int block_size = atoi(argv[3]);
   int nblocks = N / block_size;
 
+  randvec_t randpts;
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+
   Hatrix::Context::init();
-  Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
-  Hatrix::BLR A = construct_BLR(block_size, nblocks, rank, 0);
-  qsparse_factorize(A, N, nblocks, rank);
-  //Hatrix::Matrix x = qsparse_substitute(A, b);
+  const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
+  Hatrix::Matrix last_lu = qsparse_factorize(A, N, nblocks, rank);
+  Hatrix::Matrix x = qsparse_substitute(A, last_lu, b, nblocks, rank);
+
+  Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
   Hatrix::Context::finalize();
 }

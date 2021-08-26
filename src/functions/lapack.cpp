@@ -49,10 +49,21 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
   LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.stride);
 }
 
-void lu(Matrix& A) {
+std::vector<int> lu(Matrix& A) {
   std::vector<int> ipiv(A.min_dim());
   LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+  return ipiv;
 }
+
+Matrix lu_solve(Matrix& A, const Matrix& b) {
+  Matrix x(b);
+  std::vector<int> ipiv = lu(A);
+  LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', A.rows, b.cols, &A, A.stride, ipiv.data(),
+    &x, x.stride);
+
+  return x;
+}
+
 
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
   // check dimensions
