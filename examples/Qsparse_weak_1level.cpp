@@ -182,6 +182,13 @@ Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
           }
         }
       }
+      else {
+        for (int irow = 0; irow < rank; ++irow) {
+          for (int icol = 0; icol < rank; ++icol) {
+            M(i * rank + irow, i * rank + icol) = A.S(i, j)(irow, icol);
+          }
+        }
+      }
     }
   }
 
