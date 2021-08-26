@@ -252,13 +252,12 @@ void permute_backward(Hatrix::Matrix& x, int rank, int nblocks, int block_size) 
 Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const Hatrix::Matrix& b,
   int nblocks, int block_size, int rank) {
   Hatrix::Matrix x(b);
-  double * x_temp;
 
   // Forward substitution.
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix& D = A.D(node, node);
-    x_temp = &x + node * block_size;
+    double * x_temp = &x + node * block_size;
 
     std::vector<double> result(block_size);
     cblas_dgemv(CblasColMajor, CblasTrans, U_F.cols, U_F.rows, 1.0, &U_F, U_F.stride,
@@ -284,6 +283,14 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
   cblas_dtrsm(CblasColMajor, CblasLeft, CblasUpper, CblasNoTrans, CblasNonUnit,
     last_lu.rows, 1, 1.0, &last_lu, last_lu.stride, &x + c * nblocks, x.stride);
   permute_backward(x, rank, nblocks, block_size);
+
+  for (int node = 0; node < nblocks; ++node) {
+    Hatrix::Matrix& D = A.D(node, node);
+    double *x_temp = &x + node * block_size;
+
+    Hatrix::Matrix V_F = make_complement(A.V[node]);
+    std::vector<double> result(block_size);
+  }
 
   return x;
 }
