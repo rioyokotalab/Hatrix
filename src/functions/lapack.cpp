@@ -49,6 +49,11 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
   LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.stride);
 }
 
+void lu(Matrix& A) {
+  std::vector<int> ipiv(A.min_dim());
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+}
+
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
   // check dimensions
   assert(Q.rows == A.rows);

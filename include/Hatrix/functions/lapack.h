@@ -9,6 +9,9 @@ namespace Hatrix {
 // Compute the LU factorization of A and store in L and U. Over-writes A.
 void lu(Matrix& A, Matrix& L, Matrix& U);
 
+// Compute the in-place LU factorization of A.
+void lu(Matrix& A);
+
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
 // Perform pivoted QR factorization using GEQP3

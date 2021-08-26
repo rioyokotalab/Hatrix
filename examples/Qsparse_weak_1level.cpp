@@ -169,6 +169,25 @@ void partial_lu(Hatrix::Matrix& D, int rank) {
               lower_left, D.stride, upper_right, D.stride, -1.0, lower_right, D.stride);
 }
 
+Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
+  Hatrix::Matrix M(rank * nblocks, rank * nblocks);
+
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      if (i == j) {
+        for (int irow = 0; irow < rank; ++irow) {
+          for (int icol = 0; icol < rank; ++icol) {
+            int c = A.D(i, j).rows - rank;
+            M(i * rank + irow, j * rank + icol) = A.D(i, j)(c + irow, c + icol);
+          }
+        }
+      }
+    }
+  }
+
+  return M;
+}
+
 void qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
@@ -178,6 +197,8 @@ void qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
 
     partial_lu(A.D(node, node), rank);
   }
+
+  Hatrix::Matrix M = merge_null_spaces(A, nblocks, rank);
 
 }
 
