@@ -229,9 +229,29 @@ void permute_forward(Hatrix::Matrix& x, int rank, int nblocks, int block_size) {
   x = std::move(x_copy);
 }
 
+void permute_backward(Hatrix::Matrix& x, int rank, int nblocks, int block_size) {
+  Hatrix::Matrix x_copy(x.rows, x.cols);
+  int c = block_size - rank;
+  int offset = c * nblocks;
+
+  for (int block = 0; block < nblocks; ++block) {
+    // Copy the c part from the top of the original vector.
+    for (int i = 0; i < c; ++i) {
+      x_copy(block * block_size + i, 0) = x(block * c + i, 0);
+    }
+
+    // Copy the rank part from the bottom of the original vector.
+    for (int i = 0; i < rank; ++i) {
+      x_copy(block_size * block + c + i, 0) = x(offset + block * rank + i, 0);
+    }
+  }
+
+  x = std::move(x_copy);
+}
+
 Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const Hatrix::Matrix& b,
   int nblocks, int block_size, int rank) {
-  Hatrix::Matrix x(b.rows, 1);
+  Hatrix::Matrix x(b);
   double * x_temp;
 
   // Forward substitution.
@@ -256,8 +276,14 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
       x_temp, 1, 1.0, x_temp + c, 1);
   }
 
+  int c = last_lu.rows - rank;
   permute_forward(x, rank, nblocks, block_size);
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
+    last_lu.rows, 1, 1.0, &last_lu, last_lu.stride, &x + c * nblocks, x.stride);
 
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasUpper, CblasNoTrans, CblasNonUnit,
+    last_lu.rows, 1, 1.0, &last_lu, last_lu.stride, &x + c * nblocks, x.stride);
+  permute_backward(x, rank, nblocks, block_size);
 
   return x;
 }
@@ -280,6 +306,8 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
+  x.print();
+  x_dense.print();
   double error = Hatrix::norm(x - x_dense);
   std::cout << "solution error: " << error << std::endl;
 
