@@ -287,9 +287,25 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix& D = A.D(node, node);
     double *x_temp = &x + node * block_size;
+    int c = D.rows - rank;
+
+    // Perform upper trinagular TRSM on a piece of the vector.
+    cblas_dgemv(CblasColMajor, CblasNoTrans, c, rank, -1.0,
+                &D + c * D.stride, D.stride, x_temp + c,
+                1, 1.0, x_temp, 1);
+
+    cblas_dtrsm(CblasColMajor, CblasLeft, CblasUpper,
+                CblasNoTrans, CblasNonUnit,
+                c, 1, 1.0, &D, D.stride, x_temp, x.stride);
 
     Hatrix::Matrix V_F = make_complement(A.V[node]);
     std::vector<double> result(block_size);
+    cblas_dgemv(CblasColMajor, CblasNoTrans, V_F.rows, V_F.cols, 1.0,
+                &V_F, V_F.stride, x_temp, 1, 0.0, result.data(), 1);
+
+    for (int i = 0; i < result.size(); ++i) {
+      x_temp[i] = result[i];
+    }
   }
 
   return x;
