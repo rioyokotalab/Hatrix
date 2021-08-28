@@ -6,6 +6,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cassert>
+#include <fstream>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -21,6 +22,13 @@
 #include "Hatrix/Hatrix.h"
 
 using randvec_t = std::vector<std::vector<double> >;
+
+double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
+  double A_norm = Hatrix::norm(A);
+  double B_norm = Hatrix::norm(B);
+
+  return std::abs(A_norm - B_norm) / B_norm;
+}
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   std::vector<double> res(N, 0.0);
@@ -350,7 +358,15 @@ int main(int argc, char *argv[]) {
   int N = atoi(argv[1]);
   int rank = atoi(argv[2]);
   int block_size = atoi(argv[3]);
+  const char * fname = argv[4];
   int nblocks = N / block_size;
+
+  if (rank > block_size || N % block_size != 0) {
+    exit(1);
+  }
+
+  std::ofstream file;
+  file.open(fname, std::ios::app | std::ios::out);
 
   randvec_t randpts;
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
@@ -364,8 +380,10 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
-  double error = Hatrix::norm(x - x_dense);
+  double error = rel_error(x, x_dense);
   std::cout << "solution error: " << error << std::endl;
 
   Hatrix::Context::finalize();
+
+  return 0;
 }
