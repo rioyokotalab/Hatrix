@@ -5,6 +5,7 @@
 #include <utility>
 #include <cmath>
 #include <algorithm>
+#include <cassert>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -199,18 +200,45 @@ Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
   return M;
 }
 
+#ifdef VERIFY
+
+void verify_complement_generation(const Hatrix::Matrix& Q_F, const Hatrix::Matrix& Q) {
+  Hatrix::Matrix result = Hatrix::matmul(Q_F, Q, true, false, 1.0);
+  result.print();
+}
+
+void verify_multiplication(const Hatrix::Matrix& prod, const Hatrix::Matrix& A,
+  const Hatrix::Matrix& U_F, const Hatrix::Matrix& V_F) {
+  Hatrix::Matrix temp = Hatrix::matmul(U_F, prod, false, false, 1.0);
+  Hatrix::Matrix result = Hatrix::matmul(temp, V_F, false, true, 1.0);
+
+  assert(Hatrix::norm(result) - Hatrix::norm(A) < 0.001);
+}
+#endif
+
 Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
 
-    A.D(node, node) = left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
+#ifdef VERIFY
+    verify_complement_generation(U_F, A.U[node]);
+    verify_complement_generation(V_F, A.V[node]);
+#endif
+
+    Hatrix::Matrix prod = left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
+
+#ifdef VERIFY
+  verify_multiplication(prod, A.D(node, node), U_F, V_F);
+#endif
+
+    A.D(node, node) = prod;
 
     partial_lu(A.D(node, node), rank);
   }
 
   Hatrix::Matrix M = merge_null_spaces(A, nblocks, rank);
-  lu(M);
+  Hatrix::lu(M);
 
   return M;
 }

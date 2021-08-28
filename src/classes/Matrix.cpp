@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <iostream>
+#include <iomanip>
 #include <memory>
 #include <vector>
 
@@ -152,7 +153,12 @@ int64_t Matrix::max_dim() const { return std::max(rows, cols); }
 void Matrix::print() const {
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
-      std::cout << (*this)(i, j) << " ";
+      if ((*this)(i, j) > -1e-15 && (*this)(i, j) < 1e-15) {
+        std::cout << 0 << " ";
+      }
+      else {
+        std::cout << (*this)(i, j) << " ";
+      }
     }
     std::cout << "\n";
   }
