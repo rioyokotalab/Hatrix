@@ -138,16 +138,18 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix& Q) {
   return Q_F;
 }
 
-void left_and_right_multiply_dense_block(const Hatrix::Matrix& U_F,
-  const Hatrix::Matrix& V_F, Hatrix::Matrix& D) {
+Hatrix::Matrix left_and_right_multiply_dense_block(const Hatrix::Matrix& U_F,
+  const Hatrix::Matrix& V_F, const Hatrix::Matrix& D) {
+  Hatrix::Matrix result(D);
   Hatrix::Matrix temp(U_F.cols, D.cols);
   Hatrix::matmul(U_F, D, temp, true, false, 1.0, 0.0);
-  Hatrix::matmul(temp, V_F, D, false, false, 1.0, 0.0);
+  Hatrix::matmul(temp, V_F, result, false, false, 1.0, 0.0);
+
+  return result;
 }
 
 void partial_lu(Hatrix::Matrix& D, int rank) {
   int c = D.rows - rank;
-  const double alpha = 1.0;
   double * upper_left = &D;
   double * lower_left = upper_left + c;
   double * upper_right = upper_left + c * D.stride;
@@ -155,13 +157,17 @@ void partial_lu(Hatrix::Matrix& D, int rank) {
 
   std::vector<int> ipiv(c);
 
-  LAPACKE_dgetrf(LAPACK_COL_MAJOR, c, c, upper_left, D.stride, ipiv.data());
+  int info = LAPACKE_dgetrf(LAPACK_COL_MAJOR, c, c, upper_left, D.stride, ipiv.data());
+
+  if (info != 0) {
+    std::cout << "GETRF ERROR: " << info << std::endl;
+  }
 
   cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
-              c, rank, alpha, upper_left, D.stride, upper_right, D.stride);
+              c, rank, 1.0, upper_left, D.stride, upper_right, D.stride);
 
   cblas_dtrsm(CblasColMajor, CblasRight, CblasUpper, CblasNoTrans, CblasNonUnit,
-              rank, c, alpha, upper_left, D.stride, lower_left, D.stride);
+              rank, c, 1.0, upper_left, D.stride, lower_left, D.stride);
 
   cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, rank, c, -1.0,
               lower_left, D.stride, upper_right, D.stride, -1.0, lower_right, D.stride);
@@ -198,7 +204,7 @@ Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
 
-    left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
+    A.D(node, node) = left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
 
     partial_lu(A.D(node, node), rank);
   }
@@ -324,16 +330,16 @@ int main(int argc, char *argv[]) {
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
   Hatrix::Matrix last_lu = qsparse_factorize(A, N, nblocks, rank);
-  Hatrix::Matrix x = qsparse_substitute(A, last_lu, b, nblocks, block_size, rank);
+  // Hatrix::Matrix x = qsparse_substitute(A, last_lu, b, nblocks, block_size, rank);
 
-  Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
-  Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
+  // Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  // Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
-  //x_dense.print();
+  // x_dense.print();
   // x.print();
 
-  double error = Hatrix::norm(x - x_dense);
-  std::cout << "solution error: " << error << std::endl;
+  // double error = Hatrix::norm(x - x_dense);
+  // std::cout << "solution error: " << error << std::endl;
 
   Hatrix::Context::finalize();
 }

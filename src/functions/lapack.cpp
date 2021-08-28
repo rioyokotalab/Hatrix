@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <tuple>
 #include <vector>
+#include <iostream>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -51,7 +52,10 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 
 std::vector<int> lu(Matrix& A) {
   std::vector<int> ipiv(A.min_dim());
-  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+  int info = LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+  if (info != 0) {
+    std::cout << "GETRF ERROR: " << info << std::endl;
+  }
   return ipiv;
 }
 
