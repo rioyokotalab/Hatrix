@@ -329,8 +329,9 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
-  x.print();
-  x_dense.print();
+  //x_dense.print();
+  // x.print();
+
   double error = Hatrix::norm(x - x_dense);
   std::cout << "solution error: " << error << std::endl;
 
