@@ -39,9 +39,8 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_blocks, int64_t rank, int64_t admis) {
-  // Random points for laplace kernel
-
+Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_blocks,
+  int64_t rank, int64_t admis) {
   Hatrix::BLR A;
   for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {
@@ -164,22 +163,23 @@ void partial_lu(Hatrix::Matrix& D, int rank) {
   double * upper_right = upper_left + c * D.stride;
   double * lower_right = upper_left + c * D.stride + c;
 
-  std::vector<int> ipiv(c);
+  if (c != 0) {
+    std::vector<int> ipiv(c);
+    int info = LAPACKE_dgetrf(LAPACK_COL_MAJOR, c, c, upper_left, D.stride, ipiv.data());
 
-  int info = LAPACKE_dgetrf(LAPACK_COL_MAJOR, c, c, upper_left, D.stride, ipiv.data());
+    if (info != 0) {
+      std::cout << "GETRF ERROR: " << info << std::endl;
+    }
 
-  if (info != 0) {
-    std::cout << "GETRF ERROR: " << info << std::endl;
+    cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
+                c, rank, 1.0, upper_left, D.stride, upper_right, D.stride);
+
+    cblas_dtrsm(CblasColMajor, CblasRight, CblasUpper, CblasNoTrans, CblasNonUnit,
+                rank, c, 1.0, upper_left, D.stride, lower_left, D.stride);
+
+    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, rank, c, -1.0,
+                lower_left, D.stride, upper_right, D.stride, 1.0, lower_right, D.stride);
   }
-
-  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
-              c, rank, 1.0, upper_left, D.stride, upper_right, D.stride);
-
-  cblas_dtrsm(CblasColMajor, CblasRight, CblasUpper, CblasNoTrans, CblasNonUnit,
-              rank, c, 1.0, upper_left, D.stride, lower_left, D.stride);
-
-  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, rank, c, -1.0,
-              lower_left, D.stride, upper_right, D.stride, 1.0, lower_right, D.stride);
 }
 
 Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
@@ -209,7 +209,6 @@ Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
 }
 
 #ifdef VERIFY
-
 void verify_complement_generation(const Hatrix::Matrix& Q_F, const Hatrix::Matrix& Q) {
   Hatrix::Matrix result = Hatrix::matmul(Q_F, Q, true, false, 1.0);
   result.print();
@@ -229,14 +228,11 @@ Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
 
-#ifdef VERIFY
-    verify_complement_generation(U_F, A.U[node]);
-    verify_complement_generation(V_F, A.V[node]);
-#endif
-
     Hatrix::Matrix prod = left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
 
 #ifdef VERIFY
+  verify_complement_generation(U_F, A.U[node]);
+  verify_complement_generation(V_F, A.V[node]);
   verify_multiplication(prod, A.D(node, node), U_F, V_F);
 #endif
 
@@ -380,8 +376,14 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
+  x.print();
+  x_dense.print();
+
   double error = rel_error(x, x_dense);
   std::cout << "solution error: " << error << std::endl;
+
+  file << N << "," << rank << "," << block_size << "," << error << std::endl;
+  file.close();
 
   Hatrix::Context::finalize();
 
