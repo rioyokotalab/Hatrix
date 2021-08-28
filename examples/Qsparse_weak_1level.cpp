@@ -26,8 +26,9 @@ using randvec_t = std::vector<std::vector<double> >;
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   double A_norm = Hatrix::norm(A);
   double B_norm = Hatrix::norm(B);
+  double diff = A_norm - B_norm;
 
-  return std::abs(A_norm - B_norm) / B_norm;
+  return std::sqrt((diff * diff) / (B_norm * B_norm));
 }
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -148,12 +149,8 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix& Q) {
 
 Hatrix::Matrix left_and_right_multiply_dense_block(const Hatrix::Matrix& U_F,
   const Hatrix::Matrix& V_F, const Hatrix::Matrix& D) {
-  Hatrix::Matrix result(D);
-  Hatrix::Matrix temp(U_F.cols, D.cols);
-  Hatrix::matmul(U_F, D, temp, true, false, 1.0, 0.0);
-  Hatrix::matmul(temp, V_F, result, false, false, 1.0, 0.0);
-
-  return result;
+  Hatrix::Matrix temp = Hatrix::matmul(U_F, D, true, false, 1.0);
+  return Hatrix::matmul(temp, V_F, false, false, 1.0);
 }
 
 void partial_lu(Hatrix::Matrix& D, int rank) {
@@ -227,7 +224,6 @@ Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
-
     Hatrix::Matrix prod = left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
 
 #ifdef VERIFY
@@ -237,7 +233,6 @@ Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
 #endif
 
     A.D(node, node) = prod;
-
     partial_lu(A.D(node, node), rank);
   }
 
@@ -289,6 +284,7 @@ void permute_backward(Hatrix::Matrix& x, int rank, int nblocks, int block_size) 
 
 Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const Hatrix::Matrix& b,
   int nblocks, int block_size, int rank) {
+  int c = block_size - rank;
   Hatrix::Matrix x(b);
 
   // Forward substitution.
@@ -305,15 +301,12 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
       x_temp[i] = result[i];
     }
 
-    int c = block_size - rank;
     cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
       c, 1, 1.0, &D, D.stride, x_temp, x.stride);
 
-    cblas_dgemv(CblasColMajor, CblasNoTrans, rank, c, -1.0, &D + c, D.stride,
+    cblas_dgemv(CblasColMajor, CblasNoTrans, rank, c, 1.0, &D + c, D.stride,
       x_temp, 1, 1.0, x_temp + c, 1);
   }
-
-  int c = block_size - rank;
 
   permute_forward(x, rank, nblocks, block_size);
   cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
@@ -326,10 +319,9 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix& D = A.D(node, node);
     double *x_temp = &x + node * block_size;
-    int c = D.rows - rank;
 
     // // Perform upper trinagular TRSM on a piece of the vector.
-    cblas_dgemv(CblasColMajor, CblasNoTrans, c, rank, -1.0,
+    cblas_dgemv(CblasColMajor, CblasNoTrans, c, rank, 1.0,
                  &D + c * D.stride, D.stride, x_temp + c,
                  1, 1.0, x_temp, 1);
 
@@ -375,9 +367,6 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
-
-  x.print();
-  x_dense.print();
 
   double error = rel_error(x, x_dense);
   std::cout << "solution error: " << error << std::endl;
