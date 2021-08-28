@@ -154,10 +154,10 @@ void Matrix::print() const {
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
       if ((*this)(i, j) > -1e-15 && (*this)(i, j) < 1e-15) {
-        std::cout << 0 << " ";
+        std::cout << std::setw(10) << 0 << " ";
       }
       else {
-        std::cout << (*this)(i, j) << " ";
+        std::cout << std::setw(10) << std::setprecision(3) <<  (*this)(i, j) << " ";
       }
     }
     std::cout << "\n";

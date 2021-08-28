@@ -171,7 +171,7 @@ void partial_lu(Hatrix::Matrix& D, int rank) {
               rank, c, 1.0, upper_left, D.stride, lower_left, D.stride);
 
   cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, rank, c, -1.0,
-              lower_left, D.stride, upper_right, D.stride, -1.0, lower_right, D.stride);
+              lower_left, D.stride, upper_right, D.stride, 1.0, lower_right, D.stride);
 }
 
 Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
@@ -310,6 +310,9 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
   }
 
   int c = last_lu.rows - rank;
+
+  last_lu.print();
+
   permute_forward(x, rank, nblocks, block_size);
   cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
     last_lu.rows, 1, 1.0, &last_lu, last_lu.stride, &x + c * nblocks, x.stride);
@@ -323,19 +326,19 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
     double *x_temp = &x + node * block_size;
     int c = D.rows - rank;
 
-    // Perform upper trinagular TRSM on a piece of the vector.
-    cblas_dgemv(CblasColMajor, CblasNoTrans, c, rank, -1.0,
-                &D + c * D.stride, D.stride, x_temp + c,
-                1, 1.0, x_temp, 1);
+    // // Perform upper trinagular TRSM on a piece of the vector.
+    // cblas_dgemv(CblasColMajor, CblasNoTrans, c, rank, -1.0,
+    //             &D + c * D.stride, D.stride, x_temp + c,
+    //             1, 1.0, x_temp, 1);
 
-    cblas_dtrsm(CblasColMajor, CblasLeft, CblasUpper,
-                CblasNoTrans, CblasNonUnit,
-                c, 1, 1.0, &D, D.stride, x_temp, x.stride);
+    // cblas_dtrsm(CblasColMajor, CblasLeft, CblasUpper,
+    //             CblasNoTrans, CblasNonUnit,
+    //             c, 1, 1.0, &D, D.stride, x_temp, x.stride);
 
     Hatrix::Matrix V_F = make_complement(A.V[node]);
     std::vector<double> result(block_size);
-    cblas_dgemv(CblasColMajor, CblasNoTrans, V_F.rows, V_F.cols, 1.0,
-                &V_F, V_F.stride, x_temp, 1, 0.0, result.data(), 1);
+    // cblas_dgemv(CblasColMajor, CblasNoTrans, V_F.rows, V_F.cols, 1.0,
+    //             &V_F, V_F.stride, x_temp, 1, 0.0, result.data(), 1);
 
     for (int i = 0; i < result.size(); ++i) {
       x_temp[i] = result[i];
@@ -358,16 +361,16 @@ int main(int argc, char *argv[]) {
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
   Hatrix::Matrix last_lu = qsparse_factorize(A, N, nblocks, rank);
-  // Hatrix::Matrix x = qsparse_substitute(A, last_lu, b, nblocks, block_size, rank);
+  Hatrix::Matrix x = qsparse_substitute(A, last_lu, b, nblocks, block_size, rank);
 
-  // Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
-  // Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
+  Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
-  // x_dense.print();
-  // x.print();
+  x_dense.print();
+  x.print();
 
-  // double error = Hatrix::norm(x - x_dense);
-  // std::cout << "solution error: " << error << std::endl;
+  double error = Hatrix::norm(x - x_dense);
+  std::cout << "solution error: " << error << std::endl;
 
   Hatrix::Context::finalize();
 }
