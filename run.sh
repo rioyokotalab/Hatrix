@@ -10,7 +10,11 @@ make -j all
 FILE=blr_qsparse.csv
 
 # ./bin/Qsparse_full_rank 50
-./bin/Qsparse_weak_1level 40 10 10 $FILE
+# ./bin/Qsparse_weak_1level 40 10 10 $FILE
+for rank in 1 2 4 8 10; do
+    ./bin/Qsparse_weak_1level 100 $rank 10 $FILE
+done
+
 
 # for N in 1000 2000 4000 8000 16000 32000 64000; do
 #     for block in 50 100 200 500 1000; do

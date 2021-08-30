@@ -109,23 +109,18 @@ Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_bloc
 
 
 Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
-  Hatrix::Matrix Q(A);
+  Hatrix::Matrix Q(A.rows, A.rows);
   std::vector<double> tau(std::max(A.rows, A.cols));
+  for (int i = 0; i < Q.rows; ++i) {
+    for (int j = 0; j < A.cols; ++j) {
+      Q(i, j) = A(i, j);
+    }
+  }
 
-  LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, tau.data());
+  LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
 
   // for (int i = 0; i < Q.rows; ++i) {
-  //   Q(i, i) = 1.0;
-  // }
-
-  std::cout << "GEQRF\n";
-  Q.print();
-
-
-  // for (int64_t i = 0; i < Q.rows; ++i) {
-  //   for (int j = 0; j < Q.cols; ++j) {
-  //     Q(i, j) = A(i, j);
-  //   }
+  //   Q(i, i) = 0.0;
   // }
 
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
@@ -232,10 +227,10 @@ Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
 
-    std::cout << "U_F:\n";
-    U_F.print();
-    std::cout << "U:\n";
-    A.U[node].print();
+    // std::cout << "U_F:\n";
+    // U_F.print();
+    // std::cout << "U:\n";
+    // A.U[node].print();
     Hatrix::Matrix prod = left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
 
 #ifdef VERIFY
