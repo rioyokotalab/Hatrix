@@ -37,6 +37,25 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
+Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
+  Hatrix::Matrix Q(A.rows, A.rows);
+  std::vector<double> tau(std::max(A.rows, A.cols));
+
+  LAPACKE_dgeqrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, tau.data());
+
+  for (int64_t i = 0; i < Q.rows; ++i) {
+    Q(i, i) = 1.0;
+    for (int j = 0; j < std::min(i, A.cols); ++j) {
+      Q(i, j) = A(i, j);
+    }
+  }
+
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, Q.cols, &Q,
+    Q.stride, tau.data());
+
+  return Q;
+}
+
 
 int main(int argc, char *argv[]) {
   int N = atoi(argv[1]);
@@ -49,8 +68,26 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
-//  double error = rel_error(x, x_dense);
-//  std::cout << "solution error: " << error << std::endl;
+  Hatrix::Matrix U, S, V;
+  double error;
+  Hatrix::Matrix A1 = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  std::tie(U, S, V, error) = Hatrix::truncated_svd(A1, A1.cols);
+  Hatrix::Matrix Aprod = Hatrix::matmul(Hatrix::matmul(U, A1, true), V);
+  Hatrix::lu(Aprod);
+
+  Hatrix::Matrix x0 = Hatrix::matmul(U, b, true);
+  Hatrix::Matrix x1(x0);
+  Hatrix::solve_triangular(Aprod, x1, Hatrix::Left, Hatrix::Lower,
+    true, false, 1.0);
+  Hatrix::solve_triangular(Aprod, x1, Hatrix::Left, Hatrix::Upper,
+    false, false, 1.0);
+  Hatrix::Matrix x_prod = Hatrix::matmul(V, x1);
+
+  x_prod.print();
+  x_dense.print();
+
+  double e = rel_error(x_prod, x_dense);
+ std::cout << "solution error: " << e << std::endl;
 
   Hatrix::Context::finalize();
 

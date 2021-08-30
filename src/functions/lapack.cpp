@@ -146,20 +146,4 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                  'F', 'C', C.rows, C.cols, T.cols, &V, V.stride, &T, T.stride,
                  &C, C.stride);
 }
-
-std::tuple<Matrix, Matrix> pivoted_qr(Matrix& A, const int rank, const bool transpose) {
-  int Q_rows = transpose ? A.cols : A.rows;
-  int R_cols = transpose ? A.rows : A.cols;
-  Matrix Q(Q_rows, rank), R(rank, R_cols);
-  std::vector<double> tau(std::max(A.rows, A.cols));
-  std::vector<int> jpvt(R_cols);
-  for (int i = 0; i < std::min(Q.rows, Q.cols); ++i) {
-    Q(i, i) = 1.0;
-  }
-
-  LAPACKE_dgeqp3(LAPACK_ROW_MAJOR, Q_rows, R_cols, &A, A.stride, jpvt.data(), tau.data());
-
-  return {Q, R};
-}
-
 }  // namespace Hatrix

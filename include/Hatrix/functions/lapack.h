@@ -17,9 +17,6 @@ Matrix lu_solve(Matrix& A, const Matrix& b);
 
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
-// Perform pivoted QR factorization using GEQP3
-std::tuple<Matrix, Matrix> pivoted_qr(Matrix& A, const int rank, const bool transpose=false);
-
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
