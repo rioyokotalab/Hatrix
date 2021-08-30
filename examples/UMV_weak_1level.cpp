@@ -16,9 +16,6 @@
 #include "lapacke.h"
 #endif
 
-// TODO: The V here is stored as a horizontal matrix. Should we be storing both
-// U and V as (b x rank) matrices? Right now I manually transpose.
-
 #include "Hatrix/Hatrix.h"
 
 using randvec_t = std::vector<std::vector<double> >;
@@ -227,7 +224,7 @@ void verify_multiplication(const Hatrix::Matrix& prod, const Hatrix::Matrix& A,
 }
 #endif
 
-Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
+Hatrix::Matrix UMV_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
@@ -281,7 +278,7 @@ void permute_backward(Hatrix::Matrix& x, int rank, int nblocks, int block_size) 
   x = std::move(x_copy);
 }
 
-Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const Hatrix::Matrix& b,
+Hatrix::Matrix UMV_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const Hatrix::Matrix& b,
   int nblocks, int block_size, int rank) {
   int c = block_size - rank;
   Hatrix::Matrix x(b);
@@ -296,7 +293,7 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
     cblas_dgemv(CblasColMajor, CblasTrans, U_F.cols, U_F.rows, 1.0, &U_F, U_F.stride,
       x_temp, 1, 0.0, result.data(), 1);
 
-    for (int i = 0; i < result.size(); ++i) {
+    for (int64_t i = 0; i < result.size(); ++i) {
       x_temp[i] = result[i];
     }
 
@@ -333,7 +330,7 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
     cblas_dgemv(CblasColMajor, CblasNoTrans, V_F.rows, V_F.cols, 1.0,
                 &V_F, V_F.stride, x_temp, 1, 0.0, result.data(), 1);
 
-    for (int i = 0; i < result.size(); ++i) {
+    for (int64_t i = 0; i < result.size(); ++i) {
       x_temp[i] = result[i];
     }
   }
@@ -361,8 +358,8 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
-  Hatrix::Matrix last_lu = qsparse_factorize(A, N, nblocks, rank);
-  Hatrix::Matrix x = qsparse_substitute(A, last_lu, b, nblocks, block_size, rank);
+  Hatrix::Matrix last_lu = UMV_factorize(A, N, nblocks, rank);
+  Hatrix::Matrix x = UMV_substitute(A, last_lu, b, nblocks, block_size, rank);
 
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
