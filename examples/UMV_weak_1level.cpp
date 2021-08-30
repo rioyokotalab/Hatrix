@@ -48,7 +48,7 @@ namespace Hatrix {
 
         for (int irow = 0; irow < rank; ++irow) {
           for (int jcol = 0; jcol < rank; ++jcol) {
-            dense(irow + c_size, jcol + c_size) = Dcc(i, j)(irow, jcol);
+            dense(irow + c_size, jcol + c_size) = Doo(i, j)(irow, jcol);
           }
         }
 
@@ -70,8 +70,8 @@ namespace Hatrix {
         for (int i = 0; i < n_blocks; ++i) {
           for (int j = 0; j < n_blocks; ++j) {
             Dcc.insert(i, j,
-                       Hatrix::generate_laplacend_matrix(randpts,
-                                                         c_size, c_size, i * block_size, j * block_size));
+                       Hatrix::generate_laplacend_matrix(randpts, c_size, c_size,
+                                                         i * block_size, j * block_size));
             Dco.insert(i, j,
                        Hatrix::generate_laplacend_matrix(randpts, c_size, rank,
                                                          i * block_size, j * block_size + c_size));
@@ -87,7 +87,6 @@ namespace Hatrix {
 
         // Expected errors to check against later.
         std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
-
         int64_t oversampling = 5;
         double error;
         std::vector<Hatrix::Matrix> Y;
