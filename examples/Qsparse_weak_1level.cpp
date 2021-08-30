@@ -119,14 +119,8 @@ Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
 
   LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
 
-  // for (int i = 0; i < Q.rows; ++i) {
-  //   Q(i, i) = 1.0;
-  // }
-
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
     Q.stride, tau.data());
-
-//  std::cout << "norm : " << Hatrix::norm(A - Hatrix::matmul(Q, R)) << std::endl;;
 
   return Q;
 }
@@ -325,7 +319,7 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
     Hatrix::Matrix& D = A.D(node, node);
     double *x_temp = &x + node * block_size;
 
-    // // Perform upper trinagular TRSM on a piece of the vector.
+    // Perform upper trinagular TRSM on a piece of the vector.
      cblas_dgemv(CblasColMajor, CblasNoTrans, c, rank, -1.0,
                   &D + c * D.stride, D.stride, x_temp + c,
                   1, 1.0, x_temp, 1);
