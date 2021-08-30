@@ -9,7 +9,7 @@
 
 #include "Hatrix/Hatrix.h"
 
-std::vector<double> equallySpacedVector(int64_t N, double minVal, double maxVal) {
+std::vector<double> equally_spaced_vector(int64_t N, double minVal, double maxVal) {
   std::vector<double> res(N, 0.0);
   double rnge = maxVal - minVal;
   for(int64_t i=0; i<N; i++) {
@@ -21,8 +21,8 @@ std::vector<double> equallySpacedVector(int64_t N, double minVal, double maxVal)
 Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank, int64_t admis) {
   // Random points for laplace kernel
   std::vector<std::vector<double>> randpts;
-  randpts.push_back(equallySpacedVector(n_blocks * block_size, 0.0, 1.0));
-  randpts.push_back(equallySpacedVector(n_blocks * block_size, 0.0, 1.0)); //2D
+  randpts.push_back(equally_spaced_vector(n_blocks * block_size, 0.0, 1.0));
+  randpts.push_back(equally_spaced_vector(n_blocks * block_size, 0.0, 1.0)); //2D
   
   Hatrix::BLR A;
   for (int i = 0; i < n_blocks; ++i) {

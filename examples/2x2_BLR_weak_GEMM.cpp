@@ -59,7 +59,7 @@ class BLR_2x2 {
   const Hatrix::Matrix& V(int64_t col) const { return V_.at(col); }
 };
 
-std::vector<double> equallySpacedVector(int64_t N, double minVal, double maxVal) {
+std::vector<double> equally_spaced_vector(int64_t N, double minVal, double maxVal) {
   std::vector<double> res(N, 0.0);
   double rnge = maxVal - minVal;
   for(int64_t i=0; i<N; i++) {
@@ -71,7 +71,7 @@ std::vector<double> equallySpacedVector(int64_t N, double minVal, double maxVal)
 BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
   // Random points for laplace kernel
   std::vector<std::vector<double>> randpts;
-  randpts.push_back(equallySpacedVector(2*N, 0.0, 1.0)); //1D
+  randpts.push_back(equally_spaced_vector(2*N, 0.0, 1.0)); //1D
   
   BLR_2x2 A;
   // Also store expected errors to check against later
