@@ -37,8 +37,6 @@ HSS_2level_construction: $(EXAMPLES)/HSS_2level_construction.o dirs
 Qsparse_weak_1level: $(EXAMPLES)/Qsparse_weak_1level.o dirs
 	$(LINK_EXECUTABLE)
 
-Qsparse_full_rank: $(EXAMPLES)/Qsparse_full_rank.o dirs
-	$(LINK_EXECUTABLE)
 
 .PHONY: clean
 clean:
