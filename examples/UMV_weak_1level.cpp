@@ -23,25 +23,127 @@ using randvec_t = std::vector<std::vector<double> >;
 namespace Hatrix {
   namespace ULV {
     class BLR2 {
-      public:
-        RowColMap Dcc, Dco, Doc, Doo;
-        RowColMap S;
-        RowMap U, Uc;
-        ColMap V, Vc;
+    private:
+      Matrix compose_dense(int i, int j) {
+        Matrix dense(block_size, block_size);
+        int c_size = block_size - rank;
 
-        BLR2(randvec_t& randpts, int block_size, int n_blocks, int rank, int admis) {
-          int c_size = block_size - rank;
-          for (int i = 0; i < n_blocks; ++i) {
-            for (int j = 0; j < n_blocks; ++j) {
-              Dcc.insert(i, j,
-                         Hatrix::generate_laplacend_matrix(randpts,
-                          c_size, c_size, i * block_size, j * block_size));
-              Doo.insert(i, j,
-                Hatrix::generate_laplacend_matrix(randpts, rank, rank,
-                  i * block_size + c_size, j * block_size + c_size));
+        for (int irow = 0; irow < c_size; ++irow) {
+          for (int jcol = 0; jcol < c_size; ++jcol) {
+            dense(irow, jcol) = Dcc(i, j)(irow, jcol);
+          }
+        }
+
+        for (int irow = 0; irow < rank; ++irow) {
+          for (int jcol = 0; jcol < c_size; ++jcol) {
+            dense(irow + c_size, jcol) = Doc(i, j)(irow, jcol);
+          }
+        }
+
+        for (int irow = 0; irow < c_size; ++irow) {
+          for (int jcol = 0; jcol < rank; ++jcol) {
+            dense(irow, jcol + c_size) = Dco(i, j)(irow, jcol);
+          }
+        }
+
+        for (int irow = 0; irow < rank; ++irow) {
+          for (int jcol = 0; jcol < rank; ++jcol) {
+            dense(irow + c_size, jcol + c_size) = Dcc(i, j)(irow, jcol);
+          }
+        }
+
+        return dense;
+      }
+
+    public:
+      RowColMap Dcc, Dco, Doc, Doo;
+      RowColMap S;
+      RowMap U, Uc;
+      ColMap V, Vc;
+      int N, block_size, n_blocks, rank, admis;
+
+      BLR2(randvec_t& randpts, int _N, int _block_size, int _n_blocks, int _rank, int _admis) :
+        N(_N), block_size(_block_size), n_blocks(_n_blocks), rank(_rank), admis(_admis) {
+        int c_size = block_size - rank;
+
+        // Populate dense blocks.
+        for (int i = 0; i < n_blocks; ++i) {
+          for (int j = 0; j < n_blocks; ++j) {
+            Dcc.insert(i, j,
+                       Hatrix::generate_laplacend_matrix(randpts,
+                                                         c_size, c_size, i * block_size, j * block_size));
+            Dco.insert(i, j,
+                       Hatrix::generate_laplacend_matrix(randpts, c_size, rank,
+                                                         i * block_size, j * block_size + c_size));
+
+            Doc.insert(i, j,
+                       Hatrix::generate_laplacend_matrix(randpts, rank, c_size,
+                                                         i * block_size + c_size, j * block_size));
+            Doo.insert(i, j,
+                       Hatrix::generate_laplacend_matrix(randpts, rank, rank,
+                                                         i * block_size + c_size, j * block_size + c_size));
+          }
+        }
+
+        // Expected errors to check against later.
+        std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
+
+        int64_t oversampling = 5;
+        double error;
+        std::vector<Hatrix::Matrix> Y;
+        for (int64_t i = 0; i < n_blocks; ++i) {
+          Y.push_back(
+                      Hatrix::generate_random_matrix(block_size, rank + oversampling));
+        }
+
+        for (int64_t i = 0; i < n_blocks; ++i) {
+          Hatrix::Matrix Ui, Si, Vi;
+          Hatrix::Matrix AY(block_size, rank + oversampling);
+          for (int64_t j = 0; j < n_blocks; ++j) {
+            if (i == j) continue;
+            Hatrix::matmul(compose_dense(i, j), Y[j], AY);
+          }
+          std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(AY, rank);
+          U.insert(i, std::move(Ui));
+        }
+
+        for (int64_t j = 0; j < n_blocks; ++j) {
+          Hatrix::Matrix Ui, Si, Vi;
+          Hatrix::Matrix YtA(rank + oversampling, block_size);
+          for (int64_t i = 0; i < n_blocks; ++i) {
+            if (j == i) continue;
+            Hatrix::matmul(Y[i], compose_dense(i, j), YtA, true);
+          }
+          std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(YtA, rank);
+          V.insert(j, std::move(Vi));
+        }
+
+        for (int i = 0; i < n_blocks; ++i) {
+          for (int j = 0; j < n_blocks; ++j) {
+            if (i != j) {
+              S.insert(i, j,
+                       Hatrix::matmul(Hatrix::matmul(U[i], compose_dense(i, j), true),
+                                      V[j], false, true));
             }
           }
-        };
+        }
+
+        double diff = 0, norm = 0, fnorm, fdiff;
+        for (int i = 0; i < n_blocks; ++i) {
+          for (int j = 0; j < n_blocks; ++j) {
+            fnorm = Hatrix::norm(compose_dense(i, j));
+            norm += fnorm * fnorm;
+            if (i == j)
+              continue;
+            else {
+              fdiff = Hatrix::norm(U[i] * S(i, j) * V[j] - compose_dense(i, j));
+              diff += fdiff * fdiff;
+            }
+          }
+        }
+        std::cout << "BLR2 construction error (rel): " << std::sqrt(diff/norm) << "\n";
+
+      };
     };
   };
 };
@@ -66,6 +168,16 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
 Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_blocks,
   int64_t rank, int64_t admis) {
   Hatrix::BLR A;
+
+  for (int i = 0; i < n_blocks; ++i) {
+    for (int j = 0; j < n_blocks; ++j) {
+      A.D.insert(i, j,
+		 Hatrix::generate_laplacend_matrix(randpts,
+						   block_size, block_size,
+						   i*block_size, j*block_size));
+    }
+  }
+
 
   // Also store expected errors to check against later
   std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
@@ -209,16 +321,16 @@ Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
     for (int j = 0; j < nblocks; ++j) {
       if (i == j) {
         for (int irow = 0; irow < rank; ++irow) {
-          for (int icol = 0; icol < rank; ++icol) {
+          for (int jcol = 0; jcol < rank; ++jcol) {
             int c = A.D(i, j).rows - rank;
-            M(i * rank + irow, j * rank + icol) = A.D(i, j)(c + irow, c + icol);
+            M(i * rank + irow, j * rank + jcol) = A.D(i, j)(c + irow, c + jcol);
           }
         }
       }
       else {
         for (int irow = 0; irow < rank; ++irow) {
-          for (int icol = 0; icol < rank; ++icol) {
-            M(i * rank + irow, j * rank + icol) = A.S(i, j)(irow, icol);
+          for (int jcol = 0; jcol < rank; ++jcol) {
+            M(i * rank + irow, j * rank + jcol) = A.S(i, j)(irow, jcol);
           }
         }
       }
@@ -377,7 +489,7 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
-  Hatrix::ULV::BLR2 A_(randpts, block_size, nblocks, rank, 0);
+  Hatrix::ULV::BLR2 A_(randpts, N, block_size, nblocks, rank, 0);
 
   Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
   Hatrix::Matrix last_lu = UMV_factorize(A, N, nblocks, rank);
