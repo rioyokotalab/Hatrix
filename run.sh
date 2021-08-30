@@ -2,7 +2,7 @@
 #YBATCH -r epyc-7502_8
 #SBATCH -N 1
 #SBATCH -J UMV
-#SBATCH --time=10:00:00
+#SBATCH --time=100:00:00
 
 make clean
 make -j all

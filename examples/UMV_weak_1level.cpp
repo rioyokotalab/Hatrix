@@ -20,6 +20,32 @@
 
 using randvec_t = std::vector<std::vector<double> >;
 
+namespace Hatrix {
+  namespace ULV {
+    class BLR2 {
+      public:
+        RowColMap Dcc, Dco, Doc, Doo;
+        RowColMap S;
+        RowMap U, Uc;
+        ColMap V, Vc;
+
+        BLR2(randvec_t& randpts, int block_size, int n_blocks, int rank, int admis) {
+          int c_size = block_size - rank;
+          for (int i = 0; i < n_blocks; ++i) {
+            for (int j = 0; j < n_blocks; ++j) {
+              Dcc.insert(i, j,
+                         Hatrix::generate_laplacend_matrix(randpts,
+                          c_size, c_size, i * block_size, j * block_size));
+              Doo.insert(i, j,
+                Hatrix::generate_laplacend_matrix(randpts, rank, rank,
+                  i * block_size + c_size, j * block_size + c_size));
+            }
+          }
+        };
+    };
+  };
+};
+
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   double A_norm = Hatrix::norm(A);
   double B_norm = Hatrix::norm(B);
@@ -40,14 +66,7 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
 Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_blocks,
   int64_t rank, int64_t admis) {
   Hatrix::BLR A;
-  for (int i = 0; i < n_blocks; ++i) {
-    for (int j = 0; j < n_blocks; ++j) {
-      A.D.insert(i, j,
-		 Hatrix::generate_laplacend_matrix(randpts,
-						   block_size, block_size,
-						   i*block_size, j*block_size));
-    }
-  }
+
   // Also store expected errors to check against later
   std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
 
@@ -357,6 +376,9 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::init();
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+
+  Hatrix::ULV::BLR2 A_(randpts, block_size, nblocks, rank, 0);
+
   Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
   Hatrix::Matrix last_lu = UMV_factorize(A, N, nblocks, rank);
   Hatrix::Matrix x = UMV_substitute(A, last_lu, b, nblocks, block_size, rank);
