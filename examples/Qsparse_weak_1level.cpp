@@ -84,8 +84,8 @@ Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_bloc
     for (int j = 0; j < n_blocks; ++j) {
      if (std::abs(i - j) > admis) {
         A.S.insert(i, j,
-                   Hatrix::matmul(Hatrix::matmul(A.U[i], A.D(i, j), true),
-                                  A.V[j], false, false));
+                  Hatrix::matmul(Hatrix::matmul(A.U[i], A.D(i, j), true),
+                                   A.V[j], false, false));
       }
     }
   }
@@ -119,12 +119,14 @@ Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
 
   LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
 
-  for (int i = 0; i < Q.rows; ++i) {
-    Q(i, i) = 1.0;
-  }
+  // for (int i = 0; i < Q.rows; ++i) {
+  //   Q(i, i) = 1.0;
+  // }
 
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
     Q.stride, tau.data());
+
+//  std::cout << "norm : " << Hatrix::norm(A - Hatrix::matmul(Q, R)) << std::endl;;
 
   return Q;
 }
@@ -155,6 +157,22 @@ Hatrix::Matrix left_and_right_multiply_dense_block(const Hatrix::Matrix& U_F,
     V_F, false, false, 1.0);
 }
 
+void dgetrfnp(int m, int n, double* a, int lda) {
+  int k = std::min(m, n);
+  for (int i = 0; i < k; i++) {
+    double p = 1. / a[i + (size_t)i * lda];
+    int mi = m - i - 1;
+    int ni = n - i - 1;
+
+    double* ax = a + i + (size_t)i * lda + 1;
+    double* ay = a + i + (size_t)i * lda + lda;
+    double* an = ay + 1;
+
+    cblas_dscal(mi, p, ax, 1);
+    cblas_dger(CblasColMajor, mi, ni, -1., ax, 1, ay, lda, an, lda);
+  }
+}
+
 void partial_lu(Hatrix::Matrix& D, int rank) {
   int c = D.rows - rank;
   double * upper_left = &D;
@@ -162,13 +180,7 @@ void partial_lu(Hatrix::Matrix& D, int rank) {
   double * upper_right = upper_left + c * D.stride;
   double * lower_right = upper_left + c * D.stride + c;
 
-  if (c != 0) {
-    std::vector<int> ipiv(c);
-    int info = LAPACKE_dgetrf(LAPACK_COL_MAJOR, c, c, upper_left, D.stride, ipiv.data());
-
-    if (info != 0) {
-      std::cout << "GETRF ERROR: " << info << std::endl;
-    }
+    dgetrfnp(c, c, upper_left, D.stride);
 
     cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
                 c, rank, 1.0, upper_left, D.stride, upper_right, D.stride);
@@ -178,7 +190,6 @@ void partial_lu(Hatrix::Matrix& D, int rank) {
 
     cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, rank, c, -1.0,
                 lower_left, D.stride, upper_right, D.stride, 1.0, lower_right, D.stride);
-  }
 }
 
 Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
@@ -226,22 +237,9 @@ Hatrix::Matrix qsparse_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
-
-    // std::cout << "U_F:\n";
-    // U_F.print();
-    // std::cout << "U:\n";
-    // A.U[node].print();
-    Hatrix::Matrix prod = left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
-
-#ifdef VERIFY
-  verify_complement_generation(U_F, A.U[node]);
-  verify_complement_generation(V_F, A.V[node]);
-  verify_multiplication(prod, A.D(node, node), U_F, V_F);
-#endif
-
-    A.D(node, node) = prod;
+    A.D(node, node) = left_and_right_multiply_dense_block(U_F, V_F, A.D(node, node));
     partial_lu(A.D(node, node), rank);
-  }
+ }
 
   Hatrix::Matrix M = merge_null_spaces(A, nblocks, rank);
   Hatrix::lu(M);
@@ -311,7 +309,7 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
     cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans, CblasUnit,
       c, 1, 1.0, &D, D.stride, x_temp, x.stride);
 
-    cblas_dgemv(CblasColMajor, CblasNoTrans, rank, c, 1.0, &D + c, D.stride,
+    cblas_dgemv(CblasColMajor, CblasNoTrans, rank, c, -1.0, &D + c, D.stride,
       x_temp, 1, 1.0, x_temp + c, 1);
   }
 
@@ -328,13 +326,13 @@ Hatrix::Matrix qsparse_substitute(Hatrix::BLR& A, Hatrix::Matrix& last_lu, const
     double *x_temp = &x + node * block_size;
 
     // // Perform upper trinagular TRSM on a piece of the vector.
-    cblas_dgemv(CblasColMajor, CblasNoTrans, c, rank, 1.0,
-                 &D + c * D.stride, D.stride, x_temp + c,
-                 1, 1.0, x_temp, 1);
+     cblas_dgemv(CblasColMajor, CblasNoTrans, c, rank, -1.0,
+                  &D + c * D.stride, D.stride, x_temp + c,
+                  1, 1.0, x_temp, 1);
 
-    cblas_dtrsm(CblasColMajor, CblasLeft, CblasUpper,
-                 CblasNoTrans, CblasNonUnit,
-                c, 1, 1.0, &D, D.stride, x_temp, x.stride);
+     cblas_dtrsm(CblasColMajor, CblasLeft, CblasUpper,
+                  CblasNoTrans, CblasNonUnit,
+                 c, 1, 1.0, &D, D.stride, x_temp, x.stride);
 
     Hatrix::Matrix V_F = make_complement(A.V[node]);
     std::vector<double> result(block_size);

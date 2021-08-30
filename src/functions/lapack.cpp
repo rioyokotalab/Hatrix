@@ -50,19 +50,33 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
   LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.stride);
 }
 
-std::vector<int> lu(Matrix& A) {
-  std::vector<int> ipiv(A.min_dim());
-  int info = LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
-  if (info != 0) {
-    std::cout << "GETRF ERROR: " << info << std::endl;
+void lu(Matrix& A) {
+  double * a = &A;
+  int m = A.rows;
+  int n = A.cols;
+  int lda = A.stride;
+  int k = std::min(A.rows, A.cols);
+  for (int i = 0; i < k; i++) {
+    double p = 1. / a[i + (size_t)i * lda];
+    int mi = m - i - 1;
+    int ni = n - i - 1;
+
+    double* ax = a + i + (size_t)i * lda + 1;
+    double* ay = a + i + (size_t)i * lda + lda;
+    double* an = ay + 1;
+
+    cblas_dscal(mi, p, ax, 1);
+    cblas_dger(CblasColMajor, mi, ni, -1., ax, 1, ay, lda, an, lda);
   }
-  return ipiv;
 }
 
 Matrix lu_solve(Matrix& A, const Matrix& b) {
   Matrix x(b);
-  std::vector<int> ipiv = lu(A);
-  LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', A.rows, b.cols, &A, A.stride, ipiv.data(),
+  Matrix Ac(A);
+  std::vector<int> ipiv(Ac.rows);
+
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, Ac.rows, Ac.cols, &Ac, A.stride, ipiv.data());
+  LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', Ac.rows, b.cols, &Ac, Ac.stride, ipiv.data(),
     &x, x.stride);
 
   return x;
@@ -104,6 +118,17 @@ void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
   for (int64_t i = 0; i < S.rows; i++) {
     S(i, i) = Sdiag[i];
   }
+}
+
+std::tuple<Matrix, Matrix, Matrix> svd(const Matrix& A) {
+  Matrix Acopy(A);
+  Matrix U(A.rows, A.rows);
+  Matrix S(A.rows, A.cols);
+  Matrix V(A.cols, A.cols);
+
+  svd(Acopy, U, S, V);
+
+  return {std::move(U), std::move(S), std::move(V)};
 }
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank) {

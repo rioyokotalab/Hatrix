@@ -5,7 +5,7 @@ DIRS := src/classes src/functions src/util
 OBJLIBS := libutil.a libclasses.a libfunctions.a
 TEST := test
 EXAMPLES := examples
-EXECUTABLES := matmul lu qr Matrix HSS_2level_construction Qsparse_weak_1level Qsparse_full_rank
+EXECUTABLES := matmul lu qr Matrix HSS_2level_construction Qsparse_weak_1level
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)

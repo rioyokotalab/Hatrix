@@ -9,8 +9,8 @@ namespace Hatrix {
 // Compute the LU factorization of A and store in L and U. Over-writes A.
 void lu(Matrix& A, Matrix& L, Matrix& U);
 
-// Compute the in-place LU factorization of A.
-std::vector<int> lu(Matrix& A);
+// Compute the in-place LU factorization of A. Non-pivoted CBLAS version.
+void lu(Matrix& A);
 
 // Use getrs for solving dense matrix A w.r.t RHS b.
 Matrix lu_solve(Matrix& A, const Matrix& b);
@@ -18,6 +18,8 @@ Matrix lu_solve(Matrix& A, const Matrix& b);
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
+
+std::tuple<Matrix, Matrix, Matrix> svd(const Matrix& A);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
