@@ -11,8 +11,15 @@ FILE=blr_qsparse.csv
 
 # ./bin/Qsparse_full_rank 50
 # ./bin/Qsparse_weak_1level 40 10 10 $FILE
-for rank in 1 2 4 8 10; do
+
+echo "100"
+for rank in 10; do
     ./bin/Qsparse_weak_1level 100 $rank 10 $FILE
+done
+
+echo "1000"
+for rank in 100; do
+    ./bin/Qsparse_weak_1level 1000 $rank 100 $FILE
 done
 
 

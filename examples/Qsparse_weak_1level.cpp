@@ -119,9 +119,9 @@ Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
 
   LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
 
-  // for (int i = 0; i < Q.rows; ++i) {
-  //   Q(i, i) = 0.0;
-  // }
+  for (int i = 0; i < Q.rows; ++i) {
+    Q(i, i) = 1.0;
+  }
 
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
     Q.stride, tau.data());
@@ -151,8 +151,8 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix& Q) {
 
 Hatrix::Matrix left_and_right_multiply_dense_block(const Hatrix::Matrix& U_F,
   const Hatrix::Matrix& V_F, const Hatrix::Matrix& D) {
-  Hatrix::Matrix temp = Hatrix::matmul(U_F, D, true, false, 1.0);
-  return Hatrix::matmul(temp, V_F, false, false, 1.0);
+  return Hatrix::matmul(Hatrix::matmul(U_F, D, true, false, 1.0),
+    V_F, false, false, 1.0);
 }
 
 void partial_lu(Hatrix::Matrix& D, int rank) {
