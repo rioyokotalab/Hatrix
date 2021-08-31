@@ -27,8 +27,8 @@ namespace Hatrix { namespace UMV {
   public:
     // Maps of the vector blocks. bc for upper part of the vector
     // and bo for lower part.
-    RowMap c, o;
     int N, block_size, nblocks, rank;
+    RowMap c, o;
 
     Vector(const Vector& V) : N(V.N), block_size(V.block_size),
                         nblocks(V.nblocks), rank(V.rank),
@@ -354,6 +354,12 @@ namespace Hatrix { namespace UMV {
     for (int block = 0; block < A.n_blocks; ++block) {
       Hatrix::Matrix U_F = A.U_F(block);
       matrix_vector_multiply(U_F, x, block, true);
+
+      if (A.rank != A.block_size) {
+        Hatrix::solve_triangular(A.Dcc(block, block), x.c[block], Hatrix::Left,
+                                 Hatrix::Lower, true);
+        // Hatrix::matmul(A.D(block, block), x.o[block], x.);
+      }
     }
 
     // Backward substitute
@@ -362,6 +368,11 @@ namespace Hatrix { namespace UMV {
     for (int block = 0; block < A.n_blocks; ++block) {
       Hatrix::Matrix V_F = A.V_F(block);
       matrix_vector_multiply(V_F, x, block, false);
+
+      if (A.rank != A.block_size) {
+        Hatrix::solve_triangular(A.Dcc(block, block), x.c[block], Hatrix::Left,
+                                 Hatrix::Upper, false);
+      }
     }
 
     return x;

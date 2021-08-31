@@ -2,6 +2,8 @@
 
 namespace Hatrix {
 
+// RowMap::RowMap(const RowMap& m) : map(m.map) {}
+
 Matrix& RowMap::operator[](int64_t key) { return map.at(key); }
 const Matrix& RowMap::operator[](int64_t key) const { return map.at(key); }
 
