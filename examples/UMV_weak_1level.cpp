@@ -24,19 +24,8 @@ using randvec_t = std::vector<std::vector<double> >;
 
 namespace Hatrix { namespace UMV {
   class Vector {
-  public:
-    // Maps of the vector blocks. bc for upper part of the vector
-    // and bo for lower part.
-    int N, block_size, nblocks, rank;
-    RowMap c, o;
-
-    Vector(const Vector& V) : N(V.N), block_size(V.block_size),
-                        nblocks(V.nblocks), rank(V.rank),
-                        c(V.c), o(V.o) {}
-
-    Vector(std::function<Matrix(int64_t, int64_t)> gen_fn, int _N, int _block_size, int _nblocks, int _rank) :
-      N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
-      Hatrix::Matrix vector = gen_fn(N, 1);
+  private:
+    void copy_from_vector(const Hatrix::Matrix& vector) {
       int c_size = block_size - rank;
 
       for (int block = 0; block < nblocks; ++block) {
@@ -56,6 +45,28 @@ namespace Hatrix { namespace UMV {
         c.insert(block, std::move(c_vector));
         o.insert(block, std::move(o_vector));
       }
+    }
+
+  public:
+    // Maps of the vector blocks. bc for upper part of the vector
+    // and bo for lower part.
+    int N, block_size, nblocks, rank;
+    RowMap c, o;
+
+    Vector(const Hatrix::Matrix& v, int _N, int _block_size, int _nblocks, int _rank) :
+      N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
+      assert(v.cols == 1);
+      copy_from_vector(v);
+    }
+
+    Vector(const Vector& V) : N(V.N), block_size(V.block_size),
+                        nblocks(V.nblocks), rank(V.rank),
+                        c(V.c), o(V.o) {}
+
+    Vector(std::function<Matrix(int64_t, int64_t)> gen_fn, int _N, int _block_size, int _nblocks, int _rank) :
+      N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
+      Hatrix::Matrix vector = gen_fn(N, 1);
+      copy_from_vector(vector);
     }
 
     void print() {
@@ -321,6 +332,25 @@ namespace Hatrix { namespace UMV {
     }
 
     Hatrix::Matrix last(A.rank * A.n_blocks, A.rank * A.n_blocks);
+
+    for (int i = 0; i < A.n_blocks; ++i) {
+      for (int j = 0; j < A.n_blocks; ++j) {
+        if (i == j) {
+          for (int irow = 0; irow < A.rank; ++irow) {
+            for (int jcol = 0; jcol < A.rank; ++jcol) {
+              last(i * A.rank + irow, j * A.rank + jcol)  = A.Doo(i, j)(irow, jcol);
+            }
+          }
+        }
+        else {
+          for (int irow = 0; irow < A.rank; ++irow) {
+            for (int jcol = 0; jcol < A.rank; ++jcol) {
+              last(i * A.rank + irow, j * A.rank + jcol) = A.S(i, j)(irow, jcol);
+            }
+          }
+        }
+      }
+    }
     Hatrix::lu(last);
 
     return last;
@@ -747,7 +777,7 @@ int main(int argc, char *argv[]) {
 
   Hatrix::UMV::BLR2 A_(randpts, N, block_size, nblocks, rank, 0);
   std::cout << "A_.error= " << A_.construct_error << std::endl;
-  Hatrix::UMV::Vector b_(Hatrix::generate_random_matrix, N, block_size, nblocks, rank);
+  Hatrix::UMV::Vector b_(b, N, block_size, nblocks, rank);
 
   double construct_error;
   Hatrix::BLR A;
