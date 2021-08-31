@@ -198,14 +198,17 @@ namespace Hatrix { namespace UMV {
                                                        i * block_size, j * block_size));
           Dco.insert(i, j,
                      Hatrix::generate_laplacend_matrix(randpts, c_size, rank,
-                                                       i * block_size, j * block_size + c_size));
+                                                       i * block_size,
+                                                       j * block_size + c_size));
 
           Doc.insert(i, j,
                      Hatrix::generate_laplacend_matrix(randpts, rank, c_size,
-                                                       i * block_size + c_size, j * block_size));
+                                                       i * block_size + c_size,
+                                                       j * block_size));
           Doo.insert(i, j,
                      Hatrix::generate_laplacend_matrix(randpts, rank, rank,
-                                                       i * block_size + c_size, j * block_size + c_size));
+                                                       i * block_size + c_size,
+                                                       j * block_size + c_size));
         }
       }
 
@@ -276,7 +279,6 @@ namespace Hatrix { namespace UMV {
         Q(i, j) = A(i, j);
       }
     }
-
     LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
     LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
                    Q.stride, tau.data());
@@ -290,7 +292,7 @@ namespace Hatrix { namespace UMV {
     Hatrix::Matrix Q_full = full_qr(Q_copy);
 
     for (int i = 0; i < Q_F.rows; ++i) {
-      for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+      for (int j = 0; j < Q_F.cols; ++j) {
         Q_F(i, j) = Q_full(i, j + Q.cols);
       }
     }
@@ -328,6 +330,7 @@ namespace Hatrix { namespace UMV {
       A.Uc.insert(block, std::move(make_complement(A.U[block])));
       A.Vc.insert(block, std::move(make_complement(A.V[block])));
       left_and_right_multiply_dense(A, block);
+            Hatrix::Matrix c(A.D(block, block));
       partial_lu(A, block);
     }
 
@@ -505,6 +508,10 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, _b);
+
+  x.print();
+  x_dense.print();
+
 
   double substitute_error = rel_error(Hatrix::norm(x), Hatrix::norm(x_dense));
   std::cout << "err: " << substitute_error << std::endl;
