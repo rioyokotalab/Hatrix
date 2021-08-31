@@ -105,6 +105,74 @@ namespace Hatrix { namespace UMV {
     int N, block_size, n_blocks, rank, admis;
     double construct_error;
 
+    Hatrix::Matrix D(int row, int col) {
+      return compose_dense(row, col);
+    }
+
+    void insert_D(int row, int col, Hatrix::Matrix& mat) {
+      int c_size = block_size - rank;
+
+      for (int i = 0; i < c_size; ++i) {
+        for (int j = 0; j < c_size; ++j) {
+          Dcc(row, col)(i, j) = mat(i, j);
+        }
+      }
+
+      for (int i = 0; i < c_size; ++i) {
+        for (int j = 0; j < rank; ++j) {
+          Dco(row, col)(i, j) = mat(i, j + c_size);
+        }
+      }
+
+      for (int i = 0; i < rank; ++i) {
+        for (int j = 0; j < c_size; ++j) {
+          Doc(row, col)(i, j) = mat(i + c_size, j);
+        }
+      }
+
+      for (int i = 0; i < rank; ++i) {
+        for (int j = 0; j < rank; ++j) {
+          Doo(row, col)(i, j) = mat(i + c_size, j + c_size);
+        }
+      }
+    }
+
+    Hatrix::Matrix U_F(int row) {
+      Hatrix::Matrix U_F(block_size, block_size);
+      int c_size = block_size - rank;
+
+      for (int i = 0; i < block_size; ++i) {
+        for (int j = 0; j < c_size; ++j) {
+          U_F(i, j) = Uc[row](i, j);
+        }
+      }
+
+      for (int i = 0; i < block_size; ++i) {
+        for (int j = 0; j < rank; ++j) {
+          U_F(i, c_size + j) = U[row](i, j);
+        }
+      }
+
+      return U_F;
+    }
+
+    Hatrix::Matrix V_F(int col) {
+      Hatrix::Matrix V_F(block_size, block_size);
+      int c_size = block_size - rank;
+      for (int i = 0; i < block_size; ++i) {
+        for (int j = 0; j < c_size; ++j) {
+          V_F(i, j) = Vc[col](i, j);
+        }
+      }
+
+      for (int i = 0; i < block_size; ++i) {
+        for (int j = 0; j < rank; ++j) {
+          V_F(i, c_size + j) = V[col](i, j);
+        }
+      }
+      return V_F;
+    }
+
     BLR2(randvec_t& randpts, int _N, int _block_size, int _n_blocks, int _rank, int _admis) :
       N(_N), block_size(_block_size), n_blocks(_n_blocks), rank(_rank), admis(_admis) {
       int c_size = block_size - rank;
@@ -216,11 +284,29 @@ namespace Hatrix { namespace UMV {
     return Q_F;
   }
 
+  void left_and_right_multiply_dense(BLR2& A, int block) {
+    Hatrix::Matrix U_F = A.U_F(block);
+    Hatrix::Matrix V_F = A.V_F(block);
+
+    Hatrix::Matrix D = Hatrix::matmul(
+                                      Hatrix::matmul(
+                                                     U_F,
+                                                     A.D(block, block),
+                                                     true,
+                                                     false),
+                                      V_F);
+    A.insert_D(block, block, D);
+  }
+
+  void partial_lu(BLR2& A, int block) {
+  }
 
   void factorize(BLR2& A) {
     for (int block = 0; block < A.n_blocks; ++block) {
       A.Uc.insert(block, std::move(make_complement(A.U[block])));
       A.Vc.insert(block, std::move(make_complement(A.V[block])));
+      left_and_right_multiply_dense(A, block);
+      partial_lu(A, block);
     }
   }
 }; }; // namespace Hatrix::UMV

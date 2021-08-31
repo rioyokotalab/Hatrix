@@ -10,7 +10,7 @@ make -j all
 FILE=blr2_time_no_blocks.csv
 
 ./bin/UMV_weak_1level 100 4 10 $FILE
-./bin/UMV_weak_1level 100 10 10 $FILE
+# ./bin/UMV_weak_1level 100 10 10 $FILE
 # for N in 1000 5000 10000 20000 40000 80000; do
 #     for rank in 5 10 20 40 60 100; do
 #         for block in 100 500 1000 2000 4000; do
