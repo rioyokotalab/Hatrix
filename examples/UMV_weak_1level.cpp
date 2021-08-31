@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cassert>
 #include <fstream>
+#include <functional>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -21,7 +22,23 @@
 using randvec_t = std::vector<std::vector<double> >;
 
 namespace Hatrix {
-  namespace ULV {
+  namespace UMV {
+    class Vector {
+    private:
+      // Maps of the vector blocks. bc for upper part of the vector
+      // and bo for lower part.
+      RowMap bc, bo;
+      int N, block_size, nblocks;
+
+    public:
+
+      Vector(std::function<Matrix(int64_t, int64_t)> gen_fn, int _N, int _block_size, int _nblocks) :
+        N(_N), block_size(_block_size), nblocks(_nblocks) {
+        Hatrix::Matrix vector = gen_fn(N, 1);
+
+      }
+    };
+
     class BLR2 {
     private:
       Matrix compose_dense(int i, int j) {
@@ -488,7 +505,8 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
-  Hatrix::ULV::BLR2 A_(randpts, N, block_size, nblocks, rank, 0);
+  Hatrix::UMV::BLR2 A_(randpts, N, block_size, nblocks, rank, 0);
+  Hatrix::UMV::Vector b_(Hatrix::generate_random_matrix, N, block_size, nblocks);
 
   Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
   Hatrix::Matrix last_lu = UMV_factorize(A, N, nblocks, rank);

@@ -7,13 +7,19 @@
 make clean
 make -j all
 
-FILE=blr_qsparse.csv
+FILE=qsparse_test.csv
 
-for N in 1000; do
-    for rank in 5 10 20 40 100; do
-        ./bin/UMV_weak_1level $N $rank 100 $FILE
-    done
-done
+
+echo "rank 10"
+./bin/UMV_weak_1level 1000 10 100 $FILE
+
+echo "full rank"
+./bin/UMV_weak_1level 1000 100 100 $FILE
+# for N in 1000; do
+#     for rank in 5 10 20 40 100; do
+#         ./bin/UMV_weak_1level $N $rank 100 $FILE
+#     done
+# done
 
 
 
