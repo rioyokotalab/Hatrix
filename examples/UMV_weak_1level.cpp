@@ -8,6 +8,7 @@
 #include <cassert>
 #include <fstream>
 #include <functional>
+#include <chrono>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -181,7 +182,7 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_blocks,
+std::tuple<Hatrix::BLR, double> construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_blocks,
   int64_t rank, int64_t admis) {
   Hatrix::BLR A;
 
@@ -247,8 +248,7 @@ Hatrix::BLR construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_bloc
       }
     }
   }
-  std::cout << "BLR construction error (rel): " << std::sqrt(diff/norm) << "\n";
-  return A;
+  return {A, std::sqrt(diff/norm)};
 }
 
 
@@ -505,20 +505,40 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
-  Hatrix::UMV::BLR2 A_(randpts, N, block_size, nblocks, rank, 0);
-  Hatrix::UMV::Vector b_(Hatrix::generate_random_matrix, N, block_size, nblocks);
+  // Hatrix::UMV::BLR2 A_(randpts, N, block_size, nblocks, rank, 0);
+  // Hatrix::UMV::Vector b_(Hatrix::generate_random_matrix, N, block_size, nblocks);
 
-  Hatrix::BLR A = construct_BLR(randpts, block_size, nblocks, rank, 0);
+  double construct_error;
+  Hatrix::BLR A;
+  auto start_construct = std::chrono::system_clock::now();
+  std::tie(A, construct_error) = construct_BLR(randpts, block_size, nblocks, rank, 0);
+  auto stop_construct = std::chrono::system_clock::now();
+  double construct_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_construct - start_construct).count();
+
+
+  auto start_factorize = std::chrono::system_clock::now();
   Hatrix::Matrix last_lu = UMV_factorize(A, N, nblocks, rank);
+  auto stop_factorize = std::chrono::system_clock::now();
+  double factorize_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_factorize - start_factorize).count();
+
+  auto start_subs = std::chrono::system_clock::now();
   Hatrix::Matrix x = UMV_substitute(A, last_lu, b, nblocks, block_size, rank);
+  auto stop_subs = std::chrono::system_clock::now();
+  double subs_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_subs - start_subs).count();
 
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
-  double error = rel_error(x, x_dense);
-  std::cout << "solution error: " << error << std::endl;
+  double substitute_error = rel_error(x, x_dense);
+  // std::cout << "solution error: " << error << std::endl;
 
-  file << N << "," << rank << "," << block_size << "," << error << std::endl;
+  file << N << "," << rank << "," << block_size << "," << substitute_error << ","
+       << construct_error << "," << construct_time << "," << factorize_time << ","
+       << subs_time << std::endl;
+
   file.close();
 
   Hatrix::Context::finalize();
