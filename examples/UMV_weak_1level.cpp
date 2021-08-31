@@ -27,12 +27,12 @@ namespace Hatrix { namespace UMV {
   public:
     // Maps of the vector blocks. bc for upper part of the vector
     // and bo for lower part.
-    RowMap bc, bo;
+    RowMap c, o;
     int N, block_size, nblocks, rank;
 
     Vector(const Vector& V) : N(V.N), block_size(V.block_size),
                         nblocks(V.nblocks), rank(V.rank),
-                        bc(V.bc), bo(V.bo) {}
+                        c(V.c), o(V.o) {}
 
     Vector(std::function<Matrix(int64_t, int64_t)> gen_fn, int _N, int _block_size, int _nblocks, int _rank) :
       N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
@@ -53,15 +53,15 @@ namespace Hatrix { namespace UMV {
           o_vector(i, 0) = vector(block * block_size + c_size + i, 0);
         }
 
-        bc.insert(block, std::move(c_vector));
-        bo.insert(block, std::move(o_vector));
+        c.insert(block, std::move(c_vector));
+        o.insert(block, std::move(o_vector));
       }
     }
 
     void print() {
       for (int block = 0; block < nblocks; ++block) {
-        bc[block].print();
-        bo[block].print();
+        c[block].print();
+        o[block].print();
       }
     }
   };
@@ -326,8 +326,43 @@ namespace Hatrix { namespace UMV {
     return last;
   }
 
+  void matrix_vector_multiply(Hatrix::Matrix& A, Hatrix::UMV::Vector& x, int block, bool transpose) {
+    Hatrix::Matrix temp(A.rows, 1);
+    int c_size = x.block_size - x.rank;
+
+    for (int i = 0; i < c_size; ++i) {
+      temp(i, 0) = x.c[block](i, 0);
+    }
+    for (int i = 0; i < x.rank; ++i) {
+      temp(i + c_size, 0) = x.o[block](i, 0);
+    }
+
+    Hatrix::Matrix product = Hatrix::matmul(A, temp, transpose);
+
+    for (int i = 0; i < c_size; ++i) {
+      x.c[block](i, 0) = product(i, 0);
+    }
+    for (int i = 0; i < x.rank; ++i) {
+      x.o[block](i, 0) = product(i + c_size, 0);
+    }
+  }
+
   Hatrix::UMV::Vector substitute(BLR2& A, Hatrix::Matrix& last, const Vector& b) {
     Hatrix::UMV::Vector x(b);
+
+    // Forward substitute.
+    for (int block = 0; block < A.n_blocks; ++block) {
+      Hatrix::Matrix U_F = A.U_F(block);
+      matrix_vector_multiply(U_F, x, block, true);
+    }
+
+    // Backward substitute
+
+
+    for (int block = 0; block < A.n_blocks; ++block) {
+      Hatrix::Matrix V_F = A.V_F(block);
+      matrix_vector_multiply(V_F, x, block, false);
+    }
 
     return x;
   }
