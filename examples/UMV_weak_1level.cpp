@@ -299,24 +299,31 @@ namespace Hatrix { namespace UMV {
   }
 
   void partial_lu(BLR2& A, int block) {
-    Hatrix::lu(A.Dcc(block, block));
-    Hatrix::solve_triangular(A.Dcc(block, block), A.Dco(block, block), Hatrix::Left,
-                             Hatrix::Lower, true, false, 1.0);
-    Hatrix::solve_triangular(A.Dcc(block, block), A.Doc(block, block), Hatrix::Right,
-                             Hatrix::Upper, false, false, 1.0);
-    Hatrix::matmul(A.Doc(block, block), A.Dco(block, block), A.Doo(block, block),
-                   false, false, -1.0, 1.0);
+    if (A.rank != A.block_size) {
+      Hatrix::lu(A.Dcc(block, block));
+      Hatrix::solve_triangular(A.Dcc(block, block), A.Dco(block, block), Hatrix::Left,
+                               Hatrix::Lower, true, false, 1.0);
+      Hatrix::solve_triangular(A.Dcc(block, block), A.Doc(block, block), Hatrix::Right,
+                               Hatrix::Upper, false, false, 1.0);
+      Hatrix::matmul(A.Doc(block, block), A.Dco(block, block), A.Doo(block, block),
+                     false, false, -1.0, 1.0);
+    }
   }
 
-  void factorize(BLR2& A) {
+  Hatrix::Matrix factorize(BLR2& A) {
     for (int block = 0; block < A.n_blocks; ++block) {
       A.Uc.insert(block, std::move(make_complement(A.U[block])));
       A.Vc.insert(block, std::move(make_complement(A.V[block])));
       left_and_right_multiply_dense(A, block);
       partial_lu(A, block);
     }
+
+    Hatrix::Matrix last(A.rank * A.n_blocks, A.rank * A.n_blocks);
+    Hatrix::lu(last);
+
+    return last;
   }
-}; }; // namespace Hatrix::UMV
+}} // namespace Hatrix::UMV
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   double A_norm = Hatrix::norm(A);
@@ -673,7 +680,7 @@ int main(int argc, char *argv[]) {
 
   auto start_factorize = std::chrono::system_clock::now();
   Hatrix::Matrix last_lu = UMV_factorize(A, N, nblocks, rank);
-  Hatrix::UMV::factorize(A_);
+  Hatrix::Matrix last = Hatrix::UMV::factorize(A_);
   auto stop_factorize = std::chrono::system_clock::now();
   double factorize_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factorize - start_factorize).count();
