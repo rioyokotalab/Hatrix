@@ -55,6 +55,13 @@ namespace Hatrix { namespace UMV {
         bo.insert(block, std::move(o_vector));
       }
     }
+
+    void print() {
+      for (int block = 0; block < nblocks; ++block) {
+        bc[block].print();
+        bo[block].print();
+      }
+    }
   };
 
   class BLR2 {
@@ -150,7 +157,7 @@ namespace Hatrix { namespace UMV {
           Hatrix::matmul(Y[i], compose_dense(i, j), YtA, true);
         }
         std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(YtA, rank);
-        V.insert(j, std::move(Vi));
+        V.insert(j, std::move(Vi.transpose()));
       }
 
       for (int i = 0; i < n_blocks; ++i) {
@@ -158,7 +165,7 @@ namespace Hatrix { namespace UMV {
           if (i != j) {
             S.insert(i, j,
                      Hatrix::matmul(Hatrix::matmul(U[i], compose_dense(i, j), true),
-                                    V[j], false, true));
+                                    V[j], false, false));
           }
         }
       }
@@ -171,7 +178,7 @@ namespace Hatrix { namespace UMV {
           if (i == j)
             continue;
           else {
-            fdiff = Hatrix::norm(U[i] * S(i, j) * V[j] - compose_dense(i, j));
+            fdiff = Hatrix::norm(U[i] * S(i, j) * V[j].transpose() - compose_dense(i, j));
             diff += fdiff * fdiff;
           }
         }
@@ -180,8 +187,41 @@ namespace Hatrix { namespace UMV {
     };
   };
 
-  void factorize(BLR2& A) {
+  Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
+    Hatrix::Matrix Q(A.rows, A.rows);
+    std::vector<double> tau(std::max(A.rows, A.cols));
+    for (int i = 0; i < Q.rows; ++i) {
+      for (int j = 0; j < A.cols; ++j) {
+        Q(i, j) = A(i, j);
+      }
+    }
 
+    LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
+    LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
+                   Q.stride, tau.data());
+    return Q;
+  }
+
+
+  Hatrix::Matrix make_complement(const Hatrix::Matrix& Q) {
+    Hatrix::Matrix Q_copy(Q);
+    Hatrix::Matrix Q_F(Q.rows, Q.rows - Q.cols);
+    Hatrix::Matrix Q_full = full_qr(Q_copy);
+
+    for (int i = 0; i < Q_F.rows; ++i) {
+      for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+        Q_F(i, j) = Q_full(i, j + Q.cols);
+      }
+    }
+    return Q_F;
+  }
+
+
+  void factorize(BLR2& A) {
+    for (int block = 0; block < A.n_blocks; ++block) {
+      A.Uc.insert(block, std::move(make_complement(A.U[block])));
+      A.Vc.insert(block, std::move(make_complement(A.V[block])));
+    }
   }
 }; }; // namespace Hatrix::UMV
 
