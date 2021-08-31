@@ -414,7 +414,6 @@ namespace Hatrix { namespace UMV {
                        -1.0, 1.0);
       }
     }
-
     Hatrix::Matrix o_vectors = gather_o_vectors(x);
     Hatrix::solve_triangular(last, o_vectors, Hatrix::Left, Hatrix::Lower, true);
 
@@ -423,15 +422,15 @@ namespace Hatrix { namespace UMV {
     scatter_o_vectors(x, o_vectors);
 
     for (int block = 0; block < A.n_blocks; ++block) {
-      Hatrix::Matrix V_F = A.V_F(block);
-      matrix_vector_multiply(V_F, x, block, false);
-
       if (A.rank != A.block_size) {
         Hatrix::matmul(A.Dco(block, block), x.o[block], x.c[block], false,
                        false, -1.0, 1.0);
         Hatrix::solve_triangular(A.Dcc(block, block), x.c[block], Hatrix::Left,
                                  Hatrix::Upper, false);
       }
+
+      Hatrix::Matrix V_F = A.V_F(block);
+      matrix_vector_multiply(V_F, x, block, false);
     }
 
     return x;
@@ -508,10 +507,6 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, _b);
-
-  x.print();
-  x_dense.print();
-
 
   double substitute_error = rel_error(Hatrix::norm(x), Hatrix::norm(x_dense));
   std::cout << "err: " << substitute_error << std::endl;
