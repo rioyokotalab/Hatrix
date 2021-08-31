@@ -299,6 +299,9 @@ namespace Hatrix { namespace UMV {
   }
 
   void partial_lu(BLR2& A, int block) {
+    Hatrix::lu(A.Dcc(block, block));
+    Hatrix::solve_triangular(A.Dcc(block, block), A.Dco(block, block), Hatrix::Left,
+                             Hatrix::Lower, true, false, 1.0);
   }
 
   void factorize(BLR2& A) {
