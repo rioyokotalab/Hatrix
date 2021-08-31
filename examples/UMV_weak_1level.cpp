@@ -347,6 +347,25 @@ namespace Hatrix { namespace UMV {
     }
   }
 
+  Hatrix::Matrix gather_o_vectors(const Vector& x) {
+    Hatrix::Matrix o_vectors(x.rank * x.nblocks, 1);
+    for (int block = 0; block < x.nblocks; ++block) {
+      for (int i = 0; i < x.rank; ++i) {
+        o_vectors(block * x.rank + i, 0) = x.o[block](i, 0);
+      }
+    }
+
+    return o_vectors;
+  }
+
+  void scatter_o_vectors(Vector& x, Hatrix::Matrix& o_vectors) {
+    for (int block = 0; block < x.nblocks; ++block) {
+      for (int i = 0; i < x.rank; ++i) {
+        x.o[block](i, 0) = o_vectors(block * x.rank + i, 0);
+      }
+    }
+  }
+
   Hatrix::UMV::Vector substitute(BLR2& A, Hatrix::Matrix& last, const Vector& b) {
     Hatrix::UMV::Vector x(b);
 
@@ -358,18 +377,25 @@ namespace Hatrix { namespace UMV {
       if (A.rank != A.block_size) {
         Hatrix::solve_triangular(A.Dcc(block, block), x.c[block], Hatrix::Left,
                                  Hatrix::Lower, true);
-        // Hatrix::matmul(A.D(block, block), x.o[block], x.);
+        Hatrix::matmul(A.Doc(block, block), x.c[block], x.o[block], false, false,
+                       -1.0, 1.0);
       }
     }
 
-    // Backward substitute
+    Hatrix::Matrix o_vectors = gather_o_vectors(x);
+    Hatrix::solve_triangular(last, o_vectors, Hatrix::Left, Hatrix::Lower, true);
 
+    // Backward substitute
+    Hatrix::solve_triangular(last, o_vectors, Hatrix::Left, Hatrix::Upper, false);
+    scatter_o_vectors(x, o_vectors);
 
     for (int block = 0; block < A.n_blocks; ++block) {
       Hatrix::Matrix V_F = A.V_F(block);
       matrix_vector_multiply(V_F, x, block, false);
 
       if (A.rank != A.block_size) {
+        Hatrix::matmul(A.Dco(block, block), x.o[block], x.c[block], false,
+                       false, -1.0, 1.0);
         Hatrix::solve_triangular(A.Dcc(block, block), x.c[block], Hatrix::Left,
                                  Hatrix::Upper, false);
       }
@@ -748,6 +774,9 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
+
+  x.print();
+  x_.print();
 
   double substitute_error = rel_error(x, x_dense);
   // std::cout << "solution error: " << error << std::endl;
