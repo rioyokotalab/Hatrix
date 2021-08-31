@@ -29,14 +29,32 @@ namespace Hatrix {
       // Maps of the vector blocks. bc for upper part of the vector
       // and bo for lower part.
       RowMap bc, bo;
-      int N, block_size, nblocks;
+      int N, block_size, nblocks, rank;
 
     public:
 
-      Vector(std::function<Matrix(int64_t, int64_t)> gen_fn, int _N, int _block_size, int _nblocks) :
-        N(_N), block_size(_block_size), nblocks(_nblocks) {
+      Vector(std::function<Matrix(int64_t, int64_t)> gen_fn, int _N, int _block_size, int _nblocks, int _rank) :
+        N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
         Hatrix::Matrix vector = gen_fn(N, 1);
+        int c_size = block_size - rank;
 
+        for (int block = 0; block < nblocks; ++block) {
+          Hatrix::Matrix c_vector(c_size, 1);
+          Hatrix::Matrix o_vector(rank, 1);
+
+          // copy c vector
+          for (int i = 0; i < c_size; ++i) {
+            c_vector(i, 0) = vector(block * block_size + i, 0);
+          }
+
+          // copy rank vector
+          for (int i = 0; i < rank; ++i) {
+            o_vector(i, 0) = vector(block * block_size + c_size + i, 0);
+          }
+
+          bc.insert(block, std::move(c_vector));
+          bo.insert(block, std::move(o_vector));
+        }
       }
     };
 
@@ -505,8 +523,8 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
-  // Hatrix::UMV::BLR2 A_(randpts, N, block_size, nblocks, rank, 0);
-  // Hatrix::UMV::Vector b_(Hatrix::generate_random_matrix, N, block_size, nblocks);
+  Hatrix::UMV::BLR2 A_(randpts, N, block_size, nblocks, rank, 0);
+  Hatrix::UMV::Vector b_(Hatrix::generate_random_matrix, N, block_size, nblocks, rank);
 
   double construct_error;
   Hatrix::BLR A;
