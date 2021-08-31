@@ -437,6 +437,14 @@ namespace Hatrix { namespace UMV {
 
   double norm(Hatrix::UMV::Vector& x) {
     double norm = 0;
+    for (int b = 0; b < x.nblocks; ++b) {
+      double c_norm = Hatrix::norm(x.c[b]);
+      double o_norm = Hatrix::norm(x.o[b]);
+
+      norm += c_norm * c_norm + o_norm * o_norm;
+    }
+
+    return std::sqrt(norm);
   }
 
 } // namespace Hatrix
@@ -483,7 +491,6 @@ int main(int argc, char *argv[]) {
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
 
-
   auto start_factorize = std::chrono::system_clock::now();
   Hatrix::Matrix last = Hatrix::UMV::factorize(A);
   auto stop_factorize = std::chrono::system_clock::now();
@@ -500,6 +507,7 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, _b);
 
   double substitute_error = rel_error(Hatrix::norm(x), Hatrix::norm(x_dense));
+  std::cout << "err: " << substitute_error << std::endl;
 
   file << N << "," << rank << "," << block_size << "," << substitute_error << ","
        << construct_error << "," << construct_time << "," << factorize_time << ","
