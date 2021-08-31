@@ -24,13 +24,15 @@ using randvec_t = std::vector<std::vector<double> >;
 
 namespace Hatrix { namespace UMV {
   class Vector {
-  private:
+  public:
     // Maps of the vector blocks. bc for upper part of the vector
     // and bo for lower part.
     RowMap bc, bo;
     int N, block_size, nblocks, rank;
 
-  public:
+    Vector(const Vector& V) : N(V.N), block_size(V.block_size),
+                        nblocks(V.nblocks), rank(V.rank),
+                        bc(V.bc), bo(V.bo) {}
 
     Vector(std::function<Matrix(int64_t, int64_t)> gen_fn, int _N, int _block_size, int _nblocks, int _rank) :
       N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
@@ -322,6 +324,12 @@ namespace Hatrix { namespace UMV {
     Hatrix::lu(last);
 
     return last;
+  }
+
+  Hatrix::UMV::Vector substitute(BLR2& A, Hatrix::Matrix& last, const Vector& b) {
+    Hatrix::UMV::Vector x(b);
+
+    return x;
   }
 }} // namespace Hatrix::UMV
 
@@ -687,6 +695,7 @@ int main(int argc, char *argv[]) {
 
   auto start_subs = std::chrono::system_clock::now();
   Hatrix::Matrix x = UMV_substitute(A, last_lu, b, nblocks, block_size, rank);
+  Hatrix::UMV::Vector x_ = Hatrix::UMV::substitute(A_, last, b_);
   auto stop_subs = std::chrono::system_clock::now();
   double subs_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_subs - start_subs).count();
