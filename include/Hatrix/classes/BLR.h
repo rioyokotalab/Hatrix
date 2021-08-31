@@ -5,7 +5,8 @@ namespace Hatrix {
 
 class BLR {
  public:
-  RowColMap D, S;
+  RowColMap<bool> is_admissible;
+  RowColMap<Matrix> D, S;
   RowMap U;
   ColMap V;
 };

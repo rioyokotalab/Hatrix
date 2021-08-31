@@ -26,7 +26,8 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank, in
   
   Hatrix::BLR A;
   for (int i = 0; i < n_blocks; ++i) {
-    for (int j = 0; j < n_blocks; ++j) {      
+    for (int j = 0; j < n_blocks; ++j) {
+      A.is_admissible.insert(i, j, std::abs(i - j) > admis);
       A.D.insert(i, j,
 		 Hatrix::generate_laplacend_matrix(randpts,
 						   block_size, block_size,
@@ -47,8 +48,7 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank, in
   for (int64_t i = 0; i < n_blocks; ++i) {
     Hatrix::Matrix AY(block_size, rank + oversampling);
     for (int64_t j = 0; j < n_blocks; ++j) {
-      if (std::abs(i - j) <= admis) continue;
-      Hatrix::matmul(A.D(i, j), Y[j], AY);
+      if (A.is_admissible(i, j)) Hatrix::matmul(A.D(i, j), Y[j], AY);
     }
     std::tie(U, S, V, error) = Hatrix::truncated_svd(AY, rank);
     A.U.insert(i, std::move(U));
@@ -56,15 +56,14 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank, in
   for (int64_t j = 0; j < n_blocks; ++j) {
     Hatrix::Matrix YtA(rank + oversampling, block_size);
     for (int64_t i = 0; i < n_blocks; ++i) {
-      if (std::abs(i - j) <= admis) continue;
-      Hatrix::matmul(Y[i], A.D(i, j), YtA, true);
+      if (A.is_admissible(i, j)) Hatrix::matmul(Y[i], A.D(i, j), YtA, true);
     }
     std::tie(U, S, V, error) = Hatrix::truncated_svd(YtA, rank);
     A.V.insert(j, std::move(V));
   }
   for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {
-     if (std::abs(i - j) > admis) {
+      if (A.is_admissible(i, j)) {
         A.S.insert(i, j,
                    Hatrix::matmul(Hatrix::matmul(A.U[i], A.D(i, j), true),
                                   A.V[j], false, true));
@@ -77,9 +76,7 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank, in
     for (int j = 0; j < n_blocks; ++j) {
       fnorm = Hatrix::norm(A.D(i, j));
       norm += fnorm * fnorm;
-      if (std::abs(i - j) <= admis)
-        continue;
-      else {
+      if (A.is_admissible(i, j)) {
 	fdiff = Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j] - A.D(i, j));
 	diff += fdiff * fdiff;
       }
@@ -115,13 +112,15 @@ Hatrix::BLR dense_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_blocks) {
 void projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
 			  double alpha, double beta, int64_t n_blocks, int64_t admis) {
   //Precompute
-  Hatrix::RowColMap UCTxAxUB, VAxBxVCT;
+  Hatrix::RowColMap<Hatrix::Matrix> UCTxAxUB, VAxBxVCT;
   std::vector<Hatrix::Matrix> UCTxUA, VBxVCT;
   std::vector<Hatrix::Matrix> VAxUB;
   for(int k = 0; k < n_blocks; k++) {
     for(int l = 0; l < n_blocks; l++) {
-      if(std::abs(k - l) <= admis) {
+      if(!A.is_admissible(k, l)) {
 	UCTxAxUB.insert(k, l, Hatrix::matmul(C.U[k], A.D(k, l) * B.U[l], true, false));
+      }
+      if(!B.is_admissible(l, k)) {
 	VAxBxVCT.insert(l, k, Hatrix::matmul(A.V[l] * B.D(l, k), C.V[k], false, true));
       }
     }
@@ -133,19 +132,19 @@ void projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
   }
   for (int i = 0; i < n_blocks; i++) {
     for(int j = 0; j < n_blocks; j++) {
-      if(std::abs(i - j) <= admis) { //Inadmissible C(i, j)
+      if(!C.is_admissible(i, j)) { //Inadmissible C(i, j)
 	C.D(i, j) *= beta;
 	Hatrix::Matrix S_ij(C.U[i].cols, C.V[j].rows);
 	for(int k = 0; k < n_blocks; k++) {
-	  if((std::abs(i - k) <= admis) && (std::abs(k - j) <= admis)) { //D x D
+	  if((!A.is_admissible(i, k)) && (!B.is_admissible(k, j))) { //D x D
 	    Hatrix::matmul(A.D(i, k), B.D(k, j), C.D(i, j),
 			   false, false, alpha);
 	  }
-	  else if(std::abs(i - k) <= admis) { //D x LR
+	  else if(!A.is_admissible(i, k)) { //D x LR
 	    Hatrix::matmul(A.D(i, k) * B.U[k], B.S(k, j) * B.V[j], C.D(i, j),
 			   false, false, alpha);
 	  }
-	  else if(std::abs(k - j) <= admis) { //LR x D
+	  else if(!B.is_admissible(k, j)) { //LR x D
 	    Hatrix::matmul(A.U[i] * A.S(i, k), A.V[k] * B.D(k, j), C.D(i, j),
 			   false, false, alpha);
 	  }
@@ -158,17 +157,17 @@ void projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, Hatrix::BLR& C,
       else { //Admissible C(i, j)
 	C.S(i, j) *= beta;
 	for(int k = 0; k < n_blocks; k++) {
-	  if((std::abs(i - k) <= admis) && (std::abs(k - j) <= admis)) { //D x D
+	  if((!A.is_admissible(i, k)) && (!B.is_admissible(k, j))) { //D x D
 	    Hatrix::matmul(Hatrix::matmul(C.U[i], A.D(i, k), true, false),
 			   Hatrix::matmul(B.D(k, j), C.V[j], false, true),
 			   C.S(i, j), false, false, alpha);
 	  }
-	  else if(std::abs(i - k) <= admis) { //D x LR
+	  else if(!A.is_admissible(i, k)) { //D x LR
 	    Hatrix::matmul(UCTxAxUB(i, k),
 			   B.S(k, j) * VBxVCT[j],
 			   C.S(i, j), false, false, alpha);
 	  }
-	  else if(std::abs(k - j) <= admis) { //LR x D
+	  else if(!B.is_admissible(k, j)) { //LR x D
 	    Hatrix::matmul(UCTxUA[i],
 			   A.S(i, k) * VAxBxVCT(k, j),
 			   C.S(i, j), false, false, alpha);
@@ -195,7 +194,8 @@ Hatrix::BLR projected_matmul_BLR(Hatrix::BLR& A, Hatrix::BLR& B, int64_t n_block
   for(int i = 0; i < n_blocks; i++) {
     for(int j = 0; j < n_blocks; j++) {
       C.D.insert(i, j, Hatrix::Matrix(A.D(i, j).rows, B.D(i, j).cols));
-      if(std::abs(i - j) > admis) {
+      C.is_admissible.insert(i, j, std::abs(i - j) > admis);
+      if(C.is_admissible(i, j)) {
 	C.S.insert(i, j, Hatrix::Matrix(C.U[i].cols, C.V[j].rows));
       }
     }
@@ -224,10 +224,11 @@ int main(int argc, char** argv) {
     for (int j = 0; j < n_blocks; ++j) {
       fnorm = Hatrix::norm(C_dense.D(i, j));
       norm += fnorm * fnorm;
-      if (std::abs(i - j) <= admis) {
+      if (C_proj.is_admissible(i, j)) {
+	fdiff = Hatrix::norm(C_proj.U[i] * C_proj.S(i, j) * C_proj.V[j] - C_dense.D(i, j));
+      }
+      else {
 	fdiff = Hatrix::norm(C_proj.D(i, j) - C_dense.D(i, j));
-      } else {
-        fdiff = Hatrix::norm(C_proj.U[i] * C_proj.S(i, j) * C_proj.V[j] - C_dense.D(i, j));
       }
       diff += fdiff * fdiff;
     }
