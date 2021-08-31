@@ -302,6 +302,10 @@ namespace Hatrix { namespace UMV {
     Hatrix::lu(A.Dcc(block, block));
     Hatrix::solve_triangular(A.Dcc(block, block), A.Dco(block, block), Hatrix::Left,
                              Hatrix::Lower, true, false, 1.0);
+    Hatrix::solve_triangular(A.Dcc(block, block), A.Doc(block, block), Hatrix::Right,
+                             Hatrix::Upper, false, false, 1.0);
+    Hatrix::matmul(Doc(block, block), Dco(block, block), Doo(block, block),
+                   false, false, -1.0, 1.0);
   }
 
   void factorize(BLR2& A) {
