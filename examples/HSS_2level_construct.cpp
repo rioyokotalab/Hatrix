@@ -10,7 +10,7 @@ namespace Hatrix {
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap D, S;
-    int N, rank, levels;
+    int N, rank, height;
 
     std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, randvec_t& randvec) {
       Matrix U_temp(leaf_size, rank);
@@ -26,31 +26,34 @@ namespace Hatrix {
       return {V_temp, Vgen_temp};
     }
 
+    Matrix generate_coupling_matrix(int row, int col, int level) {
+      Matrix S(rank, rank);
+
+      return S;
+    }
+
     std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(randvec_t& randvec) {
-      int nblocks = pow(levels, 2);
+      int nblocks = pow(height, 2);
       int leaf_size = N / nblocks;
       ColLevelMap Ugen;
       RowLevelMap Vgen;
 
       for (int block = 0; block < nblocks; ++block) {
-        D.insert(block, block, levels,
+        D.insert(block, block, height,
                  Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                                    block * leaf_size, block * leaf_size));
         Matrix U_temp, Ugen_temp;
         std::tie(U_temp, Ugen_temp) = generate_column_bases(block, leaf_size, randvec);
-        U.insert(block, levels, std::move(U_temp));
-        Ugen.insert(block, levels, std::move(Ugen_temp));
+        U.insert(block, height, std::move(U_temp));
+        Ugen.insert(block, height, std::move(Ugen_temp));
 
         Matrix V_temp, Vgen_temp;
         std::tie(V_temp, Vgen_temp) = generate_row_bases(block, leaf_size, randvec);
-        V.insert(block, levels, std::move(V_temp));
-        Vgen.insert(block, levels, std::move(Vgen_temp));
-      }
+        V.insert(block, height, std::move(V_temp));
+        Vgen.insert(block, height, std::move(Vgen_temp));
 
-      for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-
-        }
+        int s_col = block % 2 == 0 ? block + 1 : block - 1;
+        S.insert(block, s_col, height, generate_coupling_matrix(block, s_col, height));
       }
 
       return {Ugen, Vgen};
@@ -58,8 +61,8 @@ namespace Hatrix {
 
   public:
 
-    HSS(randvec_t& randpts, int _N, int _rank, int _levels) :
-      N(_N), rank(_rank), levels(_levels) {
+    HSS(randvec_t& randpts, int _N, int _rank, int _height) :
+      N(_N), rank(_rank), height(_height) {
       RowLevelMap Ugen;
       ColLevelMap Vgen;
 
@@ -81,13 +84,13 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
 int main(int argc, char *argv[]) {
   int N = atoi(argv[1]);
   int rank = atoi(argv[2]);
-  int levels = 2;
+  int height = 2;
 
   Hatrix::Context::init();
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
-  Hatrix::HSS(randvec, N, rank, levels);
+  Hatrix::HSS(randvec, N, rank, height);
 
   Hatrix::Context::finalize();
 
