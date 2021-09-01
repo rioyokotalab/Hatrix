@@ -7,20 +7,50 @@ using randvec_t = std::vector<std::vector<double> >;
 
 namespace Hatrix {
   class HSS {
-    RowLevelMap U;
-    ColLevelMap V;
+    ColLevelMap U;
+    RowLevelMap V;
     RowColLevelMap D, S;
     int N, rank, levels;
+
+    std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, randvec_t& randvec) {
+      Matrix U_temp(leaf_size, rank);
+      Matrix Ugen_temp(rank, N - leaf_size);
+
+      return {U_temp, Ugen_temp};
+    }
+
+    std::tuple<Matrix, Matrix> generate_row_bases(int block, int leaf_size, randvec_t& randvec) {
+      Matrix V_temp(leaf_size, rank);
+      Matrix Vgen_temp(rank, N - leaf_size);
+
+      return {V_temp, Vgen_temp};
+    }
 
     std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(randvec_t& randvec) {
       int nblocks = pow(levels, 2);
       int leaf_size = N / nblocks;
-      RowLevelMap Ugen, Vgen;
+      ColLevelMap Ugen;
+      RowLevelMap Vgen;
 
       for (int block = 0; block < nblocks; ++block) {
         D.insert(block, block, levels,
                  Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                                    block * leaf_size, block * leaf_size));
+        Matrix U_temp, Ugen_temp;
+        std::tie(U_temp, Ugen_temp) = generate_column_bases(block, leaf_size, randvec);
+        U.insert(block, levels, std::move(U_temp));
+        Ugen.insert(block, levels, std::move(Ugen_temp));
+
+        Matrix V_temp, Vgen_temp;
+        std::tie(V_temp, Vgen_temp) = generate_row_bases(block, leaf_size, randvec);
+        V.insert(block, levels, std::move(V_temp));
+        Vgen.insert(block, levels, std::move(Vgen_temp));
+      }
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+
+        }
       }
 
       return {Ugen, Vgen};
