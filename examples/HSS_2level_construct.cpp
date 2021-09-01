@@ -65,10 +65,10 @@ namespace Hatrix {
       return {U, Hatrix::matmul(S, V)};
     }
 
-    Matrix generate_coupling_matrix(int row, int col, int level) {
-      Matrix S(rank, rank);
-
-      return S;
+    Matrix generate_coupling_matrix(randvec_t& randvec, int row, int col, int leaf_size, int level) {
+      Matrix D = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                           row * leaf_size, col * leaf_size);
+      return Hatrix::matmul(Hatrix::matmul(U(row, level), D, true), V(row, level));
     }
 
     std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(randvec_t& randvec) {
@@ -90,9 +90,12 @@ namespace Hatrix {
         std::tie(V_temp, Vgen_temp) = generate_row_bases(block, leaf_size, randvec);
         V.insert(block, height, std::move(V_temp));
         Vgen.insert(block, height, std::move(Vgen_temp));
+      }
 
+      for (int block = 0; block < nblocks; ++block) {
         int s_col = block % 2 == 0 ? block + 1 : block - 1;
-        S.insert(block, s_col, height, generate_coupling_matrix(block, s_col, height));
+        S.insert(block, s_col, height, generate_coupling_matrix(randvec, block, s_col,
+                                                                leaf_size, height));
       }
 
       return {Ugen, Vgen};
