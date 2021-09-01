@@ -10,7 +10,9 @@ make -j all
 FILE=test_hatrix.csv
 
 rm $FILE
-./bin/HSS_2level_construct 1000 10 100 $FILE
-./bin/HSS_2level_construct 1000 100 100 $FILE
+./bin/HSS_2level_construct 40 4 10 $FILE
+# ./bin/HSS_2level_construct 1000 100 100 $FILE
+# ./bin/HSS_2level_construct 1000 10 100 $FILE
+# ./bin/HSS_2level_construct 1000 100 100 $FILE
 
 cat $FILE

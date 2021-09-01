@@ -1,4 +1,5 @@
 #include <vector>
+#include <iostream>
 #include <cmath>
 
 #include "Hatrix/Hatrix.h"
@@ -13,17 +14,55 @@ namespace Hatrix {
     int N, rank, height;
 
     std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, randvec_t& randvec) {
-      Matrix U_temp(leaf_size, rank);
-      Matrix Ugen_temp(rank, N - leaf_size);
+      Matrix row_slice(leaf_size, N - leaf_size);
+      int ncols_left_slice = block * leaf_size;
+      Matrix left_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_left_slice,
+                                                    block * leaf_size, block * leaf_size);
+      int ncols_right_slice = N - (block+1) * leaf_size;
+      Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
+                                                     block * leaf_size, (block+1) * leaf_size);
 
-      return {U_temp, Ugen_temp};
+      // concat left and right slices
+      for (int i = 0; i < leaf_size; ++i) {
+        for (int j = 0; j < block * leaf_size; ++j) {
+          row_slice(i, j) = left_slice(i, j);
+        }
+
+        for (int j = 0; j < ncols_right_slice; ++j) {
+          row_slice(i, j + ncols_left_slice) = right_slice(i, j);
+        }
+      }
+
+      Matrix U, S, V; double error;
+      std::tie(U, S, V, error) = truncated_svd(row_slice, rank);
+
+      return {U, Hatrix::matmul(S, V)};
     }
 
     std::tuple<Matrix, Matrix> generate_row_bases(int block, int leaf_size, randvec_t& randvec) {
-      Matrix V_temp(leaf_size, rank);
-      Matrix Vgen_temp(rank, N - leaf_size);
+      Matrix col_slice(N - leaf_size, leaf_size);
+      int nrows_upper_slice = block * leaf_size;
+      Matrix upper_slice = generate_laplacend_matrix(randvec, nrows_upper_slice, leaf_size,
+                                                     0, block * leaf_size);
+      int nrows_lower_slice = N - (block + 1) * leaf_size;
+      Matrix lower_slice = generate_laplacend_matrix(randvec, nrows_lower_slice, leaf_size,
+                                                     (block+1) * leaf_size, block * leaf_size);
 
-      return {V_temp, Vgen_temp};
+      for (int j = 0; j < col_slice.cols; ++j) {
+        for (int i = 0; i < nrows_upper_slice; ++i) {
+          col_slice(i, j) = upper_slice(i, j);
+        }
+
+        for (int i = 0; i < nrows_lower_slice; ++i) {
+          col_slice(i + nrows_upper_slice, j) = lower_slice(i, j);
+        }
+      }
+
+      Matrix U, S, V; double error;
+      Matrix col_slice_t = col_slice.transpose();
+      std::tie(U, S, V, error) = truncated_svd(col_slice_t, rank);
+
+      return {U, Hatrix::matmul(S, V)};
     }
 
     Matrix generate_coupling_matrix(int row, int col, int level) {
@@ -59,6 +98,9 @@ namespace Hatrix {
       return {Ugen, Vgen};
     }
 
+    void generate_transfer_matrices(RowLevelMap& Ugen, ColLevelMap& Vgen) {
+    }
+
   public:
 
     HSS(randvec_t& randpts, int _N, int _rank, int _height) :
@@ -67,6 +109,10 @@ namespace Hatrix {
       ColLevelMap Vgen;
 
       std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
+      generate_transfer_matrices(Ugen, Vgen);
+    }
+
+    double construction_relative_error() {
 
     }
   };
@@ -90,7 +136,8 @@ int main(int argc, char *argv[]) {
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
-  Hatrix::HSS(randvec, N, rank, height);
+  Hatrix::HSS A(randvec, N, rank, height);
+  double error = A.construction_relative_error();
 
   Hatrix::Context::finalize();
 
