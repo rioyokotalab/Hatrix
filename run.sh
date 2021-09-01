@@ -9,7 +9,9 @@ make -j all
 
 FILE=test_hatrix.csv
 
+rm $FILE
 ./bin/UMV_weak_1level 1000 10 100 $FILE
+./bin/UMV_weak_1level 1000 100 100 $FILE
 cat $FILE
 
 # for N in 1000 5000 10000 20000 40000 80000; do
