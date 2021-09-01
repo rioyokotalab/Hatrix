@@ -6,6 +6,11 @@
 
 using randvec_t = std::vector<std::vector<double> >;
 
+double rel_error(const double A_norm, const double B_norm) {
+  double diff = A_norm - B_norm;
+  return std::sqrt((diff * diff) / (B_norm * B_norm));
+}
+
 namespace Hatrix {
   class HSS {
     ColLevelMap U;
@@ -17,7 +22,7 @@ namespace Hatrix {
       Matrix row_slice(leaf_size, N - leaf_size);
       int ncols_left_slice = block * leaf_size;
       Matrix left_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_left_slice,
-                                                    block * leaf_size, block * leaf_size);
+                                                    block * leaf_size, 0);
       int ncols_right_slice = N - (block+1) * leaf_size;
       Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
                                                      block * leaf_size, (block+1) * leaf_size);
@@ -32,6 +37,7 @@ namespace Hatrix {
           row_slice(i, j + ncols_left_slice) = right_slice(i, j);
         }
       }
+
 
       Matrix U, S, V; double error;
       std::tie(U, S, V, error) = truncated_svd(row_slice, rank);
@@ -68,7 +74,8 @@ namespace Hatrix {
     Matrix generate_coupling_matrix(randvec_t& randvec, int row, int col, int leaf_size, int level) {
       Matrix D = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                            row * leaf_size, col * leaf_size);
-      return Hatrix::matmul(Hatrix::matmul(U(row, level), D, true), V(row, level));
+      Matrix S = Hatrix::matmul(Hatrix::matmul(U(row, level), D, true), V(col, level));
+      return S;
     }
 
     std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(randvec_t& randvec) {
@@ -108,15 +115,51 @@ namespace Hatrix {
 
     HSS(randvec_t& randpts, int _N, int _rank, int _height) :
       N(_N), rank(_rank), height(_height) {
-      RowLevelMap Ugen;
-      ColLevelMap Vgen;
+      RowLevelMap Ugen; ColLevelMap Vgen;
 
       std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
       generate_transfer_matrices(Ugen, Vgen);
     }
 
-    double construction_relative_error() {
+    double construction_relative_error(randvec_t& randvec) {
+      int leaf_size = N / pow(height, 2);
+      double error = 0;
 
+      for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < 2; ++j) {
+          Matrix A = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                               i * leaf_size, j * leaf_size);
+          if (i == j) {
+            error += pow(rel_error(Hatrix::norm(A), Hatrix::norm(D(i, j, height)) ), 2);
+          }
+          else {
+            Matrix Anew = Hatrix::matmul(Hatrix::matmul(U(i, height),
+                                                        S(i, j, height)),
+                                         V(j, height), false, true);
+            error += pow(rel_error(Hatrix::norm(A),
+                                   Hatrix::norm(Anew)), 2);
+          }
+        }
+      }
+
+      for (int i = 2; i < 4; ++i) {
+        for (int j = 2; j < 4; ++j) {
+          Matrix A = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                               i * leaf_size, j * leaf_size);
+          if (i == j) {
+            error += pow(rel_error(Hatrix::norm(A), Hatrix::norm(D(i, j, height)) ), 2);
+          }
+          else {
+            Matrix Anew = Hatrix::matmul(Hatrix::matmul(U(i, height),
+                                                        S(i, j, height)),
+                                         V(j, height), false, true);
+            error += pow(rel_error(Hatrix::norm(A),
+                                   Hatrix::norm(Anew)), 2);
+          }
+        }
+      }
+
+      return std::sqrt(error);
     }
   };
 }
@@ -135,13 +178,20 @@ int main(int argc, char *argv[]) {
   int rank = atoi(argv[2]);
   int height = 2;
 
+  if (N % int(pow(height, 2)) != 0) {
+    std::cout << N << " % " << pow(height, 2) << " != 0 \n";
+    abort();
+  }
+
   Hatrix::Context::init();
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
   Hatrix::HSS A(randvec, N, rank, height);
-  double error = A.construction_relative_error();
+  double error = A.construction_relative_error(randvec);
 
   Hatrix::Context::finalize();
+
+  std::cout << "construction error : " << error << std::endl;
 
 }
