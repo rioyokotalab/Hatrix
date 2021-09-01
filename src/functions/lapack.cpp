@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <tuple>
 #include <vector>
-#include <iostream>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
