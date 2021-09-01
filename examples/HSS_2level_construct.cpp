@@ -6,8 +6,17 @@ using randvec_t = std::vector<std::vector<double> >;
 
 namespace Hatrix {
   class HSS {
-    RowLevelMap U, V;
+    RowLevelMap U;
+    ColLevelMap V;
     RowColLevelMap D, S;
+    int N, rank, levels;
+
+  public:
+
+    HSS(randvec_t& randpts, int _N, int _rank, int _levels) :
+      N(_N), rank(_rank), levels(_levels) {
+
+    }
   };
 }
 
@@ -29,6 +38,7 @@ int main(int argc, char *argv[]) {
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
+  Hatrix::HSS(randvec, N, rank, levels);
 
   Hatrix::Context::finalize();
 
