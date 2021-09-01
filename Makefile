@@ -5,7 +5,7 @@ DIRS := src/classes src/functions src/util
 OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
-EXECUTABLES := matmul lu qr block_dense_lu Matrix HSS_2level_construct
+EXECUTABLES := matmul lu qr Matrix HSS_2level_construct
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -29,9 +29,6 @@ qr: $(TEST)/qr.o dirs
 	$(LINK_EXECUTABLE)
 
 Matrix: $(TEST)/Matrix.o dirs
-	$(LINK_EXECUTABLE)
-
-block_dense_lu: $(TEST)/block_dense_lu.o dirs
 	$(LINK_EXECUTABLE)
 
 HSS_2level_construct: $(EXAMPLES)/HSS_2level_construct.o dirs
