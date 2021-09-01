@@ -486,12 +486,13 @@ int main(int argc, char *argv[]) {
   const Hatrix::Matrix _b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::UMV::Vector b(_b, N, block_size, nblocks, rank);
 
-  double construct_error;
+
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::UMV::BLR2 A(randpts, N, block_size, nblocks, rank, 0);
   auto stop_construct = std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
+  double construct_error = A.construct_error;
 
   auto start_factorize = std::chrono::system_clock::now();
   Hatrix::Matrix last = Hatrix::UMV::factorize(A);
