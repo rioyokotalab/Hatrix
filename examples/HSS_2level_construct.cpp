@@ -1,4 +1,5 @@
 #include <vector>
+#include <cmath>
 
 #include "Hatrix/Hatrix.h"
 
@@ -11,10 +12,28 @@ namespace Hatrix {
     RowColLevelMap D, S;
     int N, rank, levels;
 
+    std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(randvec_t& randvec) {
+      int nblocks = pow(levels, 2);
+      int leaf_size = N / nblocks;
+      RowLevelMap Ugen, Vgen;
+
+      for (int block = 0; block < nblocks; ++block) {
+        D.insert(block, block, levels,
+                 Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                                   block * leaf_size, block * leaf_size));
+      }
+
+      return {Ugen, Vgen};
+    }
+
   public:
 
     HSS(randvec_t& randpts, int _N, int _rank, int _levels) :
       N(_N), rank(_rank), levels(_levels) {
+      RowLevelMap Ugen;
+      ColLevelMap Vgen;
+
+      std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
 
     }
   };
