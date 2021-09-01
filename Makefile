@@ -1,10 +1,10 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
-DIRS := src/classes src/functions
-OBJLIBS := libclasses.a libfunctions.a
+DIRS := src/classes src/functions src/util
+OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
-EXECUTABLES := matmul lu qr block_dense_lu Matrix
+EXECUTABLES := matmul lu qr block_dense_lu Matrix HSS_2level_construct
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -31,6 +31,9 @@ Matrix: $(TEST)/Matrix.o dirs
 	$(LINK_EXECUTABLE)
 
 block_dense_lu: $(TEST)/block_dense_lu.o dirs
+	$(LINK_EXECUTABLE)
+
+HSS_2level_construct: $(TEST)/HSS_2level_construct.o dirs
 	$(LINK_EXECUTABLE)
 
 .PHONY: clean
