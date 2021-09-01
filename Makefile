@@ -5,7 +5,7 @@ DIRS := src/classes src/functions src/util
 OBJLIBS := libutil.a libclasses.a libfunctions.a
 TEST := test
 EXAMPLES := examples
-EXECUTABLES := matmul lu qr Matrix HSS_2level_construction UMV_weak_1level
+EXECUTABLES := matmul lu qr Matrix UMV_weak_1level
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -29,9 +29,6 @@ qr: $(TEST)/qr.o dirs
 	$(LINK_EXECUTABLE)
 
 Matrix: $(TEST)/Matrix.o dirs
-	$(LINK_EXECUTABLE)
-
-HSS_2level_construction: $(EXAMPLES)/HSS_2level_construction.o dirs
 	$(LINK_EXECUTABLE)
 
 UMV_weak_1level: $(EXAMPLES)/UMV_weak_1level.o dirs
