@@ -39,10 +39,10 @@ namespace Hatrix {
       }
 
 
-      Matrix U, S, V; double error;
-      std::tie(U, S, V, error) = truncated_svd(row_slice, rank);
+      Matrix Ui, Si, Vi; double error;
+      std::tie(Ui, Si, Vi, error) = truncated_svd(row_slice, rank);
 
-      return {U, Hatrix::matmul(S, V)};
+      return {Ui, Hatrix::matmul(Si, Vi)};
     }
 
     std::tuple<Matrix, Matrix> generate_row_bases(int block, int leaf_size, randvec_t& randvec) {
@@ -64,11 +64,11 @@ namespace Hatrix {
         }
       }
 
-      Matrix U, S, V; double error;
+      Matrix Ui, Si, Vi; double error;
       Matrix col_slice_t = col_slice.transpose();
-      std::tie(U, S, V, error) = truncated_svd(col_slice_t, rank);
+      std::tie(Ui, Si, Vi, error) = truncated_svd(col_slice_t, rank);
 
-      return {U, Hatrix::matmul(S, V)};
+      return {Ui, Hatrix::matmul(Si, Vi)};
     }
 
     Matrix generate_coupling_matrix(randvec_t& randvec, int row, int col, int leaf_size, int level) {
@@ -109,6 +109,53 @@ namespace Hatrix {
     }
 
     void generate_transfer_matrices(RowLevelMap& Ugen, ColLevelMap& Vgen) {
+      Matrix Ui, Si, Vi; double error;
+
+      for (int p = 0; p < 2; ++p) {
+        int child1 = p * 2;
+        int child2 = p * 2 + 1;
+
+        // Generate U transfer matrix.
+        Matrix& Ugen_upper = Ugen(child1, height);
+        Matrix& Ugen_lower = Ugen(child2, height);
+        Matrix Ugen_concat(Ugen_upper.rows + Ugen_lower.rows, Ugen_upper.cols);
+
+        for (int i = 0; i < Ugen_upper.rows; ++i) {
+          for (int j = 0; j < Ugen_concat.cols; ++j) {
+            Ugen_concat(i, j) = Ugen_upper(i, j);
+          }
+        }
+
+        for (int i = 0; i < Ugen_lower.rows; ++i) {
+          for (int j = 0; j < Ugen_concat.cols; ++j) {
+            Ugen_concat(i + Ugen_upper.rows, j) = Ugen_lower(i, j);
+          }
+        }
+
+
+        std::tie(Ui, Si, Vi, error) = truncated_svd(Ugen_concat, rank);
+        U.insert(p, height-1, std::move(Ui));
+
+        // Generate V transfer matrix.
+        Matrix& Vgen_upper = Vgen(child1, height);
+        Matrix& Vgen_lower = Vgen(child2, height);
+        Matrix Vgen_concat(Vgen_upper.rows + Vgen_lower.rows, Vgen_upper.cols);
+
+        for (int i = 0; i < Vgen_upper.rows; ++i) {
+          for (int j = 0; j < Vgen_concat.cols; ++j) {
+            Vgen_concat(i, j) = Vgen_upper(i, j);
+          }
+        }
+
+        for (int i = 0; i < Vgen_lower.rows; ++i) {
+          for (int j = 0; j < Vgen_concat.cols; ++j) {
+            Vgen_concat(i + Vgen_upper.rows, j) = Vgen_lower(i, j);
+          }
+        }
+
+        std::tie(Ui, Si, Vi, error) = truncated_svd(Vgen_concat, rank);
+        V.insert(p, height-1, std::move(Ui));
+      }
     }
 
   public:
