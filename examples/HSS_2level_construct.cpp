@@ -109,8 +109,16 @@ namespace Hatrix {
     }
 
     Matrix generate_U_actual_bases(int p) {
+      int child1 = p * 2;
+      int child2 = p * 2 + 1;
       int leaf_size = int(N / 2);
-      Matrix Ubig(leaf_size, rank);
+      Matrix Ubig(rank, leaf_size);
+
+      std::vector<Matrix> Ubig_splits = Ubig.split(1, 2);
+      std::vector<Matrix> U_splits = U(p, height-1).split(2, 1);
+
+      matmul(U_splits[0], U(child1, height), Ubig_splits[0], true, true);
+      matmul(U_splits[1], U(child2, height), Ubig_splits[1], true, true);
 
       return Ubig;
     }
