@@ -111,8 +111,8 @@ namespace Hatrix { namespace UMV {
     }
 
   public:
-    RowColMap Dcc, Dco, Doc, Doo;
-    RowColMap S;
+    RowColMap<Matrix> Dcc, Dco, Doc, Doo;
+    RowColMap<Matrix> S;
     RowMap U, Uc;
     ColMap V, Vc;
     int N, block_size, n_blocks, rank, admis;

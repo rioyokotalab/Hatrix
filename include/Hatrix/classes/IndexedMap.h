@@ -63,7 +63,7 @@ class RowColMap {
 };
 
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol
-using RowLevelMap = RowColMap;
-using ColLevelMap = RowColMap;
+using RowLevelMap = RowColMap<Matrix>;
+using ColLevelMap = RowColMap<Matrix>;
 
 }  // namespace Hatrix
