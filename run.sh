@@ -1,5 +1,5 @@
 #!/bin/bash
-#YBATCH -r dgx-a100_2
+#YBATCH -r epyc-7502_8
 #SBATCH -N 1
 #SBATCH -J UMV
 #SBATCH --time=160:00:00
@@ -11,7 +11,7 @@ FILE=blr2_epyc_copy_blocks.csv
 
 for N in 1000 5000 10000 20000 40000 80000; do
     for rank in 5 10 20 40 60 100; do
-        for block in 100 500 1000 2000 4000; do
+        for block in 100 500 1000 2000 4000 10000; do
             ./bin/UMV_weak_1level $N $rank $block $FILE
         done
     done
