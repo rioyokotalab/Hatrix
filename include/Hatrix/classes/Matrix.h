@@ -42,6 +42,19 @@ class Matrix {
 
   void shrink(int64_t rows, int64_t cols);
 
+  // Split the matrix into n_row_splits * n_col_splits blocks.
+  // n_row_splits is the number of blocks in the row dimension and
+  // n_col_splits is the number of blocks in the column dimension.
+  //
+  // All blocks except the last block will be subdivided into equal parts
+  // (last block will be different if split dimension is not an exact dimension
+  // of the total dimension of the matrix).
+  //
+  // Example:
+  // Matrix A(100, 100);
+  // std::vector<Matrix> splits = A.split(10, 10);
+  // // splits is now a vector of size 100 containing 100 Matrix objects
+  // // of size 10x10 each.
   std::vector<Matrix> split(int64_t n_row_splits, int64_t n_col_splits,
                             bool copy = false) const;
 
