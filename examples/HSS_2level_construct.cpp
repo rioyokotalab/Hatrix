@@ -201,11 +201,6 @@ namespace Hatrix {
         Matrix Ubig = generate_U_actual_bases(row);
         Matrix Vbig = generate_V_actual_bases(col);
 
-        std::cout << "S gen row: " << row << std::endl;
-        Ubig.print();
-        std::cout << "S gen col: " << col << std::endl;
-        Vbig.print();
-
         S.insert(row, col, height - 1,
                  generate_non_leaf_coupling_matrix(randvec, row, col, leaf_size,
                                                    Ubig, Vbig));
@@ -302,8 +297,8 @@ int main(int argc, char *argv[]) {
   int rank = atoi(argv[2]);
   int height = 2;
 
-  if (N % int(pow(height, 2)) != 0) {
-    std::cout << N << " % " << pow(height, 2) << " != 0 \n";
+  if (N % int(pow(height, 2)) != 0 || rank > int(N / pow(height, 2))) {
+    std::cout << N << " % " << pow(height, 2) << " != 0 || rank > leaf(" << int(N / pow(height, 2))  << ")\n";
     abort();
   }
 
@@ -316,6 +311,6 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::finalize();
 
-  std::cout << "construction error : " << error << std::endl;
+  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;
 
 }
