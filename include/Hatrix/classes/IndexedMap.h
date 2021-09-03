@@ -54,27 +54,28 @@ class RowMap {
 };
 typedef RowMap ColMap;
 
+template <class T>
 class RowColMap {
  private:
-  std::unordered_map<std::tuple<int64_t, int64_t>, Matrix> map;
+  std::unordered_map<std::tuple<int64_t, int64_t>, T> map;
 
  public:
-  Matrix& operator()(int64_t row, int64_t col);
-  const Matrix& operator()(int64_t row, int64_t col) const;
+  T& operator()(int64_t row, int64_t col);
+  const T& operator()(int64_t row, int64_t col) const;
 
-  Matrix& operator[](const std::tuple<int64_t, int64_t>& key);
-  const Matrix& operator[](const std::tuple<int64_t, int64_t>& key) const;
+  T& operator[](const std::tuple<int64_t, int64_t>& key);
+  const T& operator[](const std::tuple<int64_t, int64_t>& key) const;
 
-  void insert(int64_t row, int64_t col, Matrix&& matrix);
-  void insert(const std::tuple<int64_t, int64_t>& key, Matrix&& matrix);
+  void insert(int64_t row, int64_t col, T&& value);
+  void insert(const std::tuple<int64_t, int64_t>& key, T&& value);
 
-  Matrix extract(int64_t row, int64_t col);
-  Matrix extract(const std::tuple<int64_t, int64_t>& key);
+  T extract(int64_t row, int64_t col);
+  T extract(const std::tuple<int64_t, int64_t>& key);
 };
 
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol
-using RowLevelMap = RowColMap;
-using ColLevelMap = RowColMap;
+using RowLevelMap = RowColMap<Matrix>;
+using ColLevelMap = RowColMap<Matrix>;
 
 class RowColLevelMap {
 private:
