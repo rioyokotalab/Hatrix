@@ -65,7 +65,7 @@ namespace Hatrix {
       }
 
       Matrix Ui, Si, Vi; double error;
-      Matrix col_slice_t = col_slice.transpose();
+      Matrix col_slice_t = transpose(col_slice);
       std::tie(Ui, Si, Vi, error) = truncated_svd(col_slice_t, rank);
 
       return {Ui, Hatrix::matmul(Si, Vi)};

@@ -57,8 +57,6 @@ class Matrix {
   size_t memory_used() const;
 
   size_t shared_memory_used() const;
-
-  Matrix transpose() const;
 };
 
 }  // namespace Hatrix
