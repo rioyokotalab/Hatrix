@@ -120,12 +120,20 @@ namespace Hatrix {
       matmul(U_splits[0], U(child1, height), Ubig_splits[0], true, true);
       matmul(U_splits[1], U(child2, height), Ubig_splits[1], true, true);
 
-      return Ubig;
+      return transpose(Ubig);
     }
 
     Matrix generate_V_actual_bases(int p) {
+      int child1 = p * 2;
+      int child2 = p * 2 + 1;
       int leaf_size = int(N / 2);
       Matrix Vbig(leaf_size, rank);
+
+      std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
+      std::vector<Matrix> V_splits = V(p, height - 1).split(2, 1);
+
+      matmul(V(child1, height), V_splits[0], Vbig_splits[0]);
+      matmul(V(child2, height), V_splits[1], Vbig_splits[1]);
 
       return Vbig;
     }
@@ -134,7 +142,7 @@ namespace Hatrix {
                                              Matrix& Ubig, Matrix& Vbig) {
       Matrix D = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                            row * leaf_size, col * leaf_size);
-      return matmul(matmul(Ubig, D, true), Vbig);
+      return matmul(matmul(Ubig, D, true, false), Vbig);
     }
 
     void generate_transfer_matrices(randvec_t& randvec, RowLevelMap& Ugen, ColLevelMap& Vgen) {
@@ -192,6 +200,12 @@ namespace Hatrix {
 
         Matrix Ubig = generate_U_actual_bases(row);
         Matrix Vbig = generate_V_actual_bases(col);
+
+        std::cout << "S gen row: " << row << std::endl;
+        Ubig.print();
+        std::cout << "S gen col: " << col << std::endl;
+        Vbig.print();
+
         S.insert(row, col, height - 1,
                  generate_non_leaf_coupling_matrix(randvec, row, col, leaf_size,
                                                    Ubig, Vbig));
@@ -212,6 +226,7 @@ namespace Hatrix {
       int leaf_size = N / pow(height, 2);
       double error = 0;
 
+      // Check leaf level blocks.
       for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
           Matrix A = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
@@ -245,6 +260,28 @@ namespace Hatrix {
           }
         }
       }
+
+      // Check off-diagonal non-leaf blocks
+
+      // Upper right
+      int row = 0, col = 1;
+      leaf_size = N / 2;
+
+      Matrix A = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                           row * leaf_size, col * leaf_size);
+      Matrix Ubig = generate_U_actual_bases(row);
+      Matrix Vbig = generate_V_actual_bases(col);
+      Matrix Anew = matmul(matmul(Ubig, S(row, col, height-1)), Vbig, false, true);
+      error += pow(rel_error(norm(A), norm(Anew)), 2);
+
+      // Lower left
+      row = 1, col = 0;
+      A = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                           row * leaf_size, col * leaf_size);
+      Ubig = generate_U_actual_bases(row);
+      Vbig = generate_V_actual_bases(col);
+      Anew = matmul(matmul(Ubig, S(row, col, height-1)), Vbig, false, true);
+      error += pow(rel_error(norm(A), norm(Anew)), 2);
 
       return std::sqrt(error);
     }
