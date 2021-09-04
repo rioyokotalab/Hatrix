@@ -188,7 +188,7 @@ TEST(MatrixTests, uniform_split_copy) {
   }
 }
 
-TEST(MatrixTests, non_uniform_split_copy) {
+TEST(MatrixTests, non_uniform_square_split_copy) {
   int N = 40; int Nslice = 10; int split_dim = 30;
   std::vector<int64_t> split_vector = {split_dim};
   Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
@@ -205,6 +205,39 @@ TEST(MatrixTests, non_uniform_split_copy) {
       else {
         EXPECT_EQ(A(i + split_dim, j + split_dim), 0.0);
       }
+    }
+  }
+}
+
+TEST(MatrixTests, non_uniform_rectangle_split_copy) {
+  int64_t N = 40; int64_t Nslice = 10; int64_t split_dim = 30;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
+  std::vector<Hatrix::Matrix> A_splits = A.split({0}, {split_dim}, false);
+  Hatrix::Matrix B = Hatrix::generate_random_matrix(N, Nslice);
+
+  A_splits[1] = B;
+
+  for (int i = 0; i < B.rows; ++i) {
+    for (int j = 0; j < B.cols; ++j) {
+      EXPECT_EQ(A(i, j + split_dim), B(i, j));
+    }
+  }
+}
+
+TEST(MatrixTests, split_no_split) {
+  int64_t N = 40;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
+  std::vector<Hatrix::Matrix> A_splits = A.split({0}, {0}, false);
+
+  for (int i = 0; i < A_splits[0].rows; ++i) {
+    for (int j = 0; j < A_splits[1].cols; ++j) {
+      EXPECT_EQ(A(i, j), A_splits[0](i, j));
+    }
+  }
+
+  for (int i = 0; i < A_splits[1].rows; ++i) {
+    for (int j = 0; j < A_splits[1].cols; ++j) {
+      EXPECT_EQ(A(i + A_splits[0].rows, j + A_splits[0].cols), A_splits[1](i, j));
     }
   }
 }

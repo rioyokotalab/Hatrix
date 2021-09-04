@@ -20,14 +20,16 @@ namespace Hatrix {
 
     std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, randvec_t& randvec) {
       Matrix row_slice(leaf_size, N - leaf_size);
-      int ncols_left_slice = block * leaf_size;
+      int64_t ncols_left_slice = block * leaf_size;
       Matrix left_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_left_slice,
                                                     block * leaf_size, 0);
-      int ncols_right_slice = N - (block+1) * leaf_size;
+      int64_t ncols_right_slice = N - (block+1) * leaf_size;
       Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
                                                      block * leaf_size, (block+1) * leaf_size);
-      std::vector<Matrix> row_slice_parts = row_slice.split(1, 2);
+      // std::vector<Matrix> row_slice_parts = row_slice.split({0}, {ncols_left_slice});
 
+      // row_slice_parts[0] = left_slice;
+      // row_slice_parts[1] = right_slice;
       // concat left and right slices
       for (int i = 0; i < leaf_size; ++i) {
         for (int j = 0; j < ncols_left_slice; ++j) {
