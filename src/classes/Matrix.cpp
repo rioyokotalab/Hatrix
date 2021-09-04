@@ -42,6 +42,8 @@ Matrix& Matrix::operator=(const Matrix& A) {
   // Manual copy. We dont simply assign the data pointer since we want to
   // the ability to work with Matrix objects that might be views of an
   // underlying parent Matrix object.
+  assert((*this).rows == A.rows);
+  assert((*this).cols == A.cols);
   for (int i = 0; i < A.rows; ++i) {
     for (int j = 0; j < A.cols; ++j) {
       (*this)(i, j) = A(i, j);

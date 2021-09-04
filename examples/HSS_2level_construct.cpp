@@ -26,10 +26,11 @@ namespace Hatrix {
       int ncols_right_slice = N - (block+1) * leaf_size;
       Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
                                                      block * leaf_size, (block+1) * leaf_size);
+      std::vector<Matrix> row_slice_parts = row_slice.split(1, 2);
 
       // concat left and right slices
       for (int i = 0; i < leaf_size; ++i) {
-        for (int j = 0; j < block * leaf_size; ++j) {
+        for (int j = 0; j < ncols_left_slice; ++j) {
           row_slice(i, j) = left_slice(i, j);
         }
 
