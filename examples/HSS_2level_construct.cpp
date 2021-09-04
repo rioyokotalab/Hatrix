@@ -157,19 +157,9 @@ namespace Hatrix {
         Matrix& Ugen_upper = Ugen(child1, height);
         Matrix& Ugen_lower = Ugen(child2, height);
         Matrix Ugen_concat(Ugen_upper.rows + Ugen_lower.rows, Ugen_upper.cols);
-
-        for (int i = 0; i < Ugen_upper.rows; ++i) {
-          for (int j = 0; j < Ugen_concat.cols; ++j) {
-            Ugen_concat(i, j) = Ugen_upper(i, j);
-          }
-        }
-
-        for (int i = 0; i < Ugen_lower.rows; ++i) {
-          for (int j = 0; j < Ugen_concat.cols; ++j) {
-            Ugen_concat(i + Ugen_upper.rows, j) = Ugen_lower(i, j);
-          }
-        }
-
+        std::vector<Matrix> Ugen_slices = Ugen_concat.split(2, 1);
+        Ugen_slices[0] = Ugen_upper;
+        Ugen_slices[1] = Ugen_lower;
 
         std::tie(Ui, Si, Vi, error) = truncated_svd(Ugen_concat, rank);
         U.insert(p, height-1, std::move(Ui));
@@ -178,18 +168,9 @@ namespace Hatrix {
         Matrix& Vgen_upper = Vgen(child1, height);
         Matrix& Vgen_lower = Vgen(child2, height);
         Matrix Vgen_concat(Vgen_upper.rows + Vgen_lower.rows, Vgen_upper.cols);
-
-        for (int i = 0; i < Vgen_upper.rows; ++i) {
-          for (int j = 0; j < Vgen_concat.cols; ++j) {
-            Vgen_concat(i, j) = Vgen_upper(i, j);
-          }
-        }
-
-        for (int i = 0; i < Vgen_lower.rows; ++i) {
-          for (int j = 0; j < Vgen_concat.cols; ++j) {
-            Vgen_concat(i + Vgen_upper.rows, j) = Vgen_lower(i, j);
-          }
-        }
+        std::vector<Matrix> Vgen_slices = Vgen_concat.split(2, 1);
+        Vgen_slices[0] = Vgen_upper;
+        Vgen_slices[1] = Vgen_lower;
 
         std::tie(Ui, Si, Vi, error) = truncated_svd(Vgen_concat, rank);
         V.insert(p, height-1, std::move(Ui));
