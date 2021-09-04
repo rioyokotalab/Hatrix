@@ -5,12 +5,14 @@ DIRS := src/classes src/functions src/util
 OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
-EXECUTABLES := matmul lu qr Matrix HSS_2level_construct
+TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \
+	qr Matrix norms
+EXAMPLE_EXECUTABLES := HSS_2level_construct
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
 
-all: $(EXECUTABLES)
+all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES)
 
 $(DIRS):
 	$(MAKE) -C $@
@@ -19,19 +21,12 @@ LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS)  -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-matmul: $(TEST)/matmul.o dirs
+# The extra colon is needed for correct expansion in the dependency list
+# https://stackoverflow.com/questions/16262344/pass-a-target-name-to-dependency-list-in-makefile
+$(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-lu: $(TEST)/lu.o dirs
-	$(LINK_EXECUTABLE)
-
-qr: $(TEST)/qr.o dirs
-	$(LINK_EXECUTABLE)
-
-Matrix: $(TEST)/Matrix.o dirs
-	$(LINK_EXECUTABLE)
-
-HSS_2level_construct: $(EXAMPLES)/HSS_2level_construct.o dirs
+$(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 .PHONY: clean

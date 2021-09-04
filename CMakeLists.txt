@@ -3,16 +3,16 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(policies)
 set_policies()
 
-project(NewStructure
-  LANGUAGES CXX
-  VERSION 1.0
-)
-
 option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
 option(Hatrix_CPU_ONLY "Build Hatrix without GPU usage." ON)
 
 include(host_specific_settings)
 host_specific_settings()
+
+project(NewStructure
+  LANGUAGES CXX
+  VERSION 1.0
+)
 
 if(Hatrix_CPU_ONLY)
   message(STATUS "Will not compile code for GPU.")
