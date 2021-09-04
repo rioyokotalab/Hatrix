@@ -211,11 +211,13 @@ TEST(MatrixTests, non_uniform_square_split_copy) {
 
 TEST(MatrixTests, non_uniform_rectangle_split_copy) {
   int64_t N = 40; int64_t Nslice = 10; int64_t split_dim = 30;
+  std::vector<int64_t> y_split_vector = {split_dim};
+  std::vector<int64_t> x_split_vector = {0};
   Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
-  std::vector<Hatrix::Matrix> A_splits = A.split({0}, {split_dim}, false);
+  std::vector<Hatrix::Matrix> A_splits = A.split(x_split_vector, y_split_vector, false);
   Hatrix::Matrix B = Hatrix::generate_random_matrix(N, Nslice);
 
-  A_splits[1] = B;
+  A_splits[3] = B;
 
   for (int i = 0; i < B.rows; ++i) {
     for (int j = 0; j < B.cols; ++j) {
@@ -227,7 +229,8 @@ TEST(MatrixTests, non_uniform_rectangle_split_copy) {
 TEST(MatrixTests, split_no_split) {
   int64_t N = 40;
   Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
-  std::vector<Hatrix::Matrix> A_splits = A.split({0}, {0}, false);
+  std::vector<Hatrix::Matrix> A_splits = A.split(std::vector<int64_t>(1, 0),
+                                                 std::vector<int64_t>(1, 0), false);
 
   for (int i = 0; i < A_splits[0].rows; ++i) {
     for (int j = 0; j < A_splits[1].cols; ++j) {

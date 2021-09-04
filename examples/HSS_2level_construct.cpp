@@ -26,10 +26,9 @@ namespace Hatrix {
       int64_t ncols_right_slice = N - (block+1) * leaf_size;
       Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
                                                      block * leaf_size, (block+1) * leaf_size);
-      // std::vector<Matrix> row_slice_parts = row_slice.split({0}, {ncols_left_slice});
+      std::vector<Matrix> row_slice_parts = row_slice.split(std::vector<int64_t>(1, 0),
+                                                            std::vector<int64_t>(1, ncols_left_slice));
 
-      // row_slice_parts[0] = left_slice;
-      // row_slice_parts[1] = right_slice;
       // concat left and right slices
       for (int i = 0; i < leaf_size; ++i) {
         for (int j = 0; j < ncols_left_slice; ++j) {
@@ -40,7 +39,6 @@ namespace Hatrix {
           row_slice(i, j + ncols_left_slice) = right_slice(i, j);
         }
       }
-
 
       Matrix Ui, Si, Vi; double error;
       std::tie(Ui, Si, Vi, error) = truncated_svd(row_slice, rank);
