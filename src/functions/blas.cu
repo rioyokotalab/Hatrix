@@ -13,7 +13,7 @@ void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
   Context::iterate();
   cublasDgemm(handle, transA ? CUBLAS_OP_T : CUBLAS_OP_N,
               transB ? CUBLAS_OP_T : CUBLAS_OP_N, C.rows, C.cols,
-              transA ? A.rows : A.cols, &alpha, &A, A.stride, &B, B.sride,
+              transA ? A.rows : A.cols, &alpha, &A, A.stride, &B, B.stride,
               &beta, &C, C.stride);
 };
 
@@ -34,7 +34,7 @@ void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
               uplo == Upper ? CUBLAS_FILL_MODE_UPPER : CUBLAS_FILL_MODE_LOWER,
               transA ? CUBLAS_OP_T : CUBLAS_OP_N,
               diag ? CUBLAS_DIAG_UNIT : CUBLAS_DIAG_NON_UNIT, B.rows, B.cols,
-              &alpha, &A, A.strie, &B, B.strie, &B, B.stride);
+              &alpha, &A, A.stride, &B, B.stride, &B, B.stride);
 }
 
 void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,

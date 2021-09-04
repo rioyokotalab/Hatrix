@@ -1,15 +1,27 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
-DIRS := src/classes src/functions
-OBJLIBS := libclasses.a libfunctions.a
+DIRS := src/classes src/functions src/util
+OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
-EXECUTABLES := matmul lu qr block_dense_lu Matrix
+EXAMPLES := examples
+TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \
+	qr Matrix norms
+EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
+	2x2_BlockDense_QR \
+	2x2_BLR_LU \
+	2x2_BLR_weak_GEMM \
+	HSS_2level_construct \
+	NxN_BlockDense_LU \
+	NxN_BLR_LU \
+	NxN_BLR_strong_GEMM \
+	NxN_BLR_strong_LU \
+	NxN_BLR_weak_GEMM
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
 
-all: $(EXECUTABLES)
+all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES)
 
 $(DIRS):
 	$(MAKE) -C $@
@@ -18,20 +30,18 @@ LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS)  -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-matmul: $(TEST)/matmul.o dirs
+# The extra colon is needed for correct expansion in the dependency list
+# https://stackoverflow.com/questions/16262344/pass-a-target-name-to-dependency-list-in-makefile
+$(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-lu: $(TEST)/lu.o dirs
+$(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-qr: $(TEST)/qr.o dirs
-	$(LINK_EXECUTABLE)
-
-Matrix: $(TEST)/Matrix.o dirs
-	$(LINK_EXECUTABLE)
-
-block_dense_lu: $(TEST)/block_dense_lu.o dirs
-	$(LINK_EXECUTABLE)
+test: $(TEST_EXECUTABLES)
+	for e in $(TEST_EXECUTABLES); do \
+		./bin/$$e; \
+	done
 
 .PHONY: clean
 clean:

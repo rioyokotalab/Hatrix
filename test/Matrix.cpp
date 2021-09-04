@@ -152,3 +152,95 @@ TEST(MatrixTests, shrinktest) {
     m_start += split[i_c * (col_split_indices.size()+1)].rows;
   }
 }
+
+TEST(MatrixTests, uniform_split_copy) {
+  int N = 100, Nslice = N / 2;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
+  std::vector<Hatrix::Matrix> A_splits = A.split(2, 2, false);
+  Hatrix::Matrix B = Hatrix::generate_identity_matrix(Nslice, Nslice);
+
+  A_splits[1] = B;
+
+  // Verify upper right corner
+  for (int i = 0; i < B.rows; ++i) {
+    for (int j = 0; j < B.cols; ++j) {
+      if (i == j) {
+        EXPECT_EQ(A(i, j + Nslice) , 1.0);
+      }
+      else {
+        EXPECT_EQ(A(i, j + Nslice) , 0.0);
+      }
+    }
+  }
+
+  A_splits[2] = B;
+
+  // Verify lower right corner
+  for (int i = 0; i < B.rows; ++i) {
+    for (int j = 0; j < B.cols; ++j) {
+      if (i == j) {
+        EXPECT_EQ(A(i + Nslice, j), 1.0);
+      }
+      else {
+        EXPECT_EQ(A(i + Nslice, j), 0.0);
+      }
+    }
+  }
+}
+
+TEST(MatrixTests, non_uniform_square_split_copy) {
+  int N = 40; int Nslice = 10; int split_dim = 30;
+  std::vector<int64_t> split_vector = {split_dim};
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
+  std::vector<Hatrix::Matrix> A_splits = A.split(split_vector, split_vector, false);
+  Hatrix::Matrix B = Hatrix::generate_identity_matrix(Nslice, Nslice);
+
+  A_splits[3] = B;
+
+  for (int i = 0; i < B.rows; ++i) {
+    for (int j = 0; j < B.cols; ++j) {
+      if (i == j) {
+        EXPECT_EQ(A(i + split_dim, j + split_dim), 1.0);
+      }
+      else {
+        EXPECT_EQ(A(i + split_dim, j + split_dim), 0.0);
+      }
+    }
+  }
+}
+
+TEST(MatrixTests, non_uniform_rectangle_split_copy) {
+  int64_t N = 40; int64_t Nslice = 10; int64_t split_dim = 30;
+  std::vector<int64_t> y_split_vector = {split_dim};
+  std::vector<int64_t> x_split_vector = {0};
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
+  std::vector<Hatrix::Matrix> A_splits = A.split(x_split_vector, y_split_vector, false);
+  Hatrix::Matrix B = Hatrix::generate_random_matrix(N, Nslice);
+
+  A_splits[3] = B;
+
+  for (int i = 0; i < B.rows; ++i) {
+    for (int j = 0; j < B.cols; ++j) {
+      EXPECT_EQ(A(i, j + split_dim), B(i, j));
+    }
+  }
+}
+
+TEST(MatrixTests, split_no_split) {
+  int64_t N = 40;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
+  std::vector<Hatrix::Matrix> A_splits = A.split(std::vector<int64_t>(1, 0),
+                                                 std::vector<int64_t>(1, 0), false);
+
+  for (int i = 0; i < A_splits[0].rows; ++i) {
+    for (int j = 0; j < A_splits[1].cols; ++j) {
+      EXPECT_EQ(A(i, j), A_splits[0](i, j));
+    }
+  }
+
+  for (int i = 0; i < A_splits[1].rows; ++i) {
+    for (int j = 0; j < A_splits[1].cols; ++j) {
+      EXPECT_EQ(A(i + A_splits[0].rows, j + A_splits[0].cols), A_splits[1](i, j));
+    }
+  }
+}

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <iostream>
+#include <iomanip>
 #include <memory>
 #include <vector>
 
@@ -38,12 +39,16 @@ Matrix::Matrix(const Matrix& A)
       data_ptr(data->get_ptr()) {}
 
 Matrix& Matrix::operator=(const Matrix& A) {
-  rows = A.rows;
-  cols = A.cols;
-  stride = A.stride;
-  // Manual deep copy
-  data = std::make_shared<DataHandler>(*A.data);
-  data_ptr = data->get_ptr();
+  // Manual copy. We dont simply assign the data pointer since we want to
+  // the ability to work with Matrix objects that might be views of an
+  // underlying parent Matrix object.
+  assert((*this).rows == A.rows);
+  assert((*this).cols == A.cols);
+  for (int i = 0; i < A.rows; ++i) {
+    for (int j = 0; j < A.cols; ++j) {
+      (*this)(i, j) = A(i, j);
+    }
+  }
   return *this;
 }
 
@@ -152,7 +157,12 @@ int64_t Matrix::max_dim() const { return std::max(rows, cols); }
 void Matrix::print() const {
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
-      std::cout << (*this)(i, j) << " ";
+      if ((*this)(i, j) > -1e-15 && (*this)(i, j) < 1e-15) {
+        std::cout << std::setw(10) << 0 << " ";
+      }
+      else {
+        std::cout << std::setw(10) << std::setprecision(7) <<  (*this)(i, j) << " ";
+      }
     }
     std::cout << "\n";
   }

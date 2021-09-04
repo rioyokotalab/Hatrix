@@ -13,6 +13,7 @@ else()
     NxN_BlockDense_LU
     NxN_BLR_LU
     NxN_BLR_strong_LU
+    HSS_2level_construct
   )
 endif()
 

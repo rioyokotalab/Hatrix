@@ -25,6 +25,15 @@ void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
 
 Matrix matmul(const Matrix& A, const Matrix& B, bool transA, bool transB,
               double alpha) {
+  if (transA) {
+    if (transB) { assert(A.rows == B.cols); }
+    else        { assert(A.rows == B.rows); }
+  }
+  else {
+    if (transB) { assert(A.cols == B.cols); }
+    else        { assert(A.cols == B.rows); }
+  }
+
   Matrix C(transA ? A.cols : A.rows, transB ? B.rows : B.cols);
   matmul(A, B, C, transA, transB, alpha, 0);
   return C;
