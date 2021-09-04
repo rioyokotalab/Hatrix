@@ -8,3 +8,4 @@ gemm
 *.a
 bin/
 hatrix_deps.sh
+run.sh
