@@ -38,6 +38,11 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
+test: $(TEST_EXECUTABLES)
+	for e in $(TEST_EXECUTABLES); do \
+		./bin/$$e; \
+	done
+
 .PHONY: clean
 clean:
 	for dir in $(DIRS) test; do \
