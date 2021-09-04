@@ -154,13 +154,14 @@ TEST(MatrixTests, shrinktest) {
 }
 
 TEST(MatrixTests, split_copy) {
-  int N = 100, Nslice = 25;
+  int N = 20, Nslice = 10;
   Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
   std::vector<Hatrix::Matrix> A_splits = A.split(2, 2, false);
   Hatrix::Matrix B = Hatrix::generate_identity_matrix(Nslice, Nslice);
 
   A_splits[1] = B;
 
+  // Verify upper right corner
   for (int i = 0; i < B.rows; ++i) {
     for (int j = 0; j < B.cols; ++j) {
       if (i == j) {
@@ -168,6 +169,20 @@ TEST(MatrixTests, split_copy) {
       }
       else {
         EXPECT_EQ(A(i, j + Nslice) , 0.0);
+      }
+    }
+  }
+
+  A_splits[2] = B;
+
+  // Verify lower right corner
+  for (int i = 0; i < B.rows; ++i) {
+    for (int j = 0; j < B.cols; ++j) {
+      if (i == j) {
+        EXPECT_EQ(A(i + Nslice, j), 1.0);
+      }
+      else {
+        EXPECT_EQ(A(i + Nslice, j), 0.0);
       }
     }
   }
