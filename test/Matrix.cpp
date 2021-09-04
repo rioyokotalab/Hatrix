@@ -152,3 +152,7 @@ TEST(MatrixTests, shrinktest) {
     m_start += split[i_c * (col_split_indices.size()+1)].rows;
   }
 }
+
+TEST(MatrixTests, split_copy) {
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(100, 100);
+}

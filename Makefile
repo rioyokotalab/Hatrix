@@ -7,7 +7,16 @@ TEST := test
 EXAMPLES := examples
 TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \
 	qr Matrix norms
-EXAMPLE_EXECUTABLES := HSS_2level_construct
+EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
+	2x2_BlockDense_QR \
+	2x2_BLR_LU \
+	2x2_BLR_weak_GEMM \
+	HSS_2level_construct \
+	NxN_BlockDense_LU \
+	NxN_BLR_LU \
+	NxN_BLR_strong_GEMM \
+	NxN_BLR_strong_LU \
+	NxN_BLR_weak_GEMM
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
