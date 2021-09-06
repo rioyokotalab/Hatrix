@@ -24,6 +24,8 @@ Matrix lu_solve(Matrix& A, const Matrix& b);
 
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
+// Compute the storage for Q and R automatically from mode and qr_ret values
+// and return Q and R matrices.
 std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret);
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);

@@ -83,29 +83,12 @@ namespace Hatrix { namespace UMV {
       Matrix dense(block_size, block_size);
       int c_size = block_size - rank;
 
-      for (int irow = 0; irow < c_size; ++irow) {
-        for (int jcol = 0; jcol < c_size; ++jcol) {
-          dense(irow, jcol) = Dcc(i, j)(irow, jcol);
-        }
-      }
-
-      for (int irow = 0; irow < rank; ++irow) {
-        for (int jcol = 0; jcol < c_size; ++jcol) {
-          dense(irow + c_size, jcol) = Doc(i, j)(irow, jcol);
-        }
-      }
-
-      for (int irow = 0; irow < c_size; ++irow) {
-        for (int jcol = 0; jcol < rank; ++jcol) {
-          dense(irow, jcol + c_size) = Dco(i, j)(irow, jcol);
-        }
-      }
-
-      for (int irow = 0; irow < rank; ++irow) {
-        for (int jcol = 0; jcol < rank; ++jcol) {
-          dense(irow + c_size, jcol + c_size) = Doo(i, j)(irow, jcol);
-        }
-      }
+      std::vector<Hatrix::Matrix> dense_splits = dense.split(std::vector<int64_t>(1, c_size),
+                                                             std::vector<int64_t>(1, c_size));
+      dense_splits[0] = Dcc(i, j);
+      dense_splits[1] = Dco(i, j);
+      dense_splits[2] = Doc(i, j);
+      dense_splits[3] = Doo(i, j);
 
       return dense;
     }
@@ -124,30 +107,14 @@ namespace Hatrix { namespace UMV {
 
     void insert_D(int row, int col, Hatrix::Matrix& mat) {
       int c_size = block_size - rank;
+      std::vector<Hatrix::Matrix> mat_splits =
+        mat.split(std::vector<int64_t>(1, c_size),
+                  std::vector<int64_t>(1, c_size));
 
-      for (int i = 0; i < c_size; ++i) {
-        for (int j = 0; j < c_size; ++j) {
-          Dcc(row, col)(i, j) = mat(i, j);
-        }
-      }
-
-      for (int i = 0; i < c_size; ++i) {
-        for (int j = 0; j < rank; ++j) {
-          Dco(row, col)(i, j) = mat(i, j + c_size);
-        }
-      }
-
-      for (int i = 0; i < rank; ++i) {
-        for (int j = 0; j < c_size; ++j) {
-          Doc(row, col)(i, j) = mat(i + c_size, j);
-        }
-      }
-
-      for (int i = 0; i < rank; ++i) {
-        for (int j = 0; j < rank; ++j) {
-          Doo(row, col)(i, j) = mat(i + c_size, j + c_size);
-        }
-      }
+      Dcc(row, col) = mat_splits[0];
+      Dco(row, col) = mat_splits[1];
+      Doc(row, col) = mat_splits[2];
+      Doo(row, col) = mat_splits[3];
     }
 
     Hatrix::Matrix U_F(int row) {
@@ -193,22 +160,16 @@ namespace Hatrix { namespace UMV {
       // Populate dense blocks.
       for (int i = 0; i < n_blocks; ++i) {
         for (int j = 0; j < n_blocks; ++j) {
-          Dcc.insert(i, j,
-                     Hatrix::generate_laplacend_matrix(randpts, c_size, c_size,
-                                                       i * block_size, j * block_size));
-          Dco.insert(i, j,
-                     Hatrix::generate_laplacend_matrix(randpts, c_size, rank,
-                                                       i * block_size,
-                                                       j * block_size + c_size));
+          Hatrix::Matrix D = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
+                                                               i * block_size, j * block_size);
+          // TODO: Will need to change D storage and make functions Dcc etc in order to not make copies.
+          std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
+                                                         std::vector<int64_t>(1, c_size), true);
 
-          Doc.insert(i, j,
-                     Hatrix::generate_laplacend_matrix(randpts, rank, c_size,
-                                                       i * block_size + c_size,
-                                                       j * block_size));
-          Doo.insert(i, j,
-                     Hatrix::generate_laplacend_matrix(randpts, rank, rank,
-                                                       i * block_size + c_size,
-                                                       j * block_size + c_size));
+          Dcc.insert(i, j, std::move(D_splits[0]));
+          Dco.insert(i, j, std::move(D_splits[1]));
+          Doc.insert(i, j, std::move(D_splits[2]));
+          Doo.insert(i, j, std::move(D_splits[3]));
         }
       }
 
@@ -320,22 +281,15 @@ namespace Hatrix { namespace UMV {
     }
 
     Hatrix::Matrix last(A.rank * A.n_blocks, A.rank * A.n_blocks);
+    std::vector<Hatrix::Matrix> last_splits = last.split(A.n_blocks, A.n_blocks);
 
     for (int i = 0; i < A.n_blocks; ++i) {
       for (int j = 0; j < A.n_blocks; ++j) {
         if (i == j) {
-          for (int irow = 0; irow < A.rank; ++irow) {
-            for (int jcol = 0; jcol < A.rank; ++jcol) {
-              last(i * A.rank + irow, j * A.rank + jcol)  = A.Doo(i, j)(irow, jcol);
-            }
-          }
+          last_splits[i * A.n_blocks + j] = A.Doo(i, j);
         }
         else {
-          for (int irow = 0; irow < A.rank; ++irow) {
-            for (int jcol = 0; jcol < A.rank; ++jcol) {
-              last(i * A.rank + irow, j * A.rank + jcol) = A.S(i, j)(irow, jcol);
-            }
-          }
+          last_splits[i * A.n_blocks + j] = A.S(i, j);
         }
       }
     }
