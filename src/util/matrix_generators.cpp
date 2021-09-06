@@ -64,23 +64,31 @@ Matrix generate_laplacend_matrix(std::vector<std::vector<double>>& x,
 
 
 
-Hatrix::Matrix convert(const nbd::Matrix& m) {
-  Hatrix::Matrix out(m.M, m.N);
-  for (int64_t j = 0; j < m.N; j++)
-  for (int64_t i = 0; i < m.M; i++) {
-    out(i, j) = m.A[i + m.LDA * j];
+Hatrix::Matrix convert(const nbd::Matrix& m, bool transpose = false) {
+  if (transpose) {
+    Hatrix::Matrix out(m.N, m.M);
+    for (int64_t j = 0; j < m.M; j++)
+    for (int64_t i = 0; i < m.N; i++)
+      out(i, j) = m.A[j + m.LDA * i];
+    return out;
   }
-  return out;
+  else {
+    Hatrix::Matrix out(m.M, m.N);
+    for (int64_t j = 0; j < m.N; j++)
+    for (int64_t i = 0; i < m.M; i++)
+      out(i, j) = m.A[i + m.LDA * j];
+    return out;
+  }
 }
 
 BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
 
   BLR A;
 
-  int dim = 2;
+  int dim = 1;
   int m = block_size * n_blocks;
   int leaf = block_size;
-  int p = 20;
+  int p = 5;
   double theta = 1.01; // weak
   auto fun = dim == 2 ? nbd::l2d() : nbd::l3d();
 
@@ -103,10 +111,12 @@ BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
   nbd::shared_epilogue(d);
   nbd::stop("build H2");
 
+  nbd::printTree(&c1[0], dim);
+
   Hatrix::Matrix U, S, V;
   for (int64_t i = 0; i < n_blocks; ++i) {
     U = convert(bi[i + 1]);
-    V = convert(bi[i + 1]);
+    V = convert(bi[i + 1], true);
     A.U.insert(i, std::move(U));
     A.V.insert(i, std::move(V));
   }
@@ -132,6 +142,17 @@ BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
       nbd::Matrix m;
       nbd::P2Pnear(fun, &c1[y], &c1[_x], dim, m);
       
+      D = convert(m);
+      A.D.insert(y - 1, _x - 1, std::move(D));
+    }
+
+    // should be removed
+    for (auto& j : i.listFar) {
+      auto _x = j - &c1[0];
+      auto xi = j->BODY - i_begin;
+      nbd::Matrix m;
+      nbd::P2Pnear(fun, &c1[y], &c1[_x], dim, m);
+
       D = convert(m);
       A.D.insert(y - 1, _x - 1, std::move(D));
     }

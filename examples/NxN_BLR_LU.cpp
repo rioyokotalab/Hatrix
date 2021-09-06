@@ -9,9 +9,9 @@
 
 #include "Hatrix/Hatrix.h"
 
-Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
-  Hatrix::BLR A;
-  for (int i = 0; i < n_blocks; ++i) {
+Hatrix::BLR _construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
+  Hatrix::BLR A = Hatrix::construct_BLR(block_size, n_blocks, rank);
+  /*for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {
       if (i == j) {
         Hatrix::Matrix diag =
@@ -52,7 +52,7 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
     }
     std::tie(U, S, V, error) = Hatrix::truncated_svd(YtA, rank);
     A.V.insert(j, std::move(V));
-  }
+  }*/
 
   double norm_diff = 0;
   double norm = 0;
@@ -203,7 +203,7 @@ int main() {
   int64_t n_blocks = 8;
   int64_t rank = 8;
   bool multiply_compressed = false;
-  Hatrix::BLR A = construct_BLR(block_size, n_blocks, rank);
+  Hatrix::BLR A = _construct_BLR(block_size, n_blocks, rank);
 
   std::vector<Hatrix::Matrix> x;
   for (int64_t i = 0; i < n_blocks; ++i) {
