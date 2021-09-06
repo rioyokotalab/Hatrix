@@ -43,8 +43,6 @@ class RowMap {
   std::unordered_map<int64_t, Matrix> map;
 
 public:
-  // RowMap(const RowMap& m);
-
   Matrix& operator[](int64_t key);
   const Matrix& operator[](int64_t key) const;
 

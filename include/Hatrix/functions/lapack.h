@@ -1,10 +1,17 @@
 #pragma once
 #include <cstdint>
 #include <tuple>
+#include <string>
 
 #include "Hatrix/classes/Matrix.h"
 
 namespace Hatrix {
+
+namespace Lapack {
+  enum QR_mode { Full };
+  enum QR_ret { QAndR, OnlyQ };
+}
+
 
 // Compute the LU factorization of A and store in L and U. Over-writes A.
 void lu(Matrix& A, Matrix& L, Matrix& U);
@@ -16,6 +23,8 @@ void lu(Matrix& A);
 Matrix lu_solve(Matrix& A, const Matrix& b);
 
 void qr(Matrix& A, Matrix& Q, Matrix& R);
+
+std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret);
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
 

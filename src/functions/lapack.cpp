@@ -102,6 +102,31 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
 }
 
+// TODO: complete this function  get rid of return warnings. Also return empty R. Needs dummy alloc now.
+std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret) {
+  Matrix R(1, 1);
+
+  if (mode == Lapack::Full) {
+    if (qr_ret == Lapack::OnlyQ) {
+      Matrix Q(A.rows, A.rows);
+      std::vector<double> tau(Q.rows);
+      for (int i = 0; i < Q.rows; ++i) {
+        for (int j = 0; j < A.cols; ++j) {
+          Q(i, j) = A(i, j);
+        }
+      }
+      LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
+      LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
+                     Q.stride, tau.data());
+
+      return {Q, R};
+    }
+  }
+  else {
+    abort();
+  }
+}
+
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
   // check dimensions
   assert(U.rows == A.rows);

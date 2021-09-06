@@ -271,25 +271,10 @@ namespace Hatrix { namespace UMV {
     };
   };
 
-  Hatrix::Matrix full_qr(Hatrix::Matrix& A) {
-    Hatrix::Matrix Q(A.rows, A.rows);
-    std::vector<double> tau(std::max(A.rows, A.cols));
-    for (int i = 0; i < Q.rows; ++i) {
-      for (int j = 0; j < A.cols; ++j) {
-        Q(i, j) = A(i, j);
-      }
-    }
-    LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
-    LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
-                   Q.stride, tau.data());
-    return Q;
-  }
-
-
   Hatrix::Matrix make_complement(const Hatrix::Matrix& Q) {
-    Hatrix::Matrix Q_copy(Q);
     Hatrix::Matrix Q_F(Q.rows, Q.rows - Q.cols);
-    Hatrix::Matrix Q_full = full_qr(Q_copy);
+    Hatrix::Matrix Q_full, R;
+    std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
 
     for (int i = 0; i < Q_F.rows; ++i) {
       for (int j = 0; j < Q_F.cols; ++j) {
