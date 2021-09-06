@@ -144,17 +144,6 @@ void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
   }
 }
 
-std::tuple<Matrix, Matrix, Matrix> svd(const Matrix& A) {
-  Matrix Acopy(A);
-  Matrix U(A.rows, A.rows);
-  Matrix S(A.rows, A.cols);
-  Matrix V(A.cols, A.cols);
-
-  svd(Acopy, U, S, V);
-
-  return {std::move(U), std::move(S), std::move(V)};
-}
-
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank) {
   assert(rank <= A.min_dim());
   svd(A, U, S, V);

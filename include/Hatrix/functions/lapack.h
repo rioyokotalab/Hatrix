@@ -1,7 +1,6 @@
 #pragma once
 #include <cstdint>
 #include <tuple>
-#include <string>
 
 #include "Hatrix/classes/Matrix.h"
 
@@ -29,8 +28,6 @@ void qr(Matrix& A, Matrix& Q, Matrix& R);
 std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret);
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
-
-std::tuple<Matrix, Matrix, Matrix> svd(const Matrix& A);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
