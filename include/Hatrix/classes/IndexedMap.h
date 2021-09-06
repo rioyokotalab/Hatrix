@@ -7,6 +7,7 @@
 
 namespace std {
 
+// TODO: why use these values for the hashing? Write comment.
 template <>
 struct hash<std::tuple<int64_t, int64_t>> {
   size_t operator()(const std::tuple<int64_t, int64_t>& pair) const {
@@ -41,7 +42,7 @@ class RowMap {
  private:
   std::unordered_map<int64_t, Matrix> map;
 
- public:
+public:
   Matrix& operator[](int64_t key);
   const Matrix& operator[](int64_t key) const;
 
@@ -94,6 +95,5 @@ public:
   Matrix extract(int64_t row, int64_t col, int64_t level);
   Matrix extract(const std::tuple<int64_t, int64_t, int64_t>& key);
 };
-
 
 }  // namespace Hatrix
