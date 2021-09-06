@@ -290,25 +290,37 @@ namespace Hatrix {
 
     void factorize(Hatrix::HSS& A) {
       // Start at leaf nodes for factorization
-      int leaf_blocks = pow(A.height, 2);
-      int c_size = (A.N / leaf_blocks) - A.rank;
-      for (int block = 0; block < leaf_blocks; ++block) {
-        Hatrix::Matrix& D = A.D(block, block, A.height);
+      for (int level = A.height; level > 1; --level) {
+        int nblocks = pow(level, 2);
+        for (int block = 0; block < nblocks; ++block) {
+          Hatrix::Matrix& D = A.D(block, block, level);
+          Hatrix::Matrix U_F = make_complement(A.U(block, level));
+          Hatrix::Matrix V_F = make_complement(A.V(block, level));
 
-        Hatrix::Matrix U_F = make_complement(A.U(block, A.height));
-        Hatrix::Matrix V_F = make_complement(A.V(block, A.height));
-        matmul(matmul(U_F, D, true, false), V_F, D);
+          // Left and right multiply complements and store back in diagonal matrix.
+          matmul(matmul(U_F, D, true, false), V_F, D);
 
-        // perform partial LU
-        std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
-                                                       std::vector<int64_t>(1, c_size));
-        Hatrix::Matrix Dcc = D_splits[0];
-        Hatrix::Matrix Dco = D_splits[1];
-        Hatrix::Matrix Doc = D_splits[2];
-        Hatrix::Matrix Doo = D_splits[3];
+          // perform partial LU
+          int c_size = D.rows - A.rank;
+          std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
+                                                        std::vector<int64_t>(1, c_size));
+          Hatrix::Matrix Dcc = D_splits[0];
+          Hatrix::Matrix Dco = D_splits[1];
+          Hatrix::Matrix Doc = D_splits[2];
+          Hatrix::Matrix Doo = D_splits[3];
 
-        Hatrix::lu(Dcc);
+          Hatrix::lu(Dcc);
+          solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+          solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+          matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
+        }
 
+        // Merge unfactorized blocks
+        for (int block = 0; block < nblocks; ++block) {
+          Hatrix::Matrix D(A.rank * 2, A.rank * 2);
+          std::vector<Hatrix::Matrix> D_splits = D.split(2, 2);
+
+        }
       }
     }
   };
