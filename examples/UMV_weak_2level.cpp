@@ -298,7 +298,7 @@ namespace Hatrix {
 
     void factorize(Hatrix::HSS& A) {
       // Start at leaf nodes for factorization
-      for (int level = A.height; level > 1; --level) {
+      for (int level = A.height; level > 0; --level) {
         int nblocks = pow(level, 2);
         for (int block = 0; block < nblocks; ++block) {
           Hatrix::Matrix& D = A.D(block, block, level);
@@ -324,14 +324,26 @@ namespace Hatrix {
         }
 
         // Merge unfactorized blocks
-        for (int block = 0; block < int(pow(level-1, 2)); ++block) {
+        int parent_level = level - 1;
+        for (int block = 0; block < int(pow(parent_level, 2)) + 1; ++block) {
           Hatrix::Matrix D_unsolved(A.rank * 2, A.rank * 2);
           std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
 
-          D_unsolved_splits[0] = unsolved_chunk(block * 2, A, level);
-          D_unsolved_splits[3] = unsolved_chunk(block * 2 + 1, A, level);
+          int child1 = block * 2; int child2 = block * 2 + 1;
+          D_unsolved_splits[0] = unsolved_chunk(child1, A, level);
+          D_unsolved_splits[3] = unsolved_chunk(child2, A, level);
+
+          int col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
+          int col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
+
+          D_unsolved_splits[1] = A.S(child1, col_child1, level);
+          D_unsolved_splits[2] = A.S(child2, col_child2, level);
+
+          A.D.insert(block, block, parent_level, std::move(D_unsolved));
         }
       }
+
+      Hatrix::lu(A.D(0, 0, 0));
     }
   };
 }

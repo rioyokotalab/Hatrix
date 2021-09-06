@@ -118,8 +118,6 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
                                   bool copy) const {
   std::vector<Matrix> parts;
   std::vector<int64_t> row_split_indices(_row_split_indices), col_split_indices(_col_split_indices);
-  if (row_split_indices[0] == 0) { row_split_indices.erase(row_split_indices.begin()); }
-  if (col_split_indices[0] == 0) { col_split_indices.erase(col_split_indices.begin()); }
 
   auto row_iter = row_split_indices.cbegin();
   int64_t row_start = 0;
