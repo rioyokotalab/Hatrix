@@ -241,7 +241,7 @@ namespace Hatrix { namespace UMV {
           Hatrix::matmul(Y[i], compose_dense(i, j), YtA, true);
         }
         std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(YtA, rank);
-        V.insert(j, std::move(Vi.transpose()));
+        V.insert(j, std::move(transpose(Vi)));
       }
 
       for (int i = 0; i < n_blocks; ++i) {
@@ -262,7 +262,7 @@ namespace Hatrix { namespace UMV {
           if (i == j)
             continue;
           else {
-            fdiff = Hatrix::norm(U[i] * S(i, j) * V[j].transpose() - compose_dense(i, j));
+            fdiff = Hatrix::norm(U[i] * S(i, j) * transpose(V[j]) - compose_dense(i, j));
             diff += fdiff * fdiff;
           }
         }

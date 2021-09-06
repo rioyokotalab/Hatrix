@@ -114,8 +114,6 @@ class Matrix {
   // If this matrix is part of a view, it will return the memory used
   // by the whole matrix, not just the view.
   size_t shared_memory_used() const;
-
-  Matrix transpose() const;
 };
 
 }  // namespace Hatrix

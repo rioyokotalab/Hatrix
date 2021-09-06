@@ -80,7 +80,7 @@ std::tuple<Hatrix::BLR, double> construct_BLR(randvec_t& randpts, int64_t block_
       Hatrix::matmul(Y[i], A.D(i, j), YtA, true);
     }
     std::tie(U, S, V, error) = Hatrix::truncated_svd(YtA, rank);
-    A.V.insert(j, std::move(V.transpose()));
+    A.V.insert(j, std::move(transpose(V)));
   }
   for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {
@@ -100,7 +100,7 @@ std::tuple<Hatrix::BLR, double> construct_BLR(randvec_t& randpts, int64_t block_
       if (std::abs(i - j) <= admis)
         continue;
       else {
-	fdiff = Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j].transpose() - A.D(i, j));
+	fdiff = Hatrix::norm(A.U[i] * A.S(i, j) * transpose(A.V[j]) - A.D(i, j));
 	diff += fdiff * fdiff;
       }
     }
