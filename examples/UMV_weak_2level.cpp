@@ -13,10 +13,13 @@ double rel_error(const double A_norm, const double B_norm) {
 
 namespace Hatrix {
   class HSS {
+  public:
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap D, S;
     int N, rank, height;
+
+  private:
 
     std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, randvec_t& randvec) {
       Matrix row_slice(leaf_size, N - leaf_size);
@@ -194,7 +197,6 @@ namespace Hatrix {
     HSS(randvec_t& randpts, int _N, int _rank, int _height) :
       N(_N), rank(_rank), height(_height) {
       RowLevelMap Ugen; ColLevelMap Vgen;
-
       std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
       generate_transfer_matrices(randpts, Ugen, Vgen);
     }
@@ -263,6 +265,24 @@ namespace Hatrix {
       return std::sqrt(error);
     }
   };
+
+  namespace UMV {
+    void factorize(Hatrix::HSS& A) {
+      // Start at leaf nodes for factorization
+      int leaf_blocks = pow(A.height, 2);
+      int c_size = (A.N / leaf_blocks) - A.rank;
+      for (int block = 0; block < leaf_blocks; ++block) {
+        Hatrix::Matrix& D = A.D(block, block, A.height);
+        std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
+                                                       std::vector<int64_t>(1, c_size));
+        Hatrix::Matrix Dcc = D_splits[0];
+        Hatrix::Matrix Dco = D_splits[1];
+        Hatrix::Matrix Doc = D_splits[2];
+        Hatrix::Matrix Doo = D_splits[3];
+
+      }
+    }
+  };
 }
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -290,9 +310,11 @@ int main(int argc, char *argv[]) {
 
   Hatrix::HSS A(randvec, N, rank, height);
   double error = A.construction_relative_error(randvec);
+  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;
+
+  Hatrix::UMV::factorize(A);
 
   Hatrix::Context::finalize();
 
-  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;
 
 }
