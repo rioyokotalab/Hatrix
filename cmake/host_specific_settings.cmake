@@ -14,5 +14,4 @@ function(host_specific_settings)
   set(BLA_VENDOR Intel10_64lp PARENT_SCOPE)
   set(BLAS_INCLUDE_DIR $ENV{MKLROOT}/include PARENT_SCOPE)
   add_definitions(-DUSE_MKL)
-
 endfunction()
