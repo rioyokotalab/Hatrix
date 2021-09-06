@@ -66,6 +66,39 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
   LAPACKE_dlaset(LAPACK_COL_MAJOR, 'U', L.rows, L.cols, 0, 1, &L, L.stride);
 }
 
+void lu(Matrix& A) {
+  double * a = &A;
+  int m = A.rows;
+  int n = A.cols;
+  int lda = A.stride;
+  int k = std::min(A.rows, A.cols);
+  for (int i = 0; i < k; i++) {
+    double p = 1. / a[i + (size_t)i * lda];
+    int mi = m - i - 1;
+    int ni = n - i - 1;
+
+    double* ax = a + i + (size_t)i * lda + 1;
+    double* ay = a + i + (size_t)i * lda + lda;
+    double* an = ay + 1;
+
+    cblas_dscal(mi, p, ax, 1);
+    cblas_dger(CblasColMajor, mi, ni, -1., ax, 1, ay, lda, an, lda);
+  }
+}
+
+Matrix lu_solve(Matrix& A, const Matrix& b) {
+  Matrix x(b);
+  Matrix Ac(A);
+  std::vector<int> ipiv(Ac.rows);
+
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, Ac.rows, Ac.cols, &Ac, A.stride, ipiv.data());
+  LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', Ac.rows, b.cols, &Ac, Ac.stride, ipiv.data(),
+    &x, x.stride);
+
+  return x;
+}
+
+
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
   // check dimensions
   assert(Q.rows == A.rows);
@@ -84,6 +117,31 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
     cblas_dcopy(Q.rows - j, &A(j, j), 1, &Q(j, j), 1);
   }
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
+}
+
+// TODO: complete this function  get rid of return warnings. Also return empty R. Needs dummy alloc now.
+std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret) {
+  Matrix R(1, 1);
+
+  if (mode == Lapack::Full) {
+    if (qr_ret == Lapack::OnlyQ) {
+      Matrix Q(A.rows, A.rows);
+      std::vector<double> tau(Q.rows);
+      for (int i = 0; i < Q.rows; ++i) {
+        for (int j = 0; j < A.cols; ++j) {
+          Q(i, j) = A(i, j);
+        }
+      }
+      LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
+      LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
+                     Q.stride, tau.data());
+
+      return {Q, R};
+    }
+  }
+  else {
+    abort();
+  }
 }
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
@@ -143,5 +201,4 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                  'F', 'C', C.rows, C.cols, T.cols, &V, V.stride, &T, T.stride,
                  &C, C.stride);
 }
-
 }  // namespace Hatrix
