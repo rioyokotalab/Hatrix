@@ -20,6 +20,22 @@
 
 namespace Hatrix {
 
+void dgetrfnp(int m, int n, double* a, int lda) {
+  int k = std::min(m, n);
+  for (int i = 0; i < k; i++) {
+    double p = 1. / a[i + (size_t)i * lda];
+    int mi = m - i - 1;
+    int ni = n - i - 1;
+
+    double* ax = a + i + (size_t)i * lda + 1;
+    double* ay = a + i + (size_t)i * lda + lda;
+    double* an = ay + 1;
+
+    cblas_dscal(mi, p, ax, 1);
+    cblas_dger(CblasColMajor, mi, ni, -1., ax, 1, ay, lda, an, lda);
+  }
+}
+
 void lu(Matrix& A, Matrix& L, Matrix& U) {
   // check dimensions
   assert(L.rows == A.rows);
@@ -28,7 +44,8 @@ void lu(Matrix& A, Matrix& L, Matrix& U) {
 
   std::vector<int> ipiv(A.min_dim());
 
-  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+  //LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+  dgetrfnp(A.rows, A.cols, &A, A.stride);
 
   // U: set lower triangular matrix to 0
   LAPACKE_dlaset(LAPACK_COL_MAJOR, 'L', U.rows, U.cols, 0, 0, &L, U.stride);
