@@ -28,6 +28,7 @@ else()
   endif()
 endif()
 
+add_subdirectory(nbd)
 add_library(Hatrix
   src/util/matrix_generators.cpp
 )
@@ -37,6 +38,7 @@ target_include_directories(Hatrix
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   PRIVATE
+    nbd
     ${BLAS_INCLUDE_DIR}
 )
 
@@ -62,7 +64,7 @@ else()
     src/functions/lapack.cpp
     src/util/context.cpp
   )
-  target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+  target_link_libraries(Hatrix nbd ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 endif()
 
 add_subdirectory(examples)
