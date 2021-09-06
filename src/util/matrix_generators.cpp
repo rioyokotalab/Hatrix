@@ -1,5 +1,10 @@
 #include "Hatrix/util/matrix_generators.h"
 
+#include "build_tree.h"
+#include "kernel.h"
+#include "test_util.h"
+#include "timer.h"
+
 #include <cmath>
 #include <cstdint>
 #include <random>
@@ -58,10 +63,6 @@ Matrix generate_laplacend_matrix(std::vector<std::vector<double>>& x,
 }
 
 
-#include "build_tree.h"
-#include "kernel.h"
-#include "test_util.h"
-#include "timer.h"
 
 Hatrix::Matrix convert(const nbd::Matrix& m) {
   Hatrix::Matrix out(m.M, m.N);
@@ -81,7 +82,7 @@ BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
   int leaf = block_size;
   int p = 20;
   double theta = 1.01; // weak
-  auto fun = dim == 2 ? l2d() : l3d();
+  auto fun = dim == 2 ? nbd::l2d() : nbd::l3d();
 
   nbd::start("bodies");
   nbd::Bodies b1(m);
@@ -126,13 +127,13 @@ BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
     auto i = c1[y];
     auto yi = i.BODY - i_begin;
     for (auto& j : i.listNear) {
-      auto _x = j - &jcells[0];
-      auto xi = j->BODY - j_begin;
+      auto _x = j - &c1[0];
+      auto xi = j->BODY - i_begin;
       nbd::Matrix m;
-      nbd::P2Pnear(ef, &icells[y], &jcells[_x], dim, m);
+      nbd::P2Pnear(fun, &c1[y], &c1[_x], dim, m);
       
       D = convert(m);
-      A.D.insert(i - 1, j - 1, std::move(D));
+      A.D.insert(y - 1, _x - 1, std::move(D));
     }
   }
 
