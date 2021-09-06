@@ -288,6 +288,14 @@ namespace Hatrix {
       return Q_F;
     }
 
+    Matrix& unsolved_chunk(int block, Hatrix::HSS& A, int level) {
+      Hatrix::Matrix& D = A.D(block, block, level);
+      int c_size = D.rows - A.rank;
+      std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
+                                                     std::vector<int64_t>(1, c_size));
+      return D_splits[3];
+    }
+
     void factorize(Hatrix::HSS& A) {
       // Start at leaf nodes for factorization
       for (int level = A.height; level > 1; --level) {
@@ -316,10 +324,12 @@ namespace Hatrix {
         }
 
         // Merge unfactorized blocks
-        for (int block = 0; block < nblocks; ++block) {
-          Hatrix::Matrix D(A.rank * 2, A.rank * 2);
-          std::vector<Hatrix::Matrix> D_splits = D.split(2, 2);
+        for (int block = 0; block < int(pow(level-1, 2)); ++block) {
+          Hatrix::Matrix D_unsolved(A.rank * 2, A.rank * 2);
+          std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
 
+          D_unsolved_splits[0] = unsolved_chunk(block * 2, A, level);
+          D_unsolved_splits[3] = unsolved_chunk(block * 2 + 1, A, level);
         }
       }
     }

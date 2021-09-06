@@ -50,6 +50,8 @@ class Matrix {
   // (last block will be different if split dimension is not an exact dimension
   // of the total dimension of the matrix).
   //
+  // The vector returns the slices stored in row major order.
+  //
   // Example:
   //
   // Matrix A(100, 100);
@@ -74,6 +76,7 @@ class Matrix {
   // Split the matrix along the dimensions specifed in each vector
   // in row_split_indices and col_split_indices. This function will
   // return as many tiles that can be generated from the indices supplied.
+  // The vector returns the slices stored in row major order.
   //
   // Example:
   // Matrix A(100, 100);

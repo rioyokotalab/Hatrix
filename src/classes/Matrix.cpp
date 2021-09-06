@@ -113,12 +113,17 @@ std::vector<Matrix> Matrix::split(int64_t n_row_splits, int64_t n_col_splits,
   return split(row_split_indices, col_split_indices, copy);
 }
 
-std::vector<Matrix> Matrix::split(const std::vector<int64_t>& row_split_indices,
-                                  const std::vector<int64_t>& col_split_indices,
+std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices,
+                                  const std::vector<int64_t>& _col_split_indices,
                                   bool copy) const {
   std::vector<Matrix> parts;
+  std::vector<int64_t> row_split_indices(_row_split_indices), col_split_indices(_col_split_indices);
+  if (row_split_indices[0] == 0) { row_split_indices.erase(row_split_indices.begin()); }
+  if (col_split_indices[0] == 0) { col_split_indices.erase(col_split_indices.begin()); }
+
   auto row_iter = row_split_indices.cbegin();
   int64_t row_start = 0;
+
   while (row_start < rows) {
     int64_t row_end = row_iter == row_split_indices.end() ? rows : *row_iter++;
     int64_t n_rows = row_end - row_start;
@@ -127,9 +132,10 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& row_split_indices,
     while (col_start < cols) {
       int64_t col_end =
           col_iter == col_split_indices.end() ? cols : *col_iter++;
+      int64_t n_cols = col_end - col_start;
       Matrix part_of_this;
       if (copy) {
-        part_of_this = Matrix(n_rows, col_end - col_start);
+        part_of_this = Matrix(n_rows, n_cols);
         double* part_start = &data_ptr[col_start * stride + row_start];
         for (int64_t j = 0; j < part_of_this.cols; j++) {
           for (int64_t i = 0; i < part_of_this.rows; i++) {
@@ -138,7 +144,7 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& row_split_indices,
         }
       } else {
         part_of_this.rows = n_rows;
-        part_of_this.cols = col_end - col_start;
+        part_of_this.cols = n_cols;
         part_of_this.stride = stride;
         part_of_this.data = std::make_shared<DataHandler>(*data);
         part_of_this.data_ptr = &data_ptr[col_start * stride + row_start];

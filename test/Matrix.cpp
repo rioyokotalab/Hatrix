@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #include "Hatrix/Hatrix.h"
 #include "gtest/gtest.h"
@@ -217,7 +218,9 @@ TEST(MatrixTests, non_uniform_rectangle_split_copy) {
   std::vector<Hatrix::Matrix> A_splits = A.split(x_split_vector, y_split_vector, false);
   Hatrix::Matrix B = Hatrix::generate_random_matrix(N, Nslice);
 
-  A_splits[3] = B;
+//  EXPECT_EQ(A_splits.size(), 2);
+
+  A_splits[1] = B;
 
   for (int i = 0; i < B.rows; ++i) {
     for (int j = 0; j < B.cols; ++j) {
@@ -233,14 +236,14 @@ TEST(MatrixTests, split_no_split) {
                                                  std::vector<int64_t>(1, 0), false);
 
   for (int i = 0; i < A_splits[0].rows; ++i) {
-    for (int j = 0; j < A_splits[1].cols; ++j) {
+    for (int j = 0; j < A_splits[0].cols; ++j) {
       EXPECT_EQ(A(i, j), A_splits[0](i, j));
     }
   }
 
-  for (int i = 0; i < A_splits[1].rows; ++i) {
-    for (int j = 0; j < A_splits[1].cols; ++j) {
-      EXPECT_EQ(A(i + A_splits[0].rows, j + A_splits[0].cols), A_splits[1](i, j));
-    }
-  }
+  // for (int i = 0; i < A_splits[0].rows; ++i) {
+  //   for (int j = 0; j < A_splits[0].cols; ++j) {
+  //     EXPECT_EQ(A(i + A_splits[0].rows, j + A_splits[0].cols), A_splits[0](i, j));
+  //   }
+  // }
 }
