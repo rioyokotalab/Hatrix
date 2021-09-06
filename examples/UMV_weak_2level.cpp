@@ -267,18 +267,47 @@ namespace Hatrix {
   };
 
   namespace UMV {
+
+    Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
+      Hatrix::Matrix Q_F(Q.rows, Q.rows);
+      Hatrix::Matrix Q_full, R;
+      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full,
+        Hatrix::Lapack::QR_ret::OnlyQ);
+
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+          Q_F(i, j) = Q_full(i, j + Q.cols);
+        }
+      }
+
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q.cols; ++j) {
+          Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+        }
+      }
+      return Q_F;
+    }
+
     void factorize(Hatrix::HSS& A) {
       // Start at leaf nodes for factorization
       int leaf_blocks = pow(A.height, 2);
       int c_size = (A.N / leaf_blocks) - A.rank;
       for (int block = 0; block < leaf_blocks; ++block) {
         Hatrix::Matrix& D = A.D(block, block, A.height);
+
+        Hatrix::Matrix U_F = make_complement(A.U(block, A.height));
+        Hatrix::Matrix V_F = make_complement(A.V(block, A.height));
+        matmul(matmul(U_F, D, true, false), V_F, D);
+
+        // perform partial LU
         std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
                                                        std::vector<int64_t>(1, c_size));
         Hatrix::Matrix Dcc = D_splits[0];
         Hatrix::Matrix Dco = D_splits[1];
         Hatrix::Matrix Doc = D_splits[2];
         Hatrix::Matrix Doo = D_splits[3];
+
+        Hatrix::lu(Dcc);
 
       }
     }
