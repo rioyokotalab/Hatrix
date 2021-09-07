@@ -375,8 +375,23 @@ namespace Hatrix {
       Hatrix::lu(A.D(0, 0, 0));
     }
 
-    Hatrix::Vector substitute(Hatrix::HSS& A, const Hatrix::Vector& b) {
+    Hatrix::Vector solve(Hatrix::HSS& A, const Hatrix::Vector& b) {
       Hatrix::Vector x(b);
+
+      // Forward
+      for (int level = 2; level > 0; --level) {
+        for (int node = 0; node < int(pow(level, 2)); ++node) {
+
+        }
+      }
+
+
+      // Backward
+      for (int level = 1; level <= 2; ++level) {
+        for (int node = 0; node < int(pow(level, 2)); ++node) {
+
+        }
+      }
 
       return x;
     }
@@ -415,7 +430,7 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Vector b_blocks = Hatrix::Vector(b, N, N / int(pow(height, 2)), int(pow(height, 2)), rank);
 
-  Hatrix::Vector x_blocks = Hatrix::UMV::substitute(A, b_blocks);
+  Hatrix::Vector x_blocks = Hatrix::UMV::solve(A, b_blocks);
 
   Hatrix::Context::finalize();
 
