@@ -384,18 +384,38 @@ namespace Hatrix {
     }
 
     Hatrix::Matrix solve(Hatrix::HSS& A, const Hatrix::Matrix& b) {
+      std::vector<Matrix> x_splits;
       Hatrix::Matrix x(b);
-      int64_t rhs_offset = 0, c_size;
+      int64_t rhs_offset = 0, c_size, offset;
 
       // Forward
       for (int level = 2; level > 0; --level) {
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
-          Hatrix::Matrix& D = A.D(node, node, level);
+          Matrix& D = A.D(node, node, level);
           c_size = D.rows - A.rank;
-          int64_t offset = rhs_offset + node * D.rows;
+          offset = rhs_offset + node * D.rows;
 
-          std::vector<Hatrix::Matrix> x_splits = x.split({offset, offset + c_size, offset + D.rows}, {});
+          x_splits = x.split({offset, offset + D.rows}, {});
+          Matrix x_slice = x_splits[1];
+          Matrix U_F = make_complement(A.U(node, level));
+          x_slice = matmul(U_F, x_slice);
+
+          if (A.rank != D.rows) {
+            // TODO: Implementing split of split should be helpful here.
+            x_splits = x.split(
+              {offset, offset + c_size, offset + D.rows}, {});
+            Hatrix::Matrix& c = x_splits[1];
+            Hatrix::Matrix& o = x_splits[2];
+
+            std::vector<Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
+                                                   std::vector<int64_t>(1, c_size));
+            Matrix& Dcc = D_splits[0];
+            Matrix& Doc = D_splits[2];
+
+            solve_triangular(Dcc, c, Hatrix::Left, Hatrix::Lower, true);
+            matmul(Doc, c, o, false, false, -1.0, 1.0);
+          }
         }
         rhs_offset = rhs_offset + c_size * num_nodes;
         permute_forward(x);

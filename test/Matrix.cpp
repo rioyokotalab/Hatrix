@@ -218,9 +218,7 @@ TEST(MatrixTests, non_uniform_rectangle_split_copy) {
   std::vector<Hatrix::Matrix> A_splits = A.split(x_split_vector, y_split_vector, false);
   Hatrix::Matrix B = Hatrix::generate_random_matrix(N, Nslice);
 
-//  EXPECT_EQ(A_splits.size(), 2);
-
-  A_splits[1] = B;
+  A_splits[3] = B;
 
   for (int i = 0; i < B.rows; ++i) {
     for (int j = 0; j < B.cols; ++j) {
@@ -240,10 +238,4 @@ TEST(MatrixTests, split_no_split) {
       EXPECT_EQ(A(i, j), A_splits[0](i, j));
     }
   }
-
-  // for (int i = 0; i < A_splits[0].rows; ++i) {
-  //   for (int j = 0; j < A_splits[0].cols; ++j) {
-  //     EXPECT_EQ(A(i + A_splits[0].rows, j + A_splits[0].cols), A_splits[0](i, j));
-  //   }
-  // }
 }
