@@ -13,34 +13,6 @@ double rel_error(const double A_norm, const double B_norm) {
 }
 
 namespace Hatrix {
-  class Vector {
-  private:
-    int N, block_size, nblocks, rank;
-    RowMap blocks;
-
-    void copy_from_vector(const Hatrix::Matrix& v) {
-      for (int block = 0; block < nblocks; ++block) {
-        Matrix vector(block_size, 1);
-
-        for (int i = 0; i < block_size; ++i) {
-          vector(i, 0) = v(block * block_size + i, 0);
-        }
-
-        blocks.insert(block, std::move(vector));
-      }
-    }
-
-  public:
-    Vector(const Hatrix::Matrix& v, int _N, int _block_size, int _nblocks, int _rank) :
-      N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
-      assert(v.cols == 1);
-      copy_from_vector(v);
-    }
-
-    Vector(const Vector& v) : N(v.N), block_size(v.block_size), nblocks(v.nblocks),
-                              rank(v.rank), blocks(v.blocks) {}
-  };
-
   class HSS {
   public:
     ColLevelMap U;
