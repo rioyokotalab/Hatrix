@@ -389,7 +389,7 @@ namespace Hatrix {
       int64_t rhs_offset = 0, c_size, offset;
 
       // Forward
-      for (int level = 2; level > 0; --level) {
+      for (int level = 2; level > 1; --level) {
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
           Matrix& D = A.D(node, node, level);
@@ -423,10 +423,26 @@ namespace Hatrix {
 
 
       // Backward
-      for (int level = 1; level <= 2; ++level) {
+      for (int level = 2; level <= 2; ++level) {
         permute_backward(x);
         for (int node = 0; node < int(pow(2, level)); ++node) {
+          Matrix& D = A.D(node, node, level);
+          c_size = D.rows - A.rank;
+          offset = rhs_offset + node * D.rows;
+          if (A.rank != D.rows) {
+            x_splits = x.split({offset, offset + c_size, offset + D.rows}, {});
+            Matrix& c = x_splits[1];
+            Matrix& o = x_splits[2];
 
+            std::vector<Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
+                                                   std::vector<int64_t>(1, c_size));
+
+            Matrix& Dcc = D_splits[0];
+            Matrix& Dco = D_splits[1];
+
+            matmul(Dco, c, o, false, false, -1.0, 1.0);
+            solve_triangular(Dcc, c, Hatrix::Left, Hatrix::Upper, false);
+          }
         }
       }
 
