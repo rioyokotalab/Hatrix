@@ -423,6 +423,7 @@ namespace Hatrix {
 
 
       // Backward
+      rhs_offset = 0;
       for (int level = 2; level <= 2; ++level) {
         permute_backward(x);
         for (int node = 0; node < int(pow(2, level)); ++node) {
@@ -440,9 +441,14 @@ namespace Hatrix {
             Matrix& Dcc = D_splits[0];
             Matrix& Dco = D_splits[1];
 
-            matmul(Dco, c, o, false, false, -1.0, 1.0);
+            matmul(Dco, o, c, false, false, -1.0, 1.0);
             solve_triangular(Dcc, c, Hatrix::Left, Hatrix::Upper, false);
           }
+
+          x_splits = x.split({offset, offset + D.rows}, {});
+          Matrix x_slice = x_splits[1];
+          Matrix V_F = make_complement(A.V(node, level));
+          x_slice = matmul(V_F, x_slice);
         }
       }
 
@@ -477,12 +483,23 @@ int main(int argc, char *argv[]) {
   Hatrix::HSS A(randvec, N, rank, height);
 
   double error = A.construction_relative_error(randvec);
-  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;
 
   Hatrix::UMV::factorize(A);
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
-
   Hatrix::Matrix x = Hatrix::UMV::solve(A, b);
+
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randvec, N, N, 0, 0);
+  Hatrix::Matrix x_solve = Hatrix::lu_solve(Adense, b);
+
+
+  std::cout << "X:\n";
+  x.print();
+
+  std::cout << "X dense: \n";
+  x_solve.print();
+
+  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error
+            << " solve error: " << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve)) << std::endl;
 
   Hatrix::Context::finalize();
 
