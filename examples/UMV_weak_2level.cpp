@@ -1,6 +1,7 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <cassert>
 
 #include "Hatrix/Hatrix.h"
 
@@ -12,6 +13,34 @@ double rel_error(const double A_norm, const double B_norm) {
 }
 
 namespace Hatrix {
+  class Vector {
+  private:
+    int N, block_size, nblocks, rank;
+    RowMap blocks;
+
+    void copy_from_vector(const Hatrix::Matrix& v) {
+      for (int block = 0; block < nblocks; ++block) {
+        Matrix vector(block_size, 1);
+
+        for (int i = 0; i < block_size; ++i) {
+          vector(i, 0) = v(block * block_size + i, 0);
+        }
+
+        blocks.insert(block, std::move(vector));
+      }
+    }
+
+  public:
+    Vector(const Hatrix::Matrix& v, int _N, int _block_size, int _nblocks, int _rank) :
+      N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
+      assert(v.cols == 1);
+      copy_from_vector(v);
+    }
+
+    Vector(const Vector& v) : N(v.N), block_size(v.block_size), nblocks(v.nblocks),
+                              rank(v.rank), blocks(v.blocks) {}
+  };
+
   class HSS {
   public:
     ColLevelMap U;
@@ -345,6 +374,12 @@ namespace Hatrix {
 
       Hatrix::lu(A.D(0, 0, 0));
     }
+
+    Hatrix::Vector substitute(Hatrix::HSS& A, const Hatrix::Vector& b) {
+      Hatrix::Vector x(b);
+
+      return x;
+    }
   };
 }
 
@@ -376,6 +411,11 @@ int main(int argc, char *argv[]) {
   std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;
 
   Hatrix::UMV::factorize(A);
+
+  Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Vector b_blocks = Hatrix::Vector(b, N, N / int(pow(height, 2)), int(pow(height, 2)), rank);
+
+  Hatrix::Vector x_blocks = Hatrix::UMV::substitute(A, b_blocks);
 
   Hatrix::Context::finalize();
 
