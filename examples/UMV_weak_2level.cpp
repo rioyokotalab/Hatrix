@@ -375,24 +375,36 @@ namespace Hatrix {
       Hatrix::lu(A.D(0, 0, 0));
     }
 
+    void permute_forward(Hatrix::Matrix& x) {
+
+    }
+
+    void permute_backward(Hatrix::Matrix& x) {
+
+    }
+
     Hatrix::Matrix solve(Hatrix::HSS& A, const Hatrix::Matrix& b) {
       Hatrix::Matrix x(b);
+      int64_t rhs_offset = 0, c_size;
 
       // Forward
       for (int level = 2; level > 0; --level) {
-        for (int node = 0; node < int(pow(2, level)); ++node) {
+        int num_nodes = pow(2, level);
+        for (int node = 0; node < num_nodes; ++node) {
           Hatrix::Matrix& D = A.D(node, node, level);
-          int64_t c_size = D.rows - A.rank;
-          int64_t offset = node * D.rows;
+          c_size = D.rows - A.rank;
+          int64_t offset = rhs_offset + node * D.rows;
 
           std::vector<Hatrix::Matrix> x_splits = x.split({offset, offset + c_size, offset + D.rows}, {});
-          std::cout << "s: " << x_splits.size() << " rows: " << x_splits[1].rows << std::endl;
         }
+        rhs_offset = rhs_offset + c_size * num_nodes;
+        permute_forward(x);
       }
 
 
       // Backward
       for (int level = 1; level <= 2; ++level) {
+        permute_backward(x);
         for (int node = 0; node < int(pow(2, level)); ++node) {
 
         }
