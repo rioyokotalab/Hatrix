@@ -112,7 +112,7 @@ namespace Hatrix {
     }
 
     std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(randvec_t& randvec) {
-      int nblocks = pow(height, 2);
+      int nblocks = pow(2, height);
       int leaf_size = N / nblocks;
       ColLevelMap Ugen;
       RowLevelMap Vgen;
@@ -231,7 +231,7 @@ namespace Hatrix {
     }
 
     double construction_relative_error(randvec_t& randvec) {
-      int leaf_size = N / pow(height, 2);
+      int leaf_size = N / pow(2, height);
       double error = 0;
 
       // Check leaf level blocks.
@@ -328,7 +328,7 @@ namespace Hatrix {
     void factorize(Hatrix::HSS& A) {
       // Start at leaf nodes for factorization
       for (int level = A.height; level > 0; --level) {
-        int nblocks = pow(level, 2);
+        int nblocks = pow(2, level);
         for (int block = 0; block < nblocks; ++block) {
           Hatrix::Matrix& D = A.D(block, block, level);
           Hatrix::Matrix U_F = make_complement(A.U(block, level));
@@ -354,7 +354,7 @@ namespace Hatrix {
 
         // Merge unfactorized blocks
         int parent_level = level - 1;
-        for (int block = 0; block < int(pow(parent_level, 2)) + 1; ++block) {
+        for (int block = 0; block < int(pow(2, parent_level)); ++block) {
           Hatrix::Matrix D_unsolved(A.rank * 2, A.rank * 2);
           std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
 
@@ -375,20 +375,25 @@ namespace Hatrix {
       Hatrix::lu(A.D(0, 0, 0));
     }
 
-    Hatrix::Vector solve(Hatrix::HSS& A, const Hatrix::Vector& b) {
-      Hatrix::Vector x(b);
+    Hatrix::Matrix solve(Hatrix::HSS& A, const Hatrix::Matrix& b) {
+      Hatrix::Matrix x(b);
 
       // Forward
       for (int level = 2; level > 0; --level) {
-        for (int node = 0; node < int(pow(level, 2)); ++node) {
+        for (int node = 0; node < int(pow(2, level)); ++node) {
+          Hatrix::Matrix& D = A.D(node, node, level);
+          int64_t c_size = D.rows - A.rank;
+          int64_t offset = node * D.rows;
 
+          std::vector<Hatrix::Matrix> x_splits = x.split({offset, offset + c_size, offset + D.rows}, {});
+          std::cout << "s: " << x_splits.size() << " rows: " << x_splits[1].rows << std::endl;
         }
       }
 
 
       // Backward
       for (int level = 1; level <= 2; ++level) {
-        for (int node = 0; node < int(pow(level, 2)); ++node) {
+        for (int node = 0; node < int(pow(2, level)); ++node) {
 
         }
       }
@@ -412,8 +417,8 @@ int main(int argc, char *argv[]) {
   int rank = atoi(argv[2]);
   int height = 2;
 
-  if (N % int(pow(height, 2)) != 0 || rank > int(N / pow(height, 2))) {
-    std::cout << N << " % " << pow(height, 2) << " != 0 || rank > leaf(" << int(N / pow(height, 2))  << ")\n";
+  if (N % int(pow(2, height)) != 0 || rank > int(N / pow(2, height))) {
+    std::cout << N << " % " << pow(2, height) << " != 0 || rank > leaf(" << int(N / pow(2, height))  << ")\n";
     abort();
   }
 
@@ -422,15 +427,14 @@ int main(int argc, char *argv[]) {
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
   Hatrix::HSS A(randvec, N, rank, height);
+
   double error = A.construction_relative_error(randvec);
   std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;
 
   Hatrix::UMV::factorize(A);
-
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
-  Hatrix::Vector b_blocks = Hatrix::Vector(b, N, N / int(pow(height, 2)), int(pow(height, 2)), rank);
 
-  Hatrix::Vector x_blocks = Hatrix::UMV::solve(A, b_blocks);
+  Hatrix::Matrix x = Hatrix::UMV::solve(A, b);
 
   Hatrix::Context::finalize();
 
