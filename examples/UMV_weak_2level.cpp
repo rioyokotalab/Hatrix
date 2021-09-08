@@ -347,8 +347,16 @@ namespace Hatrix {
       Hatrix::lu(A.D(0, 0, 0));
     }
 
-    void permute_forward(Hatrix::Matrix& x) {
+    void permute_forward(Hatrix::Matrix& x, Hatrix::HSS& A, int level) {
+      int offset = 0;
 
+      for (int block = 0; block < int(pow(2, level)); ++block) {
+        int rows = A.D(block, block, level).rows;
+        int c_size = rows - A.rank;
+
+        std::vector<double> c_temp(c_size), r_temp(A.rank);
+
+      }
     }
 
     void permute_backward(Hatrix::Matrix& x) {
@@ -390,7 +398,7 @@ namespace Hatrix {
           }
         }
         rhs_offset = rhs_offset + c_size * num_nodes;
-        permute_forward(x);
+        permute_forward(x, A, level);
       }
 
 
