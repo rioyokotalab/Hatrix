@@ -175,6 +175,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(ArithmeticTests, Transpose) {
   int64_t m, n;
+  Hatrix::Context::init();
   std::tie(m, n) = GetParam();
 
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
@@ -187,4 +188,69 @@ TEST_P(ArithmeticTests, Transpose) {
       EXPECT_EQ(A(i, j), A_trans(j, i));
     }
   }
+  Hatrix::Context::finalize();
+}
+
+TEST_P(ArithmeticTests, LowerTriangularPart) {
+  int64_t m, n;
+  Hatrix::Context::init();
+  std::tie(m, n) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_nounit_lower = lower_tri(A);
+  Hatrix::Matrix A_unit_lower = lower_tri(A, true);
+
+  EXPECT_EQ(A_nounit_lower.rows, m);
+  EXPECT_EQ(A_nounit_lower.cols, n);
+  EXPECT_EQ(A_unit_lower.rows, m);
+  EXPECT_EQ(A_unit_lower.cols, n);
+  for (int64_t i = 0; i < m; ++i) {
+    for (int64_t j = 0; j < n; ++j) {
+      if(i == j) {
+	EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
+	EXPECT_EQ(1., A_unit_lower(i, j));
+      }
+      else if(i > j) {
+	EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
+	EXPECT_EQ(A(i, j), A_unit_lower(i, j));
+      }
+      else {
+	EXPECT_EQ(0., A_nounit_lower(i, j));
+	EXPECT_EQ(0., A_unit_lower(i, j));
+      }
+    }
+  }
+  Hatrix::Context::finalize();
+}
+
+TEST_P(ArithmeticTests, UpperTriangularPart) {
+  int64_t m, n;
+  Hatrix::Context::init();
+  std::tie(m, n) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_nounit_upper = upper_tri(A);
+  Hatrix::Matrix A_unit_upper = upper_tri(A, true);
+
+  EXPECT_EQ(A_nounit_upper.rows, m);
+  EXPECT_EQ(A_nounit_upper.cols, n);
+  EXPECT_EQ(A_unit_upper.rows, m);
+  EXPECT_EQ(A_unit_upper.cols, n);
+  for (int64_t i = 0; i < m; ++i) {
+    for (int64_t j = 0; j < n; ++j) {
+      if(i == j) {
+	EXPECT_EQ(A(i, j), A_nounit_upper(i, j));
+	EXPECT_EQ(1., A_unit_upper(i, j));
+      }
+      else if(i > j) {
+	EXPECT_EQ(0., A_nounit_upper(i, j));
+	EXPECT_EQ(0., A_unit_upper(i, j));
+      }
+      else {
+	EXPECT_EQ(A(i, j), A_nounit_upper(i, j));
+	EXPECT_EQ(A(i, j), A_unit_upper(i, j));
+      }
+    }
+  }
+  Hatrix::Context::finalize();
 }
