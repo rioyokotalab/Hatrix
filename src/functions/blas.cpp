@@ -50,6 +50,13 @@ void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
               A.stride, &B, B.stride);
 }
 
+Matrix triangular_matmul(const Matrix& A, const Matrix& B, Side side, Mode uplo,
+                       bool transA, bool diag, double alpha) {
+  Matrix C(B);
+  triangular_matmul(A, C, side, uplo, transA, diag, alpha);
+  return C;
+}
+
 void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
                       bool diag, bool transA, double alpha) {
   cblas_dtrsm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
