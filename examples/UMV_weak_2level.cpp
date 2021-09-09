@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cmath>
 #include <cassert>
+#include <chrono>
 
 #include "Hatrix/Hatrix.h"
 
@@ -529,12 +530,20 @@ int main(int argc, char *argv[]) {
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
+  auto start_construct = std::chrono::system_clock::now();
   Hatrix::HSS A(randvec, N, rank, height);
+  auto stop_construct = std::chrono::system_clock::now();
+
   double error = A.construction_relative_error(randvec);
 
+  auto start_factorize = std::chrono::system_clock::now();
   Hatrix::UMV::factorize(A);
+  auto stop_factorize = std::chrono::system_clock::now();
+
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+  auto start_solve = std::chrono::system_clock::now();
   Hatrix::Matrix x = Hatrix::UMV::solve(A, b);
+  auto stop_solve = std::chrono::system_clock::now();
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randvec, N, N, 0, 0);
   Hatrix::Matrix x_solve(b);
@@ -542,8 +551,11 @@ int main(int argc, char *argv[]) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error
-            << " solve error: " << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve)) << std::endl;
+  std::cout << N << "\t" << rank << "\t" << error
+            << "\t" << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve))
+            << "\t" << std::chrono::duration_cast<std::chrono::milliseconds>(stop_construct - start_construct).count()
+            << "\t" << std::chrono::duration_cast<std::chrono::milliseconds>(stop_factorize - start_factorize).count()
+            << "\t" << std::chrono::duration_cast<std::chrono::milliseconds>(stop_solve - start_solve).count() << std::endl;
 
   Hatrix::Context::finalize();
 
