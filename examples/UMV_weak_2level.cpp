@@ -307,9 +307,11 @@ namespace Hatrix {
           Hatrix::Matrix V_F = make_complement(A.V(block, level));
 
           // Left and right multiply complements and store back in diagonal matrix.
-          matmul(matmul(U_F, D, true, false), V_F, D);
+          D = matmul(matmul(U_F, D, true, false), V_F);
 
           // perform partial LU
+          if (A.rank == D.rows) { continue; }
+
           int c_size = D.rows - A.rank;
           std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
                                                         std::vector<int64_t>(1, c_size));
@@ -317,6 +319,8 @@ namespace Hatrix {
           Hatrix::Matrix Dco = D_splits[1];
           Hatrix::Matrix Doc = D_splits[2];
           Hatrix::Matrix Doo = D_splits[3];
+
+          Hatrix::Matrix copy(D);
 
           Hatrix::lu(Dcc);
           solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
@@ -445,7 +449,7 @@ namespace Hatrix {
       solve_triangular(A.D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
       // Backward
-      for (int level = 1; level < A.height; ++level) {
+      for (int level = 1; level <= A.height; ++level) {
         rhs_offset = permute_backward(x, A, level, rhs_offset);
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
@@ -514,11 +518,11 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix x_solve = Hatrix::lu_solve(Adense, b);
 
 
-  // std::cout << "X:\n";
-  // x.print();
+  std::cout << "X:\n";
+  x.print();
 
-  // std::cout << "X dense: \n";
-  // x_solve.print();
+  std::cout << "X dense: \n";
+  x_solve.print();
 
   std::cout << "N=" << N << " rank=" << rank << " construction error : " << error
             << " solve error: " << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve)) << std::endl;
