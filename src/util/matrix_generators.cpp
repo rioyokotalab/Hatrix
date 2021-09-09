@@ -40,7 +40,7 @@ Matrix generate_identity_matrix(int64_t rows, int64_t cols) {
   return out;
 }
 
-Matrix generate_laplacend_matrix(std::vector<std::vector<double>>& x,
+Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
 				 int64_t rows, int64_t cols,
 				 int64_t row_start, int64_t col_start) {
   Matrix out(rows, cols);
