@@ -348,25 +348,27 @@ namespace Hatrix {
     }
 
     // permute the vector forward and return the offset at which the new vector begins.
-    int permute_forward(Hatrix::Matrix& x, Hatrix::HSS& A, int level, int rank_offset) {
+    int permute_forward(Hatrix::Matrix& x, const Hatrix::HSS& A, const int level, int rank_offset) {
       Hatrix::Matrix copy(x);
       int num_nodes = int(pow(2, level));
+      int c_offset = rank_offset;
       for (int block = 0; block < num_nodes; ++block) {
         rank_offset += A.D(block, block, level).rows - A.rank;
       }
+
+      std::cout << "start c off: " << c_offset << " r off: " << rank_offset << std::endl;
 
       for (int block = 0; block < num_nodes; ++block) {
         int rows = A.D(block, block, level).rows;
         int c_size = rows - A.rank;
 
-        std::vector<double> c_temp(c_size), r_temp(A.rank);
         // copy the complement part of the vector into the temporary vector
         for (int i = 0; i < c_size; ++i) {
-          copy(c_size * block + i, 0) = x(block * rows + i, 0);
+          copy(c_offset + c_size * block + i, 0) = x(c_offset + block * rows + i, 0);
         }
         // copy the rank part of the vector into the temporary vector
         for (int i = 0; i < A.rank; ++i) {
-          copy(rank_offset + A.rank * block + i, 0) = x(block * rows + c_size + i, 0);
+          copy(rank_offset + A.rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
         }
       }
 
@@ -375,19 +377,42 @@ namespace Hatrix {
       return rank_offset;
     }
 
-    void permute_backward(Hatrix::Matrix& x) {
+    int permute_backward(Hatrix::Matrix& x, const Hatrix::HSS& A, const int level, int rank_offset) {
+      Hatrix::Matrix copy(x);
+      int num_nodes = pow(2, level);
+      int c_offset = rank_offset;
+      for (int block = 0; block < num_nodes; ++block) {
+        c_offset -= A.D(block, block, level).rows - A.rank;
+      }
 
+      for (int block = 0; block < num_nodes; ++block) {
+        int rows = A.D(block, block, level).rows;
+        int c_size = rows - A.rank;
+
+        for (int i = 0; i < c_size; ++i) {
+          copy(c_offset + block * rows + i, 0) = x(rank_offset + block * c_size + i, 0);
+        }
+
+        for (int i = 0; i < A.rank; ++i) {
+          copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + A.rank * block + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return c_offset;
     }
 
     Hatrix::Matrix solve(Hatrix::HSS& A, const Hatrix::Matrix& b) {
       std::vector<Matrix> x_splits;
       Hatrix::Matrix x(b);
-      int64_t rhs_offset = 0, c_size, offset;
+      int rhs_offset = 0, c_size, offset;
 
       // Forward
-      for (int level = 2; level > 1; --level) {
+      for (int level = A.height; level > 0; --level) {
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
+          std::cout << "UF l: " << level << std::endl;
           Matrix& D = A.D(node, node, level);
           c_size = D.rows - A.rank;
           offset = rhs_offset + node * D.rows;
@@ -417,11 +442,12 @@ namespace Hatrix {
       }
 
 
+
       // Backward
-      rhs_offset = 0;
-      for (int level = 2; level <= 2; ++level) {
-        permute_backward(x);
-        for (int node = 0; node < int(pow(2, level)); ++node) {
+      for (int level = 1; level < A.height; ++level) {
+        rhs_offset = permute_backward(x, A, level, rhs_offset);
+        int num_nodes = pow(2, level);
+        for (int node = 0; node < num_nodes; ++node) {
           Matrix& D = A.D(node, node, level);
           c_size = D.rows - A.rank;
           offset = rhs_offset + node * D.rows;
@@ -487,11 +513,11 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix x_solve = Hatrix::lu_solve(Adense, b);
 
 
-  std::cout << "X:\n";
-  x.print();
+  // std::cout << "X:\n";
+  // x.print();
 
-  std::cout << "X dense: \n";
-  x_solve.print();
+  // std::cout << "X dense: \n";
+  // x_solve.print();
 
   std::cout << "N=" << N << " rank=" << rank << " construction error : " << error
             << " solve error: " << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve)) << std::endl;
