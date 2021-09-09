@@ -412,7 +412,6 @@ namespace Hatrix {
       for (int level = A.height; level > 0; --level) {
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
-          std::cout << "UF l: " << level << std::endl;
           Matrix& D = A.D(node, node, level);
           c_size = D.rows - A.rank;
           offset = rhs_offset + node * D.rows;
@@ -441,7 +440,9 @@ namespace Hatrix {
         rhs_offset = permute_forward(x, A, level, rhs_offset);
       }
 
-
+      x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
+      solve_triangular(A.D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(A.D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
       // Backward
       for (int level = 1; level < A.height; ++level) {
