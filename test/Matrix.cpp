@@ -1,7 +1,6 @@
 #include <cstdint>
 #include <utility>
 #include <vector>
-#include <iostream>
 
 #include "Hatrix/Hatrix.h"
 #include "gtest/gtest.h"
