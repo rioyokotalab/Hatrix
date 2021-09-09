@@ -117,6 +117,7 @@ namespace Hatrix {
       int child1 = p * 2;
       int child2 = p * 2 + 1;
       int leaf_size = int(N / 2);
+      int rank = leaf_size;
       Matrix Ubig(rank, leaf_size);
 
       std::vector<Matrix> Ubig_splits = Ubig.split(1, 2);
@@ -132,6 +133,7 @@ namespace Hatrix {
       int child1 = p * 2;
       int child2 = p * 2 + 1;
       int leaf_size = int(N / 2);
+      int rank = leaf_size;
       Matrix Vbig(leaf_size, rank);
 
       std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
@@ -161,6 +163,7 @@ namespace Hatrix {
         Matrix& Ugen_upper = Ugen(child1, height);
         Matrix& Ugen_lower = Ugen(child2, height);
         Matrix Ugen_concat(Ugen_upper.rows + Ugen_lower.rows, Ugen_upper.cols);
+        int rank = Ugen_concat.rows;
         std::vector<Matrix> Ugen_slices = Ugen_concat.split(2, 1);
         Ugen_slices[0] = Ugen_upper;
         Ugen_slices[1] = Ugen_lower;
@@ -289,9 +292,9 @@ namespace Hatrix {
       return Q_F;
     }
 
-    Matrix& unsolved_chunk(int block, Hatrix::HSS& A, int level) {
+    Matrix& unsolved_chunk(int block, Hatrix::HSS& A, int level, int rank) {
       Hatrix::Matrix& D = A.D(block, block, level);
-      int c_size = D.rows - A.rank;
+      int c_size = D.rows - rank;
       std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
       return D_splits[3];
@@ -303,6 +306,8 @@ namespace Hatrix {
         int nblocks = pow(2, level);
         for (int block = 0; block < nblocks; ++block) {
           Hatrix::Matrix& D = A.D(block, block, level);
+          int rank = A.U(block, level).cols;
+
           Hatrix::Matrix U_F = make_complement(A.U(block, level));
           Hatrix::Matrix V_F = make_complement(A.V(block, level));
 
@@ -312,15 +317,13 @@ namespace Hatrix {
           // perform partial LU
           if (A.rank == D.rows) { continue; }
 
-          int c_size = D.rows - A.rank;
+          int c_size = D.rows - rank;
           std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
                                                         std::vector<int64_t>(1, c_size));
           Hatrix::Matrix Dcc = D_splits[0];
           Hatrix::Matrix Dco = D_splits[1];
           Hatrix::Matrix Doc = D_splits[2];
           Hatrix::Matrix Doo = D_splits[3];
-
-          Hatrix::Matrix copy(D);
 
           Hatrix::lu(Dcc);
           solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
@@ -331,12 +334,14 @@ namespace Hatrix {
         // Merge unfactorized blocks
         int parent_level = level - 1;
         for (int block = 0; block < int(pow(2, parent_level)); ++block) {
-          Hatrix::Matrix D_unsolved(A.rank * 2, A.rank * 2);
+          int rank = A.U(block, level).cols;
+          Hatrix::Matrix D_unsolved(rank * 2, rank * 2);
           std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
 
+
           int child1 = block * 2; int child2 = block * 2 + 1;
-          D_unsolved_splits[0] = unsolved_chunk(child1, A, level);
-          D_unsolved_splits[3] = unsolved_chunk(child2, A, level);
+          D_unsolved_splits[0] = unsolved_chunk(child1, A, level, rank);
+          D_unsolved_splits[3] = unsolved_chunk(child2, A, level, rank);
 
           int col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
           int col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
@@ -509,6 +514,8 @@ int main(int argc, char *argv[]) {
   Hatrix::HSS A(randvec, N, rank, height);
 
   double error = A.construction_relative_error(randvec);
+  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;;
+
 
   Hatrix::UMV::factorize(A);
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
@@ -524,8 +531,8 @@ int main(int argc, char *argv[]) {
   std::cout << "X dense: \n";
   x_solve.print();
 
-  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error
-            << " solve error: " << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve)) << std::endl;
+  // std::cout << "N=" << N << " rank=" << rank << " construction error : " << error
+  //           << " solve error: " << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve)) << std::endl;
 
   Hatrix::Context::finalize();
 
