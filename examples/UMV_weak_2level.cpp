@@ -347,16 +347,32 @@ namespace Hatrix {
       Hatrix::lu(A.D(0, 0, 0));
     }
 
-    void permute_forward(Hatrix::Matrix& x, Hatrix::HSS& A, int level) {
-      int offset = 0;
+    // permute the vector forward and return the offset at which the new vector begins.
+    int permute_forward(Hatrix::Matrix& x, Hatrix::HSS& A, int level, int rank_offset) {
+      Hatrix::Matrix copy(x);
+      int num_nodes = int(pow(2, level));
+      for (int block = 0; block < num_nodes; ++block) {
+        rank_offset += A.D(block, block, level).rows - A.rank;
+      }
 
-      for (int block = 0; block < int(pow(2, level)); ++block) {
+      for (int block = 0; block < num_nodes; ++block) {
         int rows = A.D(block, block, level).rows;
         int c_size = rows - A.rank;
 
         std::vector<double> c_temp(c_size), r_temp(A.rank);
-
+        // copy the complement part of the vector into the temporary vector
+        for (int i = 0; i < c_size; ++i) {
+          copy(c_size * block + i, 0) = x(block * rows + i, 0);
+        }
+        // copy the rank part of the vector into the temporary vector
+        for (int i = 0; i < A.rank; ++i) {
+          copy(rank_offset + A.rank * block + i, 0) = x(block * rows + c_size + i, 0);
+        }
       }
+
+      x = copy;
+
+      return rank_offset;
     }
 
     void permute_backward(Hatrix::Matrix& x) {
@@ -397,8 +413,7 @@ namespace Hatrix {
             matmul(Doc, c, o, false, false, -1.0, 1.0);
           }
         }
-        rhs_offset = rhs_offset + c_size * num_nodes;
-        permute_forward(x, A, level);
+        rhs_offset = permute_forward(x, A, level, rhs_offset);
       }
 
 
