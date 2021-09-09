@@ -117,7 +117,7 @@ namespace Hatrix {
       int child1 = p * 2;
       int child2 = p * 2 + 1;
       int leaf_size = int(N / 2);
-      int rank = leaf_size;
+      // int rank = leaf_size;
       Matrix Ubig(rank, leaf_size);
 
       std::vector<Matrix> Ubig_splits = Ubig.split(1, 2);
@@ -133,7 +133,7 @@ namespace Hatrix {
       int child1 = p * 2;
       int child2 = p * 2 + 1;
       int leaf_size = int(N / 2);
-      int rank = leaf_size;
+      // int rank = leaf_size;
       Matrix Vbig(leaf_size, rank);
 
       std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
@@ -163,7 +163,7 @@ namespace Hatrix {
         Matrix& Ugen_upper = Ugen(child1, height);
         Matrix& Ugen_lower = Ugen(child2, height);
         Matrix Ugen_concat(Ugen_upper.rows + Ugen_lower.rows, Ugen_upper.cols);
-        int rank = Ugen_concat.rows;
+        // int rank = Ugen_concat.rows;
         std::vector<Matrix> Ugen_slices = Ugen_concat.split(2, 1);
         Ugen_slices[0] = Ugen_upper;
         Ugen_slices[1] = Ugen_lower;
@@ -315,15 +315,16 @@ namespace Hatrix {
           D = matmul(matmul(U_F, D, true, false), V_F);
 
           // perform partial LU
-          if (A.rank == D.rows) { continue; }
+          if (rank == D.rows) { continue; }
 
           int c_size = D.rows - rank;
           std::vector<Hatrix::Matrix> D_splits = D.split(std::vector<int64_t>(1, c_size),
-                                                        std::vector<int64_t>(1, c_size));
-          Hatrix::Matrix Dcc = D_splits[0];
-          Hatrix::Matrix Dco = D_splits[1];
-          Hatrix::Matrix Doc = D_splits[2];
-          Hatrix::Matrix Doo = D_splits[3];
+                                                         std::vector<int64_t>(1, c_size));
+          Hatrix::Matrix& Dcc = D_splits[0];
+          Hatrix::Matrix& Dco = D_splits[1];
+          Hatrix::Matrix& Doc = D_splits[2];
+          Hatrix::Matrix& Doo = D_splits[3];
+
 
           Hatrix::lu(Dcc);
           solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
@@ -362,14 +363,13 @@ namespace Hatrix {
       int num_nodes = int(pow(2, level));
       int c_offset = rank_offset;
       for (int block = 0; block < num_nodes; ++block) {
-        rank_offset += A.D(block, block, level).rows - A.rank;
+        rank_offset += A.D(block, block, level).rows - A.U(block, level).cols;
       }
-
-      std::cout << "start c off: " << c_offset << " r off: " << rank_offset << std::endl;
 
       for (int block = 0; block < num_nodes; ++block) {
         int rows = A.D(block, block, level).rows;
-        int c_size = rows - A.rank;
+        int rank = A.U(block, level).cols;
+        int c_size = rows - rank;
 
         // copy the complement part of the vector into the temporary vector
         for (int i = 0; i < c_size; ++i) {
@@ -377,7 +377,7 @@ namespace Hatrix {
         }
         // copy the rank part of the vector into the temporary vector
         for (int i = 0; i < A.rank; ++i) {
-          copy(rank_offset + A.rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
+          copy(rank_offset + rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
         }
       }
 
@@ -391,19 +391,20 @@ namespace Hatrix {
       int num_nodes = pow(2, level);
       int c_offset = rank_offset;
       for (int block = 0; block < num_nodes; ++block) {
-        c_offset -= A.D(block, block, level).rows - A.rank;
+        c_offset -= A.D(block, block, level).rows - A.U(block, level).cols;
       }
 
       for (int block = 0; block < num_nodes; ++block) {
         int rows = A.D(block, block, level).rows;
-        int c_size = rows - A.rank;
+        int rank = A.U(block, level).cols;
+        int c_size = rows - rank;
 
         for (int i = 0; i < c_size; ++i) {
-          copy(c_offset + block * rows + i, 0) = x(rank_offset + block * c_size + i, 0);
+          copy(c_offset + block * rows + i, 0) = x(c_offset + block * c_size + i, 0);
         }
 
-        for (int i = 0; i < A.rank; ++i) {
-          copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + A.rank * block + i, 0);
+        for (int i = 0; i < rank; ++i) {
+          copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
         }
       }
 
@@ -415,22 +416,30 @@ namespace Hatrix {
     Hatrix::Matrix solve(Hatrix::HSS& A, const Hatrix::Matrix& b) {
       std::vector<Matrix> x_splits;
       Hatrix::Matrix x(b);
-      int rhs_offset = 0, c_size, offset;
+      int rhs_offset = 0, c_size, offset, rank;
 
       // Forward
       for (int level = A.height; level > 0; --level) {
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
           Matrix& D = A.D(node, node, level);
-          c_size = D.rows - A.rank;
+          int rank = A.U(node, level).cols;
+          c_size = D.rows - rank;
           offset = rhs_offset + node * D.rows;
 
-          x_splits = x.split({offset, offset + D.rows}, {});
-          Matrix x_slice = x_splits[1];
+          Matrix temp(D.rows, 1);
+          for (int i = 0; i < D.rows; ++i) {
+            temp(i, 0) = x(offset + i, 0);
+          }
           Matrix U_F = make_complement(A.U(node, level));
-          x_slice = matmul(U_F, x_slice);
+          Matrix product = matmul(U_F, temp, true);
+          for (int i = 0; i < D.rows; ++i) {
+            x(offset + i, 0) = product(i, 0);
+          }
 
-          if (A.rank != D.rows) {
+
+          Matrix copy(x);
+          if (rank != D.rows) {
             // TODO: Implementing split of split should be helpful here.
             x_splits = x.split(
               {offset, offset + c_size, offset + D.rows}, {});
@@ -459,9 +468,11 @@ namespace Hatrix {
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
           Matrix& D = A.D(node, node, level);
-          c_size = D.rows - A.rank;
+          int rank = A.U(node, level).cols;
+          c_size = D.rows - rank;
           offset = rhs_offset + node * D.rows;
-          if (A.rank != D.rows) {
+
+          if (rank != D.rows) {
             x_splits = x.split({offset, offset + c_size, offset + D.rows}, {});
             Matrix& c = x_splits[1];
             Matrix& o = x_splits[2];
@@ -476,10 +487,17 @@ namespace Hatrix {
             solve_triangular(Dcc, c, Hatrix::Left, Hatrix::Upper, false);
           }
 
-          x_splits = x.split({offset, offset + D.rows}, {});
-          Matrix x_slice = x_splits[1];
+
+          // TODO: Make this work with slicing.
+          Matrix temp(D.rows, 1);
+          for (int i = 0; i < D.rows; ++i) {
+            temp(i, 0) = x(offset + i, 0);
+          }
           Matrix V_F = make_complement(A.V(node, level));
-          x_slice = matmul(V_F, x_slice);
+          Matrix product = matmul(V_F, temp);
+          for (int i = 0; i < D.rows; ++i) {
+            x(offset + i, 0) = product(i, 0);
+          }
         }
       }
 
@@ -512,27 +530,20 @@ int main(int argc, char *argv[]) {
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
   Hatrix::HSS A(randvec, N, rank, height);
-
   double error = A.construction_relative_error(randvec);
-  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;;
-
 
   Hatrix::UMV::factorize(A);
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix x = Hatrix::UMV::solve(A, b);
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randvec, N, N, 0, 0);
-  Hatrix::Matrix x_solve = Hatrix::lu_solve(Adense, b);
+  Hatrix::Matrix x_solve(b);
+  Hatrix::lu(Adense);
+  Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-
-  std::cout << "X:\n";
-  x.print();
-
-  std::cout << "X dense: \n";
-  x_solve.print();
-
-  // std::cout << "N=" << N << " rank=" << rank << " construction error : " << error
-  //           << " solve error: " << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve)) << std::endl;
+  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error
+            << " solve error: " << rel_error(Hatrix::norm(x), Hatrix::norm(x_solve)) << std::endl;
 
   Hatrix::Context::finalize();
 
