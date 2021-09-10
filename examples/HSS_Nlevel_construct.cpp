@@ -17,7 +17,9 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-double rel_error(const double A_norm, const double B_norm) {
+double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
+  double A_norm = Hatrix::norm(A);
+  double B_norm = Hatrix::norm(B);
   double diff = A_norm - B_norm;
   return std::sqrt((diff * diff) / (B_norm * B_norm));
 }
@@ -166,8 +168,9 @@ namespace Hatrix {
                                                                     ColLevelMap& Vgen, const int level) {
       Matrix Ui, Si, Vi; double error;
       RowLevelMap Ugen_transfer; ColLevelMap Vgen_transfer;
+      int num_nodes = pow(2, level);
 
-      for (int p = 0; p < int(pow(2, level)); ++p) {
+      for (int p = 0; p < num_nodes; ++p) {
         int child1 = p * 2;
         int child2 = p * 2 + 1;
         int child_level = level + 1;
@@ -198,14 +201,14 @@ namespace Hatrix {
         Vgen_transfer.insert(p, level, matmul(Si, Vi));
       }
 
-      for (int row = 0; row < 2; ++row) {
+      for (int row = 0; row < num_nodes; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
         int leaf_size = int(N / 2);
 
         Matrix Ubig = generate_U_actual_bases(row);
         Matrix Vbig = generate_V_actual_bases(col);
 
-        S.insert(row, col, height - 1,
+        S.insert(row, col, level,
                  generate_non_leaf_coupling_matrix(randvec, row, col, leaf_size,
                                                    Ubig, Vbig));
       }
@@ -224,9 +227,19 @@ namespace Hatrix {
       }
     }
 
-    double construction_relative_error(randvec_t& randvec) {
+    double construction_relative_error(const randvec_t& randvec) {
+      // verify diagonal matrix block constructions at the leaf level
+      double error = 0;
+      int num_nodes = pow(2, height);
+      int leaf_size = N / num_nodes;
+      for (int block = 0; block < num_nodes; ++block) {
+        double diagonal_error = rel_error(D(block, block, height),
+                                          Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                                                            block * leaf_size, block * leaf_size));
+        error += pow(diagonal_error, 2);
+      }
 
-      return 1.0;
+      return std::sqrt(error);
     }
   };
 } // namespace Hatrix
