@@ -111,14 +111,7 @@ namespace Hatrix {
       int slice = N / int(pow(2, level));
       Matrix D = generate_laplacend_matrix(randvec, block_nrows, block_ncols,
                                            row * slice, col * slice);
-
-      std::cout << "row: " << row << " col: " << col << " U.rows: " << Ubig.rows << " D.r: "
-                << D.rows
-                << " D.c: " << D.cols
-                << " V.row: " << Vbig.rows << " level: " << level << std::endl;
-      auto temp = matmul(Ubig, D, true, false);
-      std::cout << "temp\n";
-      return matmul(temp, Vbig);
+      return matmul(matmul(Ubig, D, true, false), Vbig);
     }
 
 
@@ -172,16 +165,21 @@ namespace Hatrix {
       int child1 = p * 2;
       int child2 = p * 2 + 1;
       int num_nodes = pow(2, level);
-      int leaf_size = int(N / num_nodes);
+
       // int rank = leaf_size;
+
+      Matrix Ubig_child1 = get_Ubig(child1, level+1);
+      Matrix Ubig_child2 = get_Ubig(child2, level+1);
+
+      int leaf_size = Ubig_child1.rows + Ubig_child2.rows;
 
       Matrix Ubig(rank, leaf_size);
 
-      std::vector<Matrix> Ubig_splits = Ubig.split(1, 2);
+      std::vector<Matrix> Ubig_splits = Ubig.split({}, std::vector<int64_t>(1, Ubig_child1.rows));
       std::vector<Matrix> U_splits = U(p, level).split(2, 1);
 
-      matmul(U_splits[0], get_Ubig(child1, level+1), Ubig_splits[0], true, true);
-      matmul(U_splits[1], get_Ubig(child2, level+1), Ubig_splits[1], true, true);
+      matmul(U_splits[0], Ubig_child1, Ubig_splits[0], true, true);
+      matmul(U_splits[1], Ubig_child2, Ubig_splits[1], true, true);
 
       return transpose(Ubig);
     }
@@ -193,16 +191,20 @@ namespace Hatrix {
       int child1 = p * 2;
       int child2 = p * 2 + 1;
       int num_nodes = pow(2, level);
-      int leaf_size = int(N / num_nodes);
+
+      Matrix Vbig_child1 = get_Vbig(child1, level+1);
+      Matrix Vbig_child2 = get_Vbig(child2, level+1);
+
+      int leaf_size = Vbig_child1.rows + Vbig_child2.rows;
       // int rank = leaf_size;
 
       Matrix Vbig(leaf_size, rank);
 
-      std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
+      std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
       std::vector<Matrix> V_splits = V(p, level).split(2, 1);
 
-      matmul(get_Vbig(child1, level+1), V_splits[0], Vbig_splits[0]);
-      matmul(get_Vbig(child2, level+1), V_splits[1], Vbig_splits[1]);
+      matmul(Vbig_child1, V_splits[0], Vbig_splits[0]);
+      matmul(Vbig_child2, V_splits[1], Vbig_splits[1]);
 
       return Vbig;
     }
@@ -267,13 +269,11 @@ namespace Hatrix {
         Vgen_transfer.insert(p, level, matmul(Si, Vi));
       }
 
-      std::cout << "start S process\n";
       for (int row = 0; row < num_nodes; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
         S.insert(row, col, level,
                  generate_coupling_matrix(randvec, row, col, level));
       }
-      std::cout << "done S;\n";
 
       return {Ugen_transfer, Vgen_transfer};
     }
@@ -292,7 +292,6 @@ namespace Hatrix {
 
     double construction_relative_error(const randvec_t& randvec) {
       // verify diagonal matrix block constructions at the leaf level.
-      std::cout << "const\n";
       double error = 0;
       int num_nodes = pow(2, height);
       for (int block = 0; block < num_nodes; ++block) {
@@ -349,7 +348,7 @@ int main(int argc, char *argv[]) {
 
   std::ofstream file;
   file.open("output.txt", std::ios::app | std::ios::out);
-  file << "N= " << N << " rank= " << rank << " height=" << height <<  " const. error=" << error << std::endl;
+  std::cout << "N= " << N << " rank= " << rank << " height=" << height <<  " const. error=" << error << std::endl;
   file.close();
 
 }

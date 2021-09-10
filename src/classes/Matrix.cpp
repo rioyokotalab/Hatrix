@@ -173,6 +173,10 @@ void Matrix::print() const {
   std::cout << "\n";
 }
 
+void Matrix::print_meta() const {
+  std::cout << "rows=" << rows << " cols=" << cols << " stride=" << stride << std::endl;
+}
+
 size_t Matrix::memory_used() const { return rows * cols * sizeof(double); }
 
 size_t Matrix::shared_memory_used() const {
