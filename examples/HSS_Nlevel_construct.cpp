@@ -163,17 +163,18 @@ namespace Hatrix {
     }
 
     std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const randvec_t& randvec, RowLevelMap& Ugen,
-                                    ColLevelMap& Vgen, const int level) {
+                                                                    ColLevelMap& Vgen, const int level) {
       Matrix Ui, Si, Vi; double error;
       RowLevelMap Ugen_transfer; ColLevelMap Vgen_transfer;
 
-      for (int p = 0; p < 2; ++p) {
+      for (int p = 0; p < int(pow(2, level)); ++p) {
         int child1 = p * 2;
         int child2 = p * 2 + 1;
+        int child_level = level + 1;
 
         // Generate U transfer matrix.
-        Matrix& Ugen_upper = Ugen(child1, height);
-        Matrix& Ugen_lower = Ugen(child2, height);
+        Matrix& Ugen_upper = Ugen(child1, child_level);
+        Matrix& Ugen_lower = Ugen(child2, child_level);
         Matrix Ugen_concat(Ugen_upper.rows + Ugen_lower.rows, Ugen_upper.cols);
         // int rank = Ugen_concat.rows;
         std::vector<Matrix> Ugen_slices = Ugen_concat.split(2, 1);
@@ -181,18 +182,20 @@ namespace Hatrix {
         Ugen_slices[1] = Ugen_lower;
 
         std::tie(Ui, Si, Vi, error) = truncated_svd(Ugen_concat, rank);
-        U.insert(p, height-1, std::move(Ui));
+        U.insert(p, level, std::move(Ui));
+        Ugen_transfer.insert(p, level, matmul(Si, Vi));
 
         // Generate V transfer matrix.
-        Matrix& Vgen_upper = Vgen(child1, height);
-        Matrix& Vgen_lower = Vgen(child2, height);
+        Matrix& Vgen_upper = Vgen(child1, child_level);
+        Matrix& Vgen_lower = Vgen(child2, child_level);
         Matrix Vgen_concat(Vgen_upper.rows + Vgen_lower.rows, Vgen_upper.cols);
         std::vector<Matrix> Vgen_slices = Vgen_concat.split(2, 1);
         Vgen_slices[0] = Vgen_upper;
         Vgen_slices[1] = Vgen_lower;
 
         std::tie(Ui, Si, Vi, error) = truncated_svd(Vgen_concat, rank);
-        V.insert(p, height-1, std::move(Ui));
+        V.insert(p, level, std::move(Ui));
+        Vgen_transfer.insert(p, level, matmul(Si, Vi));
       }
 
       for (int row = 0; row < 2; ++row) {
