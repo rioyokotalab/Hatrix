@@ -126,42 +126,43 @@ namespace Hatrix {
     }
 
     Matrix get_Ubig(int p, int level) {
+      if (level == height) {
+        return U(p, level);
+      }
       int child1 = p * 2;
       int child2 = p * 2 + 1;
       int num_nodes = pow(2, level);
       int leaf_size = int(N / num_nodes);
       // int rank = leaf_size;
-      if (level == height) {
-        return U(p, level);
-      }
+
       Matrix Ubig(rank, leaf_size);
 
       std::vector<Matrix> Ubig_splits = Ubig.split(1, 2);
-      std::vector<Matrix> U_splits = U(p, height-1).split(2, 1);
+      std::vector<Matrix> U_splits = U(p, level).split(2, 1);
 
-      matmul(U_splits[0], U(child1, height), Ubig_splits[0], true, true);
-      matmul(U_splits[1], U(child2, height), Ubig_splits[1], true, true);
+      matmul(U_splits[0], get_Ubig(child1, level+1), Ubig_splits[0], true, true);
+      matmul(U_splits[1], get_Ubig(child2, level+1), Ubig_splits[1], true, true);
 
       return transpose(Ubig);
     }
 
     Matrix get_Vbig(int p, int level) {
+      if (level == height) {
+        return V(p, level);
+      }
       int child1 = p * 2;
       int child2 = p * 2 + 1;
       int num_nodes = pow(2, level);
       int leaf_size = int(N / num_nodes);
       // int rank = leaf_size;
-      if (level == height) {
-        return V(p, level);
-      }
 
       Matrix Vbig(leaf_size, rank);
 
       std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
-      std::vector<Matrix> V_splits = V(p, height - 1).split(2, 1);
+      std::vector<Matrix> V_splits = V(p, level).split(2, 1);
 
-      matmul(V(child1, height), V_splits[0], Vbig_splits[0]);
-      matmul(V(child2, height), V_splits[1], Vbig_splits[1]);
+      matmul(get_Vbig(child1, level+1), V_splits[0], Vbig_splits[0]);
+      matmul(get_Vbig(child2, level+1), V_splits[1], Vbig_splits[1]);
 
       return Vbig;
     }
@@ -253,12 +254,16 @@ namespace Hatrix {
         int num_nodes = pow(2, level);
         int block_size = N / num_nodes;
 
-        for (int node = 0; node < num_nodes; ++node) {
-          Matrix Ubig = get_Ubig(node, level);
-          Matrix Vbig = get_Vbig(node, level);
+        for (int row = 0; row < num_nodes; ++row) {
+          int col = row % 2 == 0 ? row + 1 : row - 1;
+          Matrix Ubig = get_Ubig(row, level);
+          Matrix Vbig = get_Vbig(col, level);
+          Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+          Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_size, block_size,
+                                                            row * block_size, col * block_size);
+          double offD_error = rel_error(expected, actual);
+          error += pow(offD_error, 2);
         }
-
-
       }
 
       return std::sqrt(error);
@@ -283,6 +288,8 @@ int main(int argc, char *argv[]) {
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::HSS A(randvec, N, rank, height);
   auto stop_construct = std::chrono::system_clock::now();
+
+  std::cout << " r: " << A.U(0, 2).rows << " c: " << A.U(0, 1).cols << std::endl;
 
   double error = A.construction_relative_error(randvec);
 
