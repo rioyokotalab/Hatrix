@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cassert>
 #include <chrono>
+#include <ofstream>
 
 #include "Hatrix/Hatrix.h"
 
@@ -285,6 +286,9 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::finalize();
 
-  std::cout << "N= " << N << " rank= " << rank << " height=" << height <<  " const. error=" << error << std::endl;
+  std::ofstream file;
+  file.open("output.txt", std::ios::app | std::ios::out);
+  file << "N= " << N << " rank= " << rank << " height=" << height <<  " const. error=" << error << std::endl;
+  file.close();
 
 }
