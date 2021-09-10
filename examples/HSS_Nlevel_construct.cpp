@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cassert>
 #include <chrono>
-#include <ofstream>
+#include <fstream>
 
 #include "Hatrix/Hatrix.h"
 
@@ -35,11 +35,14 @@ namespace Hatrix {
 
   private:
 
-    std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, const randvec_t& randvec) {
+    std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size,
+                                                     const randvec_t& randvec) {
       Matrix row_slice(leaf_size, N - leaf_size);
       int64_t ncols_left_slice = block * leaf_size;
       Matrix left_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_left_slice,
                                                     block * leaf_size, 0);
+
+
       int64_t ncols_right_slice = N - (block+1) * leaf_size;
       Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
                                                      block * leaf_size, (block+1) * leaf_size);
@@ -102,14 +105,18 @@ namespace Hatrix {
 
     std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(const randvec_t& randvec) {
       int nblocks = pow(2, height);
-      int leaf_size = N / nblocks;
       ColLevelMap Ugen;
       RowLevelMap Vgen;
 
       for (int block = 0; block < nblocks; ++block) {
+        int slice = N / nblocks;
+        int leaf_size = (block == (nblocks-1)) ? (N - (slice * block)) :  slice;
+
+        int diagonal_offset = slice * block;
         D.insert(block, block, height,
                  Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
-                                                   block * leaf_size, block * leaf_size));
+                                                   diagonal_offset, diagonal_offset));
+
         Matrix U_temp, Ugen_temp;
         std::tie(U_temp, Ugen_temp) = generate_column_bases(block, leaf_size, randvec);
         U.insert(block, height, std::move(U_temp));
@@ -267,7 +274,7 @@ int main(int argc, char *argv[]) {
   int rank = atoi(argv[2]);
   int height = atoi(argv[3]);
 
-  if (N % int(pow(2, height)) != 0 || rank > int(N / pow(2, height))) {
+  if (N % int(N / pow(2, height)) != 0 || rank > int(N / pow(2, height))) {
     std::cout << N << " % " << pow(2, height) << " != 0 || rank > leaf(" << int(N / pow(2, height))  << ")\n";
     abort();
   }
@@ -279,8 +286,6 @@ int main(int argc, char *argv[]) {
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::HSS A(randvec, N, rank, height);
   auto stop_construct = std::chrono::system_clock::now();
-
-  std::cout << " r: " << A.U(0, 2).rows << " c: " << A.U(0, 1).cols << std::endl;
 
   double error = A.construction_relative_error(randvec);
 
