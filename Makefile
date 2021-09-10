@@ -49,7 +49,7 @@ test: $(TEST_EXECUTABLES)
 
 .PHONY: clean
 clean:
-	for dir in $(DIRS) test; do \
+	for dir in $(DIRS) $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/
