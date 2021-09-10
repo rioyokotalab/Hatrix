@@ -125,11 +125,15 @@ namespace Hatrix {
       return {Ugen, Vgen};
     }
 
-    Matrix generate_U_actual_bases(int p) {
+    Matrix get_Ubig(int p, int level) {
       int child1 = p * 2;
       int child2 = p * 2 + 1;
-      int leaf_size = int(N / 2);
+      int num_nodes = pow(2, level);
+      int leaf_size = int(N / num_nodes);
       // int rank = leaf_size;
+      if (level == height) {
+        return U(p, level);
+      }
       Matrix Ubig(rank, leaf_size);
 
       std::vector<Matrix> Ubig_splits = Ubig.split(1, 2);
@@ -141,11 +145,16 @@ namespace Hatrix {
       return transpose(Ubig);
     }
 
-    Matrix generate_V_actual_bases(int p) {
+    Matrix get_Vbig(int p, int level) {
       int child1 = p * 2;
       int child2 = p * 2 + 1;
-      int leaf_size = int(N / 2);
+      int num_nodes = pow(2, level);
+      int leaf_size = int(N / num_nodes);
       // int rank = leaf_size;
+      if (level == height) {
+        return V(p, level);
+      }
+
       Matrix Vbig(leaf_size, rank);
 
       std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
@@ -203,10 +212,10 @@ namespace Hatrix {
 
       for (int row = 0; row < num_nodes; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
-        int leaf_size = int(N / 2);
+        int leaf_size = int(N / num_nodes);
 
-        Matrix Ubig = generate_U_actual_bases(row);
-        Matrix Vbig = generate_V_actual_bases(col);
+        Matrix Ubig = get_Ubig(row, level);
+        Matrix Vbig = get_Vbig(col, level);
 
         S.insert(row, col, level,
                  generate_non_leaf_coupling_matrix(randvec, row, col, leaf_size,
@@ -228,15 +237,28 @@ namespace Hatrix {
     }
 
     double construction_relative_error(const randvec_t& randvec) {
-      // verify diagonal matrix block constructions at the leaf level
+      // verify diagonal matrix block constructions at the leaf level.
       double error = 0;
       int num_nodes = pow(2, height);
-      int leaf_size = N / num_nodes;
       for (int block = 0; block < num_nodes; ++block) {
+        int leaf_size = N / num_nodes;
         double diagonal_error = rel_error(D(block, block, height),
                                           Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                                                             block * leaf_size, block * leaf_size));
         error += pow(diagonal_error, 2);
+      }
+
+      // regenerate off-diagonal blocks and test for correctness.
+      for (int level = height; level > 0; --level) {
+        int num_nodes = pow(2, level);
+        int block_size = N / num_nodes;
+
+        for (int node = 0; node < num_nodes; ++node) {
+          Matrix Ubig = get_Ubig(node, level);
+          Matrix Vbig = get_Vbig(node, level);
+        }
+
+
       }
 
       return std::sqrt(error);
