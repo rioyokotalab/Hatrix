@@ -233,14 +233,20 @@ TEST(MatrixTests, split_no_split) {
                                                  std::vector<int64_t>(1, 0), false);
 
   for (int i = 0; i < A_splits[0].rows; ++i) {
-    for (int j = 0; j < A_splits[1].cols; ++j) {
+    for (int j = 0; j < A_splits[0].cols; ++j) {
       EXPECT_EQ(A(i, j), A_splits[0](i, j));
     }
   }
+}
 
-  for (int i = 0; i < A_splits[1].rows; ++i) {
-    for (int j = 0; j < A_splits[1].cols; ++j) {
-      EXPECT_EQ(A(i + A_splits[0].rows, j + A_splits[0].cols), A_splits[1](i, j));
-    }
+TEST(MatrixTests, split_vector_row_end) {
+  int64_t N = 40;
+  Hatrix::Matrix V = Hatrix::generate_random_matrix(N, 1);
+  std::vector<Hatrix::Matrix> V_splits = V.split({0, N/4, N/2, (3 * N) / 4, N}, {});
+
+  EXPECT_EQ(V_splits.size(), 4);
+  for (int i = 0; i < 4; ++i) {
+    EXPECT_EQ(V_splits[i].rows, N/4);
+    EXPECT_EQ(V_splits[i].cols, 1);
   }
 }
