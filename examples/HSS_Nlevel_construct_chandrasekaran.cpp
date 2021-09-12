@@ -35,24 +35,14 @@ namespace Hatrix {
 
   private:
 
-    Matrix generate_column_bases(int block,
-                                 int leaf_size,
-                                 int diagonal_offset,
-                                 int slice,
-                                 int level,
-                                 const randvec_t& randvec) {
-      int num_nodes = pow(2, level);
+    Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randvec) {
       Matrix row_slice(leaf_size, N - leaf_size);
-      int64_t ncols_left_slice = block * slice;
+      int64_t ncols_left_slice = block * leaf_size;
       Matrix left_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_left_slice,
-                                                    diagonal_offset, 0);
-
-      int64_t ncols_right_slice = block == num_nodes - 1 ? 0 : N - (block+1) * slice;
+                                                    block * leaf_size, 0);
+      int64_t ncols_right_slice = N - (block+1) * leaf_size;
       Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
-                                                     diagonal_offset, (block+1) * slice);
-
-      std::vector<Matrix> row_slice_parts = row_slice.split({},
-                                                            std::vector<int64_t>(1, ncols_left_slice));
+                                                     block * leaf_size, (block+1) * leaf_size);
 
       // concat left and right slices
       for (int i = 0; i < leaf_size; ++i) {
@@ -71,21 +61,14 @@ namespace Hatrix {
       return Ui;
     }
 
-    Matrix generate_row_bases(int block,
-                              int leaf_size,
-                              int diagonal_offset,
-                              int slice,
-                              int level,
-                              const randvec_t& randvec) {
-      int num_nodes = pow(2, level);
+    Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randvec) {
       Matrix col_slice(N - leaf_size, leaf_size);
-      int nrows_upper_slice = block * slice;
+      int nrows_upper_slice = block * leaf_size;
       Matrix upper_slice = generate_laplacend_matrix(randvec, nrows_upper_slice, leaf_size,
-                                                     0, diagonal_offset);
-
-      int nrows_lower_slice = block == num_nodes - 1 ? 0 : N - (block + 1) * slice;
+                                                     0, block * leaf_size);
+      int nrows_lower_slice = N - (block + 1) * leaf_size;
       Matrix lower_slice = generate_laplacend_matrix(randvec, nrows_lower_slice, leaf_size,
-                                                     (block+1) * slice, diagonal_offset);
+                                                     (block+1) * leaf_size, block * leaf_size);
 
       for (int j = 0; j < col_slice.cols; ++j) {
         for (int i = 0; i < nrows_upper_slice; ++i) {
@@ -102,7 +85,7 @@ namespace Hatrix {
       std::tie(Ui, Si, Vi, error) = truncated_svd(col_slice_t, rank);
 
       return Ui;
-    }
+    }X
 
     Matrix generate_coupling_matrix(const randvec_t& randvec, const int row, const int col,
                                     const int level) {
@@ -122,29 +105,21 @@ namespace Hatrix {
       int nblocks = pow(2, height);
 
       for (int block = 0; block < nblocks; ++block) {
-        int slice = N / nblocks;
-        int leaf_size = (block == (nblocks-1)) ? (N - (slice * block)) :  slice;
+        int leaf_size = N / nblocks;
 
         // Diagonal offset is used since the last block can have a different shape from
         // the rest.
-        int diagonal_offset = slice * block;
         D.insert(block, block, height,
                  Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
-                                                   diagonal_offset, diagonal_offset));
+                                                   block * leaf_size, block * leaf_size));
 
         Matrix U_temp = generate_column_bases(block,
-                                               leaf_size,
-                                               diagonal_offset,
-                                               slice,
-                                               height,
-                                               randvec);
+                                              leaf_size,
+                                              randvec);
         U.insert(block, height, std::move(U_temp));
 
         Matrix V_temp = generate_row_bases(block,
                                            leaf_size,
-                                           diagonal_offset,
-                                           slice,
-                                           height,
                                            randvec);
         V.insert(block, height, std::move(V_temp));
       }
@@ -221,34 +196,14 @@ namespace Hatrix {
 
         // Generate U transfer matrix.
         int c_num_nodes = pow(2, child_level);
-        int c1_slice = N / c_num_nodes;
-        int c1_leaf_size = (child1 == (c_num_nodes-1)) ? (N - (c1_slice * child1)) :  c1_slice;
-        int c1_diagonal_offset = c1_slice * child1;
+        int child_leaf_size = N / c_num_nodes;
         Matrix U_child1 = generate_column_bases(child1,
-                                                c1_leaf_size,
-                                                c1_diagonal_offset,
-                                                c1_slice,
-                                                child_level,
+                                                child_leaf_size,
                                                 randvec);// get_Ubig(child1, child_level);
-
-        int c2_slice = N / c_num_nodes;
-        int c2_leaf_size = (child2 == (c_num_nodes-1)) ? (N - (c2_slice * child2)) :  c2_slice;
-        int c2_diagonal_offset = c2_slice * child2;
         Matrix U_child2 = generate_column_bases(child2,
-                                                c2_leaf_size,
-                                                c2_diagonal_offset,
-                                                c2_slice,
-                                                child_level,
+                                                child_leaf_size,
                                                 randvec);
-
-        // Matrix U_child2 = get_Ubig(child2, child_level);
-
-        Matrix Ubig = generate_column_bases(p,
-                                            leaf_size,
-                                            diagonal_offset,
-                                            slice,
-                                            level,
-                                            randvec);
+        Matrix Ubig = generate_column_bases(p, leaf_size, randvec);
         std::vector<Matrix> Ubig_splits = Ubig.split(std::vector<int64_t>(1, U_child1.rows), {});
 
         Matrix Utransfer(rank * 2, rank);
@@ -262,26 +217,12 @@ namespace Hatrix {
 
         // Generate V transfer matrix.
         Matrix Vbig_child1 = generate_row_bases(child1,
-                                                c1_leaf_size,
-                                                c1_diagonal_offset,
-                                                c1_slice,
-                                                child_level,
+                                                child_leaf_size,
                                                 randvec);// get_Ubig(child1, child_level);
-
-        // Matrix Vbig_child1 = get_Vbig(child1, child_level);
         Matrix Vbig_child2 = generate_row_bases(child2,
-                                                c2_leaf_size,
-                                                c2_diagonal_offset,
-                                                c2_slice,
-                                                child_level,
+                                                child_leaf_size,
                                                 randvec);// get_Ubig(child1, child_level);
-        // Matrix Vbig_child2 = get_Vbig(child2, child_level);
-        Matrix Vbig  = generate_row_bases(p,
-                                          leaf_size,
-                                          diagonal_offset,
-                                          slice,
-                                          level,
-                                          randvec);
+        Matrix Vbig  = generate_row_bases(p, leaf_size, randvec);
         std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
         Matrix Vtransfer(rank * 2, rank);
         std::vector<Matrix> Vtransfer_splits = Vtransfer.split(2, 1);
@@ -365,7 +306,7 @@ int main(int argc, char *argv[]) {
   int rank = atoi(argv[2]);
   int height = atoi(argv[3]);
 
-  if (rank > int(N / pow(2, height))) {
+  if (N % int(pow(2, height)) != 0 && rank > int(N / pow(2, height))) {
     std::cout << N << " % " << pow(2, height) << " != 0 || rank > leaf(" << int(N / pow(2, height))  << ")\n";
     abort();
   }
