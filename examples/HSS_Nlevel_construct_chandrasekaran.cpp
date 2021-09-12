@@ -85,28 +85,13 @@ namespace Hatrix {
       std::tie(Ui, Si, Vi, error) = truncated_svd(col_slice_t, rank);
 
       return Ui;
-    }X
-
-    Matrix generate_coupling_matrix(const randvec_t& randvec, const int row, const int col,
-                                    const int level) {
-
-      Matrix Ubig = get_Ubig(row, level);
-      Matrix Vbig = get_Vbig(col, level);
-      int block_nrows = Ubig.rows;
-      int block_ncols = Vbig.rows;
-      int slice = N / int(pow(2, level));
-      Matrix D = generate_laplacend_matrix(randvec, block_nrows, block_ncols,
-                                           row * slice, col * slice);
-      return matmul(matmul(Ubig, D, true, false), Vbig);
     }
-
 
     void generate_leaf_nodes(const randvec_t& randvec) {
       int nblocks = pow(2, height);
+      int leaf_size = N / nblocks;
 
       for (int block = 0; block < nblocks; ++block) {
-        int leaf_size = N / nblocks;
-
         // Diagonal offset is used since the last block can have a different shape from
         // the rest.
         D.insert(block, block, height,
@@ -126,7 +111,9 @@ namespace Hatrix {
 
       for (int row = 0; row < nblocks; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
-        S.insert(row, col, height, generate_coupling_matrix(randvec, row, col, height));
+        Matrix D = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                             row * leaf_size, col * leaf_size);
+        S.insert(row, col, height, matmul(matmul(U(row, height), D, true, false), V(col, height)));
       }
     }
 
@@ -183,20 +170,18 @@ namespace Hatrix {
 
     void generate_transfer_matrices(const randvec_t& randvec, const int level) {
       int num_nodes = pow(2, level);
-      int slice = N / num_nodes;
+      int leaf_size = N / num_nodes;
+      int child_level = level + 1;
+      int c_num_nodes = pow(2, child_level);
+      int child_leaf_size = N / c_num_nodes;
 
       std::vector<Matrix> Ublocks, Vblocks;
 
       for (int p = 0; p < num_nodes; ++p) {
         int child1 = p * 2;
         int child2 = p * 2 + 1;
-        int child_level = level + 1;
-        int leaf_size = (p == (num_nodes-1)) ? (N - (slice * p)) :  slice;
-        int diagonal_offset = slice * p;
 
         // Generate U transfer matrix.
-        int c_num_nodes = pow(2, child_level);
-        int child_leaf_size = N / c_num_nodes;
         Matrix U_child1 = generate_column_bases(child1,
                                                 child_leaf_size,
                                                 randvec);// get_Ubig(child1, child_level);
@@ -238,12 +223,9 @@ namespace Hatrix {
         int col = row % 2 == 0 ? row + 1 : row - 1;
         Matrix& Ubig = Ublocks[row];
         Matrix& Vbig = Vblocks[col];
-        int block_nrows = Ubig.rows;
-        int block_ncols = Vbig.rows;
-        int slice = N / int(pow(2, level));
 
-        Matrix D = generate_laplacend_matrix(randvec, block_nrows, block_ncols,
-                                             row * slice, col * slice);
+        Matrix D = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                             row * leaf_size, col * leaf_size);
         S.insert(row, col, level, matmul(matmul(Ubig, D, true, false), Vbig));
       }
     }
@@ -265,12 +247,9 @@ namespace Hatrix {
       int num_nodes = pow(2, height);
       for (int block = 0; block < num_nodes; ++block) {
         int slice = N / num_nodes;
-        int diagonal_offset = slice * block;
-        int leaf_size = (block == (num_nodes-1)) ? (N - (slice * block)) :  slice;
-
         double diagonal_error = rel_error(D(block, block, height),
-                                          Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
-                                                                            diagonal_offset, diagonal_offset));
+                                          Hatrix::generate_laplacend_matrix(randvec, slice, slice,
+                                                                            slice * block, slice * block));
         error += pow(diagonal_error, 2);
       }
 
@@ -283,10 +262,8 @@ namespace Hatrix {
           int col = row % 2 == 0 ? row + 1 : row - 1;
           Matrix Ubig = get_Ubig(row, level);
           Matrix Vbig = get_Vbig(col, level);
-          int block_nrows = Ubig.rows;
-          int block_ncols = Vbig.rows;
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-          Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
+          Matrix actual = Hatrix::generate_laplacend_matrix(randvec, slice, slice,
                                                             row * slice, col * slice);
           double offD_error = rel_error(expected, actual);
 
