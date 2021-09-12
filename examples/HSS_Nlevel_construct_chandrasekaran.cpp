@@ -51,7 +51,7 @@ namespace Hatrix {
       Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
                                                      diagonal_offset, (block+1) * slice);
 
-      std::vector<Matrix> row_slice_parts = row_slice.split(std::vector<int64_t>(1, 0),
+      std::vector<Matrix> row_slice_parts = row_slice.split({},
                                                             std::vector<int64_t>(1, ncols_left_slice));
 
       // concat left and right slices
@@ -305,7 +305,6 @@ namespace Hatrix {
                                                             row * slice, col * slice);
           double offD_error = rel_error(expected, actual);
 
-          std::cout << "row=" << row << " col=" << col << " level=" << level << " error=" << offD_error << std::endl;
           error += pow(offD_error, 2);
         }
       }
