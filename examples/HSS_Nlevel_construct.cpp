@@ -198,7 +198,7 @@ namespace Hatrix {
       Matrix Vbig_child2 = get_Vbig(child2, level+1);
 
       int leaf_size = Vbig_child1.rows + Vbig_child2.rows;
-      // int rank = leaf_size;
+      //int rank = leaf_size;
 
       Matrix Vbig(leaf_size, rank);
 
@@ -241,7 +241,6 @@ namespace Hatrix {
             Ugen_slices[1](i, j) = Ugen_lower(i, j);
           }
         }
-
 
         std::tie(Ui, Si, Vi, error) = truncated_svd(Ugen_concat, rank);
         U.insert(p, level, std::move(Ui));
