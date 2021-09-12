@@ -245,19 +245,6 @@ namespace Hatrix {
         // Use max since the last block might differ in length.
         Matrix Ugen_concat(Ugen_upper.rows + Ugen_lower.rows, std::max(Ugen_upper.cols, Ugen_lower.cols));
         // int rank = Ugen_concat.rows;
-        std::vector<Matrix> Ugen_slices = Ugen_concat.split(2, 1);
-
-        // cannot use slices since the large matrix can have a larger dimension than the smaller ones.
-        for (int i = 0; i < Ugen_upper.rows; i++) {
-          for (int j = 0; j < Ugen_upper.cols; j++) {
-            Ugen_slices[0](i, j) = Ugen_upper(i, j);
-          }
-        }
-        for (int i = 0; i < Ugen_lower.rows; i++) {
-          for (int j = 0; j < Ugen_lower.cols; j++) {
-            Ugen_slices[1](i, j) = Ugen_lower(i, j);
-          }
-        }
 
         std::tie(Ui, Si, Vi, error) = truncated_svd(Ugen_concat, rank);
         U.insert(p, level, std::move(U1_0));
@@ -277,17 +264,6 @@ namespace Hatrix {
         Matrix& Vgen_upper = Vgen(child1, child_level);
         Matrix& Vgen_lower = Vgen(child2, child_level);
         Matrix Vgen_concat(Vgen_upper.rows + Vgen_lower.rows, std::max(Vgen_upper.cols, Vgen_lower.cols));
-        std::vector<Matrix> Vgen_slices = Vgen_concat.split(2, 1);
-        for (int i = 0; i < Vgen_upper.rows; i++) {
-          for (int j = 0; j < Vgen_upper.cols; j++) {
-            Vgen_slices[0](i, j) = Vgen_upper(i, j);
-          }
-        }
-        for (int i = 0; i < Vgen_lower.rows; i++) {
-          for (int j = 0; j < Vgen_lower.cols; j++) {
-            Vgen_slices[1](i, j) = Vgen_lower(i, j);
-          }
-        }
 
         std::tie(Ui, Si, Vi, error) = truncated_svd(Vgen_concat, rank);
         V.insert(p, level, std::move(V1_0));
