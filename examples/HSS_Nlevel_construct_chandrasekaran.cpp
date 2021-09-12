@@ -218,8 +218,28 @@ namespace Hatrix {
         int diagonal_offset = slice * p;
 
         // Generate U transfer matrix.
-        Matrix U_child1 = get_Ubig(child1, child_level);
-        Matrix U_child2 = get_Ubig(child2, child_level);
+        int c_num_nodes = pow(2, child_level);
+        int c1_slice = N / c_num_nodes;
+        int c1_leaf_size = (child1 == (c_num_nodes-1)) ? (N - (c1_slice * child1)) :  c1_slice;
+        int c1_diagonal_offset = c1_slice * child1;
+        Matrix U_child1 = generate_column_bases(child1,
+                                                c1_leaf_size,
+                                                c1_diagonal_offset,
+                                                c1_slice,
+                                                child_level,
+                                                randvec);// get_Ubig(child1, child_level);
+
+        int c2_slice = N / c_num_nodes;
+        int c2_leaf_size = (child2 == (c_num_nodes-1)) ? (N - (c2_slice * child2)) :  c2_slice;
+        int c2_diagonal_offset = c2_slice * child2;
+        Matrix U_child2 = generate_column_bases(child2,
+                                                c2_leaf_size,
+                                                c2_diagonal_offset,
+                                                c2_slice,
+                                                child_level,
+                                                randvec);
+
+        // Matrix U_child2 = get_Ubig(child2, child_level);
 
         Matrix Ubig = generate_column_bases(p,
                                             leaf_size,
@@ -238,8 +258,21 @@ namespace Hatrix {
         U.insert(p, level, std::move(Utransfer));
 
         // Generate V transfer matrix.
-        Matrix Vbig_child1 = get_Vbig(child1, child_level);
-        Matrix Vbig_child2 = get_Vbig(child2, child_level);
+        Matrix Vbig_child1 = generate_row_bases(child1,
+                                                   c1_leaf_size,
+                                                   c1_diagonal_offset,
+                                                   c1_slice,
+                                                   child_level,
+                                                   randvec);// get_Ubig(child1, child_level);
+
+        // Matrix Vbig_child1 = get_Vbig(child1, child_level);
+        Matrix Vbig_child2 = generate_row_bases(child2,
+                                                   c2_leaf_size,
+                                                   c2_diagonal_offset,
+                                                   c2_slice,
+                                                   child_level,
+                                                   randvec);// get_Ubig(child1, child_level);
+        // Matrix Vbig_child2 = get_Vbig(child2, child_level);
         Matrix Vbig  = generate_row_bases(p,
                                           leaf_size,
                                           diagonal_offset,
@@ -304,6 +337,8 @@ namespace Hatrix {
           Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
                                                             row * slice, col * slice);
           double offD_error = rel_error(expected, actual);
+
+          std::cout << "level=" << level << " row=" << row << " error=" << offD_error << std::endl;
 
           error += pow(offD_error, 2);
         }
