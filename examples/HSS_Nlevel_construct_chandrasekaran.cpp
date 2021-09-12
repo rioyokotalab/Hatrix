@@ -210,6 +210,8 @@ namespace Hatrix {
       int num_nodes = pow(2, level);
       int slice = N / num_nodes;
 
+      std::vector<Matrix> Ublocks, Vblocks;
+
       for (int p = 0; p < num_nodes; ++p) {
         int child1 = p * 2;
         int child2 = p * 2 + 1;
@@ -256,22 +258,23 @@ namespace Hatrix {
         matmul(U_child2, Ubig_splits[1], Utransfer_splits[1], true, false, 1.0, 0.0);
 
         U.insert(p, level, std::move(Utransfer));
+        Ublocks.push_back(Ubig);
 
         // Generate V transfer matrix.
         Matrix Vbig_child1 = generate_row_bases(child1,
-                                                   c1_leaf_size,
-                                                   c1_diagonal_offset,
-                                                   c1_slice,
-                                                   child_level,
-                                                   randvec);// get_Ubig(child1, child_level);
+                                                c1_leaf_size,
+                                                c1_diagonal_offset,
+                                                c1_slice,
+                                                child_level,
+                                                randvec);// get_Ubig(child1, child_level);
 
         // Matrix Vbig_child1 = get_Vbig(child1, child_level);
         Matrix Vbig_child2 = generate_row_bases(child2,
-                                                   c2_leaf_size,
-                                                   c2_diagonal_offset,
-                                                   c2_slice,
-                                                   child_level,
-                                                   randvec);// get_Ubig(child1, child_level);
+                                                c2_leaf_size,
+                                                c2_diagonal_offset,
+                                                c2_slice,
+                                                child_level,
+                                                randvec);// get_Ubig(child1, child_level);
         // Matrix Vbig_child2 = get_Vbig(child2, child_level);
         Matrix Vbig  = generate_row_bases(p,
                                           leaf_size,
@@ -287,12 +290,20 @@ namespace Hatrix {
         matmul(Vbig_child2, Vbig_splits[1], Vtransfer_splits[1], true, false, 1.0, 0.0);
 
         V.insert(p, level, std::move(Vtransfer));
+        Vblocks.push_back(Vbig);
       }
 
       for (int row = 0; row < num_nodes; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
-        S.insert(row, col, level,
-                 generate_coupling_matrix(randvec, row, col, level));
+        Matrix& Ubig = Ublocks[row];
+        Matrix& Vbig = Vblocks[col];
+        int block_nrows = Ubig.rows;
+        int block_ncols = Vbig.rows;
+        int slice = N / int(pow(2, level));
+
+        Matrix D = generate_laplacend_matrix(randvec, block_nrows, block_ncols,
+                                             row * slice, col * slice);
+        S.insert(row, col, level, matmul(matmul(Ubig, D, true, false), Vbig));
       }
     }
 
