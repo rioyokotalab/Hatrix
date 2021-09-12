@@ -13,6 +13,7 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	2x2_BLR_weak_GEMM \
 	HSS_2level_construct \
 	HSS_Nlevel_construct \
+	HSS_Nlevel_construct_chandrasekaran \
 	NxN_BlockDense_LU \
 	NxN_BLR_LU \
 	NxN_BLR_strong_GEMM \
