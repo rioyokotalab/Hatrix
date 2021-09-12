@@ -208,34 +208,50 @@ namespace Hatrix {
 
     void generate_transfer_matrices(const randvec_t& randvec, const int level) {
       int num_nodes = pow(2, level);
-      int leaf_size = N / num_nodes;
+      int slice = N / num_nodes;
 
       for (int p = 0; p < num_nodes; ++p) {
         int child1 = p * 2;
         int child2 = p * 2 + 1;
         int child_level = level + 1;
+        int leaf_size = (p == (num_nodes-1)) ? (N - (slice * p)) :  slice;
+        int diagonal_offset = slice * p;
 
         // Generate U transfer matrix.
-        Matrix Ubig = generate_column_bases(p, leaf_size, p * leaf_size, leaf_size, level, randvec);
-        std::vector<Matrix> Ubig_splits = Ubig.split(2, 1);
+        Matrix U_child1 = get_Ubig(child1, child_level);
+        Matrix U_child2 = get_Ubig(child2, child_level);
+
+        Matrix Ubig = generate_column_bases(p,
+                                            leaf_size,
+                                            diagonal_offset,
+                                            slice,
+                                            level,
+                                            randvec);
+        std::vector<Matrix> Ubig_splits = Ubig.split(std::vector<int64_t>(1, U_child1.rows), {});
 
         Matrix Utransfer(rank * 2, rank);
         std::vector<Matrix> Utransfer_splits = Utransfer.split(2, 1);
 
-        matmul(get_Ubig(child1, child_level), Ubig_splits[0], Utransfer_splits[0], true, false, 1.0, 0.0);
-        matmul(get_Ubig(child2, child_level), Ubig_splits[1], Utransfer_splits[1], true, false, 1.0, 0.0);
+        matmul(U_child1, Ubig_splits[0], Utransfer_splits[0], true, false, 1.0, 0.0);
+        matmul(U_child2, Ubig_splits[1], Utransfer_splits[1], true, false, 1.0, 0.0);
 
         U.insert(p, level, std::move(Utransfer));
 
         // Generate V transfer matrix.
-        Matrix Vbig  = generate_row_bases(p, leaf_size, p * leaf_size, leaf_size, level, randvec);
-
-        std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
+        Matrix Vbig_child1 = get_Vbig(child1, child_level);
+        Matrix Vbig_child2 = get_Vbig(child2, child_level);
+        Matrix Vbig  = generate_row_bases(p,
+                                          leaf_size,
+                                          diagonal_offset,
+                                          slice,
+                                          level,
+                                          randvec);
+        std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
         Matrix Vtransfer(rank * 2, rank);
         std::vector<Matrix> Vtransfer_splits = Vtransfer.split(2, 1);
 
-        matmul(get_Vbig(child1, child_level), Vbig_splits[0], Vtransfer_splits[0], true, false, 1.0, 0.0);
-        matmul(get_Vbig(child2, child_level), Vbig_splits[1], Vtransfer_splits[1], true, false, 1.0, 0.0);
+        matmul(Vbig_child1, Vbig_splits[0], Vtransfer_splits[0], true, false, 1.0, 0.0);
+        matmul(Vbig_child2, Vbig_splits[1], Vtransfer_splits[1], true, false, 1.0, 0.0);
 
         V.insert(p, level, std::move(Vtransfer));
       }
@@ -288,6 +304,8 @@ namespace Hatrix {
           Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
                                                             row * slice, col * slice);
           double offD_error = rel_error(expected, actual);
+
+          std::cout << "row=" << row << " col=" << col << " level=" << level << " error=" << offD_error << std::endl;
           error += pow(offD_error, 2);
         }
       }
