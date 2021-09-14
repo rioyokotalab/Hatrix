@@ -13,6 +13,7 @@ else()
     NxN_BLR_strong_GEMM
     NxN_BlockDense_LU
     NxN_BLR_LU
+    NxN_BLR_weak_QR
     NxN_BLR_strong_LU
     HSS_2level_construct
     UMV_weak_2level
