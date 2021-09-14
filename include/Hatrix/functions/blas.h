@@ -17,8 +17,8 @@ Matrix matmul(const Matrix& A, const Matrix& B, bool transA = false,
 void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
                        bool transA, bool diag, double alpha = 1.0);
 
-Matrix triangular_matmul(const Matrix& A, const Matrix& B, Side side, Mode uplo,
-                       bool transA, bool diag, double alpha = 1.0);
+Matrix triangular_matmul_out(const Matrix& A, const Matrix& B, Side side, Mode uplo,
+			     bool transA, bool diag, double alpha = 1.0);
 
 void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
                       bool unit_diag, bool transA = false, double alpha = 1.0);

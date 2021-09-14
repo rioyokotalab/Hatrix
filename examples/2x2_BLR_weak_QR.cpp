@@ -104,17 +104,17 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
       }
     }
   }
-  std::cout <<"BLR construction error (rel): " <<std::sqrt(diff/norm) <<"\n";
+  std::cout <<"BLR2 construction error (rel): " <<std::sqrt(diff/norm) <<"\n";
   return A;
 }
 
 Hatrix::RowColMap<Hatrix::Matrix> compute_YTY(BLR_2x2& A, BLR_2x2& T, bool transT) {
   Hatrix::RowColMap<Hatrix::Matrix> out;
   for(int i=0; i<2; i++) {
-    Hatrix::Matrix YT = Hatrix::triangular_matmul(T.D(0, 0),
-						  i == 0 ? lower_tri(A.D(0, 0), true) : T.S(i, 0),
-						  Hatrix::Right, Hatrix::Upper,
-						  transT, false);
+    Hatrix::Matrix YT = Hatrix::triangular_matmul_out(T.D(0, 0),
+						      i == 0 ? lower_tri(A.D(0, 0), true) :
+						      T.S(i, 0), Hatrix::Right, Hatrix::Upper,
+						      transT, false);
     for(int j=0; j<2; j++) {
       out.insert(i, j, Hatrix::matmul(YT,
 				      j == 0 ? lower_tri(A.D(0, 0), true) : T.S(j, 0),
