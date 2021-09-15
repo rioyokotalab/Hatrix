@@ -132,15 +132,19 @@ namespace Hatrix {
 
       int leaf_size = Ubig_child1.rows + Ubig_child2.rows;
 
-      Matrix Ubig(rank, leaf_size);
+      Matrix Ubig(leaf_size, rank);
 
-      std::vector<Matrix> Ubig_splits = Ubig.split({}, std::vector<int64_t>(1, Ubig_child1.rows));
+      std::vector<Matrix> Ubig_splits =
+        Ubig.split(
+                   std::vector<int64_t>(1,
+                                        Ubig_child1.rows), {});
+
       std::vector<Matrix> U_splits = U(p, level).split(2, 1);
 
-      matmul(U_splits[0], Ubig_child1, Ubig_splits[0], true, true);
-      matmul(U_splits[1], Ubig_child2, Ubig_splits[1], true, true);
+      matmul(Ubig_child1, U_splits[0], Ubig_splits[0]);
+      matmul(Ubig_child2, U_splits[1], Ubig_splits[1]);
 
-      return transpose(Ubig);
+      return Ubig;
     }
 
     Matrix get_Vbig(int p, int level) {
@@ -260,7 +264,10 @@ namespace Hatrix {
 
         for (int row = 0; row < num_nodes; ++row) {
           int col = row % 2 == 0 ? row + 1 : row - 1;
+          Matrix Ubig_real = generate_column_bases(row, slice, randvec);
           Matrix Ubig = get_Ubig(row, level);
+          std::cout << "rows: " << row <<  Hatrix::norm(Ubig_real - Ubig) << std::endl;
+          // Matrix Vbig = generate_row_bases(col, slice, randvec);
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
           Matrix actual = Hatrix::generate_laplacend_matrix(randvec, slice, slice,
