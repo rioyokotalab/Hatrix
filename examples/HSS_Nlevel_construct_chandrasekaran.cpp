@@ -266,7 +266,7 @@ namespace Hatrix {
           int col = row % 2 == 0 ? row + 1 : row - 1;
           Matrix Ubig_real = generate_column_bases(row, slice, randvec);
           Matrix Ubig = get_Ubig(row, level);
-          std::cout << "rows: " << row <<  Hatrix::norm(Ubig_real - Ubig) << std::endl;
+
           // Matrix Vbig = generate_row_bases(col, slice, randvec);
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
@@ -275,6 +275,8 @@ namespace Hatrix {
           double offD_error = rel_error(expected, actual);
 
           std::cout << "level=" << level << " row=" << row << " error=" << offD_error << std::endl;
+          std::cout << "Ubig error--->: row ->" << row << " error -> " <<  Hatrix::norm(Ubig_real - Ubig) << std::endl;
+          std::cout << "\n\n";
 
           error += pow(offD_error, 2);
         }
