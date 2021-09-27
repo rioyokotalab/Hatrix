@@ -2,7 +2,7 @@ TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
 DIRS := src/classes src/functions src/util
-OBJLIBS := libclasses.a libfunctions.a libutil.a
+OBJLIBS := libfunctions.a libclasses.a libutil.a
 TEST := test
 EXAMPLES := examples
 TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \

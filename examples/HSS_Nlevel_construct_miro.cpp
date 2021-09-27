@@ -27,14 +27,45 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
 
 namespace Hatrix {
   class HSS {
-  public:
+  private:
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap D, S;
     int N, rank, height;
 
+    Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randvec) {
+      Matrix bases(N-leaf_size, rank);
+
+      return bases;
+    }
+
+    Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randvec) {
+      Matrix bases(N-leaf_size, rank);
+
+      return bases;
+    }
+
+    void generate_leaf_bases(const randvec_t& randpts) {
+      int nblocks = pow(2, height);
+      int leaf_size = N / nblocks;
+
+      for (int block = 0; block < nblocks; ++block) {
+        D.insert(block, block, height,
+                 Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                   block * leaf_size, block * leaf_size));
+        Matrix Ubig = generate_column_bases(block, leaf_size, randpts);
+        U.insert(block, height, std::move(Ubig));
+        Matrix Vbig = generate_row_bases(block, leaf_size, randpts);
+        V.insert(block, height, std::move(Vbig));
+      }
+    }
+
+  public:
+
+
     HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
       N(_N), rank(_rank), height(_height) {
+      generate_leaf_bases(randpts);
 
     }
 
@@ -59,7 +90,8 @@ int main(int argc, char* argv[]) {
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
   Hatrix::HSS A(randvec, N, rank, height);
+  double error = A.construction_relative_error(randvec);
 
   Hatrix::Context::finalize();
-
+  std::cout << "N= " << N << " rank= " << rank << " height=" << height <<  " construction error=" << error << std::endl;
 }
