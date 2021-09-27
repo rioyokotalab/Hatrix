@@ -101,6 +101,33 @@ namespace Hatrix {
         Matrix Vbig = generate_row_bases(block, leaf_size, randpts);
         V.insert(block, height, std::move(Vbig));
       }
+
+      for (int row = 0; row < nblocks; ++row) {
+        int col = row % 2 == 0 ? row + 1 : row - 1;
+        Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                             row * leaf_size, col * leaf_size);
+        S.insert(row, col, height, matmul(matmul(U(row, height), D, true, false), V(col, height)));
+      }
+    }
+
+    std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const randvec_t& randpts,
+                                                                    int level, RowLevelMap& Ubig,
+                                                                    ColLevelMap& Vbig) {
+      int num_nodes = pow(2, level);
+      int leaf_size = N / num_nodes;
+      int child_level = level + 1;
+      int c_num_nodes = pow(2, child_level);
+      RowLevelMap Uchild;
+      ColLevelMap Vchild;
+
+      for (int p = 0; p < num_nodes; ++p) {
+        int child1 = p * 2;
+        int child2 = p * 2 + 1;
+
+
+      }
+
+      return {Uchild, Vchild};
     }
 
   public:
@@ -108,12 +135,40 @@ namespace Hatrix {
 
     HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
       N(_N), rank(_rank), height(_height) {
+      RowLevelMap Uchild;
+      ColLevelMap Vchild;
+
       generate_leaf_bases(randpts);
 
+      Uchild = U;
+      Vchild = V;
+
+      for (int level = height-1; level > 0; --level) {
+        std::tie(Uchild, Vchild) = generate_transfer_matrices(randpts, level, Uchild, Vchild);
+      }
     }
 
     double construction_relative_error(const randvec_t& randvec) {
-      return 0;
+      double error = 0;
+      int num_nodes = pow(2, height);
+
+      for (int block = 0; block < num_nodes; ++block) {
+        int slice = N / num_nodes;
+        double diagonal_error = rel_error(D(block, block, height),
+                                          Hatrix::generate_laplacend_matrix(randvec, slice, slice,
+                                                                            slice * block, slice * block));
+        error += pow(diagonal_error, 2);
+      }
+
+      for (int level = height; level > 0; --level) {
+        int num_nodes = pow(2, level);
+        int slice = N / num_nodes;
+
+        for (int row = 0; row < num_nodes; ++row) {
+          int col = row % 2 == 0 ? row + 1 : row - 1;
+        }
+      }
+      return std::sqrt(error);
     }
   };
 }

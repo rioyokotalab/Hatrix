@@ -7,6 +7,9 @@
 
 #include "Hatrix/Hatrix.h"
 
+// Implements the HSS construction algorithm from
+// Chandrasekaran's 2006 paper.
+
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
