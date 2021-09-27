@@ -65,8 +65,27 @@ namespace Hatrix {
     Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randvec) {
       // Col slice since row bases should be cutting across the rows.
       Matrix col_slice(N-leaf_size, leaf_size);
+      int nrows_upper_slice = block * leaf_size;
+      Matrix upper_slice = generate_laplacend_matrix(randvec, nrows_upper_slice, leaf_size,
+                                                     0, block * leaf_size);
+      int nrows_lower_slice = N - (block + 1) * leaf_size;
+      Matrix lower_slice = generate_laplacend_matrix(randvec, nrows_lower_slice, leaf_size,
+                                                     (block+1) * leaf_size, block * leaf_size);
 
-      return bases;
+      for (int j = 0; j < col_slice.cols; ++j) {
+        for (int i = 0; i < nrows_upper_slice; ++i) {
+          col_slice(i, j) = upper_slice(i, j);
+        }
+
+        for (int i = 0; i < nrows_lower_slice; ++i) {
+          col_slice(i + nrows_upper_slice, j) = lower_slice(i, j);
+        }
+      }
+
+      Matrix Ui, Si, Vi; double error;
+      std::tie(Ui, Si, Vi, error) = truncated_svd(col_slice, rank);
+
+      return transpose(Vi);
     }
 
     void generate_leaf_bases(const randvec_t& randpts) {
@@ -94,7 +113,7 @@ namespace Hatrix {
     }
 
     double construction_relative_error(const randvec_t& randvec) {
-
+      return 0;
     }
   };
 }
