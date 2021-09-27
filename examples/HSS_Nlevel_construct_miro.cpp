@@ -33,14 +33,38 @@ namespace Hatrix {
     RowColLevelMap D, S;
     int N, rank, height;
 
+    // Generate U for the leaf.
     Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randvec) {
-      Matrix bases(N-leaf_size, rank);
+      // Row slice since column bases should be cutting across the columns.
+      Matrix row_slice(leaf_size, N-leaf_size);
+      int64_t ncols_left_slice = block * leaf_size;
+      Matrix left_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_left_slice,
+                                                    block * leaf_size, 0);
+      int64_t ncols_right_slice = N - (block+1) * leaf_size;
+      Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
+                                                     block * leaf_size, (block+1) * leaf_size);
 
-      return bases;
+      // concat left and right slices
+      for (int i = 0; i < leaf_size; ++i) {
+        for (int j = 0; j < ncols_left_slice; ++j) {
+          row_slice(i, j) = left_slice(i, j);
+        }
+
+        for (int j = 0; j < ncols_right_slice; ++j) {
+          row_slice(i, j + ncols_left_slice) = right_slice(i, j);
+        }
+      }
+
+      Matrix Ui, Si, Vi; double error;
+      std::tie(Ui, Si, Vi, error) = truncated_svd(row_slice, rank);
+
+      return Ui;
     }
 
+    // Generate V for the leaf.
     Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randvec) {
-      Matrix bases(N-leaf_size, rank);
+      // Col slice since row bases should be cutting across the rows.
+      Matrix col_slice(N-leaf_size, leaf_size);
 
       return bases;
     }
