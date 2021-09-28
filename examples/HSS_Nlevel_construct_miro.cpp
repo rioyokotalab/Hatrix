@@ -33,19 +33,20 @@ namespace Hatrix {
     RowColLevelMap D, S;
     int N, rank, height;
 
-    // Generate U for the leaf.
-    Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randvec) {
-      // Row slice since column bases should be cutting across the columns.
-      Matrix row_slice(leaf_size, N-leaf_size);
-      int64_t ncols_left_slice = block * leaf_size;
-      Matrix left_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_left_slice,
-                                                    block * leaf_size, 0);
-      int64_t ncols_right_slice = N - (block+1) * leaf_size;
-      Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
-                                                     block * leaf_size, (block+1) * leaf_size);
+    // Generate a row slice without the diagonal block specified by 'block'. The
+    // nrows parameter determines at what level the slice is generated at. Returns
+    // a block of size (nrows x (N - nrows)).
+    Matrix generate_row_slice(int block, int nrows, const randvec_t& randpts) {
+      Matrix row_slice(nrows, N-nrows);
+      int64_t ncols_left_slice = block * nrows;
+      Matrix left_slice = generate_laplacend_matrix(randpts, nrows, ncols_left_slice,
+                                                    block * nrows, 0);
+      int64_t ncols_right_slice = N - (block+1) * nrows;
+      Matrix right_slice = generate_laplacend_matrix(randpts, nrows, ncols_right_slice,
+                                                     block * nrows, (block+1) * nrows);
 
       // concat left and right slices
-      for (int i = 0; i < leaf_size; ++i) {
+      for (int i = 0; i < nrows; ++i) {
         for (int j = 0; j < ncols_left_slice; ++j) {
           row_slice(i, j) = left_slice(i, j);
         }
@@ -55,6 +56,13 @@ namespace Hatrix {
         }
       }
 
+      return row_slice;
+    }
+
+    // Generate U for the leaf.
+    Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randpts) {
+      // Row slice since column bases should be cutting across the columns.
+      Matrix row_slice = generate_row_slice(block, leaf_size, randpts);
       Matrix Ui, Si, Vi; double error;
       std::tie(Ui, Si, Vi, error) = truncated_svd(row_slice, rank);
 
@@ -62,14 +70,14 @@ namespace Hatrix {
     }
 
     // Generate V for the leaf.
-    Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randvec) {
+    Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randpts) {
       // Col slice since row bases should be cutting across the rows.
       Matrix col_slice(N-leaf_size, leaf_size);
       int nrows_upper_slice = block * leaf_size;
-      Matrix upper_slice = generate_laplacend_matrix(randvec, nrows_upper_slice, leaf_size,
+      Matrix upper_slice = generate_laplacend_matrix(randpts, nrows_upper_slice, leaf_size,
                                                      0, block * leaf_size);
       int nrows_lower_slice = N - (block + 1) * leaf_size;
-      Matrix lower_slice = generate_laplacend_matrix(randvec, nrows_lower_slice, leaf_size,
+      Matrix lower_slice = generate_laplacend_matrix(randpts, nrows_lower_slice, leaf_size,
                                                      (block+1) * leaf_size, block * leaf_size);
 
       for (int j = 0; j < col_slice.cols; ++j) {
@@ -129,6 +137,8 @@ namespace Hatrix {
         Matrix Utransfer(rank*2, rank);
         std::vector<Matrix> Utransfer_splits = Utransfer.split(2, 1);
 
+        Matrix Alevel_p_plus = generate_row_slice(p, leaf_size, randpts);
+        std::vector<Matrix> Alevel_p_plus_splits = Alevel_p_plus.split(2, 1);
       }
 
       return {Uchild, Vchild};
@@ -152,19 +162,19 @@ namespace Hatrix {
       }
     }
 
-    double construction_relative_error(const randvec_t& randvec) {
+    double construction_relative_error(const randvec_t& randpts) {
       double error = 0;
       int num_nodes = pow(2, height);
 
       for (int block = 0; block < num_nodes; ++block) {
         int slice = N / num_nodes;
         double diagonal_error = rel_error(D(block, block, height),
-                                          Hatrix::generate_laplacend_matrix(randvec, slice, slice,
+                                          Hatrix::generate_laplacend_matrix(randpts, slice, slice,
                                                                             slice * block, slice * block));
         error += pow(diagonal_error, 2);
       }
 
-      for (int level = height; level > 0; --level) {
+      for (int level = height; level > height-1; --level) {
         int num_nodes = pow(2, level);
         int slice = N / num_nodes;
 
@@ -188,11 +198,11 @@ int main(int argc, char* argv[]) {
   }
 
   Hatrix::Context::init();
-  randvec_t randvec;
-  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randvec_t randpts;
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
-  Hatrix::HSS A(randvec, N, rank, height);
-  double error = A.construction_relative_error(randvec);
+  Hatrix::HSS A(randpts, N, rank, height);
+  double error = A.construction_relative_error(randpts);
 
   Hatrix::Context::finalize();
   std::cout << "N= " << N << " rank= " << rank << " height=" << height <<  " construction error=" << error << std::endl;
