@@ -144,6 +144,59 @@ namespace Hatrix {
       return {Uchild, Vchild};
     }
 
+    Matrix get_Ubig(int node, int level) {
+      if (level == height) {
+        return U(node, level);
+      }
+      int child1 = node * 2;
+      int child2 = node * 2 + 1;
+
+      // int rank = leaf_size;
+
+      Matrix Ubig_child1 = get_Ubig(child1, level+1);
+      Matrix Ubig_child2 = get_Ubig(child2, level+1);
+
+      int leaf_size = Ubig_child1.rows + Ubig_child2.rows;
+
+      Matrix Ubig(leaf_size, rank);
+
+      std::vector<Matrix> Ubig_splits =
+        Ubig.split(
+                   std::vector<int64_t>(1,
+                                        Ubig_child1.rows), {});
+
+      std::vector<Matrix> U_splits = U(node, level).split(2, 1);
+
+      matmul(Ubig_child1, U_splits[0], Ubig_splits[0]);
+      matmul(Ubig_child2, U_splits[1], Ubig_splits[1]);
+
+      return Ubig;
+    }
+
+    Matrix get_Vbig(int node, int level) {
+      if (level == height) {
+        return V(node, level);
+      }
+      int child1 = node * 2;
+      int child2 = node * 2 + 1;
+
+      Matrix Vbig_child1 = get_Vbig(child1, level+1);
+      Matrix Vbig_child2 = get_Vbig(child2, level+1);
+
+      int leaf_size = Vbig_child1.rows + Vbig_child2.rows;
+      //int rank = leaf_size;
+
+      Matrix Vbig(leaf_size, rank);
+
+      std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
+      std::vector<Matrix> V_splits = V(node, level).split(2, 1);
+
+      matmul(Vbig_child1, V_splits[0], Vbig_splits[0]);
+      matmul(Vbig_child2, V_splits[1], Vbig_splits[1]);
+
+      return Vbig;
+    }
+
   public:
 
 
@@ -180,6 +233,13 @@ namespace Hatrix {
 
         for (int row = 0; row < num_nodes; ++row) {
           int col = row % 2 == 0 ? row + 1 : row - 1;
+          Matrix Ubig = get_Ubig(row, level);
+          Matrix Vbig = get_Vbig(col, level);
+          Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+          Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+                                                            row * slice, col * slice);
+          double offD_error = rel_error(expected, actual);
+          error += pow(offD_error, 2);
         }
       }
       return std::sqrt(error);
