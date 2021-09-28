@@ -131,30 +131,67 @@ namespace Hatrix {
       int leaf_size = N / num_nodes;
       int child_level = level + 1;
       int c_num_nodes = pow(2, child_level);
-      RowLevelMap Uparent;
-      ColLevelMap Vparent;
+      // Generate the actual bases for the upper level and pass it to this
+      // function again for generating transfer matrices at successive levels.
+      RowLevelMap Ubig_parent;
+      ColLevelMap Vbig_parent;
 
       for (int node = 0; node < num_nodes; ++node) {
         int child1 = node * 2;
         int child2 = node * 2 + 1;
 
-        Matrix& Ubig_child1 = Uchild(child1, child_level);
-        Matrix& Ubig_child2 = Uchild(child2, child_level);
+        {
+          // Generate U transfer matrix.
+          Matrix& Ubig_child1 = Uchild(child1, child_level);
+          Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-        Matrix Alevel_node_plus = generate_row_slice(node, leaf_size, randpts);
-        std::vector<Matrix> Alevel_node_plus_splits = Alevel_node_plus.split(2, 1);
+          Matrix Alevel_node_plus = generate_row_slice(node, leaf_size, randpts);
+          std::vector<Matrix> Alevel_node_plus_splits = Alevel_node_plus.split(2, 1);
 
-        Matrix temp(Ubig_child1.cols + Ubig_child2.cols, Alevel_node_plus.cols);
-        std::vector<Matrix> temp_splits = temp.split(2, 1);
+          Matrix temp(Ubig_child1.cols + Ubig_child2.cols, Alevel_node_plus.cols);
+          std::vector<Matrix> temp_splits = temp.split(2, 1);
 
-        matmul(Ubig_child1, Alevel_node_plus_splits[0], temp_splits[0], true, false, 1, 0);
-        matmul(Ubig_child2, Alevel_node_plus_splits[1], temp_splits[1], true, false, 1, 0);
+          matmul(Ubig_child1, Alevel_node_plus_splits[0], temp_splits[0], true, false, 1, 0);
+          matmul(Ubig_child2, Alevel_node_plus_splits[1], temp_splits[1], true, false, 1, 0);
 
-        Matrix Ui, Si, Vi; double error;
-        std::tie(Ui, Si, Vi, error) = truncated_svd(temp, rank);
+          Matrix Utransfer, Si, Vi; double error;
+          std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
+          U.insert(node, level, std::move(Utransfer));
+
+          // Generate the full bases for passing onto the upper level.
+          std::vector<Matrix> Utransfer_splits = Utransfer.split(2, 1);
+          Matrix Ubig(leaf_size, rank);
+          std::vector<Matrix> Ubig_splits = Ubig.split(2, 1);
+          matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
+          matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
+
+          // Save the actual basis into the temporary Map to pass to generate
+          // the S block and pass it to higher levels.
+          Ubig_parent.insert(node, level, std::move(Ubig));
+        }
+
+        {
+          // Generate V transfer matrix.
+          Matrix& Vbig_child1 = Vchild(child1, child_level);
+          Matrix& Vbig_child2 = Vchild(child2, child_level);
+
+          Matrix Alevel_plus_node = generate_column_slice(node, leaf_size, randpts);
+          std::vector<Matrix> Alevel_plus_node_splits = Alevel_plus_node.split(1, 2);
+
+          Matrix temp(Alevel_plus_node.rows, Vbig_child1.cols + Vbig_child2.cols);
+          std::vector<Matrix> temp_splits = temp.split(1, 2);
+
+          matmul(Alevel_plus_node_splits[0], Vbig_child1, temp_splits[0]);
+          matmul(Alevel_plus_node_splits[1], Vbig_child2, temp_splits[1]);
+
+          Matrix Ui, Si, Vi; double error;
+          std::tie(Ui, Si, Vi, error) = truncated_svd(temp, rank);
+
+          V.insert(node, level, std::move(transpose(Vi)));
+        }
       }
 
-      return {Uchild, Vchild};
+      return {Ubig_parent, Vbig_parent};
     }
 
     Matrix get_Ubig(int node, int level) {
