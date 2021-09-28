@@ -111,19 +111,23 @@ namespace Hatrix {
     }
 
     std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const randvec_t& randpts,
-                                                                    int level, RowLevelMap& Ubig,
-                                                                    ColLevelMap& Vbig) {
+                                                                    int level, RowLevelMap& Uchild,
+                                                                    ColLevelMap& Vchild) {
       int num_nodes = pow(2, level);
       int leaf_size = N / num_nodes;
       int child_level = level + 1;
       int c_num_nodes = pow(2, child_level);
-      RowLevelMap Uchild;
-      ColLevelMap Vchild;
+      RowLevelMap Uparent;
+      ColLevelMap Vparent;
 
       for (int p = 0; p < num_nodes; ++p) {
         int child1 = p * 2;
         int child2 = p * 2 + 1;
 
+        Matrix& Ubig_child1 = Uchild(child1, child_level);
+        Matrix& Ubig_child2 = Uchild(child2, child_level);
+        Matrix Utransfer(rank*2, rank);
+        std::vector<Matrix> Utransfer_splits = Utransfer.split(2, 1);
 
       }
 
