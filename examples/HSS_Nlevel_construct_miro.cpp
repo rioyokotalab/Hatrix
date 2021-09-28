@@ -59,6 +59,29 @@ namespace Hatrix {
       return row_slice;
     }
 
+    // Generate a column slice without the diagonal block.
+    Matrix generate_column_slice(int block, int ncols, const randvec_t& randpts) {
+      Matrix col_slice(N-ncols, ncols);
+      int nrows_upper_slice = block * ncols;
+      Matrix upper_slice = generate_laplacend_matrix(randpts, nrows_upper_slice, ncols,
+                                                     0, block * ncols);
+      int nrows_lower_slice = N - (block + 1) * ncols;
+      Matrix lower_slice = generate_laplacend_matrix(randpts, nrows_lower_slice, ncols,
+                                                     (block+1) * ncols, block * ncols);
+
+      for (int j = 0; j < col_slice.cols; ++j) {
+        for (int i = 0; i < nrows_upper_slice; ++i) {
+          col_slice(i, j) = upper_slice(i, j);
+        }
+
+        for (int i = 0; i < nrows_lower_slice; ++i) {
+          col_slice(i + nrows_upper_slice, j) = lower_slice(i, j);
+        }
+      }
+
+      return col_slice;
+    }
+
     // Generate U for the leaf.
     Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randpts) {
       // Row slice since column bases should be cutting across the columns.
@@ -72,24 +95,7 @@ namespace Hatrix {
     // Generate V for the leaf.
     Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randpts) {
       // Col slice since row bases should be cutting across the rows.
-      Matrix col_slice(N-leaf_size, leaf_size);
-      int nrows_upper_slice = block * leaf_size;
-      Matrix upper_slice = generate_laplacend_matrix(randpts, nrows_upper_slice, leaf_size,
-                                                     0, block * leaf_size);
-      int nrows_lower_slice = N - (block + 1) * leaf_size;
-      Matrix lower_slice = generate_laplacend_matrix(randpts, nrows_lower_slice, leaf_size,
-                                                     (block+1) * leaf_size, block * leaf_size);
-
-      for (int j = 0; j < col_slice.cols; ++j) {
-        for (int i = 0; i < nrows_upper_slice; ++i) {
-          col_slice(i, j) = upper_slice(i, j);
-        }
-
-        for (int i = 0; i < nrows_lower_slice; ++i) {
-          col_slice(i + nrows_upper_slice, j) = lower_slice(i, j);
-        }
-      }
-
+      Matrix col_slice = generate_column_slice(block, leaf_size, randpts);
       Matrix Ui, Si, Vi; double error;
       std::tie(Ui, Si, Vi, error) = truncated_svd(col_slice, rank);
 
@@ -128,17 +134,24 @@ namespace Hatrix {
       RowLevelMap Uparent;
       ColLevelMap Vparent;
 
-      for (int p = 0; p < num_nodes; ++p) {
-        int child1 = p * 2;
-        int child2 = p * 2 + 1;
+      for (int node = 0; node < num_nodes; ++node) {
+        int child1 = node * 2;
+        int child2 = node * 2 + 1;
 
         Matrix& Ubig_child1 = Uchild(child1, child_level);
         Matrix& Ubig_child2 = Uchild(child2, child_level);
-        Matrix Utransfer(rank*2, rank);
-        std::vector<Matrix> Utransfer_splits = Utransfer.split(2, 1);
 
-        Matrix Alevel_p_plus = generate_row_slice(p, leaf_size, randpts);
-        std::vector<Matrix> Alevel_p_plus_splits = Alevel_p_plus.split(2, 1);
+        Matrix Alevel_node_plus = generate_row_slice(node, leaf_size, randpts);
+        std::vector<Matrix> Alevel_node_plus_splits = Alevel_node_plus.split(2, 1);
+
+        Matrix temp(Ubig_child1.cols + Ubig_child2.cols, Alevel_node_plus.cols);
+        std::vector<Matrix> temp_splits = temp.split(2, 1);
+
+        matmul(Ubig_child1, Alevel_node_plus_splits[0], temp_splits[0], true, false, 1, 0);
+        matmul(Ubig_child2, Alevel_node_plus_splits[1], temp_splits[1], true, false, 1, 0);
+
+        Matrix Ui, Si, Vi; double error;
+        std::tie(Ui, Si, Vi, error) = truncated_svd(temp, rank);
       }
 
       return {Uchild, Vchild};
