@@ -159,7 +159,7 @@ namespace Hatrix {
           U.insert(node, level, std::move(Utransfer));
 
           // Generate the full bases for passing onto the upper level.
-          std::vector<Matrix> Utransfer_splits = Utransfer.split(2, 1);
+          std::vector<Matrix> Utransfer_splits = U(node, level).split(2, 1);
           Matrix Ubig(leaf_size, rank);
           std::vector<Matrix> Ubig_splits = Ubig.split(2, 1);
           matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
@@ -184,10 +184,19 @@ namespace Hatrix {
           matmul(Alevel_plus_node_splits[0], Vbig_child1, temp_splits[0]);
           matmul(Alevel_plus_node_splits[1], Vbig_child2, temp_splits[1]);
 
-          Matrix Ui, Si, Vi; double error;
-          std::tie(Ui, Si, Vi, error) = truncated_svd(temp, rank);
+          Matrix Ui, Si, Vtransfer; double error;
+          std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
+          V.insert(node, level, transpose(Vtransfer));
 
-          V.insert(node, level, std::move(transpose(Vi)));
+          // Generate the full bases for passing onto the upper level.
+          std::vector<Matrix> Vtransfer_splits = V(node, level).split(2, 1);
+          Matrix Vbig(rank, leaf_size);
+          std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
+
+          matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
+          matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
+
+          Vbig_parent.insert(node, level, transpose(Vbig));
         }
       }
 
