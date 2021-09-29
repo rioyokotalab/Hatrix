@@ -76,4 +76,25 @@ Matrix transpose(const Matrix& A) {
   return A_trans;
 }
 
+Matrix lower_tri(const Matrix& A, bool diag) {
+  Matrix A_lower(A.rows, A.cols);
+  for(int64_t i = 0; i < A.rows; i++) {
+    for(int64_t j = 0; j < std::min(i+1, A.cols); j++) {
+      A_lower(i, j) = (i == j && diag ? 1. : A(i, j));
+    }
+  }
+  return A_lower;
+}
+
+Matrix upper_tri(const Matrix& A, bool diag) {
+  Matrix A_upper(A.rows, A.cols);
+  for(int64_t i = 0; i < A.rows; i++) {
+    for(int64_t j = i; j < A.cols; j++) {
+      A_upper(i, j) = (i == j && diag ? 1. : A(i, j));
+    }
+  }
+  return A_upper;
+}
+   
+
 }  // namespace Hatrix
