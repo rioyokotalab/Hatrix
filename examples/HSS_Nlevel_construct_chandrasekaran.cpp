@@ -22,11 +22,9 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
 }
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
-  double A_norm = Hatrix::norm(A);
-  double B_norm = Hatrix::norm(B);
-  double diff = A_norm - B_norm;
-  return std::sqrt((diff * diff) / (B_norm * B_norm));
+  return Hatrix::norm(A - B) / Hatrix::norm(B);
 }
+
 
 namespace Hatrix {
   class HSS {
@@ -254,10 +252,8 @@ namespace Hatrix {
       int num_nodes = pow(2, height);
       for (int block = 0; block < num_nodes; ++block) {
         int slice = N / num_nodes;
-        double diagonal_error = rel_error(D(block, block, height),
-                                          Hatrix::generate_laplacend_matrix(randvec, slice, slice,
-                                                                            slice * block, slice * block));
-        error += pow(diagonal_error, 2);
+        error += Hatrix::norm(D(block, block, height) - Hatrix::generate_laplacend_matrix(randvec, slice, slice,
+                                                                                          slice * block, slice * block));
       }
 
       // regenerate off-diagonal blocks and test for correctness.
@@ -267,25 +263,17 @@ namespace Hatrix {
 
         for (int row = 0; row < num_nodes; ++row) {
           int col = row % 2 == 0 ? row + 1 : row - 1;
-          Matrix Ubig_real = generate_column_bases(row, slice, randvec);
           Matrix Ubig = get_Ubig(row, level);
-
-          // Matrix Vbig = generate_row_bases(col, slice, randvec);
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
           Matrix actual = Hatrix::generate_laplacend_matrix(randvec, slice, slice,
                                                             row * slice, col * slice);
-          double offD_error = rel_error(expected, actual);
 
-          std::cout << "level=" << level << " row=" << row << " error=" << offD_error << std::endl;
-          std::cout << "Ubig error--->: row ->" << row << " error -> " <<  Hatrix::norm(Ubig_real - Ubig) << std::endl;
-          std::cout << "\n\n";
-
-          error += pow(offD_error, 2);
+          error += Hatrix::norm(expected - actual);
         }
       }
 
-      return std::sqrt(error);
+      return std::sqrt(error / N / N);
     }
   };
 } // namespace Hatrix

@@ -19,10 +19,7 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
 }
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
-  double A_norm = Hatrix::norm(A);
-  double B_norm = Hatrix::norm(B);
-  double diff = A_norm - B_norm;
-  return std::sqrt((diff * diff) / (B_norm * B_norm));
+  return Hatrix::norm(A - B) / Hatrix::norm(B);
 }
 
 namespace Hatrix {
@@ -278,13 +275,13 @@ namespace Hatrix {
       double error = 0;
       int num_nodes = pow(2, height);
 
-      for (int block = 0; block < num_nodes; ++block) {
-        int slice = N / num_nodes;
-        double diagonal_error = rel_error(D(block, block, height),
-                                          Hatrix::generate_laplacend_matrix(randpts, slice, slice,
-                                                                            slice * block, slice * block));
-        error += pow(diagonal_error, 2);
-      }
+      // for (int block = 0; block < num_nodes; ++block) {
+      //   int slice = N / num_nodes;
+      //   double diagonal_error = rel_error(D(block, block, height),
+      //                                     Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+      //                                                                       slice * block, slice * block));
+      //   error += pow(diagonal_error, 2);
+      // }
 
       for (int level = height; level > height-1; --level) {
         int num_nodes = pow(2, level);
@@ -295,13 +292,17 @@ namespace Hatrix {
           Matrix Ubig = get_Ubig(row, level);
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+
+
           Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
                                                             row * slice, col * slice);
-          double offD_error = rel_error(expected, actual);
-          error += pow(offD_error, 2);
+
+          error += Hatrix::norm(expected - actual);
+          // double offD_error = rel_error(expected, actual);
+          // error += pow(offD_error, 2);
         }
       }
-      return std::sqrt(error);
+      return std::sqrt(error / N / N);
     }
   };
 }
