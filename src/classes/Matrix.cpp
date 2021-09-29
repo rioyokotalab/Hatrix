@@ -165,12 +165,16 @@ void Matrix::print() const {
         std::cout << std::setw(7) << 0 << " ";
       }
       else {
-        std::cout << std::setw(7) << std::setprecision(3) <<  (*this)(i, j) << " ";
+        std::cout << std::setprecision(3) << std::setw(7) <<  (*this)(i, j) << " ";
       }
     }
     std::cout << "\n";
   }
   std::cout << "\n";
+}
+
+void Matrix::print_meta() const {
+  std::cout << "rows=" << rows << " cols=" << cols << " stride=" << stride << std::endl;
 }
 
 size_t Matrix::memory_used() const { return rows * cols * sizeof(double); }

@@ -72,10 +72,10 @@ BLR_2x2 construct_2x2_BLR(int64_t N, int64_t rank) {
   // Random points for laplace kernel
   std::vector<std::vector<double>> randpts;
   randpts.push_back(equally_spaced_vector(2*N, 0.0, 1.0)); //1D
-  
+
   BLR_2x2 A;
   // Also store expected errors to check against later
-  std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;  
+  std::unordered_map<std::tuple<int64_t, int64_t>, double> expected_err;
   for (int64_t i = 0; i < 2; ++i) {
     for (int64_t j = 0; j < 2; ++j) {
       A.insert_D(i, j, Hatrix::generate_laplacend_matrix(randpts, N, N, i*N, j*N));
@@ -145,7 +145,7 @@ void projected_matmul_2x2_BLR(BLR_2x2& A, BLR_2x2& B, BLR_2x2& C) {
   //C_check(1, 1)
   Hatrix::matmul(A.D(1, 0), B.D(0, 1), C_check.D(1, 1));
   Hatrix::matmul(A.D(1, 1), B.D(1, 1), C_check.D(1, 1));
-  
+
   double norm = 0, diff = 0, fnorm, fdiff;
   for (int64_t i = 0; i < 2; ++i) {
     for (int64_t j = 0; j < 2; ++j) {
@@ -166,7 +166,7 @@ void construct_induced_product_basis(BLR_2x2& A, BLR_2x2& B, BLR_2x2& M, BLR_2x2
   //Assume uniform rank
   //U bases
   double rankA = A.U(0).cols;
-  double rankB = B.U(0).cols; 
+  double rankB = B.U(0).cols;
   tmp.insert_U(0, A.D(0, 0) * B.U(0));
   tmp.insert_U(1, A.D(1, 1) * B.U(1));
   M.insert_U(0, Hatrix::Matrix(A.U(0).rows, rankA + rankB));
@@ -232,7 +232,7 @@ BLR_2x2 exact_matmul_2x2_BLR(BLR_2x2& A, BLR_2x2& B) {
   construct_induced_product_basis(A, B, M, tmp);
   //Assume uniform rank
   double rankA = A.U(0).cols;
-  double rankB = B.U(0).cols; 
+  double rankB = B.U(0).cols;
 
   //For error checking
   BLR_2x2 M_check(M);
@@ -337,9 +337,9 @@ int main(int argc, char** argv) {
   C.insert_V(1, Hatrix::Matrix(B.V(1)));
   C.insert_S(0, 1, Hatrix::Matrix(A.U(0).cols, B.V(1).rows));
   C.insert_S(1, 0, Hatrix::Matrix(A.U(1).cols, B.V(0).rows));
-  
+
   projected_matmul_2x2_BLR(A, B, C);
   BLR_2x2 M = exact_matmul_2x2_BLR(A, B);
-  
+
   return 0;
 }

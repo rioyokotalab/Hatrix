@@ -153,7 +153,7 @@ namespace Hatrix { namespace UMV {
       return V_F;
     }
 
-    BLR2(randvec_t& randpts, int _N, int _block_size, int _n_blocks, int _rank, int _admis) :
+    BLR2(const randvec_t& randpts, int _N, int _block_size, int _n_blocks, int _rank, int _admis) :
       N(_N), block_size(_block_size), n_blocks(_n_blocks), rank(_rank), admis(_admis) {
       int c_size = block_size - rank;
 

@@ -39,7 +39,7 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-std::tuple<Hatrix::BLR, double> construct_BLR(randvec_t& randpts, int64_t block_size, int64_t n_blocks,
+std::tuple<Hatrix::BLR, double> construct_BLR(const randvec_t& randpts, int64_t block_size, int64_t n_blocks,
                                               int64_t rank, int64_t admis) {
   Hatrix::BLR A;
 

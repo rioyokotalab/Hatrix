@@ -2,7 +2,7 @@ TOPSRCDIR = .
 include $(TOPSRCDIR)/make.inc
 
 DIRS := src/classes src/functions src/util
-OBJLIBS := libclasses.a libfunctions.a libutil.a
+OBJLIBS := libfunctions.a libclasses.a libutil.a
 TEST := test
 EXAMPLES := examples
 TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \
@@ -12,6 +12,9 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	2x2_BLR_LU \
 	2x2_BLR_weak_GEMM \
 	HSS_2level_construct \
+	HSS_Nlevel_construct \
+	HSS_Nlevel_construct_chandrasekaran \
+	HSS_Nlevel_construct_miro \
 	NxN_BlockDense_LU \
 	NxN_BLR_LU \
 	NxN_BLR_strong_GEMM \
@@ -48,7 +51,7 @@ test: $(TEST_EXECUTABLES)
 
 .PHONY: clean
 clean:
-	for dir in $(DIRS) test; do \
+	for dir in $(DIRS) $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/

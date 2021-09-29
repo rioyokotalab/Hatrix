@@ -14,6 +14,9 @@ else()
     NxN_BLR_LU
     NxN_BLR_strong_LU
     HSS_2level_construct
+    HSS_Nlevel_construct
+    HSS_Nlevel_construct_chandrasekaran
+    HSS_Nlevel_construct_miro
     UMV_weak_2level
   )
 endif()

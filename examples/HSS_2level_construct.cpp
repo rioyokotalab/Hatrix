@@ -18,7 +18,7 @@ namespace Hatrix {
     RowColLevelMap D, S;
     int N, rank, height;
 
-    std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, randvec_t& randvec) {
+    std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, const randvec_t& randvec) {
       Matrix row_slice(leaf_size, N - leaf_size);
       int64_t ncols_left_slice = block * leaf_size;
       Matrix left_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_left_slice,
@@ -46,7 +46,7 @@ namespace Hatrix {
       return {Ui, Hatrix::matmul(Si, Vi)};
     }
 
-    std::tuple<Matrix, Matrix> generate_row_bases(int block, int leaf_size, randvec_t& randvec) {
+    std::tuple<Matrix, Matrix> generate_row_bases(int block, int leaf_size, const randvec_t& randvec) {
       Matrix col_slice(N - leaf_size, leaf_size);
       int nrows_upper_slice = block * leaf_size;
       Matrix upper_slice = generate_laplacend_matrix(randvec, nrows_upper_slice, leaf_size,
@@ -72,14 +72,14 @@ namespace Hatrix {
       return {Ui, Hatrix::matmul(Si, Vi)};
     }
 
-    Matrix generate_coupling_matrix(randvec_t& randvec, int row, int col, int leaf_size, int level) {
+    Matrix generate_coupling_matrix(const randvec_t& randvec, int row, int col, int leaf_size, int level) {
       Matrix D = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                            row * leaf_size, col * leaf_size);
       Matrix S = Hatrix::matmul(Hatrix::matmul(U(row, level), D, true), V(col, level));
       return S;
     }
 
-    std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(randvec_t& randvec) {
+    std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(const randvec_t& randvec) {
       int nblocks = pow(height, 2);
       int leaf_size = N / nblocks;
       ColLevelMap Ugen;
@@ -139,14 +139,14 @@ namespace Hatrix {
       return Vbig;
     }
 
-    Matrix generate_non_leaf_coupling_matrix(randvec_t& randvec, int row, int col, int leaf_size,
+    Matrix generate_non_leaf_coupling_matrix(const randvec_t& randvec, int row, int col, int leaf_size,
                                              Matrix& Ubig, Matrix& Vbig) {
       Matrix D = generate_laplacend_matrix(randvec, leaf_size, leaf_size,
                                            row * leaf_size, col * leaf_size);
       return matmul(matmul(Ubig, D, true, false), Vbig);
     }
 
-    void generate_transfer_matrices(randvec_t& randvec, RowLevelMap& Ugen, ColLevelMap& Vgen) {
+    void generate_transfer_matrices(const randvec_t& randvec, RowLevelMap& Ugen, ColLevelMap& Vgen) {
       Matrix Ui, Si, Vi; double error;
 
       for (int p = 0; p < 2; ++p) {
@@ -191,7 +191,7 @@ namespace Hatrix {
 
   public:
 
-    HSS(randvec_t& randpts, int _N, int _rank, int _height) :
+    HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
       N(_N), rank(_rank), height(_height) {
       RowLevelMap Ugen; ColLevelMap Vgen;
 
@@ -199,7 +199,7 @@ namespace Hatrix {
       generate_transfer_matrices(randpts, Ugen, Vgen);
     }
 
-    double construction_relative_error(randvec_t& randvec) {
+    double construction_relative_error(const randvec_t& randvec) {
       int leaf_size = N / pow(height, 2);
       double error = 0;
 

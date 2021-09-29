@@ -109,6 +109,8 @@ class Matrix {
 
   void print() const;
 
+  void print_meta() const;
+
   // Get the size of the memory used by this matrix. If this is a view,
   // this function returns only the memory consumed by the view.
   size_t memory_used() const;
