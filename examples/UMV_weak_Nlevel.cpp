@@ -261,8 +261,27 @@ namespace Hatrix {
       return Vbig;
     }
 
-  public:
+    Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
+      Hatrix::Matrix Q_F(Q.rows, Q.rows);
+      Hatrix::Matrix Q_full, R;
+      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full,
+        Hatrix::Lapack::QR_ret::OnlyQ);
 
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+          Q_F(i, j) = Q_full(i, j + Q.cols);
+        }
+      }
+
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q.cols; ++j) {
+          Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+        }
+      }
+      return Q_F;
+    }
+
+  public:
 
     HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
       N(_N), rank(_rank), height(_height) {
@@ -308,12 +327,22 @@ namespace Hatrix {
 
     // UMV factorization of this HSS matrix.
     void factorize() {
+      for (int level = height; level > height-1; --level) {
+        int num_nodes = pow(2, level);
+        for (int block = 0; block < num_nodes; ++block) {
+          Hatrix::Matrix& diagonal = D(block, block, level);
 
+          Hatrix::Matrix U_F = make_complement(U(block, level));
+          Hatrix::Matrix V_F = make_complement(V(block, level));
+        }
+      }
     }
 
     // Forward/backward substitution of UMV factorized HSS matrix.
     Hatrix::Matrix solve(const Hatrix::Matrix& b) {
+      Hatrix::Matrix x(b);
 
+      return x;
     }
   };
 }
