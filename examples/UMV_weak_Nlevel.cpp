@@ -497,17 +497,43 @@ namespace Hatrix {
       }
 
       x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
-      solve_triangular(A.D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      solve_triangular(A.D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
+      solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
       // backward
       for (int level = 1; level < height; ++level) {
         rhs_offset = permute_backward(x, level, rhs_offset);
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
-          Matrix& Diag = A.D(node, node, level);
-          c_size = D.rows - rank;
-          offset = rhs_offset + node * D.rows;
+          Matrix& Diag = D(node, node, level);
+          c_size = Diag.rows - rank;
+          offset = rhs_offset + node * Diag.rows;
+
+          if (rank != Diag.rows) {
+            x_splits = x.split({offset, offset + c_size, offset + Diag.rows}, {});
+            Matrix& c = x_splits[1];
+            Matrix& o = x_splits[2];
+
+            std::vector<Matrix> D_splits = Diag.split(std::vector<int64_t>(1, c_size),
+                                                      std::vector<int64_t>(1, c_size));
+
+            Matrix& Dcc = D_splits[0];
+            Matrix& Dco = D_splits[1];
+
+            matmul(Dco, o, c, false, false, -1.0, 1.0);
+            solve_triangular(Dcc, c, Hatrix::Left, Hatrix::Upper, false);
+          }
+
+          // TODO: Make this work with slicing.
+          Matrix temp(Diag.rows, 1);
+          for (int i = 0; i < Diag.rows; ++i) {
+            temp(i, 0) = x(offset + i, 0);
+          }
+          Matrix V_F = make_complement(V(node, level));
+          Matrix product = matmul(V_F, temp);
+          for (int i = 0; i < Diag.rows; ++i) {
+            x(offset + i, 0) = product(i, 0);
+          }
         }
       }
 

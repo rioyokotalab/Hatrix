@@ -20,6 +20,7 @@ else()
     HSS_Nlevel_construct_chandrasekaran
     HSS_Nlevel_construct_miro
     UMV_weak_2level
+    UMV_weak_Nlevel
   )
 endif()
 
