@@ -22,7 +22,8 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	NxN_BLR_weak_GEMM \
 	UMV_weak_1level \
 	UMV_weak_1level_noblock \
-	UMV_weak_2level
+	UMV_weak_2level \
+	UMV_weak_Nlevel
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)

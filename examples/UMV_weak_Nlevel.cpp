@@ -7,6 +7,14 @@
 
 #include "Hatrix/Hatrix.h"
 
+// UMV factorization and substitution of N-level HSS matrix. Compression
+// done by following the technique in the Miro board. Implementation in
+// HSS_Nlevel_construct_miro.cpp
+
+// Algorithm taken from paper
+// "Accuracy Controlled Direct Integral Equation Solver of Linear Complexity with Change
+// of Basis for Large-Scale Interconnect Extraction"
+
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -275,13 +283,11 @@ namespace Hatrix {
       double error = 0;
       int num_nodes = pow(2, height);
 
-      // for (int block = 0; block < num_nodes; ++block) {
-      //   int slice = N / num_nodes;
-      //   double diagonal_error = rel_error(D(block, block, height),
-      //                                     Hatrix::generate_laplacend_matrix(randpts, slice, slice,
-      //                                                                       slice * block, slice * block));
-      //   error += pow(diagonal_error, 2);
-      // }
+      for (int block = 0; block < num_nodes; ++block) {
+        int slice = N / num_nodes;
+        error += Hatrix::norm(D(block, block, height) - Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+                                                                                          slice * block, slice * block));
+      }
 
       for (int level = height; level > height-1; --level) {
         int num_nodes = pow(2, level);
@@ -292,11 +298,8 @@ namespace Hatrix {
           Matrix Ubig = get_Ubig(row, level);
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-
-
           Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
                                                             row * slice, col * slice);
-
           error += Hatrix::norm(expected - actual);
         }
       }
