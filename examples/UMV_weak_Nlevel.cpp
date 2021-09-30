@@ -502,7 +502,13 @@ namespace Hatrix {
 
       // backward
       for (int level = 1; level < height; ++level) {
-
+        rhs_offset = permute_backward(x, level, rhs_offset);
+        int num_nodes = pow(2, level);
+        for (int node = 0; node < num_nodes; ++node) {
+          Matrix& Diag = A.D(node, node, level);
+          c_size = D.rows - rank;
+          offset = rhs_offset + node * D.rows;
+        }
       }
 
       return x;
