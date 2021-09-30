@@ -305,6 +305,16 @@ namespace Hatrix {
       }
       return std::sqrt(error / N / N);
     }
+
+    // UMV factorization of this HSS matrix.
+    void factorize() {
+
+    }
+
+    // Forward/backward substitution of UMV factorized HSS matrix.
+    Hatrix::Matrix solve(const Hatrix::Matrix& b) {
+
+    }
   };
 }
 
@@ -323,8 +333,25 @@ int main(int argc, char* argv[]) {
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
   Hatrix::HSS A(randpts, N, rank, height);
-  double error = A.construction_relative_error(randpts);
+  Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+
+  double construct_error = A.construction_relative_error(randpts);
+
+  // UMV factorization and substitution of HSS matrix.
+  A.factorize();
+  Hatrix::Matrix x = A.solve(b);
+
+  // Verification with dense solver.
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  Hatrix::Matrix x_solve(b);
+  Hatrix::lu(Adense);
+  Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
+
+  double solve_error = rel_error(x, x_solve);
 
   Hatrix::Context::finalize();
-  std::cout << "N= " << N << " rank= " << rank << " height=" << height <<  " construction error=" << error << std::endl;
+  std::cout << "N= " << N << " rank= " << rank << " height=" << height
+            << " construction error=" << construct_error
+            << " solve error=" << solve_error << std::endl;
 }
