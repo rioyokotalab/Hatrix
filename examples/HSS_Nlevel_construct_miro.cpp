@@ -197,6 +197,14 @@ namespace Hatrix {
         }
       }
 
+      for (int row = 0; row < num_nodes; ++row) {
+        int col = row % 2 == 0 ? row + 1 : row - 1;
+        Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                             row * leaf_size, col * leaf_size);
+        S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
+                                         Vbig_parent(col, level)));
+      }
+
       return {Ubig_parent, Vbig_parent};
     }
 
@@ -283,7 +291,7 @@ namespace Hatrix {
       //   error += pow(diagonal_error, 2);
       // }
 
-      for (int level = height; level > height-1; --level) {
+      for (int level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
         int slice = N / num_nodes;
 
@@ -292,8 +300,6 @@ namespace Hatrix {
           Matrix Ubig = get_Ubig(row, level);
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-
-
           Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
                                                             row * slice, col * slice);
 

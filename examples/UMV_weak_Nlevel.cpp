@@ -205,6 +205,15 @@ namespace Hatrix {
         }
       }
 
+      for (int row = 0; row < num_nodes; ++row) {
+        int col = row % 2 == 0 ? row + 1 : row - 1;
+        Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                             row * leaf_size, col * leaf_size);
+        S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
+                                         Vbig_parent(col, level)));
+      }
+
+
       return {Ubig_parent, Vbig_parent};
     }
 
@@ -281,6 +290,14 @@ namespace Hatrix {
       return Q_F;
     }
 
+    Matrix& unsolved_chunk(int block, int level, int rank) {
+      Hatrix::Matrix& Diag = D(block, block, level);
+      int c_size = Diag.rows - rank;
+      std::vector<Hatrix::Matrix> Diag_splits = Diag.split(std::vector<int64_t>(1, c_size),
+                                                           std::vector<int64_t>(1, c_size));
+      return Diag_splits[3];
+    }
+
   public:
 
     HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
@@ -327,7 +344,7 @@ namespace Hatrix {
 
     // UMV factorization of this HSS matrix.
     void factorize() {
-      for (int level = height; level > height-1; --level) {
+      for (int level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
 
         // Perform multiplication of U_F and V_F along with partial LU.
@@ -358,7 +375,27 @@ namespace Hatrix {
         }
 
         // Merge the unfactorized parts.
+        int parent_level = level - 1;
+        for (int block = 0; block < int(pow(2, parent_level)); ++block) {
+          Hatrix::Matrix D_unsolved(rank * 2, rank * 2);
+          std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
+
+          int child1 = block * 2; int child2 = block * 2 + 1;
+          D_unsolved_splits[0] = unsolved_chunk(child1, level, rank);
+          D_unsolved_splits[3] = unsolved_chunk(child2, level, rank);
+
+          int col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
+          int col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
+
+          std::cout << "l: " << level <<  " blo: " << block <<  " child1: " << child1 << " col chi1: " << col_child1 << std::endl;
+
+          D_unsolved_splits[1] = S(child1, col_child1, level);
+          D_unsolved_splits[2] = S(child2, col_child2, level);
+
+          D.insert(block, block, parent_level, std::move(D_unsolved));
+        }
       }
+      Hatrix::lu(D(0, 0, 0));
     }
 
     // Forward/backward substitution of UMV factorized HSS matrix.
