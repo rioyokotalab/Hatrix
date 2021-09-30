@@ -387,8 +387,6 @@ namespace Hatrix {
           int col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
           int col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
 
-          std::cout << "l: " << level <<  " blo: " << block <<  " child1: " << child1 << " col chi1: " << col_child1 << std::endl;
-
           D_unsolved_splits[1] = S(child1, col_child1, level);
           D_unsolved_splits[2] = S(child2, col_child2, level);
 
