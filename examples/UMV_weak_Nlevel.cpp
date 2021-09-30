@@ -7,6 +7,14 @@
 
 #include "Hatrix/Hatrix.h"
 
+// UMV factorization and substitution of N-level HSS matrix. Compression
+// done by following the technique in the Miro board. Implementation in
+// HSS_Nlevel_construct_miro.cpp
+
+// Algorithm taken from paper
+// "Accuracy Controlled Direct Integral Equation Solver of Linear Complexity with Change
+// of Basis for Large-Scale Interconnect Extraction"
+
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -205,6 +213,7 @@ namespace Hatrix {
                                          Vbig_parent(col, level)));
       }
 
+
       return {Ubig_parent, Vbig_parent};
     }
 
@@ -261,8 +270,91 @@ namespace Hatrix {
       return Vbig;
     }
 
-  public:
+    Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
+      Hatrix::Matrix Q_F(Q.rows, Q.rows);
+      Hatrix::Matrix Q_full, R;
+      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full,
+        Hatrix::Lapack::QR_ret::OnlyQ);
 
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+          Q_F(i, j) = Q_full(i, j + Q.cols);
+        }
+      }
+
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q.cols; ++j) {
+          Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+        }
+      }
+      return Q_F;
+    }
+
+    Matrix& unsolved_chunk(int block, int level, int rank) {
+      Hatrix::Matrix& Diag = D(block, block, level);
+      int c_size = Diag.rows - rank;
+      std::vector<Hatrix::Matrix> Diag_splits = Diag.split(std::vector<int64_t>(1, c_size),
+                                                           std::vector<int64_t>(1, c_size));
+      return Diag_splits[3];
+    }
+
+    // permute the vector forward and return the offset at which the new vector begins.
+    int permute_forward(Hatrix::Matrix& x, const int level, int rank_offset) {
+      Hatrix::Matrix copy(x);
+      int num_nodes = int(pow(2, level));
+      int c_offset = rank_offset;
+      for (int block = 0; block < num_nodes; ++block) {
+        rank_offset += D(block, block, level).rows - U(block, level).cols;
+      }
+
+      for (int block = 0; block < num_nodes; ++block) {
+        int rows = D(block, block, level).rows;
+        int rank = U(block, level).cols;
+        int c_size = rows - rank;
+
+        // copy the complement part of the vector into the temporary vector
+        for (int i = 0; i < c_size; ++i) {
+          copy(c_offset + c_size * block + i, 0) = x(c_offset + block * rows + i, 0);
+        }
+        // copy the rank part of the vector into the temporary vector
+        for (int i = 0; i < rank; ++i) {
+          copy(rank_offset + rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return rank_offset;
+    }
+
+    int permute_backward(Hatrix::Matrix& x, const int level, int rank_offset) {
+      Hatrix::Matrix copy(x);
+      int num_nodes = pow(2, level);
+      int c_offset = rank_offset;
+      for (int block = 0; block < num_nodes; ++block) {
+        c_offset -= D(block, block, level).rows - U(block, level).cols;
+      }
+
+      for (int block = 0; block < num_nodes; ++block) {
+        int rows = D(block, block, level).rows;
+        int rank = U(block, level).cols;
+        int c_size = rows - rank;
+
+        for (int i = 0; i < c_size; ++i) {
+          copy(c_offset + block * rows + i, 0) = x(c_offset + block * c_size + i, 0);
+        }
+
+        for (int i = 0; i < rank; ++i) {
+          copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return c_offset;
+    }
+
+  public:
 
     HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
       N(_N), rank(_rank), height(_height) {
@@ -283,15 +375,13 @@ namespace Hatrix {
       double error = 0;
       int num_nodes = pow(2, height);
 
-      // for (int block = 0; block < num_nodes; ++block) {
-      //   int slice = N / num_nodes;
-      //   double diagonal_error = rel_error(D(block, block, height),
-      //                                     Hatrix::generate_laplacend_matrix(randpts, slice, slice,
-      //                                                                       slice * block, slice * block));
-      //   error += pow(diagonal_error, 2);
-      // }
+      for (int block = 0; block < num_nodes; ++block) {
+        int slice = N / num_nodes;
+        error += Hatrix::norm(D(block, block, height) - Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+                                                                                          slice * block, slice * block));
+      }
 
-      for (int level = height; level > 0; --level) {
+      for (int level = height; level > height-1; --level) {
         int num_nodes = pow(2, level);
         int slice = N / num_nodes;
 
@@ -302,11 +392,151 @@ namespace Hatrix {
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
           Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
                                                             row * slice, col * slice);
-
           error += Hatrix::norm(expected - actual);
         }
       }
       return std::sqrt(error / N / N);
+    }
+
+    // UMV factorization of this HSS matrix.
+    void factorize() {
+      for (int level = height; level > 0; --level) {
+        int num_nodes = pow(2, level);
+
+        // Perform multiplication of U_F and V_F along with partial LU.
+        for (int block = 0; block < num_nodes; ++block) {
+          Hatrix::Matrix& diagonal = D(block, block, level);
+
+          Hatrix::Matrix U_F = make_complement(U(block, level));
+          Hatrix::Matrix V_F = make_complement(V(block, level));
+
+          diagonal = matmul(matmul(U_F, diagonal, true, false), V_F);
+
+          // in case of full rank, dont perform partial LU
+          if (rank == diagonal.rows) { continue; }
+
+          int c_size = diagonal.rows - rank;
+          std::vector<Hatrix::Matrix> diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
+                                                                       std::vector<int64_t>(1, c_size));
+          Hatrix::Matrix& Dcc = diagonal_splits[0];
+          Hatrix::Matrix& Dco = diagonal_splits[1];
+          Hatrix::Matrix& Doc = diagonal_splits[2];
+          Hatrix::Matrix& Doo = diagonal_splits[3];
+
+          Hatrix::lu(Dcc);
+          solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+          solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+          matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
+        }
+
+        // Merge the unfactorized parts.
+        int parent_level = level - 1;
+        for (int block = 0; block < int(pow(2, parent_level)); ++block) {
+          Hatrix::Matrix D_unsolved(rank * 2, rank * 2);
+          std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
+
+          int child1 = block * 2; int child2 = block * 2 + 1;
+          D_unsolved_splits[0] = unsolved_chunk(child1, level, rank);
+          D_unsolved_splits[3] = unsolved_chunk(child2, level, rank);
+
+          int col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
+          int col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
+
+          D_unsolved_splits[1] = S(child1, col_child1, level);
+          D_unsolved_splits[2] = S(child2, col_child2, level);
+
+          D.insert(block, block, parent_level, std::move(D_unsolved));
+        }
+      }
+      Hatrix::lu(D(0, 0, 0));
+    }
+
+    // Forward/backward substitution of UMV factorized HSS matrix.
+    Hatrix::Matrix solve(const Hatrix::Matrix& b) {
+      std::vector<Hatrix::Matrix> x_splits;
+      Hatrix::Matrix x(b);
+      int rhs_offset = 0, c_size, offset;
+
+      // forward
+      for (int level = height; level > 0; --level) {
+        int num_nodes = pow(2, level);
+        for (int node = 0; node < num_nodes; ++node) {
+          Matrix& Diag = D(node, node, level);
+          c_size = Diag.rows - rank;
+          offset = rhs_offset + node * Diag.rows;
+
+          Matrix temp(Diag.rows, 1);
+          for (int i = 0; i < Diag.rows; ++i) {
+            temp(i, 0) = x(offset + i, 0);
+          }
+          Matrix U_F = make_complement(U(node, level));
+          Matrix product = matmul(U_F, temp, true);
+          for (int i = 0; i < Diag.rows; ++i) {
+            x(offset + i, 0) = product(i, 0);
+          }
+
+          // don't compute partial LU if full rank.
+          if (rank == Diag.rows) { continue; }
+
+          x_splits = x.split(
+                             {offset, offset + c_size, offset + Diag.rows}, {});
+          Hatrix::Matrix& c = x_splits[1];
+          Hatrix::Matrix& o = x_splits[2];
+
+          std::vector<Matrix> D_splits = Diag.split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+          Matrix& Dcc = D_splits[0];
+          Matrix& Doc = D_splits[2];
+
+          solve_triangular(Dcc, c, Hatrix::Left, Hatrix::Lower, true);
+          matmul(Doc, c, o, false, false, -1.0, 1.0);
+        }
+
+        rhs_offset = permute_forward(x, level, rhs_offset);
+      }
+
+      x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
+      solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
+
+      // backward
+      for (int level = 1; level <= height; ++level) {
+        rhs_offset = permute_backward(x, level, rhs_offset);
+        int num_nodes = pow(2, level);
+        for (int node = 0; node < num_nodes; ++node) {
+          Matrix& Diag = D(node, node, level);
+          c_size = Diag.rows - rank;
+          offset = rhs_offset + node * Diag.rows;
+
+          if (rank != Diag.rows) {
+            x_splits = x.split({offset, offset + c_size, offset + Diag.rows}, {});
+            Matrix& c = x_splits[1];
+            Matrix& o = x_splits[2];
+
+            std::vector<Matrix> D_splits = Diag.split(std::vector<int64_t>(1, c_size),
+                                                      std::vector<int64_t>(1, c_size));
+
+            Matrix& Dcc = D_splits[0];
+            Matrix& Dco = D_splits[1];
+
+            matmul(Dco, o, c, false, false, -1.0, 1.0);
+            solve_triangular(Dcc, c, Hatrix::Left, Hatrix::Upper, false);
+          }
+
+          // TODO: Make this work with slicing.
+          Matrix temp(Diag.rows, 1);
+          for (int i = 0; i < Diag.rows; ++i) {
+            temp(i, 0) = x(offset + i, 0);
+          }
+          Matrix V_F = make_complement(V(node, level));
+          Matrix product = matmul(V_F, temp);
+          for (int i = 0; i < Diag.rows; ++i) {
+            x(offset + i, 0) = product(i, 0);
+          }
+        }
+      }
+
+      return x;
     }
   };
 }
@@ -326,8 +556,25 @@ int main(int argc, char* argv[]) {
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
   Hatrix::HSS A(randpts, N, rank, height);
-  double error = A.construction_relative_error(randpts);
+  Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+
+  double construct_error = A.construction_relative_error(randpts);
+
+  // UMV factorization and substitution of HSS matrix.
+  A.factorize();
+  Hatrix::Matrix x = A.solve(b);
+
+  // Verification with dense solver.
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  Hatrix::Matrix x_solve(b);
+  Hatrix::lu(Adense);
+  Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
+
+  double solve_error = std::sqrt(Hatrix::norm(x - x_solve) / N);
 
   Hatrix::Context::finalize();
-  std::cout << "N= " << N << " rank= " << rank << " height=" << height <<  " construction error=" << error << std::endl;
+  std::cout << "N= " << N << " rank= " << rank << " height=" << height
+            << " construction error=" << construct_error
+            << " solve error=" << solve_error << std::endl;
 }
