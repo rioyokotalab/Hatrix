@@ -423,7 +423,6 @@ namespace Hatrix {
           Hatrix::Matrix& Doc = diagonal_splits[2];
           Hatrix::Matrix& Doo = diagonal_splits[3];
 
-
           Hatrix::lu(Dcc);
           solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
           solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
@@ -501,7 +500,7 @@ namespace Hatrix {
       solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
       // backward
-      for (int level = 1; level < height; ++level) {
+      for (int level = 1; level <= height; ++level) {
         rhs_offset = permute_backward(x, level, rhs_offset);
         int num_nodes = pow(2, level);
         for (int node = 0; node < num_nodes; ++node) {
@@ -572,7 +571,7 @@ int main(int argc, char* argv[]) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  double solve_error = rel_error(x, x_solve);
+  double solve_error = std::sqrt(Hatrix::norm(x - x_solve) / N);
 
   Hatrix::Context::finalize();
   std::cout << "N= " << N << " rank= " << rank << " height=" << height
