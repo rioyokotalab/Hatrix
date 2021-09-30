@@ -329,12 +329,35 @@ namespace Hatrix {
     void factorize() {
       for (int level = height; level > height-1; --level) {
         int num_nodes = pow(2, level);
+
+        // Perform multiplication of U_F and V_F along with partial LU.
         for (int block = 0; block < num_nodes; ++block) {
           Hatrix::Matrix& diagonal = D(block, block, level);
 
           Hatrix::Matrix U_F = make_complement(U(block, level));
           Hatrix::Matrix V_F = make_complement(V(block, level));
+
+          diagonal = matmul(matmul(U_F, diagonal, true, false), V_F);
+
+          // in case of full rank, dont perform partial LU
+          if (rank == diagonal.rows) { continue; }
+
+          int c_size = diagonal.rows - rank;
+          std::vector<Hatrix::Matrix> diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
+                                                                       std::vector<int64_t>(1, c_size));
+          Hatrix::Matrix& Dcc = diagonal_splits[0];
+          Hatrix::Matrix& Dco = diagonal_splits[1];
+          Hatrix::Matrix& Doc = diagonal_splits[2];
+          Hatrix::Matrix& Doo = diagonal_splits[3];
+
+
+          Hatrix::lu(Dcc);
+          solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+          solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+          matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
         }
+
+        // Merge the unfactorized parts.
       }
     }
 
