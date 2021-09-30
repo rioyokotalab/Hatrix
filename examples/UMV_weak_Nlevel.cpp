@@ -298,6 +298,62 @@ namespace Hatrix {
       return Diag_splits[3];
     }
 
+    // permute the vector forward and return the offset at which the new vector begins.
+    int permute_forward(Hatrix::Matrix& x, const int level, int rank_offset) {
+      Hatrix::Matrix copy(x);
+      int num_nodes = int(pow(2, level));
+      int c_offset = rank_offset;
+      for (int block = 0; block < num_nodes; ++block) {
+        rank_offset += D(block, block, level).rows - U(block, level).cols;
+      }
+
+      for (int block = 0; block < num_nodes; ++block) {
+        int rows = D(block, block, level).rows;
+        int rank = U(block, level).cols;
+        int c_size = rows - rank;
+
+        // copy the complement part of the vector into the temporary vector
+        for (int i = 0; i < c_size; ++i) {
+          copy(c_offset + c_size * block + i, 0) = x(c_offset + block * rows + i, 0);
+        }
+        // copy the rank part of the vector into the temporary vector
+        for (int i = 0; i < rank; ++i) {
+          copy(rank_offset + rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return rank_offset;
+    }
+
+    int permute_backward(Hatrix::Matrix& x, const int level, int rank_offset) {
+      Hatrix::Matrix copy(x);
+      int num_nodes = pow(2, level);
+      int c_offset = rank_offset;
+      for (int block = 0; block < num_nodes; ++block) {
+        c_offset -= D(block, block, level).rows - U(block, level).cols;
+      }
+
+      for (int block = 0; block < num_nodes; ++block) {
+        int rows = D(block, block, level).rows;
+        int rank = U(block, level).cols;
+        int c_size = rows - rank;
+
+        for (int i = 0; i < c_size; ++i) {
+          copy(c_offset + block * rows + i, 0) = x(c_offset + block * c_size + i, 0);
+        }
+
+        for (int i = 0; i < rank; ++i) {
+          copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return c_offset;
+    }
+
   public:
 
     HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
@@ -398,7 +454,56 @@ namespace Hatrix {
 
     // Forward/backward substitution of UMV factorized HSS matrix.
     Hatrix::Matrix solve(const Hatrix::Matrix& b) {
+      std::vector<Hatrix::Matrix> x_splits;
       Hatrix::Matrix x(b);
+      int rhs_offset = 0, c_size, offset;
+
+      // forward
+      for (int level = height; level > 0; --level) {
+        int num_nodes = pow(2, level);
+        for (int node = 0; node < num_nodes; ++node) {
+          Matrix& Diag = D(node, node, level);
+          c_size = Diag.rows - rank;
+          offset = rhs_offset + node * Diag.rows;
+
+          Matrix temp(Diag.rows, 1);
+          for (int i = 0; i < Diag.rows; ++i) {
+            temp(i, 0) = x(offset + i, 0);
+          }
+          Matrix U_F = make_complement(U(node, level));
+          Matrix product = matmul(U_F, temp, true);
+          for (int i = 0; i < Diag.rows; ++i) {
+            x(offset + i, 0) = product(i, 0);
+          }
+
+          // don't compute partial LU if full rank.
+          if (rank == Diag.rows) { continue; }
+
+          x_splits = x.split(
+                             {offset, offset + c_size, offset + Diag.rows}, {});
+          Hatrix::Matrix& c = x_splits[1];
+          Hatrix::Matrix& o = x_splits[2];
+
+          std::vector<Matrix> D_splits = Diag.split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+          Matrix& Dcc = D_splits[0];
+          Matrix& Doc = D_splits[2];
+
+          solve_triangular(Dcc, c, Hatrix::Left, Hatrix::Lower, true);
+          matmul(Doc, c, o, false, false, -1.0, 1.0);
+        }
+
+        rhs_offset = permute_forward(x, level, rhs_offset);
+      }
+
+      x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
+      solve_triangular(A.D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(A.D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
+
+      // backward
+      for (int level = 1; level < height; ++level) {
+
+      }
 
       return x;
     }
