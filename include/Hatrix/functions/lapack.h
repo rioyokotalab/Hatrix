@@ -21,6 +21,9 @@ void lu(Matrix& A);
 // Use getrs for solving dense matrix A w.r.t RHS b.
 Matrix lu_solve(Matrix& A, const Matrix& b);
 
+// Compute the in-place non-pivoted LDLT factorization of A.
+void ldl(Matrix& A);
+
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
 // Compute the storage for Q and R automatically from mode and qr_ret values
