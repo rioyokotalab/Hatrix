@@ -108,15 +108,23 @@ namespace Hatrix {
       N(N), nblocks(nblocks), rank(rank) {
       int leaf_size = N / nblocks;
 
-      for (int block = 0; block < nblocks; ++block) {
-        D.insert(block, block,
-                 Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                                   block * leaf_size, block * leaf_size));
-        Matrix Ubig = generate_column_bases(block, leaf_size, randpts);
-        U.insert(block, std::move(Ubig));
-        Matrix Vbig = generate_row_bases(block, leaf_size, randpts);
-        V.insert(block, std::move(Vbig));
+      // generate diagonal and off-diagonal dense blocks
+      for (int irow = 0; irow < nblocks; ++irow) {
+        for (int icol = 0; icol < nblocks; ++icol) {
+          if (std::abs(irow - icol) <= 1) {
+            D.insert(irow, icol,
+                     Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                       irow * leaf_size, icol * leaf_size));
+            is_admissible(irow, icol) = false;
+          }
+        }
       }
+
+      Matrix Ubig = generate_column_bases(block, leaf_size, randpts);
+      U.insert(block, std::move(Ubig));
+      Matrix Vbig = generate_row_bases(block, leaf_size, randpts);
+      V.insert(block, std::move(Vbig));
+
 
       for (int row = 0; row < nblocks; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
@@ -129,8 +137,26 @@ namespace Hatrix {
 
     double construction_error(const randvec_t& randpts) {
       double error = 0;
+      int slice = N / nblocks;
 
-      return error;
+      for (int block = 0; block < nblocks; ++block) {
+        double diagonal_error = rel_error(D(block, block),
+                                          Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+                                                                            slice * block, slice * block));
+        error += pow(diagonal_error, 2);
+      }
+
+      for (int row = 0; row < num_nodes; ++row) {
+        int col = row % 2 == 0 ? row + 1 : row - 1;
+        Matrix Ubig = get_Ubig(row, level);
+        Matrix Vbig = get_Vbig(col, level);
+        Matrix expected = matmul(matmul(Ubig, S(row, col)), Vbig, false, true);
+        Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+                                                          row * slice, col * slice);
+
+        error += Hatrix::norm(expected - actual);
+      }
+      return std::sqrt(error / N / N);
     }
   };
 
@@ -143,7 +169,9 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
   randvec_t randpts;
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * (N/2))); // 1D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * (N/2))); // 2D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * (N/2))); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
