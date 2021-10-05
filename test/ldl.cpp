@@ -5,7 +5,10 @@
 #include "Hatrix/Hatrix.h"
 #include "gtest/gtest.h"
 
-class LDLTests : public testing::TestWithParam<std::tuple<int64_t>> {};
+class LDLTests
+  : public testing::TestWithParam<std::tuple<int64_t>> {};
+class SolveDiagonalTests :
+  public testing::TestWithParam<std::tuple<int64_t, int64_t, Hatrix::Side, double>> {};
 
 TEST_P(LDLTests, ldl) {
   Hatrix::Context::init();
@@ -41,6 +44,37 @@ TEST_P(LDLTests, ldl) {
   Hatrix::Context::finalize();
 }
 
+TEST_P(SolveDiagonalTests, solve_diagonal) {
+  Hatrix::Context::init();
+  int64_t m, n;
+  Hatrix::Side side;
+  double alpha;
+  std::tie(m, n, side, alpha) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, m);
+  Hatrix::Matrix B = Hatrix::generate_random_matrix(
+    side == Hatrix::Left ? m : n, side == Hatrix::Left ? n : m);
+  
+  // Set a large value on the diagonal
+  int64_t d = m * m;
+  for (int64_t i = 0; i < m; ++i) {
+    A(i, i) += d--;
+  }
+
+  Hatrix::Matrix B_copy(B);
+  Hatrix::solve_diagonal(A, B, side, alpha);
+  
+  // Check result
+  for (int64_t i = 0; i < B.rows; ++i) {
+    for (int64_t j = 0; j < B.cols; ++j) {
+      double val = B(i, j) * (side == Hatrix::Left ? A(i, i) : A(j, j)) / alpha;
+      EXPECT_NEAR(B_copy(i, j), val, 1e-14);
+    }
+  }
+
+  Hatrix::Context::finalize();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     LAPACK, LDLTests,
     testing::Combine(testing::Values(8, 16, 32)),
@@ -48,3 +82,9 @@ INSTANTIATE_TEST_SUITE_P(
       std::string name = ("m" + std::to_string(std::get<0>(info.param)));
       return name;
     });
+
+INSTANTIATE_TEST_SUITE_P(
+    BLAS, SolveDiagonalTests,
+    testing::Combine(testing::Values(16, 32), testing::Values(16, 32),
+                     testing::Values(Hatrix::Left, Hatrix::Right),
+                     testing::Values(-1., 0.5, 1.)));

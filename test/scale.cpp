@@ -44,6 +44,42 @@ TEST_P(ScaleTests, ScalingPart) {
   Hatrix::Context::finalize();
 }
 
+TEST_P(ScaleTests, RowScaling) {
+  int64_t m, n;
+  double alpha;
+  std::tie(m, n, alpha) = GetParam();
+  Hatrix::Context::init();
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_copy(A);
+  Hatrix::Matrix D = Hatrix::generate_random_matrix(m, m);  
+
+  Hatrix::row_scale(A, D);
+  for (int64_t j = 0; j < A.cols; ++j) {
+    for (int64_t i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(A(i, j), A_copy(i, j) * D(i, i));
+    }
+  }
+  Hatrix::Context::finalize();
+}
+
+TEST_P(ScaleTests, ColumnScaling) {
+  int64_t m, n;
+  double alpha;
+  std::tie(m, n, alpha) = GetParam();
+  Hatrix::Context::init();
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_copy(A);
+  Hatrix::Matrix D = Hatrix::generate_random_matrix(n, n);  
+
+  Hatrix::column_scale(A, D);
+  for (int64_t j = 0; j < A.cols; ++j) {
+    for (int64_t i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(A(i, j), A_copy(i, j) * D(j, j));
+    }
+  }
+  Hatrix::Context::finalize();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     BLAS, ScaleTests,
     testing::Values(std::make_tuple(10, 10, 4.32), std::make_tuple(1, 7, 2),
