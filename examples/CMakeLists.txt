@@ -21,6 +21,7 @@ else()
     HSS_Nlevel_construct_miro
     UMV_weak_2level
     UMV_weak_Nlevel
+    UMV_strong_1level
   )
 endif()
 
