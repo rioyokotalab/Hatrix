@@ -11,20 +11,7 @@
 
 // BLR2 compression scheme using randomization and multiplying each row/col block
 // into another to generate the shared bases.
-
-// Accuracy:
-// N: 1000 rank: 10 nblocks: 10 admis: 0 construct error: 0.00280282
-// N: 2000 rank: 10 nblocks: 20 admis: 0 construct error: 0.00211956
-// N: 4000 rank: 10 nblocks: 40 admis: 0 construct error: 0.00172444
-// N: 1000 rank: 10 nblocks: 10 admis: 1 construct error: 6.48274e-11
-// N: 2000 rank: 10 nblocks: 20 admis: 1 construct error: 1.67429e-10
-// N: 4000 rank: 10 nblocks: 40 admis: 1 construct error: 2.84801e-10
-// N: 1000 rank: 10 nblocks: 10 admis: 2 construct error: 9.38326e-14
-// N: 2000 rank: 10 nblocks: 20 admis: 2 construct error: 4.61331e-13
-// N: 4000 rank: 10 nblocks: 40 admis: 2 construct error: 1.39515e-12
-// N: 1000 rank: 10 nblocks: 10 admis: 3 construct error: 2.01124e-14
-// N: 2000 rank: 10 nblocks: 20 admis: 3 construct error: 1.39202e-13
-// N: 4000 rank: 10 nblocks: 40 admis: 3 construct error: 5.52532e-13
+// UMV factorization using Miamiao Ma's method.
 
 using randvec_t = std::vector<std::vector<double> >;
 
