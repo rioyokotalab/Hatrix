@@ -107,6 +107,16 @@ namespace Hatrix {
       }
     }
 
+    void factorize() {
+
+    }
+
+    Hatrix::Matrix solve(Hatrix::Matrix& b) {
+      Hatrix::Matrix x(b);
+
+      return x;
+    }
+
     double construction_error(const randvec_t& randpts) {
       double error = 0, fnorm = 0;
       int block_size = N / nblocks;
@@ -152,8 +162,21 @@ int main(int argc, char** argv) {
     abort();
   }
 
+  Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
   double construct_error = A.construction_error(randpts);
+  A.factorize();
+  Hatrix::Matrix x = A.solve(b);
+
+  // Verification with dense solver.
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  Hatrix::Matrix x_solve(b);
+  Hatrix::lu(Adense);
+  Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
+
+  double solve_error = std::sqrt(pow(Hatrix::norm(x - x_solve), 2) / N);
 
   Hatrix::Context::finalize();
 
