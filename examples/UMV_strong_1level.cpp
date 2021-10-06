@@ -31,100 +31,73 @@ namespace Hatrix {
     ColMap V;
     RowColMap<bool> is_admissible;
     RowColMap<Matrix> D, S;
-    int64_t N, nblocks, rank;
-
-    // Generate a row slice without the diagonal block specified by 'block'. The
-    // nrows parameter determines at what level the slice is generated at. Returns
-    // a block of size (nrows x (N - nrows)).
-    Matrix generate_row_slice(int block, int nrows, const randvec_t& randpts) {
-      Matrix row_slice(nrows, N-nrows);
-      int64_t ncols_left_slice = block * nrows;
-      Matrix left_slice = generate_laplacend_matrix(randpts, nrows, ncols_left_slice,
-                                                    block * nrows, 0);
-      int64_t ncols_right_slice = N - (block+1) * nrows;
-      Matrix right_slice = generate_laplacend_matrix(randpts, nrows, ncols_right_slice,
-                                                     block * nrows, (block+1) * nrows);
-
-      // concat left and right slices
-      for (int i = 0; i < nrows; ++i) {
-        for (int j = 0; j < ncols_left_slice; ++j) {
-          row_slice(i, j) = left_slice(i, j);
-        }
-
-        for (int j = 0; j < ncols_right_slice; ++j) {
-          row_slice(i, j + ncols_left_slice) = right_slice(i, j);
-        }
-      }
-
-      return row_slice;
-    }
-
-    // Generate a column slice without the diagonal block.
-    Matrix generate_column_slice(int block, int ncols, const randvec_t& randpts) {
-      Matrix col_slice(N-ncols, ncols);
-      int nrows_upper_slice = block * ncols;
-      Matrix upper_slice = generate_laplacend_matrix(randpts, nrows_upper_slice, ncols,
-                                                     0, block * ncols);
-      int nrows_lower_slice = N - (block + 1) * ncols;
-      Matrix lower_slice = generate_laplacend_matrix(randpts, nrows_lower_slice, ncols,
-                                                     (block+1) * ncols, block * ncols);
-
-      for (int j = 0; j < col_slice.cols; ++j) {
-        for (int i = 0; i < nrows_upper_slice; ++i) {
-          col_slice(i, j) = upper_slice(i, j);
-        }
-
-        for (int i = 0; i < nrows_lower_slice; ++i) {
-          col_slice(i + nrows_upper_slice, j) = lower_slice(i, j);
-        }
-      }
-
-      return col_slice;
-    }
-
-    // Generate U for the leaf.
-    Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randpts) {
-      // Row slice since column bases should be cutting across the columns.
-      Matrix row_slice = generate_row_slice(block, leaf_size, randpts);
-      Matrix Ui, Si, Vi; double error;
-      std::tie(Ui, Si, Vi, error) = truncated_svd(row_slice, rank);
-
-      return Ui;
-    }
-
-    // Generate V for the leaf.
-    Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randpts) {
-      // Col slice since row bases should be cutting across the rows.
-      Matrix col_slice = generate_column_slice(block, leaf_size, randpts);
-      Matrix Ui, Si, Vi; double error;
-      std::tie(Ui, Si, Vi, error) = truncated_svd(col_slice, rank);
-
-      return transpose(Vi);
-    }
-
+    int64_t N, nblocks, rank, admis;
 
   public:
-    BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank) :
-      N(N), nblocks(nblocks), rank(rank) {
-      int leaf_size = N / nblocks;
+    BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
+      N(N), nblocks(nblocks), rank(rank), admis(admis) {
+      int block_size = N / nblocks;
 
-      for (int block = 0; block < nblocks; ++block) {
-        D.insert(block, block,
-                 Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                                   block * leaf_size, block * leaf_size));
-        Matrix Ubig = generate_column_bases(block, leaf_size, randpts);
-        U.insert(block, std::move(Ubig));
-        Matrix Vbig = generate_row_bases(block, leaf_size, randpts);
-        V.insert(block, std::move(Vbig));
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::abs(i - j) > admis);
+
+          if (is_admissible(i, j)) {
+            D.insert(i, j,
+                     Hatrix::generate_laplacend_matrix(randpts,
+                                                       block_size, block_size,
+                                                       i*block_size, j*block_size));
+          }
+        }
       }
 
-      for (int row = 0; row < nblocks; ++row) {
-        int col = row % 2 == 0 ? row + 1 : row - 1;
-        Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                             row * leaf_size, col * leaf_size);
-        S.insert(row, col, matmul(matmul(U(row), D, true, false), V(col)));
+      int64_t oversampling = 5;
+      Hatrix::Matrix Utemp, Stemp, Vtemp;
+      double error;
+      std::vector<Hatrix::Matrix> Y;
+
+      // Generate a bunch of random matrices.
+      for (int64_t i = 0; i < nblocks; ++i) {
+        Y.push_back(
+                    Hatrix::generate_random_matrix(block_size, rank + oversampling));
       }
 
+      for (int64_t i = 0; i < nblocks; ++i) {
+        Hatrix::Matrix AY(block_size, rank + oversampling);
+        for (int64_t j = 0; j < nblocks; ++j) {
+          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                   block_size, block_size,
+                                                                   i*block_size, j*block_size);
+          if (is_admissible(i, j)) Hatrix::matmul(dense, Y[j], AY);
+        }
+        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+        U.insert(i, std::move(Utemp));
+      }
+
+      for (int64_t j = 0; j < nblocks; ++j) {
+        Hatrix::Matrix YtA(rank + oversampling, block_size);
+        for (int64_t i = 0; i < nblocks; ++i) {
+          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                   block_size, block_size,
+                                                                   i*block_size, j*block_size);
+          if (is_admissible(i, j)) Hatrix::matmul(Y[i], dense, YtA, true);
+        }
+        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
+        V.insert(j, std::move(Vtemp));
+      }
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j)) {
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                     block_size, block_size,
+                                                                     i*block_size, j*block_size);
+            S.insert(i, j,
+                     Hatrix::matmul(Hatrix::matmul(U[i], dense, true),
+                                    V[j], false, true));
+          }
+        }
+      }
     }
 
     double construction_error(const randvec_t& randpts) {
@@ -140,6 +113,7 @@ int main(int argc, char** argv) {
   int64_t N = atoi(argv[1]);
   int64_t nblocks = atoi(argv[2]);
   int64_t rank = atoi(argv[3]);
+  int64_t admis = atoi(argv[4]);
 
   Hatrix::Context::init();
   randvec_t randpts;
@@ -150,7 +124,7 @@ int main(int argc, char** argv) {
     abort();
   }
 
-  Hatrix::BLR2 A(randpts, N, nblocks, rank);
+  Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
   double construct_error = A.construction_error(randpts);
 
   Hatrix::Context::finalize();
