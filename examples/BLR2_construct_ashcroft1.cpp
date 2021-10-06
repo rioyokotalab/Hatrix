@@ -9,6 +9,9 @@
 
 #include "Hatrix/Hatrix.h"
 
+// Construction of BLR2 matrix as per Alg. 3.1 in
+// Block Low-Rank Matrices with Shared Bases: Potential and Limitations of the BLR2 Format.
+
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -47,6 +50,9 @@ namespace Hatrix {
                      Hatrix::generate_laplacend_matrix(randpts,
                                                        block_size, block_size,
                                                        i*block_size, j*block_size));
+          }
+          else {
+
           }
         }
       }
