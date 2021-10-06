@@ -22,6 +22,7 @@ else()
     UMV_weak_2level
     UMV_weak_Nlevel
     UMV_strong_1level
+    BLR2_construct_ashcroft1
   )
 endif()
 
