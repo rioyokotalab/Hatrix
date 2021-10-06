@@ -37,6 +37,19 @@ namespace Hatrix {
     RowColMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;
 
+    Hatrix::Matrix make_complement(const Hatrix::Matrix& Q) {
+      Hatrix::Matrix Q_F(Q.rows, Q.rows - Q.cols);
+      Hatrix::Matrix Q_full, R;
+      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q_F.cols; ++j) {
+          Q_F(i, j) = Q_full(i, j + Q.cols);
+        }
+      }
+      return Q_F;
+    }
+
   public:
     BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
       N(N), nblocks(nblocks), rank(rank), admis(admis) {
@@ -108,7 +121,43 @@ namespace Hatrix {
     }
 
     void factorize() {
+      for (int block = 0; block < nblocks; ++block) {
+        Hatrix::Matrix& diagonal = D(block, block);
 
+        Hatrix::Matrix U_F = make_complement(U(block));
+        Hatrix::Matrix V_F = make_complement(V(block));
+
+        diagonal = matmul(matmul(U_F, diagonal, true, false), V_F);
+
+        // in case of full rank, dont perform partial LU
+        if (rank == diagonal.rows) { continue; }
+
+        int c_size = diagonal.rows - rank;
+        std::vector<Hatrix::Matrix> diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
+                                                                     std::vector<int64_t>(1, c_size));
+        Hatrix::Matrix& Dcc = diagonal_splits[0];
+        Hatrix::Matrix& Dco = diagonal_splits[1];
+        Hatrix::Matrix& Doc = diagonal_splits[2];
+        Hatrix::Matrix& Doo = diagonal_splits[3];
+
+        Hatrix::lu(Dcc);
+        solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+        solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+        matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
+      }
+
+      // Merge unfactorized portions.
+      Hatrix::Matrix last(rank * nblocks, rank * nblocks);
+      std::vector<Hatrix::Matrix> last_splits = last.split(nblocks, nblocks);
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j)) {
+            last_splits[i * nblocks + j] = S(i, j);
+          }
+        }
+      }
+      Hatrix::lu(last);
     }
 
     Hatrix::Matrix solve(Hatrix::Matrix& b) {
