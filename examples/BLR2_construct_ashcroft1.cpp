@@ -60,10 +60,15 @@ namespace Hatrix {
 
     double construction_error(const randvec_t& randpts) {
       double error = 0;
+      double fnorm = 0;
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
+          double dd = Hatrix::norm(Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
+                                                                     block_size * i, block_size * j));
+          fnorm += dd * dd;
+
           if (!is_admissible(i, j)) {
             double dense_error = Hatrix::norm(D(i, j) -
                                            Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,

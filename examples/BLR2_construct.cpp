@@ -119,7 +119,7 @@ namespace Hatrix {
     }
 
     double construction_error(const randvec_t& randpts) {
-      double error = 0;
+      double error = 0, fnorm = 0;
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
@@ -128,7 +128,7 @@ namespace Hatrix {
             double dense_error = Hatrix::norm(D(i, j) -
                                            Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
                                                                              block_size * i, block_size * j));
-            error += dense_error;
+            error += pow(dense_error, 2);
           }
           else {
             Matrix& Ubig = U(i);
@@ -136,7 +136,7 @@ namespace Hatrix {
             Matrix expected = matmul(matmul(Ubig, S(i, j)), Vbig, false, true);
             Matrix actual = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
                                                               i * block_size, j * block_size);
-            error += Hatrix::norm(expected - actual);
+            error += pow(Hatrix::norm(expected - actual), 2);
           }
         }
       }
