@@ -11,7 +11,9 @@
 
 // BLR2 compression scheme using randomization and multiplying each row/col block
 // into another to generate the shared bases.
-// UMV factorization using Miamiao Ma's method.
+// UMV factorization using Miamiao Ma's method as shown in
+// Accuracy Directly Controlled Fast Direct Solution of General H^2-matrices and Its
+// Application to Solving Electrodynamics Volume Integral Equations
 
 using randvec_t = std::vector<std::vector<double> >;
 
@@ -48,6 +50,26 @@ namespace Hatrix {
         }
       }
       return Q_F;
+    }
+
+    void factorize_upper_right_strips(int block, int c_size, Hatrix::Matrix& Dcc) {
+      for (int irow = 0; irow < block; ++irow) {
+        if (!is_admissible(irow, block)) {
+          std::vector<Hatrix::Matrix> upper_strip_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
+                                                                                std::vector<int64_t>(1, c_size));
+
+          Hatrix::Matrix& URoc = upper_strip_splits[2];
+          Hatrix::Matrix& URoo = upper_strip_splits[3];
+        }
+      }
+    }
+
+    void factorize_lower_left_strips(int block, int c_size, Hatrix::Matrix& Dcc) {
+      for (int icol = 0; icol < block; ++icol) {
+        if (!is_admissible(block, icol)) {
+
+        }
+      }
     }
 
   public:
@@ -122,6 +144,8 @@ namespace Hatrix {
 
     void factorize() {
       for (int block = 0; block < nblocks; ++block) {
+        // Diagonal block is always dense so obtain compliment matrices and perform partial LU
+        // on it first.
         Hatrix::Matrix& diagonal = D(block, block);
 
         Hatrix::Matrix U_F = make_complement(U(block));
@@ -144,6 +168,38 @@ namespace Hatrix {
         solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
         solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
         matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
+
+        // Multiply previously remaining unfactorized upper strips in the column
+        // of the diagonal block. Fig. 4b in the paper.
+        if (block > 0) {
+          factorize_upper_right_strips(block, c_size, Dcc);
+        }
+
+        // Multiply and TRSM upper right blocks.
+        for (int icol = block + 1; icol < nblocks; ++icol) {
+          if (!is_admissible(block, icol)) {
+            Hatrix::Matrix& upper_right = D(block, icol);
+            upper_right = matmul(U_F, upper_right, true, false);
+
+            std::vector<Hatrix::Matrix> upper_right_splits = upper_right.split(std::vector<int64_t>(1, c_size),
+                                                                               std::vector<int64_t>(1, c_size));
+            Hatrix::Matrix& URcc = upper_right_splits[0];
+            Hatrix::Matrix& URco = upper_right_splits[1];
+            Hatrix::Matrix& URoc = upper_right_splits[2];
+            Hatrix::Matrix& URoo = upper_right_splits[3];
+
+          }
+        }
+
+        // Multiply previously remaining unfactorized lower strips in the row
+        // of the diagonal block. Fig. 4b in the paper.
+        if (block > 0) {
+          factorize_lower_left_strips(block, c_size, Dcc);
+        }
+
+        // Multiply and TRSM lower left blocks.
+        for (int irow = block + 1; irow < nblocks; ++irow) {
+        }
       }
 
       // Merge unfactorized portions.
