@@ -59,7 +59,7 @@ namespace Hatrix {
                                                                                 std::vector<int64_t>(1, c_size));
 
           Hatrix::Matrix& URoc = upper_strip_splits[2];
-          Hatrix::Matrix& URoo = upper_strip_splits[3];
+          solve_triangular(Dcc, URoc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
         }
       }
     }
@@ -67,7 +67,10 @@ namespace Hatrix {
     void factorize_lower_left_strips(int block, int c_size, Hatrix::Matrix& Dcc) {
       for (int icol = 0; icol < block; ++icol) {
         if (!is_admissible(block, icol)) {
-
+          std::vector<Hatrix::Matrix> lower_strip_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
+                                                                                std::vector<int64_t>(1, c_size));
+          Hatrix::Matrix& LLco = lower_strip_splits[1];
+          solve_triangular(Dcc, LLco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
         }
       }
     }
@@ -199,6 +202,10 @@ namespace Hatrix {
 
         // Multiply and TRSM lower left blocks.
         for (int irow = block + 1; irow < nblocks; ++irow) {
+          if (!is_admissible(irow, block)) {
+            Hatrix::Matrix& lower_left = D(irow, block);
+            lower_left = matmul(lower_left, V_F);
+          }
         }
       }
 
