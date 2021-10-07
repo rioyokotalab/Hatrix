@@ -85,13 +85,26 @@ public:
 
   Hatrix::Matrix Uf(int row) {
     Hatrix::Matrix Uf(block_size, block_size);
-    matrix_splits Uf_splits = Uf.split(vec(), vec{block_size - rank});
+    vec col_split_indices = rank < block_size ?
+      vec{block_size - rank} : vec();
+    matrix_splits Uf_splits = Uf.split(vec(), col_split_indices);
     Uf_splits[0] = Uc[row];
-    Uf_splits[1] = U[row];
+    if(rank < block_size) Uf_splits[1] = U[row];
     return Uf;
   }
   
 };
+
+Hatrix::Matrix copy_dense(BLR2_SPD& A) {
+  Hatrix::Matrix out(A.n_blocks * A.block_size, A.n_blocks * A.block_size);
+  matrix_splits out_splits = out.split(A.n_blocks, A.n_blocks);
+  for(int i = 0; i < A.n_blocks; i++) {
+    for(int j = 0; j < A.n_blocks; j++) {
+      out_splits[i*A.n_blocks + j] = A.D(i, j);
+    }
+  }
+  return out;
+}
 
 Hatrix::Matrix make_complement(const Hatrix::Matrix& _U) {
   Hatrix::Matrix U(_U);
@@ -151,6 +164,77 @@ Hatrix::Matrix factorize(BLR2_SPD& A) {
   return merged;
 }
 
+void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
+  //Split b
+  int c_size = A.block_size - A.rank;
+  vec local_split_indices{c_size};
+  vec global_split_indices;
+  for(int i = 0; i < A.n_blocks; i++) {
+    global_split_indices.push_back(i*A.block_size + c_size);
+    if(i < (A.n_blocks - 1))
+      global_split_indices.push_back(i*A.block_size + c_size + A.rank);
+  }
+  matrix_splits b_block_splits = b.split(A.n_blocks, 1);
+  matrix_splits b_block_co_splits = b.split(global_split_indices, vec());
+
+  //---Forward Substitution---
+  for(int i = 0; i < A.n_blocks; i++) {
+    //Multiply with orthogonal matrices
+    Hatrix::Matrix bi(b_block_splits[i].rows, b_block_splits[i].cols);
+    bi = b_block_splits[i];
+    Hatrix::matmul(A.Uf(i), bi, b_block_splits[i], true, false, 1, 0);
+
+    //Solve triangular from diagonals
+    matrix_splits Li_splits = A.D(i, i).split(local_split_indices,
+					      local_split_indices);
+    Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
+			     Hatrix::Left, Hatrix::Lower, true);
+    Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i], b_block_co_splits[2*i+1],
+		   false, false, -1, 1);
+  }
+  //Gather o parts
+  Hatrix::Matrix bo(A.n_blocks * A.rank, 1);
+  matrix_splits bo_splits = bo.split(A.n_blocks, 1);
+  for(int i = 0; i < A.n_blocks; i++) {
+    bo_splits[i] = b_block_co_splits[2*i+1];
+  }
+  Hatrix::solve_triangular(root, bo, Hatrix::Left, Hatrix::Lower, true);
+
+  //---Solve Diagonal---
+  //Solve in c parts
+  for(int i = 0; i < A.n_blocks; i++) {
+    matrix_splits Li_splits = A.D(i, i).split(local_split_indices,
+					      local_split_indices);
+    Hatrix::solve_diagonal(Li_splits[0], b_block_co_splits[2*i], Hatrix::Left);
+  }
+  //Solve in o parts
+  Hatrix::solve_diagonal(root, bo, Hatrix::Left);
+
+  //---Backward substitution---
+  Hatrix::solve_triangular(root, bo, Hatrix::Left, Hatrix::Lower, true, true);
+  //Scatter o parts
+  for(int i = 0; i < A.n_blocks; i++) {
+    b_block_co_splits[2*i+1] = bo_splits[i];
+  }
+  for(int i = 0; i < A.n_blocks; i++) {
+    matrix_splits Li_splits = A.D(i, i).split(local_split_indices,
+					      local_split_indices);
+    Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i+1], b_block_co_splits[2*i],
+		   true, false, -1., 1.);
+    Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
+			     Hatrix::Left, Hatrix::Lower, true, true);
+    //Multiply with orthogonal matrix
+    Hatrix::Matrix bi(b_block_splits[i].rows, b_block_splits[i].cols);
+    bi = b_block_splits[i];
+    Hatrix::matmul(A.Uf(i), bi, b_block_splits[i], false, false, 1., 0);
+  }
+}
+
+double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
+  double norm = Hatrix::norm(A);
+  double diff = Hatrix::norm(A - B);
+  return diff/norm;
+}
 
 int main(int argc, char** argv) {
   int64_t N = argc > 1 ? atoi(argv[1]) : 256;
@@ -163,9 +247,15 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
 
   BLR2_SPD A(randpts, N, block_size, rank, 0);
+  Hatrix::Matrix A_dense = copy_dense(A);
+  Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Matrix b = A_dense * x;
   std::cout <<"BLR construction error: " <<A.construct_error <<"\n";
 
-  Hatrix::Matrix last = factorize(A);
+  Hatrix::Matrix root = factorize(A);
+  substitute(A, root, b);
+  double substitution_error = rel_error(x, b);
+  std::cout <<"Solve Error : " <<substitution_error <<"\n";
 
   Hatrix::Context::finalize();
   return 0;
