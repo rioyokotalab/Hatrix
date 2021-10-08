@@ -23,7 +23,7 @@ namespace Hatrix {
     void generate_transfer_matrices(const randvec_t& randpts) {
       int nblocks = 2;          // level 1 so only 2 blocks on this level.
       int leaf_size = N / nblocks;
-      constexpr int64_t oversampling = 5;
+      constexpr int64_t oversampling = 5, child_level = 2;
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -54,7 +54,17 @@ namespace Hatrix {
             matmul(dense, Y[j], AY);
           }
         }
-        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+
+        Matrix& Ubig_child1 = U(i * 2, child_level);
+        Matrix& Ubig_child2 = U(i * 2 + 1, child_level);
+        Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
+        std::vector<Matrix> temp_splits = temp.split(2, 1);
+        std::vector<Matrix> AY_splits = AY.split(2, 1);
+
+        matmul(Ubig_child1, AY_splits[0], temp_splits[0], true, false, 1, 0);
+        matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
+
+        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(temp, rank);
         U.insert(i, 1, std::move(Utemp));
       }
 
@@ -67,6 +77,16 @@ namespace Hatrix {
             matmul(Y[i], dense, YtA, true);
           }
         }
+
+        Matrix& Vbig_child1 = V(j * 2, child_level);
+        Matrix& Vbig_child2 = V(j * 2 + 1, child_level);
+        Matrix temp(YtA.rows, Vbig_child1.cols + Vbig_child2.cols);
+        std::vector<Matrix> temp_splits = temp.split(1, 2);
+        std::vector<Matrix> YtA_splits = YtA.split(1, 2);
+
+        matmul(YtA_splits[0], Vbig_child1, temp_splits[0]);
+        matmul(YtA_splits[1], Vbig_child2, temp_splits[1]);
+
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
         V.insert(j, 1, std::move(transpose(Vtemp)));
       }
