@@ -39,6 +39,7 @@ namespace Hatrix {
       std::vector<Matrix> Y;
       Matrix Utemp, Stemp, Vtemp;
       double error;
+      RowLevelMap Ubig, Vbig;
 
       // Generate random matrices.
       for (int64_t i = 0; i < nblocks; ++i) {
@@ -55,6 +56,7 @@ namespace Hatrix {
           }
         }
 
+        // Generate U transfer matrix.
         Matrix& Ubig_child1 = U(i * 2, child_level);
         Matrix& Ubig_child2 = U(i * 2 + 1, child_level);
         Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
@@ -66,6 +68,15 @@ namespace Hatrix {
 
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(temp, rank);
         U.insert(i, 1, std::move(Utemp));
+
+        // Generate Ubig actual bases.
+        Matrix Ubig_temp(leaf_size, rank);
+        std::vector<Matrix> Utransfer_splits = U(i, 1).split(2, 1);
+        std::vector<Matrix> Ubig_temp_splits = Ubig_temp.split(2, 1);
+
+        matmul(Ubig_child1, Utransfer_splits[0], Ubig_temp_splits[0]);
+        matmul(Ubig_child2, Utransfer_splits[1], Ubig_temp_splits[1]);
+        Ubig.insert(i, 1, std::move(Ubig_temp));
       }
 
       for (int64_t j = 0; j < nblocks; ++j) {
@@ -78,6 +89,7 @@ namespace Hatrix {
           }
         }
 
+        // Generate V transfer matrix.
         Matrix& Vbig_child1 = V(j * 2, child_level);
         Matrix& Vbig_child2 = V(j * 2 + 1, child_level);
         Matrix temp(YtA.rows, Vbig_child1.cols + Vbig_child2.cols);
@@ -89,6 +101,15 @@ namespace Hatrix {
 
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
         V.insert(j, 1, std::move(transpose(Vtemp)));
+
+        // Generate Vbig actual bases.
+        Matrix Vbig_temp(rank, leaf_size);
+        std::vector<Matrix> Vtransfer_splits = V(j, 1).split(2, 1);
+        std::vector<Matrix> Vbig_temp_splits = Vbig_temp.split(1, 2);
+
+        matmul(Vtransfer_splits[0], Vbig_child1, Vbig_temp_splits[0], true, true, 1, 0);
+        matmul(Vtransfer_splits[1], Vbig_child2, Vbig_temp_splits[1], true, true, 1, 0);
+        Vbig.insert(j, 1, transpose(Vbig_temp));
       }
     }
 
