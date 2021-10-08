@@ -203,20 +203,35 @@ namespace Hatrix {
     }
 
     double construction_relative_error(const randvec_t& randpts) {
-      double error = 0;
+      double error = 0, fnorm = 0;
 
       // leaf level error checking for dense blocks
       int nblocks = pow(height, 2);
+      int leaf_size = N / nblocks;
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (D.exists(i, j, 2)) {
+            Matrix dense = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                 i * leaf_size, j * leaf_size);
+            fnorm += pow(norm(dense), 2);
+            error += pow(norm(D(i, j, 2) - dense), 2);
             std::cout << "D: " << i << " j: " << j << std::endl;
           }
         }
-
       }
 
-      return error;
+      // level 1
+      nblocks = 2;
+      leaf_size = N / nblocks;
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (S.exists(i, j, 1)) {
+
+          }
+        }
+      }
+
+      return std::sqrt(error/fnorm);
     }
   };
 }
