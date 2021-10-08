@@ -39,7 +39,8 @@ namespace Hatrix {
       std::vector<Matrix> Y;
       Matrix Utemp, Stemp, Vtemp;
       double error;
-      RowLevelMap Ubig, Vbig;
+      RowLevelMap Ubig;
+      ColLevelMap Vbig;
 
       // Generate random matrices.
       for (int64_t i = 0; i < nblocks; ++i) {
@@ -110,6 +111,16 @@ namespace Hatrix {
         matmul(Vtransfer_splits[0], Vbig_child1, Vbig_temp_splits[0], true, true, 1, 0);
         matmul(Vtransfer_splits[1], Vbig_child2, Vbig_temp_splits[1], true, true, 1, 0);
         Vbig.insert(j, 1, transpose(Vbig_temp));
+      }
+
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j, 1)) {
+            Matrix dense = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                     i * leaf_size, j * leaf_size);
+            S.insert(i, j, 1, matmul(matmul(Ubig(i, 1), dense, true, false), Vbig(j, 1)));
+          }
+        }
       }
     }
 
