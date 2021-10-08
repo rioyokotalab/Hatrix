@@ -106,6 +106,11 @@ T RowColLevelMap<T>::extract(const std::tuple<int64_t, int64_t, int64_t>& key) {
   return out;
 }
 
+template <class T>
+bool RowColLevelMap<T>::exists(int64_t row, int64_t col, int64_t level) const {
+  return map.count({row, col, level}) == 0 ? false : true;
+}
+
 // explicit instatiation
 template class RowColLevelMap<bool>;
 template class RowColLevelMap<Matrix>;

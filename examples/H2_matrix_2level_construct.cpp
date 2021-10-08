@@ -18,7 +18,6 @@ namespace Hatrix {
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
     RowColLevelMap<bool> is_admissible;
-
     int64_t N, rank, admis, height;
 
     void generate_transfer_matrices(const randvec_t& randvec, RowLevelMap& Ugen, ColLevelMap& Vgen) {

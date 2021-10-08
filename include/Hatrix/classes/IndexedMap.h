@@ -95,6 +95,8 @@ public:
 
   T extract(int64_t row, int64_t col, int64_t level);
   T extract(const std::tuple<int64_t, int64_t, int64_t>& key);
+
+  bool exists(int64_t row, int64_t col, int64_t level) const;
 };
 
 using RolColLevelMap = RowColLevelMap<Matrix>;
