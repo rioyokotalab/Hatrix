@@ -20,6 +20,55 @@ namespace Hatrix {
     RowColLevelMap<bool> is_admissible;
     int64_t N, rank, admis, height;
 
+    Matrix get_Ubig(int p, int level) {
+      if (level == height) {
+        return U(p, level);
+      }
+      int child1 = p * 2;
+      int child2 = p * 2 + 1;
+
+      // int rank = leaf_size;
+
+      Matrix Ubig_child1 = get_Ubig(child1, level+1);
+      Matrix Ubig_child2 = get_Ubig(child2, level+1);
+
+      int leaf_size = Ubig_child1.rows + Ubig_child2.rows;
+
+      Matrix Ubig(rank, leaf_size);
+
+      std::vector<Matrix> Ubig_splits = Ubig.split({}, std::vector<int64_t>(1, Ubig_child1.rows));
+      std::vector<Matrix> U_splits = U(p, level).split(2, 1);
+
+      matmul(U_splits[0], Ubig_child1, Ubig_splits[0], true, true);
+      matmul(U_splits[1], Ubig_child2, Ubig_splits[1], true, true);
+
+      return transpose(Ubig);
+    }
+
+    Matrix get_Vbig(int p, int level) {
+      if (level == height) {
+        return V(p, level);
+      }
+      int child1 = p * 2;
+      int child2 = p * 2 + 1;
+
+      Matrix Vbig_child1 = get_Vbig(child1, level+1);
+      Matrix Vbig_child2 = get_Vbig(child2, level+1);
+
+      int leaf_size = Vbig_child1.rows + Vbig_child2.rows;
+      //int rank = leaf_size;
+
+      Matrix Vbig(leaf_size, rank);
+
+      std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
+      std::vector<Matrix> V_splits = V(p, level).split(2, 1);
+
+      matmul(Vbig_child1, V_splits[0], Vbig_splits[0]);
+      matmul(Vbig_child2, V_splits[1], Vbig_splits[1]);
+
+      return Vbig;
+    }
+
     void generate_transfer_matrices(const randvec_t& randpts) {
       int nblocks = 2;          // level 1 so only 2 blocks on this level.
       int leaf_size = N / nblocks;
@@ -226,7 +275,9 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (S.exists(i, j, 1)) {
-
+            std::cout << "S: i-> " << i << " j-> " << j << std::endl;
+            Matrix Ubig = get_Ubig(i, 1);
+            Matrix Vbig = get_Vbig(j, 1);
           }
         }
       }
