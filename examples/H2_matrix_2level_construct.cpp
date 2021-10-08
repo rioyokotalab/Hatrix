@@ -149,7 +149,7 @@ namespace Hatrix {
         matmul(YtA_splits[0], Vbig_child1, temp_splits[0]);
         matmul(YtA_splits[1], Vbig_child2, temp_splits[1]);
 
-        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
+        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(temp, rank);
         V.insert(j, 1, std::move(transpose(Vtemp)));
 
         // Generate Vbig actual bases.
@@ -225,13 +225,13 @@ namespace Hatrix {
       }
 
       for (int64_t j = 0; j < nblocks; ++j) {
-        Hatrix::Matrix YtA(rank + oversampling, leaf_size);
+        Matrix YtA(rank + oversampling, leaf_size);
         for (int64_t i = 0; i < nblocks; ++i) {
           if (is_admissible(i, j, height)) {
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                     leaf_size, leaf_size,
-                                                                     i*leaf_size, j*leaf_size);
-            Hatrix::matmul(Y[i], dense, YtA, true);
+            Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                             leaf_size, leaf_size,
+                                                             i*leaf_size, j*leaf_size);
+            matmul(Y[i], dense, YtA, true);
           }
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
@@ -264,7 +264,6 @@ namespace Hatrix {
                                                  i * leaf_size, j * leaf_size);
             fnorm += pow(norm(dense), 2);
             error += pow(norm(D(i, j, 2) - dense), 2);
-            std::cout << "D: " << i << " j: " << j << std::endl;
           }
         }
       }
@@ -275,9 +274,13 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (S.exists(i, j, 1)) {
-            std::cout << "S: i-> " << i << " j-> " << j << std::endl;
             Matrix Ubig = get_Ubig(i, 1);
             Matrix Vbig = get_Vbig(j, 1);
+            Matrix expected = matmul(matmul(Ubig, S(i, j, 1)), Vbig, false, true);
+            Matrix actual = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                      i * leaf_size, j * leaf_size);
+            fnorm += pow(norm(actual), 2);
+            error += pow(norm(expected - actual), 2);
           }
         }
       }
