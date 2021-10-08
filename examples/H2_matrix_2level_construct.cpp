@@ -131,11 +131,20 @@ namespace Hatrix {
       RowLevelMap Vgen;
 
       for (int i = 0; i < nblocks; ++i) {
+        int j = i % 2 == 0 ? i + 1 : i - 1;
+        is_admissible.insert(i, j, height, std::abs(i - j) > admis);
+        if (!is_admissible(i, j, height)) {
+          D.insert(i, j, height, Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                                   i * leaf_size, j * leaf_size));
+        }
+
+        is_admissible.insert(i, i, height, false);
+        D.insert(i, i, height, Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                                 i * leaf_size, i * leaf_size));
+
         for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, height, std::abs(i - j) < admis);
-          if (!is_admissible(i, j, height)) {
-            D.insert(i, j, height, Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                                                     i * leaf_size, j * leaf_size));
+          if (!is_admissible.exists(i, j, 2)) {
+            is_admissible.insert(i, j, 2, true);
           }
         }
       }
@@ -195,6 +204,17 @@ namespace Hatrix {
 
     double construction_relative_error(const randvec_t& randpts) {
       double error = 0;
+
+      // leaf level error checking for dense blocks
+      int nblocks = pow(height, 2);
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (D.exists(i, j, 2)) {
+            std::cout << "D: " << i << " j: " << j << std::endl;
+          }
+        }
+
+      }
 
       return error;
     }
