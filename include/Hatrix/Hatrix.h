@@ -7,3 +7,4 @@
 #include "functions/lapack.h"
 #include "util/context.h"
 #include "util/matrix_generators.h"
+#include "util/helpers.h"
