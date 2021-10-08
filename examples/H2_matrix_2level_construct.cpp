@@ -20,10 +20,10 @@ namespace Hatrix {
     RowColLevelMap<bool> is_admissible;
     int64_t N, rank, admis, height;
 
-    void generate_transfer_matrices(const randvec_t& randvec, RowLevelMap& Ugen, ColLevelMap& Vgen) {
+    void generate_transfer_matrices(const randvec_t& randpts) {
     }
 
-    std::tuple<RowLevelMap, ColLevelMap> generate_leaf_nodes(const randvec_t& randpts) {
+    void generate_leaf_nodes(const randvec_t& randpts) {
       int nblocks = pow(height, 2);
       int leaf_size = N / nblocks;
       ColLevelMap Ugen;
@@ -32,7 +32,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           is_admissible.insert(i, j, height, std::abs(i - j) < admis);
-          if (is_admissible(i, j, height)) {
+          if (!is_admissible(i, j, height)) {
             D.insert(i, j, height, Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
                                                                      i * leaf_size, j * leaf_size));
           }
@@ -79,9 +79,7 @@ namespace Hatrix {
         V.insert(j, height, std::move(transpose(Vtemp)));
       }
 
-
-
-      return {Ugen, Vgen};
+      // No S blocks at the leaf level since all the leaf nodes are dense.
     }
 
   public:
@@ -90,8 +88,8 @@ namespace Hatrix {
       N(N), rank(rank), admis(admis), height(height) {
       RowLevelMap Ugen; ColLevelMap Vgen;
 
-      std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
-      generate_transfer_matrices(randpts, Ugen, Vgen);
+      generate_leaf_nodes(randpts);
+      generate_transfer_matrices(randpts);
     }
 
     double construction_relative_error(const randvec_t& randpts) {
