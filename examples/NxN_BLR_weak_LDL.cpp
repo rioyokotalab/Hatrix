@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <cassert>
 
 #include "Hatrix/Hatrix.h"
 
@@ -85,11 +86,10 @@ public:
 
   Hatrix::Matrix Uf(int row) {
     Hatrix::Matrix Uf(block_size, block_size);
-    vec col_split_indices = rank < block_size ?
-      vec{block_size - rank} : vec();
+    vec col_split_indices = vec{block_size - rank};
     matrix_splits Uf_splits = Uf.split(vec(), col_split_indices);
     Uf_splits[0] = Uc[row];
-    if(rank < block_size) Uf_splits[1] = U[row];
+    Uf_splits[1] = U[row];
     return Uf;
   }
   
@@ -119,22 +119,22 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix& _U) {
 }
 
 void partial_ldl_diag(BLR2_SPD& A, int i) {
-  if(A.rank < A.block_size) {
-    matrix_splits D_splits = A.D(i, i).split(vec{A.block_size - A.rank},
-					     vec{A.block_size - A.rank});
-    Hatrix::ldl(D_splits[0]);
-    Hatrix::solve_triangular(D_splits[0], D_splits[2], Hatrix::Right,
-			     Hatrix::Lower, true, true, 1.);
-    Hatrix::solve_diagonal(D_splits[0], D_splits[2], Hatrix::Right, 1.);
-    //Compute Schur's complement
-    Hatrix::Matrix L_oc(D_splits[2].rows, D_splits[2].cols);
-    L_oc = D_splits[2]; // Hatrix::Matrix L_oc(D_splits[2]) doesn't work due to current copy-constructor
-    column_scale(L_oc, D_splits[0]); //L*D
-    Hatrix::matmul(L_oc, D_splits[2], D_splits[3], false, true, -1., 1.);
-  }
+  matrix_splits D_splits = A.D(i, i).split(vec{A.block_size - A.rank},
+					   vec{A.block_size - A.rank});
+  Hatrix::ldl(D_splits[0]);
+  Hatrix::solve_triangular(D_splits[0], D_splits[2], Hatrix::Right,
+			   Hatrix::Lower, true, true, 1.);
+  Hatrix::solve_diagonal(D_splits[0], D_splits[2], Hatrix::Right, 1.);
+  //Compute Schur's complement
+  Hatrix::Matrix L_oc(D_splits[2].rows, D_splits[2].cols);
+  L_oc = D_splits[2]; // Hatrix::Matrix L_oc(D_splits[2]) doesn't work due to current copy-constructor
+  column_scale(L_oc, D_splits[0]); //L*D
+  Hatrix::matmul(L_oc, D_splits[2], D_splits[3], false, true, -1., 1.);
 }
 
 Hatrix::Matrix factorize(BLR2_SPD& A) {
+  assert(A.rank < A.block_size);
+  
   for(int64_t i = 0; i < A.n_blocks; i++) {
     A.Uc.insert(i, make_complement(A.U[i]));
     //Transform diagonal
@@ -165,6 +165,8 @@ Hatrix::Matrix factorize(BLR2_SPD& A) {
 }
 
 void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
+  assert(A.rank < A.block_size);
+  
   //Split b
   int c_size = A.block_size - A.rank;
   vec local_split_indices{c_size};
