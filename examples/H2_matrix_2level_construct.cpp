@@ -40,6 +40,48 @@ namespace Hatrix {
         }
       }
 
+      // Use randomization and matrix multiplication to generate column bases U.
+      constexpr int64_t oversampling = 5;
+      Matrix Utemp, Stemp, Vtemp;
+      double error;
+      std::vector<Hatrix::Matrix> Y;
+
+      // Generate a bunch of random matrices.
+      for (int64_t i = 0; i < nblocks; ++i) {
+        Y.push_back(
+                    Hatrix::generate_random_matrix(leaf_size, rank + oversampling));
+      }
+
+      for (int64_t i = 0; i < nblocks; ++i) {
+        Matrix AY(leaf_size, rank + oversampling);
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j, height)) {
+            Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                     leaf_size, leaf_size,
+                                                                     i*leaf_size, j*leaf_size);
+            matmul(dense, Y[j], AY);
+          }
+        }
+        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+        U.insert(i, height, std::move(Utemp));
+      }
+
+      for (int64_t j = 0; j < nblocks; ++j) {
+        Hatrix::Matrix YtA(rank + oversampling, leaf_size);
+        for (int64_t i = 0; i < nblocks; ++i) {
+          if (is_admissible(i, j, height)) {
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                     leaf_size, leaf_size,
+                                                                     i*leaf_size, j*leaf_size);
+            Hatrix::matmul(Y[i], dense, YtA, true);
+          }
+        }
+        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
+        V.insert(j, height, std::move(transpose(Vtemp)));
+      }
+
+
+
       return {Ugen, Vgen};
     }
 
