@@ -22,7 +22,6 @@ else()
     UMV_weak_2level
     UMV_weak_Nlevel
     BLR2_construct
-    BLR2_construct_ashcroft1
     UMV_strong_1level
     H2_matrix_2level_construct
   )
