@@ -15,7 +15,7 @@ namespace Hatrix {
   class HSS {
     ColLevelMap U;
     RowLevelMap V;
-    RowColLevelMap D, S;
+    RowColLevelMap<Matrix> D, S;
     int N, rank, height;
 
     std::tuple<Matrix, Matrix> generate_column_bases(int block, int leaf_size, const randvec_t& randvec) {

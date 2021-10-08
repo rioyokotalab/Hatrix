@@ -78,22 +78,25 @@ class RowColMap {
 using RowLevelMap = RowColMap<Matrix>;
 using ColLevelMap = RowColMap<Matrix>;
 
+template <class T>
 class RowColLevelMap {
 private:
-  std::unordered_map<std::tuple<int64_t, int64_t, int64_t>, Matrix> map;
+  std::unordered_map<std::tuple<int64_t, int64_t, int64_t>, T> map;
 
 public:
-  Matrix& operator()(int64_t row, int64_t col, int64_t level);
-  const Matrix& operator()(int64_t row, int64_t col, int64_t level) const;
+  T& operator()(int64_t row, int64_t col, int64_t level);
+  const T& operator()(int64_t row, int64_t col, int64_t level) const;
 
-  Matrix& operator[](const std::tuple<int64_t, int64_t, int64_t>& key);
-  const Matrix& operator[](const std::tuple<int64_t, int64_t, int64_t>& key) const;
+  T& operator[](const std::tuple<int64_t, int64_t, int64_t>& key);
+  const T& operator[](const std::tuple<int64_t, int64_t, int64_t>& key) const;
 
-  void insert(int64_t row, int64_t col, int64_t level, Matrix&& matrix);
-  void insert(const std::tuple<int64_t, int64_t, int64_t>& key, Matrix&& matrix);
+  void insert(int64_t row, int64_t col, int64_t level, T&& matrix);
+  void insert(const std::tuple<int64_t, int64_t, int64_t>& key, T&& matrix);
 
-  Matrix extract(int64_t row, int64_t col, int64_t level);
-  Matrix extract(const std::tuple<int64_t, int64_t, int64_t>& key);
+  T extract(int64_t row, int64_t col, int64_t level);
+  T extract(const std::tuple<int64_t, int64_t, int64_t>& key);
 };
+
+using RolColLevelMap = RowColLevelMap<Matrix>;
 
 }  // namespace Hatrix
