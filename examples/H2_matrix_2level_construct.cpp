@@ -21,6 +21,55 @@ namespace Hatrix {
     int64_t N, rank, admis, height;
 
     void generate_transfer_matrices(const randvec_t& randpts) {
+      int nblocks = 2;          // level 1 so only 2 blocks on this level.
+      int leaf_size = N / nblocks;
+      constexpr int64_t oversampling = 5;
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (i == j) {
+            is_admissible.insert(i, j, 1, false);
+          }
+          else {
+            is_admissible.insert(i, j, 1, true);
+          }
+        }
+      }
+
+      std::vector<Matrix> Y;
+      Matrix Utemp, Stemp, Vtemp;
+      double error;
+
+      // Generate random matrices.
+      for (int64_t i = 0; i < nblocks; ++i) {
+        Y.push_back(generate_random_matrix(leaf_size, rank + oversampling));
+      }
+
+      for (int64_t i = 0; i < nblocks; ++i) {
+        Matrix AY(leaf_size, rank + oversampling);
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j, 1)) {
+            Matrix dense = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                     i * leaf_size, j * leaf_size);
+            matmul(dense, Y[j], AY);
+          }
+        }
+        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+        U.insert(i, 1, std::move(Utemp));
+      }
+
+      for (int64_t j = 0; j < nblocks; ++j) {
+        Matrix YtA(rank + oversampling, leaf_size);
+        for (int64_t i = 0; i < nblocks; ++i) {
+          if (is_admissible(i, j, 1)) {
+            Matrix dense = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
+                                                     i * leaf_size, j * leaf_size);
+            matmul(Y[i], dense, YtA, true);
+          }
+        }
+        std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
+        V.insert(j, 1, std::move(transpose(Vtemp)));
+      }
     }
 
     void generate_leaf_nodes(const randvec_t& randpts) {
