@@ -30,14 +30,20 @@ namespace Hatrix {
     RowColMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;
 
-    Hatrix::Matrix make_complement(const Hatrix::Matrix& Q) {
-      Hatrix::Matrix Q_F(Q.rows, Q.rows - Q.cols);
-      Hatrix::Matrix Q_full, R;
-      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+    Matrix make_complement(const Hatrix::Matrix &Q) {
+      Matrix Q_F(Q.rows, Q.rows);
+      Matrix Q_full, R;
+       std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
 
       for (int i = 0; i < Q_F.rows; ++i) {
-        for (int j = 0; j < Q_F.cols; ++j) {
+        for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
           Q_F(i, j) = Q_full(i, j + Q.cols);
+        }
+      }
+
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q.cols; ++j) {
+          Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
         }
       }
       return Q_F;
@@ -137,15 +143,19 @@ namespace Hatrix {
 
     void factorize() {
       int block_size = N / nblocks;
+      int c_size = block_size - rank;
       RowColMap<Matrix> F; // store fill-in blocks
 
       for (int block = 0; block < nblocks; ++block) {
-
         if (block > 0) {        // account for fill-ins from previous updates
           for (int irow = block; irow < nblocks; ++irow) {
             for (int icol = block; icol < nblocks; ++icol) {
               if (F.exists(irow, icol)) {
-                D(irow, icol) += F(irow, icol);
+                if (!is_admissible(irow, icol)) {
+                  // dense block so directly add the fill-in.
+                  D(irow, icol) += F(irow, icol);
+                }
+
                 F.erase(irow, icol);
               }
             }
@@ -153,24 +163,26 @@ namespace Hatrix {
         }
         // Diagonal block is always dense so obtain compliment matrices and perform partial LU
         // on it first.
-        Hatrix::Matrix& diagonal = D(block, block);
-        Hatrix::Matrix U_F = make_complement(U(block));
-        Hatrix::Matrix V_F = make_complement(V(block));
+        Matrix& diagonal = D(block, block);
+        Matrix U_F = make_complement(U(block));
+        Matrix V_F = make_complement(V(block));
+
+        V_F.print_meta();
 
         diagonal = matmul(matmul(U_F, diagonal, true, false), V_F);
 
         // in case of full rank, dont perform partial LU
         if (rank == diagonal.rows) { continue; }
 
-        int c_size = diagonal.rows - rank;
-        std::vector<Hatrix::Matrix> diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
-                                                                     std::vector<int64_t>(1, c_size));
+        auto diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
+                                              std::vector<int64_t>(1, c_size));
+
         Matrix& Dcc = diagonal_splits[0];
         Matrix& Dco = diagonal_splits[1];
         Matrix& Doc = diagonal_splits[2];
         Matrix& Doo = diagonal_splits[3];
 
-        Hatrix::lu(Dcc);
+        lu(Dcc);
         solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
         solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
         matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
@@ -257,17 +269,23 @@ namespace Hatrix {
       }
 
       // Merge unfactorized portions.
-      Hatrix::Matrix last(rank * nblocks, rank * nblocks);
-      std::vector<Hatrix::Matrix> last_splits = last.split(nblocks, nblocks);
+      Matrix last(rank * nblocks, rank * nblocks);
+      auto last_splits = last.split(nblocks, nblocks);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j)) {
             last_splits[i * nblocks + j] = S(i, j);
           }
+          else {
+            auto dense_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
+                                              std::vector<int64_t>(1, c_size));
+            last_splits[i * nblocks + j] = dense_splits[3];
+          }
         }
       }
-      Hatrix::lu(last);
+
+      lu(last);
     }
 
     Hatrix::Matrix solve(Hatrix::Matrix& b) {
