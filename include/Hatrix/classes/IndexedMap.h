@@ -72,6 +72,8 @@ class RowColMap {
 
   T extract(int64_t row, int64_t col);
   T extract(const std::tuple<int64_t, int64_t>& key);
+
+  bool exists(int64_t row, int64_t col) const;
 };
 
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol

@@ -61,6 +61,11 @@ T RowColMap<T>::extract(const std::tuple<int64_t, int64_t>& key) {
   return out;
 }
 
+template<class T>
+bool RowColMap<T>::exists(int64_t row, int64_t col) const {
+  return map.count({row, col}) == 0 ? false : true;
+}
+
 // explicit instatiation
 template class RowColMap<bool>;
 template class RowColMap<Matrix>;

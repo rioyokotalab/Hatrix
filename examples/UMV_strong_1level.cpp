@@ -136,13 +136,15 @@ namespace Hatrix {
     }
 
     void factorize() {
+      int block_size = N / nblocks;
+      RowColMap<Matrix> F; // store fill-in blocks
+
       for (int block = 0; block < nblocks; ++block) {
-        RowColLevelMap<Matrix> F; // store fill-in blocks
+
 
         // Diagonal block is always dense so obtain compliment matrices and perform partial LU
         // on it first.
         Hatrix::Matrix& diagonal = D(block, block);
-
         Hatrix::Matrix U_F = make_complement(U(block));
         Hatrix::Matrix V_F = make_complement(V(block));
 
@@ -154,10 +156,10 @@ namespace Hatrix {
         int c_size = diagonal.rows - rank;
         std::vector<Hatrix::Matrix> diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
                                                                      std::vector<int64_t>(1, c_size));
-        Hatrix::Matrix& Dcc = diagonal_splits[0];
-        Hatrix::Matrix& Dco = diagonal_splits[1];
-        Hatrix::Matrix& Doc = diagonal_splits[2];
-        Hatrix::Matrix& Doo = diagonal_splits[3];
+        Matrix& Dcc = diagonal_splits[0];
+        Matrix& Dco = diagonal_splits[1];
+        Matrix& Doc = diagonal_splits[2];
+        Matrix& Doo = diagonal_splits[3];
 
         Hatrix::lu(Dcc);
         solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
@@ -222,6 +224,20 @@ namespace Hatrix {
         for (int irow = block + 1; irow < nblocks; ++irow) {
           for (int icol = block + 1; icol < nblocks; ++icol) {
             if (!is_admissible(irow, block) && !is_admissible(block, icol)) {
+              Matrix& A_row_block = D(irow, block);
+              Matrix& A_block_col = D(block, icol);
+
+              auto A_row_block_splits = A_row_block.split(std::vector<int64_t>(1, c_size),
+                                                          std::vector<int64_t>(1, c_size));
+              auto A_block_col_splits = A_block_col.split(std::vector<int64_t>(1, c_size),
+                                                          std::vector<int64_t>(1, c_size));
+
+              Matrix fill(block_size, block_size);
+              auto fill_splits = fill.split(std::vector<int64_t>(1, c_size),
+                                            std::vector<int64_t>(1, c_size));
+
+              matmul(A_row_block_splits[0], A_block_col_splits[0], fill_splits[0]);
+
               std::cout << "admis block: i-> " << irow << "," << block
                         << " j-> " << block << "," <<  icol << std::endl;
             }
