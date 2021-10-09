@@ -74,6 +74,12 @@ class RowColMap {
   T extract(const std::tuple<int64_t, int64_t>& key);
 
   bool exists(int64_t row, int64_t col) const;
+
+  // Erase given (row, col) from the map.
+  void erase(int64_t row, int64_t col);
+
+  // Destructively clear all keys in the map.
+  void erase_all();
 };
 
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol

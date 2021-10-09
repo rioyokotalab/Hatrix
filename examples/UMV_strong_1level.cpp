@@ -141,7 +141,16 @@ namespace Hatrix {
 
       for (int block = 0; block < nblocks; ++block) {
 
-
+        if (block > 0) {        // account for fill-ins from previous updates
+          for (int irow = block; irow < nblocks; ++irow) {
+            for (int icol = block; icol < nblocks; ++icol) {
+              if (F.exists(irow, icol)) {
+                D(irow, icol) += F(irow, icol);
+                F.erase(irow, icol);
+              }
+            }
+          }
+        }
         // Diagonal block is always dense so obtain compliment matrices and perform partial LU
         // on it first.
         Hatrix::Matrix& diagonal = D(block, block);
@@ -241,8 +250,7 @@ namespace Hatrix {
               matmul(A_row_block_splits[2], A_block_col_splits[0], fill_splits[2]);
               matmul(A_row_block_splits[2], A_block_col_splits[1], fill_splits[3]);
 
-              std::cout << "admis block: i-> " << irow << "," << block
-                        << " j-> " << block << "," <<  icol << std::endl;
+              F.insert(irow, icol, std::move(fill));
             }
           }
         }

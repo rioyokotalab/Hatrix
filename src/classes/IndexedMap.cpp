@@ -66,6 +66,16 @@ bool RowColMap<T>::exists(int64_t row, int64_t col) const {
   return map.count({row, col}) == 0 ? false : true;
 }
 
+template<class T>
+void RowColMap<T>::erase(int64_t row, int64_t col) {
+  map.erase({row, col});
+}
+
+template<class T>
+void RowColMap<T>::erase_all() {
+  map.erase(map.begin(), map.end());
+}
+
 // explicit instatiation
 template class RowColMap<bool>;
 template class RowColMap<Matrix>;
