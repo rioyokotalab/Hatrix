@@ -237,6 +237,9 @@ namespace Hatrix {
                                             std::vector<int64_t>(1, c_size));
 
               matmul(A_row_block_splits[0], A_block_col_splits[0], fill_splits[0]);
+              matmul(A_row_block_splits[0], A_block_col_splits[1], fill_splits[1]);
+              matmul(A_row_block_splits[2], A_block_col_splits[0], fill_splits[2]);
+              matmul(A_row_block_splits[2], A_block_col_splits[1], fill_splits[3]);
 
               std::cout << "admis block: i-> " << irow << "," << block
                         << " j-> " << block << "," <<  icol << std::endl;
