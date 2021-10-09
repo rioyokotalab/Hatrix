@@ -137,6 +137,8 @@ namespace Hatrix {
 
     void factorize() {
       for (int block = 0; block < nblocks; ++block) {
+        RowColLevelMap<Matrix> F; // store fill-in blocks
+
         // Diagonal block is always dense so obtain compliment matrices and perform partial LU
         // on it first.
         Hatrix::Matrix& diagonal = D(block, block);
@@ -203,7 +205,7 @@ namespace Hatrix {
             lower_left = matmul(lower_left, V_F);
 
             std::vector<Hatrix::Matrix> left_splits = lower_left.split(std::vector<int64_t>(1, c_size),
-                                                                             std::vector<int64_t>(1, c_size));
+                                                                       std::vector<int64_t>(1, c_size));
             Matrix& Lcc = left_splits[0];
             Matrix& Lco = left_splits[1];
             Matrix& Loc = left_splits[2];
@@ -213,6 +215,16 @@ namespace Hatrix {
             solve_triangular(Dcc, Loc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
             matmul(Lcc, Dco, Lco, false, false, -1.0, 1.0);
             matmul(Loc, Dco, Loo, false, false, -1.0, 1.0);
+          }
+        }
+
+        // Generate fill-in blocks and store temporarily.
+        for (int irow = block + 1; irow < nblocks; ++irow) {
+          for (int icol = block + 1; icol < nblocks; ++icol) {
+            if (!is_admissible(irow, block) && !is_admissible(block, icol)) {
+              std::cout << "admis block: i-> " << irow << "," << block
+                        << " j-> " << block << "," <<  icol << std::endl;
+            }
           }
         }
       }
