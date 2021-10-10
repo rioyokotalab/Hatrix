@@ -167,8 +167,6 @@ namespace Hatrix {
         Matrix U_F = make_complement(U(block));
         Matrix V_F = make_complement(V(block));
 
-        V_F.print_meta();
-
         diagonal = matmul(matmul(U_F, diagonal, true, false), V_F);
 
         // in case of full rank, dont perform partial LU
@@ -288,8 +286,31 @@ namespace Hatrix {
       lu(last);
     }
 
+    void left_trsm_solve(Matrix& x, int row, int col, int c_size) {
+      auto D_splits = D(row, col).split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+    }
+
     Hatrix::Matrix solve(Hatrix::Matrix& b) {
+      int block_size = N / nblocks;
+      int c_size = block_size - rank;
       Hatrix::Matrix x(b);
+      auto x_split = x.split(nblocks, 1);
+
+      for (int irow = nblocks-1; irow >= 0; --irow) {
+        auto U_F = make_complement(U(irow));
+        Matrix temp(x_split[irow]);
+        x_split[irow] = matmul(U_F, x_split[irow], true);
+        left_trsm_solve(x, irow, irow);
+
+        for (int icol = irow; icol < nblocks; ++icol) {
+          if (!is_admissible(irow, icol)) {
+
+          }
+        }
+      }
+
+
 
       return x;
     }

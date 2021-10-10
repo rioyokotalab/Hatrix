@@ -270,11 +270,11 @@ namespace Hatrix {
       return Vbig;
     }
 
-    Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
-      Hatrix::Matrix Q_F(Q.rows, Q.rows);
-      Hatrix::Matrix Q_full, R;
-      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full,
-        Hatrix::Lapack::QR_ret::OnlyQ);
+    Matrix make_complement(const Matrix &Q) {
+      Matrix Q_F(Q.rows, Q.rows);
+      Matrix Q_full, R;
+      std::tie(Q_full, R) = qr(Q, Lapack::QR_mode::Full,
+        Lapack::QR_ret::OnlyQ);
 
       for (int i = 0; i < Q_F.rows; ++i) {
         for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
@@ -291,16 +291,16 @@ namespace Hatrix {
     }
 
     Matrix& unsolved_chunk(int block, int level, int rank) {
-      Hatrix::Matrix& Diag = D(block, block, level);
+      Matrix& Diag = D(block, block, level);
       int c_size = Diag.rows - rank;
-      std::vector<Hatrix::Matrix> Diag_splits = Diag.split(std::vector<int64_t>(1, c_size),
+      std::vector<Matrix> Diag_splits = Diag.split(std::vector<int64_t>(1, c_size),
                                                            std::vector<int64_t>(1, c_size));
       return Diag_splits[3];
     }
 
     // permute the vector forward and return the offset at which the new vector begins.
-    int permute_forward(Hatrix::Matrix& x, const int level, int rank_offset) {
-      Hatrix::Matrix copy(x);
+    int permute_forward(Matrix& x, const int level, int rank_offset) {
+      Matrix copy(x);
       int num_nodes = int(pow(2, level));
       int c_offset = rank_offset;
       for (int block = 0; block < num_nodes; ++block) {
@@ -327,8 +327,8 @@ namespace Hatrix {
       return rank_offset;
     }
 
-    int permute_backward(Hatrix::Matrix& x, const int level, int rank_offset) {
-      Hatrix::Matrix copy(x);
+    int permute_backward(Matrix& x, const int level, int rank_offset) {
+      Matrix copy(x);
       int num_nodes = pow(2, level);
       int c_offset = rank_offset;
       for (int block = 0; block < num_nodes; ++block) {
@@ -377,7 +377,7 @@ namespace Hatrix {
 
       for (int block = 0; block < num_nodes; ++block) {
         int slice = N / num_nodes;
-        error += Hatrix::norm(D(block, block, height) - Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+        error += norm(D(block, block, height) - generate_laplacend_matrix(randpts, slice, slice,
                                                                                           slice * block, slice * block));
       }
 
@@ -390,9 +390,9 @@ namespace Hatrix {
           Matrix Ubig = get_Ubig(row, level);
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-          Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+          Matrix actual = generate_laplacend_matrix(randpts, slice, slice,
                                                             row * slice, col * slice);
-          error += Hatrix::norm(expected - actual);
+          error += norm(expected - actual);
         }
       }
       return std::sqrt(error / N / N);
