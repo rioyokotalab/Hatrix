@@ -10,7 +10,6 @@
 
 #include "Hatrix/Hatrix.h"
 
-using matrix_splits = std::vector<Hatrix::Matrix>;
 using vec = std::vector<int64_t>;
 using randvec_t = std::vector<std::vector<double> >;
 
@@ -87,7 +86,7 @@ public:
   Hatrix::Matrix Uf(int row) {
     Hatrix::Matrix Uf(block_size, block_size);
     vec col_split_indices = vec{block_size - rank};
-    matrix_splits Uf_splits = Uf.split(vec(), col_split_indices);
+    auto Uf_splits = Uf.split(vec(), col_split_indices);
     Uf_splits[0] = Uc[row];
     Uf_splits[1] = U[row];
     return Uf;
@@ -97,7 +96,7 @@ public:
 
 Hatrix::Matrix copy_dense(BLR2_SPD& A) {
   Hatrix::Matrix out(A.n_blocks * A.block_size, A.n_blocks * A.block_size);
-  matrix_splits out_splits = out.split(A.n_blocks, A.n_blocks);
+  auto out_splits = out.split(A.n_blocks, A.n_blocks);
   for(int i = 0; i < A.n_blocks; i++) {
     for(int j = 0; j < A.n_blocks; j++) {
       out_splits[i*A.n_blocks + j] = A.D(i, j);
@@ -112,14 +111,14 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix& _U) {
   Hatrix::Matrix R(U.rows, U.cols);
   Hatrix::qr(U, Q, R);
 
-  matrix_splits Q_splits = Q.split(vec(), vec{U.cols});
+  auto Q_splits = Q.split(vec(), vec{U.cols});
   Hatrix::Matrix Uc(U.rows, U.rows - U.cols);
   Uc = Q_splits[1];
   return Uc;
 }
 
 void partial_ldl_diag(BLR2_SPD& A, int i) {
-  matrix_splits D_splits = A.D(i, i).split(vec{A.block_size - A.rank},
+  auto D_splits = A.D(i, i).split(vec{A.block_size - A.rank},
 					   vec{A.block_size - A.rank});
   Hatrix::ldl(D_splits[0]);
   Hatrix::solve_triangular(D_splits[0], D_splits[2], Hatrix::Right,
@@ -145,23 +144,23 @@ Hatrix::Matrix factorize(BLR2_SPD& A) {
     partial_ldl_diag(A, i);
   }
 
-  Hatrix::Matrix merged(A.n_blocks * A.rank, A.n_blocks * A.rank);
-  matrix_splits merged_splits = merged.split(A.n_blocks, A.n_blocks);
+  Hatrix::Matrix last(A.n_blocks * A.rank, A.n_blocks * A.rank);
+  auto last_splits = last.split(A.n_blocks, A.n_blocks);
 
   for(int64_t i = 0; i < A.n_blocks; i++) {
     for(int64_t j = 0; j < A.n_blocks; j++) {
       if(i == j) {
-	matrix_splits D_split = A.D(i, j).split(vec{A.block_size - A.rank},
+	auto D_split = A.D(i, j).split(vec{A.block_size - A.rank},
 						vec{A.block_size - A.rank});
-	merged_splits[i * A.n_blocks + j] = D_split[3];
+	last_splits[i * A.n_blocks + j] = D_split[3];
       }
       else {
-	merged_splits[i * A.n_blocks + j] = A.S(i, j);
+	last_splits[i * A.n_blocks + j] = A.S(i, j);
       }
     }
   }
-  Hatrix::ldl(merged);
-  return merged;
+  Hatrix::ldl(last);
+  return last;
 }
 
 void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
@@ -176,8 +175,8 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
     if(i < (A.n_blocks - 1))
       global_split_indices.push_back(i*A.block_size + c_size + A.rank);
   }
-  matrix_splits b_block_splits = b.split(A.n_blocks, 1);
-  matrix_splits b_block_co_splits = b.split(global_split_indices, vec());
+  auto b_block_splits = b.split(A.n_blocks, 1);
+  auto b_block_co_splits = b.split(global_split_indices, vec());
 
   //---Forward Substitution---
   for(int i = 0; i < A.n_blocks; i++) {
@@ -187,7 +186,7 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
     Hatrix::matmul(A.Uf(i), bi, b_block_splits[i], true, false, 1, 0);
 
     //Solve triangular from diagonals
-    matrix_splits Li_splits = A.D(i, i).split(local_split_indices,
+    auto Li_splits = A.D(i, i).split(local_split_indices,
 					      local_split_indices);
     Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
 			     Hatrix::Left, Hatrix::Lower, true);
@@ -196,7 +195,7 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
   }
   //Gather o parts
   Hatrix::Matrix bo(A.n_blocks * A.rank, 1);
-  matrix_splits bo_splits = bo.split(A.n_blocks, 1);
+  auto bo_splits = bo.split(A.n_blocks, 1);
   for(int i = 0; i < A.n_blocks; i++) {
     bo_splits[i] = b_block_co_splits[2*i+1];
   }
@@ -205,7 +204,7 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
   //---Solve Diagonal---
   //Solve in c parts
   for(int i = 0; i < A.n_blocks; i++) {
-    matrix_splits Li_splits = A.D(i, i).split(local_split_indices,
+    auto Li_splits = A.D(i, i).split(local_split_indices,
 					      local_split_indices);
     Hatrix::solve_diagonal(Li_splits[0], b_block_co_splits[2*i], Hatrix::Left);
   }
@@ -219,7 +218,7 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
     b_block_co_splits[2*i+1] = bo_splits[i];
   }
   for(int i = 0; i < A.n_blocks; i++) {
-    matrix_splits Li_splits = A.D(i, i).split(local_split_indices,
+    auto Li_splits = A.D(i, i).split(local_split_indices,
 					      local_split_indices);
     Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i+1], b_block_co_splits[2*i],
 		   true, false, -1., 1.);
@@ -254,8 +253,8 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = A_dense * x;
   std::cout <<"BLR construction error: " <<A.construct_error <<"\n";
 
-  Hatrix::Matrix root = factorize(A);
-  substitute(A, root, b);
+  Hatrix::Matrix last = factorize(A);
+  substitute(A, last, b);
   double substitution_error = rel_error(x, b);
   std::cout <<"Solve Error : " <<substitution_error <<"\n";
 
