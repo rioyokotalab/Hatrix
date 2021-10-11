@@ -315,7 +315,20 @@ namespace Hatrix {
     }
 
     void permute_back(Matrix& x, int block_size, int c_size) {
+      int offset = c_size * nblocks;
+      Matrix temp(x);
 
+      for (int block = 0; block < nblocks; ++block) {
+        for (int i = 0; i < c_size; ++i) {
+          temp(block_size * block + i, 0) = x(c_size * block + i, 0);
+        }
+
+        for (int i = 0; i < rank; ++i) {
+          temp(block_size * block + c_size + i, 0) = x(offset + rank * block + i, 0);
+        }
+      }
+
+      x = temp;
     }
 
     Hatrix::Matrix solve(Matrix& b, const Matrix& last) {
