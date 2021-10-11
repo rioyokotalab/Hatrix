@@ -297,20 +297,22 @@ namespace Hatrix {
       Hatrix::Matrix x(b);
       auto x_split = x.split(nblocks, 1);
 
-      for (int irow = nblocks-1; irow >= 0; --irow) {
+      for (int irow = 0; irow < nblocks; ++irow) {
         auto U_F = make_complement(U(irow));
         Matrix temp(x_split[irow]);
         x_split[irow] = matmul(U_F, x_split[irow], true);
-        left_trsm_solve(x, irow, irow);
 
-        for (int icol = irow; icol < nblocks; ++icol) {
+        // Perform TRSM.
+        for (int icol = 0; icol < irow; ++icol) {
           if (!is_admissible(irow, icol)) {
-
+            auto L_split = D(irow, icol).split(std::vector<int64_t>(1, c_size),
+                                               std::vector<int64_t>(1, c_size));
+            // x[irow] = matmul(L_split[2], x[icol]);
           }
         }
+
+        left_trsm_solve(x, irow, irow, c_size);
       }
-
-
 
       return x;
     }
