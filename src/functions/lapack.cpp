@@ -81,6 +81,28 @@ Matrix lu_solve(Matrix& A, const Matrix& b) {
   return x;
 }
 
+void ldl(Matrix& A) {
+  assert(A.rows == A.cols);
+  
+  double* a = &A;
+  int n = A.rows;
+  int lda = A.stride;
+  for(int j = 0; j < n; j++) {
+    double p = 1. / a[j + (size_t)j * lda];
+    double* ax = a + j + 1 + (size_t)j * lda;
+    int nj = n - j - 1;
+    cblas_dscal(nj, p, ax, 1);
+
+    for(int i = j + 1; i < n; i++) {
+      double c = a[j + (size_t)j * lda] * a[i + (size_t)j * lda];
+      double* aii = a + i + (size_t)i * lda;
+      double* aij = a + i + (size_t)j * lda;
+      int ni = n - i;
+      cblas_daxpy(ni, -c, aij, 1, aii, 1);
+    }
+  }
+}
+
 
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
   // check dimensions
