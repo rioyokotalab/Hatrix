@@ -190,6 +190,7 @@ namespace Hatrix {
                                                                      i*block_size, j*block_size);
             S.insert(i, j,
                      Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[j]));
+            // S.insert(i, j, std::move(dense));
           }
         }
       }
@@ -224,7 +225,9 @@ namespace Hatrix {
         diagonal = matmul(matmul(U_F, diagonal, true, false), V_F);
 
         // in case of full rank, dont perform partial LU
-        if (rank == diagonal.rows) { continue; }
+        if (rank == block_size) { continue; }
+
+        std::cout << "BBOOOO!!\n";
 
         auto diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
                                               std::vector<int64_t>(1, c_size));
@@ -346,18 +349,26 @@ namespace Hatrix {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
       Hatrix::Matrix x(b);
-      auto x_split = x.split(nblocks, 1);
+      std::vector<Matrix> x_split = x.split(nblocks, 1);
+
+      Matrix t(x);
 
       for (int irow = 0; irow < nblocks; ++irow) {
         auto U_F = make_complement(U(irow));
-        x_split[irow] = matmul(U_F, x_split[irow], true);
+        // TODO: Figure out how to make this work only with views. Too confusing now.
+        Matrix temp = matmul(U_F, x_split[irow], true);
+        for (int i = 0; i < block_size; ++i) {
+          x(irow * block_size + i, 0) = temp(i, 0);
+        }
+
+        if (rank == block_size) { continue; }
 
         // Multiply lower left blocks with the current diagonal block.
-        for (int icol = 0; icol < irow; ++icol) {
-          if (!is_admissible(irow, icol)) {
-            matmul(D(irow, icol), x_split[irow], x_split[icol], false, false, -1.0, 1.0);
-          }
-        }
+        // for (int icol = 0; icol < irow; ++icol) {
+        //   if (!is_admissible(irow, icol)) {
+        //     matmul(D(irow, icol), x_split[irow], x_split[icol], false, false, -1.0, 1.0);
+        //   }
+        // }
 
         // Perform TRSM between current diagonal block and corresponding part of RHS.
         left_lower_trsm_solve(x_split, irow, c_size);
@@ -372,14 +383,20 @@ namespace Hatrix {
       permute_back(x, block_size, c_size);
 
       for (int irow = nblocks-1; irow >= 0; --irow) {
-        left_upper_trsm_solve(x_split, irow, c_size);
-        for (int icol = nblocks-1; icol > irow; --icol) {
-          if (!is_admissible(irow, icol)) {
-            matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
-          }
+        if (rank != block_size) {
+          left_upper_trsm_solve(x_split, irow, c_size);
+          // for (int icol = nblocks-1; icol > irow; --icol) {
+          //   if (!is_admissible(irow, icol)) {
+          //     matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
+          //   }
+          // }
         }
+
         auto V_F = make_complement(V(irow));
-        x_split[irow] = matmul(V_F, x_split[irow]);
+        Matrix temp = matmul(V_F, x_split[irow]);
+        for (int i = 0; i < block_size; ++i) {
+          x(irow * block_size + i, 0) = temp(i, 0);
+        }
       }
 
       return x;
@@ -422,8 +439,8 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -444,7 +461,13 @@ int main(int argc, char** argv) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x);
+  // std::cout << "x solve:\n";
+  // x_solve.print();
+
+  // std::cout << "x:\n";
+  // x.print();
+
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
 
