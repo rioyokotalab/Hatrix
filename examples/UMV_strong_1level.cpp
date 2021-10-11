@@ -329,18 +329,22 @@ namespace Hatrix {
         Matrix temp(x_split[irow]);
         x_split[irow] = matmul(U_F, x_split[irow], true);
 
-        // Perform TRSM.
+        // Multiply lower left blocks with the current diagonal block.
         for (int icol = 0; icol < irow; ++icol) {
           if (!is_admissible(irow, icol)) {
             matmul(D(irow, icol), x_split[irow], x_split[icol], false, false, -1.0, 1.0);
           }
         }
 
+        // Perform TRSM between current diagonal block and corresponding part of RHS.
         left_trsm_solve(x_split, irow, c_size);
       }
 
       permute_forward(x, block_size, c_size);
 
+      auto permute_splits = x.split(std::vector<int64_t>(1, c_size * nblocks), {});
+      solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
       permute_back(x, block_size, c_size);
 
