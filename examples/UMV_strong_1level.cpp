@@ -380,7 +380,7 @@ namespace Hatrix {
         // }
 
         // Perform TRSM between current diagonal block and corresponding part of RHS.
-        // left_lower_trsm_solve(x, x_split, irow, c_size, block_size);
+        left_lower_trsm_solve(x, x_split, irow, c_size, block_size);
       }
 
       std::cout << "ch nr: " << norm(x - t) << std::endl;
@@ -398,7 +398,7 @@ namespace Hatrix {
       for (int irow = nblocks-1; irow >= 0; --irow) {
         Matrix tt(x);
         if (rank != block_size) {
-          // left_upper_trsm_solve(x, x_split, irow, c_size, block_size);
+          left_upper_trsm_solve(x, x_split, irow, c_size, block_size);
           // for (int icol = nblocks-1; icol > irow; --icol) {
           //   if (!is_admissible(irow, icol)) {
           //     matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
