@@ -141,7 +141,7 @@ namespace Hatrix {
       }
     }
 
-    void factorize() {
+    Matrix factorize() {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
       RowColMap<Matrix> F; // store fill-in blocks
@@ -284,14 +284,41 @@ namespace Hatrix {
       }
 
       lu(last);
+
+      return last;
     }
 
-    void left_trsm_solve(Matrix& x, int row, int col, int c_size) {
-      auto D_splits = D(row, col).split(std::vector<int64_t>(1, c_size),
+    void left_trsm_solve(std::vector<Matrix>& x_split, int row, int c_size) {
+      auto D_splits = D(row, row).split(std::vector<int64_t>(1, c_size),
                                         std::vector<int64_t>(1, c_size));
+      Matrix temp(x_split[row]);
+      auto temp_splits = temp.split(std::vector<int64_t>(1, c_size), {});
+      solve_triangular(D_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Lower, true);
+      matmul(D_splits[2], temp_splits[0], temp_splits[1], false, false, -1.0, 1.0);
+      x_split[row] = temp;
     }
 
-    Hatrix::Matrix solve(Hatrix::Matrix& b) {
+    void permute_forward(Matrix& x, int block_size, int c_size) {
+      int offset = c_size * nblocks;
+      Matrix temp(x);
+
+      for (int block = 0; block < nblocks; ++block) {
+        for (int i = 0; i < c_size; ++i) {
+          temp(c_size * block + i, 0) = x(block_size * block + i, 0);
+        }
+        for (int i = 0; i < rank; ++i) {
+          temp(block * rank + offset + i, 0) = x(block_size * block + c_size + i, 0);
+        }
+      }
+
+      x = temp;
+    }
+
+    void permute_back(Matrix& x, int block_size, int c_size) {
+
+    }
+
+    Hatrix::Matrix solve(Matrix& b, const Matrix& last) {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
       Hatrix::Matrix x(b);
@@ -305,14 +332,19 @@ namespace Hatrix {
         // Perform TRSM.
         for (int icol = 0; icol < irow; ++icol) {
           if (!is_admissible(irow, icol)) {
-            auto L_split = D(irow, icol).split(std::vector<int64_t>(1, c_size),
-                                               std::vector<int64_t>(1, c_size));
-            // x[irow] = matmul(L_split[2], x[icol]);
+            matmul(D(irow, icol), x_split[irow], x_split[icol], false, false, -1.0, 1.0);
           }
         }
 
-        left_trsm_solve(x, irow, irow, c_size);
+        left_trsm_solve(x_split, irow, c_size);
       }
+
+      permute_forward(x, block_size, c_size);
+
+
+      permute_back(x, block_size, c_size);
+
+
 
       return x;
     }
@@ -366,8 +398,8 @@ int main(int argc, char** argv) {
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
   double construct_error = A.construction_relative_error(randpts);
-  A.factorize();
-  Hatrix::Matrix x = A.solve(b);
+  Hatrix::Matrix last = A.factorize();
+  Hatrix::Matrix x = A.solve(b, last);
 
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
