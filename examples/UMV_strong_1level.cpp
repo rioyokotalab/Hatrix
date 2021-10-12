@@ -209,7 +209,7 @@ namespace Hatrix {
               if (F.exists(irow, icol)) {
                 if (!is_admissible(irow, icol)) {
                   // dense block so directly add the fill-in.
-                  D(irow, icol) += F(irow, icol);
+                  D(irow, icol) -= F(irow, icol);
                 }
 
                 F.erase(irow, icol);
@@ -223,7 +223,7 @@ namespace Hatrix {
         Matrix U_F = make_complement(U(block));
         Matrix V_F = make_complement(V(block));
 
-        diagonal = matmul(matmul(U_F, diagonal, true, false), V_F);
+        // diagonal = matmul(matmul(U_F, diagonal, true, false), V_F);
 
         // in case of full rank, dont perform partial LU
         if (rank == block_size) { continue; }
@@ -236,23 +236,31 @@ namespace Hatrix {
         Matrix& Doc = diagonal_splits[2];
         Matrix& Doo = diagonal_splits[3];
 
+        Matrix tt(diagonal);
+
         lu(Dcc);
         solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
         solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
         matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
 
+        lu(tt);
+
+        (tt - diagonal).print();
+
         // TRSMs with the lower part of the diagonal block.
-        // Multiply previously remaining unfactorized upper strips in the column
+        // Multiply previously remaining unfactorized strips in the column
         // of the diagonal block. Fig. 4b in the paper.
         if (block > 0) {
           factorize_left_strips(block, c_size, Dcc);
         }
 
+        // Matrix tt_r(D(block, block +1));
+
         // Multiply and TRSM right blocks.
         for (int icol = block + 1; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
             Hatrix::Matrix& upper_right = D(block, icol);
-            upper_right = matmul(U_F, upper_right, true, false);
+            // upper_right = matmul(U_F, upper_right, true, false);
 
             std::vector<Hatrix::Matrix> right_splits = upper_right.split(std::vector<int64_t>(1, c_size),
                                                                          std::vector<int64_t>(1, c_size));
@@ -262,11 +270,20 @@ namespace Hatrix {
             Matrix& Roo = right_splits[3];
 
             solve_triangular(Dcc, Rcc, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
-            solve_triangular(Dcc, Rco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
             matmul(Doc, Rcc, Roc, false, false, -1.0, 1.0);
+
+            solve_triangular(Dcc, Rco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
             matmul(Doc, Rco, Roo, false, false, -1.0, 1.0);
           }
         }
+
+
+
+        // if (block == 0) {
+        //   solve_triangular(tt, tt_r, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+        //   (D(block, block+1) - tt_r).print();
+        // }
+
 
         // TRSMs with the upper part of the diagonal block.
         // Multiply previously remaining unfactorized lower strips in the row
@@ -275,11 +292,13 @@ namespace Hatrix {
           factorize_upper_strips(block, c_size, Dcc);
         }
 
+        // Matrix tt_l(D(block+1, block));
+
         // Multiply and TRSM lower blocks.
         for (int irow = block + 1; irow < nblocks; ++irow) {
           if (!is_admissible(irow, block)) {
             Hatrix::Matrix& lower_left = D(irow, block);
-            lower_left = matmul(lower_left, V_F);
+            // lower_left = matmul(lower_left, V_F);
 
             std::vector<Hatrix::Matrix> left_splits = lower_left.split(std::vector<int64_t>(1, c_size),
                                                                        std::vector<int64_t>(1, c_size));
@@ -289,16 +308,23 @@ namespace Hatrix {
             Matrix& Loo = left_splits[3];
 
             solve_triangular(Dcc, Lcc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
-            solve_triangular(Dcc, Loc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
             matmul(Lcc, Dco, Lco, false, false, -1.0, 1.0);
+
+            solve_triangular(Dcc, Loc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
             matmul(Loc, Dco, Loo, false, false, -1.0, 1.0);
           }
         }
+
+        // if (block == 0) {
+        //   solve_triangular(tt, tt_l, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+        //   (D(block+1, block) - tt_l).print();
+        // }
 
         // Generate fill-in blocks and store temporarily.
         for (int irow = block + 1; irow < nblocks; ++irow) {
           for (int icol = block + 1; icol < nblocks; ++icol) {
             if (!is_admissible(irow, block) && !is_admissible(block, icol)) {
+              std::cout << "fill in :: " << irow << " " << icol << std::endl;
               Matrix& A_row_block = D(irow, block);
               Matrix& A_block_col = D(block, icol);
 
@@ -320,6 +346,8 @@ namespace Hatrix {
             }
           }
         }
+
+        // (matmul(tt_r, tt_l) - F(1, 1)).print();
       }
 
       // Merge unfactorized portions.
@@ -351,12 +379,12 @@ namespace Hatrix {
       std::vector<Matrix> x_split = x.split(nblocks, 1);
 
       for (int irow = 0; irow < nblocks; ++irow) {
-        auto U_F = make_complement(U(irow));
-        // TODO: Figure out how to make this work only with views. Too confusing now.
-        Matrix temp = matmul(U_F, x_split[irow], true);
-        for (int64_t i = 0; i < block_size; ++i) {
-          x(irow * block_size + i, 0) = temp(i, 0);
-        }
+        // auto U_F = make_complement(U(irow));
+        // // TODO: Figure out how to make this work only with views. Too confusing now.
+        // Matrix temp = matmul(U_F, x_split[irow], true);
+        // for (int64_t i = 0; i < block_size; ++i) {
+        //   x(irow * block_size + i, 0) = temp(i, 0);
+        // }
 
         if (rank == block_size) { continue; }
 
@@ -390,11 +418,11 @@ namespace Hatrix {
           }
         }
 
-        auto V_F = make_complement(V(irow));
-        Matrix temp = matmul(V_F, x_split[irow]);
-        for (int i = 0; i < block_size; ++i) {
-          x(irow * block_size + i, 0) = temp(i, 0);
-        }
+        // auto V_F = make_complement(V(irow));
+        // Matrix temp = matmul(V_F, x_split[irow]);
+        // for (int i = 0; i < block_size; ++i) {
+        //   x(irow * block_size + i, 0) = temp(i, 0);
+        // }
       }
 
       return x;
