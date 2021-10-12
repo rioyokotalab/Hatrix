@@ -211,20 +211,20 @@ namespace Hatrix {
       RowColMap<Matrix> F; // store fill-in blocks
 
       for (int block = 0; block < nblocks; ++block) {
-        // if (block > 0) {        // account for fill-ins from previous updates
-        //   for (int irow = block; irow < nblocks; ++irow) {
-        //     for (int icol = block; icol < nblocks; ++icol) {
-        //       if (F.exists(irow, icol)) {
-        //         if (!is_admissible(irow, icol)) {
-        //           // dense block so directly add the fill-in.
-        //           D(irow, icol) += F(irow, icol);
-        //         }
+        if (block > 0) {        // account for fill-ins from previous updates
+          for (int irow = block; irow < nblocks; ++irow) {
+            for (int icol = block; icol < nblocks; ++icol) {
+              if (F.exists(irow, icol)) {
+                if (!is_admissible(irow, icol)) {
+                  // dense block so directly add the fill-in.
+                  D(irow, icol) += F(irow, icol);
+                }
 
-        //         F.erase(irow, icol);
-        //       }
-        //     }
-        //   }
-        // }
+                F.erase(irow, icol);
+              }
+            }
+          }
+        }
         // Diagonal block is always dense so obtain compliment matrices and perform partial LU
         // on it first.
         Matrix& diagonal = D(block, block);
@@ -252,82 +252,82 @@ namespace Hatrix {
         // TRSMs with the lower part of the diagonal block.
         // Multiply previously remaining unfactorized upper strips in the column
         // of the diagonal block. Fig. 4b in the paper.
-        // if (block > 0) {
-        //   factorize_left_strips(block, c_size, Dcc);
-        // }
+        if (block > 0) {
+          factorize_left_strips(block, c_size, Dcc);
+        }
 
-        // // Multiply and TRSM right blocks.
-        // for (int icol = block + 1; icol < nblocks; ++icol) {
-        //   if (!is_admissible(block, icol)) {
-        //     Hatrix::Matrix& upper_right = D(block, icol);
-        //     upper_right = matmul(U_F, upper_right, true, false);
+        // Multiply and TRSM right blocks.
+        for (int icol = block + 1; icol < nblocks; ++icol) {
+          if (!is_admissible(block, icol)) {
+            Hatrix::Matrix& upper_right = D(block, icol);
+            upper_right = matmul(U_F, upper_right, true, false);
 
-        //     std::vector<Hatrix::Matrix> right_splits = upper_right.split(std::vector<int64_t>(1, c_size),
-        //                                                                  std::vector<int64_t>(1, c_size));
-        //     Matrix& Rcc = right_splits[0];
-        //     Matrix& Rco = right_splits[1];
-        //     Matrix& Roc = right_splits[2];
-        //     Matrix& Roo = right_splits[3];
+            std::vector<Hatrix::Matrix> right_splits = upper_right.split(std::vector<int64_t>(1, c_size),
+                                                                         std::vector<int64_t>(1, c_size));
+            Matrix& Rcc = right_splits[0];
+            Matrix& Rco = right_splits[1];
+            Matrix& Roc = right_splits[2];
+            Matrix& Roo = right_splits[3];
 
-        //     solve_triangular(Dcc, Rcc, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
-        //     solve_triangular(Dcc, Rco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
-        //     matmul(Doc, Rcc, Roc, false, false, -1.0, 1.0);
-        //     matmul(Doc, Rco, Roo, false, false, -1.0, 1.0);
-        //   }
-        // }
+            solve_triangular(Dcc, Rcc, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+            solve_triangular(Dcc, Rco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+            matmul(Doc, Rcc, Roc, false, false, -1.0, 1.0);
+            matmul(Doc, Rco, Roo, false, false, -1.0, 1.0);
+          }
+        }
 
-        // // TRSMs with the upper part of the diagonal block.
-        // // Multiply previously remaining unfactorized lower strips in the row
-        // // of the diagonal block. Fig. 4b in the paper.
-        // if (block > 0) {
-        //   factorize_upper_strips(block, c_size, Dcc);
-        // }
+        // TRSMs with the upper part of the diagonal block.
+        // Multiply previously remaining unfactorized lower strips in the row
+        // of the diagonal block. Fig. 4b in the paper.
+        if (block > 0) {
+          factorize_upper_strips(block, c_size, Dcc);
+        }
 
-        // // Multiply and TRSM lower blocks.
-        // for (int irow = block + 1; irow < nblocks; ++irow) {
-        //   if (!is_admissible(irow, block)) {
-        //     Hatrix::Matrix& lower_left = D(irow, block);
-        //     lower_left = matmul(lower_left, V_F);
+        // Multiply and TRSM lower blocks.
+        for (int irow = block + 1; irow < nblocks; ++irow) {
+          if (!is_admissible(irow, block)) {
+            Hatrix::Matrix& lower_left = D(irow, block);
+            lower_left = matmul(lower_left, V_F);
 
-        //     std::vector<Hatrix::Matrix> left_splits = lower_left.split(std::vector<int64_t>(1, c_size),
-        //                                                                std::vector<int64_t>(1, c_size));
-        //     Matrix& Lcc = left_splits[0];
-        //     Matrix& Lco = left_splits[1];
-        //     Matrix& Loc = left_splits[2];
-        //     Matrix& Loo = left_splits[3];
+            std::vector<Hatrix::Matrix> left_splits = lower_left.split(std::vector<int64_t>(1, c_size),
+                                                                       std::vector<int64_t>(1, c_size));
+            Matrix& Lcc = left_splits[0];
+            Matrix& Lco = left_splits[1];
+            Matrix& Loc = left_splits[2];
+            Matrix& Loo = left_splits[3];
 
-        //     solve_triangular(Dcc, Lcc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
-        //     solve_triangular(Dcc, Loc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
-        //     matmul(Lcc, Dco, Lco, false, false, -1.0, 1.0);
-        //     matmul(Loc, Dco, Loo, false, false, -1.0, 1.0);
-        //   }
-        // }
+            solve_triangular(Dcc, Lcc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+            solve_triangular(Dcc, Loc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+            matmul(Lcc, Dco, Lco, false, false, -1.0, 1.0);
+            matmul(Loc, Dco, Loo, false, false, -1.0, 1.0);
+          }
+        }
 
-        // // Generate fill-in blocks and store temporarily.
-        // for (int irow = block + 1; irow < nblocks; ++irow) {
-        //   for (int icol = block + 1; icol < nblocks; ++icol) {
-        //     if (!is_admissible(irow, block) && !is_admissible(block, icol)) {
-        //       Matrix& A_row_block = D(irow, block);
-        //       Matrix& A_block_col = D(block, icol);
+        // Generate fill-in blocks and store temporarily.
+        for (int irow = block + 1; irow < nblocks; ++irow) {
+          for (int icol = block + 1; icol < nblocks; ++icol) {
+            if (!is_admissible(irow, block) && !is_admissible(block, icol)) {
+              Matrix& A_row_block = D(irow, block);
+              Matrix& A_block_col = D(block, icol);
 
-        //       auto A_row_block_splits = A_row_block.split(std::vector<int64_t>(1, c_size),
-        //                                                   std::vector<int64_t>(1, c_size));
-        //       auto A_block_col_splits = A_block_col.split(std::vector<int64_t>(1, c_size),
-        //                                                   std::vector<int64_t>(1, c_size));
+              auto A_row_block_splits = A_row_block.split(std::vector<int64_t>(1, c_size),
+                                                          std::vector<int64_t>(1, c_size));
+              auto A_block_col_splits = A_block_col.split(std::vector<int64_t>(1, c_size),
+                                                          std::vector<int64_t>(1, c_size));
 
-        //       Matrix fill(block_size, block_size);
-        //       auto fill_splits = fill.split(std::vector<int64_t>(1, c_size),
-        //                                     std::vector<int64_t>(1, c_size));
+              Matrix fill(block_size, block_size);
+              auto fill_splits = fill.split(std::vector<int64_t>(1, c_size),
+                                            std::vector<int64_t>(1, c_size));
 
-        //       matmul(A_row_block_splits[0], A_block_col_splits[0], fill_splits[0]);
-        //       matmul(A_row_block_splits[0], A_block_col_splits[1], fill_splits[1]);
-        //       matmul(A_row_block_splits[2], A_block_col_splits[0], fill_splits[2]);
-        //       matmul(A_row_block_splits[2], A_block_col_splits[1], fill_splits[3]);
+              matmul(A_row_block_splits[0], A_block_col_splits[0], fill_splits[0]);
+              matmul(A_row_block_splits[0], A_block_col_splits[1], fill_splits[1]);
+              matmul(A_row_block_splits[2], A_block_col_splits[0], fill_splits[2]);
+              matmul(A_row_block_splits[2], A_block_col_splits[1], fill_splits[3]);
 
-        //       F.insert(irow, icol, std::move(fill));
-        //     }
-        //   }
-        // }
+              F.insert(irow, icol, std::move(fill));
+            }
+          }
+        }
       }
 
       // Merge unfactorized portions.
@@ -368,14 +368,14 @@ namespace Hatrix {
           x(irow * block_size + i, 0) = temp(i, 0);
         }
 
-        // if (rank == block_size) { continue; }
+        if (rank == block_size) { continue; }
 
         // Multiply lower left blocks with the current diagonal block.
-        // for (int icol = 0; icol < irow; ++icol) {
-        //   if (!is_admissible(irow, icol)) {
-        //     matmul(D(irow, icol), x_split[irow], x_split[icol], false, false, -1.0, 1.0);
-        //   }
-        // }
+        for (int icol = 0; icol < irow; ++icol) {
+          if (!is_admissible(irow, icol)) {
+            matmul(D(irow, icol), x_split[irow], x_split[icol], false, false, -1.0, 1.0);
+          }
+        }
 
         // Perform TRSM between current diagonal block and corresponding part of RHS.
         auto D_splits = D(irow, irow).split(std::vector<int64_t>(1, c_size),
@@ -385,8 +385,6 @@ namespace Hatrix {
         solve_triangular(D_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Lower, true);
         matmul(D_splits[2], temp_splits[0], temp_splits[1], false, false, -1.0, 1.0);
         x_split[irow] = temp_rhs;
-
-        // left_lower_trsm_solve(x, x_split, irow, c_size, block_size);
       }
 
 
@@ -406,14 +404,13 @@ namespace Hatrix {
         matmul(D_split[1], temp_splits[1], temp_splits[0], false, false, -1.0, 1.0);
         solve_triangular(D_split[0], temp_splits[0], Hatrix::Left, Hatrix::Upper, false);
         x_split[irow] = temp_rhs;
-        // if (rank != block_size) {
-          // left_upper_trsm_solve(x, x_split, irow, c_size, block_size);
-          // for (int icol = nblocks-1; icol > irow; --icol) {
-          //   if (!is_admissible(irow, icol)) {
-          //     matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
-          //   }
-          // }
-        // }
+        if (rank != block_size) {
+          for (int icol = nblocks-1; icol > irow; --icol) {
+            if (!is_admissible(irow, icol)) {
+              matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
+            }
+          }
+        }
 
         auto V_F = make_complement(V(irow));
         Matrix temp = matmul(V_F, x_split[irow]);
