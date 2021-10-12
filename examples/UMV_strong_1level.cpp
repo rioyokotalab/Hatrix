@@ -388,15 +388,22 @@ namespace Hatrix {
 
         if (rank == block_size) { continue; }
 
+        // Perform TRSM between current diagonal block and corresponding part of RHS.
+        left_lower_trsm_solve(x, x_split, irow, c_size, block_size);
+
         // Multiply lower left blocks with the current diagonal block.
         for (int icol = 0; icol < irow; ++icol) {
           if (!is_admissible(irow, icol)) {
-            matmul(D(irow, icol), x_split[irow], x_split[icol], false, false, -1.0, 1.0);
+            // matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
+
+            auto D_splits = D(irow, icol).split({}, std::vector<int64_t>(1, c_size));
+
+            Matrix x_icol(x_split[icol]);
+            auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
+
+            matmul(D_splits[0], x_icol_splits[0], x_split[irow], false, false, -1.0, 1.0);
           }
         }
-
-        // Perform TRSM between current diagonal block and corresponding part of RHS.
-        left_lower_trsm_solve(x, x_split, irow, c_size, block_size);
       }
 
 
@@ -410,10 +417,20 @@ namespace Hatrix {
 
       for (int irow = nblocks-1; irow >= 0; --irow) {
         left_upper_trsm_solve(x, x_split, irow, c_size, block_size);
+
         if (rank != block_size) {
           for (int icol = nblocks-1; icol > irow; --icol) {
             if (!is_admissible(irow, icol)) {
-              matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
+              // matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
+
+              // auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size), {});
+              // Matrix x_icol(x_split[icol]);
+              // auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
+
+              // matmul(D_splits[0], x_split[icol], x_icol_splits[0], false, false, -1.0, 1.0);
+
+              // x_split[icol] = x_icol;
+
             }
           }
         }
@@ -478,14 +495,23 @@ int main(int argc, char** argv) {
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
   double construct_error = A.construction_relative_error(randpts);
   Hatrix::Matrix last = A.factorize();
+  last.print();
   Hatrix::Matrix x = A.solve(b, last);
 
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_solve(b);
   Hatrix::lu(Adense);
+  Adense.print();
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
+
+  std::cout << "x real:\n";
+  x.print();
+
+  std::cout << "x solve:\n";
+  x_solve.print();
+
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
