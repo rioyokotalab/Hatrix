@@ -36,13 +36,12 @@ namespace Hatrix {
       Matrix temp(x_split[row]);
 
       auto temp_splits = temp.split(std::vector<int64_t>(1, c_size), {});
-
       solve_triangular(D_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Lower, true);
       matmul(D_splits[2], temp_splits[0], temp_splits[1], false, false, -1.0, 1.0);
-      for (int i = 0; i < block_size; ++i) {
-        x(row * block_size + i, 0) = temp(i, 0);
-      }
-      // x_split[row] = temp;
+      // for (int i = 0; i < block_size; ++i) {
+      //   x(row * block_size + i, 0) = temp(i, 0);
+      // }
+      x_split[row] = temp;
     }
 
     void left_upper_trsm_solve(Matrix& x, std::vector<Matrix>& x_split, int row, int c_size, int block_size) {
@@ -54,10 +53,10 @@ namespace Hatrix {
       auto temp_splits = temp.split(std::vector<int64_t>(1, c_size), {});
       matmul(D_splits[1], temp_splits[1], temp_splits[0], false, false, -1.0, 1.0);
       solve_triangular(D_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Upper, false);
-      // x_split[row] = temp;
-      for (int i = 0; i < block_size; ++i) {
-        x(row * block_size + i, 0) = temp(i, 0);
-      }
+      x_split[row] = temp;
+      // for (int i = 0; i < block_size; ++i) {
+      //   x(row * block_size + i, 0) = temp(i, 0);
+      // }
     }
 
     void permute_forward(Matrix& x, int block_size, int c_size) {
@@ -237,8 +236,6 @@ namespace Hatrix {
         // in case of full rank, dont perform partial LU
         if (rank == block_size) { continue; }
 
-        std::cout << "BBOOOO!!\n";
-
         auto diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
                                               std::vector<int64_t>(1, c_size));
 
@@ -356,8 +353,8 @@ namespace Hatrix {
     }
 
     Hatrix::Matrix solve(Matrix& b, const Matrix& last) {
-      int block_size = N / nblocks;
-      int c_size = block_size - rank;
+      int64_t block_size = N / nblocks;
+      int64_t c_size = block_size - rank;
       Hatrix::Matrix x(b);
       std::vector<Matrix> x_split = x.split(nblocks, 1);
 
@@ -367,7 +364,7 @@ namespace Hatrix {
         auto U_F = make_complement(U(irow));
         // TODO: Figure out how to make this work only with views. Too confusing now.
         Matrix temp = matmul(U_F, x_split[irow], true);
-        for (int i = 0; i < block_size; ++i) {
+        for (int64_t i = 0; i < block_size; ++i) {
           x(irow * block_size + i, 0) = temp(i, 0);
         }
 
@@ -381,25 +378,36 @@ namespace Hatrix {
         // }
 
         // Perform TRSM between current diagonal block and corresponding part of RHS.
-        left_lower_trsm_solve(x, x_split, irow, c_size, block_size);
+        auto D_splits = D(irow, irow).split(std::vector<int64_t>(1, c_size),
+                                            std::vector<int64_t>(1, c_size));
+        Matrix temp_rhs(x_split[irow]);
+        auto temp_splits = temp_rhs.split(std::vector<int64_t>(1, c_size), {});
+        solve_triangular(D_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Lower, true);
+        matmul(D_splits[2], temp_splits[0], temp_splits[1], false, false, -1.0, 1.0);
+        x_split[irow] = temp_rhs;
+
+        // left_lower_trsm_solve(x, x_split, irow, c_size, block_size);
       }
 
-      // std::cout << "ch nr: " << norm(x - t) << std::endl;
 
-      // permute_forward(x, block_size, c_size);
+      permute_forward(x, block_size, c_size);
 
-      // auto permute_splits = x.split(std::vector<int64_t>(1, c_size * nblocks), {});
-      // solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      auto permute_splits = x.split(std::vector<int64_t>(1, c_size * nblocks), {});
+      solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
-      // // Backward substition
-      // solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
+      permute_back(x, block_size, c_size);
 
-      // permute_back(x, block_size, c_size);
-
-      for (int irow = 0; irow < nblocks; ++irow) {
-        // Matrix tt(x);
+      for (int irow = nblocks-1; irow >= 0; --irow) {
+        auto D_split = D(irow, irow).split(std::vector<int64_t>(1, c_size),
+                                           std::vector<int64_t>(1, c_size));
+        Matrix temp_rhs(x_split[irow]);
+        auto temp_splits = temp_rhs.split(std::vector<int64_t>(1, c_size), {});
+        matmul(D_split[1], temp_splits[1], temp_splits[0], false, false, -1.0, 1.0);
+        solve_triangular(D_split[0], temp_splits[0], Hatrix::Left, Hatrix::Upper, false);
+        x_split[irow] = temp_rhs;
         // if (rank != block_size) {
-          left_upper_trsm_solve(x, x_split, irow, c_size, block_size);
+          // left_upper_trsm_solve(x, x_split, irow, c_size, block_size);
           // for (int icol = nblocks-1; icol > irow; --icol) {
           //   if (!is_admissible(irow, icol)) {
           //     matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
@@ -476,11 +484,6 @@ int main(int argc, char** argv) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  std::cout << "x solve:\n";
-  x_solve.print();
-
-  std::cout << "x:\n";
-  x.print();
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
