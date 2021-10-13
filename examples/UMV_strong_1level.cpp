@@ -242,16 +242,10 @@ namespace Hatrix {
         Matrix& Doc = diagonal_splits[2];
         Matrix& Doo = diagonal_splits[3];
 
-        // Matrix tt(diagonal);
-
         lu(Dcc);
         solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
         solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
         matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
-
-        // lu(tt);
-
-        // (tt - diagonal).print();
 
         // TRSMs with the lower part of the diagonal block.
         // Multiply previously remaining unfactorized strips in the column
@@ -259,8 +253,6 @@ namespace Hatrix {
         if (block > 0) {
           factorize_left_strips(block, c_size, Dcc);
         }
-
-        // Matrix tt_r(D(block, block +1));
 
         // Multiply and TRSM right blocks.
         for (int icol = block + 1; icol < nblocks; ++icol) {
@@ -282,14 +274,6 @@ namespace Hatrix {
             matmul(Doc, Rco, Roo, false, false, -1.0, 1.0);
           }
         }
-
-
-
-        // if (block == 0) {
-        //   solve_triangular(tt, tt_r, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
-        //   (D(block, block+1) - tt_r).print();
-        // }
-
 
         // TRSMs with the upper part of the diagonal block.
         // Multiply previously remaining unfactorized lower strips in the row
@@ -320,32 +304,6 @@ namespace Hatrix {
             matmul(Loc, Dco, Loo, false, false, -1.0, 1.0);
           }
         }
-
-        // Multiply the upper and left strips and subtract them from corresponding upper left block
-        if (block > 0) {
-          std::cout << "HELLO\n";
-          for (int i = 0; i < nblocks; ++i) {
-            for (int j = 0; j < nblocks; ++j) {
-              if (i == 1 && j == 1) { continue; }
-              std::cout << "reducing: " << i << " j: " << j << std::endl;
-              auto D_splits = D(i,j).split(std::vector<int64_t>(1, c_size),
-                                           std::vector<int64_t>(1, c_size));
-              auto upper_splits = D(0, i).split(std::vector<int64_t>(1, c_size),
-                                                std::vector<int64_t>(1, c_size));
-              auto left_splits = D(j, 0).split(std::vector<int64_t>(1, c_size),
-                                               std::vector<int64_t>(1, c_size));
-
-              matmul(upper_splits[2], left_splits[1], D_splits[3], false, false, -1.0, 1.0);
-
-
-            }
-          }
-        }
-
-        // if (block == 0) {
-        //   solve_triangular(tt, tt_l, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
-        //   (D(block+1, block) - tt_l).print();
-        // }
 
         // Generate fill-in blocks and store temporarily.
         for (int irow = block + 1; irow < nblocks; ++irow) {
