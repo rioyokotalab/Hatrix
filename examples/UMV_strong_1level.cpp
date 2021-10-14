@@ -341,7 +341,7 @@ namespace Hatrix {
             Matrix x_icol(x_split[icol]);
             auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
 
-            matmul(D_splits[2], x_icol_splits[0], x_irow_splits[0], false, false, -1.0, 1.0);
+            matmul(D_splits[0], x_icol_splits[0], x_irow_splits[0], false, false, -1.0, 1.0);
             x_split[irow] = x_irow;
           }
         }
@@ -357,7 +357,18 @@ namespace Hatrix {
       // forward substitution with oc blocks
       for (int irow = 0; irow < nblocks; ++irow) {
         for (int icol = 0; icol < nblocks; ++icol) {
+          if (!is_admissible(irow, icol)) {
+            auto block_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+            Matrix x_irow(x_split[irow]);
+            Matrix x_icol(x_split[icol]);
 
+            auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
+            auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
+
+            matmul(block_splits[2], x_icol_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
+            x_split[irow] = x_irow;
+          }
         }
       }
 
@@ -472,7 +483,6 @@ int main(int argc, char** argv) {
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_solve(b);
   Hatrix::lu(Adense);
-  Adense.print();
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
