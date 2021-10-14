@@ -380,51 +380,51 @@ namespace Hatrix {
 
       permute_back(x, block_size, c_size);
 
+      // backward substitution of co blocks
       for (int irow = nblocks-1; irow >= 0; --irow) {
-
-        // Reduce the lower strips
-        for (int icol = nblocks-1; icol > irow; --icol) {
-          if (!is_admissible(icol, irow)) {
-            auto D_splits = D(icol, irow).split(std::vector<int64_t>(1, c_size), {});
-            Matrix x_irow(x_split[icol]);
+        for (int icol = nblocks-1; icol >= 0; --icol) {
+          if (!is_admissible(irow, icol)) {
+            Matrix x_irow(x_split[irow]);
+            Matrix x_icol(x_split[icol]);
             auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
-
-            Matrix x_icol(x_split[irow]);
             auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
 
-            matmul(D_splits[1], x_irow_splits[1], x_icol_splits[0], false, false, -1.0, 1.0);
-            x_split[irow] = x_icol;
+            auto block_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+
+            matmul(block_splits[1], x_icol_splits[1], x_irow_splits[0], false, false, -1.0, 1.0);
+            x_split[irow] = x_irow;
           }
         }
+      }
 
-        if (rank != block_size) {
-          for (int icol = nblocks-1; icol > irow; --icol) {
-            if (!is_admissible(irow, icol)) {
-              // matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
+      // backward substition using cc blocks
+      for (int irow = nblocks-1; irow >= 0; --irow) {
+        for (int icol = nblocks-1; icol > irow; --icol) {
+          if (!is_admissible(irow, icol)) {
+            auto block_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+            Matrix x_irow(x_split[irow]);
+            Matrix x_icol(x_split[icol]);
+            auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
+            auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
 
-              auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size), {});
-              Matrix x_irow(x_split[irow]);
-              auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
-
-              matmul(D_splits[0], x_split[icol], x_irow_splits[0], false, false, -1.0, 1.0);
-
-              x_split[irow] = x_irow;
-            }
+            matmul(block_splits[0], x_icol_splits[0], x_irow_splits[0], false, false, -1.0, 1.0);
+            x_split[irow] = x_irow;
           }
         }
-
-
-
-        left_upper_trsm_solve(x, x_split, irow, c_size, block_size);
-        // auto V_F = make_complement(V(irow));
-        // Matrix temp = matmul(V_F, x_split[irow]);
-        // for (int i = 0; i < block_size; ++i) {
-        //   x(irow * block_size + i, 0) = temp(i, 0);
-        // }
+        auto block_splits = D(irow, irow).split(std::vector<int64_t>(1, c_size),
+                                                std::vector<int64_t>(1, c_size));
+        Matrix x_irow(x_split[irow]);
+        auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
+        solve_triangular(block_splits[0], x_irow_splits[0],
+                         Hatrix::Left, Hatrix::Upper, false);
+        x_split[irow] = x_irow;
       }
 
       return x;
     }
+
 
     double construction_relative_error(const randvec_t& randpts) {
       double error = 0, dense_norm = 0;
