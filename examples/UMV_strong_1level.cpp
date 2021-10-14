@@ -296,7 +296,6 @@ namespace Hatrix {
             auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
             matmul(bottom_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
-
           }
         }
 
@@ -335,6 +334,7 @@ namespace Hatrix {
           for (int icol = 0; icol < nblocks; ++icol) {
             if (is_admissible(irow, icol) || is_admissible(block, icol) ||
                 is_admissible(irow, block)) { continue; }
+            std::cout << "oo update -> irow: " << irow << " icol: " << icol << std::endl;
             auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
             auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
@@ -386,6 +386,7 @@ namespace Hatrix {
 
         for (int icol = 0; icol < irow; ++icol) {
           if (!is_admissible(irow, icol)) {
+            std::cout << "Lcc: " << irow << " " << icol << std::endl;
             auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
                                                 std::vector<int64_t>(1, c_size));
             Matrix x_irow(x_split[irow]);
@@ -411,6 +412,7 @@ namespace Hatrix {
       for (int irow = 0; irow < nblocks; ++irow) {
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(irow, icol)) {
+            std::cout << "Loc: " << irow << " " << icol << std::endl;
             auto block_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
                                                     std::vector<int64_t>(1, c_size));
             Matrix x_irow(x_split[irow]);
@@ -546,6 +548,12 @@ int main(int argc, char** argv) {
   Hatrix::lu(Adense);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
+
+  std::cout << "xsolve:\n";
+  x_solve.print();
+
+  std::cout << "x:\n";
+  x.print();
 
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
