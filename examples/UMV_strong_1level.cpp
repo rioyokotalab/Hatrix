@@ -338,7 +338,9 @@ namespace Hatrix {
           auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
 
           matmul(D_splits[0], x_icol_splits[0], x_irow_splits[0], false, false, -1.0, 1.0);
-          x_split[irow] = x_irow;
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(irow * block_size + i, 0) = x_irow(i, 0);
+          }
         }
 
         auto D_splits = D(irow, irow).split(std::vector<int64_t>(1, c_size),
@@ -346,7 +348,9 @@ namespace Hatrix {
         Matrix temp(x_split[irow]);
         auto temp_splits = temp.split(std::vector<int64_t>(1, c_size), {});
         solve_triangular(D_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Lower, true);
-        x_split[irow] = temp;
+        for (int64_t i = 0; i < block_size; ++i) {
+          x(irow * block_size + i, 0) = temp(i, 0);
+        }
       }
 
       // // forward substitution with oc blocks
@@ -362,7 +366,9 @@ namespace Hatrix {
           auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
 
           matmul(block_splits[2], x_icol_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
-          x_split[irow] = x_irow;
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(irow * block_size + i, 0) = x_irow(i, 0);
+          }
         }
       }
 
@@ -387,7 +393,9 @@ namespace Hatrix {
                                                   std::vector<int64_t>(1, c_size));
 
           matmul(block_splits[1], x_icol_splits[1], x_irow_splits[0], false, false, -1.0, 1.0);
-          x_split[irow] = x_irow;
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(irow * block_size + i, 0) = x_irow(i, 0);
+          }
         }
       }
 
@@ -403,14 +411,19 @@ namespace Hatrix {
           auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
 
           matmul(block_splits[0], x_icol_splits[0], x_irow_splits[0], false, false, -1.0, 1.0);
-          x_split[irow] = x_irow;
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(irow * block_size + i, 0) = x_irow(i, 0);
+          }
         }
+
         auto block_splits = D(irow, irow).split(std::vector<int64_t>(1, c_size),
                                                 std::vector<int64_t>(1, c_size));
         Matrix x_irow(x_split[irow]);
         auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
         solve_triangular(block_splits[0], x_irow_splits[0], Hatrix::Left, Hatrix::Upper, false);
-        x_split[irow] = x_irow;
+        for (int64_t i = 0; i < block_size; ++i) {
+          x(irow * block_size + i, 0) = x_irow(i, 0);
+        }
       }
 
       for (int irow = nblocks-1; irow >=0; --irow) {
@@ -486,7 +499,6 @@ int main(int argc, char** argv) {
   Hatrix::lu(Adense);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
-
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve) / N;
 
