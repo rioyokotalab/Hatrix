@@ -163,8 +163,10 @@ namespace Hatrix {
 
       for (int64_t i = 0; i < nblocks; ++i) {
         Hatrix::Matrix AY(block_size, rank + oversampling);
+        bool admissible_found = false;
         for (int64_t j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j)) {
+            admissible_found = true;
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
                                                                      i*block_size, j*block_size);
@@ -172,13 +174,18 @@ namespace Hatrix {
           }
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
-        U.insert(i, std::move(Utemp));
+
+        if (admissible_found) {
+          U.insert(i, std::move(Utemp));
+        }
       }
 
       for (int64_t j = 0; j < nblocks; ++j) {
         Hatrix::Matrix YtA(rank + oversampling, block_size);
+        bool admissible_found = false;
         for (int64_t i = 0; i < nblocks; ++i) {
           if (is_admissible(i, j)) {
+            admissible_found = true;
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
                                                                      i*block_size, j*block_size);
@@ -186,7 +193,10 @@ namespace Hatrix {
           }
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
-        V.insert(j, std::move(transpose(Vtemp)));
+
+        if (admissible_found) {
+          V.insert(j, std::move(transpose(Vtemp)));
+        }
       }
 
       for (int i = 0; i < nblocks; ++i) {
@@ -207,29 +217,51 @@ namespace Hatrix {
     Matrix factorize() {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
-      RowColMap<Matrix> F; // store fill-in blocks
 
       for (int block = 0; block < nblocks; ++block) {
+        if (U.exists(block) && V.exists(block)) {
+          Matrix U_F = make_complement(U(block));
+          Matrix V_F = make_complement(V(block));
+
+          // multiply the current row with U_F^T
+          for (int icol = block; icol < nblocks; ++icol) {
+            if (!is_admissible(block, icol)) {
+              D(block, icol) = matmul(U_F, D(block, icol), true, false);
+            }
+          }
+
+          // multiply the current col with V_F
+          for (int irow = block; irow < nblocks; ++irow) {
+            if (!is_admissible(irow, block)) {
+              D(irow, block) = matmul(D(irow, block), V_F);
+            }
+          }
+        }
+
         auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
-                                                     std::vector<int64_t>(1, c_size));
+                                              std::vector<int64_t>(1, c_size));
         Matrix& Dcc = diagonal_splits[0];
 
         lu(Dcc);
 
         // Reduce the large cc off-diagonals on the right.
         for (int icol = block+1; icol < nblocks; ++icol) {
-          auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
-                                                  std::vector<int64_t>(1, c_size));
-          Matrix& cc_right = right_splits[0];
-          solve_triangular(Dcc, cc_right, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+          if (!is_admissible(block, icol)) {
+            auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
+                                                     std::vector<int64_t>(1, c_size));
+            Matrix& cc_right = right_splits[0];
+            solve_triangular(Dcc, cc_right, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+          }
         }
 
         // Reduce the large cc off-diagonals on the bottom.
         for (int irow = block+1; irow < nblocks; ++irow) {
-          auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-          Matrix& cc_bottom = bottom_splits[0];
-          solve_triangular(Dcc, cc_bottom, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+          if (!is_admissible(irow, block)) {
+            auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
+                                                      std::vector<int64_t>(1, c_size));
+            Matrix& cc_bottom = bottom_splits[0];
+            solve_triangular(Dcc, cc_bottom, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+          }
         }
 
         // Reduce the small co vertical strips to the right.
@@ -331,6 +363,14 @@ namespace Hatrix {
 
       // forward substitution with cc blocks
       for (int irow = 0; irow < nblocks; ++irow) {
+        if (U.exists(irow)) {
+          Matrix U_F = make_complement(U(irow));
+          Matrix prod = matmul(U_F, x_split[irow], true);
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(irow * block_size + i, 0) = prod(i, 0);
+          }
+        }
+
         for (int icol = 0; icol < irow; ++icol) {
           if (!is_admissible(irow, icol)) {
             auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
@@ -420,6 +460,14 @@ namespace Hatrix {
         solve_triangular(block_splits[0], x_irow_splits[0],
                          Hatrix::Left, Hatrix::Upper, false);
         x_split[irow] = x_irow;
+
+        if (V.exists(irow)) {
+          auto V_F = make_complement(V(irow));
+          Matrix prod = matmul(V_F, x_split[irow]);
+          for (int i = 0; i < block_size; ++i) {
+            x(irow * block_size + i, 0) = prod(i, 0);
+          }
+        }
       }
 
       return x;

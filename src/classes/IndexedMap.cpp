@@ -18,6 +18,9 @@ Matrix RowMap::extract(int64_t key) {
   return out;
 }
 
+bool RowMap::exists(int64_t key) const {
+  return map.count(key) == 0 ? false : true;
+}
 
 template<class T>
 T& RowColMap<T>::operator()(int64_t row, int64_t col) {
