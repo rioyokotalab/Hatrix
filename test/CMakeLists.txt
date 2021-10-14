@@ -18,6 +18,7 @@ else()
     matmul
     triangular_matmul
     lu
+    ldl
     qr
     svd
     norms
