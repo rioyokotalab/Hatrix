@@ -449,7 +449,7 @@ namespace Hatrix {
           }
         }
       }
-      return std::sqrt(error / dense_norm);
+      return std::sqrt(error / dense_norm) / N;
     }
   };
 
