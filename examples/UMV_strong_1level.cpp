@@ -348,7 +348,6 @@ namespace Hatrix {
         for (int icol = 0; icol < irow; ++icol) {
           if (!is_admissible(irow, icol)) {
             // matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
-            std::cout << "irow: " << irow << " icol: " << icol << std::endl;
             D(irow, icol).print();
             auto D_splits = D(irow, icol).split({}, std::vector<int64_t>(1, c_size));
 
