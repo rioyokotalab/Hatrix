@@ -487,14 +487,8 @@ int main(int argc, char** argv) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  // std::cout << "xsolve:\n";
-  // x_solve.print();
 
-  // std::cout << "x:\n";
-  // x.print();
-
-
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve) / N;
 
   Hatrix::Context::finalize();
 
