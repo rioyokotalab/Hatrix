@@ -329,48 +329,35 @@ namespace Hatrix {
       Hatrix::Matrix x(b);
       std::vector<Matrix> x_split = x.split(nblocks, 1);
 
+      // forward substitution with cc blocks
       for (int irow = 0; irow < nblocks; ++irow) {
-        // auto U_F = make_complement(U(irow));
-        // // TODO: Figure out how to make this work only with views. Too confusing now.
-        // Matrix temp = matmul(U_F, x_split[irow], true);
-        // for (int64_t i = 0; i < block_size; ++i) {
-        //   x(irow * block_size + i, 0) = temp(i, 0);
-        // }
-
-        if (rank == block_size) { continue; }
-
-
-
-        // As shown in Eq. 38 in the paper.
-        // Perform TRSM between current diagonal block and corresponding part of RHS.
-        left_lower_trsm_solve(x, x_split, irow, c_size, block_size);
-        // Multiply lower left blocks with the current diagonal block.
         for (int icol = 0; icol < irow; ++icol) {
-          if (!is_admissible(irow, icol)) {
-            // matmul(D(irow, icol), x_split[icol], x_split[irow], false, false, -1.0, 1.0);
-            D(irow, icol).print();
-            auto D_splits = D(irow, icol).split({}, std::vector<int64_t>(1, c_size));
-
-            Matrix x_icol(x_split[icol]);
-            auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
-            matmul(D_splits[0], x_icol_splits[0], x_split[irow], false, false, -1.0, 1.0);
-          }
-        }
-
-        // Multiply the upper row strips from the partial factorization and reduce the vector
-        for (int icol = irow + 1; icol < nblocks; ++icol) {
           if (!is_admissible(irow, icol)) {
             auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
                                                 std::vector<int64_t>(1, c_size));
-            Matrix x_icol(x_split[icol]);
-            auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
-
             Matrix x_irow(x_split[irow]);
             auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
 
-            matmul(D_splits[2], x_icol_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
+            Matrix x_icol(x_split[icol]);
+            auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, c_size), {});
+
+            matmul(D_splits[2], x_icol_splits[0], x_irow_splits[0], false, false, -1.0, 1.0);
             x_split[irow] = x_irow;
           }
+        }
+
+        auto D_splits = D(irow, irow).split(std::vector<int64_t>(1, c_size),
+                                            std::vector<int64_t>(1, c_size));
+        Matrix temp(x_split[irow]);
+        auto temp_splits = temp.split(std::vector<int64_t>(1, c_size), {});
+        solve_triangular(D_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Lower, true);
+        x_split[irow] = temp;
+      }
+
+      // forward substitution with oc blocks
+      for (int irow = 0; irow < nblocks; ++irow) {
+        for (int icol = 0; icol < nblocks; ++icol) {
+
         }
       }
 
@@ -387,7 +374,6 @@ namespace Hatrix {
         // Reduce the lower strips
         for (int icol = nblocks-1; icol > irow; --icol) {
           if (!is_admissible(icol, irow)) {
-            std::cout << "BACK irow : " << irow << " icol: " << icol << std::endl;
             auto D_splits = D(icol, irow).split(std::vector<int64_t>(1, c_size), {});
             Matrix x_irow(x_split[icol]);
             auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
