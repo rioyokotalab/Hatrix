@@ -266,36 +266,45 @@ namespace Hatrix {
 
         // Reduce the small co vertical strips to the right.
         for (int icol = 0; icol < nblocks; ++icol) {
-          auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
-                                                   std::vector<int64_t>(1, c_size));
-          Matrix& co_right = right_splits[1];
-          solve_triangular(Dcc, co_right, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+          if (!is_admissible(block, icol)) {
+            auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
+                                                     std::vector<int64_t>(1, c_size));
+            Matrix& co_right = right_splits[1];
+            solve_triangular(Dcc, co_right, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+          }
         }
 
         // Reduce the small oc horizontal stips to the bottom.
         for (int irow = 0; irow < nblocks; ++irow) {
-          auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
-                                                std::vector<int64_t>(1, c_size));
-          Matrix& co_bottom = bottom_splits[2];
-          solve_triangular(Dcc, co_bottom, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+          if (!is_admissible(irow, block)) {
+            auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
+                                                      std::vector<int64_t>(1, c_size));
+            Matrix& co_bottom = bottom_splits[2];
+            solve_triangular(Dcc, co_bottom, Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+          }
         }
 
         // Compute schur's compliments for cc blocks
         for (int irow = block+1; irow < nblocks; ++irow) {
           for (int icol = block+1; icol < nblocks; ++icol) {
+            if (is_admissible(irow, block) || is_admissible(block, icol) ||
+                is_admissible(irow, icol)) { continue; }
             auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
-                                                     std::vector<int64_t>(1, c_size));
-            auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
                                                       std::vector<int64_t>(1, c_size));
+            auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
+                                                     std::vector<int64_t>(1, c_size));
             auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
             matmul(bottom_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
+
           }
         }
 
         // Compute schur's compliments for co blocks from cc and co blocks (right side of the matrix)
         for (int irow = block+1; irow < nblocks; ++irow) {
           for (int icol = 0; icol < nblocks; ++icol) {
+            if (is_admissible(irow, icol) || is_admissible(block, icol) ||
+                is_admissible(irow, block)) { continue; }
             auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                       std::vector<int64_t>(1, c_size));
             auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
@@ -309,6 +318,8 @@ namespace Hatrix {
         // Compute Schur's compliments for oc blocks from cc and oc blocks (bottom side of the matrix)
         for (int icol = block+1; icol < nblocks; ++icol) {
           for (int irow = 0; irow < nblocks; ++irow) {
+            if (is_admissible(irow, icol) || is_admissible(block, icol) ||
+                is_admissible(irow, block)) { continue; }
             auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                       std::vector<int64_t>(1, c_size));
             auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
@@ -322,6 +333,8 @@ namespace Hatrix {
         // Compute Schur's compliments for oo blocks from oc and co blocks
         for (int irow = 0; irow < nblocks; ++irow) {
           for (int icol = 0; icol < nblocks; ++icol) {
+            if (is_admissible(irow, icol) || is_admissible(block, icol) ||
+                is_admissible(irow, block)) { continue; }
             auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
             auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
