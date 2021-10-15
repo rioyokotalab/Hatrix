@@ -168,39 +168,36 @@ namespace Hatrix {
     Matrix factorize() {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
+      RowColMap<Matrix> F;      // fill-ins
 
+      // for (int irow = 0; irow < nblocks; ++irow) {
+      //   for (int icol = 0; icol < nblocks; ++icol) {
+      //     if (U.exists(irow) && V.exists(icol)) {
 
-      for (int irow = 0; irow < nblocks; ++irow) {
-        for (int icol = 0; icol < nblocks; ++icol) {
-          if (U.exists(irow) && V.exists(icol)) {
+      //       if (!is_admissible(irow, icol)) {
+      //         Matrix U_F = make_complement(U(irow));
+      //         Matrix V_F = make_complement(V(icol));
 
-            if (!is_admissible(irow, icol)) {
-              Matrix U_F = make_complement(U(irow));
-              Matrix V_F = make_complement(V(icol));
-
-              D(irow, icol) = matmul(matmul(U_F, D(irow, icol), true), V_F);
-            }
-          }
-        }
-      }
-
+      //         D(irow, icol) = matmul(matmul(U_F, D(irow, icol), true), V_F);
+      //       }
+      //     }
+      //   }
+      // }
 
       for (int block = 0; block < nblocks; ++block) {
+        for (int icol = 0; icol < nblocks; ++icol) {
+          if (!is_admissible(block, icol)) {
+            Matrix U_F = make_complement(U(block));
+            D(block, icol) = matmul(U_F, D(block, icol), true);
+          }
+        }
 
-        // for (int icol = 0; icol < nblocks; ++icol) {
-        //   if (!is_admissible(block, icol)) {
-        //     std::cout << "U mul -> row: " << block << " col: " << icol << std::endl;
-        //     Matrix U_F = make_complement(U(block));
-        //     D(block, icol) = matmul(U_F, D(block, icol), true);
-        //   }
-        // }
-
-        // for (int irow = 0; irow < nblocks; ++irow) {
-        //   if (!is_admissible(irow, block)) {
-        //     Matrix V_F = make_complement(V(irow));
-        //     D(irow, block) = matmul(D(irow, block), V_F);
-        //   }
-        // }
+        for (int irow = 0; irow < nblocks; ++irow) {
+          if (!is_admissible(irow, block)) {
+            Matrix V_F = make_complement(V(irow));
+            D(irow, block) = matmul(D(irow, block), V_F);
+          }
+        }
 
         auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
@@ -267,15 +264,10 @@ namespace Hatrix {
                                                       std::vector<int64_t>(1, c_size));
             auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
-            // if (is_admissible(irow, icol)) {
-              // Generate a fill-in in the Uco block that previously did not contain any matrix.
-              // D.insert(irow, icol, matmul(bottom_splits[0], right_splits[1], false, false, -1.0));
-            // }
-            // else {
-              auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
-                                                       std::vector<int64_t>(1, c_size));
-              matmul(bottom_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
-            // }
+
+            auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
+                                                     std::vector<int64_t>(1, c_size));
+            matmul(bottom_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
           }
         }
 
@@ -287,14 +279,10 @@ namespace Hatrix {
                                                       std::vector<int64_t>(1, c_size));
             auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
-            // if (is_admissible(irow, icol)) {
-              // D.insert(irow, icol, matmul(bottom_splits[2], right_splits[0], false, false, -1.0));
-            // }
-            // else {
-              auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
-                                                       std::vector<int64_t>(1, c_size));
-              matmul(bottom_splits[2], right_splits[0], reduce_splits[2], false, false, -1.0, 1.0);
-            // }
+
+            auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
+                                                     std::vector<int64_t>(1, c_size));
+            matmul(bottom_splits[2], right_splits[0], reduce_splits[2], false, false, -1.0, 1.0);
           }
         }
 
@@ -319,29 +307,25 @@ namespace Hatrix {
           }
         }
 
-        // Compute Schur's complement for oo blocks from oc and co blocks that correspond
-        // to newly generated fill-ins. The newly formed fill-ins are directly stored in
-        // the D matrix.
-        // for (int irow = 0; irow < nblocks; ++irow) {
-        //   for (int icol = 0; icol < nblocks; ++icol) {
-        //     if (is_admissible(irow, block)) {
-        //       if (is_admissible(block, icol)) {
-        //         // Fill-in between newly formed Loc and Uco blocks.
-        //         if (D.exists(irow, block) && D.exists(block, icol)) {
-        //           auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
-        //                                                    std::vector<int64_t>(1, c_size));
-        //           // matmul(D(irow, block), D(block, icol), reduce_splits[3], false, false, -1.0, 1.0);
-        //         }
-        //       }
-        //       else {
-        //         // Fill-in between newly formed Loc and already present Uco block.
-        //         if (D.exists(block, icol)) {
+        // Compute fill-in blocks between co stips on the right side and cc blocks in the middle.
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          for (int icol = 0; icol < nblocks; ++icol) {
+            if (!is_admissible(irow, block) && !is_admissible(block, icol)) {
+              Matrix matrix(block_size, block_size);
+              auto cc_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+              auto co_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+              auto matrix_splits = matrix.split(std::vector<int64_t>(1, c_size),
+                                                std::vector<int64_t>(1, c_size));
 
-        //         }
-        //       }
-        //     }
-        //   }
-        // }
+              matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 1.0);
+              matrix_splits[3] = S(irow, icol);
+              F.insert(irow, icol, std::move(matrix));
+            }
+          }
+        }
+
       }
 
       // Merge unfactorized portions.
