@@ -189,7 +189,10 @@ namespace Hatrix {
         if (block > 0) {
           // Compress all fill-ins on this row
           for (int icol = 0; icol < nblocks; ++icol) {
-            Matrix& fill_in = F(block, icol);
+            if (F.exists(block, icol)) {
+              Matrix& fill_in = F(block, icol);
+            }
+
           }
         }
 
@@ -318,7 +321,7 @@ namespace Hatrix {
         // Compute fill-in blocks between co stips on the right side and cc blocks in the middle.
         for (int irow = block+1; irow < nblocks; ++irow) {
           for (int icol = 0; icol < nblocks; ++icol) {
-            if (!is_admissible(irow, block) && !is_admissible(block, icol)) {
+            if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
               Matrix matrix(block_size, block_size);
               auto cc_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                     std::vector<int64_t>(1, c_size));
@@ -328,6 +331,24 @@ namespace Hatrix {
                                                 std::vector<int64_t>(1, c_size));
 
               matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 1.0);
+              matrix_splits[3] = S(irow, icol);
+              F.insert(irow, icol, std::move(matrix));
+            }
+          }
+        }
+
+        // Compute fill-in blocks between oc strips on the bottom side and cc blocks in the middle.
+        for (int irow = 0; irow < nblocks; ++irow) {
+          for (int icol = block+1; icol < nblocks; ++icol) {
+            if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
+              Matrix matrix(block_size, block_size);
+              auto cc_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+              auto oc_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+              auto matrix_splits = matrix.split(std::vector<int64_t>(1, c_size),
+                                                std::vector<int64_t>(1, c_size));
+              matmul(oc_splits[2], cc_splits[0], matrix_splits[2], false, false, -1.0, 1.0);
               matrix_splits[3] = S(irow, icol);
               F.insert(irow, icol, std::move(matrix));
             }
