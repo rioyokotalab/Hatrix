@@ -222,8 +222,8 @@ namespace Hatrix {
           if (is_admissible(irow, block)) { continue; }
           auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                     std::vector<int64_t>(1, c_size));
-          Matrix& co_bottom = bottom_splits[2];
-          solve_triangular(Dcc, co_bottom, Hatrix::Right, Hatrix::Upper, false);
+          Matrix& oc_bottom = bottom_splits[2];
+          solve_triangular(Dcc, oc_bottom, Hatrix::Right, Hatrix::Upper, false);
         }
 
         // Compute schur's compliments for cc blocks
@@ -274,15 +274,20 @@ namespace Hatrix {
         // Compute Schur's compliments for oo blocks from oc and co blocks
         for (int irow = 0; irow < nblocks; ++irow) {
           for (int icol = 0; icol < nblocks; ++icol) {
-            if (is_admissible(irow, icol) || is_admissible(block, icol) ||
-                is_admissible(irow, block)) { continue; }
+            if (is_admissible(block, icol) || is_admissible(irow, block)) { continue; }
             auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
             auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
                                                       std::vector<int64_t>(1, c_size));
-            auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
-                                                     std::vector<int64_t>(1, c_size));
-            matmul(bottom_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+
+            if (is_admissible(irow, icol)) {
+              matmul(bottom_splits[2], right_splits[1], S(irow, icol), false, false, -1.0, 1.0);
+            }
+            else {
+              auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, c_size),
+                                                       std::vector<int64_t>(1, c_size));
+              matmul(bottom_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+            }
           }
         }
       }
