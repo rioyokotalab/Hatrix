@@ -185,6 +185,14 @@ namespace Hatrix {
       // }
 
       for (int block = 0; block < nblocks; ++block) {
+        // Compress fill-ins accumulated from previous steps
+        if (block > 0) {
+          // Compress all fill-ins on this row
+          for (int icol = 0; icol < nblocks; ++icol) {
+            Matrix& fill_in = F(block, icol);
+          }
+        }
+
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
             Matrix U_F = make_complement(U(block));
