@@ -83,7 +83,7 @@ Matrix lu_solve(Matrix& A, const Matrix& b) {
 
 void ldl(Matrix& A) {
   assert(A.rows == A.cols);
-  
+
   double* a = &A;
   int n = A.rows;
   int lda = A.stride;
@@ -185,6 +185,27 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
   Matrix V(A.min_dim(), A.cols);
   double expected_err = truncated_svd(A, U, S, V, rank);
   return {std::move(U), std::move(S), std::move(V), expected_err};
+}
+
+std::tuple<Matrix, Matrix, Matrix> truncated_svd(Matrix& A, double error) {
+  Matrix U(A.rows, A.min_dim());
+  Matrix S(A.min_dim(), A.min_dim());
+  Matrix V(A.min_dim(), A.cols);
+
+  svd(A, U, S, V);
+
+  int rank = 1;
+  int irow = 1;
+  while (rank < S.rows || S(irow, irow) > error) {
+    rank += 1;
+    irow += 1;
+  }
+
+  U.shrink(U.rows, rank);
+  S.shrink(rank, rank);
+  V.shrink(rank, V.cols);
+
+  return {std::move(U), std::move(S), std::move(V)};
 }
 
 double norm(const Matrix& A) {
