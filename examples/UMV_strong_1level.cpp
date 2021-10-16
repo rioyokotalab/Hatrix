@@ -187,29 +187,49 @@ namespace Hatrix {
       for (int block = 0; block < nblocks; ++block) {
         // Compress fill-ins accumulated from previous steps
         if (block > 0) {
-          // Compress all fill-ins on this row
-
           // Accumulate fill-ins in this row
-          Matrix acc(block_size, block_size);
+          Matrix acc_row(block_size, block_size);
+          bool row_has_fill_in = false;
           for (int icol = 0; icol < nblocks; ++icol) {
             if (F.exists(block, icol)) {
+              row_has_fill_in = true;
               Matrix& fill_in = F(block, icol);
-              matmul(fill_in, fill_in, acc, false, true, 1.0, 1.0);
+              matmul(fill_in, fill_in, acc_row, false, true, 1.0, 1.0);
               F.erase(block, icol);
             }
           }
 
-          // Calcuate the error change
-          Matrix error_change = matmul(U(block), U(block), false, true);
-          // Subtract from identity
-          for (int i = 0; i < error_change.rows; ++i) {
-            error_change(i,i) -= 1;
+          if (row_has_fill_in) {
+            // Calcuate the error change
+            Matrix error_change = matmul(U(block), U(block), false, true);
+            // Subtract from identity
+            for (int i = 0; i < error_change.rows; ++i) {
+              error_change(i,i) -= 1;
+            }
+
+            // Calculate Gi for this row (U) bases. Eq. 15 in the paper.
+            Matrix Gi_U = matmul(matmul(error_change, acc_row), error_change, false, true);
+            Matrix Ui, Si, Vi; double error;
+
+            // Compute the SVD of this block. Eq. 16.
+            std::tie(Ui, Si, Vi, error) = truncated_svd(Gi_U, rank/2);
+
+            // Concatenate with the old bases and replace the older bases. Eq. 17.
+            std::cout << "U(b) = " << block << std::endl;
+            U(block) = concat(U(block), Ui, 1);
           }
 
-          // Calculate Gi for this row (U) bases. Eq. 15 in the paper.
-          Matrix Gi_U = matmul(matmul(error_change, acc), error_change, false, true);
-          Matrix Ui, Si, Vi; double error;
-          std::tie(Ui, Si, Vi, error) = truncated_svd(Gi_U, rank/2);
+          // Accumulate fill-ins in this column
+          Matrix acc_col(block_size, block_size);
+          bool col_has_fill_in = false;
+          for (int irow = 0; irow < nblocks; ++irow) {
+            if (F.exists(irow, block)) {
+              col_has_fill_in = true;
+              Matrix& fill_in = F(irow, block);
+              matmul(fill_in, fill_in, acc_col, false, true, 1.0, 1.0);
+              F.erase(irow, block);
+            }
+          }
         }
 
         for (int icol = 0; icol < nblocks; ++icol) {
@@ -349,8 +369,6 @@ namespace Hatrix {
               matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 1.0);
               matrix_splits[3] = S(irow, icol);
               F.insert(irow, icol, std::move(matrix));
-
-              std::cout << "Fill r: " << irow << " c: " << icol << std::endl;
             }
           }
         }
@@ -369,8 +387,6 @@ namespace Hatrix {
               matmul(oc_splits[2], cc_splits[0], matrix_splits[2], false, false, -1.0, 1.0);
               matrix_splits[3] = S(irow, icol);
               F.insert(irow, icol, std::move(matrix));
-
-              std::cout << "Fill r: " << irow << " c: " << icol << std::endl;
             }
           }
         }
