@@ -187,6 +187,7 @@ namespace Hatrix {
       for (int block = 0; block < nblocks; ++block) {
         // Compress fill-ins accumulated from previous steps
         if (block > 0) {
+          int64_t fill_in_rank = rank / 4;
           // Accumulate fill-ins in this row
           Matrix acc_row(block_size, block_size);
           bool row_has_fill_in = false;
@@ -205,6 +206,9 @@ namespace Hatrix {
             // Subtract from identity
             for (int i = 0; i < error_change.rows; ++i) {
               error_change(i,i) -= 1;
+              for (int j = 0; j < error_change.cols; ++j) {
+                error_change(i,j) = -error_change(i,j);
+              }
             }
 
             // Calculate Gi for this row (U) bases. Eq. 15 in the paper.
@@ -212,10 +216,9 @@ namespace Hatrix {
             Matrix Ui, Si, Vi; double error;
 
             // Compute the SVD of this block. Eq. 16.
-            std::tie(Ui, Si, Vi, error) = truncated_svd(Gi_U, rank/2);
+            std::tie(Ui, Si, Vi, error) = truncated_svd(Gi_U, fill_in_rank);
 
             // Concatenate with the old bases and replace the older bases. Eq. 17.
-            std::cout << "U(b) = " << block << std::endl;
             U(block) = concat(U(block), Ui, 1);
           }
 
@@ -229,6 +232,27 @@ namespace Hatrix {
               matmul(fill_in, fill_in, acc_col, false, true, 1.0, 1.0);
               F.erase(irow, block);
             }
+          }
+
+          if (col_has_fill_in) {
+            Matrix error_change = matmul(V(block), V(block), false, true);
+            // Subtract from identity
+            for (int i = 0; i < error_change.rows; ++i) {
+              error_change(i, i) -= 1;
+              for (int j = 0; j < error_change.cols; ++j) {
+                error_change(i,j) = -error_change(i,j);
+              }
+            }
+
+            // Calculte Gi for this col (V). Eq. 15.
+            Matrix Gi_V = matmul(matmul(error_change, acc_col), error_change, false, true);
+            Matrix Ui, Si, Vi; double error;
+
+            // Compute the SVD of this block. Eq. 16.
+            std::tie(Ui, Si, Vi, error) = truncated_svd(Gi_V, fill_in_rank);
+
+            // Concat with the old bases and replace with the new.
+            V(block) = concat(V(block), Ui, 1);
           }
         }
 
