@@ -25,6 +25,7 @@ else()
     UMV_strong_1level
     H2_matrix_2level_construct
     LDL_weak_1level
+    BLR2_strong_far_dense_construct
   )
 endif()
 
