@@ -85,7 +85,10 @@ public:
 
   Hatrix::Matrix Uf(int row) {
     Hatrix::Matrix Uf(block_size, block_size);
-    vec col_split_indices = vec{block_size - rank};
+    int c_size = block_size - rank;
+    if(c_size == 0) return U[row];
+    
+    vec col_split_indices = vec{c_size};
     auto Uf_splits = Uf.split(vec(), col_split_indices);
     Uf_splits[0] = Uc[row];
     Uf_splits[1] = U[row];
@@ -107,19 +110,22 @@ Hatrix::Matrix copy_dense(BLR2_SPD& A) {
 
 Hatrix::Matrix make_complement(const Hatrix::Matrix& _U) {
   Hatrix::Matrix U(_U);
+  int c_size = U.rows - U.cols;
+  if(c_size == 0) return Hatrix::Matrix(0, 0);
+  
   Hatrix::Matrix Q(U.rows, U.rows);
   Hatrix::Matrix R(U.rows, U.cols);
   Hatrix::qr(U, Q, R);
 
   auto Q_splits = Q.split(vec(), vec{U.cols});
-  Hatrix::Matrix Uc(U.rows, U.rows - U.cols);
+  Hatrix::Matrix Uc(U.rows, c_size);
   Uc = Q_splits[1];
   return Uc;
 }
 
 void partial_ldl_diag(BLR2_SPD& A, int i) {
-  auto D_splits = A.D(i, i).split(vec{A.block_size - A.rank},
-					   vec{A.block_size - A.rank});
+  int c_size = A.block_size - A.rank;
+  auto D_splits = A.D(i, i).split(vec{c_size}, vec{c_size});
   Hatrix::ldl(D_splits[0]);
   Hatrix::solve_triangular(D_splits[0], D_splits[2], Hatrix::Right,
 			   Hatrix::Lower, true, true, 1.);
@@ -132,26 +138,22 @@ void partial_ldl_diag(BLR2_SPD& A, int i) {
 }
 
 Hatrix::Matrix factorize(BLR2_SPD& A) {
-  assert(A.rank < A.block_size);
-  
+  int c_size = A.block_size - A.rank;
   for(int64_t i = 0; i < A.n_blocks; i++) {
     A.Uc.insert(i, make_complement(A.U[i]));
     //Transform diagonal
-    Hatrix::Matrix Di = Hatrix::matmul(Hatrix::matmul(A.Uf(i), A.D(i, i), true),
-				       A.Uf(i));
-    A.D(i, i) = Di;
+    A.D(i, i) = Hatrix::matmul(Hatrix::matmul(A.Uf(i), A.D(i, i), true), A.Uf(i));
     //Partial factorization
-    partial_ldl_diag(A, i);
+    if(c_size > 0) partial_ldl_diag(A, i);
   }
 
   Hatrix::Matrix last(A.n_blocks * A.rank, A.n_blocks * A.rank);
   auto last_splits = last.split(A.n_blocks, A.n_blocks);
-
+  
   for(int64_t i = 0; i < A.n_blocks; i++) {
     for(int64_t j = 0; j < A.n_blocks; j++) {
       if(i == j) {
-	auto D_split = A.D(i, j).split(vec{A.block_size - A.rank},
-						vec{A.block_size - A.rank});
+	auto D_split = A.D(i, j).split(vec{c_size}, vec{c_size});
 	last_splits[i * A.n_blocks + j] = D_split[3];
       }
       else {
@@ -164,8 +166,6 @@ Hatrix::Matrix factorize(BLR2_SPD& A) {
 }
 
 void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
-  assert(A.rank < A.block_size);
-  
   //Split b
   int c_size = A.block_size - A.rank;
   vec local_split_indices{c_size};
@@ -185,13 +185,15 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
     bi = b_block_splits[i];
     Hatrix::matmul(A.Uf(i), bi, b_block_splits[i], true, false, 1, 0);
 
-    //Solve triangular from diagonals
-    auto Li_splits = A.D(i, i).split(local_split_indices,
-					      local_split_indices);
-    Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
-			     Hatrix::Left, Hatrix::Lower, true);
-    Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i], b_block_co_splits[2*i+1],
-		   false, false, -1, 1);
+    //Solve triangular from diagonal partial factorizations
+    if(c_size > 0) {
+      auto Li_splits = A.D(i, i).split(local_split_indices,
+				       local_split_indices);
+      Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
+			       Hatrix::Left, Hatrix::Lower, true);
+      Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i], b_block_co_splits[2*i+1],
+		     false, false, -1, 1);
+    }
   }
   //Gather o parts
   Hatrix::Matrix bo(A.n_blocks * A.rank, 1);
@@ -203,10 +205,12 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
 
   //---Solve Diagonal---
   //Solve in c parts
-  for(int i = 0; i < A.n_blocks; i++) {
-    auto Li_splits = A.D(i, i).split(local_split_indices,
-					      local_split_indices);
-    Hatrix::solve_diagonal(Li_splits[0], b_block_co_splits[2*i], Hatrix::Left);
+  if(c_size > 0) {
+    for(int i = 0; i < A.n_blocks; i++) {
+      auto Li_splits = A.D(i, i).split(local_split_indices,
+				       local_split_indices);
+      Hatrix::solve_diagonal(Li_splits[0], b_block_co_splits[2*i], Hatrix::Left);
+    }
   }
   //Solve in o parts
   Hatrix::solve_diagonal(root, bo, Hatrix::Left);
@@ -218,12 +222,14 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
     b_block_co_splits[2*i+1] = bo_splits[i];
   }
   for(int i = 0; i < A.n_blocks; i++) {
-    auto Li_splits = A.D(i, i).split(local_split_indices,
-					      local_split_indices);
-    Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i+1], b_block_co_splits[2*i],
-		   true, false, -1., 1.);
-    Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
-			     Hatrix::Left, Hatrix::Lower, true, true);
+    if(c_size > 0) {
+      auto Li_splits = A.D(i, i).split(local_split_indices,
+				       local_split_indices);
+      Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i+1], b_block_co_splits[2*i],
+		     true, false, -1., 1.);
+      Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
+			       Hatrix::Left, Hatrix::Lower, true, true);
+    }
     //Multiply with orthogonal matrix
     Hatrix::Matrix bi(b_block_splits[i].rows, b_block_splits[i].cols);
     bi = b_block_splits[i];
