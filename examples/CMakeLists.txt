@@ -22,6 +22,7 @@ else()
     UMV_weak_2level
     UMV_weak_Nlevel
     LDL_weak_1level
+    LDL_weak_2level
   )
 endif()
 
