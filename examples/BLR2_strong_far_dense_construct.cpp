@@ -9,15 +9,48 @@
 
 #include "Hatrix/Hatrix.h"
 
-using randvec_t = std::vector<std::vector<double> >;
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 
 namespace Hatrix {
-  class BLR2 {
+  class Particle {
+  private:
+    double value;
+    std::vector<int64_t> coords;
 
+  public:
+    Particle(int64_t x, double _value) : value(_value)  {
+      coords.push_back(x);
+    }
+  };
+
+  class BLR2 {
+  private:
+    RowColMap<bool> is_admissible;
+    int64_t N, nblocks, rank, admis;
+
+  public:
+    BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
+      N(N), nblocks(nblocks), rank(rank), admis(admis) {
+
+    }
   };
 }
+
+using randvec_t = std::vector<std::vector<double> >;
+
+std::vector<Hatrix::Particle> equally_spaced_particles(int64_t ndim, int64_t N,
+                                                       double min_val, double max_val) {
+  std::vector<Hatrix::Particle> particles;
+  double range = max_val - min_val;
+
+  for (int64_t i = 0; i < N; ++i) {
+    particles.push_back(Particle(i, min_val + (double(i) / double(range))));
+  }
+
+  return particles;
+}
+
 int main(int argc, char** argv) {
   int64_t N = atoi(argv[1]);
   int64_t nblocks = atoi(argv[2]);
@@ -27,8 +60,8 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
