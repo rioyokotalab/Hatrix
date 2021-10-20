@@ -16,14 +16,14 @@ namespace Hatrix {
   class Particle {
   private:
     double value;
-    std::vector<int64_t> coords;
+    std::vector<double> coords;
 
   public:
-    Particle(int64_t x, double _value) : value(_value)  {
+    Particle(double x, double _value) : value(_value)  {
       coords.push_back(x);
     }
 
-    int64_t x() { return coords[0]; }
+    double x() const { return coords[0]; }
   };
 
   class Box {
@@ -32,15 +32,21 @@ namespace Hatrix {
     int64_t ndim;
     // Store the center, start and end co-ordinates of this box. Each number
     // in corresponds to the x, y, and z co-oridinate.
-    std::vector<int64_t> center, start, end;
+    std::vector<double> center, start, end;
 
   public:
-    Box(double _diameter, int64_t center_x, int64_t start_x, int64_t end_x) : diameter(_diameter), ndim(1) {
+    Box(double _diameter, double center_x, double start_x, double end_x) : diameter(_diameter), ndim(1) {
       center.push_back(center_x);
       start.push_back(start_x);
       end.push_back(end_x);
     }
+
+
   };
+
+  double distance(Box& a, Box& b) {
+    return 0;
+  }
 
   class BLR2 {
   private:
@@ -51,25 +57,34 @@ namespace Hatrix {
       std::vector<Box> boxes;
       int64_t nleaf = N / nblocks;
       for (int64_t i = 0; i < nblocks; ++i) {
+        auto start_x = particles[i * nleaf].x();
+        auto stop_x = particles[(i+1) * nleaf].x();
+        auto center_x = stop_x - start_x;
+        auto diameter = stop_x - start_x;
 
-        for (int64_t p = 0; p < nleaf; ++p) {
-
-        }
+        boxes.push_back(Box(diameter, center_x, start_x, stop_x));
       }
+
+      return boxes;
     }
 
   public:
     BLR2(const std::vector<Hatrix::Particle>& particles, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
       N(N), nblocks(nblocks), rank(rank), admis(admis) {
       auto boxes = create_particle_boxes(particles);
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::min(boxes[i].diameter, boxes[j].diameter) <=
+                               distance(boxes[i], boxes[j]));
+        }
+      }
     }
 
     double construction_error(const std::vector<Hatrix::Particle>& randpts) {
     }
   };
 }
-
-
 
 std::vector<Hatrix::Particle> equally_spaced_particles(int64_t ndim, int64_t N,
                                                        double min_val, double max_val) {
@@ -91,10 +106,6 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
   auto particles = equally_spaced_particles(1, N, 0.0, 1.0 * N);
-  // randvec_t randpts;
-  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
