@@ -23,6 +23,12 @@ namespace Hatrix {
       coords.push_back(x);
     }
 
+    Particle(double x, double y, double z, double _value) : value(_value)  {
+      coords.push_back(x);
+      coords.push_back(y);
+      coords.push_back(z);
+    }
+
     double x() const { return coords[0]; }
   };
 
@@ -247,9 +253,20 @@ std::vector<Hatrix::Particle> equally_spaced_particles(int64_t ndim, int64_t N,
   std::vector<Hatrix::Particle> particles;
   double range = max_val - min_val;
 
-  for (int64_t i = 0; i < N; ++i) {
-    particles.push_back(Hatrix::Particle(i*0.4, min_val + (double(i) / double(range))));
+  if (ndim == 1) {
+    for (int64_t i = 0; i < N; ++i) {
+      particles.push_back(Hatrix::Particle(i*0.4, min_val + (double(i) / double(range))));
+    }
   }
+  else if (ndim == 3) {
+    // Generate a unit sphere geometry with N points on the surface.
+    // http://www.cpp.re/forum/windows/262648/
+    // https://neil-strickland.staff.shef.ac.uk/courses/MAS243/lectures/handout10.pdf
+    for (int64_t i = 0; i < N; ++i) {
+      particles.push_back(Hatrix::Particle(i*0.4, i*0.4, i*0.4, min_val + (double(i) / double(range))));
+    }
+  }
+
 
   return particles;
 }
@@ -259,7 +276,7 @@ int main(int argc, char** argv) {
   int64_t nblocks = atoi(argv[2]);
   int64_t rank = atoi(argv[3]);
   double admis = atof(argv[4]);
-  int64_t ndim = 1;
+  int64_t ndim = atoi(argv[5]);
 
   Hatrix::Context::init();
   auto particles = equally_spaced_particles(ndim, N, 0.0, 1.0 * N);
