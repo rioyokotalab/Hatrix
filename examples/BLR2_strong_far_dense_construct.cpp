@@ -110,7 +110,13 @@ namespace Hatrix {
 
     double construction_error(const std::vector<Hatrix::Particle>& randpts) {
       // Check dense blocks
+      for (int i = 0; i < nblocks; ++i) {
+        std::pair<std::multimap<int64_t, Matrix>::iterator,
+                  std::multimap<int64_t, Matrix>::iterator> row_dense_blocks = D.equal_range(i);
 
+        for (std::multimap<int64_t, Matrix>::iterator it = row_dense_blocks.first; it != row_dense_blocks.second; ++it) {
+        }
+      }
 
       return 0;
     }
@@ -157,8 +163,7 @@ int main(int argc, char** argv) {
   A.print_structure();
   double construct_error = A.construction_error(particles);
 
-  Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles, 50, 50, 0, 0, 1);
-  dense.print();
+  Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles, N, N, 0, 0, 1);
 
   Hatrix::Context::finalize();
 
