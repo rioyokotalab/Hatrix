@@ -15,11 +15,10 @@
 
 namespace Hatrix {
   class Particle {
-  private:
+  public:
     double value;
     std::vector<double> coords;
 
-  public:
     Particle(double x, double _value) : value(_value)  {
       coords.push_back(x);
     }
@@ -35,21 +34,33 @@ namespace Hatrix {
     // in corresponds to the x, y, and z co-oridinate.
     std::vector<double> center, start, end;
 
-    Box(double _diameter, double center_x, double start_x, double end_x) : diameter(_diameter), ndim(1) {
+    Box(double _diameter, double center_x, double start_x, double end_x) :
+      diameter(_diameter), ndim(1) {
       center.push_back(center_x);
       start.push_back(start_x);
       end.push_back(end_x);
     }
 
-    double distance_from(Box& b) {
+    double distance_from(const Box& b) const {
       return std::sqrt(pow(b.center[0] - center[0], 2));
     }
   };
 
-  Matrix generate_laplacend_matrix(const std::vector<Hatrix::Particle>& particles, int64_t nrows, int64_t ncols,
-                                   int64_t row_start, int64_t col_start) {
+  // Generate a laplacian kernel assuming that each particle has unit charge.
+  Matrix generate_laplacend_matrix(const std::vector<Hatrix::Particle>& particles,
+                                   int64_t nrows, int64_t ncols,
+                                   int64_t row_start, int64_t col_start, int64_t ndim) {
     Matrix out(nrows, ncols);
 
+    for (int64_t i = 0; i < nrows; ++i) {
+      for (int64_t j = 0; j < ncols; ++j) {
+        double rij = 0;
+        for (int64_t k = 0; k < ndim; ++k) {
+          rij += pow(particles[i].coords[k] - particles[j].coords[k], 2);
+        }
+        out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
+      }
+    }
     return out;
   }
 
@@ -58,7 +69,7 @@ namespace Hatrix {
     // Store the dense blocks in a multimap for faster iteration without hash lookups.
     std::multimap<int64_t, Matrix> D;
     RowColMap<bool> is_admissible;
-    int64_t N, nblocks, rank;
+    int64_t N, nblocks, rank, ndim;
     double admis;
 
     std::vector<Box> create_particle_boxes(const std::vector<Hatrix::Particle>& particles) {
@@ -77,7 +88,8 @@ namespace Hatrix {
     }
 
   public:
-    BLR2(const std::vector<Hatrix::Particle>& particles, int64_t N, int64_t nblocks, int64_t rank, double admis) :
+    BLR2(const std::vector<Hatrix::Particle>& particles, int64_t N, int64_t nblocks,
+         int64_t rank, double admis, int64_t ndim) :
       N(N), nblocks(nblocks), rank(rank), admis(admis) {
       int64_t block_size = N / nblocks;
       auto boxes = create_particle_boxes(particles);
@@ -90,7 +102,7 @@ namespace Hatrix {
           if (!is_admissible(i, j)) {
             D.insert({i, generate_laplacend_matrix(particles,
                                                    block_size, block_size,
-                                                   i*block_size, j*block_size)});
+                                                   i*block_size, j*block_size, ndim)});
           }
         }
       }
@@ -128,16 +140,17 @@ int main(int argc, char** argv) {
   int64_t nblocks = atoi(argv[2]);
   int64_t rank = atoi(argv[3]);
   double admis = atof(argv[4]);
+  int64_t ndim = 1;
 
   Hatrix::Context::init();
-  auto particles = equally_spaced_particles(1, N, 0.0, 1.0 * N);
+  auto particles = equally_spaced_particles(ndim, N, 0.0, 1.0 * N);
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
     abort();
   }
 
-  Hatrix::BLR2 A(particles, N, nblocks, rank, admis);
+  Hatrix::BLR2 A(particles, N, nblocks, rank, admis, ndim);
   A.print_structure();
   double construct_error = A.construction_error(particles);
 

@@ -36,12 +36,12 @@ namespace Hatrix {
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
-    int N, rank, height;
+    int64_t N, rank, height;
 
     // Generate a row slice without the diagonal block specified by 'block'. The
     // nrows parameter determines at what level the slice is generated at. Returns
     // a block of size (nrows x (N - nrows)).
-    Matrix generate_row_slice(int block, int nrows, const randvec_t& randpts) {
+    Matrix generate_row_slice(int64_t block, int64_t nrows, const randvec_t& randpts) {
       Matrix row_slice(nrows, N-nrows);
       int64_t ncols_left_slice = block * nrows;
       Matrix left_slice = generate_laplacend_matrix(randpts, nrows, ncols_left_slice,
@@ -51,12 +51,12 @@ namespace Hatrix {
                                                      block * nrows, (block+1) * nrows);
 
       // concat left and right slices
-      for (int i = 0; i < nrows; ++i) {
-        for (int j = 0; j < ncols_left_slice; ++j) {
+      for (int64_t i = 0; i < nrows; ++i) {
+        for (int64_t j = 0; j < ncols_left_slice; ++j) {
           row_slice(i, j) = left_slice(i, j);
         }
 
-        for (int j = 0; j < ncols_right_slice; ++j) {
+        for (int64_t j = 0; j < ncols_right_slice; ++j) {
           row_slice(i, j + ncols_left_slice) = right_slice(i, j);
         }
       }
@@ -65,21 +65,21 @@ namespace Hatrix {
     }
 
     // Generate a column slice without the diagonal block.
-    Matrix generate_column_slice(int block, int ncols, const randvec_t& randpts) {
+    Matrix generate_column_slice(int64_t block, int64_t ncols, const randvec_t& randpts) {
       Matrix col_slice(N-ncols, ncols);
-      int nrows_upper_slice = block * ncols;
+      int64_t nrows_upper_slice = block * ncols;
       Matrix upper_slice = generate_laplacend_matrix(randpts, nrows_upper_slice, ncols,
                                                      0, block * ncols);
-      int nrows_lower_slice = N - (block + 1) * ncols;
+      int64_t nrows_lower_slice = N - (block + 1) * ncols;
       Matrix lower_slice = generate_laplacend_matrix(randpts, nrows_lower_slice, ncols,
                                                      (block+1) * ncols, block * ncols);
 
-      for (int j = 0; j < col_slice.cols; ++j) {
-        for (int i = 0; i < nrows_upper_slice; ++i) {
+      for (int64_t j = 0; j < col_slice.cols; ++j) {
+        for (int64_t i = 0; i < nrows_upper_slice; ++i) {
           col_slice(i, j) = upper_slice(i, j);
         }
 
-        for (int i = 0; i < nrows_lower_slice; ++i) {
+        for (int64_t i = 0; i < nrows_lower_slice; ++i) {
           col_slice(i + nrows_upper_slice, j) = lower_slice(i, j);
         }
       }
@@ -88,7 +88,7 @@ namespace Hatrix {
     }
 
     // Generate U for the leaf.
-    Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randpts) {
+    Matrix generate_column_bases(int64_t block, int64_t leaf_size, const randvec_t& randpts) {
       // Row slice since column bases should be cutting across the columns.
       Matrix row_slice = generate_row_slice(block, leaf_size, randpts);
       Matrix Ui, Si, Vi; double error;
@@ -98,7 +98,7 @@ namespace Hatrix {
     }
 
     // Generate V for the leaf.
-    Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randpts) {
+    Matrix generate_row_bases(int64_t block, int64_t leaf_size, const randvec_t& randpts) {
       // Col slice since row bases should be cutting across the rows.
       Matrix col_slice = generate_column_slice(block, leaf_size, randpts);
       Matrix Ui, Si, Vi; double error;
@@ -108,10 +108,10 @@ namespace Hatrix {
     }
 
     void generate_leaf_bases(const randvec_t& randpts) {
-      int nblocks = pow(2, height);
-      int leaf_size = N / nblocks;
+      int64_t nblocks = pow(2, height);
+      int64_t leaf_size = N / nblocks;
 
-      for (int block = 0; block < nblocks; ++block) {
+      for (int64_t block = 0; block < nblocks; ++block) {
         D.insert(block, block, height,
                  Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
                                                    block * leaf_size, block * leaf_size));
@@ -121,8 +121,8 @@ namespace Hatrix {
         V.insert(block, height, std::move(Vbig));
       }
 
-      for (int row = 0; row < nblocks; ++row) {
-        int col = row % 2 == 0 ? row + 1 : row - 1;
+      for (int64_t row = 0; row < nblocks; ++row) {
+        int64_t col = row % 2 == 0 ? row + 1 : row - 1;
         Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
                                              row * leaf_size, col * leaf_size);
         S.insert(row, col, height, matmul(matmul(U(row, height), D, true, false), V(col, height)));
@@ -130,20 +130,20 @@ namespace Hatrix {
     }
 
     std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const randvec_t& randpts,
-                                                                    int level, RowLevelMap& Uchild,
+                                                                    int64_t level, RowLevelMap& Uchild,
                                                                     ColLevelMap& Vchild) {
-      int num_nodes = pow(2, level);
-      int leaf_size = N / num_nodes;
-      int child_level = level + 1;
-      int c_num_nodes = pow(2, child_level);
+      int64_t num_nodes = pow(2, level);
+      int64_t leaf_size = N / num_nodes;
+      int64_t child_level = level + 1;
+      int64_t c_num_nodes = pow(2, child_level);
       // Generate the actual bases for the upper level and pass it to this
       // function again for generating transfer matrices at successive levels.
       RowLevelMap Ubig_parent;
       ColLevelMap Vbig_parent;
 
-      for (int node = 0; node < num_nodes; ++node) {
-        int child1 = node * 2;
-        int child2 = node * 2 + 1;
+      for (int64_t node = 0; node < num_nodes; ++node) {
+        int64_t child1 = node * 2;
+        int64_t child2 = node * 2 + 1;
 
         {
           // Generate U transfer matrix.
@@ -205,8 +205,8 @@ namespace Hatrix {
         }
       }
 
-      for (int row = 0; row < num_nodes; ++row) {
-        int col = row % 2 == 0 ? row + 1 : row - 1;
+      for (int64_t row = 0; row < num_nodes; ++row) {
+        int64_t col = row % 2 == 0 ? row + 1 : row - 1;
         Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
                                              row * leaf_size, col * leaf_size);
         S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
@@ -217,19 +217,19 @@ namespace Hatrix {
       return {Ubig_parent, Vbig_parent};
     }
 
-    Matrix get_Ubig(int node, int level) {
+    Matrix get_Ubig(int64_t node, int64_t level) {
       if (level == height) {
         return U(node, level);
       }
-      int child1 = node * 2;
-      int child2 = node * 2 + 1;
+      int64_t child1 = node * 2;
+      int64_t child2 = node * 2 + 1;
 
       // int rank = leaf_size;
 
       Matrix Ubig_child1 = get_Ubig(child1, level+1);
       Matrix Ubig_child2 = get_Ubig(child2, level+1);
 
-      int leaf_size = Ubig_child1.rows + Ubig_child2.rows;
+      int64_t leaf_size = Ubig_child1.rows + Ubig_child2.rows;
 
       Matrix Ubig(leaf_size, rank);
 
@@ -246,17 +246,17 @@ namespace Hatrix {
       return Ubig;
     }
 
-    Matrix get_Vbig(int node, int level) {
+    Matrix get_Vbig(int64_t node, int64_t level) {
       if (level == height) {
         return V(node, level);
       }
-      int child1 = node * 2;
-      int child2 = node * 2 + 1;
+      int64_t child1 = node * 2;
+      int64_t child2 = node * 2 + 1;
 
       Matrix Vbig_child1 = get_Vbig(child1, level+1);
       Matrix Vbig_child2 = get_Vbig(child2, level+1);
 
-      int leaf_size = Vbig_child1.rows + Vbig_child2.rows;
+      int64_t leaf_size = Vbig_child1.rows + Vbig_child2.rows;
       //int rank = leaf_size;
 
       Matrix Vbig(leaf_size, rank);
@@ -276,48 +276,48 @@ namespace Hatrix {
       std::tie(Q_full, R) = qr(Q, Lapack::QR_mode::Full,
         Lapack::QR_ret::OnlyQ);
 
-      for (int i = 0; i < Q_F.rows; ++i) {
-        for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+      for (int64_t i = 0; i < Q_F.rows; ++i) {
+        for (int64_t j = 0; j < Q_F.cols - Q.cols; ++j) {
           Q_F(i, j) = Q_full(i, j + Q.cols);
         }
       }
 
-      for (int i = 0; i < Q_F.rows; ++i) {
-        for (int j = 0; j < Q.cols; ++j) {
+      for (int64_t i = 0; i < Q_F.rows; ++i) {
+        for (int64_t j = 0; j < Q.cols; ++j) {
           Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
         }
       }
       return Q_F;
     }
 
-    Matrix& unsolved_chunk(int block, int level, int rank) {
+    Matrix& unsolved_chunk(int64_t block, int64_t level, int64_t rank) {
       Matrix& Diag = D(block, block, level);
-      int c_size = Diag.rows - rank;
+      int64_t c_size = Diag.rows - rank;
       std::vector<Matrix> Diag_splits = Diag.split(std::vector<int64_t>(1, c_size),
                                                            std::vector<int64_t>(1, c_size));
       return Diag_splits[3];
     }
 
     // permute the vector forward and return the offset at which the new vector begins.
-    int permute_forward(Matrix& x, const int level, int rank_offset) {
+    int64_t permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) {
       Matrix copy(x);
-      int num_nodes = int(pow(2, level));
-      int c_offset = rank_offset;
-      for (int block = 0; block < num_nodes; ++block) {
+      int64_t num_nodes = int64_t(pow(2, level));
+      int64_t c_offset = rank_offset;
+      for (int64_t block = 0; block < num_nodes; ++block) {
         rank_offset += D(block, block, level).rows - U(block, level).cols;
       }
 
-      for (int block = 0; block < num_nodes; ++block) {
-        int rows = D(block, block, level).rows;
-        int rank = U(block, level).cols;
-        int c_size = rows - rank;
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        int64_t rows = D(block, block, level).rows;
+        int64_t rank = U(block, level).cols;
+        int64_t c_size = rows - rank;
 
         // copy the complement part of the vector into the temporary vector
-        for (int i = 0; i < c_size; ++i) {
+        for (int64_t i = 0; i < c_size; ++i) {
           copy(c_offset + c_size * block + i, 0) = x(c_offset + block * rows + i, 0);
         }
         // copy the rank part of the vector into the temporary vector
-        for (int i = 0; i < rank; ++i) {
+        for (int64_t i = 0; i < rank; ++i) {
           copy(rank_offset + rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
         }
       }
@@ -327,24 +327,24 @@ namespace Hatrix {
       return rank_offset;
     }
 
-    int permute_backward(Matrix& x, const int level, int rank_offset) {
+    int64_t permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) {
       Matrix copy(x);
-      int num_nodes = pow(2, level);
-      int c_offset = rank_offset;
-      for (int block = 0; block < num_nodes; ++block) {
+      int64_t num_nodes = pow(2, level);
+      int64_t c_offset = rank_offset;
+      for (int64_t block = 0; block < num_nodes; ++block) {
         c_offset -= D(block, block, level).rows - U(block, level).cols;
       }
 
-      for (int block = 0; block < num_nodes; ++block) {
-        int rows = D(block, block, level).rows;
-        int rank = U(block, level).cols;
-        int c_size = rows - rank;
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        int64_t rows = D(block, block, level).rows;
+        int64_t rank = U(block, level).cols;
+        int64_t c_size = rows - rank;
 
-        for (int i = 0; i < c_size; ++i) {
+        for (int64_t i = 0; i < c_size; ++i) {
           copy(c_offset + block * rows + i, 0) = x(c_offset + block * c_size + i, 0);
         }
 
-        for (int i = 0; i < rank; ++i) {
+        for (int64_t i = 0; i < rank; ++i) {
           copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
         }
       }
@@ -356,7 +356,7 @@ namespace Hatrix {
 
   public:
 
-    HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
+    HSS(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height) :
       N(_N), rank(_rank), height(_height) {
       RowLevelMap Uchild;
       ColLevelMap Vchild;
@@ -366,27 +366,27 @@ namespace Hatrix {
       Uchild = U;
       Vchild = V;
 
-      for (int level = height-1; level > 0; --level) {
+      for (int64_t level = height-1; level > 0; --level) {
         std::tie(Uchild, Vchild) = generate_transfer_matrices(randpts, level, Uchild, Vchild);
       }
     }
 
     double construction_relative_error(const randvec_t& randpts) {
       double error = 0;
-      int num_nodes = pow(2, height);
+      int64_t num_nodes = pow(2, height);
 
-      for (int block = 0; block < num_nodes; ++block) {
-        int slice = N / num_nodes;
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        int64_t slice = N / num_nodes;
         error += norm(D(block, block, height) - generate_laplacend_matrix(randpts, slice, slice,
                                                                                           slice * block, slice * block));
       }
 
-      for (int level = height; level > height-1; --level) {
-        int num_nodes = pow(2, level);
-        int slice = N / num_nodes;
+      for (int64_t level = height; level > height-1; --level) {
+        int64_t num_nodes = pow(2, level);
+        int64_t slice = N / num_nodes;
 
-        for (int row = 0; row < num_nodes; ++row) {
-          int col = row % 2 == 0 ? row + 1 : row - 1;
+        for (int64_t row = 0; row < num_nodes; ++row) {
+          int64_t col = row % 2 == 0 ? row + 1 : row - 1;
           Matrix Ubig = get_Ubig(row, level);
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
@@ -400,11 +400,11 @@ namespace Hatrix {
 
     // UMV factorization of this HSS matrix.
     void factorize() {
-      for (int level = height; level > 0; --level) {
-        int num_nodes = pow(2, level);
+      for (int64_t level = height; level > 0; --level) {
+        int64_t num_nodes = pow(2, level);
 
         // Perform multiplication of U_F and V_F along with partial LU.
-        for (int block = 0; block < num_nodes; ++block) {
+        for (int64_t block = 0; block < num_nodes; ++block) {
           Hatrix::Matrix& diagonal = D(block, block, level);
 
           Hatrix::Matrix U_F = make_complement(U(block, level));
@@ -415,7 +415,7 @@ namespace Hatrix {
           // in case of full rank, dont perform partial LU
           if (rank == diagonal.rows) { continue; }
 
-          int c_size = diagonal.rows - rank;
+          int64_t c_size = diagonal.rows - rank;
           std::vector<Hatrix::Matrix> diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
                                                                        std::vector<int64_t>(1, c_size));
           Hatrix::Matrix& Dcc = diagonal_splits[0];
@@ -430,17 +430,17 @@ namespace Hatrix {
         }
 
         // Merge the unfactorized parts.
-        int parent_level = level - 1;
-        for (int block = 0; block < int(pow(2, parent_level)); ++block) {
+        int64_t parent_level = level - 1;
+        for (int64_t block = 0; block < int64_t(pow(2, parent_level)); ++block) {
           Hatrix::Matrix D_unsolved(rank * 2, rank * 2);
           std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
 
-          int child1 = block * 2; int child2 = block * 2 + 1;
+          int64_t child1 = block * 2; int64_t child2 = block * 2 + 1;
           D_unsolved_splits[0] = unsolved_chunk(child1, level, rank);
           D_unsolved_splits[3] = unsolved_chunk(child2, level, rank);
 
-          int col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
-          int col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
+          int64_t col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
+          int64_t col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
 
           D_unsolved_splits[1] = S(child1, col_child1, level);
           D_unsolved_splits[2] = S(child2, col_child2, level);
@@ -455,23 +455,23 @@ namespace Hatrix {
     Hatrix::Matrix solve(const Hatrix::Matrix& b) {
       std::vector<Hatrix::Matrix> x_splits;
       Hatrix::Matrix x(b);
-      int rhs_offset = 0, c_size, offset;
+      int64_t rhs_offset = 0, c_size, offset;
 
       // forward
-      for (int level = height; level > 0; --level) {
-        int num_nodes = pow(2, level);
-        for (int node = 0; node < num_nodes; ++node) {
+      for (int64_t level = height; level > 0; --level) {
+        int64_t num_nodes = pow(2, level);
+        for (int64_t node = 0; node < num_nodes; ++node) {
           Matrix& Diag = D(node, node, level);
           c_size = Diag.rows - rank;
           offset = rhs_offset + node * Diag.rows;
 
           Matrix temp(Diag.rows, 1);
-          for (int i = 0; i < Diag.rows; ++i) {
+          for (int64_t i = 0; i < Diag.rows; ++i) {
             temp(i, 0) = x(offset + i, 0);
           }
           Matrix U_F = make_complement(U(node, level));
           Matrix product = matmul(U_F, temp, true);
-          for (int i = 0; i < Diag.rows; ++i) {
+          for (int64_t i = 0; i < Diag.rows; ++i) {
             x(offset + i, 0) = product(i, 0);
           }
 
@@ -500,10 +500,10 @@ namespace Hatrix {
       solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
       // backward
-      for (int level = 1; level <= height; ++level) {
+      for (int64_t level = 1; level <= height; ++level) {
         rhs_offset = permute_backward(x, level, rhs_offset);
-        int num_nodes = pow(2, level);
-        for (int node = 0; node < num_nodes; ++node) {
+        int64_t num_nodes = pow(2, level);
+        for (int64_t node = 0; node < num_nodes; ++node) {
           Matrix& Diag = D(node, node, level);
           c_size = Diag.rows - rank;
           offset = rhs_offset + node * Diag.rows;
@@ -525,12 +525,12 @@ namespace Hatrix {
 
           // TODO: Make this work with slicing.
           Matrix temp(Diag.rows, 1);
-          for (int i = 0; i < Diag.rows; ++i) {
+          for (int64_t i = 0; i < Diag.rows; ++i) {
             temp(i, 0) = x(offset + i, 0);
           }
           Matrix V_F = make_complement(V(node, level));
           Matrix product = matmul(V_F, temp);
-          for (int i = 0; i < Diag.rows; ++i) {
+          for (int64_t i = 0; i < Diag.rows; ++i) {
             x(offset + i, 0) = product(i, 0);
           }
         }
@@ -542,9 +542,9 @@ namespace Hatrix {
 }
 
 int main(int argc, char* argv[]) {
-  int N = atoi(argv[1]);
-  int rank = atoi(argv[2]);
-  int height = atoi(argv[3]);
+  int64_t N = atoi(argv[1]);
+  int64_t rank = atoi(argv[2]);
+  int64_t height = atoi(argv[3]);
 
   if (N % int(pow(2, height)) != 0 && rank > int(N / pow(2, height))) {
     std::cout << N << " % " << pow(2, height) << " != 0 || rank > leaf(" << int(N / pow(2, height))  << ")\n";
