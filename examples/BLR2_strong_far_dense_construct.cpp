@@ -109,6 +109,9 @@ namespace Hatrix {
     }
 
     double construction_error(const std::vector<Hatrix::Particle>& randpts) {
+      // Check dense blocks
+
+
       return 0;
     }
 
@@ -153,6 +156,9 @@ int main(int argc, char** argv) {
   Hatrix::BLR2 A(particles, N, nblocks, rank, admis, ndim);
   A.print_structure();
   double construct_error = A.construction_error(particles);
+
+  Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles, 50, 50, 0, 0, 1);
+  dense.print();
 
   Hatrix::Context::finalize();
 
