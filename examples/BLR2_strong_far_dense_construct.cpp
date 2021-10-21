@@ -47,6 +47,8 @@ namespace Hatrix {
       end.push_back(end_x);
     }
 
+
+
     double distance_from(const Box& b) const {
       return std::sqrt(pow(b.center[0] - center[0], 2));
     }
@@ -90,13 +92,19 @@ namespace Hatrix {
     std::vector<Box> create_particle_boxes(const std::vector<Hatrix::Particle>& particles) {
       std::vector<Box> boxes;
       int64_t nleaf = N / nblocks;
-      for (int64_t i = 0; i < nblocks; ++i) {
-        auto start_x = particles[i * nleaf].x();
-        auto stop_x = particles[i == nblocks-1 ? N-1 : (i+1) * nleaf - 1].x();
-        auto center_x = (start_x + stop_x) / 2;
-        auto diameter = stop_x - start_x;
 
-        boxes.push_back(Box(diameter, center_x, start_x, stop_x));
+      if (ndim == 1) {
+        for (int64_t i = 0; i < nblocks; ++i) {
+          auto start_x = particles[i * nleaf].x();
+          auto stop_x = particles[i == nblocks-1 ? N-1 : (i+1) * nleaf - 1].x();
+          auto center_x = (start_x + stop_x) / 2;
+          auto diameter = stop_x - start_x;
+
+          boxes.push_back(Box(diameter, center_x, start_x, stop_x));
+        }
+      }
+      else if (ndim == 3) {
+
       }
 
       return boxes;
