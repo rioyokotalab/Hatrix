@@ -68,7 +68,10 @@ namespace Hatrix {
   private:
     // Store the dense blocks in a multimap for faster iteration without hash lookups.
     std::multimap<int64_t, Matrix> D;
+    // Map of inadmissible indices.
     RowColMap<bool> is_admissible;
+    // Vector of vector for storing the actual indices of all the inadmissible blocks in a given row.
+    std::vector<std::vector<int64_t> > inadmissible_indices;
     int64_t N, nblocks, rank, ndim;
     double admis;
 
@@ -90,8 +93,9 @@ namespace Hatrix {
   public:
     BLR2(const std::vector<Hatrix::Particle>& particles, int64_t N, int64_t nblocks,
          int64_t rank, double admis, int64_t ndim) :
-      N(N), nblocks(nblocks), rank(rank), admis(admis) {
+      N(N), nblocks(nblocks), rank(rank), admis(admis), ndim(ndim) {
       int64_t block_size = N / nblocks;
+      inadmissible_indices.resize(nblocks);
       auto boxes = create_particle_boxes(particles);
 
       for (int i = 0; i < nblocks; ++i) {
@@ -100,6 +104,7 @@ namespace Hatrix {
                                admis * boxes[i].distance_from(boxes[j]));
 
           if (!is_admissible(i, j)) {
+            inadmissible_indices[i].push_back(j);
             D.insert({i, generate_laplacend_matrix(particles,
                                                    block_size, block_size,
                                                    i*block_size, j*block_size, ndim)});
@@ -108,17 +113,29 @@ namespace Hatrix {
       }
     }
 
-    double construction_error(const std::vector<Hatrix::Particle>& randpts) {
+    double construction_error(const std::vector<Hatrix::Particle>& particles) {
       // Check dense blocks
+      double error = 0; double dense_norm = 0;
+      int64_t block_size = N / nblocks;
+
       for (int i = 0; i < nblocks; ++i) {
         std::pair<std::multimap<int64_t, Matrix>::iterator,
                   std::multimap<int64_t, Matrix>::iterator> row_dense_blocks = D.equal_range(i);
 
+        int j = 0;
         for (std::multimap<int64_t, Matrix>::iterator it = row_dense_blocks.first; it != row_dense_blocks.second; ++it) {
+          int64_t icol = inadmissible_indices[i][j];
+          auto dense = generate_laplacend_matrix(particles,
+                                                 block_size, block_size,
+                                                 i*block_size, icol*block_size, ndim);
+          dense_norm += pow(norm(dense), 2);
+          error += pow(norm(it->second -  dense), 2);
+
+          j++;
         }
       }
 
-      return 0;
+      return std::sqrt(error / dense_norm);
     }
 
     void print_structure() {
