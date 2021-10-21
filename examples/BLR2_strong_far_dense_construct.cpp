@@ -56,7 +56,7 @@ namespace Hatrix {
       for (int64_t j = 0; j < ncols; ++j) {
         double rij = 0;
         for (int64_t k = 0; k < ndim; ++k) {
-          rij += pow(particles[i].coords[k] - particles[j].coords[k], 2);
+          rij += pow(particles[i+row_start].coords[k] - particles[j+col_start].coords[k], 2);
         }
         out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
       }
@@ -159,7 +159,7 @@ namespace Hatrix {
         Hatrix::Matrix AY(block_size, rank + oversampling);
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles,
+          Hatrix::Matrix dense = generate_laplacend_matrix(particles,
                                                                    block_size, block_size,
                                                                    i*block_size, jcol*block_size, ndim);
           Hatrix::matmul(dense, Y[jcol], AY);
