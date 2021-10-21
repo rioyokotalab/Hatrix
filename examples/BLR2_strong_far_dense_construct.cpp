@@ -67,7 +67,7 @@ namespace Hatrix {
   class BLR2 {
   private:
     // Store the dense blocks in a multimap for faster iteration without hash lookups.
-    std::multimap<int64_t, Matrix> D, S;
+    std::multimap<int64_t, Matrix> D;
     // Map of inadmissible indices.
     RowColMap<bool> is_admissible;
     // Vector of vector for storing the actual indices of all the inadmissible blocks in a given row.
@@ -76,6 +76,7 @@ namespace Hatrix {
 
     RowMap U;
     ColMap V;
+    RowColMap<Matrix> S;
 
     int64_t N, nblocks, rank, ndim;
     double admis;
@@ -182,12 +183,12 @@ namespace Hatrix {
       }
 
       for (int i = 0; i < nblocks; ++i) {
-        for (unsigned j = 0; j < admissible_row_indices[j].size(); ++j) {
+        for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
           Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles,
                                                                    block_size, block_size,
                                                                    i*block_size, jcol*block_size, ndim);
-          S.insert({i, Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[jcol])});
+          S.insert(i, jcol, Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[jcol]));
         }
       }
     }
@@ -203,13 +204,27 @@ namespace Hatrix {
 
         int j = 0;
         for (std::multimap<int64_t, Matrix>::iterator it = row_dense_blocks.first; it != row_dense_blocks.second; ++it) {
-          int64_t icol = inadmissible_row_indices[i][j];
-          auto dense = generate_laplacend_matrix(particles,
-                                                 block_size, block_size,
-                                                 i*block_size, icol*block_size, ndim);
+          int64_t jcol = inadmissible_row_indices[i][j];
+          auto dense = generate_laplacend_matrix(particles, block_size, block_size,
+                                                 i*block_size, jcol*block_size, ndim);
           dense_norm += pow(norm(dense), 2);
           error += pow(norm(it->second -  dense), 2);
           j++;
+        }
+      }
+
+      for (unsigned i = 0; i < nblocks; ++i) {
+        for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
+          int64_t jcol = admissible_row_indices[i][j];
+          auto dense = generate_laplacend_matrix(particles, block_size, block_size,
+                                                 i*block_size, jcol*block_size, ndim);
+          Matrix& Ubig = U(i);
+          Matrix& Vbig = V(jcol);
+          Matrix expected = matmul(matmul(Ubig, S(i, jcol)), Vbig, false, true);
+          Matrix actual = generate_laplacend_matrix(particles, block_size, block_size,
+                                                            i * block_size, jcol * block_size, ndim);
+          error += pow(norm(expected - actual), 2);
+          dense_norm += pow(norm(actual), 2);
         }
       }
 
