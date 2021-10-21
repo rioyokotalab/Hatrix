@@ -7,9 +7,9 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <random>
 
 #include "Hatrix/Hatrix.h"
-
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 
@@ -262,8 +262,19 @@ std::vector<Hatrix::Particle> equally_spaced_particles(int64_t ndim, int64_t N,
     // Generate a unit sphere geometry with N points on the surface.
     // http://www.cpp.re/forum/windows/262648/
     // https://neil-strickland.staff.shef.ac.uk/courses/MAS243/lectures/handout10.pdf
+    std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
+    double radius = 1.0;
     for (int64_t i = 0; i < N; ++i) {
-      particles.push_back(Hatrix::Particle(i*0.4, i*0.4, i*0.4, min_val + (double(i) / double(range))));
+      double phi = dis(gen);
+      double theta = dis(gen);
+
+      double x = radius * sin(phi) * cos(theta);
+      double y = radius * sin(phi) * sin(theta);
+      double z = radius * cos(phi);
+
+      particles.push_back(Hatrix::Particle(x, y, z, min_val + (double(i) / double(range))));
     }
   }
 
