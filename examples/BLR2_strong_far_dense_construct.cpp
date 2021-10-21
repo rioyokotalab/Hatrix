@@ -130,7 +130,6 @@ namespace Hatrix {
                                                  i*block_size, icol*block_size, ndim);
           dense_norm += pow(norm(dense), 2);
           error += pow(norm(it->second -  dense), 2);
-
           j++;
         }
       }
