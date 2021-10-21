@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iostream>
 #include <tuple>
+#include <map>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -45,8 +46,17 @@ namespace Hatrix {
     }
   };
 
+  Matrix generate_laplacend_matrix(const std::vector<Hatrix::Particle>& particles, int64_t nrows, int64_t ncols,
+                                   int64_t row_start, int64_t col_start) {
+    Matrix out(nrows, ncols);
+
+    return out;
+  }
+
   class BLR2 {
   private:
+    // Store the dense blocks in a multimap for faster iteration without hash lookups.
+    std::multimap<int64_t, Matrix> D;
     RowColMap<bool> is_admissible;
     int64_t N, nblocks, rank;
     double admis;
@@ -69,12 +79,19 @@ namespace Hatrix {
   public:
     BLR2(const std::vector<Hatrix::Particle>& particles, int64_t N, int64_t nblocks, int64_t rank, double admis) :
       N(N), nblocks(nblocks), rank(rank), admis(admis) {
+      int64_t block_size = N / nblocks;
       auto boxes = create_particle_boxes(particles);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           is_admissible.insert(i, j, std::min(boxes[i].diameter, boxes[j].diameter) <=
                                admis * boxes[i].distance_from(boxes[j]));
+
+          if (!is_admissible(i, j)) {
+            D.insert({i, generate_laplacend_matrix(particles,
+                                                   block_size, block_size,
+                                                   i*block_size, j*block_size)});
+          }
         }
       }
     }
