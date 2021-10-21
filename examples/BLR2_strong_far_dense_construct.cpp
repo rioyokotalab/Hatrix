@@ -27,26 +27,23 @@ namespace Hatrix {
   };
 
   class Box {
-  private:
+  public:
     double diameter;
     int64_t ndim;
     // Store the center, start and end co-ordinates of this box. Each number
     // in corresponds to the x, y, and z co-oridinate.
     std::vector<double> center, start, end;
 
-  public:
     Box(double _diameter, double center_x, double start_x, double end_x) : diameter(_diameter), ndim(1) {
       center.push_back(center_x);
       start.push_back(start_x);
       end.push_back(end_x);
     }
 
-
+    double distance_from(Box& b) {
+      return b.center[0] - center[0];
+    }
   };
-
-  double distance(Box& a, Box& b) {
-    return 0;
-  }
 
   class BLR2 {
   private:
@@ -58,7 +55,7 @@ namespace Hatrix {
       int64_t nleaf = N / nblocks;
       for (int64_t i = 0; i < nblocks; ++i) {
         auto start_x = particles[i * nleaf].x();
-        auto stop_x = particles[(i+1) * nleaf].x();
+        auto stop_x = particles[i == nblocks-1 ? N-1 : (i+1) * nleaf].x();
         auto center_x = stop_x - start_x;
         auto diameter = stop_x - start_x;
 
@@ -73,15 +70,18 @@ namespace Hatrix {
       N(N), nblocks(nblocks), rank(rank), admis(admis) {
       auto boxes = create_particle_boxes(particles);
 
+      std::cout << "size: " << boxes.size() << std::endl;
+
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           is_admissible.insert(i, j, std::min(boxes[i].diameter, boxes[j].diameter) <=
-                               distance(boxes[i], boxes[j]));
+                               boxes[i].distance_from(boxes[j]));
         }
       }
     }
 
     double construction_error(const std::vector<Hatrix::Particle>& randpts) {
+      return 0;
     }
   };
 }
