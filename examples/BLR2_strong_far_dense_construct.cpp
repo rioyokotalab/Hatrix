@@ -67,7 +67,7 @@ namespace Hatrix {
   class BLR2 {
   private:
     // Store the dense blocks in a multimap for faster iteration without hash lookups.
-    std::multimap<int64_t, Matrix> D;
+    std::multimap<int64_t, Matrix> D, S;
     // Map of inadmissible indices.
     RowColMap<bool> is_admissible;
     // Vector of vector for storing the actual indices of all the inadmissible blocks in a given row.
@@ -76,7 +76,6 @@ namespace Hatrix {
 
     RowMap U;
     ColMap V;
-    RowColMap<Matrix> S;
 
     int64_t N, nblocks, rank, ndim;
     double admis;
@@ -188,8 +187,7 @@ namespace Hatrix {
           Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles,
                                                                    block_size, block_size,
                                                                    i*block_size, jcol*block_size, ndim);
-          S.insert(i, jcol,
-                   Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[jcol]));
+          S.insert({i, Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[jcol])});
         }
       }
     }
