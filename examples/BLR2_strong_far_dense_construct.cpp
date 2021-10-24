@@ -167,7 +167,7 @@ namespace Hatrix {
         int64_t source = domain.boxes[irow].start[0];
         int64_t target = domain.boxes[icol].start[0];
 
-        rij += pow(domain.sorted_x[target] - domain.sorted_x[source], 2);
+        rij += pow(domain.sorted_x[source+i] - domain.sorted_x[target+j], 2);
 
         out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
       }
@@ -213,7 +213,7 @@ namespace Hatrix {
           if (!is_admissible(i, j)) {
             D.insert({i, generate_p2p_interactions(domain, i, j, ndim)});
 
-            generate_p2p_interactions(domain.boxes, i, j, ndim).print();
+            generate_p2p_interactions(domain, i, j, ndim).print();
           }
         }
       }
