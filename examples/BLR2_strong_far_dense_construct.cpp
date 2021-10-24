@@ -76,7 +76,7 @@ namespace Hatrix {
     return out;
   }
 
-  Matrix generate_p2p_interactions(const std::vector<Hatrix::Particle>& boxes,
+  Matrix generate_p2p_interactions(const std::vector<Hatrix::Box>& boxes,
                                    int64_t irow, int64_t icol, int64_t ndim) {
     Matrix out(boxes[irow].num_particles, boxes[icol].num_particles);
 
@@ -87,6 +87,50 @@ namespace Hatrix {
     }
 
     return out;
+  }
+
+  void orthogonal_recursive_bisection_1dim(const std::vector<Hatrix::Particle>& particles, int64_t start,
+                                           int64_t end, std::vector<double>& sorted_x,
+                                           std::string morton_index, std::vector<Box>& boxes, int64_t nleaf) {
+    int num_points = end - start;
+    // found a box with the correct number of points.
+    if (num_points <= nleaf) {
+      auto start_x = particles[start].coords[0];
+      auto stop_x = particles[end-1].coords[0];
+      auto center_x = (start_x + stop_x) / 2;
+      auto diameter = stop_x - start_x;
+      boxes.push_back(Box(diameter, center_x, start_x, stop_x, morton_index, num_points));
+    }
+    else {                    // recurse further and split again.
+      int64_t middle = (start + end) / 2;
+      // first half
+      orthogonal_recursive_bisection_1dim(particles, start, middle, sorted_x, morton_index + "0", boxes, nleaf);
+      // second half
+      orthogonal_recursive_bisection_1dim(particles, middle, end, sorted_x, morton_index + "1", boxes, nleaf);
+    }
+  }
+
+  std::vector<Box> divide_domain_and_create_particle_boxes(const std::vector<Hatrix::Particle>& particles,
+                                                           int64_t N, int64_t ndim, int64_t nleaf) {
+    std::vector<Box> boxes;
+
+    if (ndim == 1) {
+      // Keep a sorted
+      std::vector<double> sorted_x(N);
+      for (int i = 0; i < N; ++i) { sorted_x[i] = particles[i].coords[0]; }
+      std::sort(sorted_x.begin(), sorted_x.end());
+
+      int64_t start = 0;
+      int64_t end = N;
+      std::string morton_index = "";
+
+      orthogonal_recursive_bisection_1dim(particles, start, end, sorted_x, morton_index, boxes, nleaf);
+    }
+    else if (ndim == 3) {
+
+    }
+
+    return boxes;
   }
 
   class BLR2 {
@@ -103,59 +147,14 @@ namespace Hatrix {
     ColMap V;
     RowColMap<Matrix> S;
 
-    int64_t N, nleaf, rank, ndim;
+    int64_t N, nleaf, rank, ndim, nblocks;
     double admis;
-    int64_t nblocks=-1;
-
-    void orthogonal_recursive_bisection_1dim(const std::vector<Hatrix::Particle>& particles, int64_t start,
-                                             int64_t end, std::vector<double>& sorted_x,
-                                             std::string morton_index, std::vector<Box>& boxes) {
-      int num_points = end - start;
-      // found a box with the correct number of points.
-      if (num_points <= nleaf) {
-        auto start_x = particles[start].coords[0];
-        auto stop_x = particles[end-1].coords[0];
-        auto center_x = (start_x + stop_x) / 2;
-        auto diameter = stop_x - start_x;
-        boxes.push_back(Box(diameter, center_x, start_x, stop_x, morton_index, num_points));
-      }
-      else {                    // recurse further and split again.
-        int64_t middle = (start + end) / 2;
-        // first half
-        orthogonal_recursive_bisection_1dim(particles, start, middle, sorted_x, morton_index + "0", boxes);
-        // second half
-        orthogonal_recursive_bisection_1dim(particles, middle, end, sorted_x, morton_index + "1", boxes);
-      }
-    }
-
-    std::vector<Box> divide_domain_and_create_particle_boxes(const std::vector<Hatrix::Particle>& particles) {
-      std::vector<Box> boxes;
-
-      if (ndim == 1) {
-        // Keep a sorted
-        std::vector<double> sorted_x(N);
-        for (int i = 0; i < N; ++i) { sorted_x[i] = particles[i].coords[0]; }
-        std::sort(sorted_x.begin(), sorted_x.end());
-
-        int64_t start = 0;
-        int64_t end = N;
-        std::string morton_index = "";
-
-        orthogonal_recursive_bisection_1dim(particles, start, end, sorted_x, morton_index, boxes);
-        nblocks = boxes.size();
-      }
-      else if (ndim == 3) {
-
-      }
-
-      return boxes;
-    }
 
   public:
-    BLR2(const std::vector<Hatrix::Particle>& particles, int64_t N, int64_t nleaf,
-         int64_t rank, int64_t ndim, double admis) :
+    BLR2(const std::vector<Hatrix::Particle>& particles, const std::vector<Hatrix::Box>& boxes, int64_t N,
+         int64_t nleaf, int64_t rank, int64_t ndim, double admis) :
       N(N), nleaf(nleaf), rank(rank), ndim(ndim), admis(admis) {
-      auto boxes = divide_domain_and_create_particle_boxes(particles);
+      nblocks = boxes.size();
 
       inadmissible_row_indices.resize(nblocks);
       admissible_row_indices.resize(nblocks);
@@ -223,7 +222,7 @@ namespace Hatrix {
 
         for (long unsigned int i = 0; i < admissible_col_indices[j].size(); ++i) {
           int64_t irow = admissible_col_indices[j][i];
-          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(boxes, irow, j, ndim);
+          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(boxes, irow, j, ndim);
           Hatrix::matmul(Y[irow], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
@@ -233,13 +232,13 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(boxes, i, jcol, ndim);
+          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(boxes, i, jcol, ndim);
           S.insert(i, jcol, Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[jcol]));
         }
       }
     }
 
-    double construction_error(const std::vector<Hatrix::Particle>& particles) {
+    double construction_error(const std::vector<Hatrix::Particle>& particles, const std::vector<Hatrix::Box>& boxes) {
       // Check dense blocks
       double error = 0; double dense_norm = 0;
 
@@ -250,8 +249,7 @@ namespace Hatrix {
         int j = 0;
         for (std::multimap<int64_t, Matrix>::iterator it = row_dense_blocks.first; it != row_dense_blocks.second; ++it) {
           int64_t jcol = inadmissible_row_indices[i][j];
-          auto dense = generate_laplacend_matrix(particles, nleaf, nleaf,
-                                                 i*nleaf, jcol*nleaf, ndim);
+          auto dense = Hatrix::generate_p2p_interactions(boxes, i, jcol, ndim);
           dense_norm += pow(norm(dense), 2);
           error += pow(norm(it->second -  dense), 2);
           j++;
@@ -261,13 +259,11 @@ namespace Hatrix {
       for (unsigned i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          auto dense = generate_laplacend_matrix(particles, nleaf, nleaf,
-                                                 i*nleaf, jcol*nleaf, ndim);
+          auto dense = generate_p2p_interactions(boxes, i, jcol, ndim);
           Matrix& Ubig = U(i);
           Matrix& Vbig = V(jcol);
           Matrix expected = matmul(matmul(Ubig, S(i, jcol)), Vbig, false, true);
-          Matrix actual = generate_laplacend_matrix(particles, nleaf, nleaf,
-                                                            i * nleaf, jcol * nleaf, ndim);
+          Matrix actual = generate_p2p_interactions(boxes, i, jcol, ndim);
           error += pow(norm(expected - actual), 2);
           dense_norm += pow(norm(actual), 2);
         }
@@ -330,15 +326,16 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
   auto particles = equally_spaced_particles(ndim, N, 0.0, 1.0 * N);
+  auto boxes = divide_domain_and_create_particle_boxes(particles, N, ndim, nleaf);
 
   if (N % nleaf != 0) {
     std::cout << "N % nleaf != 0. Aborting.\n";
     abort();
   }
 
-  Hatrix::BLR2 A(particles, N, nleaf, rank, ndim, admis);
+  Hatrix::BLR2 A(particles, boxes, N, nleaf, rank, ndim, admis);
   A.print_structure();
-  double construct_error = A.construction_error(particles);
+  double construct_error = A.construction_error(particles, boxes);
 
   Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles, N, N, 1);
 
