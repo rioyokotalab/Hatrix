@@ -73,10 +73,13 @@ namespace Hatrix {
       int64_t num_points = end - start;
       // found a box with the correct number of points.
       if (num_points <= nleaf) {
-        auto start_x = particles[start].coords[0];
-        auto stop_x = particles[end-1].coords[0];
-        auto center_x = (start_x + stop_x) / 2;
-        auto diameter = stop_x - start_x;
+        auto start_x = start;
+        auto stop_x = end-1;
+
+        auto start_coord_x = sorted_x[start];
+        auto end_coord_x = sorted_x[end-1];
+        auto center_x = (start_coord_x + end_coord_x) / 2;
+        auto diameter = end_coord_x - start_coord_x;
         boxes.push_back(Box(diameter, center_x, start_x, stop_x, morton_index, num_points));
       }
       else {                    // recurse further and split again.
@@ -167,6 +170,8 @@ namespace Hatrix {
         int64_t source = domain.boxes[irow].start[0];
         int64_t target = domain.boxes[icol].start[0];
 
+
+
         rij += pow(domain.sorted_x[source+i] - domain.sorted_x[target+j], 2);
 
         out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
@@ -212,8 +217,6 @@ namespace Hatrix {
 
           if (!is_admissible(i, j)) {
             D.insert({i, generate_p2p_interactions(domain, i, j, ndim)});
-
-            generate_p2p_interactions(domain, i, j, ndim).print();
           }
         }
       }
@@ -250,6 +253,8 @@ namespace Hatrix {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
           Hatrix::Matrix dense = generate_p2p_interactions(domain, i, jcol, ndim);
+          // std::cout << "i: " << i << " jcol: " << jcol << std::endl;
+          // dense.print();
           Hatrix::Matrix random_matrix = generate_random_matrix(dense.cols, rank + oversampling);
           Hatrix::matmul(dense, random_matrix, AY);
         }
