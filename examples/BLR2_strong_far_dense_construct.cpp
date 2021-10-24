@@ -213,7 +213,7 @@ namespace Hatrix {
           if (!is_admissible(i, j)) {
             D.insert({i, generate_p2p_interactions(domain, i, j, ndim)});
 
-            // generate_p2p_interactions(domain.boxes, i, j, ndim).print();
+            generate_p2p_interactions(domain.boxes, i, j, ndim).print();
           }
         }
       }
