@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 #include <random>
+#include <string>
 
 #include "Hatrix/Hatrix.h"
 
@@ -40,14 +41,17 @@ namespace Hatrix {
     // in corresponds to the x, y, and z co-oridinate.
     std::vector<double> center, start, end;
 
-    Box(double _diameter, double center_x, double start_x, double end_x) :
+    std::string morton_index;
+
+    Box() {}
+
+    Box(double _diameter, double center_x, double start_x, double end_x, std::string _morton_index) :
       diameter(_diameter), ndim(1) {
       center.push_back(center_x);
       start.push_back(start_x);
       end.push_back(end_x);
+      morton_index = _morton_index;
     }
-
-
 
     double distance_from(const Box& b) const {
       return std::sqrt(pow(b.center[0] - center[0], 2));
@@ -86,22 +90,55 @@ namespace Hatrix {
     ColMap V;
     RowColMap<Matrix> S;
 
-    int64_t N, nblocks, rank, ndim;
+    int64_t N, nleaf, rank, ndim;
     double admis;
+    int64_t nblocks=-1;
 
-    std::vector<Box> create_particle_boxes(const std::vector<Hatrix::Particle>& particles) {
+    void orthogonal_recursive_bisection_1dim(const std::vector<Hatrix::Particle>& particles, int64_t start,
+                                             int64_t end, std::vector<double>& sorted_x,
+                                             std::string morton_index, std::vector<Box>& boxes) {
+      int num_points = end - start;
+      // found a box with the correct number of points.
+      if (num_points <= nleaf) {
+        auto start_x = particles[start].coords[0];
+        auto stop_x = particles[end-1].coords[0];
+        auto center_x = (start_x + stop_x) / 2;
+        auto diameter = stop_x - start_x;
+        boxes.push_back(Box(diameter, center_x, start_x, stop_x, morton_index));
+      }
+      else {                    // recurse further and split again.
+        int64_t middle = (start + end) / 2;
+        // first half
+        orthogonal_recursive_bisection_1dim(particles, start, middle, sorted_x, morton_index + "0", boxes);
+        // second half
+        orthogonal_recursive_bisection_1dim(particles, middle, end, sorted_x, morton_index + "1", boxes);
+      }
+    }
+
+    std::vector<Box> divide_domain_and_create_particle_boxes(const std::vector<Hatrix::Particle>& particles) {
       std::vector<Box> boxes;
-      int64_t nleaf = N / nblocks;
 
       if (ndim == 1) {
-        for (int64_t i = 0; i < nblocks; ++i) {
-          auto start_x = particles[i * nleaf].x();
-          auto stop_x = particles[i == nblocks-1 ? N-1 : (i+1) * nleaf - 1].x();
-          auto center_x = (start_x + stop_x) / 2;
-          auto diameter = stop_x - start_x;
+        // Keep a sorted
+        std::vector<double> sorted_x(N);
+        for (int i = 0; i < N; ++i) { sorted_x[i] = particles[i].coords[0]; }
+        std::sort(sorted_x.begin(), sorted_x.end());
 
-          boxes.push_back(Box(diameter, center_x, start_x, stop_x));
-        }
+        int64_t start = 0;
+        int64_t end = N;
+        std::string morton_index = "";
+
+        orthogonal_recursive_bisection_1dim(particles, start, end, sorted_x, morton_index, boxes);
+        nblocks = boxes.size();
+
+        // for (int64_t i = 0; i < nblocks; ++i) {
+        //   auto start_x = particles[i * nleaf].x();
+        //   auto stop_x = particles[i == nblocks-1 ? N-1 : (i+1) * nleaf - 1].x();
+        //   auto center_x = (start_x + stop_x) / 2;
+        //   auto diameter = stop_x - start_x;
+
+        //   boxes.push_back(Box(diameter, center_x, start_x, stop_x));
+        // }
       }
       else if (ndim == 3) {
 
@@ -111,17 +148,16 @@ namespace Hatrix {
     }
 
   public:
-    BLR2(const std::vector<Hatrix::Particle>& particles, int64_t N, int64_t nblocks,
+    BLR2(const std::vector<Hatrix::Particle>& particles, int64_t N, int64_t nleaf,
          int64_t rank, int64_t ndim, double admis) :
-      N(N), nblocks(nblocks), rank(rank), ndim(ndim), admis(admis) {
+      N(N), nleaf(nleaf), rank(rank), ndim(ndim), admis(admis) {
+      auto boxes = divide_domain_and_create_particle_boxes(particles);
+
       inadmissible_row_indices.resize(nblocks);
       admissible_row_indices.resize(nblocks);
 
       inadmissible_col_indices.resize(nblocks);
       admissible_col_indices.resize(nblocks);
-
-      int64_t block_size = N / nblocks;
-      auto boxes = create_particle_boxes(particles);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -130,8 +166,8 @@ namespace Hatrix {
 
           if (!is_admissible(i, j)) {
             D.insert({i, generate_laplacend_matrix(particles,
-                                                   block_size, block_size,
-                                                   i*block_size, j*block_size, ndim)});
+                                                   nleaf, nleaf,
+                                                   i*nleaf, j*nleaf, ndim)});
           }
         }
       }
@@ -166,16 +202,16 @@ namespace Hatrix {
       // Generate a bunch of random matrices.
       for (int64_t i = 0; i < nblocks; ++i) {
         Y.push_back(
-                    Hatrix::generate_random_matrix(block_size, rank + oversampling));
+                    Hatrix::generate_random_matrix(nleaf, rank + oversampling));
       }
 
       for (int64_t i = 0; i < nblocks; ++i) {
-        Hatrix::Matrix AY(block_size, rank + oversampling);
+        Hatrix::Matrix AY(nleaf, rank + oversampling);
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
           Hatrix::Matrix dense = generate_laplacend_matrix(particles,
-                                                                   block_size, block_size,
-                                                                   i*block_size, jcol*block_size, ndim);
+                                                                   nleaf, nleaf,
+                                                                   i*nleaf, jcol*nleaf, ndim);
           Hatrix::matmul(dense, Y[jcol], AY);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
@@ -183,13 +219,13 @@ namespace Hatrix {
       }
 
       for (int64_t j = 0; j < nblocks; ++j) {
-        Hatrix::Matrix YtA(rank + oversampling, block_size);
+        Hatrix::Matrix YtA(rank + oversampling, nleaf);
 
         for (long unsigned int i = 0; i < admissible_col_indices[j].size(); ++i) {
           int64_t irow = admissible_col_indices[j][i];
           Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles,
-                                                                   block_size, block_size,
-                                                                   irow*block_size, j*block_size, ndim);
+                                                                   nleaf, nleaf,
+                                                                   irow*nleaf, j*nleaf, ndim);
           Hatrix::matmul(Y[irow], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
@@ -200,8 +236,8 @@ namespace Hatrix {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
           Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles,
-                                                                   block_size, block_size,
-                                                                   i*block_size, jcol*block_size, ndim);
+                                                                   nleaf, nleaf,
+                                                                   i*nleaf, jcol*nleaf, ndim);
           S.insert(i, jcol, Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[jcol]));
         }
       }
@@ -210,7 +246,6 @@ namespace Hatrix {
     double construction_error(const std::vector<Hatrix::Particle>& particles) {
       // Check dense blocks
       double error = 0; double dense_norm = 0;
-      int64_t block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
         std::pair<std::multimap<int64_t, Matrix>::iterator,
@@ -219,8 +254,8 @@ namespace Hatrix {
         int j = 0;
         for (std::multimap<int64_t, Matrix>::iterator it = row_dense_blocks.first; it != row_dense_blocks.second; ++it) {
           int64_t jcol = inadmissible_row_indices[i][j];
-          auto dense = generate_laplacend_matrix(particles, block_size, block_size,
-                                                 i*block_size, jcol*block_size, ndim);
+          auto dense = generate_laplacend_matrix(particles, nleaf, nleaf,
+                                                 i*nleaf, jcol*nleaf, ndim);
           dense_norm += pow(norm(dense), 2);
           error += pow(norm(it->second -  dense), 2);
           j++;
@@ -230,13 +265,13 @@ namespace Hatrix {
       for (unsigned i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          auto dense = generate_laplacend_matrix(particles, block_size, block_size,
-                                                 i*block_size, jcol*block_size, ndim);
+          auto dense = generate_laplacend_matrix(particles, nleaf, nleaf,
+                                                 i*nleaf, jcol*nleaf, ndim);
           Matrix& Ubig = U(i);
           Matrix& Vbig = V(jcol);
           Matrix expected = matmul(matmul(Ubig, S(i, jcol)), Vbig, false, true);
-          Matrix actual = generate_laplacend_matrix(particles, block_size, block_size,
-                                                            i * block_size, jcol * block_size, ndim);
+          Matrix actual = generate_laplacend_matrix(particles, nleaf, nleaf,
+                                                            i * nleaf, jcol * nleaf, ndim);
           error += pow(norm(expected - actual), 2);
           dense_norm += pow(norm(actual), 2);
         }
@@ -292,7 +327,7 @@ std::vector<Hatrix::Particle> equally_spaced_particles(int64_t ndim, int64_t N,
 
 int main(int argc, char** argv) {
   int64_t N = atoi(argv[1]);
-  int64_t nblocks = atoi(argv[2]);
+  int64_t nleaf = atoi(argv[2]);
   int64_t rank = atoi(argv[3]);
   double admis = atof(argv[4]);
   int64_t ndim = atoi(argv[5]);
@@ -300,12 +335,12 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
   auto particles = equally_spaced_particles(ndim, N, 0.0, 1.0 * N);
 
-  if (N % nblocks != 0) {
-    std::cout << "N % nblocks != 0. Aborting.\n";
+  if (N % nleaf != 0) {
+    std::cout << "N % nleaf != 0. Aborting.\n";
     abort();
   }
 
-  Hatrix::BLR2 A(particles, N, nblocks, rank, ndim, admis);
+  Hatrix::BLR2 A(particles, N, nleaf, rank, ndim, admis);
   A.print_structure();
   double construct_error = A.construction_error(particles);
 
@@ -313,6 +348,6 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::finalize();
 
-  std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
+  std::cout << "N: " << N << " rank: " << rank << " nleaf: " << nleaf << " admis: " <<  admis
             << " construct error: " << construct_error << "\n";
 }
