@@ -163,7 +163,13 @@ namespace Hatrix {
 
     for (int64_t i = 0; i < domain.boxes[irow].num_particles; ++i) {
       for (int64_t j = 0; j < domain.boxes[icol].num_particles; ++j) {
+        double rij = 0;
+        int64_t source = domain.boxes[irow].start[0];
+        int64_t target = domain.boxes[icol].start[0];
 
+        rij += pow(domain.sorted_x[target] - domain.sorted_x[source], 2);
+
+        out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
       }
     }
 
