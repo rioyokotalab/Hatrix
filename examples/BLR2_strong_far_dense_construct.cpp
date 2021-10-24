@@ -36,7 +36,7 @@ namespace Hatrix {
   class Box {
   public:
     double diameter;
-    int64_t ndim;
+    int64_t ndim, num_particles;
     // Store the center, start and end co-ordinates of this box. Each number
     // in corresponds to the x, y, and z co-oridinate.
     std::vector<double> center, start, end;
@@ -45,8 +45,9 @@ namespace Hatrix {
 
     Box() {}
 
-    Box(double _diameter, double center_x, double start_x, double end_x, std::string _morton_index) :
-      diameter(_diameter), ndim(1) {
+    Box(double _diameter, double center_x, double start_x, double end_x,
+        std::string _morton_index, int64_t _num_particles) :
+      diameter(_diameter), ndim(1), num_particles(_num_particles) {
       center.push_back(center_x);
       start.push_back(start_x);
       end.push_back(end_x);
@@ -58,21 +59,33 @@ namespace Hatrix {
     }
   };
 
-  // Generate a laplacian kernel assuming that each particle has unit charge.
+  // Generate a full dense laplacian matrix assuming unit charges.
   Matrix generate_laplacend_matrix(const std::vector<Hatrix::Particle>& particles,
-                                   int64_t nrows, int64_t ncols,
-                                   int64_t row_start, int64_t col_start, int64_t ndim) {
+                                   int64_t nrows, int64_t ncols, int64_t ndim) {
     Matrix out(nrows, ncols);
 
     for (int64_t i = 0; i < nrows; ++i) {
       for (int64_t j = 0; j < ncols; ++j) {
         double rij = 0;
         for (int64_t k = 0; k < ndim; ++k) {
-          rij += pow(particles[i+row_start].coords[k] - particles[j+col_start].coords[k], 2);
+          rij += pow(particles[i].coords[k] - particles[j].coords[k], 2);
         }
         out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
       }
     }
+    return out;
+  }
+
+  Matrix generate_p2p_interactions(const std::vector<Hatrix::Particle>& boxes,
+                                   int64_t irow, int64_t icol, int64_t ndim) {
+    Matrix out(boxes[irow].num_particles, boxes[icol].num_particles);
+
+    for (int64_t i = 0; i < boxes[irow].num_particles; ++i) {
+      for (int64_t j = 0; j < boxes[icol].num_particles; ++j) {
+
+      }
+    }
+
     return out;
   }
 
@@ -104,7 +117,7 @@ namespace Hatrix {
         auto stop_x = particles[end-1].coords[0];
         auto center_x = (start_x + stop_x) / 2;
         auto diameter = stop_x - start_x;
-        boxes.push_back(Box(diameter, center_x, start_x, stop_x, morton_index));
+        boxes.push_back(Box(diameter, center_x, start_x, stop_x, morton_index, num_points));
       }
       else {                    // recurse further and split again.
         int64_t middle = (start + end) / 2;
@@ -130,15 +143,6 @@ namespace Hatrix {
 
         orthogonal_recursive_bisection_1dim(particles, start, end, sorted_x, morton_index, boxes);
         nblocks = boxes.size();
-
-        // for (int64_t i = 0; i < nblocks; ++i) {
-        //   auto start_x = particles[i * nleaf].x();
-        //   auto stop_x = particles[i == nblocks-1 ? N-1 : (i+1) * nleaf - 1].x();
-        //   auto center_x = (start_x + stop_x) / 2;
-        //   auto diameter = stop_x - start_x;
-
-        //   boxes.push_back(Box(diameter, center_x, start_x, stop_x));
-        // }
       }
       else if (ndim == 3) {
 
@@ -165,9 +169,7 @@ namespace Hatrix {
                                admis * boxes[i].distance_from(boxes[j]));
 
           if (!is_admissible(i, j)) {
-            D.insert({i, generate_laplacend_matrix(particles,
-                                                   nleaf, nleaf,
-                                                   i*nleaf, j*nleaf, ndim)});
+            D.insert({i, generate_p2p_interactions(boxes, i, j, ndim)});
           }
         }
       }
@@ -209,9 +211,7 @@ namespace Hatrix {
         Hatrix::Matrix AY(nleaf, rank + oversampling);
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = generate_laplacend_matrix(particles,
-                                                                   nleaf, nleaf,
-                                                                   i*nleaf, jcol*nleaf, ndim);
+          Hatrix::Matrix dense = generate_p2p_interactions(boxes, i, jcol, ndim);
           Hatrix::matmul(dense, Y[jcol], AY);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
@@ -223,9 +223,7 @@ namespace Hatrix {
 
         for (long unsigned int i = 0; i < admissible_col_indices[j].size(); ++i) {
           int64_t irow = admissible_col_indices[j][i];
-          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles,
-                                                                   nleaf, nleaf,
-                                                                   irow*nleaf, j*nleaf, ndim);
+          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(boxes, irow, j, ndim);
           Hatrix::matmul(Y[irow], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
@@ -235,9 +233,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles,
-                                                                   nleaf, nleaf,
-                                                                   i*nleaf, jcol*nleaf, ndim);
+          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(boxes, i, jcol, ndim);
           S.insert(i, jcol, Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[jcol]));
         }
       }
@@ -344,7 +340,7 @@ int main(int argc, char** argv) {
   A.print_structure();
   double construct_error = A.construction_error(particles);
 
-  Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles, N, N, 0, 0, 1);
+  Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(particles, N, N, 1);
 
   Hatrix::Context::finalize();
 
