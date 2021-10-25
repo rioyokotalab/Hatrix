@@ -425,7 +425,7 @@ int main(int argc, char** argv) {
   }
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_error(domain);
 
   Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(domain.particles, N, N, 1);
