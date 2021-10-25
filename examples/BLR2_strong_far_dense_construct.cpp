@@ -70,6 +70,7 @@ namespace Hatrix {
     std::vector<double> sorted_x, sorted_y, sorted_z;
 
   private:
+    // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
     void orthogonal_recursive_bisection_1dim(const std::vector<Hatrix::Particle>& particles, int64_t start,
                                              int64_t end, std::vector<double>& sorted_x,
                                              std::string morton_index, std::vector<Box>& boxes, int64_t nleaf) {
@@ -154,7 +155,8 @@ namespace Hatrix {
         orthogonal_recursive_bisection_1dim(particles, start, end, sorted_x, morton_index, boxes, nleaf);
       }
       else if (ndim == 2) {
-
+        sorted_x.resize(N);
+        sorted_y.resize(N);
       }
       else if (ndim == 3) {
 
