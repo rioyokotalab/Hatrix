@@ -39,22 +39,26 @@ namespace Hatrix {
   class Box {
   public:
     double diameter;
-    int64_t ndim, num_particles;
+    int64_t ndim, num_particles, start_index, stop_index;
     // Store the center, start and end co-ordinates of this box. Each number
     // in corresponds to the x, y, and z co-oridinate.
-    std::vector<double> center, start, end;
+    std::vector<double> center;
 
     std::string morton_index;
 
     Box() {}
 
-    Box(double _diameter, double center_x, double start_x, double end_x,
+    Box(double _diameter, double center_x, int64_t _start_index, int64_t _stop_index,
         std::string _morton_index, int64_t _num_particles) :
-      diameter(_diameter), ndim(1), num_particles(_num_particles) {
+      diameter(_diameter), ndim(1), num_particles(_num_particles), start_index(_start_index), stop_index(_stop_index) {
       center.push_back(center_x);
-      start.push_back(start_x);
-      end.push_back(end_x);
       morton_index = _morton_index;
+    }
+
+    Box(double diameter, double center_x, double center_y, double start_index,
+        double end_index, std::string morton_index, int64_t num_particles) :
+      diameter(diameter), ndim(2), num_particles(num_particles) {
+
     }
 
     double distance_from(const Box& b) const {
@@ -177,7 +181,6 @@ namespace Hatrix {
 
     void divide_domain_and_create_particle_boxes(int64_t nleaf) {
       if (ndim == 1) {
-
         orthogonal_recursive_bisection_1dim(0, N, std::string(""), nleaf);
       }
       else if (ndim == 2) {
@@ -214,8 +217,8 @@ namespace Hatrix {
     for (int64_t i = 0; i < domain.boxes[irow].num_particles; ++i) {
       for (int64_t j = 0; j < domain.boxes[icol].num_particles; ++j) {
         double rij = 0;
-        int64_t source = domain.boxes[irow].start[0];
-        int64_t target = domain.boxes[icol].start[0];
+        int64_t source = domain.boxes[irow].start_index;
+        int64_t target = domain.boxes[icol].start_index;
 
         for (int64_t k = 0; k < ndim; ++k) {
           rij += pow(domain.particles[source+i].coords[k] - domain.particles[target+j].coords[k], 2);
