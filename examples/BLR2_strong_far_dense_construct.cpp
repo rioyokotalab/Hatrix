@@ -71,6 +71,11 @@ namespace Hatrix {
   private:
     // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
     void orthogonal_recursive_bisection_1dim(int64_t start, int64_t end, std::string morton_index, int64_t nleaf) {
+      // Sort the particles only by the X axis since that is the only axis that needs to be bisected.
+      std::sort(particles.begin()+start, particles.begin()+end, [](const Particle& lhs, const Particle& rhs) {
+        return lhs.coords[0] <= rhs.coords[0];
+      });
+
       int64_t num_points = end - start;
       // found a box with the correct number of points.
       if (num_points <= nleaf) {
@@ -172,15 +177,8 @@ namespace Hatrix {
 
     void divide_domain_and_create_particle_boxes(int64_t nleaf) {
       if (ndim == 1) {
-        // Sort the particles only by the X axis since that is the only axis that needs to be bisected.
-        std::sort(particles.begin(), particles.end(), [](const Particle& lhs, const Particle& rhs) {
-          return lhs.coords[0] <= rhs.coords[0];
-        });
 
-        int64_t start = 0, end = N;
-        std::string morton_index = "";
-
-        orthogonal_recursive_bisection_1dim(start, end, morton_index, nleaf);
+        orthogonal_recursive_bisection_1dim(0, N, std::string(""), nleaf);
       }
       else if (ndim == 2) {
         orthogonal_recursive_bisection_2dim_xaxis(0, N, std::string(""), nleaf);
