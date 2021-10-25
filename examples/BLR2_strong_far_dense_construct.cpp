@@ -170,8 +170,6 @@ namespace Hatrix {
         int64_t source = domain.boxes[irow].start[0];
         int64_t target = domain.boxes[icol].start[0];
 
-
-
         rij += pow(domain.sorted_x[source+i] - domain.sorted_x[target+j], 2);
 
         out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
@@ -249,14 +247,15 @@ namespace Hatrix {
       std::vector<Hatrix::Matrix> Y;
 
       for (int64_t i = 0; i < nblocks; ++i) {
+        Y.push_back(generate_random_matrix(domain.boxes[i].num_particles, rank + oversampling));
+      }
+
+      for (int64_t i = 0; i < nblocks; ++i) {
         Hatrix::Matrix AY(domain.boxes[i].num_particles, rank + oversampling);
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
           Hatrix::Matrix dense = generate_p2p_interactions(domain, i, jcol, ndim);
-          // std::cout << "i: " << i << " jcol: " << jcol << std::endl;
-          // dense.print();
-          Hatrix::Matrix random_matrix = generate_random_matrix(dense.cols, rank + oversampling);
-          Hatrix::matmul(dense, random_matrix, AY);
+          Hatrix::matmul(dense, Y[jcol], AY);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
         U.insert(i, std::move(Utemp));
@@ -268,8 +267,7 @@ namespace Hatrix {
         for (long unsigned int i = 0; i < admissible_col_indices[j].size(); ++i) {
           int64_t irow = admissible_col_indices[j][i];
           Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, irow, j, ndim);
-          Hatrix::Matrix random_matrix = generate_random_matrix(dense.rows, rank + oversampling);
-          Hatrix::matmul(random_matrix, dense, YtA, true);
+          Hatrix::matmul(Y[irow], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
         V.insert(j, std::move(transpose(Vtemp)));
@@ -349,7 +347,7 @@ int main(int argc, char** argv) {
   }
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_error(domain);
 
   Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(domain.particles, N, N, 1);
