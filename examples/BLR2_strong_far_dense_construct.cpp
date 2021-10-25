@@ -71,6 +71,20 @@ namespace Hatrix {
       center.push_back(center_y);
     }
 
+    Box(double diameter, double center_x, double center_y, double center_z, double start_index,
+        double stop_index, std::string _morton_index, int64_t num_particles) :
+      diameter(diameter),
+      ndim(3),
+      num_particles(num_particles),
+      start_index(start_index),
+      stop_index(stop_index),
+      morton_index(_morton_index) {
+      center.push_back(center_x);
+      center.push_back(center_y);
+      center.push_back(center_z);
+    }
+
+
     double distance_from(const Box& b) const {
       double dist = 0;
       for (int k = 0; k < ndim; ++k) {
@@ -157,6 +171,67 @@ namespace Hatrix {
       }
     }
 
+    void orthogonal_recursive_bisection_3dim_zaxis(int64_t start, int64_t end, std::string morton_index, int64_t nleaf) {
+      std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
+        return lhs.coords[2] <= rhs.coords[2];
+      });
+
+      int64_t num_points = end - start;
+      if (num_points <= nleaf) {
+        int64_t start_index = start;
+        int64_t end_index = end - 1;
+
+        double diameter = 0;
+        for (int k = 0; k < ndim; ++k) {
+          diameter += pow(particles[start_index].coords[k] - particles[end_index].coords[k], 2);
+        }
+        diameter = std::sqrt(diameter);
+
+        double center_x = (particles[start_index].coords[0] + particles[end_index].coords[0]) / 2;
+        double center_y = (particles[start_index].coords[1] + particles[end_index].coords[1]) / 2;
+        double center_z = (particles[start_index].coords[2] + particles[end_index].coords[2]) / 2;
+
+        boxes.push_back(Box(diameter, center_x, center_y, center_z, start_index, end_index, morton_index, num_points));
+      }
+      else {
+        int64_t middle = (start + end) / 2;
+        orthogonal_recursive_bisection_3dim_xaxis(start, middle, morton_index + "0", nleaf);
+        orthogonal_recursive_bisection_3dim_xaxis(middle, end, morton_index + "1", nleaf);
+      }
+    }
+
+    void orthogonal_recursive_bisection_3dim_yaxis(int64_t start, int64_t end, std::string morton_index, int64_t nleaf) {
+      std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
+        return lhs.coords[1] <= rhs.coords[1];
+      });
+
+      int64_t num_points = end - start;
+      if (num_points <= nleaf) {
+        orthogonal_recursive_bisection_3dim_zaxis(start, end, morton_index, nleaf);
+      }
+      else {
+        int64_t middle = (start + end) / 2;
+        orthogonal_recursive_bisection_3dim_zaxis(start, middle, morton_index + "0", nleaf);
+        orthogonal_recursive_bisection_3dim_zaxis(middle, end, morton_index + "1", nleaf);
+      }
+    }
+
+    void orthogonal_recursive_bisection_3dim_xaxis(int64_t start, int64_t end, std::string morton_index, int64_t nleaf) {
+      std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
+        return lhs.coords[0] <= rhs.coords[0];
+      });
+
+      int64_t num_points = end - start;
+      if (num_points <= nleaf) {
+        orthogonal_recursive_bisection_3dim_yaxis(start, end, morton_index, nleaf);
+      }
+      else {
+        int64_t middle = (start + end) / 2;
+        orthogonal_recursive_bisection_3dim_yaxis(start, middle, morton_index + "0", nleaf);
+        orthogonal_recursive_bisection_3dim_yaxis(middle, end, morton_index + "1", nleaf);
+      }
+    }
+
   public:
 
     Domain(int64_t N, int64_t ndim) : N(N), ndim(ndim) {}
@@ -212,7 +287,7 @@ namespace Hatrix {
         orthogonal_recursive_bisection_2dim_xaxis(0, N, std::string(""), nleaf);
       }
       else if (ndim == 3) {
-
+        orthogonal_recursive_bisection_3dim_xaxis(0, N, std::string(""), nleaf);
       }
     }
   };
@@ -394,6 +469,20 @@ namespace Hatrix {
       return std::sqrt(error / dense_norm);
     }
 
+    double low_rank_block_ratio() {
+      double total = 0, low_rank = 0;
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j)) {
+            low_rank += 1;
+          }
+          total += 1;
+        }
+      }
+
+      return low_rank / total;
+    }
+
     void print_structure() {
       std::cout << "BLR " << nblocks << " x " << nblocks << std::endl;
       for (int i = 0; i < nblocks; ++i) {
@@ -425,7 +514,7 @@ int main(int argc, char** argv) {
   }
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis);
-  // A.print_structure();
+  A.print_structure();
   double construct_error = A.construction_error(domain);
 
   Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(domain.particles, N, N, 1);
@@ -433,5 +522,5 @@ int main(int argc, char** argv) {
   Hatrix::Context::finalize();
 
   std::cout << "N: " << N << " rank: " << rank << " nleaf: " << nleaf << " admis: " <<  admis
-            << " construct error: " << construct_error << "\n";
+            << " construct error: " << construct_error << " LR ratio: " << A.low_rank_block_ratio() <<  "\n";
 }
