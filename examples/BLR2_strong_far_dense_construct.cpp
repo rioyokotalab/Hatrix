@@ -50,19 +50,33 @@ namespace Hatrix {
 
     Box(double _diameter, double center_x, int64_t _start_index, int64_t _stop_index,
         std::string _morton_index, int64_t _num_particles) :
-      diameter(_diameter), ndim(1), num_particles(_num_particles), start_index(_start_index), stop_index(_stop_index) {
+      diameter(_diameter),
+      ndim(1),
+      num_particles(_num_particles),
+      start_index(_start_index),
+      stop_index(_stop_index),
+      morton_index(_morton_index) {
       center.push_back(center_x);
-      morton_index = _morton_index;
     }
 
     Box(double diameter, double center_x, double center_y, double start_index,
-        double end_index, std::string morton_index, int64_t num_particles) :
-      diameter(diameter), ndim(2), num_particles(num_particles) {
-
+        double stop_index, std::string _morton_index, int64_t num_particles) :
+      diameter(diameter),
+      ndim(2),
+      num_particles(num_particles),
+      start_index(start_index),
+      stop_index(stop_index),
+      morton_index(_morton_index) {
+      center.push_back(center_x);
+      center.push_back(center_y);
     }
 
     double distance_from(const Box& b) const {
-      return std::sqrt(pow(b.center[0] - center[0], 2));
+      double dist = 0;
+      for (int k = 0; k < ndim; ++k) {
+        dist += pow(b.center[k] - center[k], 2);
+      }
+      return std::sqrt(dist);
     }
   };
 
@@ -106,8 +120,19 @@ namespace Hatrix {
 
       int64_t num_points = end - start;
       if (num_points <= nleaf) {
-        std::cout << "morton: " << morton_index << " points: "<< num_points << std::endl;
+        int64_t start_index = start;
+        int64_t end_index = end - 1;
 
+        double diameter = 0;
+        for (int k = 0; k < ndim; ++k) {
+          diameter += pow(particles[start_index].coords[k] - particles[end_index].coords[k], 2);
+        }
+        diameter = std::sqrt(diameter);
+
+        double center_x = (particles[start_index].coords[0] + particles[end_index].coords[0]) / 2;
+        double center_y = (particles[start_index].coords[1] + particles[end_index].coords[1]) / 2;
+
+        boxes.push_back(Box(diameter, center_x, center_y, start_index, end_index, morton_index, num_points));
       }
       else {
         int64_t middle = (start + end) / 2;
@@ -123,7 +148,7 @@ namespace Hatrix {
 
       int64_t num_points = end - start;
       if (num_points <= nleaf) {
-        std::cout << "morton: " << morton_index << std::endl;
+        orthogonal_recursive_bisection_2dim_yaxis(start, end, morton_index, nleaf);
       }
       else {
         int64_t middle = (start + end) / 2;
@@ -400,7 +425,7 @@ int main(int argc, char** argv) {
   }
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis);
-  // A.print_structure();
+  A.print_structure();
   double construct_error = A.construction_error(domain);
 
   Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(domain.particles, N, N, 1);
