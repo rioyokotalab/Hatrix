@@ -24,13 +24,16 @@ namespace Hatrix {
       coords.push_back(x);
     }
 
+    Particle(double x, double y, double _value) : value(_value) {
+      coords.push_back(x);
+      coords.push_back(y);
+    }
+
     Particle(double x, double y, double z, double _value) : value(_value)  {
       coords.push_back(x);
       coords.push_back(y);
       coords.push_back(z);
     }
-
-    double x() const { return coords[0]; }
   };
 
   class Box {
@@ -64,7 +67,7 @@ namespace Hatrix {
     std::vector<Hatrix::Particle> particles;
     std::vector<Hatrix::Box> boxes;
     int64_t N, ndim;
-    std::vector<double> sorted_x;
+    std::vector<double> sorted_x, sorted_y, sorted_z;
 
   private:
     void orthogonal_recursive_bisection_1dim(const std::vector<Hatrix::Particle>& particles, int64_t start,
@@ -94,12 +97,26 @@ namespace Hatrix {
 
     Domain(int64_t N, int64_t ndim) : N(N), ndim(ndim) {}
 
-    void equally_spaced_particles(double min_val, double max_val) {
+    void generate_particles(double min_val, double max_val) {
       double range = max_val - min_val;
 
       if (ndim == 1) {
         for (int64_t i = 0; i < N; ++i) {
           particles.push_back(Hatrix::Particle(i*0.4, min_val + (double(i) / double(range))));
+        }
+      }
+      else if (ndim == 2) {
+        // Generate a unit circle with N points on the circumference.
+        std::random_device rd;  // Will be used to obtain a seed for the random number engine
+        std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+        std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
+        double radius = 1.0;
+        for (int64_t i = 0; i < N; ++i) {
+          double theta = dis(gen);
+          double x = radius * cos(theta);
+          double y = radius * sin(theta);
+
+          particles.push_back(Hatrix::Particle(x, y, min_val + (double(i) / double(range))));
         }
       }
       else if (ndim == 3) {
@@ -135,6 +152,9 @@ namespace Hatrix {
         std::string morton_index = "";
 
         orthogonal_recursive_bisection_1dim(particles, start, end, sorted_x, morton_index, boxes, nleaf);
+      }
+      else if (ndim == 2) {
+
       }
       else if (ndim == 3) {
 
@@ -338,7 +358,7 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
   Hatrix::Domain domain(N, ndim);
-  domain.equally_spaced_particles(0.0, 1.0 * N);
+  domain.generate_particles(0.0, 1.0 * N);
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   if (N % nleaf != 0) {
