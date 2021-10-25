@@ -97,17 +97,6 @@ public:
   
 };
 
-Hatrix::Matrix copy_dense(BLR2_SPD& A) {
-  Hatrix::Matrix out(A.n_blocks * A.block_size, A.n_blocks * A.block_size);
-  auto out_splits = out.split(A.n_blocks, A.n_blocks);
-  for(int i = 0; i < A.n_blocks; i++) {
-    for(int j = 0; j < A.n_blocks; j++) {
-      out_splits[i*A.n_blocks + j] = A.D(i, j);
-    }
-  }
-  return out;
-}
-
 Hatrix::Matrix make_complement(const Hatrix::Matrix& _U) {
   Hatrix::Matrix U(_U);
   int c_size = U.rows - U.cols;
@@ -254,7 +243,7 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
 
   BLR2_SPD A(randpts, N, block_size, rank, 0);
-  Hatrix::Matrix A_dense = copy_dense(A);
+  Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix b = A_dense * x;
   std::cout <<"BLR construction error: " <<A.construct_error <<"\n";
