@@ -128,7 +128,7 @@ namespace Hatrix {
 
     void orthogonal_recursive_bisection_2dim(int64_t start, int64_t end, std::string morton_index, int64_t nleaf, int64_t axis) {
       std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
-        return lhs.coords[axis] <= rhs.coords[axis];
+        return lhs.coords[axis] < rhs.coords[axis];
       });
 
       int64_t num_points = end - start;
@@ -159,65 +159,37 @@ namespace Hatrix {
       }
     }
 
-    void orthogonal_recursive_bisection_3dim_zaxis(int64_t start, int64_t end, std::string morton_index, int64_t nleaf) {
+    void orthogonal_recursive_bisection_3dim(int64_t start, int64_t end, std::string morton_index,
+                                             int64_t nleaf, int64_t axis) {
       std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
-        return lhs.coords[2] <= rhs.coords[2];
-      });
-
+                                                                      return lhs.coords[axis] < rhs.coords[axis];
+                                                                    });
       int64_t num_points = end - start;
       if (num_points <= nleaf) {
-        int64_t start_index = start;
-        int64_t end_index = end - 1;
+        if (axis == ndim-1) {
+          int64_t start_index = start;
+          int64_t end_index = end - 1;
 
-        double diameter = 0;
-        for (int k = 0; k < ndim; ++k) {
-          diameter += pow(particles[start_index].coords[k] - particles[end_index].coords[k], 2);
+          double diameter = 0;
+          for (int k = 0; k < ndim; ++k) {
+            diameter += pow(particles[start_index].coords[k] - particles[end_index].coords[k], 2);
+          }
+          diameter = std::sqrt(diameter);
+
+          double center_x = (particles[start_index].coords[0] + particles[end_index].coords[0]) / 2;
+          double center_y = (particles[start_index].coords[1] + particles[end_index].coords[1]) / 2;
+          double center_z = (particles[start_index].coords[2] + particles[end_index].coords[2]) / 2;
+
+          boxes.push_back(Box(diameter, center_x, center_y, center_z, start_index, end_index, morton_index, num_points));
         }
-        diameter = std::sqrt(diameter);
-
-        double center_x = (particles[start_index].coords[0] + particles[end_index].coords[0]) / 2;
-        double center_y = (particles[start_index].coords[1] + particles[end_index].coords[1]) / 2;
-        double center_z = (particles[start_index].coords[2] + particles[end_index].coords[2]) / 2;
-
-        boxes.push_back(Box(diameter, center_x, center_y, center_z, start_index, end_index, morton_index, num_points));
+        else {
+          orthogonal_recursive_bisection_3dim(start, end, morton_index, nleaf, (axis+1) % ndim);
+        }
       }
       else {
         int64_t middle = (start + end) / 2;
-        orthogonal_recursive_bisection_3dim_xaxis(start, middle, morton_index + "0", nleaf);
-        orthogonal_recursive_bisection_3dim_xaxis(middle, end, morton_index + "1", nleaf);
-      }
-    }
-
-    void orthogonal_recursive_bisection_3dim_yaxis(int64_t start, int64_t end, std::string morton_index, int64_t nleaf) {
-      std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
-        return lhs.coords[1] <= rhs.coords[1];
-      });
-
-      int64_t num_points = end - start;
-      if (num_points <= nleaf) {
-        orthogonal_recursive_bisection_3dim_zaxis(start, end, morton_index, nleaf);
-      }
-      else {
-        int64_t middle = (start + end) / 2;
-        orthogonal_recursive_bisection_3dim_zaxis(start, middle, morton_index + "0", nleaf);
-        orthogonal_recursive_bisection_3dim_zaxis(middle, end, morton_index + "1", nleaf);
-      }
-    }
-
-    void orthogonal_recursive_bisection_3dim_xaxis(int64_t start, int64_t end, std::string morton_index,
-                                                   int64_t nleaf) {
-      std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
-        return lhs.coords[0] <= rhs.coords[0];
-      });
-
-      int64_t num_points = end - start;
-      if (num_points <= nleaf) {
-        orthogonal_recursive_bisection_3dim_yaxis(start, end, morton_index, nleaf);
-      }
-      else {
-        int64_t middle = (start + end) / 2;
-        orthogonal_recursive_bisection_3dim_yaxis(start, middle, morton_index + "0", nleaf);
-        orthogonal_recursive_bisection_3dim_yaxis(middle, end, morton_index + "1", nleaf);
+        orthogonal_recursive_bisection_3dim(start, middle, morton_index + "0", nleaf, (axis+1)%ndim);
+        orthogonal_recursive_bisection_3dim(middle, end, morton_index + "1", nleaf, (axis+1)%ndim);
       }
     }
 
@@ -276,7 +248,7 @@ namespace Hatrix {
         orthogonal_recursive_bisection_2dim(0, N, std::string(""), nleaf, 0);
       }
       else if (ndim == 3) {
-        orthogonal_recursive_bisection_3dim_xaxis(0, N, std::string(""), nleaf);
+        orthogonal_recursive_bisection_3dim(0, N, std::string(""), nleaf, 0);
       }
     }
   };
