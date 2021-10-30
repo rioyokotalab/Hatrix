@@ -32,7 +32,7 @@ namespace Hatrix {
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
-    int N, rank, height;
+    int64_t N, rank, height;
 
   private:
 
