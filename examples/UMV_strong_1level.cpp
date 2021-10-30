@@ -281,8 +281,8 @@ namespace Hatrix {
           if (is_admissible(block, icol)) { continue; }
           auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
                                                    std::vector<int64_t>(1, c_size));
-          Matrix& cc_right = right_splits[0];
-          solve_triangular(Dcc, cc_right, Hatrix::Left, Hatrix::Lower, true);
+          solve_triangular(Dcc, right_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          solve_triangular(Dcc, right_splits[1], Hatrix::Left, Hatrix::Lower, true);
         }
 
         // Reduce the large cc off-diagonals on the bottom.
@@ -290,26 +290,8 @@ namespace Hatrix {
           if (is_admissible(irow, block)) { continue; }
           auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                     std::vector<int64_t>(1, c_size));
-          Matrix& cc_bottom = bottom_splits[0];
-          solve_triangular(Dcc, cc_bottom, Hatrix::Right, Hatrix::Upper, false);
-        }
-
-        // Reduce the small co vertical strips to the right.
-        for (int icol = 0; icol < nblocks; ++icol) {
-          if (is_admissible(block, icol)) { continue; }
-          auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
-                                                   std::vector<int64_t>(1, c_size));
-          Matrix& co_right = right_splits[1];
-          solve_triangular(Dcc, co_right, Hatrix::Left, Hatrix::Lower, true);
-        }
-
-        // Reduce the small oc horizontal stips to the bottom.
-        for (int irow = 0; irow < nblocks; ++irow) {
-          if (is_admissible(irow, block)) { continue; }
-          auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-          Matrix& oc_bottom = bottom_splits[2];
-          solve_triangular(Dcc, oc_bottom, Hatrix::Right, Hatrix::Upper, false);
+          solve_triangular(Dcc, bottom_splits[0], Hatrix::Right, Hatrix::Upper, false);
+          solve_triangular(Dcc, bottom_splits[2], Hatrix::Right, Hatrix::Upper, false);
         }
 
         // Compute schur's compliments for cc blocks
