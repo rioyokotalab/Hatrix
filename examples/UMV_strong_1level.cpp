@@ -441,10 +441,15 @@ namespace Hatrix {
         }
       } // for (int block = 0; block < nblocks; ++block)
 
+      std::cout << "U shapes: \n";
+      for (int i = 0; i < nblocks; ++i) {
+        std::cout << "i-> " << i << " " << U(i).cols << std::endl;
+      }
+
       // Update S blocks for admissible blocks with fill-ins
       for (int irow = 0; irow < nblocks; ++irow) {
         for (int jcol = 0; jcol < nblocks; ++jcol) {
-          if (is_admissible(irow, jcol) && F.exists(irow, jcol)) {
+          if (is_admissible(irow, jcol)) {
             int64_t row_rank = U(irow).cols;
             int64_t col_rank = V(jcol).cols;
 
@@ -464,14 +469,104 @@ namespace Hatrix {
               }
             }
 
-            // Update S block like Eq. 20.
-            S.insert(irow, jcol, Sbar + matmul(matmul(U(irow), F(irow, jcol), true, false), V(jcol)));
-            F.erase(irow, jcol);
+            if (F.exists(irow, jcol)) {
+              // Update S block like Eq. 20.
+              S.insert(irow, jcol, Sbar + matmul(matmul(U(irow), F(irow, jcol), true, false), V(jcol)));
+              std::cout << "--> insert i: " << irow << " j: " << jcol << std::endl;
+              S(irow, jcol).print_meta();
+              F.erase(irow, jcol);
+            }
+            else {
+              std::cout << "insert i: " << irow << " j: " << jcol << std::endl;
+              S.insert(irow, jcol, std::move(Sbar));
+            }
           }
         }
       }
 
       // Merge unfactorized portions.
+      int64_t last_nrows = 0, last_ncols = 0;
+      std::vector<int64_t> row_intervals, col_intervals;
+
+      for (int i = 0; i < nblocks-1; ++i) {
+        last_nrows += U(i).cols;
+        row_intervals.push_back(last_nrows);
+
+        last_ncols += V(i).cols;
+        col_intervals.push_back(last_ncols);
+
+        std::cout << "row: " << last_nrows << " c: " << last_ncols << std::endl;
+      }
+      last_nrows += U(nblocks-1).cols;
+      last_ncols += V(nblocks-1).cols;
+
+      Matrix last(last_nrows, last_ncols);
+      auto last_splits = last.split(row_intervals, col_intervals);
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          std::cout << "i: " << i << " j: " << j << std::endl;
+          if (is_admissible(i, j)) {
+            S(i, j).print_meta();
+            last_splits[i + nblocks * j] = S(i, j);
+          }
+          else {
+            int64_t row_rank = U(i).cols;
+            int64_t col_rank = V(j).cols;
+
+            auto D_splits = D(i, j).split(std::vector<int64_t>(1, block_size - row_rank),
+                                          std::vector<int64_t>(1, block_size - col_rank));
+            last_splits[i + j * nblocks] = D_splits[3];
+          }
+        }
+      }
+
+      lu(last);
+
+      // for (int i = 0; i < nblocks; ++i) {
+      //   assert(U(i).cols == V(i).cols);
+
+      //   int64_t row_rank = U(i).cols;
+
+      //   auto D_splits = D(i,i).split(std::vector<int64_t>(1, block_size - row_rank),
+      //                                std::vector<int64_t>(1, block_size - row_rank));
+      //   lu(D_splits[3]);
+      //   // TRSM for row blocks
+      //   for (int j = 0; j < nblocks; ++j) {
+      //     int64_t row_rank = U(i).cols;
+      //     int64_t col_rank = V(j).cols;
+      //     if (is_admissible(i, j)) {
+      //       solve_triangular(D_splits[3], S(i, j), Hatrix::Left, Hatrix::Lower, true);
+      //     }
+      //     else {
+      //       auto D_right_splits = D(i, j).split(std::vector<int64_t>(1, block_size - row_rank),
+      //                                           std::vector<int64_t>(1, block_size - col_rank));
+      //       solve_triangular(D_splits[3], D_right_splits[3], Hatrix::Left, Hatrix::Lower, true);
+      //     }
+      //   }
+
+      //   // TRSM for col blocks
+      //   for (int i_r = 0; i_r < nblocks; ++i_r) {
+      //     int64_t row_rank = U(i_r).cols;
+      //     int64_t col_rank = V(i).cols;
+
+      //     if (is_admissible(i_r, i)) {
+      //       solve_triangular(D_splits[3], S(i_r, i), Hatrix::Right, Hatrix::Upper, false);
+      //     }
+      //     else {
+      //       auto D_lower_splits = D(i_r, i).split(std::vector<int64_t>(1, block_size - row_rank),
+      //                                             std::vector<int64_t>(1, block_size - col_rank));
+      //       solve_triangular(D_splits[3], D_lower_splits[3], Hatrix::Right, Hatrix::Upper, false);
+      //     }
+      //   }
+
+      //   // GEMM for trailing submatrix
+      //   for (int j = 0; j < nblocks; ++j) {
+      //     for (int k = 0; k < nblocks; ++k) {
+      //       if (is_admissible());
+      //     }
+      //   }
+      // }
     }
 
     Hatrix::Matrix solve(Matrix& b) {
@@ -629,8 +724,17 @@ namespace Hatrix {
       }
       return std::sqrt(error / dense_norm) / N;
     }
-  };
 
+    void print_structure() {
+      std::cout << "BLR " << nblocks << " x " << nblocks << std::endl;
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          std::cout << " | " << is_admissible(i, j);
+        }
+        std::cout << " | \n";
+      }
+    }
+  };
 }
 
 int main(int argc, char** argv) {
@@ -654,6 +758,7 @@ int main(int argc, char** argv) {
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
   double construct_error = A.construction_relative_error(randpts);
+  A.print_structure();
   A.factorize();
   Hatrix::Matrix x = A.solve(b);
 
