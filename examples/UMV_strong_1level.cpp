@@ -593,9 +593,12 @@ namespace Hatrix {
 
       permute_forward(x, block_size);
 
-      // auto permute_splits = x.split(std::vector<int64_t>(1, c_size * nblocks), {});
-      // solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      // solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
+      int64_t c_size_offset = 0;
+      for (int i = 0; i < nblocks; ++i) { c_size_offset += (block_size - U(i).cols); }
+
+      auto permute_splits = x.split(std::vector<int64_t>(1, c_size_offset), {});
+      solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
       permute_back(x, block_size, c_size);
 
