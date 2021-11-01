@@ -31,10 +31,10 @@ namespace Hatrix {
     RowColMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;
 
-    void permute_forward(Matrix& x, int block_size) {
-      int offset = 0;
+    void permute_forward(Matrix& x, int64_t block_size) {
+      int64_t offset = 0;
       for (int i = 0; i < nblocks; ++i) {
-        offset += U(i).cols;
+        offset += (block_size - U(i).cols);
       }
       Matrix temp(x);
 
@@ -58,18 +58,27 @@ namespace Hatrix {
       x = temp;
     }
 
-    void permute_back(Matrix& x, int block_size, int c_size) {
-      int offset = c_size * nblocks;
+    void permute_back(Matrix& x, int64_t block_size) {
+      int64_t offset = 0;
+      for (int i = 0; i < nblocks; ++i) { offset += (block_size - V(i).cols); }
       Matrix temp(x);
 
+      int64_t c_size_offset = 0, rank_offset = 0;
       for (int block = 0; block < nblocks; ++block) {
+        int64_t c_size = block_size - V(block).cols;
+
+        // Copy the compliment part of the vector.
         for (int i = 0; i < c_size; ++i) {
-          temp(block_size * block + i, 0) = x(c_size * block + i, 0);
+          temp(block_size * block + i, 0) = x(c_size_offset + i, 0);
         }
 
+        // Copy the rank part of the vector.
         for (int i = 0; i < rank; ++i) {
-          temp(block_size * block + c_size + i, 0) = x(offset + rank * block + i, 0);
+          temp(block_size * block + c_size + i, 0) = x(offset + rank_offset + i, 0);
         }
+
+        c_size_offset += c_size;
+        rank_offset += V(block).cols;
       }
 
       x = temp;
@@ -600,7 +609,7 @@ namespace Hatrix {
       solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
       solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
-      permute_back(x, block_size, c_size);
+      permute_back(x, block_size);
 
       // backward substitution of co blocks
       for (int irow = nblocks-1; irow >= 0; --irow) {
@@ -646,9 +655,7 @@ namespace Hatrix {
         for (int64_t i = 0; i < block_size; ++i) {
           x(irow * block_size + i, 0) = x_irow(i, 0);
         }
-      }
 
-      for (int irow = nblocks-1; irow >=0; --irow) {
         if (V.exists(irow)) {
           auto V_F = make_complement(V(irow));
           Matrix prod = matmul(V_F, x_split[irow]);
