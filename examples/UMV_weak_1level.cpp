@@ -389,15 +389,6 @@ double rel_error(const double A_norm, const double B_norm) {
   return std::sqrt((diff * diff) / (B_norm * B_norm));
 }
 
-std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
-  std::vector<double> res(N, 0.0);
-  double rnge = maxVal - minVal;
-  for(int i=0; i<N; i++) {
-    res[i] = minVal + ((double)i/(double)rnge);
-  }
-  return res;
-}
-
 int main(int argc, char *argv[]) {
   int64_t N = atoi(argv[1]);
   int64_t rank = atoi(argv[2]);
@@ -413,9 +404,9 @@ int main(int argc, char *argv[]) {
   file.open(fname, std::ios::app | std::ios::out);
 
   randvec_t randpts;
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   Hatrix::Context::init();
   const Hatrix::Matrix _b = Hatrix::generate_random_matrix(N, 1);
