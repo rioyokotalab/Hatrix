@@ -309,199 +309,198 @@ namespace Hatrix {
         }
 
         // Reduce the large cc off-diagonals on the right.
-        // for (int icol = block+1; icol < nblocks; ++icol) {
-        //   if (is_admissible(block, icol)) { continue; }
-        //   // The splitting for the inadmissible blocks on the right of the diagonal block
-        //   // happens with differnt row and col rank since the U and V over here can have
-        //   // different ranks due to fill-in compression.s
-        //   int64_t row_rank = U(block).cols;
-        //   int64_t col_rank = V(icol).cols;
-        //   auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                            std::vector<int64_t>(1, block_size - col_rank));
-        //   solve_triangular(Dcc, right_splits[0], Hatrix::Left, Hatrix::Lower, true);
-        //   solve_triangular(Dcc, right_splits[1], Hatrix::Left, Hatrix::Lower, true);
-        // }
+        for (int icol = block+1; icol < nblocks; ++icol) {
+          if (is_admissible(block, icol)) { continue; }
+          // The splitting for the inadmissible blocks on the right of the diagonal block
+          // happens with differnt row and col rank since the U and V over here can have
+          // different ranks due to fill-in compression.s
+          int64_t row_rank = U(block).cols;
+          int64_t col_rank = V(icol).cols;
+          auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                   std::vector<int64_t>(1, block_size - col_rank));
+          solve_triangular(Dcc, right_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          solve_triangular(Dcc, right_splits[1], Hatrix::Left, Hatrix::Lower, true);
+        }
 
-        // // Reduce the large cc off-diagonals on the bottom.
-        // for (int irow = block+1; irow < nblocks; ++irow) {
-        //   if (is_admissible(irow, block)) { continue; }
-        //   int64_t row_rank = U(irow).cols;
-        //   int64_t col_rank = V(block).cols;
-        //   auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                             std::vector<int64_t>(1, block_size - col_rank));
-        //   solve_triangular(Dcc, bottom_splits[0], Hatrix::Right, Hatrix::Upper, false);
-        //   solve_triangular(Dcc, bottom_splits[2], Hatrix::Right, Hatrix::Upper, false);
-        // }
+        // Reduce the large cc off-diagonals on the bottom.
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          if (is_admissible(irow, block)) { continue; }
+          int64_t row_rank = U(irow).cols;
+          int64_t col_rank = V(block).cols;
+          auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                    std::vector<int64_t>(1, block_size - col_rank));
+          solve_triangular(Dcc, bottom_splits[0], Hatrix::Right, Hatrix::Upper, false);
+          solve_triangular(Dcc, bottom_splits[2], Hatrix::Right, Hatrix::Upper, false);
+        }
 
         // Compute schur's compliments for cc blocks
-        // for (int irow = block+1; irow < nblocks; ++irow) {
-        //   for (int icol = block+1; icol < nblocks; ++icol) {
-        //     if (is_admissible(irow, block) || is_admissible(block, icol) ||
-        //         is_admissible(irow, icol)) { continue; }
-        //     std::cout << "hell\n";
-        //     int64_t row_rank = U(irow).cols;
-        //     int64_t col_rank = V(block).cols;
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          for (int icol = block+1; icol < nblocks; ++icol) {
+            if (is_admissible(irow, block) || is_admissible(block, icol) ||
+                is_admissible(irow, icol)) { continue; }
+            int64_t row_rank = U(irow).cols;
+            int64_t col_rank = V(block).cols;
 
-        //     auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                               std::vector<int64_t>(1, block_size - col_rank));
+            auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                      std::vector<int64_t>(1, block_size - col_rank));
 
-        //     row_rank = U(block).cols;
-        //     col_rank = V(icol).cols;
-        //     auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                              std::vector<int64_t>(1, block_size - col_rank));
+            row_rank = U(block).cols;
+            col_rank = V(icol).cols;
+            auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                     std::vector<int64_t>(1, block_size - col_rank));
 
-        //     row_rank = U(irow).cols;
-        //     col_rank = V(icol).cols;
-        //     auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                              std::vector<int64_t>(1, block_size - col_rank));
-        //     matmul(bottom_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
-        //   }
-        // }
+            row_rank = U(irow).cols;
+            col_rank = V(icol).cols;
+            auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                     std::vector<int64_t>(1, block_size - col_rank));
+            matmul(bottom_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
+          }
+        }
 
         // Compute schur's compliments for co blocks from cc and co blocks (right side of the matrix)
-        // for (int irow = block+1; irow < nblocks; ++irow) {
-        //   for (int icol = 0; icol < nblocks; ++icol) {
-        //     if (is_admissible(block, icol) || is_admissible(irow, block) || is_admissible(irow, icol)) { continue; }
-        //     std::cout << "hell 1\n";
-        //     int64_t row_rank = U(irow).cols;
-        //     int64_t col_rank = V(block).cols;
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          for (int icol = 0; icol < nblocks; ++icol) {
+            if (is_admissible(block, icol) || is_admissible(irow, block) || is_admissible(irow, icol)) { continue; }
+            std::cout << "hell 1\n";
+            int64_t row_rank = U(irow).cols;
+            int64_t col_rank = V(block).cols;
 
-        //     auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                               std::vector<int64_t>(1, block_size - col_rank));
+            auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                      std::vector<int64_t>(1, block_size - col_rank));
 
-        //     row_rank = U(block).cols;
-        //     col_rank = V(icol).cols;
-        //     auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                              std::vector<int64_t>(1, block_size - col_rank));
+            row_rank = U(block).cols;
+            col_rank = V(icol).cols;
+            auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                     std::vector<int64_t>(1, block_size - col_rank));
 
-        //     row_rank = U(irow).cols;
-        //     col_rank = V(icol).cols;
-        //     auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                              std::vector<int64_t>(1, block_size - col_rank));
-        //     matmul(bottom_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
-        //   }
-        // }
+            row_rank = U(irow).cols;
+            col_rank = V(icol).cols;
+            auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                     std::vector<int64_t>(1, block_size - col_rank));
+            matmul(bottom_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
+          }
+        }
 
         // Compute Schur's compliments for oc blocks from cc and oc blocks (bottom side of the matrix)
-        // for (int icol = block+1; icol < nblocks; ++icol) {
-        //   for (int irow = 0; irow < nblocks; ++irow) {
-        //     if (is_admissible(block, icol) || is_admissible(irow, block) || is_admissible(irow, icol)) { continue; }
-        //     std::cout << "hell 2\n";
-        //     int64_t row_rank = U(irow).cols;
-        //     int64_t col_rank = V(block).cols;
-        //     auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                               std::vector<int64_t>(1, block_size - col_rank));
+        for (int icol = block+1; icol < nblocks; ++icol) {
+          for (int irow = 0; irow < nblocks; ++irow) {
+            if (is_admissible(block, icol) || is_admissible(irow, block) || is_admissible(irow, icol)) { continue; }
+            std::cout << "hell 2\n";
+            int64_t row_rank = U(irow).cols;
+            int64_t col_rank = V(block).cols;
+            auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                      std::vector<int64_t>(1, block_size - col_rank));
 
-        //     row_rank = U(block).cols;
-        //     col_rank = V(icol).cols;
-        //     auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                              std::vector<int64_t>(1, block_size - col_rank));
+            row_rank = U(block).cols;
+            col_rank = V(icol).cols;
+            auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                     std::vector<int64_t>(1, block_size - col_rank));
 
-        //     row_rank = U(irow).cols;
-        //     col_rank = V(icol).cols;
-        //     auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                              std::vector<int64_t>(1, block_size - col_rank));
-        //     matmul(bottom_splits[2], right_splits[0], reduce_splits[2], false, false, -1.0, 1.0);
-        //   }
-        // }
+            row_rank = U(irow).cols;
+            col_rank = V(icol).cols;
+            auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                     std::vector<int64_t>(1, block_size - col_rank));
+            matmul(bottom_splits[2], right_splits[0], reduce_splits[2], false, false, -1.0, 1.0);
+          }
+        }
 
 
         // Compute fill-in blocks between co stips on the right side and cc blocks in the middle.
-        // for (int irow = block+1; irow < nblocks; ++irow) {
-        //   for (int icol = 0; icol < nblocks; ++icol) {
-        //     if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          for (int icol = 0; icol < nblocks; ++icol) {
+            if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
 
-        //       Matrix matrix(block_size, block_size);
+              Matrix matrix(block_size, block_size);
 
-        //       // This block exists on lower side of the matrix. It is multiplied by VF(block).
-        //       int64_t row_rank = U(irow).cols;
-        //       int64_t col_rank = V(block).cols;
-        //       auto cc_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                             std::vector<int64_t>(1, block_size - col_rank));
+              // This block exists on lower side of the matrix. It is multiplied by VF(block).
+              int64_t row_rank = U(irow).cols;
+              int64_t col_rank = V(block).cols;
+              auto cc_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                    std::vector<int64_t>(1, block_size - col_rank));
 
-        //       // This is the block on the right. It is multiplied by UF(block), so it split along
-        //       // the column by U(block).cols.
-        //       row_rank = U(block).cols;
-        //       col_rank = V(icol).cols;
-        //       auto co_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                             std::vector<int64_t>(1, block_size - col_rank));
+              // This is the block on the right. It is multiplied by UF(block), so it split along
+              // the column by U(block).cols.
+              row_rank = U(block).cols;
+              col_rank = V(icol).cols;
+              auto co_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                    std::vector<int64_t>(1, block_size - col_rank));
 
-        //       // This block exists in the trailing submatrix. Since this formed in the 'upper' part,
-        //       // the number of columns is same as the filled-in bases and number of rows same as
-        //       // the non-filled in bases.
-        //       row_rank = U(irow).cols;
-        //       col_rank = V(icol).cols;
-        //       auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                         std::vector<int64_t>(1, block_size - col_rank));
+              // This block exists in the trailing submatrix. Since this formed in the 'upper' part,
+              // the number of columns is same as the filled-in bases and number of rows same as
+              // the non-filled in bases.
+              row_rank = U(irow).cols;
+              col_rank = V(icol).cols;
+              auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
+                                                std::vector<int64_t>(1, block_size - col_rank));
 
-        //       matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 1.0);
-        //       F.insert(irow, icol, std::move(matrix));
-        //     }
-        //   }
-        // }
+              matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 1.0);
+              F.insert(irow, icol, std::move(matrix));
+            }
+          }
+        }
 
         // Compute fill-in blocks between oc strips on the bottom side and cc blocks in the middle.
-        // for (int irow = 0; irow < nblocks; ++irow) {
-        //   for (int icol = block+1; icol < nblocks; ++icol) {
-        //     if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
-        //       Matrix matrix(block_size, block_size);
-        //       // This block exists on the right side of the permuted matrix. So it is multiplied by UF(block).
-        //       int64_t row_rank = U(block).cols;
-        //       int64_t col_rank = V(icol).cols;
-        //       auto cc_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                             std::vector<int64_t>(1, block_size - col_rank));
+        for (int irow = 0; irow < nblocks; ++irow) {
+          for (int icol = block+1; icol < nblocks; ++icol) {
+            if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
+              Matrix matrix(block_size, block_size);
+              // This block exists on the right side of the permuted matrix. So it is multiplied by UF(block).
+              int64_t row_rank = U(block).cols;
+              int64_t col_rank = V(icol).cols;
+              auto cc_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                    std::vector<int64_t>(1, block_size - col_rank));
 
-        //       row_rank = U(irow).cols;
-        //       col_rank = V(block).cols;
-        //       auto oc_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                             std::vector<int64_t>(1, block_size - col_rank));
+              row_rank = U(irow).cols;
+              col_rank = V(block).cols;
+              auto oc_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                    std::vector<int64_t>(1, block_size - col_rank));
 
-        //       row_rank = U(irow).cols;
-        //       col_rank = V(icol).cols;
-        //       auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                         std::vector<int64_t>(1, block_size - col_rank));
-        //       matmul(oc_splits[2], cc_splits[0], matrix_splits[2], false, false, -1.0, 1.0);
-        //       F.insert(irow, icol, std::move(matrix));
-        //     }
-        //   }
-        // }
+              row_rank = U(irow).cols;
+              col_rank = V(icol).cols;
+              auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
+                                                std::vector<int64_t>(1, block_size - col_rank));
+              matmul(oc_splits[2], cc_splits[0], matrix_splits[2], false, false, -1.0, 1.0);
+              F.insert(irow, icol, std::move(matrix));
+            }
+          }
+        }
       } // for (int block = 0; block < nblocks; ++block)
 
       // Update S blocks for admissible blocks with fill-ins
-      // for (int irow = 0; irow < nblocks; ++irow) {
-      //   for (int jcol = 0; jcol < nblocks; ++jcol) {
-      //     if (is_admissible(irow, jcol)) {
-      //       int64_t row_rank = U(irow).cols;
-      //       int64_t col_rank = V(jcol).cols;
+      for (int irow = 0; irow < nblocks; ++irow) {
+        for (int jcol = 0; jcol < nblocks; ++jcol) {
+          if (is_admissible(irow, jcol)) {
+            int64_t row_rank = U(irow).cols;
+            int64_t col_rank = V(jcol).cols;
 
-      //       Matrix Sbar(row_rank, col_rank);
-      //       Matrix& S_old = S(irow, jcol);
+            Matrix Sbar(row_rank, col_rank);
+            Matrix& S_old = S(irow, jcol);
 
-      //       for (int i = 0; i < S_old.rows; ++i) {
-      //         for (int j = 0; j < S_old.cols; ++j) {
-      //           Sbar(i, j) = S_old(i, j);
-      //         }
-      //       }
+            for (int i = 0; i < S_old.rows; ++i) {
+              for (int j = 0; j < S_old.cols; ++j) {
+                Sbar(i, j) = S_old(i, j);
+              }
+            }
 
-      //       // Zero pad the S block like Eq. 19.
-      //       for (int i = S_old.rows; i < row_rank; ++i) {
-      //         for (int j = S_old.cols; j < col_rank; ++j) {
-      //           Sbar(i, j) = 0.0;
-      //         }
-      //       }
+            // Zero pad the S block like Eq. 19.
+            for (int i = S_old.rows; i < row_rank; ++i) {
+              for (int j = S_old.cols; j < col_rank; ++j) {
+                Sbar(i, j) = 0.0;
+              }
+            }
 
-      //       S.erase(irow, jcol);
-      //       if (F.exists(irow, jcol)) {
-      //         // Update S block like Eq. 20.
-      //         S.insert(irow, jcol, Sbar + matmul(matmul(U(irow), F(irow, jcol), true, false), V(jcol)));
-      //         F.erase(irow, jcol);
-      //       }
-      //       else {
-      //         S.insert(irow, jcol, std::move(Sbar));
-      //       }
-      //     }
-      //   }
-      // }
+            S.erase(irow, jcol);
+            if (F.exists(irow, jcol)) {
+              // Update S block like Eq. 20.
+              S.insert(irow, jcol, Sbar + matmul(matmul(U(irow), F(irow, jcol), true, false), V(jcol)));
+              F.erase(irow, jcol);
+            }
+            else {
+              S.insert(irow, jcol, std::move(Sbar));
+            }
+          }
+        }
+      }
 
       // Merge unfactorized portions.
       int64_t last_nrows = 0, last_ncols = 0;
@@ -558,24 +557,6 @@ namespace Hatrix {
         assert(U(irow).cols == V(irow).cols);
         int64_t row_rank = U(irow).cols;
 
-        // for (int icol = 0; icol < irow; ++icol) {
-        //   int64_t col_rank = V(icol).cols;
-
-        //   if (is_admissible(irow, icol)) { continue; }
-        //   auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                       std::vector<int64_t>(1, block_size - col_rank));
-        //   Matrix x_irow(x_split[irow]);
-        //   auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - row_rank), {});
-
-        //   Matrix x_icol(x_split[icol]);
-        //   auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - col_rank), {});
-
-        //   matmul(D_splits[0], x_icol_splits[0], x_irow_splits[0], false, false, -1.0, 1.0);
-        //   for (int64_t i = 0; i < block_size; ++i) {
-        //     x(irow * block_size + i, 0) = x_irow(i, 0);
-        //   }
-        // }
-
         auto D_splits = D(irow, irow).split(std::vector<int64_t>(1, block_size - row_rank),
                                             std::vector<int64_t>(1, block_size - row_rank));
         Matrix temp(x_split[irow]);
@@ -585,28 +566,23 @@ namespace Hatrix {
         for (int64_t i = 0; i < block_size; ++i) {
           x(irow * block_size + i, 0) = temp(i, 0);
         }
+
+        for (int icol = 0; icol < irow; ++icol) {
+          if (is_admissible(irow, icol)) { continue; }
+          int64_t col_rank = V(icol).cols;
+          auto D_splits = D(irow, icol).split({}, std::vector<int64_t>(1, block_size - col_rank));
+
+          Matrix x_irow(x_split[irow]);
+          Matrix x_icol(x_split[icol]);
+          auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - row_rank), {});
+          auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - col_rank), {});
+
+          matmul(D_splits[0], x_irow_splits[0], x_icol, false, false, -1.0, 1.0);
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(icol * block_size + i, 0) = x_icol(i, 0);
+          }
+        }
       }
-
-      // // forward substitution with oc blocks
-      // for (int irow = 0; irow < nblocks; ++irow) {
-      //   for (int icol = 0; icol < nblocks; ++icol) {
-      //     if (is_admissible(irow, icol)) { continue; }
-      //     int64_t row_rank = U(irow).cols;
-      //     int64_t col_rank = V(icol).cols;
-      //     auto block_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-      //                                             std::vector<int64_t>(1, block_size - col_rank));
-      //     Matrix x_irow(x_split[irow]);
-      //     Matrix x_icol(x_split[icol]);
-
-      //     auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - row_rank), {});
-      //     auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - col_rank), {});
-
-      //     matmul(block_splits[2], x_icol_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
-      //     for (int64_t i = 0; i < block_size; ++i) {
-      //       x(irow * block_size + i, 0) = x_irow(i, 0);
-      //     }
-      //   }
-      // }
 
       permute_forward(x, block_size);
 
@@ -619,50 +595,29 @@ namespace Hatrix {
 
       permute_back(x, block_size);
 
-      // backward substitution of co blocks
-      // for (int irow = nblocks-1; irow >= 0; --irow) {
-      //   for (int icol = nblocks-1; icol >= 0; --icol) {
-      //     if (is_admissible(irow, icol)) { continue; }
-      //     int64_t row_rank = U(irow).cols;
-      //     int64_t col_rank = V(icol).cols;
-
-      //     Matrix x_irow(x_split[irow]);
-      //     Matrix x_icol(x_split[icol]);
-      //     auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - row_rank), {});
-      //     auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - col_rank), {});
-
-      //     auto block_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-      //                                             std::vector<int64_t>(1, block_size - col_rank));
-
-      //     matmul(block_splits[1], x_icol_splits[1], x_irow_splits[0], false, false, -1.0, 1.0);
-      //     for (int64_t i = 0; i < block_size; ++i) {
-      //       x(irow * block_size + i, 0) = x_irow(i, 0);
-      //     }
-      //   }
-      // }
-
       // backward substition using cc blocks
       for (int irow = nblocks-1; irow >= 0; --irow) {
         assert(U(irow).cols == V(irow).cols);
 
         int64_t row_rank = V(irow).cols;
-        // for (int icol = nblocks-1; icol > irow; --icol) {
-        //   if (is_admissible(irow, icol)) { continue; }
 
-        //   int64_t col_rank = V(icol).cols;
+        // Reduce the RHS with the cc blocks of the upper right part of the matrix.
+        for (int icol = nblocks-1; icol > irow; --icol) {
+          if (is_admissible(irow, icol)) { continue; }
+          int64_t col_rank = V(icol).cols;
 
-        //   auto block_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-        //                                           std::vector<int64_t>(1, block_size - col_rank));
-        //   Matrix x_irow(x_split[irow]);
-        //   Matrix x_icol(x_split[icol]);
-        //   auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - row_rank), {});
-        //   auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - col_rank), {});
+          auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank), {});
+          Matrix x_irow(x_split[irow]);
+          Matrix x_icol(x_split[icol]);
+          auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - row_rank), {});
+          auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - col_rank), {});
 
-        //   matmul(block_splits[0], x_icol_splits[0], x_irow_splits[0], false, false, -1.0, 1.0);
-        //   for (int64_t i = 0; i < block_size; ++i) {
-        //     x(irow * block_size + i, 0) = x_irow(i, 0);
-        //   }
-        // }
+          matmul(D_splits[0], x_icol, x_irow_splits[0], false, false, -1.0, 1.0);
+
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(irow * block_size + i, 0) = x_irow(i, 0);
+          }
+        }
 
         auto block_splits = D(irow, irow).split(std::vector<int64_t>(1, block_size - row_rank),
                                                 std::vector<int64_t>(1, block_size - row_rank));
