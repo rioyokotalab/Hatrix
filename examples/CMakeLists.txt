@@ -20,6 +20,7 @@ else()
     HSS_Nlevel_construct_chandrasekaran
     HSS_Nlevel_construct_miro
     UMV_weak_2level
+    UMV_weak_1level
     UMV_weak_Nlevel
     BLR2_construct
     UMV_strong_1level

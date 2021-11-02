@@ -284,6 +284,9 @@ namespace Hatrix {
                                                      std::vector<int64_t>(1, c_size));
         Matrix& Dcc = diagonal_splits[0];
         lu(Dcc);
+        solve_triangular(Dcc, diagonal_splits[1], Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+        solve_triangular(Dcc, diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+        matmul(diagonal_splits[2], diagonal_splits[1], diagonal_splits[3], false, false, -1.0, 1.0);
 
         // Reduce the large cc off-diagonals on the right.
         for (int icol = block+1; icol < nblocks; ++icol) {
