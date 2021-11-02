@@ -211,7 +211,7 @@ namespace Hatrix {
             Matrix error_change = matmul(U(block), U(block), false, true);
             // Subtract from identity
             for (int i = 0; i < error_change.rows; ++i) {
-              error_change(i,i) -= 1;
+              error_change(i,i) = error_change(i,i) - 1;
               for (int j = 0; j < error_change.cols; ++j) {
                 error_change(i,j) = -error_change(i,j);
               }
@@ -243,7 +243,7 @@ namespace Hatrix {
             Matrix error_change = matmul(V(block), V(block), false, true);
             // Subtract from identity
             for (int i = 0; i < error_change.rows; ++i) {
-              error_change(i, i) -= 1;
+              error_change(i, i) = error_change(i, i) - 1;
               for (int j = 0; j < error_change.cols; ++j) {
                 error_change(i,j) = -error_change(i,j);
               }
@@ -433,7 +433,7 @@ namespace Hatrix {
               auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
                                                 std::vector<int64_t>(1, block_size - col_rank));
 
-              matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 1.0);
+              matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 0.0);
               F.insert(irow, icol, std::move(matrix));
             }
           }
@@ -459,7 +459,7 @@ namespace Hatrix {
               col_rank = V(icol).cols;
               auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
                                                 std::vector<int64_t>(1, block_size - col_rank));
-              matmul(oc_splits[2], cc_splits[0], matrix_splits[2], false, false, -1.0, 1.0);
+              matmul(oc_splits[2], cc_splits[0], matrix_splits[2], false, false, -1.0, 0.0);
               F.insert(irow, icol, std::move(matrix));
             }
           }
@@ -703,8 +703,8 @@ int main(int argc, char** argv) {
   auto last = A.factorize();
   Hatrix::Matrix x = A.solve(b, last);
 
-  // std::cout << "x:\n";
-  // x.print();
+  std::cout << "x:\n";
+  x.print();
 
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
@@ -713,8 +713,8 @@ int main(int argc, char** argv) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  // std::cout << "x solve:\n";
-  // x_solve.print();
+  std::cout << "x solve:\n";
+  x_solve.print();
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
