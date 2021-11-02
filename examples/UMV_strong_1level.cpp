@@ -703,7 +703,7 @@ namespace Hatrix {
           }
         }
       }
-      return std::sqrt(error / dense_norm) / N;
+      return std::sqrt(error / dense_norm);
     }
 
     void print_structure() {
@@ -750,7 +750,7 @@ int main(int argc, char** argv) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve) / N;
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
 
