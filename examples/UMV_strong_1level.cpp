@@ -267,6 +267,17 @@ namespace Hatrix {
                 matmul(Loc(irow, block), right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
               }
             }
+            // Reduction between oc and co blocks that are new fill-ins.
+            else if (Loc.exists(irow, block) && Uco.exists(block, icol)) {
+              if (is_admissible(irow, icol)) {
+                matmul(Loc(irow, block), Uco(block, icol), S(irow, icol), false, false, -1.0, 1.0);
+              }
+              else {
+                auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - rank),
+                                                         std::vector<int64_t>(1, block_size - rank));
+                matmul(Loc(irow, block), Uco(block, icol), reduce_splits[3], false, false, -1.0, 1.0);
+              }
+            }
           }
         }
 
