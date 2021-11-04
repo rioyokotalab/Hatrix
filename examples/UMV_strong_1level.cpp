@@ -189,78 +189,9 @@ namespace Hatrix {
     // Perform factorization assuming the permuted form of the BLR2 matrix.
     Matrix factorize() {
       int block_size = N / nblocks;
-      RowColMap<Matrix> F;      // fill-ins
+      RowColMap<Matrix> Loc, Uco;      // fill-ins of the small strips on the top and bottom.
 
       for (int block = 0; block < nblocks; ++block) {
-        // Compress fill-ins accumulated from previous steps
-        if (block > 0) {
-          int64_t fill_in_rank = rank / 4;
-          // Accumulate fill-ins in this row
-          Matrix acc_row(block_size, block_size);
-          bool row_has_fill_in = false;
-          for (int icol = 0; icol < nblocks; ++icol) {
-            if (F.exists(block, icol)) {
-              row_has_fill_in = true;
-              Matrix& fill_in = F(block, icol);
-              matmul(fill_in, fill_in, acc_row, false, true, 1.0, 1.0);
-            }
-          }
-
-          if (row_has_fill_in) {
-            // Calcuate the error change
-            Matrix error_change = matmul(U(block), U(block), false, true);
-            // Subtract from identity
-            for (int i = 0; i < error_change.rows; ++i) {
-              error_change(i,i) = error_change(i,i) - 1;
-              for (int j = 0; j < error_change.cols; ++j) {
-                error_change(i,j) = -error_change(i,j);
-              }
-            }
-
-            // Calculate Gi for this row (U) bases. Eq. 15 in the paper.
-            Matrix Gi_U = matmul(matmul(error_change, acc_row), error_change, false, true);
-            Matrix Ui, Si, Vi; double error;
-
-            // Compute the SVD of this block. Eq. 16.
-            std::tie(Ui, Si, Vi, error) = truncated_svd(Gi_U, fill_in_rank);
-
-            // Concatenate with the old bases and replace the older bases. Eq. 17.
-            U(block) = concat(U(block), Ui, 1);
-          }
-
-          // Accumulate fill-ins in this column
-          Matrix acc_col(block_size, block_size);
-          bool col_has_fill_in = false;
-          for (int irow = 0; irow < nblocks; ++irow) {
-            if (F.exists(irow, block)) {
-              col_has_fill_in = true;
-              Matrix& fill_in = F(irow, block);
-              matmul(fill_in, fill_in, acc_col, false, true, 1.0, 1.0);
-            }
-          }
-
-          if (col_has_fill_in) {
-            Matrix error_change = matmul(V(block), V(block), false, true);
-            // Subtract from identity
-            for (int i = 0; i < error_change.rows; ++i) {
-              error_change(i, i) = error_change(i, i) - 1;
-              for (int j = 0; j < error_change.cols; ++j) {
-                error_change(i,j) = -error_change(i,j);
-              }
-            }
-
-            // Calculte Gi for this col (V). Eq. 15.
-            Matrix Gi_V = matmul(matmul(error_change, acc_col), error_change, false, true);
-            Matrix Ui, Si, Vi; double error;
-
-            // Compute the SVD of this block. Eq. 16.
-            std::tie(Ui, Si, Vi, error) = truncated_svd(Gi_V, fill_in_rank);
-
-            // Concat with the old bases and replace with the new.
-            V(block) = concat(V(block), Ui, 1);
-          }
-        } // if (block > 0)
-
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
             Matrix U_F = make_complement(U(block));
@@ -308,7 +239,7 @@ namespace Hatrix {
           }
         }
 
-        // Reduce the large cc off-diagonals on the right.
+        // Reduce the large cc off-diagonals on the same row.
         for (int icol = block+1; icol < nblocks; ++icol) {
           if (is_admissible(block, icol)) { continue; }
           // The splitting for the inadmissible blocks on the right of the diagonal block
@@ -322,7 +253,7 @@ namespace Hatrix {
           solve_triangular(Dcc, right_splits[1], Hatrix::Left, Hatrix::Lower, true);
         }
 
-        // Reduce the large cc off-diagonals on the bottom.
+        // Reduce the large cc off-diagonals on the same column.
         for (int irow = block+1; irow < nblocks; ++irow) {
           if (is_admissible(irow, block)) { continue; }
           int64_t row_rank = U(irow).cols;
@@ -331,30 +262,6 @@ namespace Hatrix {
                                                     std::vector<int64_t>(1, block_size - col_rank));
           solve_triangular(Dcc, bottom_splits[0], Hatrix::Right, Hatrix::Upper, false);
           solve_triangular(Dcc, bottom_splits[2], Hatrix::Right, Hatrix::Upper, false);
-        }
-
-        // Compute schur's compliments for cc blocks
-        for (int irow = block+1; irow < nblocks; ++irow) {
-          for (int icol = block+1; icol < nblocks; ++icol) {
-            if (is_admissible(irow, block) || is_admissible(block, icol) ||
-                is_admissible(irow, icol)) { continue; }
-            int64_t row_rank = U(irow).cols;
-            int64_t col_rank = V(block).cols;
-
-            auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
-                                                      std::vector<int64_t>(1, block_size - col_rank));
-
-            row_rank = U(block).cols;
-            col_rank = V(icol).cols;
-            auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-                                                     std::vector<int64_t>(1, block_size - col_rank));
-
-            row_rank = U(irow).cols;
-            col_rank = V(icol).cols;
-            auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-                                                     std::vector<int64_t>(1, block_size - col_rank));
-            matmul(bottom_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
-          }
         }
 
         // Compute schur's compliments for co blocks from cc and co blocks (right side of the matrix)
@@ -434,7 +341,6 @@ namespace Hatrix {
                                                 std::vector<int64_t>(1, block_size - col_rank));
 
               matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 0.0);
-              F.insert(irow, icol, std::move(matrix));
             }
           }
         }
@@ -460,62 +366,14 @@ namespace Hatrix {
               auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
                                                 std::vector<int64_t>(1, block_size - col_rank));
               matmul(oc_splits[2], cc_splits[0], matrix_splits[2], false, false, -1.0, 0.0);
-              F.insert(irow, icol, std::move(matrix));
             }
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
 
-      // Update S blocks for admissible blocks with fill-ins
-      for (int irow = 0; irow < nblocks; ++irow) {
-        for (int jcol = 0; jcol < nblocks; ++jcol) {
-          if (is_admissible(irow, jcol)) {
-            int64_t row_rank = U(irow).cols;
-            int64_t col_rank = V(jcol).cols;
-
-            Matrix Sbar(row_rank, col_rank);
-            Matrix& S_old = S(irow, jcol);
-
-            for (int i = 0; i < S_old.rows; ++i) {
-              for (int j = 0; j < S_old.cols; ++j) {
-                Sbar(i, j) = S_old(i, j);
-              }
-            }
-
-            // Zero pad the S block like Eq. 19.
-            for (int i = S_old.rows; i < row_rank; ++i) {
-              for (int j = S_old.cols; j < col_rank; ++j) {
-                Sbar(i, j) = 0.0;
-              }
-            }
-
-            S.erase(irow, jcol);
-            if (F.exists(irow, jcol)) {
-              // Update S block like Eq. 20.
-              S.insert(irow, jcol, Sbar + matmul(matmul(U(irow), F(irow, jcol), true, false), V(jcol)));
-              F.erase(irow, jcol);
-            }
-            else {
-              S.insert(irow, jcol, std::move(Sbar));
-            }
-          }
-        }
-      }
-
       // Merge unfactorized portions.
-      int64_t last_nrows = 0, last_ncols = 0;
-      std::vector<int64_t> row_intervals, col_intervals;
-
-      for (int i = 0; i < nblocks; ++i) {
-        last_nrows += U(i).cols;
-        row_intervals.push_back(last_nrows);
-
-        last_ncols += V(i).cols;
-        col_intervals.push_back(last_ncols);
-      }
-
-      Matrix last(last_nrows, last_ncols);
-      auto last_splits = last.split(row_intervals, col_intervals);
+      Matrix last(nblocks * rank, nblocks * rank);
+      auto last_splits = last.split(nblocks, nblocks);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
