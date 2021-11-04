@@ -268,7 +268,6 @@ namespace Hatrix {
         for (int irow = block+1; irow < nblocks; ++irow) {
           for (int icol = 0; icol < nblocks; ++icol) {
             if (is_admissible(block, icol) || is_admissible(irow, block) || is_admissible(irow, icol)) { continue; }
-            std::cout << "hell 1\n";
             int64_t row_rank = U(irow).cols;
             int64_t col_rank = V(block).cols;
 
@@ -292,7 +291,6 @@ namespace Hatrix {
         for (int icol = block+1; icol < nblocks; ++icol) {
           for (int irow = 0; irow < nblocks; ++irow) {
             if (is_admissible(block, icol) || is_admissible(irow, block) || is_admissible(irow, icol)) { continue; }
-            std::cout << "hell 2\n";
             int64_t row_rank = U(irow).cols;
             int64_t col_rank = V(block).cols;
             auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
@@ -311,36 +309,40 @@ namespace Hatrix {
           }
         }
 
-
         // Compute fill-in blocks between co stips on the right side and cc blocks in the middle.
+        // These fill-in blocks are of size <(nb - rank) x rank> and do not contribute to worsening
+        // the scalability of the algorithm. I don't know why they are not compressed. Refer to pg. 320
+        // in Sameer's H-matrix notes for detailed studies of the fill-in procedure in UMV and IFMM.
         for (int irow = block+1; irow < nblocks; ++irow) {
           for (int icol = 0; icol < nblocks; ++icol) {
-            if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
+            Matrix matrix(block_size - rank, rank);
 
-              Matrix matrix(block_size, block_size);
-
+            if (!is_admissible(irow, block)) {
               // This block exists on lower side of the matrix. It is multiplied by VF(block).
               int64_t row_rank = U(irow).cols;
               int64_t col_rank = V(block).cols;
               auto cc_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
                                                     std::vector<int64_t>(1, block_size - col_rank));
 
-              // This is the block on the right. It is multiplied by UF(block), so it split along
-              // the column by U(block).cols.
-              row_rank = U(block).cols;
-              col_rank = V(icol).cols;
-              auto co_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
-                                                    std::vector<int64_t>(1, block_size - col_rank));
+              // Fill-in exists between blocks that were there before.
+              if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
+                // This is the block on the right. It is multiplied by UF(block), so it split along
+                // the column by U(block).cols.
+                row_rank = U(block).cols;
+                col_rank = V(icol).cols;
+                auto co_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                      std::vector<int64_t>(1, block_size - col_rank));
 
-              // This block exists in the trailing submatrix. Since this formed in the 'upper' part,
-              // the number of columns is same as the filled-in bases and number of rows same as
-              // the non-filled in bases.
-              row_rank = U(irow).cols;
-              col_rank = V(icol).cols;
-              auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
-                                                std::vector<int64_t>(1, block_size - col_rank));
-
-              matmul(cc_splits[0], co_splits[1], matrix_splits[1], false, false, -1.0, 0.0);
+                std::cout << "filling in co\n";
+                matmul(cc_splits[0], co_splits[1], matrix, false, false, -1.0, 0.0);
+                Uco.insert(irow, icol, std::move(matrix));
+              }
+              // Fill-in exists between previously created fill-in and a cc block on the inside.
+              else if (!is_admissible(irow, block) && Uco.exists(block, icol) && is_admissible(irow, icol)) {
+                std::cout << "filling in co\n";
+                matmul(cc_splits[0], Uco(block, icol), matrix, false, false, -1.0, 0.0);
+                Uco.insert(irow, icol, std::move(matrix));
+              }
             }
           }
         }
@@ -561,8 +563,8 @@ int main(int argc, char** argv) {
   auto last = A.factorize();
   Hatrix::Matrix x = A.solve(b, last);
 
-  std::cout << "x:\n";
-  x.print();
+  // std::cout << "x:\n";
+  // x.print();
 
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
@@ -571,8 +573,8 @@ int main(int argc, char** argv) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  std::cout << "x solve:\n";
-  x_solve.print();
+  // std::cout << "x solve:\n";
+  // x_solve.print();
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
