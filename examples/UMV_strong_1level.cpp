@@ -325,7 +325,7 @@ namespace Hatrix {
                                                     std::vector<int64_t>(1, block_size - col_rank));
 
               // Fill-in exists between blocks that were there before.
-              if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
+              if (!is_admissible(block, icol) && is_admissible(irow, icol)) {
                 // This is the block on the right. It is multiplied by UF(block), so it split along
                 // the column by U(block).cols.
                 row_rank = U(block).cols;
@@ -338,7 +338,7 @@ namespace Hatrix {
                 Uco.insert(irow, icol, std::move(matrix));
               }
               // Fill-in exists between previously created fill-in and a cc block on the inside.
-              else if (!is_admissible(irow, block) && Uco.exists(block, icol) && is_admissible(irow, icol)) {
+              else if (Uco.exists(block, icol) && is_admissible(irow, icol)) {
                 std::cout << "filling in co\n";
                 matmul(cc_splits[0], Uco(block, icol), matrix, false, false, -1.0, 0.0);
                 Uco.insert(irow, icol, std::move(matrix));
@@ -350,24 +350,27 @@ namespace Hatrix {
         // Compute fill-in blocks between oc strips on the bottom side and cc blocks in the middle.
         for (int irow = 0; irow < nblocks; ++irow) {
           for (int icol = block+1; icol < nblocks; ++icol) {
-            if (!is_admissible(irow, block) && !is_admissible(block, icol) && is_admissible(irow, icol)) {
-              Matrix matrix(block_size, block_size);
-              // This block exists on the right side of the permuted matrix. So it is multiplied by UF(block).
+            if (!is_admissible(block, icol)) {
+              Matrix matrix(rank, block_size - rank);
+
               int64_t row_rank = U(block).cols;
               int64_t col_rank = V(icol).cols;
               auto cc_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - row_rank),
                                                     std::vector<int64_t>(1, block_size - col_rank));
-
-              row_rank = U(irow).cols;
-              col_rank = V(block).cols;
-              auto oc_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
-                                                    std::vector<int64_t>(1, block_size - col_rank));
-
-              row_rank = U(irow).cols;
-              col_rank = V(icol).cols;
-              auto matrix_splits = matrix.split(std::vector<int64_t>(1, block_size - row_rank),
-                                                std::vector<int64_t>(1, block_size - col_rank));
-              matmul(oc_splits[2], cc_splits[0], matrix_splits[2], false, false, -1.0, 0.0);
+              if (!is_admissible(irow, block) && is_admissible(irow, icol)) {
+                std::cout << "filling oc\n";
+                row_rank = U(irow).cols;
+                col_rank = V(block).cols;
+                auto oc_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - row_rank),
+                                                      std::vector<int64_t>(1, block_size - col_rank));
+                matmul(oc_splits[2], cc_splits[0], matrix, false, false, -1.0, 0.0);
+                Loc.insert(irow, icol, std::move(matrix));
+              }
+              else if (Loc.exists(irow, block) && is_admissible(irow, icol)) {
+                std::cout << "filling oc\n";
+                matmul(Loc(irow, block), cc_splits[0], matrix, false, false, -1.0, 0.0);
+                Loc.insert(irow, icol, std::move(matrix));
+              }
             }
           }
         }
