@@ -43,6 +43,10 @@ const T& RowColMap<T>::operator[](
 
 template<class T>
 void RowColMap<T>::insert(int64_t row, int64_t col, T&& value) {
+  if ((*this).exists(row, col)) {
+    std::cout << "element row: " << row << " col: " << col << std::endl;
+    abort();
+  }
   map.insert({{row, col}, std::move(value)});
 }
 template<class T>

@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <tuple>
 #include <unordered_map>
+#include <iostream>
 
 #include "Hatrix/classes/Matrix.h"
 
