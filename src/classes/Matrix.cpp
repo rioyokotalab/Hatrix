@@ -173,7 +173,7 @@ void Matrix::print() const {
         std::cout << std::setw(7) << 0 << " ";
       }
       else {
-        std::cout << std::setprecision(3) << std::setw(7) <<  (*this)(i, j) << " ";
+        std::cout << std::setprecision(3) << std::setw(10) <<  (*this)(i, j) << " ";
       }
     }
     std::cout << "\n";

@@ -215,8 +215,8 @@ namespace Hatrix {
                                                      std::vector<int64_t>(1, block_size - col_rank));
         Matrix& Dcc = diagonal_splits[0];
         lu(Dcc);
-        solve_triangular(Dcc, diagonal_splits[1], Hatrix::Left, Hatrix::Lower, true, false, 1.0);
-        solve_triangular(Dcc, diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false, false, 1.0);
+        solve_triangular(Dcc, diagonal_splits[1], Hatrix::Left, Hatrix::Lower, true);
+        solve_triangular(Dcc, diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false);
 
         // Compute Schur's compliments for oo blocks from oc and co blocks.
         for (int irow = 0; irow < nblocks; ++irow) {
@@ -246,11 +246,7 @@ namespace Hatrix {
               auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
                                                         std::vector<int64_t>(1, block_size - rank));
               if (is_admissible(irow, icol)) {
-                // std::cout << "update S\n";
-                // S(irow, icol).print();
                 matmul(bottom_splits[2], Uco(block, icol), S(irow, icol), false, false, -1.0, 1.0);
-                // std::cout << "LATER\n";
-                // S(irow, icol).print();
               }
               else {
                 auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - rank),
@@ -437,11 +433,8 @@ namespace Hatrix {
             last_splits[i * nblocks + j] = S(i, j);
           }
           else {
-            int64_t row_rank = U(i).cols;
-            int64_t col_rank = V(j).cols;
-
-            auto D_splits = D(i, j).split(std::vector<int64_t>(1, block_size - row_rank),
-                                          std::vector<int64_t>(1, block_size - col_rank));
+            auto D_splits = D(i, j).split(std::vector<int64_t>(1, block_size - rank),
+                                          std::vector<int64_t>(1, block_size - rank));
             last_splits[i * nblocks + j] = D_splits[3];
           }
         }
@@ -645,18 +638,23 @@ int main(int argc, char** argv) {
   auto last = A.factorize();
   Hatrix::Matrix x = A.solve(b, last);
 
-  std::cout << "x:\n";
-  x.print();
+  // std::cout << "x:\n";
+  // x.print();
 
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x_solve(b);
   Hatrix::lu(Adense);
+  Adense.print();
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
+
+
   std::cout << "x solve:\n";
   (x_solve - x).print();
+
+  last.print();
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
