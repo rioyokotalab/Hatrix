@@ -273,8 +273,8 @@ namespace Hatrix {
           solve_triangular(Dcc, bottom_splits[2], Hatrix::Right, Hatrix::Upper, false);
         }
 
-        std::cout << "before left split\n";
-        D(1,0).print();
+        // std::cout << "before left split\n";
+        // D(1,0).print();
 
         // Reduce the remaining co strips behind this diagonal block on the same row.
         for (int icol = 0; icol < block; ++icol) {
@@ -466,8 +466,8 @@ namespace Hatrix {
         //   }
         // }
 
-        std::cout << "D(1,0) state: \n";
-        D(1,0).print();
+        // std::cout << "D(1,0) state: \n";
+        // D(1,0).print();
 
       } // for (int block = 0; block < nblocks; ++block)
 
