@@ -209,7 +209,16 @@ namespace Hatrix {
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
             Matrix U_F = make_complement(U(block));
-            D(block, icol) = matmul(U_F, D(block, icol), true);
+
+            if (icol < block) {
+              auto bottom_splits = D(block, icol).split({}, std::vector<int64_t>(1, block_size - rank));
+              Matrix co = matmul(U_F, bottom_splits[1], true);
+              bottom_splits[1] = co;
+
+            }
+            else {
+              D(block, icol) = matmul(U_F, D(block, icol), true);
+            }
           }
         }
 
@@ -227,11 +236,16 @@ namespace Hatrix {
         // The diagonal block is split along the row and column using the extended rank.
         auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, block_size - row_rank),
                                                      std::vector<int64_t>(1, block_size - col_rank));
+
+        Matrix ddd(D(block, block));
+        lu(ddd);
+
         Matrix& Dcc = diagonal_splits[0];
         Matrix& Dco = diagonal_splits[1];
+        Matrix& Doc = diagonal_splits[2];
         lu(Dcc);
         solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true);
-        solve_triangular(Dcc, diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false);
+        solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false);
 
         // Reduce the large cc and co off-diagonals on the same row.
         // The splitting for the inadmissible blocks on the right of the diagonal block
@@ -247,16 +261,20 @@ namespace Hatrix {
         // Reduce the large cc and oc off-diagonals on the same column.
         for (int irow = block+1; irow < nblocks; ++irow) {
           if (is_admissible(irow, block)) { continue; }
+          Matrix left_ddd(D(irow, block));
+
           // Reduce the other block with a remaining trapezoid from the diagonal dense block.
           auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
                                                     std::vector<int64_t>(1, block_size - rank));
           matmul(Dco, bottom_splits[2], bottom_splits[0], false, false, -1.0, 1.0);
 
           // Reduce the main block on the left side with direct TRSM.
-          // bottom_splits = D(irow, block).split({}, std::vector<int64_t>(1, block_size - rank));
           solve_triangular(Dcc, bottom_splits[0], Hatrix::Right, Hatrix::Upper, false);
           solve_triangular(Dcc, bottom_splits[2], Hatrix::Right, Hatrix::Upper, false);
         }
+
+        std::cout << "before left split\n";
+        D(1,0).print();
 
         // Reduce the remaining co strips behind this diagonal block on the same row.
         for (int icol = 0; icol < block; ++icol) {
@@ -271,6 +289,7 @@ namespace Hatrix {
         // Reduce the remaining oc strips behind this diagonal block on the column.
         for (int irow = 0; irow < block; ++irow) {
           if (is_admissible(irow, block)) { continue; }
+          std::cout << "oc strip update: "  << irow << " " << block << std::endl;
           auto top_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
                                                  std::vector<int64_t>(1, block_size - rank));
           solve_triangular(Dcc, top_splits[2], Hatrix::Right, Hatrix::Upper, false);
@@ -358,7 +377,7 @@ namespace Hatrix {
                                                      std::vector<int64_t>(1, c_size));
 
             std::cout << "co update: b->" << block << " irow-> " << irow << " icol->" << icol << std::endl;
-            matmul(bottom_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
+            //  matmul(bottom_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
           }
         }
 
@@ -446,6 +465,10 @@ namespace Hatrix {
         //     }
         //   }
         // }
+
+        std::cout << "D(1,0) state: \n";
+        D(1,0).print();
+
       } // for (int block = 0; block < nblocks; ++block)
 
       // Merge unfactorized portions.
