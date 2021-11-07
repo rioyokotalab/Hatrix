@@ -20,6 +20,7 @@ else()
     HSS_Nlevel_construct_chandrasekaran
     HSS_Nlevel_construct_miro
     GEMM_weak_2level
+    GEMM_weak_Nlevel
     UMV_weak_2level
     UMV_weak_Nlevel
     LDL_weak_1level
