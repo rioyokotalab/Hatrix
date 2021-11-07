@@ -324,180 +324,126 @@ Hatrix::RowLevelMap cluster_bases_product(Hatrix::RowLevelMap& W1, Hatrix::RowLe
   return P;
 }
 
+//Precompute S updates from U^T x A x V
+Hatrix::RowColLevelMap forward_transform(Hatrix::RowLevelMap& U, Hatrix::RowLevelMap& Pu,
+					 Hatrix::HSS& A,
+					 Hatrix::RowLevelMap& V, Hatrix::RowLevelMap& Pv) {
+  Hatrix::RowColLevelMap S;
+  for(int64_t level = A.height; level > 0; level--) {
+    int64_t num_nodes = pow(2, level);
+    for(int node = 0; node < num_nodes; node++) {
+      //Diagonal
+      if(level == A.height) { //Leaf
+	S.insert(node, node, level,
+		 Hatrix::matmul(Hatrix::matmul(U(node, level), A.D(node, node, level), true),
+				V(node, level)));
+      }
+      else {
+	int64_t child_level = level + 1;
+	int64_t child1 = 2*node;
+	int64_t child2 = 2*node + 1;
+	Hatrix::Matrix S_diag(A.rank, A.rank);
+	auto Utransfer_splits = U(node, level).split(2, 1);
+	auto Vtransfer_splits = V(node, level).split(2, 1);
+	
+	Hatrix::Matrix tmp1(A.rank, A.rank);
+	Hatrix::matmul(S(child1, child1, child_level), Vtransfer_splits[0], tmp1,
+		       false, false, 1., 1.);
+	Hatrix::matmul(S(child1, child2, child_level), Vtransfer_splits[1], tmp1,
+		       false, false, 1., 1.);
+	Hatrix::matmul(Utransfer_splits[0], tmp1, S_diag, true, false, 1., 1.);
+
+	Hatrix::Matrix tmp2(A.rank, A.rank);
+	Hatrix::matmul(S(child2, child1, child_level), Vtransfer_splits[0], tmp2,
+		       false, false, 1., 1.);
+	Hatrix::matmul(S(child2, child2, child_level), Vtransfer_splits[1], tmp2,
+		       false, false, 1., 1.);
+	Hatrix::matmul(Utransfer_splits[1], tmp2, S_diag, true, false, 1., 1.);
+	S.insert(node, node, level, std::move(S_diag));
+      }
+      //Off-diagonal
+      int64_t sibling = node % 2 == 0 ? node + 1 : node - 1;
+      S.insert(node, sibling, level,
+	       Hatrix::matmul(Hatrix::matmul(Pu(node, level), A.S(node, sibling, level)),
+			      Pv(sibling, level)));
+    }
+  }
+  return S;
+}
+
+void backward_transform(Hatrix::HSS& C, Hatrix::RowColLevelMap& Sc,
+			Hatrix::RowLevelMap& U, Hatrix::RowLevelMap& Pu,
+			Hatrix::RowLevelMap& V, Hatrix::RowLevelMap& Pv) {
+  for(int64_t level = 1; level <= C.height; level++) {
+    int num_nodes = pow(2, level);
+    for(int64_t node = 0; node < num_nodes; node++) {
+      //Diagonal      
+      if(level == C.height) { //Leaf
+	Hatrix::matmul(U(node, level) * Sc(node, node, level), V(node, level),
+		       C.D(node, node, level), false, true, 1., 1.);
+      }
+      else { //Non-leaf
+	int64_t child_level = level + 1;
+	int64_t child1 = 2*node;
+	int64_t child2 = 2*node + 1;
+	auto Utransfer_splits = U(node, level).split(2, 1);
+	auto Vtransfer_splits = V(node, level).split(2, 1);
+	//Add parent contribution to children
+	Hatrix::matmul(Utransfer_splits[0] * Sc(node, node, level),
+		       Vtransfer_splits[0], Sc(child1, child1, child_level),
+		       false, true, 1., 1.);
+	Hatrix::matmul(Utransfer_splits[0] * Sc(node, node, level),
+		       Vtransfer_splits[1], Sc(child1, child2, child_level),
+		       false, true, 1., 1.);
+	Hatrix::matmul(Utransfer_splits[1] * Sc(node, node, level),
+		       Vtransfer_splits[0], Sc(child2, child1, child_level),
+		       false, true, 1., 1.);
+	Hatrix::matmul(Utransfer_splits[1] * Sc(node, node, level),
+		       Vtransfer_splits[1], Sc(child2, child2, child_level),
+		       false, true, 1., 1.);
+      }
+      //Off-diagonal
+      int64_t sibling = node % 2 == 0 ? node + 1 : node - 1;
+      Hatrix::matmul(Pu(node, level), Sc(node, sibling, level) * Pv(sibling, level),
+		     C.S(node, sibling, level), false, false, 1., 1.);
+    }
+  }
+}
+							 
+
 void matmul(Hatrix::HSS& A, Hatrix::HSS& B, Hatrix::HSS& C,
 	    double alpha, double beta) {
-  Hatrix::RowLevelMap Pca = cluster_bases_product(C.U, A.U, C.height);
-  Hatrix::RowLevelMap Pab = cluster_bases_product(A.V, B.U, C.height);
-  Hatrix::RowLevelMap Pbc = cluster_bases_product(B.V, C.V, C.height);
+  auto Pca = cluster_bases_product(C.U, A.U, C.height);
+  auto Pab = cluster_bases_product(A.V, B.U, C.height);
+  auto Pbc = cluster_bases_product(B.V, C.V, C.height);
+  auto Sa = forward_transform(C.U, Pca, A, B.U, Pab);
+  auto Sb = forward_transform(A.V, Pab, B, C.V, Pbc);
+  Hatrix::RowColLevelMap Sc;
 
-  //C_1/0,0 += A_1/0,0 * B_1/0,0 + A_1/0,1 * B_1/1,0
-  Hatrix::Matrix W = A.S(0, 1, 1) * Pab(1, 1) * B.S(1, 0, 1);
-  Hatrix::Matrix A_Ubig0 = A.Ubig(0, 1);
-  auto A_Ubig0_splits = A_Ubig0.split(2, 1);
-  auto A_Utransfer0_splits = A.U(0, 1).split(2, 1);
-  Hatrix::Matrix B_Vbig0 = B.Vbig(0, 1);
-  auto B_Vbig0_splits = B_Vbig0.split(2, 1);
-  auto B_Vtransfer0_splits = B.V(0, 1).split(2, 1);
-  
-  //Recurse into C_2/0,0
-  C.D(0, 0, 2) *= beta;
-  Hatrix::matmul(A.D(0, 0, 2), B.D(0, 0, 2),
-		 C.D(0, 0, 2), false, false, alpha);
-  Hatrix::matmul(Hatrix::matmul(A.U(0, 2), A.S(0, 1, 2) * Pab(1, 2) * B.S(1, 0, 2)),
-		 B.V(0, 2), C.D(0, 0, 2), false, true, alpha);
-  Hatrix::matmul(A_Ubig0_splits[0], Hatrix::matmul(W, B_Vbig0_splits[0], false, true),
-		 C.D(0, 0, 2), false, false, alpha);
-  
-  //Recurse into C_2/0,1
-  C.S(0, 1, 2) *= beta;
-  Hatrix::matmul(Hatrix::matmul(C.U(0, 2), A.D(0, 0, 2), true) * B.U(0, 2),
-		 B.S(0, 1, 2) * Pbc(1, 2),
-		 C.S(0, 1, 2), false, false, alpha);
-  Hatrix::matmul(Pca(0, 2) * A.S(0, 1, 2),
-		 Hatrix::matmul(A.V(1, 2), B.D(1, 1, 2), true) * C.V(1, 2),
-		 C.S(0, 1, 2), false, false, alpha);
-  Hatrix::matmul(Pca(0, 2) * A_Utransfer0_splits[0] * W,
-		 Hatrix::matmul(B_Vtransfer0_splits[1], Pbc(1, 2), true),
-		 C.S(0, 1, 2), false, false, alpha);
-  //Recurse into C_2/1,0
-  C.S(1, 0, 2) *= beta;
-  Hatrix::matmul(Pca(1, 2) * A.S(1, 0, 2),
-		 Hatrix::matmul(A.V(0, 2), B.D(0, 0, 2), true) * C.V(0, 2),
-		 C.S(1, 0, 2), false, false, alpha);
-  Hatrix::matmul(Hatrix::matmul(C.U(1, 2), A.D(1, 1, 2), true) * B.U(1, 2),
-		 B.S(1, 0, 2) * Pbc(0, 2),
-		 C.S(1, 0, 2), false, false, alpha);
-  Hatrix::matmul(Pca(1, 2) * A_Utransfer0_splits[1] * W,
-		 Hatrix::matmul(B_Vtransfer0_splits[0], Pbc(0, 2), true),
-		 C.S(1, 0, 2), false, false, alpha);
-  //Recurse into C_2/1,1
-  C.D(1, 1, 2) *= beta;
-  Hatrix::matmul(Hatrix::matmul(A.U(1, 2), A.S(1, 0, 2) * Pab(0, 2)),
-		 Hatrix::matmul(B.S(0, 1, 2), B.V(1, 2), false, true),
-		 C.D(1, 1, 2), false, false, alpha);
-  Hatrix::matmul(A.D(1, 1, 2), B.D(1, 1, 2),
-		 C.D(1, 1, 2), false, false, alpha);
-  Hatrix::matmul(A_Ubig0_splits[1], Hatrix::matmul(W, B_Vbig0_splits[1], false, true),
-		 C.D(1, 1, 2), false, false, alpha);
-
-  //C_1/0,1 += A_1/0,0 * B_1/0,1
-  C.S(0, 1, 1) *= beta;
-  Hatrix::Matrix Shat_A00(C.rank, B.rank);
-  Hatrix::Matrix C_Ubig0 = C.Ubig(0, 1);
-  auto C_Ubig0_splits = C_Ubig0.split(2, 1);
-  Hatrix::Matrix B_Ubig0 = B.Ubig(0, 1);
-  auto B_Ubig0_splits = B_Ubig0.split(2, 1);
-  Hatrix::matmul(Hatrix::matmul(C_Ubig0_splits[0], A.D(0, 0, 2), true),
-		 B_Ubig0_splits[0], Shat_A00);
-  Hatrix::matmul(Hatrix::matmul(C_Ubig0_splits[1], A.U(1, 2) * A.S(1, 0, 2), true),
-		 Hatrix::matmul(A.V(0, 2), B_Ubig0_splits[0], true), Shat_A00);
-  Hatrix::matmul(Hatrix::matmul(C_Ubig0_splits[0], A.U(0, 2) * A.S(0, 1, 2), true),
-		 Hatrix::matmul(A.V(1, 2), B_Ubig0_splits[1], true), Shat_A00);
-  Hatrix::matmul(Hatrix::matmul(C_Ubig0_splits[1], A.D(1, 1, 2), true),
-		 B_Ubig0_splits[1], Shat_A00);
-  Hatrix::matmul(Shat_A00, B.S(0, 1, 1) * Pbc(1, 1),
-		 C.S(0, 1, 1), false, false, alpha);
-  //C_1/0,1 += A_1/0,1 * B_1/1,1
-  Hatrix::Matrix Shat_B11(A.rank, C.rank);
-  Hatrix::Matrix A_Vbig1 = A.Vbig(1, 1);
-  auto A_Vbig1_splits = A_Vbig1.split(2, 1);
-  Hatrix::Matrix C_Vbig1 = C.Vbig(1, 1);
-  auto C_Vbig1_splits = C_Vbig1.split(2, 1);
-  Hatrix::matmul(Hatrix::matmul(A_Vbig1_splits[0], B.D(2, 2, 2), true),
-		 C_Vbig1_splits[0], Shat_B11);
-  Hatrix::matmul(Hatrix::matmul(A_Vbig1_splits[1], B.U(3, 2) * B.S(3, 2, 2), true),
-		 Hatrix::matmul(B.V(2, 2), C_Vbig1_splits[0], true), Shat_B11);
-  Hatrix::matmul(Hatrix::matmul(A_Vbig1_splits[0], B.U(2, 2) * B.S(2, 3, 2), true),
-		 Hatrix::matmul(B.V(3, 2), C_Vbig1_splits[1], true), Shat_B11);
-  Hatrix::matmul(Hatrix::matmul(A_Vbig1_splits[1], B.D(3, 3, 2), true),
-		 C_Vbig1_splits[1], Shat_B11);
-  Hatrix::matmul(Pca(0, 1) * A.S(0, 1, 1), Shat_B11,
-		 C.S(0, 1, 1), false, false, alpha);
-
-  //C_1/1,0 += A_1/1,0 * B_1/0,0
-  C.S(1, 0, 1) *= beta;
-  Hatrix::Matrix Shat_B00(A.rank, C.rank);
-  Hatrix::Matrix A_Vbig0 = A.Vbig(0, 1);
-  auto A_Vbig0_splits = A_Vbig0.split(2, 1);
-  Hatrix::Matrix C_Vbig0 = C.Vbig(0, 1);
-  auto C_Vbig0_splits = C_Vbig0.split(2, 1);
-  Hatrix::matmul(Hatrix::matmul(A_Vbig0_splits[0], B.D(0, 0, 2), true),
-		 C_Vbig0_splits[0], Shat_B00);
-  Hatrix::matmul(Hatrix::matmul(A_Vbig0_splits[1], B.U(1, 2) * B.S(1, 0, 2), true),
-		 Hatrix::matmul(B.V(0, 2), C_Vbig0_splits[0], true), Shat_B00);
-  Hatrix::matmul(Hatrix::matmul(A_Vbig0_splits[0], B.U(0, 2) * B.S(0, 1, 2), true),
-		 Hatrix::matmul(B.V(1, 2), C_Vbig0_splits[1], true), Shat_B00);
-  Hatrix::matmul(Hatrix::matmul(A_Vbig0_splits[1], B.D(1, 1, 2), true),
-		 C_Vbig0_splits[1], Shat_B00);
-  Hatrix::matmul(Pca(1, 1) * A.S(1, 0, 1), Shat_B00,
-		 C.S(1, 0, 1), false, false, alpha);
-  //C_1/1,0 += A_1/1,1 * B_1/1,0
-  Hatrix::Matrix Shat_A11(C.rank, B.rank);
-  Hatrix::Matrix C_Ubig1 = C.Ubig(1, 1);
-  auto C_Ubig1_splits = C_Ubig1.split(2, 1);
-  Hatrix::Matrix B_Ubig1 = B.Ubig(1, 1);
-  auto B_Ubig1_splits = B_Ubig1.split(2, 1);
-  Hatrix::matmul(Hatrix::matmul(C_Ubig1_splits[0], A.D(2, 2, 2), true),
-		 B_Ubig1_splits[0], Shat_A11);
-  Hatrix::matmul(Hatrix::matmul(C_Ubig1_splits[1], A.U(3, 2) * A.S(3, 2, 2), true),
-		 Hatrix::matmul(A.V(2, 2), B_Ubig1_splits[0], true), Shat_A11);
-  Hatrix::matmul(Hatrix::matmul(C_Ubig1_splits[0], A.U(2, 2) * A.S(2, 3, 2), true),
-		 Hatrix::matmul(A.V(3, 2), B_Ubig1_splits[1], true), Shat_A11);
-  Hatrix::matmul(Hatrix::matmul(C_Ubig1_splits[1], A.D(3, 3, 2), true),
-		 B_Ubig1_splits[1], Shat_A11);
-  Hatrix::matmul(Shat_A11, B.S(1, 0, 1) * Pbc(0, 1),
-		 C.S(1, 0, 1), false, false, alpha);
-
-  //C_1/1,1 += A_1/1,0 * B_1/0,1 + A_1/1,1 * B_1/1,1
-  Hatrix::Matrix Y = A.S(1, 0, 1) * Pab(0, 1) * B.S(0, 1, 1);
-  Hatrix::Matrix A_Ubig1 = A.Ubig(1, 1);
-  auto A_Ubig1_splits = A_Ubig1.split(2, 1);
-  auto A_Utransfer1_splits = A.U(1, 1).split(2, 1);
-  Hatrix::Matrix B_Vbig1 = B.Vbig(1, 1);
-  auto B_Vbig1_splits = B_Vbig1.split(2, 1);
-  auto B_Vtransfer1_splits = B.V(1, 1).split(2, 1);
-  //Recurse into C_2/2,2
-  C.D(2, 2, 2) *= beta;
-  Hatrix::matmul(A.D(2, 2, 2), B.D(2, 2, 2),
-		 C.D(2, 2, 2), false, false, alpha);
-  Hatrix::matmul(Hatrix::matmul(A.U(2, 2), A.S(2, 3, 2) * Pab(3, 2) * B.S(3, 2, 2)),
-		 B.V(2, 2), C.D(2, 2, 2), false, true, alpha);
-  Hatrix::matmul(A_Ubig1_splits[0], Hatrix::matmul(Y, B_Vbig1_splits[0], false, true),
-		 C.D(2, 2, 2), false, false, alpha);
-
-  //Recurse into C_2/2,3
-  C.S(2, 3, 2) *= beta;
-  Hatrix::matmul(Hatrix::matmul(C.U(2, 2), A.D(2, 2, 2), true) * B.U(2, 2),
-		 B.S(2, 3, 2) * Pbc(3, 2),
-		 C.S(2, 3, 2), false, false, alpha);
-  Hatrix::matmul(Pca(2, 2) * A.S(2, 3, 2),
-		 Hatrix::matmul(A.V(3, 2), B.D(3, 3, 2), true) * C.V(3, 2),
-		 C.S(2, 3, 2), false, false, alpha);
-  Hatrix::matmul(Pca(2, 2) * A_Utransfer1_splits[0] * Y,
-		 Hatrix::matmul(B_Vtransfer1_splits[1], Pbc(3, 2), true),
-		 C.S(2, 3, 2), false, false, alpha);
-
-  //Recurse into C_2/3,2
-  C.S(3, 2, 2) *= beta;
-  Hatrix::matmul(Pca(3, 2) * A.S(3, 2, 2),
-		 Hatrix::matmul(A.V(2, 2), B.D(2, 2, 2), true) * C.V(2, 2),
-		 C.S(3, 2, 2), false, false, alpha);
-  Hatrix::matmul(Hatrix::matmul(C.U(3, 2), A.D(3, 3, 2), true) * B.U(3, 2),
-		 B.S(3, 2, 2) * Pbc(2, 2),
-		 C.S(3, 2, 2), false, false, alpha);
-  Hatrix::matmul(Pca(3, 2) * A_Utransfer1_splits[1] * Y,
-		 Hatrix::matmul(B_Vtransfer1_splits[0], Pbc(2, 2), true),
-		 C.S(3, 2, 2), false, false, alpha);
-
-  //Recurse into C_2/3,3
-  C.D(3, 3, 2) *= beta;
-  Hatrix::matmul(Hatrix::matmul(A.U(3, 2), A.S(3, 2, 2) * Pab(2, 2)),
-		 Hatrix::matmul(B.S(2, 3, 2), B.V(3, 2), false, true),
-		 C.D(3, 3, 2), false, false, alpha);
-  Hatrix::matmul(A.D(3, 3, 2), B.D(3, 3, 2),
-		 C.D(3, 3, 2), false, false, alpha);
-  Hatrix::matmul(A_Ubig1_splits[1], Hatrix::matmul(Y, B_Vbig1_splits[1], false, true),
-		 C.D(3, 3, 2), false, false, alpha);
+  for(int64_t level = C.height; level > 0; level--) {
+    int64_t num_nodes = pow(2, level);
+    for(int64_t node = 0; node < num_nodes; node++) {
+      int64_t sibling = node % 2 == 0 ? node + 1 : node - 1;
+      //Diagonal
+      if(level == C.height) { //Leaf
+	Hatrix::matmul(A.D(node, node, level), B.D(node, node, level),
+		       C.D(node, node, level), false, false, 1., 1.);
+      }
+      Sc.insert(node, node, level,
+		A.S(node, sibling, level) * Pab(sibling, level) *
+		B.S(sibling, node, level));
+      //Off-diagonal
+      Hatrix::matmul(Sa(node, node, level),
+		     B.S(node, sibling, level) * Pbc(sibling, level),
+		     C.S(node, sibling, level), false, false, 1., 1.);
+      Hatrix::matmul(Pca(node, level) * A.S(node, sibling, level),
+		     Sb(sibling, sibling, level),
+		     C.S(node, sibling, level), false, false, 1., 1.);
+      Sc.insert(node, sibling, level,
+		Hatrix::Matrix(A.U(node, level).cols, B.V(sibling, level).cols));
+    }
+  }
+  backward_transform(C, Sc, A.U, Pca, B.V, Pbc);
 }
 
 double cond(Hatrix::Matrix A) {
@@ -512,7 +458,7 @@ double cond(Hatrix::Matrix A) {
 int main(int argc, char** argv) {
   int64_t N = argc > 1 ? atoi(argv[1]) : 256;
   int64_t rank = argc > 2 ? atoi(argv[2]) : 8;
-  int64_t height = 2;
+  int64_t height = argc > 3 ? atoi(argv[3]) : 2;
   double pv;
 
   Hatrix::Context::init();
