@@ -116,7 +116,9 @@ namespace Hatrix {
           is_admissible.insert(i, i, std::abs(i - i) > admis);
         // }
       }
-      is_admissible.insert(1, 0, admis == 1 ? false : true);
+      for (int i = 0; i < nblocks-1; ++i) {
+        is_admissible.insert(i+1, i, admis == 1 ? false : true);
+      }
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -133,8 +135,6 @@ namespace Hatrix {
           }
         }
       }
-
-
 
       int64_t oversampling = 5;
       Hatrix::Matrix Utemp, Stemp, Vtemp;
@@ -214,7 +214,6 @@ namespace Hatrix {
               auto bottom_splits = D(block, icol).split({}, std::vector<int64_t>(1, block_size - rank));
               Matrix co = matmul(U_F, bottom_splits[1], true);
               bottom_splits[1] = co;
-
             }
             else {
               D(block, icol) = matmul(U_F, D(block, icol), true);
@@ -393,8 +392,8 @@ namespace Hatrix {
       permute_back(x, block_size);
 
       // backward substition using cc blocks
-      for (int irow = nblocks-1; irow >= 0; --irow) {
-        assert(U(irow).cols == V(irow).cols);
+      for (int block = nblocks-1; block >= 0; --block) {
+        assert(U(block).cols == V(block).cols);
 
         // Reduce the RHS with newly introduced fill-ins
         // for (int upper_col = nblocks-1; upper_col >= 0; --upper_col) {
@@ -411,54 +410,54 @@ namespace Hatrix {
 
         // Reduce the RHS with the co blocks that correspond the matrix blocks that are actually
         // in the lower triangle but still need to be considered as part of the upper triangle.
-        for (int upper_col = 0; upper_col < irow; ++upper_col) {
-          if (!is_admissible(irow, upper_col)) {
-            auto D_splits = D(irow, upper_col).split(std::vector<int64_t>(1, block_size - rank),
+        for (int upper_col = 0; upper_col < block; ++upper_col) {
+          if (!is_admissible(block, upper_col)) {
+            auto D_splits = D(block, upper_col).split(std::vector<int64_t>(1, block_size - rank),
                                                      std::vector<int64_t>(1, block_size - rank));
-            Matrix x_irow(x_split[irow]);
-            auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - rank), {});
+            Matrix x_block(x_split[block]);
+            auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_size - rank), {});
             Matrix x_upper_col(x_split[upper_col]);
             auto x_upper_col_splits = x_upper_col.split(std::vector<int64_t>(1, block_size - rank), {});
 
-            matmul(D_splits[1], x_upper_col_splits[1], x_irow_splits[0], false, false, -1.0, 1.0);
+            matmul(D_splits[1], x_upper_col_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
             for (int64_t i = 0; i < block_size; ++i) {
-              x(irow * block_size + i, 0) = x_irow(i, 0);
+              x(block * block_size + i, 0) = x_block(i, 0);
             }
           }
         }
 
         // Reduce the RHS with the cc blocks of the upper right part of the matrix. These blocks are parts
         // of the dense blocks that actually belong the upper triangle of the whole matrix.
-        for (int icol = nblocks-1; icol > irow; --icol) {
-          if (is_admissible(irow, icol)) { continue; }
-          auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - rank), {});
-          Matrix x_irow(x_split[irow]);
-          Matrix x_icol(x_split[icol]);
-          auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - rank), {});
-          auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - rank), {});
+        // for (int icol = nblocks-1; icol > irow; --icol) {
+        //   if (is_admissible(irow, icol)) { continue; }
+        //   auto D_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - rank), {});
+        //   Matrix x_irow(x_split[irow]);
+        //   Matrix x_icol(x_split[icol]);
+        //   auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - rank), {});
+        //   auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - rank), {});
 
-          matmul(D_splits[0], x_icol, x_irow_splits[0], false, false, -1.0, 1.0);
+        //   matmul(D_splits[0], x_icol, x_irow_splits[0], false, false, -1.0, 1.0);
 
-          for (int64_t i = 0; i < block_size; ++i) {
-            x(irow * block_size + i, 0) = x_irow(i, 0);
-          }
-        }
+        //   for (int64_t i = 0; i < block_size; ++i) {
+        //     x(irow * block_size + i, 0) = x_irow(i, 0);
+        //   }
+        // }
 
-        auto block_splits = D(irow, irow).split(std::vector<int64_t>(1, block_size - rank),
+        auto block_splits = D(block, block).split(std::vector<int64_t>(1, block_size - rank),
                                                 std::vector<int64_t>(1, block_size - rank));
-        Matrix x_irow(x_split[irow]);
-        auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - rank), {});
-        matmul(block_splits[1], x_irow_splits[1], x_irow_splits[0], false, false, -1.0, 1.0);
-        solve_triangular(block_splits[0], x_irow_splits[0], Hatrix::Left, Hatrix::Upper, false);
+        Matrix x_block(x_split[block]);
+        auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_size - rank), {});
+        matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+        solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
         for (int64_t i = 0; i < block_size; ++i) {
-          x(irow * block_size + i, 0) = x_irow(i, 0);
+          x(block * block_size + i, 0) = x_block(i, 0);
         }
 
-        if (V.exists(irow)) {
-          auto V_F = make_complement(V(irow));
-          Matrix prod = matmul(V_F, x_split[irow]);
+        if (V.exists(block)) {
+          auto V_F = make_complement(V(block));
+          Matrix prod = matmul(V_F, x_split[block]);
           for (int i = 0; i < block_size; ++i) {
-            x(irow * block_size + i, 0) = prod(i, 0);
+            x(block * block_size + i, 0) = prod(i, 0);
           }
         }
       }
