@@ -319,42 +319,51 @@ namespace Hatrix {
       std::vector<Matrix> x_split = x.split(nblocks, 1);
 
       // forward substitution with cc blocks
-      for (int irow = 0; irow < nblocks; ++irow) {
-        if (U.exists(irow)) {
-          Matrix U_F = make_complement(U(irow));
-          Matrix prod = matmul(U_F, x_split[irow], true);
+      for (int block = 0; block < nblocks; ++block) {
+        if (U.exists(block)) {
+          Matrix U_F = make_complement(U(block));
+          Matrix prod = matmul(U_F, x_split[block], true);
           for (int64_t i = 0; i < block_size; ++i) {
-            x(irow * block_size + i, 0) = prod(i, 0);
+            x(block * block_size + i, 0) = prod(i, 0);
           }
         }
 
-        assert(U(irow).cols == V(irow).cols);
-        int64_t row_rank = U(irow).cols;
+        assert(U(block).cols == V(block).cols);
 
-        auto D_splits = D(irow, irow).split(std::vector<int64_t>(1, block_size - row_rank),
-                                            std::vector<int64_t>(1, block_size - row_rank));
-        Matrix temp(x_split[irow]);
-        auto temp_splits = temp.split(std::vector<int64_t>(1, block_size - row_rank), {});
+        auto D_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
+                                            std::vector<int64_t>(1, c_size));
+        Matrix temp(x_split[block]);
+        auto temp_splits = temp.split(std::vector<int64_t>(1, c_size), {});
         solve_triangular(D_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Lower, true);
         matmul(D_splits[2], temp_splits[0], temp_splits[1], false, false, -1.0, 1.0);
         for (int64_t i = 0; i < block_size; ++i) {
-          x(irow * block_size + i, 0) = temp(i, 0);
+          x(block * block_size + i, 0) = temp(i, 0);
         }
 
-        for (int icol = 0; icol < irow; ++icol) {
-          if (is_admissible(irow, icol)) { continue; }
-          auto D_splits = D(irow, icol).split({}, std::vector<int64_t>(1, block_size - rank));
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          if (is_admissible(irow, block)) { continue; }
+          auto D_splits = D(irow, block).split({}, std::vector<int64_t>(1, c_size));
 
-          Matrix x_irow(x_split[irow]);
-          Matrix x_icol(x_split[icol]);
-          auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - rank), {});
-          auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - rank), {});
+          Matrix x_block(x_split[block]);
+          auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
 
-          matmul(D_splits[0], x_icol_splits[0], x_irow, false, false, -1.0, 1.0);
-          for (int64_t i = 0; i < block_size; ++i) {
-            x(irow * block_size + i, 0) = x_irow(i, 0);
-          }
+          matmul(D_splits[0], x_block_splits[0], x_split[irow], false, false, -1.0, 1.0);
         }
+
+        // for (int icol = 0; icol < block; ++icol) {
+        //   if (is_admissible(block, icol)) { continue; }
+        //   auto D_splits = D(block, icol).split({}, std::vector<int64_t>(1, block_size - rank));
+
+        //   Matrix x_irow(x_split[block]);
+        //   Matrix x_icol(x_split[icol]);
+        //   auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_size - rank), {});
+        //   auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, block_size - rank), {});
+
+        //   matmul(D_splits[0], x_icol_splits[0], x_irow, false, false, -1.0, 1.0);
+        //   for (int64_t i = 0; i < block_size; ++i) {
+        //     x(irow * block_size + i, 0) = x_irow(i, 0);
+        //   }
+        // }
 
         // // Reduce the RHS using the newly introduced fill-ins
         // for (int lower_row = 0; lower_row < nblocks; ++lower_row) {
