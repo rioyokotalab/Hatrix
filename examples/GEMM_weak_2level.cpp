@@ -500,49 +500,39 @@ void matmul(Hatrix::HSS& A, Hatrix::HSS& B, Hatrix::HSS& C,
 		 C.D(3, 3, 2), false, false, alpha);
 }
 
-double cond(Hatrix::Matrix A) {
-  int64_t s_dim = A.min_dim();
-  Hatrix::Matrix U(A.rows, s_dim);
-  Hatrix::Matrix S(s_dim, s_dim);
-  Hatrix::Matrix V(s_dim, A.cols);
-  Hatrix::svd(A, U, S, V);
-  return S(0, 0)/S(s_dim-1, s_dim-1);
-}
-
 int main(int argc, char** argv) {
   int64_t N = argc > 1 ? atoi(argv[1]) : 256;
   int64_t rank = argc > 2 ? atoi(argv[2]) : 8;
   int64_t height = 2;
   double pv;
 
+  if (N % int(pow(2, height)) != 0 || rank > int(N / pow(2, height))) {
+    std::cout << N << " % " << pow(2, height) << " != 0 || rank > leaf(" << int(N / pow(2, height))  << ")\n";
+    abort();
+  }
+
   Hatrix::Context::init();
   randvec_t A_randpts, B_randpts, C_randpts;
   A_randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
   B_randpts.push_back(equally_spaced_vector(N, 1.0, 2.0)); // 1D
   C_randpts.push_back(equally_spaced_vector(N, 3.0, 4.0)); // 1D
+  pv = 1e-3 * (1.0/N); //Make diagonal value increasing proportional to N
 
-  pv = 1e-3 * (1.0/N);
-  Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(A_randpts, N, N, 0, 0, pv);
   Hatrix::HSS A(A_randpts, pv, N, rank, height);
-  double cond_A = cond(A_dense);
-
-  Hatrix::Matrix B_dense = Hatrix::generate_laplacend_matrix(B_randpts, N, N, 0, 0, pv);
   Hatrix::HSS B(B_randpts, pv, N, rank, height);
-  double cond_B = cond(B_dense);
-
-  pv = 1e-3;
-  Hatrix::Matrix C_dense = Hatrix::generate_laplacend_matrix(C_randpts, N, N, 0, 0, pv);
   Hatrix::HSS C(C_randpts, pv, N, rank, height);
-  double cond_C = cond(C_dense);
+  
+  Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(A_randpts, N, N, 0, 0, pv);
+  Hatrix::Matrix B_dense = Hatrix::generate_laplacend_matrix(B_randpts, N, N, 0, 0, pv);
+  Hatrix::Matrix C_dense = Hatrix::generate_laplacend_matrix(C_randpts, N, N, 0, 0, pv);  
   
   matmul(A, B, C, 1, 1);
   Hatrix::matmul(A_dense, B_dense, C_dense, false, false, 1, 1);
 
   double construction_error = A.construction_rel_error(A_randpts);
   double matmul_error = C.rel_error(C_dense);
-  std::cout <<"N=" <<N <<", rank=" <<rank <<", height=" <<height <<"\n";
-  std::cout <<"cond(A)=" <<cond_A <<", cond(B)=" <<cond_B <<", cond(C)=" <<cond_C <<"\n";
-  std::cout <<"construction error=" <<construction_error <<", matmul error=" <<matmul_error <<"\n";
+  std::cout <<"N=" <<N <<", rank=" <<rank <<", height=" <<height;
+  std::cout <<", construction error=" <<construction_error <<", matmul error=" <<matmul_error <<"\n";
 
   Hatrix::Context::finalize();
   return 0;
