@@ -51,7 +51,7 @@ Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
 	rij += ((x[k][i+row_start] - x[k][j+col_start]) *
 		(x[k][i+row_start] - x[k][j+col_start]));
       }
-      out(i, j) = 1 / (std::sqrt(rij) + 1e-3);
+      out(i, j) = 1 / (std::sqrt(rij) + 1e-6);
     }
   }
   return out;
