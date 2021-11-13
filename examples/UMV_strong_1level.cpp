@@ -269,6 +269,17 @@ namespace Hatrix {
           matmul(Doc, right_splits[0], right_splits[1], false, false, -1.0, 1.0);
         }
 
+        // Perform upper TRSM between A.VF blocks above this diagonal blocks and cc of diagonal block.
+        for (int irow = 0; irow < block; ++irow) {
+          if (is_admissible(irow, block)) { continue; }
+          auto top_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
+                                                 std::vector<int64_t>(1, block_size - rank));
+          // TRSM between cc block on the diagonal and oc block above this diagonal block.
+          solve_triangular(Dcc, top_splits[2], Hatrix::Right, Hatrix::Upper, false);
+          // GEMM between oc block here and the
+          matmul(top_splits[3], Dco, top_splits[3], false, false, -1.0, 1.0);
+        }
+
         // Perform TRSM between A.VF blocks on the bottom of this diagonal block and the cc of the diagonal.
         for (int irow = block+1; irow < nblocks; ++irow) {
           if (is_admissible(irow, block)) { continue; }
