@@ -198,6 +198,7 @@ namespace Hatrix {
             Matrix U_F = make_complement(U(block));
 
             if (icol < block) {
+              D(block, icol).print();
               auto bottom_splits = D(block, icol).split({}, std::vector<int64_t>(1, block_size - rank));
               Matrix co = matmul(U_F, bottom_splits[1], true);
               bottom_splits[1] = co;
@@ -222,8 +223,7 @@ namespace Hatrix {
           }
         }
 
-        // Expanded rank as a result of fill-in compression might be different at this level.
-        // The diagonal block is split along the row and column using the extended rank.
+        // The diagonal block is split along the row and column.
         auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, block_size - rank),
                                                      std::vector<int64_t>(1, block_size - rank));
 
@@ -235,17 +235,6 @@ namespace Hatrix {
         solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false);
         matmul(Doc, Dco, diagonal_splits[3], false, false, -1.0, 1.0);
 
-        // Perform TRSM between A.UF blocks on the blocks behind the diagonal
-        for (int icol = 0; icol < block; ++icol) {
-          if (is_admissible(block, icol)) { continue; }
-          auto left_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank),
-                                                  std::vector<int64_t>(1, block_size - rank));
-          // TRSM between cc block on diagonal and co block here.
-          solve_triangular(Dcc, left_splits[1], Hatrix::Left, Hatrix::Lower, true);
-          // Use the lower part of the trapezoid.
-          matmul(Doc, left_splits[1], left_splits[3], false, false, -1.0, 1.0);
-        }
-
         // Perform lower TRSM between diagonal and the A.UF block on the right of the diagonal.
         for (int icol = block+1; icol < nblocks; ++icol) {
           if (is_admissible(block, icol)) { continue; }
@@ -254,18 +243,6 @@ namespace Hatrix {
           solve_triangular(Dcc, right_splits[0], Hatrix::Left, Hatrix::Lower, true);
           // Use the lower part of the trapezoid
           matmul(Doc, right_splits[0], right_splits[1], false, false, -1.0, 1.0);
-        }
-
-        // Perform upper TRSM between A.VF blocks (oc part) above this diagonal blocks and cc of diagonal block.
-        for (int irow = 0; irow < block; ++irow) {
-          if (is_admissible(irow, block)) { continue; }
-          std::cout << "oc part: " << irow << " b: " << block << std::endl;
-          auto top_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
-                                                 std::vector<int64_t>(1, block_size - rank));
-          // TRSM between cc block on the diagonal and oc block above this diagonal block.
-          solve_triangular(Dcc, top_splits[2], Hatrix::Right, Hatrix::Upper, false);
-          // GEMM between oc block here and the
-          matmul(top_splits[3], Dco, top_splits[3], false, false, -1.0, 1.0);
         }
 
         // Perform TRSM between A.VF blocks on the bottom of this diagonal block and the cc of the diagonal.
@@ -278,6 +255,7 @@ namespace Hatrix {
           matmul(bottom_splits[0], Dco, bottom_splits[1], false, false, -1.0, 1.0);
         }
 
+
         // Compute the schur's compliment between the reduced part of the A.UF block on the
         // upper right and reduced A.VF part of the bottom left.
         for (int irow = block+1; irow < nblocks; ++irow) {
@@ -287,6 +265,29 @@ namespace Hatrix {
             auto bottom_block = D(irow, block).split({}, std::vector<int64_t>(1, block_size - rank));
             matmul(bottom_block[0], right_block[0], D(irow, icol), false, false -1.0, 1.0);
           }
+        }
+
+        // Perform TRSM between A.UF blocks on the blocks behind the diagonal
+        for (int icol = 0; icol < block; ++icol) {
+          if (is_admissible(block, icol)) { continue; }
+          auto left_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank),
+                                                  std::vector<int64_t>(1, block_size - rank));
+          // TRSM between cc block on diagonal and co block here.
+          solve_triangular(Dcc, left_splits[1], Hatrix::Left, Hatrix::Lower, true);
+          // Use the lower part of the trapezoid.
+          matmul(Doc, left_splits[1], left_splits[3], false, false, -1.0, 1.0);
+        }
+
+        // Perform upper TRSM between A.VF blocks (oc part) above this diagonal blocks and cc of diagonal block.
+        for (int irow = 0; irow < block; ++irow) {
+          if (is_admissible(irow, block)) { continue; }
+          std::cout << "oc part: " << irow << " b: " << block << std::endl;
+          auto top_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
+                                                 std::vector<int64_t>(1, block_size - rank));
+          // TRSM between cc block on the diagonal and oc block above this diagonal block.
+          solve_triangular(Dcc, top_splits[2], Hatrix::Right, Hatrix::Upper, false);
+          // GEMM between oc block here and the
+          matmul(top_splits[3], Dco, top_splits[3], false, false, -1.0, 1.0);
         }
       } // for (int block = 0; block < nblocks; ++block)
 
@@ -329,7 +330,7 @@ namespace Hatrix {
         }
 
         auto block_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
-                                            std::vector<int64_t>(1, c_size));
+                                                  std::vector<int64_t>(1, c_size));
         Matrix temp(x_split[block]);
         auto temp_splits = temp.split(std::vector<int64_t>(1, c_size), {});
         solve_triangular(block_splits[0], temp_splits[0], Hatrix::Left, Hatrix::Lower, true);
@@ -341,6 +342,7 @@ namespace Hatrix {
         // Forward with the oc parts of the block that are actually in the upper part of the matrix.
         for (int irow = 0; irow < block; ++irow) {
           if (is_admissible(irow, block)) { continue; }
+          std::cout << "L ir: " << irow << std::endl;
           auto D_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                std::vector<int64_t>(1, c_size));
           Matrix x_irow(x_split[irow]), x_block(x_split[block]);
@@ -371,17 +373,10 @@ namespace Hatrix {
       }
 
       permute_forward(x, block_size);
-
-      last.print();
       auto permute_splits = x.split(std::vector<int64_t>(1, (block_size - rank) * nblocks), {});
+
       solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
       solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
-
-
-      // Matrix copy(permute_splits[1]);
-      // auto s = lu_solve(last, copy);
-      // permute_splits[1] = s;
-
       permute_back(x, block_size);
 
       // backward substition using cc blocks
@@ -396,7 +391,6 @@ namespace Hatrix {
 
             Matrix x_block(x_split[block]);
             auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_size - rank), {});
-            // auto x_right_col_splits = x_right_col.split(std::vector<int64_t>(1, block_size - rank), {});
 
             matmul(right_splits[0], x_split[right_col], x_block_splits[0], false, false, -1.0, 1.0);
             for (int64_t i = 0; i < block_size; ++i) {
