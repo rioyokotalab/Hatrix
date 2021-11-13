@@ -297,7 +297,6 @@ namespace Hatrix {
             if (is_admissible(irow, block) || is_admissible(block, icol) || is_admissible(irow, icol)) { continue; }
             auto right_block = D(block, icol).split(std::vector<int64_t>(1, block_size - rank), {});
             auto bottom_block = D(irow, block).split({}, std::vector<int64_t>(1, block_size - rank));
-            // std::cout << "reduce: " << irow << " " << icol << std::endl;
             matmul(bottom_block[0], right_block[0], D(irow, icol), false, false -1.0, 1.0);
           }
         }
@@ -349,6 +348,23 @@ namespace Hatrix {
           x(block * block_size + i, 0) = temp(i, 0);
         }
 
+        // Forward with the oc parts of the block that are actually in the upper part of the matrix.
+        for (int irow = 0; irow < block; ++irow) {
+          if (is_admissible(irow, block)) { continue; }
+          auto D_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
+                                               std::vector<int64_t>(1, c_size));
+          Matrix x_irow(x_split[irow]), x_block(x_split[block]);
+          auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
+          auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
+
+          matmul(D_splits[2], x_block_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
+
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(block * block_size + i, 0) = x_block(i, 0);
+          }
+        }
+
+        // Forward with the big c blocks on the lower part.
         for (int irow = block+1; irow < nblocks; ++irow) {
           if (is_admissible(irow, block)) { continue; }
           auto D_splits = D(irow, block).split({}, std::vector<int64_t>(1, c_size));
