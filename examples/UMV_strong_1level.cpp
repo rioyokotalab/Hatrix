@@ -198,7 +198,6 @@ namespace Hatrix {
             Matrix U_F = make_complement(U(block));
 
             if (icol < block) {
-              D(block, icol).print();
               auto bottom_splits = D(block, icol).split({}, std::vector<int64_t>(1, block_size - rank));
               Matrix co = matmul(U_F, bottom_splits[1], true);
               bottom_splits[1] = co;
@@ -226,7 +225,6 @@ namespace Hatrix {
         // The diagonal block is split along the row and column.
         auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, block_size - rank),
                                                      std::vector<int64_t>(1, block_size - rank));
-
         Matrix& Dcc = diagonal_splits[0];
         Matrix& Dco = diagonal_splits[1];
         Matrix& Doc = diagonal_splits[2];
@@ -255,18 +253,6 @@ namespace Hatrix {
           matmul(bottom_splits[0], Dco, bottom_splits[1], false, false, -1.0, 1.0);
         }
 
-
-        // Compute the schur's compliment between the reduced part of the A.UF block on the
-        // upper right and reduced A.VF part of the bottom left.
-        for (int irow = block+1; irow < nblocks; ++irow) {
-          for (int icol = block+1; icol < nblocks; ++icol) {
-            if (is_admissible(irow, block) || is_admissible(block, icol) || is_admissible(irow, icol)) { continue; }
-            auto right_block = D(block, icol).split(std::vector<int64_t>(1, block_size - rank), {});
-            auto bottom_block = D(irow, block).split({}, std::vector<int64_t>(1, block_size - rank));
-            matmul(bottom_block[0], right_block[0], D(irow, icol), false, false -1.0, 1.0);
-          }
-        }
-
         // Perform TRSM between A.UF blocks on the blocks behind the diagonal
         for (int icol = 0; icol < block; ++icol) {
           if (is_admissible(block, icol)) { continue; }
@@ -281,13 +267,24 @@ namespace Hatrix {
         // Perform upper TRSM between A.VF blocks (oc part) above this diagonal blocks and cc of diagonal block.
         for (int irow = 0; irow < block; ++irow) {
           if (is_admissible(irow, block)) { continue; }
-          std::cout << "oc part: " << irow << " b: " << block << std::endl;
           auto top_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
                                                  std::vector<int64_t>(1, block_size - rank));
+          std::cout << "top split\n";
+          // GEMM between oc block here and the
+          matmul(top_splits[2], Dco, top_splits[3], false, false, -1.0, 1.0);
           // TRSM between cc block on the diagonal and oc block above this diagonal block.
           solve_triangular(Dcc, top_splits[2], Hatrix::Right, Hatrix::Upper, false);
-          // GEMM between oc block here and the
-          matmul(top_splits[3], Dco, top_splits[3], false, false, -1.0, 1.0);
+        }
+
+        // Compute the schur's compliment between the reduced part of the A.UF block on the
+        // upper right and reduced A.VF part of the bottom left.
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          for (int icol = block+1; icol < nblocks; ++icol) {
+            if (is_admissible(irow, block) || is_admissible(block, icol) || is_admissible(irow, icol)) { continue; }
+            auto right_block = D(block, icol).split(std::vector<int64_t>(1, block_size - rank), {});
+            auto bottom_block = D(irow, block).split({}, std::vector<int64_t>(1, block_size - rank));
+            matmul(bottom_block[0], right_block[0], D(irow, icol), false, false -1.0, 1.0);
+          }
         }
       } // for (int block = 0; block < nblocks; ++block)
 
@@ -339,6 +336,21 @@ namespace Hatrix {
           x(block * block_size + i, 0) = temp(i, 0);
         }
 
+        // Forward with the big c blocks on the lower part.
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          if (is_admissible(irow, block)) { continue; }
+          auto D_splits = D(irow, block).split({}, std::vector<int64_t>(1, c_size));
+
+          Matrix x_block(x_split[block]);
+          auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
+
+          Matrix x_irow(x_split[irow]);
+          matmul(D_splits[0], x_block_splits[0], x_irow, false, false, -1.0, 1.0);
+          for (int64_t i = 0; i < block_size; ++i) {
+            x(irow * block_size + i, 0) = x_irow(i, 0);
+          }
+        }
+
         // Forward with the oc parts of the block that are actually in the upper part of the matrix.
         for (int irow = 0; irow < block; ++irow) {
           if (is_admissible(irow, block)) { continue; }
@@ -356,20 +368,6 @@ namespace Hatrix {
           }
         }
 
-        // Forward with the big c blocks on the lower part.
-        for (int irow = block+1; irow < nblocks; ++irow) {
-          if (is_admissible(irow, block)) { continue; }
-          auto D_splits = D(irow, block).split({}, std::vector<int64_t>(1, c_size));
-
-          Matrix x_block(x_split[block]);
-          auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
-
-          Matrix x_irow(x_split[irow]);
-          matmul(D_splits[0], x_block_splits[0], x_irow, false, false, -1.0, 1.0);
-          for (int64_t i = 0; i < block_size; ++i) {
-            x(irow * block_size + i, 0) = x_irow(i, 0);
-          }
-        }
       }
 
       permute_forward(x, block_size);
@@ -385,6 +383,24 @@ namespace Hatrix {
         auto block_splits = D(block, block).split(std::vector<int64_t>(1, block_size - rank),
                                                   std::vector<int64_t>(1, block_size - rank));
 
+        std::cout << "b: " << block << std::endl;
+        // Apply co block.
+        for (int left_col = block-1; left_col >= 0; --left_col) {
+          if (!is_admissible(block, left_col)) {
+            // std::cout << "co update: b-> " << block << " u-> " << left_col << std::endl;
+            auto left_splits = D(block, left_col).split(std::vector<int64_t>(1, block_size - rank),
+                                                        std::vector<int64_t>(1, block_size - rank));
+            Matrix x_block(x_split[block]), x_left_col(x_split[left_col]);
+            auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_size - rank), {});
+            auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, block_size - rank), {});
+
+            matmul(left_splits[1], x_left_col_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+            for (int64_t i = 0; i < block_size; ++i) {
+              x(block * block_size + i, 0) = x_block(i, 0);
+            }
+          }
+        }
+
         for (int right_col = nblocks-1; right_col > block; --right_col) {
           if (!is_admissible(block, right_col)) {
             auto right_splits = D(block, right_col).split(std::vector<int64_t>(1, block_size - rank), {});
@@ -393,22 +409,6 @@ namespace Hatrix {
             auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_size - rank), {});
 
             matmul(right_splits[0], x_split[right_col], x_block_splits[0], false, false, -1.0, 1.0);
-            for (int64_t i = 0; i < block_size; ++i) {
-              x(block * block_size + i, 0) = x_block(i, 0);
-            }
-          }
-        }
-
-        for (int left_col = block-1; left_col >= 0; --left_col) {
-          if (!is_admissible(block, left_col)) {
-            // std::cout << "co update: b-> " << block << " u-> " << left_col << std::endl;
-            auto left_splits = D(block, left_col).split(std::vector<int64_t>(1, block_size - rank),
-                                                      std::vector<int64_t>(1, block_size - rank));
-            Matrix x_block(x_split[block]), x_left_col(x_split[left_col]);
-            auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_size - rank), {});
-            auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, block_size - rank), {});
-
-            matmul(left_splits[1], x_left_col_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
             for (int64_t i = 0; i < block_size; ++i) {
               x(block * block_size + i, 0) = x_block(i, 0);
             }
