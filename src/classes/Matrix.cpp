@@ -169,12 +169,12 @@ int64_t Matrix::max_dim() const { return std::max(rows, cols); }
 void Matrix::print() const {
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
-      if ((*this)(i, j) > -1e-14 && (*this)(i, j) < 1e-14) {
-        std::cout << std::setw(7) << 0 << " ";
-      }
-      else {
+      // if ((*this)(i, j) > -1e-14 && (*this)(i, j) < 1e-14) {
+      //   std::cout << std::setw(10) << 0 << " ";
+      // }
+      // else {
         std::cout << std::setprecision(3) << std::setw(10) <<  (*this)(i, j) << " ";
-      }
+      // }
     }
     std::cout << "\n";
   }
