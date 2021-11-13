@@ -108,10 +108,10 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
 
-        is_admissible.insert(i, i, std::abs(i - i) > admis);
-        // for (int j = 0; j <= i; ++j) {
-        is_admissible.insert(i+1, i, admis == 0 ? true : false);
-        // }
+        // is_admissible.insert(i, i, std::abs(i - i) > admis);
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::abs(i - j) > admis);
+        }
       }
       // for (int i = 0; i < nblocks-1; ++i) {
       //   is_admissible.insert(i+1, i, admis == 1 ? false : true);
@@ -224,7 +224,14 @@ namespace Hatrix {
         for (int irow = 0; irow < nblocks; ++irow) {
           if (!is_admissible(irow, block) && V.exists(block)) {
             Matrix V_F = make_complement(V(block));
-            D(irow, block) = matmul(D(irow, block), V_F);
+            if (irow > block) {
+              auto right_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank), {});
+              Matrix oc = matmul(right_splits[1], V_F);
+              right_splits[1] = oc;
+            }
+            else {
+              D(irow, block) = matmul(D(irow, block), V_F);
+            }
           }
         }
 
@@ -241,12 +248,9 @@ namespace Hatrix {
         solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false);
         matmul(Doc, Dco, diagonal_splits[3], false, false, -1.0, 1.0);
 
-        // std::cout << "AT BLOCK -> " << block << std::endl;
-
         // Perform TRSM between A.UF blocks on the blocks behind the diagonal
         for (int icol = 0; icol < block; ++icol) {
           if (is_admissible(block, icol)) { continue; }
-          // std::cout << "ICOL : <" << block << "," << icol << ">" << std::endl;
           auto left_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank),
                                                   std::vector<int64_t>(1, block_size - rank));
           // TRSM between cc block on diagonal and co block here.
@@ -255,10 +259,19 @@ namespace Hatrix {
           matmul(Doc, left_splits[1], left_splits[3], false, false, -1.0, 1.0);
         }
 
+        // Perform lower TRSM between diagonal and the A.UF block on the right of the diagonal.
+        for (int icol = block+1; icol < nblocks; ++icol) {
+          if (is_admissible(block, icol)) { continue; }
+          auto right_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank), {});
+          // TRSM between cc block on diagonal and c block on the right
+          solve_triangular(Dcc, right_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          // Use the lower part of the trapezoid
+          matmul(Doc, right_splits[0], right_splits[1], false, false, -1.0, 1.0);
+        }
+
         // Perform TRSM between A.VF blocks on the bottom of this diagonal block and the cc of the diagonal.
         for (int irow = block+1; irow < nblocks; ++irow) {
           if (is_admissible(irow, block)) { continue; }
-          // std::cout << "IROW : " << irow << "," << block << ">" << std::endl;
           auto bottom_splits = D(irow, block).split({}, std::vector<int64_t>(1, block_size - rank));
           // TRSM between cc block on diagonal and c block here.
           solve_triangular(Dcc, bottom_splits[0], Hatrix::Right, Hatrix::Upper, false);
