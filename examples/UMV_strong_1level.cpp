@@ -205,85 +205,6 @@ namespace Hatrix {
     Matrix factorize() {
       int block_size = N / nblocks;
 
-      // Matrix U0 = make_complement(U(0));
-      // Matrix V0 = make_complement(V(0));
-      // Matrix D00 = matmul(matmul(U0, D(0, 0), true), V0);
-
-      // auto D00_splits = D00.split(std::vector<int64_t>(1, block_size - rank),
-      //                             std::vector<int64_t>(1, block_size - rank));
-      // lu(D00_splits[0]);
-      // solve_triangular(D00_splits[0], D00_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      // solve_triangular(D00_splits[0], D00_splits[2], Hatrix::Right, Hatrix::Upper, false);
-      // matmul(D00_splits[2], D00_splits[1], D00_splits[3], false, false, -1.0, 1.0);
-
-      // Matrix D10 = matmul(D(1, 0), V0);
-
-      // auto D10_splits = D10.split({}, std::vector<int64_t>(1, block_size - rank));
-      // solve_triangular(D00_splits[0], D10_splits[0], Hatrix::Right, Hatrix::Upper, false);
-      // matmul(D10_splits[0], D00_splits[1], D10_splits[1], false, false, -1.0, 1.0);
-
-      // Matrix U1 = make_complement(U(1));
-      // Matrix t = matmul(U1, D10_splits[1], true);
-      // D10_splits[1] = t;
-
-      // Matrix V1 = make_complement(V(1));
-      // Matrix D11 = matmul(matmul(U1, D(1,1), true), V1);
-
-      // auto D11_splits = D11.split(std::vector<int64_t>(1, block_size - rank),
-      //                             std::vector<int64_t>(1, block_size - rank));
-      // lu(D11_splits[0]);
-      // solve_triangular(D11_splits[0], D11_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      // solve_triangular(D11_splits[0], D11_splits[2], Hatrix::Right, Hatrix::Upper, false);
-      // matmul(D11_splits[2], D11_splits[1], D11_splits[3], false, false, -1.0, 1.0);
-
-      // D10_splits = D10.split(std::vector<int64_t>(1, block_size - rank),
-      //                        std::vector<int64_t>(1, block_size - rank));
-
-      // solve_triangular(D11_splits[0], D10_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      // matmul(D11_splits[2], D10_splits[1], D10_splits[3], false, false, -1.0, 1.0);
-
-      // Matrix D21 = matmul(D(2, 1), V1);
-
-      // // TRSM between diagonal block and the one below it.
-      // auto D21_splits = D21.split({}, std::vector<int64_t>(1, block_size - rank));
-      // solve_triangular(D11_splits[0], D21_splits[0], Hatrix::Right, Hatrix::Upper, false);
-      // matmul(D21_splits[0], D00_splits[1], D21_splits[1], false, false, -1.0, 1.0);
-
-      // Matrix U2 = make_complement(U(2));
-      // Matrix V2 = make_complement(V(2));
-
-      // Matrix D22 = matmul(matmul(U2, D(2,2), true), V2);
-
-      // auto D22_splits = D22.split(std::vector<int64_t>(1, block_size - rank),
-      //                             std::vector<int64_t>(1, block_size - rank));
-      // lu(D22_splits[0]);
-      // solve_triangular(D22_splits[0], D22_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      // solve_triangular(D22_splits[0], D22_splits[2], Hatrix::Right, Hatrix::Upper, false);
-      // matmul(D22_splits[2], D22_splits[1], D22_splits[3], false, false, -1.0, 1.0);
-
-      // D21_splits = D21.split(std::vector<int64_t>(1, block_size - rank),
-      //                        std::vector<int64_t>(1, block_size - rank));
-
-      // // TRSM between (2,2) and block before it.
-      // solve_triangular(D22_splits[0], D21_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      // matmul(D22_splits[2], D21_splits[1], D21_splits[3], false, false, -1.0, 1.0);
-
-      // std::cout << "D(0,0)\n";
-      // D00.print();
-
-      // std::cout << "D(1,0)\n";
-      // D10.print();
-
-      // std::cout << "D(1,1)\n";
-      // D11.print();
-
-      // std::cout << "D(2,1)\n";
-      // D21.print();
-
-      // std::cout << "D(2,2)\n";
-      // D22.print();
-
-
       for (int block = 0; block < nblocks; ++block) {
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
@@ -344,9 +265,6 @@ namespace Hatrix {
           // GEMM between c block here and co block from diagonal.
           matmul(bottom_splits[0], Dco, bottom_splits[1], false, false, -1.0, 1.0);
         }
-
-        // std::cout << "2,1:\n";
-        // D(2,1).print();
       } // for (int block = 0; block < nblocks; ++block)
 
       // Merge unfactorized portions.
@@ -365,19 +283,6 @@ namespace Hatrix {
           }
         }
       }
-
-      // Matrix A(last);
-      // std::vector<int> ipiv(A.min_dim());
-      // LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
-
-      // for (int i = 0; i < nblocks * rank; ++i) {
-      //   std::cout << "i: " << i << " " <<  (ipiv[i] == i + 1) << std::endl;;
-      // }
-      // std::cout << std::endl;
-
-      // last.print();
-            // last.print();
-      // lu(last);
 
       return last;
     }
