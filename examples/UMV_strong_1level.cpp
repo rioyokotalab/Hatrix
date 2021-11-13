@@ -278,6 +278,18 @@ namespace Hatrix {
           // GEMM between c block here and co block from diagonal.
           matmul(bottom_splits[0], Dco, bottom_splits[1], false, false, -1.0, 1.0);
         }
+
+        // Compute the schur's compliment between the reduced part of the A.UF block on the
+        // upper right and reduced A.VF part of the bottom left.
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          for (int icol = block+1; icol < nblocks; ++icol) {
+            if (is_admissible(irow, block) || is_admissible(block, icol) || is_admissible(irow, icol)) { continue; }
+            auto right_block = D(block, icol).split(std::vector<int64_t>(1, block_size - rank), {});
+            auto bottom_block = D(irow, block).split({}, std::vector<int64_t>(1, block_size - rank));
+            // std::cout << "reduce: " << irow << " " << icol << std::endl;
+            matmul(bottom_block[0], right_block[0], D(irow, icol), false, false -1.0, 1.0);
+          }
+        }
       } // for (int block = 0; block < nblocks; ++block)
 
       // Merge unfactorized portions.
