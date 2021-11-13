@@ -364,7 +364,7 @@ namespace Hatrix {
           matmul(D_splits[2], x_block_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
 
           for (int64_t i = 0; i < block_size; ++i) {
-            x(irow * block_size + i, 0) = x_irow(i, 0);
+            //   x(irow * block_size + i, 0) = x_irow(i, 0);
           }
         }
 
