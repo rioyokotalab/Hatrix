@@ -404,6 +404,21 @@ namespace Hatrix {
           }
         }
 
+        for (int right_col = block+1; right_col < nblocks; ++right_col) {
+          if (!is_admissible(block, right_col)) {
+            auto right_splits = D(block, right_col).split(std::vector<int64_t>(1, block_size - rank), {});
+
+            Matrix x_block(x_split[block]);
+            auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_size - rank), {});
+            // auto x_right_col_splits = x_right_col.split(std::vector<int64_t>(1, block_size - rank), {});
+
+            matmul(right_splits[0], x_split[right_col], x_block_splits[0], false, false, -1.0, 1.0);
+            for (int64_t i = 0; i < block_size; ++i) {
+              x(block * block_size + i, 0) = x_block(i, 0);
+            }
+          }
+        }
+
         auto block_splits = D(block, block).split(std::vector<int64_t>(1, block_size - rank),
                                                 std::vector<int64_t>(1, block_size - rank));
         Matrix x_block(x_split[block]);
