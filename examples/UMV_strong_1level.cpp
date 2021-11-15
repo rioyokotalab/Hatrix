@@ -194,6 +194,20 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
+        // Recompress fill-ins and update row bases where ever necessary.
+        for (int icol = 0; icol < nblocks; ++icol) {
+          if (F.exists(block, icol)) {
+
+          }
+        }
+
+        // Recompress fill-ins and update col bases wherever necessary.
+        for (int irow = 0; irow < nblocks; ++irow) {
+          if (F.exists(irow, block)) {
+
+          }
+        }
+
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
             Matrix U_F = make_complement(U(block));
