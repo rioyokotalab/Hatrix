@@ -191,6 +191,7 @@ namespace Hatrix {
     // Perform factorization assuming the permuted form of the BLR2 matrix.
     Matrix factorize() {
       int block_size = N / nblocks;
+      RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
         for (int icol = 0; icol < nblocks; ++icol) {
@@ -286,6 +287,30 @@ namespace Hatrix {
             auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - rank),
                                                      std::vector<int64_t>(1, block_size - rank));
             matmul(top_splits[2], left_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+          }
+        }
+
+        // Schur's compliment leading to fill-in between oc blocks on the upper part of the matrix
+        // and the (b-r) * r upper slice of the row that is being TRSM'd.
+        for (int irow = 0; irow < block; ++irow) {
+          for (int icol = block+1; icol < nblocks; ++icol) {
+            if (is_admissible(block, icol) || is_admissible(irow, block)) { continue; }
+            auto right_splits = D(block, icol).split({}, std::vector<int64_t>(1, block_size - rank));
+            auto top_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
+                                                   std::vector<int64_t>(1, block_size - rank));
+            F.insert(irow, icol, matmul(right_splits[0], top_splits[2]));
+          }
+        }
+
+        // Schur's compliment leading to fill-in between co blocks on lower part of the matrix
+        // and the r * (b-r) left slice of the column that is begin TRSM'd.
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          for (int icol = 0; icol < block; ++icol) {
+            if (is_admissible(block, icol) || is_admissible(irow, block)) { continue; }
+            auto left_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank), {});
+            auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
+                                                      std::vector<int64_t>(1, block_size - rank));
+            F.insert(irow, icol, matmul(bottom_splits[0], left_splits[1]));
           }
         }
 
