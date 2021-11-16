@@ -202,9 +202,9 @@ namespace Hatrix {
           for (int icol = 0; icol < block; ++icol) {
             if (F.exists(block, icol)) {
               update_bases = true;
-              S(block, icol).print();
               Matrix bases = matmul(U(block), S(block, icol));
-              Matrix bases_concat = concat(U(block), F(block, icol), 1);
+              std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(F(block, icol), rank);
+              Matrix bases_concat = concat(U(block), matmul(Utemp, Stemp), 1);
               row_bases_concat = concat(row_bases_concat, bases_concat, 1);
               F.erase(block, icol);
             }
@@ -222,7 +222,8 @@ namespace Hatrix {
             if (F.exists(irow, block)) {
               update_bases = true;
               Matrix bases = matmul(S(irow, block), transpose(V(block)));
-              Matrix bases_concat = concat(bases, F(irow, block), 0);
+              std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(F(irow, block), rank);
+              Matrix bases_concat = concat(bases, matmul(Stemp, Vtemp), 0);
               col_bases_concat = concat(col_bases_concat, bases_concat, 0);
               F.erase(irow, block);
             }
@@ -238,7 +239,6 @@ namespace Hatrix {
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
             Matrix U_F = make_complement(U(block));
-
             if (icol < block) {
               auto bottom_splits = D(block, icol).split({}, std::vector<int64_t>(1, block_size - rank));
               Matrix co = matmul(U_F, bottom_splits[1], true);
