@@ -189,16 +189,11 @@ namespace Hatrix {
     }
 
     // Perform factorization assuming the permuted form of the BLR2 matrix.
-    Matrix factorize() {
+    Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        // if (F.exists(2,0)) {
-        //   std::cout << "pre print 2,0\n";
-        //   F(2,0).print();
-        // }
-
         if (block > 0) {
           Matrix Utemp, Stemp, Vtemp; double error;
           // Recompress fill-ins on the row and update row bases.
@@ -207,9 +202,11 @@ namespace Hatrix {
           for (int icol = 0; icol < block; ++icol) {
             if (F.exists(block, icol)) {
               update_bases = true;
+              S(block, icol).print();
               Matrix bases = matmul(U(block), S(block, icol));
-              Matrix bases_concat = concat(bases, F(block, icol), 1);
+              Matrix bases_concat = concat(U(block), F(block, icol), 1);
               row_bases_concat = concat(row_bases_concat, bases_concat, 1);
+              F.erase(block, icol);
             }
           }
           if (update_bases) {
@@ -227,6 +224,7 @@ namespace Hatrix {
               Matrix bases = matmul(S(irow, block), transpose(V(block)));
               Matrix bases_concat = concat(bases, F(irow, block), 0);
               col_bases_concat = concat(col_bases_concat, bases_concat, 0);
+              F.erase(irow, block);
             }
           }
 
@@ -236,8 +234,6 @@ namespace Hatrix {
             V.insert(block, std::move(transpose(Vtemp)));
           }
         }
-
-        // Erase previously computed fill-ins
 
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
@@ -367,9 +363,6 @@ namespace Hatrix {
             auto fill_in_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
             Matrix t = matmul(bottom_splits[0], left_splits[1]);
             fill_in_splits[1] = t;
-
-            // std::cout << "MAKE FILLIN: row-> " << irow << " col-> " << icol << std::endl;
-            // fill_in.print();
             F.insert(irow, icol, std::move(fill_in));
           }
         }
@@ -388,8 +381,13 @@ namespace Hatrix {
 
       for (int irow = 0; irow < nblocks; ++irow) {
         for (int icol = 0; icol < nblocks; ++icol) {
-          if (is_admissible(irow, icol) && F.exists(irow, icol)) {
-            S(irow, icol) = S(irow, icol) + matmul(matmul(U(irow), F(irow, icol), true), V(icol));
+          if (is_admissible(irow, icol)) {
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                     block_size, block_size,
+                                                                     irow*block_size, icol*block_size);
+            S.erase(irow, icol);
+            S.insert(irow, icol,
+                     Hatrix::matmul(Hatrix::matmul(U(irow), dense, true), V(icol)));
           }
         }
       }
@@ -594,7 +592,7 @@ int main(int argc, char** argv) {
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
   A.print_structure();
   double construct_error = A.construction_relative_error(randpts);
-  auto last = A.factorize();
+  auto last = A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b, last);
 
   // std::cout << "x:\n";
