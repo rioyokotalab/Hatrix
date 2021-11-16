@@ -55,6 +55,8 @@ public:
   Matrix extract(int64_t key);
 
   bool exists(int64_t key) const;
+
+  void erase(int64_t key);
 };
 typedef RowMap ColMap;
 
@@ -78,6 +80,9 @@ class RowColMap {
 
   // Check if given <row,col> tuple exists.
   bool exists(int64_t row, int64_t col) const;
+
+  // Check if given <row, col> typle exists in this map.
+  bool exists(const std::tuple<int64_t, int64_t>& key) const;
 
   // Erase given (row, col) from the map.
   void erase(int64_t row, int64_t col);

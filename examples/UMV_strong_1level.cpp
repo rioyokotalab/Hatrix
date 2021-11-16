@@ -194,19 +194,44 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        // Recompress fill-ins and update row bases where ever necessary.
-        for (int icol = 0; icol < nblocks; ++icol) {
-          if (F.exists(block, icol)) {
 
+
+        if (block > 0) {
+          Matrix Utemp, Stemp, Vtemp; double error;
+          // Recompress fill-ins on the row and update row bases.
+          Matrix row_bases_concat(U(block).rows, 0);
+          bool update_bases = false;
+          for (int icol = 0; icol < block; ++icol) {
+            if (F.exists(block, icol)) {
+              update_bases = true;
+              Matrix bases = matmul(U(block), S(block, icol));
+              Matrix bases_concat = concat(bases, F(block, icol), 1);
+              row_bases_concat = concat(row_bases_concat, bases_concat, 1);
+            }
+          }
+          if (update_bases) {
+            std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(row_bases_concat, rank);
+            U.erase(block);
+            U.insert(block, std::move(Utemp));
+          }
+
+          // Recompress fill-ins on the col and update col bases.
+          Matrix col_bases_concat(0, V(block).rows);
+          update_bases = false;
+          for (int irow = 0; irow < block; ++irow) {
+            if (F.exists(irow, block)) {
+              update_bases = true;
+              std::cout << "hhll\n";
+              Matrix bases = matmul(S(irow, block), transpose(V(block)));
+              bases.print_meta();
+              F(irow, block).print_meta();
+              Matrix bases_concat = concat(bases, F(irow, block), 0);
+              col_bases_concat = concat(col_bases_concat, bases_concat, 0);
+            }
           }
         }
 
-        // Recompress fill-ins and update col bases wherever necessary.
-        for (int irow = 0; irow < nblocks; ++irow) {
-          if (F.exists(irow, block)) {
-
-          }
-        }
+        // Erase previously computed fill-ins
 
         for (int icol = 0; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
@@ -313,6 +338,9 @@ namespace Hatrix {
             auto top_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
                                                    std::vector<int64_t>(1, block_size - rank));
             F.insert(irow, icol, matmul(right_splits[0], top_splits[2]));
+
+            // std::cout << "irow " << irow << " icol " << icol << std::endl;
+            // F(irow, icol).print_meta();
           }
         }
 
@@ -321,10 +349,13 @@ namespace Hatrix {
         for (int irow = block+1; irow < nblocks; ++irow) {
           for (int icol = 0; icol < block; ++icol) {
             if (is_admissible(block, icol) || is_admissible(irow, block)) { continue; }
-            auto left_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank), {});
-            auto bottom_splits = D(irow, block).split(std::vector<int64_t>(1, block_size - rank),
-                                                      std::vector<int64_t>(1, block_size - rank));
+            auto left_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank),
+                                                    std::vector<int64_t>(1, block_size - rank));
+            auto bottom_splits = D(irow, block).split({}, std::vector<int64_t>(1, block_size - rank));
             F.insert(irow, icol, matmul(bottom_splits[0], left_splits[1]));
+
+            std::cout << "irow " << irow << " icol " << icol << std::endl;
+            F(irow, icol).print_meta();
           }
         }
 

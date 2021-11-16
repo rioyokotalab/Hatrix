@@ -22,6 +22,10 @@ bool RowMap::exists(int64_t key) const {
   return map.count(key) == 0 ? false : true;
 }
 
+void RowMap::erase(int64_t key) {
+  map.erase({key});
+}
+
 template<class T>
 T& RowColMap<T>::operator()(int64_t row, int64_t col) {
   return map.at({row, col});
@@ -43,15 +47,16 @@ const T& RowColMap<T>::operator[](
 
 template<class T>
 void RowColMap<T>::insert(int64_t row, int64_t col, T&& value) {
-  if ((*this).exists(row, col)) {
-    std::cout << "element row: " << row << " col: " << col << std::endl;
-    abort();
-  }
-  map.insert({{row, col}, std::move(value)});
+  (*this).insert({row, col}, std::move(value));
 }
 template<class T>
 void RowColMap<T>::insert(const std::tuple<int64_t, int64_t>& key,
                        T&& value) {
+  if ((*this).exists(key)) {
+    std::cout << "Element at <" << std::get<0>(key) << "," << std::get<1>(key)
+              << "> exists and cannot be inserted." << std::endl;
+    abort();
+  }
   map.insert({key, std::move(value)});
 }
 
@@ -71,6 +76,11 @@ T RowColMap<T>::extract(const std::tuple<int64_t, int64_t>& key) {
 template<class T>
 bool RowColMap<T>::exists(int64_t row, int64_t col) const {
   return map.count({row, col}) == 0 ? false : true;
+}
+
+template<class T>
+bool RowColMap<T>::exists(const std::tuple<int64_t, int64_t>& key) const {
+  return map.count(key) == 0 ? false : true;
 }
 
 template<class T>
