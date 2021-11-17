@@ -16,7 +16,6 @@ namespace Hatrix {
 
   Matrix concat(const Matrix& A, const Matrix& B, const int axis) {
     if (axis == 0) {
-      std::cout << "A.cols= " << A.cols << " B.cols= " << B.cols << std::endl;
       assert(A.cols == B.cols);
       Matrix matrix(A.rows + B.rows, A.cols);
       auto matrix_splits = matrix.split(std::vector<int64_t>(1, A.rows), {});
