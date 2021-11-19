@@ -42,7 +42,7 @@ Matrix generate_identity_matrix(int64_t rows, int64_t cols) {
 
 Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
 				 int64_t rows, int64_t cols,
-				 int64_t row_start, int64_t col_start) {
+				 int64_t row_start, int64_t col_start, double pv) {
   Matrix out(rows, cols);
   for(int64_t i = 0; i < rows; i++) {
     for(int64_t j = 0; j < cols; j++) {
@@ -51,7 +51,7 @@ Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
 	rij += ((x[k][i+row_start] - x[k][j+col_start]) *
 		(x[k][i+row_start] - x[k][j+col_start]));
       }
-      out(i, j) = 1 / (std::sqrt(rij) + 1e-6);
+      out(i, j) = 1 / (std::sqrt(rij) + pv);
     }
   }
   return out;

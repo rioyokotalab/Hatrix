@@ -16,6 +16,7 @@
 // Accuracy Directly Controlled Fast Direct Solution of General H^2-matrices and Its
 // Application to Solving Electrodynamics Volume Integral Equations
 
+constexpr double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
@@ -124,7 +125,7 @@ namespace Hatrix {
             D.insert(i, j,
                      Hatrix::generate_laplacend_matrix(randpts,
                                                        block_size, block_size,
-                                                       i*block_size, j*block_size));
+                                                       i*block_size, j*block_size, PV));
           }
         }
       }
@@ -148,7 +149,7 @@ namespace Hatrix {
             admissible_found = true;
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size);
+                                                                     i*block_size, j*block_size, PV);
             Hatrix::matmul(dense, Y[j], AY);
           }
         }
@@ -167,7 +168,7 @@ namespace Hatrix {
             admissible_found = true;
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size);
+                                                                     i*block_size, j*block_size, PV);
             Hatrix::matmul(Y[i], dense, YtA, true);
           }
         }
@@ -183,7 +184,7 @@ namespace Hatrix {
           if (is_admissible(i, j)) {
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size);
+                                                                     i*block_size, j*block_size, PV);
             S.insert(i, j,
                      Hatrix::matmul(Hatrix::matmul(U(i), dense, true), V(j)));
           }
@@ -427,7 +428,8 @@ namespace Hatrix {
                                                                      block_size,
                                                                      block_size,
                                                                      irow*block_size,
-                                                                     icol*block_size);
+                                                                     icol*block_size,
+                                                                     PV);
             S.erase(irow, icol);
             S.insert(irow, icol,
                      Hatrix::matmul(Hatrix::matmul(U(irow), dense, true), V(icol)));
@@ -581,7 +583,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           Matrix actual = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
-                                                            i * block_size, j * block_size);
+                                                            i * block_size, j * block_size, PV);
           dense_norm += pow(Hatrix::norm(actual), 2);
 
           if (!is_admissible(i, j)) {
@@ -619,9 +621,9 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
   randvec_t randpts;
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 1D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 2D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 3D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -640,7 +642,7 @@ int main(int argc, char** argv) {
   // x.print();
 
   // Verification with dense solver.
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
   // Hatrix::Matrix x_solve(b);
   // Hatrix::lu(Adense);
