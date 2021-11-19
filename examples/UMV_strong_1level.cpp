@@ -197,16 +197,6 @@ namespace Hatrix {
       int c_size = block_size - rank;
       RowColMap<Matrix> F;      // fill-in blocks.
 
-      for (int irow = 0; irow < nblocks; ++irow) {
-        for (int icol = 0; icol < nblocks; ++icol) {
-          if (!is_admissible(irow, icol)) {
-            // Matrix U_F = make_complement(U(irow));
-            // Matrix V_F = make_complement(V(icol));
-            // D(irow, icol) = matmul(matmul(U_F, D(irow, icol), true), V_F);
-          }
-        }
-      }
-
       for (int block = 0; block < nblocks; ++block) {
         if (block > 0) {
           Matrix Utemp, Stemp, Vtemp; double error;
@@ -281,7 +271,7 @@ namespace Hatrix {
         // Multiplication of UF with block ahead of the diagonal block on the same row
         for (int icol = block+1; icol < nblocks; ++icol) {
           if (!is_admissible(block, icol)) {
-            D(block, icol) = matmul(U_F, D(block, icol), true);
+             D(block, icol) = matmul(U_F, D(block, icol), true);
           }
         }
 
@@ -327,19 +317,9 @@ namespace Hatrix {
           auto right_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
                                                    {});
           // TRSM between cc block on diagonal and c block on the right
-          solve_triangular(Dcc, right_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          // solve_triangular(Dcc, right_splits[0], Hatrix::Left, Hatrix::Lower, true);
           // Use the lower part of the trapezoid
-          matmul(Doc, right_splits[0], right_splits[1], false, false, -1.0, 1.0);
-        }
-
-        // Perform TRSM between A.UF blocks on the blocks behind the diagonal
-        for (int icol = 0; icol < block; ++icol) {
-          if (is_admissible(block, icol)) { continue; }
-          auto left_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
-                                                  std::vector<int64_t>(1, c_size));
-
-          // TRSM between cc block on diagonal and co block here.
-          solve_triangular(Dcc, left_splits[1], Hatrix::Left, Hatrix::Lower, true);
+          // matmul(Doc, right_splits[0], right_splits[1], false, false, -1.0, 1.0);
         }
 
         // Perform TRSM between A.VF blocks on the bottom of this diagonal block and the cc of the diagonal.
@@ -348,10 +328,20 @@ namespace Hatrix {
           auto bottom_splits = D(irow, block).split({},
                                                     std::vector<int64_t>(1, block_size - rank));
           // TRSM between cc block on diagonal and c block here.
-          solve_triangular(Dcc, bottom_splits[0], Hatrix::Right, Hatrix::Upper, false);
+          // solve_triangular(Dcc, bottom_splits[0], Hatrix::Right, Hatrix::Upper, false);
           // GEMM between c block here and co block from diagonal.
-          matmul(bottom_splits[0], Dco, bottom_splits[1], false, false, -1.0, 1.0);
+          //          matmul(bottom_splits[0], Dco, bottom_splits[1], false, false, -1.0, 1.0);
         }
+
+        // Perform TRSM between A.UF blocks on the blocks behind the diagonal
+        for (int icol = 0; icol < block; ++icol) {
+          if (is_admissible(block, icol)) { continue; }
+          auto left_splits = D(block, icol).split(std::vector<int64_t>(1, c_size),
+                                                  std::vector<int64_t>(1, c_size));
+          // TRSM between cc block on diagonal and co block here.
+          //          solve_triangular(Dcc, left_splits[1], Hatrix::Left, Hatrix::Lower, true);
+        }
+
 
         // Perform upper TRSM between A.VF blocks (oc part) above this diagonal blocks and cc of diagonal block.
         for (int irow = 0; irow < block; ++irow) {
@@ -360,7 +350,7 @@ namespace Hatrix {
                                                  std::vector<int64_t>(1, block_size - rank));
 
           // TRSM between cc block on the diagonal and oc block above this diagonal block.
-          solve_triangular(Dcc, top_splits[2], Hatrix::Right, Hatrix::Upper, false);
+          //          solve_triangular(Dcc, top_splits[2], Hatrix::Right, Hatrix::Upper, false);
         }
 
         // Schur's compliment between the co and oc blocks on the left and upper parts of
@@ -376,7 +366,7 @@ namespace Hatrix {
                                                     std::vector<int64_t>(1, block_size - rank));
             auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - rank),
                                                      std::vector<int64_t>(1, block_size - rank));
-            matmul(top_splits[2], left_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+            //            matmul(top_splits[2], left_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
           }
         }
 
@@ -426,7 +416,7 @@ namespace Hatrix {
             auto right_block = D(block, icol).split(std::vector<int64_t>(1, c_size), {});
             auto bottom_block = D(irow, block).split({}, std::vector<int64_t>(1, c_size));
             Matrix& mat = D(irow, icol);
-            matmul(bottom_block[0], right_block[0], mat, false, false -1.0, 1.0);
+            //            matmul(bottom_block[0], right_block[0], mat, false, false -1.0, 1.0);
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
