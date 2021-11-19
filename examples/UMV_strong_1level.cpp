@@ -226,8 +226,8 @@ namespace Hatrix {
           if (update_bases) {
             std::tie(Utemp, Stemp, Vtemp, error) =
               Hatrix::truncated_svd(Urow_bases_concat, rank);
-            // U.erase(block);
-            // U.insert(block, std::move(Utemp));
+            U.erase(block);
+            U.insert(block, std::move(Utemp));
           }
         }
 
@@ -259,8 +259,8 @@ namespace Hatrix {
           if (update_bases) {
             std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(Vcol_bases_concat,
                                                                          rank);
-            // V.erase(block);
-            // V.insert(block, std::move(transpose(Vtemp)));
+            V.erase(block);
+            V.insert(block, std::move(transpose(Vtemp)));
           }
         }
 
@@ -301,17 +301,14 @@ namespace Hatrix {
         }
 
         // The diagonal block is split along the row and column.
-        std::cout << "ACCESS BLOCK : " << block << " , " << block << std::endl;
         auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
         Matrix& Dcc = diagonal_splits[0];
         Matrix& Dco = diagonal_splits[1];
         Matrix& Doc = diagonal_splits[2];
-        Matrix& Doo = diagonal_splits[3];
         lu(Dcc);
         solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true);
         solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false);
-        // matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
 
         // Perform lower TRSM between diagonal and the A.UF block on the right of the diagonal.
         for (int icol = block+1; icol < nblocks; ++icol) {
@@ -387,7 +384,7 @@ namespace Hatrix {
             auto fill_in_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
             Matrix t = matmul(top_splits[2], right_splits[0]);
             fill_in_splits[1] = t;
-            //F.insert(irow, icol, std::move(fill_in));
+            F.insert(irow, icol, std::move(fill_in));
           }
         }
 
@@ -405,7 +402,7 @@ namespace Hatrix {
             auto fill_in_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
             Matrix t = matmul(bottom_splits[0], left_splits[1]);
             fill_in_splits[1] = t;
-            //F.insert(irow, icol, std::move(fill_in));
+            F.insert(irow, icol, std::move(fill_in));
           }
         }
 
@@ -623,8 +620,8 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 1D
-  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 2D
-  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 3D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 2D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -634,7 +631,7 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b, last);
