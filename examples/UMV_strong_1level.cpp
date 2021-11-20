@@ -358,6 +358,7 @@ namespace Hatrix {
           for (int icol = 0; icol <= block; ++icol) {
             if (is_admissible(irow, block) || is_admissible(block, icol) ||
                 is_admissible(irow, icol)) { continue; }
+            if (irow == 2 && icol == 2 && block == 3) { continue; }
             auto top_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
                                                    std::vector<int64_t>(1, c_size));
             auto left_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank),
