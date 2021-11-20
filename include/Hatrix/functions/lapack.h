@@ -18,6 +18,9 @@ void lu(Matrix& A, Matrix& L, Matrix& U);
 // Compute the in-place LU factorization of A. Non-pivoted CBLAS version.
 void lu(Matrix& A);
 
+// Compute pivoted LU factorization using LAPACK.
+std::vector<int> lup(Matrix& A);
+
 // Use getrs for solving dense matrix A w.r.t RHS b.
 Matrix lu_solve(Matrix& A, const Matrix& b);
 

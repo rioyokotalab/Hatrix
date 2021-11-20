@@ -69,6 +69,12 @@ void lu(Matrix& A) {
   }
 }
 
+std::vector<int> lup(Matrix& A) {
+  std::vector<int> ipiv(A.rows);
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+  return ipiv;
+}
+
 Matrix lu_solve(Matrix& A, const Matrix& b) {
   Matrix x(b);
   Matrix Ac(A);
