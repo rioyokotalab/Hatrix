@@ -364,6 +364,8 @@ namespace Hatrix {
                                                     std::vector<int64_t>(1, block_size - rank));
             auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - rank),
                                                      std::vector<int64_t>(1, block_size - rank));
+
+            std::cout << "REDUCE: row -> " << irow << " col -> " << icol << " block -> " << block << std::endl;
             matmul(top_splits[2], left_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
           }
         }
