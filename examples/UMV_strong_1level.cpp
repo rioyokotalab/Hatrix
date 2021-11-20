@@ -108,13 +108,10 @@ namespace Hatrix {
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
-        // for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, i, std::abs(i - i) > admis);
-        // }
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::abs(i - j) > admis);
+        }
       }
-
-      is_admissible.insert(2, 3, admis == 1 ? false : true);
-      is_admissible.insert(3, 2, admis == 1 ? false : true);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -227,8 +224,8 @@ namespace Hatrix {
           if (update_bases) {
             std::tie(Utemp, Stemp, Vtemp, error) =
               Hatrix::truncated_svd(Urow_bases_concat, rank);
-            // U.erase(block);
-            // U.insert(block, std::move(Utemp));
+            U.erase(block);
+            U.insert(block, std::move(Utemp));
           }
         }
 
@@ -260,8 +257,8 @@ namespace Hatrix {
           if (update_bases) {
             std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(Vcol_bases_concat,
                                                                          rank);
-            // V.erase(block);
-            // V.insert(block, std::move(transpose(Vtemp)));
+            V.erase(block);
+            V.insert(block, std::move(transpose(Vtemp)));
           }
         }
 
@@ -366,7 +363,6 @@ namespace Hatrix {
             auto reduce_splits = D(irow, icol).split(std::vector<int64_t>(1, block_size - rank),
                                                      std::vector<int64_t>(1, block_size - rank));
 
-            std::cout << "REDUCE: row -> " << irow << " col -> " << icol << " block -> " << block << std::endl;
             matmul(top_splits[2], left_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
           }
         }
@@ -502,7 +498,7 @@ namespace Hatrix {
         for (int irow = 0; irow < block; ++irow) {
           if (is_admissible(irow, block)) { continue; }
           auto top_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
-                                               std::vector<int64_t>(1, c_size));
+                                                 std::vector<int64_t>(1, c_size));
           Matrix x_irow(x_split[irow]), x_block(x_split[block]);
           auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, c_size), {});
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
@@ -633,7 +629,7 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b, last);
@@ -651,24 +647,24 @@ int main(int argc, char** argv) {
 
 
 
-  std::cout << "x solve:\n";
-  auto res = x - x_solve;
-  std::cout << "---- 0 ----\n";
-  for (int i = 0; i < N/4; ++i) {
-    std::cout << res(i, 0) << std::endl;
-  }
-  std::cout << "---- 1 ----\n";
-  for (int i = N/4; i < N/2; ++i) {
-    std::cout << res(i, 0) << std::endl;
-  }
-  std::cout << "---- 2 ----\n";
-  for (int i = N/2; i < 3 * N / 4; ++i) {
-    std::cout << res(i, 0) << std::endl;
-  }
-  std::cout << "---- 3 ----\n";
-  for (int i = 3*N/4; i < N; ++i) {
-    std::cout << res(i, 0) << std::endl;
-  }
+  // std::cout << "x solve:\n";
+  // auto res = x - x_solve;
+  // std::cout << "---- 0 ----\n";
+  // for (int i = 0; i < N/4; ++i) {
+  //   std::cout << res(i, 0) << std::endl;
+  // }
+  // std::cout << "---- 1 ----\n";
+  // for (int i = N/4; i < N/2; ++i) {
+  //   std::cout << res(i, 0) << std::endl;
+  // }
+  // std::cout << "---- 2 ----\n";
+  // for (int i = N/2; i < 3 * N / 4; ++i) {
+  //   std::cout << res(i, 0) << std::endl;
+  // }
+  // std::cout << "---- 3 ----\n";
+  // for (int i = 3*N/4; i < N; ++i) {
+  //   std::cout << res(i, 0) << std::endl;
+  // }
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
