@@ -30,6 +30,7 @@ endif()
 
 add_library(Hatrix
   src/util/matrix_generators.cpp
+  src/util/helpers.cpp
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
 target_include_directories(Hatrix

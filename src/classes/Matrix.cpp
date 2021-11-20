@@ -35,8 +35,16 @@ Matrix::Matrix(const Matrix& A)
     : rows(A.rows),
       cols(A.cols),
       stride(A.stride),
-      data(std::make_shared<DataHandler>(*A.data)),  // Manual deep copy
-      data_ptr(data->get_ptr()) {}
+      data(std::make_shared<DataHandler>(rows * cols, 0)),
+      data_ptr(data->get_ptr()) {
+  // Need the for loop and cannot init directly in the initializer list because
+  // the object might be a view and therefore will not get copied properly.
+  for (int i = 0; i < A.rows; ++i) {
+    for (int j = 0; j < A.cols; ++j) {
+      (*this)(i, j) = A(i, j);
+    }
+  }
+}
 
 Matrix& Matrix::operator=(const Matrix& A) {
   // Manual copy. We dont simply assign the data pointer since we want to
@@ -161,12 +169,12 @@ int64_t Matrix::max_dim() const { return std::max(rows, cols); }
 void Matrix::print() const {
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
-      if ((*this)(i, j) > -1e-14 && (*this)(i, j) < 1e-14) {
-        std::cout << std::setw(7) << 0 << " ";
-      }
-      else {
-        std::cout << std::setprecision(3) << std::setw(7) <<  (*this)(i, j) << " ";
-      }
+      // if ((*this)(i, j) > -1e-14 && (*this)(i, j) < 1e-14) {
+      //   std::cout << std::setw(10) << 0 << " ";
+      // }
+      // else {
+        std::cout << std::setprecision(3) << std::setw(10) <<  (*this)(i, j) << " ";
+      // }
     }
     std::cout << "\n";
   }

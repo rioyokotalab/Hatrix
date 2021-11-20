@@ -18,8 +18,8 @@ namespace Hatrix {
   public:
     ColLevelMap U;
     RowLevelMap V;
-    RowColLevelMap D, S;
-    int N, rank, height;
+    RowColLevelMap<Matrix> D, S;
+    int64_t N, rank, height;
 
   private:
 

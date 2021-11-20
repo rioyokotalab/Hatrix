@@ -10,13 +10,6 @@
 #include <functional>
 #include <chrono>
 
-#ifdef USE_MKL
-#include "mkl_cblas.h"
-#include "mkl_lapacke.h"
-#else
-#include "cblas.h"
-#include "lapacke.h"
-#endif
 
 #include "Hatrix/Hatrix.h"
 
@@ -98,7 +91,7 @@ namespace Hatrix { namespace UMV {
     RowColMap<Matrix> S;
     RowMap U, Uc;
     ColMap V, Vc;
-    int N, block_size, n_blocks, rank, admis;
+    int64_t N, block_size, n_blocks, rank, admis;
     double construct_error;
 
     Hatrix::Matrix D(int row, int col) {
@@ -153,7 +146,8 @@ namespace Hatrix { namespace UMV {
       return V_F;
     }
 
-    BLR2(const randvec_t& randpts, int _N, int _block_size, int _n_blocks, int _rank, int _admis) :
+    BLR2(const randvec_t& randpts, int64_t _N, int64_t _block_size,
+         int64_t _n_blocks, int64_t _rank, int64_t _admis) :
       N(_N), block_size(_block_size), n_blocks(_n_blocks), rank(_rank), admis(_admis) {
       int c_size = block_size - rank;
 
@@ -395,21 +389,12 @@ double rel_error(const double A_norm, const double B_norm) {
   return std::sqrt((diff * diff) / (B_norm * B_norm));
 }
 
-std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
-  std::vector<double> res(N, 0.0);
-  double rnge = maxVal - minVal;
-  for(int i=0; i<N; i++) {
-    res[i] = minVal + ((double)i/(double)rnge);
-  }
-  return res;
-}
-
 int main(int argc, char *argv[]) {
-  int N = atoi(argv[1]);
-  int rank = atoi(argv[2]);
-  int block_size = atoi(argv[3]);
+  int64_t N = atoi(argv[1]);
+  int64_t rank = atoi(argv[2]);
+  int64_t block_size = atoi(argv[3]);
   const char * fname = argv[4];
-  int nblocks = N / block_size;
+  int64_t nblocks = N / block_size;
 
   if (rank > block_size || N % block_size != 0) {
     exit(1);
@@ -419,7 +404,9 @@ int main(int argc, char *argv[]) {
   file.open(fname, std::ios::app | std::ios::out);
 
   randvec_t randpts;
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   Hatrix::Context::init();
   const Hatrix::Matrix _b = Hatrix::generate_random_matrix(N, 1);
@@ -451,7 +438,7 @@ int main(int argc, char *argv[]) {
   double substitute_error = rel_error(Hatrix::norm(x), Hatrix::norm(x_dense));
   std::cout << "err: " << substitute_error << std::endl;
 
-  file << N << "," << rank << "," << block_size << "," << substitute_error << ","
+  std::cout << N << "," << rank << "," << block_size << "," << substitute_error << ","
        << construct_error << "," << construct_time << "," << factorize_time << ","
        << subs_time << std::endl;
 

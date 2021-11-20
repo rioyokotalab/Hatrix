@@ -27,8 +27,8 @@ namespace Hatrix {
   private:
     ColLevelMap U;
     RowLevelMap V;
-    RowColLevelMap D, S;
-    int N, rank, height;
+    RowColLevelMap<Matrix> D, S;
+    int64_t N, rank, height;
 
     // Generate a row slice without the diagonal block specified by 'block'. The
     // nrows parameter determines at what level the slice is generated at. Returns

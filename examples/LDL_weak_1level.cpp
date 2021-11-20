@@ -26,14 +26,15 @@ class BLR2_SPD {
 public:
   Hatrix::RowColMap<Hatrix::Matrix> D, S;
   Hatrix::RowMap U, Uc;
-  int N, block_size, n_blocks, rank, admis;
+  int64_t N, block_size, n_blocks, rank, admis;
   double construct_error;
 
-  BLR2_SPD(const randvec_t& randpts, int N, int block_size, int rank, int admis):
+  BLR2_SPD(const randvec_t& randpts, int64_t N, int64_t block_size, int64_t rank,
+           int64_t admis):
     N(N), block_size(block_size), n_blocks(N/block_size), rank(rank), admis(admis)
   {
-    for (int i = 0; i < n_blocks; ++i) {
-      for (int j = 0; j < n_blocks; ++j) {      
+    for (int64_t i = 0; i < n_blocks; ++i) {
+      for (int64_t j = 0; j < n_blocks; ++j) {
 	D.insert(i, j,
 		   Hatrix::generate_laplacend_matrix(randpts,
 						     block_size, block_size,
@@ -87,21 +88,21 @@ public:
     Hatrix::Matrix Uf(block_size, block_size);
     int c_size = block_size - rank;
     if(c_size == 0) return U[row];
-    
+
     vec col_split_indices = vec{c_size};
     auto Uf_splits = Uf.split(vec(), col_split_indices);
     Uf_splits[0] = Uc[row];
     Uf_splits[1] = U[row];
     return Uf;
   }
-  
+
 };
 
 Hatrix::Matrix make_complement(const Hatrix::Matrix& _U) {
   Hatrix::Matrix U(_U);
   int c_size = U.rows - U.cols;
   if(c_size == 0) return Hatrix::Matrix(0, 0);
-  
+
   Hatrix::Matrix Q(U.rows, U.rows);
   Hatrix::Matrix R(U.rows, U.cols);
   Hatrix::qr(U, Q, R);
@@ -138,7 +139,7 @@ Hatrix::Matrix factorize(BLR2_SPD& A) {
 
   Hatrix::Matrix last(A.n_blocks * A.rank, A.n_blocks * A.rank);
   auto last_splits = last.split(A.n_blocks, A.n_blocks);
-  
+
   for(int64_t i = 0; i < A.n_blocks; i++) {
     for(int64_t j = 0; j < A.n_blocks; j++) {
       if(i == j) {

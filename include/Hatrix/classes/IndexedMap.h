@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <tuple>
 #include <unordered_map>
+#include <iostream>
 
 #include "Hatrix/classes/Matrix.h"
 
@@ -52,6 +53,10 @@ public:
   void insert(int64_t key, Matrix&& matrix);
 
   Matrix extract(int64_t key);
+
+  bool exists(int64_t key) const;
+
+  void erase(int64_t key);
 };
 typedef RowMap ColMap;
 
@@ -72,28 +77,45 @@ class RowColMap {
 
   T extract(int64_t row, int64_t col);
   T extract(const std::tuple<int64_t, int64_t>& key);
+
+  // Check if given <row,col> tuple exists.
+  bool exists(int64_t row, int64_t col) const;
+
+  // Check if given <row, col> typle exists in this map.
+  bool exists(const std::tuple<int64_t, int64_t>& key) const;
+
+  // Erase given (row, col) from the map.
+  void erase(int64_t row, int64_t col);
+
+  // Destructively clear all keys in the map.
+  void erase_all();
 };
 
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol
 using RowLevelMap = RowColMap<Matrix>;
 using ColLevelMap = RowColMap<Matrix>;
 
+template <class T>
 class RowColLevelMap {
 private:
-  std::unordered_map<std::tuple<int64_t, int64_t, int64_t>, Matrix> map;
+  std::unordered_map<std::tuple<int64_t, int64_t, int64_t>, T> map;
 
 public:
-  Matrix& operator()(int64_t row, int64_t col, int64_t level);
-  const Matrix& operator()(int64_t row, int64_t col, int64_t level) const;
+  T& operator()(int64_t row, int64_t col, int64_t level);
+  const T& operator()(int64_t row, int64_t col, int64_t level) const;
 
-  Matrix& operator[](const std::tuple<int64_t, int64_t, int64_t>& key);
-  const Matrix& operator[](const std::tuple<int64_t, int64_t, int64_t>& key) const;
+  T& operator[](const std::tuple<int64_t, int64_t, int64_t>& key);
+  const T& operator[](const std::tuple<int64_t, int64_t, int64_t>& key) const;
 
-  void insert(int64_t row, int64_t col, int64_t level, Matrix&& matrix);
-  void insert(const std::tuple<int64_t, int64_t, int64_t>& key, Matrix&& matrix);
+  void insert(int64_t row, int64_t col, int64_t level, T&& matrix);
+  void insert(const std::tuple<int64_t, int64_t, int64_t>& key, T&& matrix);
 
-  Matrix extract(int64_t row, int64_t col, int64_t level);
-  Matrix extract(const std::tuple<int64_t, int64_t, int64_t>& key);
+  T extract(int64_t row, int64_t col, int64_t level);
+  T extract(const std::tuple<int64_t, int64_t, int64_t>& key);
+
+  bool exists(int64_t row, int64_t col, int64_t level) const;
 };
+
+using RolColLevelMap = RowColLevelMap<Matrix>;
 
 }  // namespace Hatrix

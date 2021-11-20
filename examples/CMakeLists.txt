@@ -22,8 +22,13 @@ else()
     GEMM_weak_2level
     GEMM_weak_Nlevel
     UMV_weak_2level
+    UMV_weak_1level
     UMV_weak_Nlevel
+    BLR2_construct
+    UMV_strong_1level
+    H2_matrix_2level_construct
     LDL_weak_1level
+    BLR2_strong_far_dense_construct
     LDL_weak_Nlevel
   )
 endif()
