@@ -34,9 +34,10 @@ class Matrix::DataHandler {
 Matrix::Matrix(const Matrix& A)
     : rows(A.rows),
       cols(A.cols),
-      stride(A.stride),
       data(std::make_shared<DataHandler>(rows * cols, 0)),
       data_ptr(data->get_ptr()) {
+  // Reinitilize the stride to number of rows if its a view.
+  stride = A.rows;
   // Need the for loop and cannot init directly in the initializer list because
   // the object might be a view and therefore will not get copied properly.
   for (int i = 0; i < A.rows; ++i) {

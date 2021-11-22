@@ -42,6 +42,34 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
   return Q_F;
 }
 
+
+// Copy the input matrix into a lower triangular matrix. Uses N^2 storage.
+// The diagonal is always identity.
+Hatrix::Matrix lower(Hatrix::Matrix& A) {
+  Hatrix::Matrix mat(A.rows, A.cols);
+
+  for (int i = 0; i < A.rows; ++i) {
+    mat(i, i) = 1.0;
+    for (int j = 0; j < i; ++j) {
+      mat(i, j) = A(i, j);
+    }
+  }
+
+  return mat;
+}
+
+Hatrix::Matrix upper(Hatrix::Matrix& A) {
+  Hatrix::Matrix mat(A.rows, A.cols);
+
+  for (int i = 0; i < A.rows; ++i) {
+    for (int j = i; j < A.cols; ++j) {
+      mat(i, j) = A(i, j);
+    }
+  }
+
+  return mat;
+}
+
 namespace Hatrix {
   class BLR2 {
   public:
@@ -101,8 +129,10 @@ namespace Hatrix {
       x = temp;
     }
 
+    BLR2(Hatrix::BLR2& A) :
+      U(A.U), V(A.V), is_admissible(A.is_admissible), D(A.D), S(A.S),
+      N(A.N), nblocks(A.nblocks), rank(A.rank), admis(A.admis) {}
 
-  public:
     BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
       N(N), nblocks(nblocks), rank(rank), admis(admis) {
       int block_size = N / nblocks;
@@ -491,8 +521,43 @@ void multiply_compliments(Hatrix::BLR2& A) {
 }
 
 double verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A_expected) {
+  int64_t block_size = A.N / A.nblocks;
+  int64_t c_size = block_size - A.rank;
+  Hatrix::Matrix last_lower = lower(last);
+  Hatrix::Matrix last_upper = upper(last);
+  Hatrix::Matrix result = matmul(last_lower, last_upper);
+  double expected = 0, diff = 0;
 
-  return 0;
+  auto result_splits = result.split(A.nblocks, A.nblocks);
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j < A.nblocks; ++j) {
+      double local_diff, local_expected;
+      Hatrix::Matrix ex = Hatrix::Matrix(result_splits[i * A.nblocks + j]);
+
+      if (A.is_admissible(i, j)) {
+        Hatrix::Matrix s = Hatrix::Matrix(A_expected.S(i, j));
+        local_expected = pow(Hatrix::norm(s), 2);
+        local_diff = pow(Hatrix::norm(ex - s), 2);
+      }
+      else {
+        auto D_expected_splits = A_expected.D(i, j).split(std::vector<int64_t>(1, c_size),
+                                                          std::vector<int64_t>(1, c_size));
+        Hatrix::Matrix d = Hatrix::Matrix(D_expected_splits[3]);
+
+        (ex - d).print();
+
+        local_expected = pow(Hatrix::norm(d), 2);
+        local_diff = pow(Hatrix::norm(ex - d), 2);
+      }
+
+      std::cout << " i-> " << i << " j-> " << j << " diff: " << local_diff  << std::endl;
+      diff += local_diff;
+      expected += local_expected;
+    }
+  }
+
+  return std::sqrt(diff / expected);
 }
 
 int main(int argc, char** argv) {
@@ -515,20 +580,13 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
+  Hatrix::BLR2 A_expected(A);
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
 
-  Hatrix::BLR2 A_expected(randpts, N, nblocks, rank, admis);
   multiply_compliments(A_expected);
 
   double oo_error = verify_P_L0_U0_PT(A, last, A_expected);
-
-  // std::cout << "x:\n";
-  // x.print();
-
-  // Verification with dense solver.
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   Hatrix::Context::finalize();
 
