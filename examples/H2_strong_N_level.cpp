@@ -32,6 +32,7 @@ namespace Hatrix {
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
     int64_t N, rank, height, admis;
+    RowColLevelMap<bool> is_admissible;
 
   private:
 
@@ -284,11 +285,61 @@ namespace Hatrix {
       return {Ugen_transfer, Vgen_transfer};
     }
 
+    void compute_matrix_structure(int64_t level) {
+      if (level == 0) { return; }
+      int64_t nodes = pow(2, level);
+      if (level == height) {
+        for (int i = 0; i < nodes; ++i) {
+          for (int j = 0; j < nodes; ++j) {
+            is_admissible.insert(i, j, level, std::abs(i - j) > admis);
+          }
+        }
+      }
+      else {
+        int64_t child_level = level + 1;
+        for (int i = 0; i < nodes; ++i) {
+          std::vector<int> row_children({i * 2, i * 2 + 1});
+          for (int j = 0; j < nodes; ++j) {
+            std::vector<int> col_children({j * 2, j * 2 + 1});
+
+            bool admis_block = true;
+            for (int c1 = 0; c1 < 2; ++c1) {
+              for (int c2 = 0; c2 < 2; ++c2) {
+                if (!is_admissible(row_children[c1], col_children[c2], child_level)) {
+                  admis_block = false;
+                }
+              }
+            }
+
+            is_admissible.insert(i, j, level, std::move(admis_block));
+          }
+        }
+      }
+
+      compute_matrix_structure(level-1);
+    }
+
+    void actually_print_structure(int64_t level) {
+      if (level == 0) { return; }
+      int64_t nodes = pow(2, level);
+      std::cout << "LEVEL: " << level << std::endl;
+      for (int i = 0; i < nodes; ++i) {
+        for (int j = 0; j < nodes; ++j) {
+          std::cout << is_admissible(i, j, level) << " | " ;
+        }
+        std::cout << std::endl;
+      }
+
+      actually_print_structure(level-1);
+    }
+
   public:
 
     H2(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height,
        int64_t _admis) :
       N(_N), rank(_rank), height(_height), admis(_admis) {
+      compute_matrix_structure(height);
+
       RowLevelMap Ugen; ColLevelMap Vgen;
       std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
 
@@ -334,6 +385,10 @@ namespace Hatrix {
 
       return std::sqrt(error);
     }
+
+    void print_structure() {
+      actually_print_structure(height);
+    }
   };
 } // namespace Hatrix
 
@@ -357,6 +412,7 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
+  A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
