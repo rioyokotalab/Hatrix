@@ -16,6 +16,7 @@
 // Accuracy Directly Controlled Fast Direct Solution of General H^2-matrices and Its
 // Application to Solving Electrodynamics Volume Integral Equations
 
+using namespace Hatrix;
 constexpr double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 
@@ -494,57 +495,63 @@ void multiply_compliments(Hatrix::BLR2& A) {
   }
 }
 
-double verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A_expected) {
+Matrix verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A_expected) {
   int64_t block_size = A.N / A.nblocks;
   int64_t c_size = block_size - A.rank;
+  double expected = 0, diff = 0;
+
+  Hatrix::Matrix A0(A.N, A.N);
+  auto A0_splits = A0.split(A.nblocks, A.nblocks);
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    A0_splits[i * A.nblocks + i] = Hatrix::generate_identity_matrix(block_size, block_size);
+  }
   Hatrix::Matrix last_lower = lower(last);
   Hatrix::Matrix last_upper = upper(last);
   Hatrix::Matrix result = matmul(last_lower, last_upper);
-  double expected = 0, diff = 0;
 
+  // Assemble the permuted matrix of Aoo and S blocks.
   auto result_splits = result.split(A.nblocks, A.nblocks);
-
   for (int i = 0; i < A.nblocks; ++i) {
     for (int j = 0; j < A.nblocks; ++j) {
-      double local_diff, local_expected;
-      Hatrix::Matrix ex = Hatrix::Matrix(result_splits[i * A.nblocks + j]);
-
-      if (A.is_admissible(i, j)) {
-        Hatrix::Matrix s = Hatrix::Matrix(A_expected.S(i, j));
-        local_expected = pow(Hatrix::norm(s), 2);
-        local_diff = pow(Hatrix::norm(ex - s), 2);
+      Matrix block(block_size, block_size);
+      if (i == j) {
+        block = generate_identity_matrix(block_size, block_size);
       }
-      else {
-        auto D_expected_splits = A_expected.D(i, j).split(std::vector<int64_t>(1, c_size),
-                                                          std::vector<int64_t>(1, c_size));
-        Hatrix::Matrix d = Hatrix::Matrix(D_expected_splits[3]);
-
-        (ex - d).print();
-        std::cout << "norm: " << Hatrix::norm(ex - d) << std::endl;
-
-        local_expected = pow(Hatrix::norm(d), 2);
-        local_diff = pow(Hatrix::norm(ex - d), 2);
-      }
-
-      std::cout << " i-> " << i << " j-> " << j << " diff: " << local_diff  << std::endl;
-      diff += local_diff;
-      expected += local_expected;
+      auto block_splits = block.split(std::vector<int64_t>(1, c_size),
+                                      std::vector<int64_t>(1, c_size));
+      result_splits[i * A.nblocks + j].print();
+      block_splits[3] = result_splits[i * A.nblocks + j];
+      A0_splits[i * A.nblocks + j] = block;
     }
   }
 
-  return std::sqrt(diff / expected);
+  return A0;
 }
 
+Matrix generate_L0(BLR2& A) {
+  int64_t block_size = A.N / A.nblocks;
+  int64_t c_size = block_size - A.rank;
+  Hatrix::Matrix L0(A.N, A.N);
 
-void block_factorize(Hatrix::BLR2& A) {
+  auto L0_splits = L0.split(A.nblocks, A.nblocks);
   for (int i = 0; i < A.nblocks; ++i) {
-    lu(A.D(i, i));
-    for (int j = i+1; j < A.nblocks; ++j) {
-      if (!A.is_admissible(i, j)) {
-        solve_triangular(A.D(i,i), A.D(i, j), Hatrix::Left, Hatrix::Lower, true);
-      }
-    }
+    Matrix block = generate_identity_matrix(block_size, block_size);
+    auto block_splits = block.split(std::vector<int64_t>(1, c_size),
+                                    std::vector<int64_t>(1, c_size));
+    auto D_splits = A.D(i, i).split(std::vector<int64_t>(1, c_size),
+                                    std::vector<int64_t>(1, c_size));
+    block_splits[0] = lower(D_splits[0]);
+    block_splits[2] = D_splits[2];
   }
+
+  return L0;
+}
+
+Matrix generate_U0(BLR2& A) {
+  Matrix U0(A.N, A.N);
+
+  return U0;
 }
 
 int main(int argc, char** argv) {
@@ -572,13 +579,13 @@ int main(int argc, char** argv) {
   auto last = A.factorize(randpts);
 
   multiply_compliments(A_expected_oo);
-  block_factorize(A_expected_oo);
 
-  double oo_error = verify_P_L0_U0_PT(A, last, A_expected_oo);
+  Matrix A0 = verify_P_L0_U0_PT(A, last, A_expected_oo);
+  Matrix L0 = generate_L0(A);
+  Matrix U0 = generate_U0(A);
 
   Hatrix::Context::finalize();
 
   std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
-            << " construct error: " << construct_error << " oo_error: "
-            << oo_error <<  "\n";
+            << " construct error: " << construct_error << "\n";
 }
