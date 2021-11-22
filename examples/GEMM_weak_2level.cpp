@@ -18,7 +18,7 @@ namespace Hatrix {
   public:
     RowLevelMap U;
     ColLevelMap V;
-    RowColLevelMap D, S;
+    RowColLevelMap<Matrix> D, S;
     int64_t N, rank, leaf_size, height;
     double pv;
 
@@ -111,13 +111,13 @@ namespace Hatrix {
 	    fdiff = Hatrix::norm(D(row, row, level) - Dii);
 	    diff += fdiff * fdiff;
 	  }
-	  
+
 	  //Off-diagonals
 	  int64_t col = row % 2 == 0 ? row + 1 : row - 1;
 	  Matrix& Dij = dense_splits[row*num_nodes + col];
 	  fnorm = Hatrix::norm(Dij);
 	  norm += fnorm * fnorm;
-	  
+
 	  Matrix Urow = Ubig(row, level);
 	  Matrix Vcol = Vbig(col, level);
 	  Matrix Aij = matmul(matmul(Urow, S(row, col, level)), Vcol, false, true);
@@ -132,10 +132,10 @@ namespace Hatrix {
     Matrix admissible_row_slice(int64_t row, int64_t level,
 				const randvec_t& randpts) {
       int64_t num_nodes = pow(2, level);
-      int64_t node_size = N / num_nodes;	
+      int64_t node_size = N / num_nodes;
       Matrix row_slice(node_size, (num_nodes - 1) * node_size);
       auto row_slice_splits = row_slice.split(1, num_nodes - 1);
-      
+
       int64_t j = 0;
       for(int64_t col = 0; col < num_nodes; col++) {
 	if(row == col) continue;
@@ -149,10 +149,10 @@ namespace Hatrix {
     Matrix admissible_column_slice(int64_t col, int64_t level,
 				   const randvec_t& randpts) {
       int64_t num_nodes = pow(2, level);
-      int64_t node_size = N / num_nodes;	
+      int64_t node_size = N / num_nodes;
       Matrix col_slice((num_nodes - 1) * node_size, node_size);
       auto col_slice_splits = col_slice.split(num_nodes - 1, 1);
-      
+
       int64_t i = 0;
       for(int64_t row = 0; row < num_nodes; row++) {
 	if(row == col) continue;
@@ -210,17 +210,17 @@ namespace Hatrix {
       int64_t node_size = N / num_nodes;
       int64_t child_level = level + 1;
       int64_t child_num_nodes = pow(2, child_level);
-      
+
       //Save the generated bases of the current level and pass them to this
       //function again for generating upper level nodes
       RowLevelMap Ubig_node;
       ColLevelMap Vbig_node;
-      
+
       //Generate transfer matrices
       for(int64_t node = 0; node < num_nodes; node++) {
 	int64_t child1 = 2*node;
 	int64_t child2 = 2*node + 1;
-	
+
 	//U transfer matrix
 	Matrix& Ubig_child1 = Ubig_child(child1, child_level);
 	Matrix& Ubig_child2 = Ubig_child(child2, child_level);
@@ -233,12 +233,12 @@ namespace Hatrix {
 	       projected_row_slice_splits[0], true);
 	matmul(Ubig_child2, row_slice_splits[1],
 	       projected_row_slice_splits[1], true);
-	
+
 	Matrix Utransfer;
 	std::tie(Utransfer, std::ignore, std::ignore, std::ignore) =
 	  truncated_svd(projected_row_slice, rank);
 	U.insert(node, level, std::move(Utransfer));
-	
+
 	//V transfer matrix
 	Matrix& Vbig_child1 = Vbig_child(child1, child_level);
 	Matrix& Vbig_child2 = Vbig_child(child2, child_level);
@@ -249,12 +249,12 @@ namespace Hatrix {
 	auto projected_col_slice_splits = projected_col_slice.split(1, 2);
 	matmul(col_slice_splits[0], Vbig_child1, projected_col_slice_splits[0]);
 	matmul(col_slice_splits[1], Vbig_child2, projected_col_slice_splits[1]);
-	
+
 	Matrix Vtransfer;
 	std::tie(std::ignore, std::ignore, Vtransfer, std::ignore) =
 	  truncated_svd(projected_col_slice, rank);
 	V.insert(node, level, transpose(Vtransfer));
-	
+
 	//Generate bases to passed for generating upper level transfer matrices
 	auto Utransfer_splits = U(node, level).split(2, 1);
 	Matrix U_big(node_size, rank);
@@ -262,7 +262,7 @@ namespace Hatrix {
 	matmul(Ubig_child1, Utransfer_splits[0], U_big_splits[0]);
 	matmul(Ubig_child2, Utransfer_splits[1], U_big_splits[1]);
 	Ubig_node.insert(node, level, std::move(U_big));
-	
+
 	auto Vtransfer_splits = V(node, level).split(2, 1);
 	Matrix V_big(node_size, rank);
 	auto V_big_splits = V_big.split(2, 1);
@@ -270,7 +270,7 @@ namespace Hatrix {
 	matmul(Vbig_child2, Vtransfer_splits[1], V_big_splits[1]);
 	Vbig_node.insert(node, level, std::move(V_big));
       }
-      
+
       //Generate coupling matrices
       for(int64_t row = 0; row < num_nodes; row++) {
 	int64_t col = row % 2 == 0 ? row + 1 : row - 1;
@@ -338,7 +338,7 @@ void matmul(Hatrix::HSS& A, Hatrix::HSS& B, Hatrix::HSS& C,
   Hatrix::Matrix B_Vbig0 = B.Vbig(0, 1);
   auto B_Vbig0_splits = B_Vbig0.split(2, 1);
   auto B_Vtransfer0_splits = B.V(0, 1).split(2, 1);
-  
+
   //Recurse into C_2/0,0
   C.D(0, 0, 2) *= beta;
   Hatrix::matmul(A.D(0, 0, 2), B.D(0, 0, 2),
@@ -347,7 +347,7 @@ void matmul(Hatrix::HSS& A, Hatrix::HSS& B, Hatrix::HSS& C,
 		 B.V(0, 2), C.D(0, 0, 2), false, true, alpha);
   Hatrix::matmul(A_Ubig0_splits[0], Hatrix::matmul(W, B_Vbig0_splits[0], false, true),
 		 C.D(0, 0, 2), false, false, alpha);
-  
+
   //Recurse into C_2/0,1
   C.S(0, 1, 2) *= beta;
   Hatrix::matmul(Hatrix::matmul(C.U(0, 2), A.D(0, 0, 2), true) * B.U(0, 2),
@@ -521,11 +521,11 @@ int main(int argc, char** argv) {
   Hatrix::HSS A(A_randpts, pv, N, rank, height);
   Hatrix::HSS B(B_randpts, pv, N, rank, height);
   Hatrix::HSS C(C_randpts, pv, N, rank, height);
-  
+
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(A_randpts, N, N, 0, 0, pv);
   Hatrix::Matrix B_dense = Hatrix::generate_laplacend_matrix(B_randpts, N, N, 0, 0, pv);
-  Hatrix::Matrix C_dense = Hatrix::generate_laplacend_matrix(C_randpts, N, N, 0, 0, pv);  
-  
+  Hatrix::Matrix C_dense = Hatrix::generate_laplacend_matrix(C_randpts, N, N, 0, 0, pv);
+
   matmul(A, B, C, 1, 1);
   Hatrix::matmul(A_dense, B_dense, C_dense, false, false, 1, 1);
 

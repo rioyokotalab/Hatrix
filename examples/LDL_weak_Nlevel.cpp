@@ -17,7 +17,7 @@ namespace Hatrix {
   class HSS_SPD {
   public:
     RowLevelMap U, Uc;
-    RowColLevelMap D, S;
+    RowColLevelMap<Matrix> D, S;
     int64_t N, rank, leaf_size, height;
 
     HSS_SPD(const randvec_t& randpts, int64_t N, int64_t rank, int64_t height):
@@ -51,7 +51,7 @@ namespace Hatrix {
       Hatrix::Matrix Uf(U(row, level).rows, U(row, level).rows);
       int64_t c_size = U(row, level).rows - rank;
       if(c_size == 0) return U(row, level);
-      
+
       vec col_split_indices = vec{c_size};
       auto Uf_splits = Uf.split(vec(), col_split_indices);
       Uf_splits[0] = Uc(row, level);
@@ -92,10 +92,10 @@ namespace Hatrix {
     Matrix admissible_row_slice(int64_t row, int64_t level,
 				const randvec_t& randpts) {
       int64_t num_nodes = pow(2, level);
-      int64_t node_size = N / num_nodes;	
+      int64_t node_size = N / num_nodes;
       Matrix row_slice(node_size, (num_nodes - 1) * node_size);
       auto row_slice_splits = row_slice.split(1, num_nodes - 1);
-      
+
       int64_t j = 0;
       for(int64_t col = 0; col < num_nodes; col++) {
 	if(row == col) continue;
@@ -142,16 +142,16 @@ namespace Hatrix {
       int64_t node_size = N / num_nodes;
       int64_t child_level = level + 1;
       int64_t child_num_nodes = pow(2, child_level);
-      
+
       //Save the generated bases of the current level and pass them to this
       //function again for generating upper level nodes
       RowLevelMap Ubig_node;
-      
+
       //Generate transfer matrices
       for(int64_t node = 0; node < num_nodes; node++) {
 	int64_t child1 = 2*node;
 	int64_t child2 = 2*node + 1;
-	
+
 	//U transfer matrix
 	Matrix& Ubig_child1 = Ubig_child(child1, child_level);
 	Matrix& Ubig_child2 = Ubig_child(child2, child_level);
@@ -164,12 +164,12 @@ namespace Hatrix {
 	       projected_row_slice_splits[0], true);
 	matmul(Ubig_child2, row_slice_splits[1],
 	       projected_row_slice_splits[1], true);
-	
+
 	Matrix Utransfer;
 	std::tie(Utransfer, std::ignore, std::ignore, std::ignore) =
 	  truncated_svd(projected_row_slice, rank);
 	U.insert(node, level, std::move(Utransfer));
-		
+
 	//Generate bases to passed for generating upper level transfer matrices
 	auto Utransfer_splits = U(node, level).split(2, 1);
 	Matrix U_big(node_size, rank);
@@ -178,7 +178,7 @@ namespace Hatrix {
 	matmul(Ubig_child2, Utransfer_splits[1], U_big_splits[1]);
 	Ubig_node.insert(node, level, std::move(U_big));
       }
-      
+
       //Generate coupling matrices
       for(int64_t row = 0; row < num_nodes; row++) {
 	int64_t col = row % 2 == 0 ? row + 1 : row - 1;
@@ -206,7 +206,7 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix& _U) {
   Hatrix::Matrix U(_U);
   int c_size = U.rows - U.cols;
   if(c_size == 0) return Hatrix::Matrix(0, 0);
-  
+
   Hatrix::Matrix Q(U.rows, U.rows);
   Hatrix::Matrix R(U.rows, U.cols);
   Hatrix::qr(U, Q, R);
@@ -286,7 +286,7 @@ void solve(Hatrix::HSS_SPD& A, Hatrix::Matrix& b) {
     }
   }
   auto b_leaf_co_splits = b.split(leaf_co_split_indices, vec());
-  
+
   //---Forward Substitution---
   for(int64_t level = A.height; level > 0; level--) {
     int64_t num_nodes = pow(2, level);
@@ -310,7 +310,7 @@ void solve(Hatrix::HSS_SPD& A, Hatrix::Matrix& b) {
 		     true, false, 1., 0.);
       b_node_c = b_node_splits[0];
       b_node_o = b_node_splits[1];
-      
+
       // Solve triangular from partial factorization
       if(c_size > 0) {
 	auto L_splits = D.split(vec{c_size}, vec{c_size});
@@ -337,7 +337,7 @@ void solve(Hatrix::HSS_SPD& A, Hatrix::Matrix& b) {
       }
     }
   }
-  
+
   //---Solve Diagonal---
   for(int64_t level = 1; level <= A.height; level++) {
     int64_t num_nodes = pow(2, level);
@@ -406,7 +406,7 @@ void solve(Hatrix::HSS_SPD& A, Hatrix::Matrix& b) {
 	Hatrix::solve_triangular(Lcc, b_node_c,
 				 Hatrix::Left, Hatrix::Lower, true, true);
       }
-      
+
       //Multiply with Uf
       Hatrix::Matrix b_node(D.rows, 1);
       auto b_node_splits = b_node.split(vec{c_size}, vec());
@@ -442,7 +442,7 @@ int main(int argc, char** argv) {
   randpts.push_back(equally_spaced_vector(N, 0.0, 10.0)); // 1D
   Hatrix::HSS_SPD A(randpts, N, rank, height);
   double construction_error = A.construction_rel_error(randpts);
-  
+
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix b = A_dense * x;

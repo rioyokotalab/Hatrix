@@ -116,6 +116,4 @@ public:
   bool exists(int64_t row, int64_t col, int64_t level) const;
 };
 
-using RolColLevelMap = RowColLevelMap<Matrix>;
-
 }  // namespace Hatrix

@@ -26,12 +26,12 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
 }
 
 namespace Hatrix {
-  class HSS {
+  class H2 {
   public:
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
-    int64_t N, rank, height;
+    int64_t N, rank, height, admis;
 
   private:
 
@@ -286,8 +286,9 @@ namespace Hatrix {
 
   public:
 
-    HSS(const randvec_t& randpts, int _N, int _rank, int _height) :
-      N(_N), rank(_rank), height(_height) {
+    H2(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height,
+       int64_t _admis) :
+      N(_N), rank(_rank), height(_height), admis(_admis) {
       RowLevelMap Ugen; ColLevelMap Vgen;
       std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
 
@@ -337,9 +338,10 @@ namespace Hatrix {
 } // namespace Hatrix
 
 int main(int argc, char *argv[]) {
-  int N = atoi(argv[1]);
-  int rank = atoi(argv[2]);
-  int height = atoi(argv[3]);
+  int64_t N = atoi(argv[1]);
+  int64_t rank = atoi(argv[2]);
+  int64_t height = atoi(argv[3]);
+  int64_t admis = atoi(argv[4]);
 
   if (rank > int(N / pow(2, height))) {
     std::cout << N << " % " << pow(2, height)
@@ -349,10 +351,12 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::init();
   randvec_t randvec;
-  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   auto start_construct = std::chrono::system_clock::now();
-  Hatrix::HSS A(randvec, N, rank, height);
+  Hatrix::H2 A(randvec, N, rank, height, admis);
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);

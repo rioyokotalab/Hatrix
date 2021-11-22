@@ -30,6 +30,7 @@ else()
     LDL_weak_1level
     BLR2_strong_far_dense_construct
     LDL_weak_Nlevel
+    H2_strong_N_level
   )
 endif()
 
