@@ -225,6 +225,16 @@ namespace Hatrix {
       int c_size = block_size - rank;
       RowColMap<Matrix> F;      // fill-in blocks.
 
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (!is_admissible(i, j)) {
+            Matrix U_F = make_complement(U(i));
+            Matrix V_F = make_complement(V(j));
+            D(i, j) = matmul(matmul(U_F, D(i, j), true), V_F);
+          }
+        }
+      }
+
       for (int block = 0; block < nblocks; ++block) {
         if (block > 0) {
           Matrix Utemp, Stemp, Vtemp; double error;
@@ -274,42 +284,6 @@ namespace Hatrix {
                                                                          rank);
             V.erase(block);
             V.insert(block, std::move(transpose(Vtemp)));
-          }
-        }
-
-        Matrix U_F = make_complement(U(block));
-        Matrix V_F = make_complement(V(block));
-        D(block, block) = matmul(matmul(U_F, D(block, block), true), V_F);
-
-        // Multiplication of UF with block ahead of the diagonal block on the same row
-        for (int icol = block+1; icol < nblocks; ++icol) {
-          if (!is_admissible(block, icol)) {
-            D(block, icol) = matmul(U_F, D(block, icol), true);
-          }
-        }
-
-        // Multiplication of VF with block below this diagonal on the same column.
-        for (int irow = block+1; irow < nblocks; ++irow) {
-          if (!is_admissible(irow, block)) {
-            D(irow, block) = matmul(D(irow, block), V_F);
-          }
-        }
-
-        // Multiplication of UF with blocks before the diagonal block on the same row
-        for (int icol = 0; icol < block; ++icol) {
-          if (!is_admissible(block, icol)) {
-            auto bottom_splits = D(block, icol).split({}, std::vector<int64_t>(1, c_size));
-            Matrix o = matmul(U_F, bottom_splits[1], true);
-            bottom_splits[1] = o;
-          }
-        }
-
-        // Multiplication of VF with blocks before the diagoanl block on the same column.
-        for (int irow = 0; irow < block; ++irow) {
-          if (!is_admissible(irow, block)) {
-            auto right_splits = D(irow, block).split(std::vector<int64_t>(1, c_size), {});
-            Matrix o = matmul(right_splits[1], V_F);
-            right_splits[1] = o;
           }
         }
 
@@ -546,6 +520,7 @@ double verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A
         Hatrix::Matrix d = Hatrix::Matrix(D_expected_splits[3]);
 
         (ex - d).print();
+        std::cout << "norm: " << Hatrix::norm(ex - d) << std::endl;
 
         local_expected = pow(Hatrix::norm(d), 2);
         local_diff = pow(Hatrix::norm(ex - d), 2);
@@ -558,6 +533,18 @@ double verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A
   }
 
   return std::sqrt(diff / expected);
+}
+
+
+void block_factorize(Hatrix::BLR2& A) {
+  for (int i = 0; i < A.nblocks; ++i) {
+    lu(A.D(i, i));
+    for (int j = i+1; j < A.nblocks; ++j) {
+      if (!A.is_admissible(i, j)) {
+        solve_triangular(A.D(i,i), A.D(i, j), Hatrix::Left, Hatrix::Lower, true);
+      }
+    }
+  }
 }
 
 int main(int argc, char** argv) {
@@ -580,13 +567,14 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  Hatrix::BLR2 A_expected(A);
+  Hatrix::BLR2 A_expected_oo(A);
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
 
-  multiply_compliments(A_expected);
+  multiply_compliments(A_expected_oo);
+  block_factorize(A_expected_oo);
 
-  double oo_error = verify_P_L0_U0_PT(A, last, A_expected);
+  double oo_error = verify_P_L0_U0_PT(A, last, A_expected_oo);
 
   Hatrix::Context::finalize();
 
