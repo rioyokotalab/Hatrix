@@ -23,9 +23,28 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   return Hatrix::norm(A - B) / Hatrix::norm(B);
 }
 
+Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
+  Hatrix::Matrix Q_F(Q.rows, Q.rows);
+  Hatrix::Matrix Q_full, R;
+  std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+
+  for (int i = 0; i < Q_F.rows; ++i) {
+    for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+      Q_F(i, j) = Q_full(i, j + Q.cols);
+    }
+  }
+
+  for (int i = 0; i < Q_F.rows; ++i) {
+    for (int j = 0; j < Q.cols; ++j) {
+      Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+    }
+  }
+  return Q_F;
+}
+
 namespace Hatrix {
   class BLR2 {
-  private:
+  public:
     RowMap U;
     ColMap V;
     RowColMap<bool> is_admissible;
@@ -82,25 +101,6 @@ namespace Hatrix {
       x = temp;
     }
 
-
-    Matrix make_complement(const Hatrix::Matrix &Q) {
-      Matrix Q_F(Q.rows, Q.rows);
-      Matrix Q_full, R;
-       std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
-
-      for (int i = 0; i < Q_F.rows; ++i) {
-        for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
-          Q_F(i, j) = Q_full(i, j + Q.cols);
-        }
-      }
-
-      for (int i = 0; i < Q_F.rows; ++i) {
-        for (int j = 0; j < Q.cols; ++j) {
-          Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
-        }
-      }
-      return Q_F;
-    }
 
   public:
     BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
@@ -477,8 +477,22 @@ namespace Hatrix {
   };
 }
 
+void multiply_compliments(Hatrix::BLR2& A) {
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j < A.nblocks; ++j) {
+      if (!A.is_admissible(i, j)) {
+        Hatrix::Matrix U_F = make_complement(A.U(i));
+        Hatrix::Matrix V_F = make_complement(A.V(j));
+
+        A.D(i, j) = matmul(matmul(U_F, A.D(i, j), true), V_F);
+      }
+    }
+  }
+}
+
 double verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A_expected) {
 
+  return 0;
 }
 
 int main(int argc, char** argv) {
@@ -505,7 +519,9 @@ int main(int argc, char** argv) {
   auto last = A.factorize(randpts);
 
   Hatrix::BLR2 A_expected(randpts, N, nblocks, rank, admis);
-  double oo_error = verify_P_L0_V0_PT(A, last, A_expected);
+  multiply_compliments(A_expected);
+
+  double oo_error = verify_P_L0_U0_PT(A, last, A_expected);
 
   // std::cout << "x:\n";
   // x.print();
@@ -517,5 +533,6 @@ int main(int argc, char** argv) {
   Hatrix::Context::finalize();
 
   std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
-            << " construct error: " << construct_error << " solve error: " << solve_error << "\n";
+            << " construct error: " << construct_error << " oo_error: "
+            << oo_error <<  "\n";
 }
