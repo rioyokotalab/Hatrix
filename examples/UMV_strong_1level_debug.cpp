@@ -139,10 +139,13 @@ namespace Hatrix {
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, std::abs(i - j) > admis);
-        }
+        // for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, i, std::abs(i - i) > admis);
+        // }
       }
+
+      is_admissible.insert(3, 2, admis == 1 ? false : true);
+      is_admissible.insert(2, 3, admis == 1 ? false : true);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -534,12 +537,13 @@ Matrix verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A
 }
 
 Matrix generate_L0(BLR2& A) {
-  int64_t block_size = A.N / A.nblocks;
+  int64_t nblocks = A.nblocks;
+  int64_t block_size = A.N / nblocks;
   int64_t c_size = block_size - A.rank;
   Hatrix::Matrix L0(A.N, A.N);
 
-  auto L0_splits = L0.split(A.nblocks, A.nblocks);
-  for (int i = 0; i < A.nblocks; ++i) {
+  auto L0_splits = L0.split(nblocks, nblocks);
+  for (int i = 0; i < nblocks; ++i) {
     Matrix block = generate_identity_matrix(block_size, block_size);
     auto block_splits = block.split(std::vector<int64_t>(1, c_size),
                                     std::vector<int64_t>(1, c_size));
@@ -548,7 +552,32 @@ Matrix generate_L0(BLR2& A) {
 
     block_splits[0] = lower(D_splits[0]);
     block_splits[2] = D_splits[2];
-    L0_splits[i * A.nblocks + i] = block;
+    L0_splits[i * nblocks + i] = block;
+
+    // Populate the blocks c blocks below the diagonal.
+    for (int irow = i + 1; irow < nblocks; ++irow) {
+      if (!A.is_admissible(irow, i)) {
+        Matrix block(block_size, block_size);
+        auto D_splits = A.D(irow, i).split({}, std::vector<int64_t>(1, c_size));
+        auto block_splits = block.split({}, std::vector<int64_t>(1, c_size));
+
+        block_splits[0] = D_splits[0];
+        L0_splits[irow * nblocks + i] = block;
+      }
+    }
+
+    // Populate the rows above the diagonal block with oc strips.
+    for (int irow = 0; irow < i; ++irow) {
+      if (!A.is_admissible(irow, i)) {
+        Matrix block(block_size, block_size);
+        auto D_splits = A.D(irow, i).split(std::vector<int64_t>(1, c_size),
+                                           std::vector<int64_t>(1, c_size));
+        auto block_splits = block.split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+        block_splits[2] = D_splits[2];
+        L0_splits[irow * nblocks + i] = block;
+      }
+    }
   }
 
   return L0;
@@ -621,6 +650,7 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
+  A.print_structure();
   Hatrix::BLR2 A_expected(A);
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
