@@ -585,7 +585,7 @@ Matrix generate_L0(BLR2& A) {
 
 Matrix generate_U0(BLR2& A) {
   Matrix U0(A.N, A.N);
-
+  int64_t nblocks = A.nblocks;
   int64_t block_size = A.N / A.nblocks;
   int64_t c_size = block_size - A.rank;
 
@@ -598,8 +598,33 @@ Matrix generate_U0(BLR2& A) {
                                     std::vector<int64_t>(1, c_size));
     block_splits[0] = upper(D_splits[0]);
     block_splits[1] = D_splits[1];
-    U0_splits[i * A.nblocks + i] = block;
+    U0_splits[i * nblocks + i] = block;
+
+    // Populate the columns to the right of the block diagonal
+    for (int icol = i + 1; icol < nblocks; ++icol) {
+      if (!A.is_admissible(i, icol))  {
+        Matrix block(block_size, block_size);
+        auto D_splits = A.D(i, icol).split(std::vector<int64_t>(1, c_size), {});
+        auto block_splits = block.split(std::vector<int64_t>(1, c_size), {});
+        block_splits[0] = D_splits[0];
+
+        U0_splits[i * nblocks + icol] = block;
+      }
+    }
+
+    for (int icol = 0; icol < i; ++icol) {
+      if (!A.is_admissible(i, icol)) {
+        Matrix block(block_size, block_size);
+        auto D_splits = A.D(i, icol).split(std::vector<int64_t>(1, c_size), std::vector<int64_t>(1, c_size));
+        auto block_splits = block.split(std::vector<int64_t>(1, c_size), std::vector<int64_t>(1, c_size));
+        block_splits[1] = D_splits[1];
+
+        U0_splits[i * nblocks + icol] = block;
+      }
+    }
   }
+
+  U0.print();
 
   return U0;
 }
