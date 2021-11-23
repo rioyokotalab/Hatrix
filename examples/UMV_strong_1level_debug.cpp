@@ -575,6 +575,32 @@ Matrix generate_U0(BLR2& A) {
   return U0;
 }
 
+double factorization_accuracy(Matrix& full_matrix, BLR2& A_expected) {
+  double diff = 0, actual = 0;
+  int64_t nblocks = A_expected.nblocks;
+  int64_t block_size = A_expected.N / nblocks;
+  int64_t c_size = block_size - A_expected.rank;
+  auto full_splits = full_matrix.split(nblocks, nblocks);
+
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      Matrix block(full_splits[i * nblocks + j]);
+      if (A_expected.is_admissible(i, j)) {
+        auto block_splits = block.split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+        actual += pow(norm(A_expected.S(i, j)), 2);
+        diff += pow(norm(block_splits[3] - A_expected.S(i, j)), 2);
+      }
+      else {
+        actual += pow(norm(block), 2);
+        diff += pow(norm(block - A_expected.D(i, j)), 2);
+      }
+    }
+  }
+
+  return std::sqrt(diff / actual);
+}
+
 int main(int argc, char** argv) {
   int64_t N = atoi(argv[1]);
   int64_t nblocks = atoi(argv[2]);
@@ -595,18 +621,21 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  Hatrix::BLR2 A_expected_oo(A);
+  Hatrix::BLR2 A_expected(A);
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
 
-  multiply_compliments(A_expected_oo);
+  multiply_compliments(A_expected);
 
-  Matrix A0 = verify_P_L0_U0_PT(A, last, A_expected_oo);
+  Matrix A0 = verify_P_L0_U0_PT(A, last, A_expected);
   Matrix L0 = generate_L0(A);
   Matrix U0 = generate_U0(A);
+  Matrix full_dense = matmul(matmul(L0, A0), U0);
+
+  double factorize_error = factorization_accuracy(full_dense, A_expected);
 
   Hatrix::Context::finalize();
 
   std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
-            << " construct error: " << construct_error << "\n";
+            << " construct error: " << construct_error << " factorization error: " << factorize_error  << "\n";
 }
