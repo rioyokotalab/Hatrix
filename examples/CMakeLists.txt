@@ -31,6 +31,7 @@ else()
     BLR2_strong_far_dense_construct
     LDL_weak_Nlevel
     H2_strong_N_level
+    UMV_strong_1level_debug
   )
 endif()
 

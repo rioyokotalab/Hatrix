@@ -11,6 +11,7 @@ class Matrix {
   int64_t rows = 0;
   int64_t cols = 0;
   int64_t stride = 0;
+  bool is_view = false;
 
  private:
   class DataHandler;

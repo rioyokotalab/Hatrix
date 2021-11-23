@@ -177,7 +177,8 @@ namespace Hatrix {
             admissible_found = true;
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size, PV);
+                                                                     i*block_size,
+                                                                     j*block_size, PV);
             Hatrix::matmul(dense, Y[j], AY);
           }
         }
@@ -196,7 +197,8 @@ namespace Hatrix {
             admissible_found = true;
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size, PV);
+                                                                     i*block_size,
+                                                                     j*block_size, PV);
             Hatrix::matmul(Y[i], dense, YtA, true);
           }
         }
@@ -212,7 +214,8 @@ namespace Hatrix {
           if (is_admissible(i, j)) {
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size, PV);
+                                                                     i*block_size,
+                                                                     j*block_size, PV);
             S.insert(i, j,
                      Hatrix::matmul(Hatrix::matmul(U(i), dense, true), V(j)));
           }
@@ -309,7 +312,8 @@ namespace Hatrix {
           matmul(Doc, right_splits[0], right_splits[1], false, false, -1.0, 1.0);
         }
 
-        // Perform TRSM between A.VF blocks on the bottom of this diagonal block and the cc of the diagonal.
+        // Perform TRSM between A.VF blocks on the bottom of this diagonal block and
+        // the cc of the diagonal.
         for (int irow = block+1; irow < nblocks; ++irow) {
           if (is_admissible(irow, block)) { continue; }
           auto bottom_splits = D(irow, block).split({}, std::vector<int64_t>(1, c_size));
@@ -329,7 +333,8 @@ namespace Hatrix {
         }
 
 
-        // Perform upper TRSM between A.VF blocks (oc part) above this diagonal blocks and cc of diagonal block.
+        // Perform upper TRSM between A.VF blocks (oc part) above this diagonal
+        // blocks and cc of diagonal block.
         for (int irow = 0; irow < block; ++irow) {
           if (is_admissible(irow, block)) { continue; }
           auto top_splits = D(irow, block).split(std::vector<int64_t>(1, c_size),
@@ -385,7 +390,7 @@ namespace Hatrix {
             auto left_splits = D(block, icol).split(std::vector<int64_t>(1, block_size - rank),
                                                     std::vector<int64_t>(1, block_size - rank));
             auto bottom_splits = D(irow, block).split({},
-                                                      std::vector<int64_t>(1, block_size - rank));
+                                                      std::vector<int64_t>(1, c_size));
             Matrix fill_in(block_size, block_size);
             auto fill_in_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
             Matrix t = matmul(bottom_splits[0], left_splits[1]);
@@ -544,8 +549,6 @@ Matrix generate_L0(BLR2& A) {
     block_splits[0] = lower(D_splits[0]);
     block_splits[2] = D_splits[2];
     L0_splits[i * A.nblocks + i] = block;
-
-    block.print();
   }
 
   return L0;
