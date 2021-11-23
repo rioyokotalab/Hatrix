@@ -48,18 +48,28 @@ Matrix::Matrix(const Matrix& A)
   }
 }
 
-// Matrix::Matrix(Matrix&& A) {
-// }
-
 // Move assignment constructor.
 Matrix& Matrix::operator=(Matrix&& A) {
   // Need to perform a manual copy (vs. swapping) since A might be
   // being assigned to a view.
-  for (int i = 0; i < A.rows; ++i) {
-    for (int j = 0; j < A.cols; ++j) {
-      (*this)(i, j) = A(i, j);
+  if (is_view) {
+    assert((*this).rows == A.rows);
+    assert((*this).cols == A.cols);
+    for (int i = 0; i < A.rows; ++i) {
+      for (int j = 0; j < A.cols; ++j) {
+        (*this)(i, j) = A(i, j);
+      }
     }
   }
+  else {
+    std::swap(rows, A.rows);
+    std::swap(cols, A.cols);
+    std::swap(stride, A.stride);
+    std::swap(data, A.data);
+    std::swap(data_ptr, A.data_ptr);
+    std::swap(is_view, A.is_view);
+  }
+
   return *this;
 }
 
@@ -71,8 +81,6 @@ Matrix& Matrix::operator=(const Matrix& A) {
   // underlying parent Matrix object.
   assert((*this).rows == A.rows);
   assert((*this).cols == A.cols);
-  std::cout << ">>> INSIDE ASSIGN\n";
-  A.print();
   for (int i = 0; i < A.rows; ++i) {
     for (int j = 0; j < A.cols; ++j) {
       (*this)(i, j) = A(i, j);
@@ -147,7 +155,8 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
                                   const std::vector<int64_t>& _col_split_indices,
                                   bool copy) const {
   std::vector<Matrix> parts;
-  std::vector<int64_t> row_split_indices(_row_split_indices), col_split_indices(_col_split_indices);
+  std::vector<int64_t> row_split_indices(_row_split_indices),
+    col_split_indices(_col_split_indices);
 
   auto row_iter = row_split_indices.cbegin();
   int64_t row_start = 0;
@@ -174,6 +183,7 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
         part_of_this.rows = n_rows;
         part_of_this.cols = n_cols;
         part_of_this.stride = stride;
+        part_of_this.is_view = true;
         part_of_this.data = std::make_shared<DataHandler>(*data);
         part_of_this.data_ptr = &data_ptr[col_start * stride + row_start];
       }
