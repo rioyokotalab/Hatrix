@@ -544,8 +544,6 @@ Matrix generate_L0(BLR2& A) {
     block_splits[0] = lower(D_splits[0]);
     block_splits[2] = D_splits[2];
     L0_splits[i * A.nblocks + i] = block;
-
-    block.print();
   }
 
   return L0;
@@ -553,6 +551,21 @@ Matrix generate_L0(BLR2& A) {
 
 Matrix generate_U0(BLR2& A) {
   Matrix U0(A.N, A.N);
+
+  int64_t block_size = A.N / A.nblocks;
+  int64_t c_size = block_size - A.rank;
+
+  auto U0_splits = U0.split(A.nblocks, A.nblocks);
+  for (int i = 0; i < A.nblocks; ++i) {
+    Matrix block = generate_identity_matrix(block_size, block_size);
+    auto block_splits = block.split(std::vector<int64_t>(1, c_size),
+                                    std::vector<int64_t>(1, c_size));
+    auto D_splits = A.D(i, i).split(std::vector<int64_t>(1, c_size),
+                                    std::vector<int64_t>(1, c_size));
+    block_splits[0] = upper(D_splits[0]);
+    block_splits[1] = D_splits[1];
+    U0_splits[i * A.nblocks + i] = block;
+  }
 
   return U0;
 }
