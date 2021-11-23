@@ -26,9 +26,9 @@ class Matrix {
 
   Matrix& operator=(const Matrix& A);
 
-  Matrix(Matrix&& A) = default;
+  Matrix& operator=(Matrix&& A);
 
-  Matrix& operator=(Matrix&& A) = default;
+  Matrix(Matrix&& A) = default;
 
   Matrix(int64_t rows, int64_t cols);
 

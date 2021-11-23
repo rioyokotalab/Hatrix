@@ -46,7 +46,7 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
 
 // Copy the input matrix into a lower triangular matrix. Uses N^2 storage.
 // The diagonal is always identity.
-Hatrix::Matrix lower(Hatrix::Matrix& A) {
+Hatrix::Matrix lower(Hatrix::Matrix A) {
   Hatrix::Matrix mat(A.rows, A.cols);
 
   for (int i = 0; i < A.rows; ++i) {
@@ -59,7 +59,7 @@ Hatrix::Matrix lower(Hatrix::Matrix& A) {
   return mat;
 }
 
-Hatrix::Matrix upper(Hatrix::Matrix& A) {
+Hatrix::Matrix upper(Hatrix::Matrix A) {
   Hatrix::Matrix mat(A.rows, A.cols);
 
   for (int i = 0; i < A.rows; ++i) {
@@ -520,7 +520,6 @@ Matrix verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A
       }
       auto block_splits = block.split(std::vector<int64_t>(1, c_size),
                                       std::vector<int64_t>(1, c_size));
-      result_splits[i * A.nblocks + j].print();
       block_splits[3] = result_splits[i * A.nblocks + j];
       A0_splits[i * A.nblocks + j] = block;
     }
@@ -541,8 +540,12 @@ Matrix generate_L0(BLR2& A) {
                                     std::vector<int64_t>(1, c_size));
     auto D_splits = A.D(i, i).split(std::vector<int64_t>(1, c_size),
                                     std::vector<int64_t>(1, c_size));
+
     block_splits[0] = lower(D_splits[0]);
     block_splits[2] = D_splits[2];
+    L0_splits[i * A.nblocks + i] = block;
+
+    block.print();
   }
 
   return L0;

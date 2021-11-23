@@ -31,6 +31,7 @@ class Matrix::DataHandler {
   void resize(int64_t size) { data_.resize(size); }
 };
 
+// Copy constructor.
 Matrix::Matrix(const Matrix& A)
     : rows(A.rows),
       cols(A.cols),
@@ -47,12 +48,13 @@ Matrix::Matrix(const Matrix& A)
   }
 }
 
-Matrix& Matrix::operator=(const Matrix& A) {
-  // Manual copy. We dont simply assign the data pointer since we want to
-  // the ability to work with Matrix objects that might be views of an
-  // underlying parent Matrix object.
-  assert((*this).rows == A.rows);
-  assert((*this).cols == A.cols);
+// Matrix::Matrix(Matrix&& A) {
+// }
+
+// Move assignment constructor.
+Matrix& Matrix::operator=(Matrix&& A) {
+  // Need to perform a manual copy (vs. swapping) since A might be
+  // being assigned to a view.
   for (int i = 0; i < A.rows; ++i) {
     for (int j = 0; j < A.cols; ++j) {
       (*this)(i, j) = A(i, j);
@@ -60,6 +62,25 @@ Matrix& Matrix::operator=(const Matrix& A) {
   }
   return *this;
 }
+
+
+// Copy assignment operator.
+Matrix& Matrix::operator=(const Matrix& A) {
+  // Manual copy. We dont simply assign the data pointer since we want to
+  // the ability to work with Matrix objects that might be views of an
+  // underlying parent Matrix object.
+  assert((*this).rows == A.rows);
+  assert((*this).cols == A.cols);
+  std::cout << ">>> INSIDE ASSIGN\n";
+  A.print();
+  for (int i = 0; i < A.rows; ++i) {
+    for (int j = 0; j < A.cols; ++j) {
+      (*this)(i, j) = A(i, j);
+    }
+  }
+  return *this;
+}
+
 
 Matrix::Matrix(int64_t rows, int64_t cols)
     : rows(rows),
