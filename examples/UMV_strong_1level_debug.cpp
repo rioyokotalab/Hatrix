@@ -558,7 +558,7 @@ void multiply_compliments(Hatrix::BLR2& A) {
   }
 }
 
-Matrix verify_P_L0_U0_PT(Hatrix::BLR2& A, Hatrix::Matrix& last, Hatrix::BLR2&  A_expected) {
+Matrix generate_A0(Hatrix::BLR2& A, Hatrix::Matrix& last) {
   int64_t block_size = A.N / A.nblocks;
   int64_t c_size = block_size - A.rank;
   double expected = 0, diff = 0;
@@ -703,7 +703,7 @@ double factorization_accuracy(Matrix& full_matrix, BLR2& A_expected) {
       }
       else {
         std::cout << " i-> " << i << " j-> " << j << std::endl;
-        (block - A_expected.D(i, j)).print();
+        // (block - A_expected.D(i, j)).print();
         actual += pow(norm(block), 2);
         d_diff += pow(norm(block - A_expected.D(i, j)), 2);
       }
@@ -713,6 +713,36 @@ double factorization_accuracy(Matrix& full_matrix, BLR2& A_expected) {
   std::cout << "S diff: " << s_diff << " D diff: " << d_diff << std::endl;
 
   return std::sqrt((s_diff + d_diff) / actual);
+}
+
+double check_A0_accuracy(Matrix& A0, BLR2& A) {
+  int64_t nblocks = A.nblocks;
+  int64_t block_size = A.N / nblocks;
+  int64_t c_size = block_size - A.rank;
+  double s_diff = 0, d_diff = 0, actual = 0;
+  auto A0_splits = A0.split(nblocks, nblocks);
+
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      Matrix block(A0_splits[i * nblocks + j]);
+      auto block_splits = block.split(std::vector<int64_t>(1, c_size),
+                                      std::vector<int64_t>(1, c_size));
+      Matrix oo(block_splits[3]);
+      actual += pow(norm(oo), 2);
+      if (A.is_admissible(i, j)) {
+        s_diff += pow(norm(A.S(i, j) - oo), 2);
+      }
+      else {
+        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+        d_diff += pow(norm(D_splits[3] - oo), 2);
+      }
+    }
+  }
+
+  std::cout << "A0 acc d: " << d_diff << " s: " << s_diff << std::endl;
+
+  return std::sqrt((d_diff + s_diff) / actual);
 }
 
 int main(int argc, char** argv) {
@@ -742,18 +772,18 @@ int main(int argc, char** argv) {
 
   multiply_compliments(A_expected);
 
-  Matrix A0 = verify_P_L0_U0_PT(A, last, A_expected);
+  Matrix A0 = generate_A0(A, last);
   Matrix L0 = generate_L0(A);
   Matrix U0 = generate_U0(A);
   Matrix full_dense = matmul(matmul(L0, A0), U0);
 
-  matmul(L0, A0).print();
-  U0.print();
-
-  double factorize_error = factorization_accuracy(full_dense, A_expected);
+  double A0_accuracy = check_A0_accuracy(A0, A_expected);
+  // double factorize_error = factorization_accuracy(full_dense, A_expected);
 
   Hatrix::Context::finalize();
 
-  std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
-            << " construct error: " << construct_error << " factorization error: " << factorize_error  << "\n";
+  // std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
+  //           << " construct error: " << construct_error
+  //           << " factorization error: " << factorize_error
+  //           << " A0 error: " << A0_accuracy << "\n";
 }
