@@ -786,7 +786,6 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
     col_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
   }
 
-
   auto L_splits = L.split(row_offsets, col_offsets);
   auto last_splits = last.split(A.nblocks, A.nblocks);
 
@@ -795,7 +794,6 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
   for (int i = 0; i < A.nblocks; ++i) {
     for (int j = 0; j <= i; ++j) {
       if (!A.is_admissible(i, j)) {
-
         auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
                                         std::vector<int64_t>(1, c_size));
 
@@ -820,7 +818,7 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
       }
       else {
         // Copy S blocks into the lower right corner
-        L_splits(i + A.nblocks) * permuted_nblocks + (j + A.nblocks) = S(i, j);
+        L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
       }
     }
   }
@@ -852,20 +850,77 @@ Matrix generate_U_permuted(BLR2& A, Matrix& last) {
       if (!A.is_admissible(i, j)) {
         auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
                                         std::vector<int64_t>(1, c_size));
+        // Copy the cc blocks
         if (i == j) {
-          U_splits[i * permuted_splits + j] = upper(D_splits[0]);
+          U_splits[i * permuted_nblocks + j] = upper(D_splits[0]);
         }
         else {
-          U_splits[i * permuted_splits + j] = D_splits[0];
+          U_splits[i * permuted_nblocks + j] = D_splits[0];
+        }
+
+        // Copy the co parts
+        U_splits[i * permuted_nblocks + j + A.nblocks] = D_splits[1];
+
+        // Copy the oo parts
+        if (i == j) {
+          U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = upper(last_splits[i * A.nblocks + j]);
+        }
+        else {
+          U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
         }
       }
       else {
-
+        // Copy S blocks
+        U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
       }
     }
   }
 
   return U;
+}
+
+Matrix generate_full_permuted(BLR2& A) {
+  Matrix M(A.N, A.N);
+  int64_t block_size = A.N / A.nblocks;
+  int64_t c_size = block_size - A.rank;
+ std::vector<int64_t> row_offsets, col_offsets;
+  for (int i = 0; i < A.nblocks; ++i) {
+    row_offsets.push_back((i+1) * c_size);
+    col_offsets.push_back((i+1) * c_size);
+  }
+  for (int i = 0; i < A.nblocks-1; ++i) {
+    row_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
+    col_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
+  }
+
+  auto M_splits = M.split(row_offsets, col_offsets);
+  int64_t permuted_nblocks = A.nblocks * 2;
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j < A.nblocks; ++j) {
+
+      if (!A.is_admissible(i, j)) {
+        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+        // Copy cc blocks
+        M_splits[i * permuted_nblocks + j] = D_splits[0];
+
+        // Copy oc blocks
+        M_splits[(i + A.nblocks) * permuted_nblocks + j] = D_splits[2];
+
+        // Copy co blocks
+        M_splits[i * permuted_nblocks + (j + A.nblocks)] = D_splits[1];
+
+        // Copy oo blocks
+        M_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = D_splits[3];
+      }
+      else {
+        M_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = A.S(i, j);
+      }
+    }
+  }
+
+  return M;
 }
 
 int main(int argc, char** argv) {
@@ -895,21 +950,28 @@ int main(int argc, char** argv) {
 
   multiply_compliments(A_expected);
 
-  Matrix A0 = generate_A0(A, last);
-  Matrix L1 = generate_L0(A);
-  Matrix U1 = generate_U0(A);
-  Matrix full_dense = matmul(matmul(L1, A0), U1);
-  L1.print();
-  U1.print();
-  // Matrix full_dense = matmul(L0, U0);
+  // Matrix A0 = generate_A0(A, last);
+  // Matrix L1 = generate_L0(A);
+  // Matrix U1 = generate_U0(A);
+  // Matrix full_dense = matmul(matmul(L1, A0), U1);
+  // L1.print();
+  // U1.print();
+  // // Matrix full_dense = matmul(L0, U0);
 
-  double A0_accuracy = check_A0_accuracy(A0, A_expected);
-  double factorize_error = factorization_accuracy(full_dense, A_expected);
+  // double A0_accuracy = check_A0_accuracy(A0, A_expected);
+  // double factorize_error = factorization_accuracy(full_dense, A_expected);
 
 
   Matrix L_permuted = generate_L_permuted(A, last);
+  Matrix U_permuted = generate_U_permuted(A, last);
+  Matrix tt = matmul(L_permuted, U_permuted);
+  Matrix ff = generate_full_permuted(A_expected);
 
   L_permuted.print();
+  U_permuted.print();
+  (tt - ff).print();
+
+  std::cout << factorization_accuracy(tt, A_expected) << std::endl;;
 
   Hatrix::Context::finalize();
 
