@@ -786,10 +786,6 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
     col_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
   }
 
-  for (int i = 0; i < row_offsets.size(); ++i) {
-    std::cout << row_offsets[i] << " ";
-  }
-  std::cout << std::endl;
 
   auto L_splits = L.split(row_offsets, col_offsets);
   auto last_splits = last.split(A.nblocks, A.nblocks);
@@ -822,6 +818,10 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
           L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
         }
       }
+      else {
+        // Copy S blocks into the lower right corner
+        L_splits(i + A.nblocks) * permuted_nblocks + (j + A.nblocks) = S(i, j);
+      }
     }
   }
 
@@ -829,7 +829,43 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
 }
 
 Matrix generate_U_permuted(BLR2& A, Matrix& last) {
+  int64_t block_size = A.N / A.nblocks;
+  int64_t c_size = block_size - A.rank;
+  Matrix U(A.N, A.N);
 
+  std::vector<int64_t> row_offsets, col_offsets;
+  for (int i = 0; i < A.nblocks; ++i) {
+    row_offsets.push_back((i+1) * c_size);
+    col_offsets.push_back((i+1) * c_size);
+  }
+  for (int i = 0; i < A.nblocks-1; ++i) {
+    row_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
+    col_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
+  }
+
+  auto U_splits = U.split(row_offsets, col_offsets);
+  auto last_splits = last.split(A.nblocks, A.nblocks);
+  int64_t permuted_nblocks = A.nblocks * 2;
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = i; j < A.nblocks; ++j) {
+      if (!A.is_admissible(i, j)) {
+        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+        if (i == j) {
+          U_splits[i * permuted_splits + j] = upper(D_splits[0]);
+        }
+        else {
+          U_splits[i * permuted_splits + j] = D_splits[0];
+        }
+      }
+      else {
+
+      }
+    }
+  }
+
+  return U;
 }
 
 int main(int argc, char** argv) {
