@@ -308,8 +308,10 @@ namespace Hatrix {
 
       for (int row = 0; row < num_nodes; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
-        S.insert(row, col, level,
-                 generate_coupling_matrix(randvec, row, col, level));
+        if (is_admissible(row, col, level)) {
+          S.insert(row, col, level,
+                   generate_coupling_matrix(randvec, row, col, level));
+        }
       }
 
       return {Ugen_transfer, Vgen_transfer};
@@ -382,16 +384,18 @@ namespace Hatrix {
       // verify diagonal matrix block constructions at the leaf level.
       double error = 0;
       int num_nodes = pow(2, height);
-      for (int block = 0; block < num_nodes; ++block) {
-        int slice = N / num_nodes;
-        int diagonal_offset = slice * block;
-        int leaf_size = (block == (num_nodes-1)) ? (N - (slice * block)) :  slice;
-
-        double diagonal_error =
-          rel_error(D(block, block, height),
-                    Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
-                                                      diagonal_offset, diagonal_offset));
-        error += pow(diagonal_error, 2);
+      for (int i = 0; i < num_nodes; ++i) {
+        for (int j = 0; j < num_nodes; ++j) {
+          if (!is_admissible(i, j, height)) {
+            std::cout << "D-> r: " << i << " c: " << j << std::endl;
+            int slice = N / num_nodes;
+            double diagonal_error =
+              rel_error(D(i, j, height),
+                        Hatrix::generate_laplacend_matrix(randvec, slice, slice,
+                                                          slice * i, slice * j));
+            error += pow(diagonal_error, 2);
+          }
+        }
       }
 
       // regenerate off-diagonal blocks and test for correctness.
@@ -401,15 +405,20 @@ namespace Hatrix {
 
         for (int row = 0; row < num_nodes; ++row) {
           int col = row % 2 == 0 ? row + 1 : row - 1;
-          Matrix Ubig = get_Ubig(row, level);
-          Matrix Vbig = get_Vbig(col, level);
-          int block_nrows = Ubig.rows;
-          int block_ncols = Vbig.rows;
-          Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-          Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
-                                                            row * slice, col * slice);
-          double offD_error = rel_error(expected, actual);
-          error += pow(offD_error, 2);
+
+          if (is_admissible(row, col, level)) {
+            Matrix Ubig = get_Ubig(row, level);
+            Matrix Vbig = get_Vbig(col, level);
+            int block_nrows = Ubig.rows;
+            int block_ncols = Vbig.rows;
+            Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+            Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
+                                                              row * slice, col * slice);
+            double offD_error = rel_error(expected, actual);
+
+            std::cout << "r: " << row << " c: " << col << std::endl;
+            error += pow(offD_error, 2);
+          }
         }
       }
 
@@ -445,11 +454,11 @@ int main(int argc, char *argv[]) {
   A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
-  // double error = A.construction_relative_error(randvec);
+  double error = A.construction_relative_error(randvec);
 
   Hatrix::Context::finalize();
 
-  // std::cout << "N= " << N << " rank= " << rank
-  //           << " height=" << height <<  " const. error=" << error << std::endl;
+  std::cout << "N= " << N << " rank= " << rank
+            << " height=" << height <<  " const. error=" << error << std::endl;
 
 }
