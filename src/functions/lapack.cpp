@@ -193,6 +193,11 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
   return {std::move(U), std::move(S), std::move(V), expected_err};
 }
 
+std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t rank) {
+  Matrix Ac = std::move(A);
+  return truncated_svd(Ac, rank);
+}
+
 std::tuple<Matrix, Matrix, Matrix> truncated_svd(Matrix& A, double error) {
   Matrix U(A.rows, A.min_dim());
   Matrix S(A.min_dim(), A.min_dim());

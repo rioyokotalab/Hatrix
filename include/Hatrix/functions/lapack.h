@@ -40,6 +40,9 @@ double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
                                                          int64_t rank);
 
+std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
+                                                         int64_t rank);
+
 // Compute truncated SVD for given accuracy threshold.
 std::tuple<Matrix, Matrix, Matrix> truncated_svd(Matrix& A, double error);
 
