@@ -727,7 +727,7 @@ double factorization_accuracy(Matrix& full_matrix, BLR2& A_expected) {
         s_diff += pow(norm(block_splits[3] - A_expected.S(i, j)), 2);
       }
       else {
-        std::cout << " i-> " << i << " j-> " << j << std::endl;
+        std::cout << " i-> " << i+1 << " j-> " << j+1 << std::endl;
         (block - A_expected.D(i, j)).print();
         actual += pow(norm(block), 2);
         d_diff += pow(norm(block - A_expected.D(i, j)), 2);
@@ -771,6 +771,67 @@ double check_A0_accuracy(Matrix& A0, BLR2& A) {
   return std::sqrt((d_diff + s_diff) / actual);
 }
 
+Matrix generate_L_permuted(BLR2& A, Matrix& last) {
+  int64_t block_size = A.N / A.nblocks;
+  int64_t c_size = block_size - A.rank;
+  Matrix L(A.N, A.N);
+
+  std::vector<int64_t> row_offsets, col_offsets;
+  for (int i = 0; i < A.nblocks; ++i) {
+    row_offsets.push_back((i+1) * c_size);
+    col_offsets.push_back((i+1) * c_size);
+  }
+  for (int i = 0; i < A.nblocks-1; ++i) {
+    row_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
+    col_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
+  }
+
+  for (int i = 0; i < row_offsets.size(); ++i) {
+    std::cout << row_offsets[i] << " ";
+  }
+  std::cout << std::endl;
+
+  auto L_splits = L.split(row_offsets, col_offsets);
+  auto last_splits = last.split(A.nblocks, A.nblocks);
+
+  int64_t permuted_nblocks = A.nblocks * 2;
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j <= i; ++j) {
+      if (!A.is_admissible(i, j)) {
+
+        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+
+        // Copy the cc parts
+        if (i == j) {
+          L_splits[i * permuted_nblocks + j] = lower(D_splits[0]);
+        }
+        else {
+          L_splits[i * permuted_nblocks + j] = D_splits[0];
+        }
+
+        // Copy the oc parts
+        L_splits[(i + A.nblocks) * permuted_nblocks + j] = D_splits[2];
+
+        // Copy the oo parts
+        if (i == j) {
+          L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = lower(last_splits[i * A.nblocks + j]);
+        }
+        else {
+          L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
+        }
+      }
+    }
+  }
+
+  return L;
+}
+
+Matrix generate_U_permuted(BLR2& A, Matrix& last) {
+
+}
+
 int main(int argc, char** argv) {
   int64_t N = atoi(argv[1]);
   int64_t nblocks = atoi(argv[2]);
@@ -799,15 +860,20 @@ int main(int argc, char** argv) {
   multiply_compliments(A_expected);
 
   Matrix A0 = generate_A0(A, last);
-  Matrix L0 = generate_L0(A);
-  Matrix U0 = generate_U0(A);
-  // Matrix full_dense = matmul(matmul(L0, A0), U0);
-  L0.print();
-  U0.print();
-  Matrix full_dense = matmul(L0, U0);
+  Matrix L1 = generate_L0(A);
+  Matrix U1 = generate_U0(A);
+  Matrix full_dense = matmul(matmul(L1, A0), U1);
+  L1.print();
+  U1.print();
+  // Matrix full_dense = matmul(L0, U0);
 
   double A0_accuracy = check_A0_accuracy(A0, A_expected);
   double factorize_error = factorization_accuracy(full_dense, A_expected);
+
+
+  Matrix L_permuted = generate_L_permuted(A, last);
+
+  L_permuted.print();
 
   Hatrix::Context::finalize();
 

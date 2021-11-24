@@ -343,6 +343,14 @@ namespace Hatrix {
               }
             }
 
+            if (admis_block) {
+              for (int c1 = 0; c1 < 2; ++c1) {
+                for (int c2 = 0; c2 < 2; ++c2) {
+                  // is_admissible.erase(row_children[c1], row_children[c2], child_level);
+                }
+              }
+            }
+
             is_admissible.insert(i, j, level, std::move(admis_block));
           }
         }
@@ -357,7 +365,12 @@ namespace Hatrix {
       std::cout << "LEVEL: " << level << std::endl;
       for (int i = 0; i < nodes; ++i) {
         for (int j = 0; j < nodes; ++j) {
-          std::cout << is_admissible(i, j, level) << " | " ;
+          if (is_admissible.exists(i, j, level)) {
+            std::cout << is_admissible(i, j, level) << " | " ;
+          }
+          else {
+            std::cout << " | ";
+          }
         }
         std::cout << std::endl;
       }
