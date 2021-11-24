@@ -317,7 +317,38 @@ namespace Hatrix {
               auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
                                                  std::vector<int64_t>(1, c_size));
               matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+            }
+          }
+        }
 
+        // Schur's compliement between co and cc blocks
+        for (int i = block+1; i < nblocks; ++i) {
+          for (int j = 0; j < nblocks; ++j) {
+            if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
+              auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+              auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+              auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
+                                                 std::vector<int64_t>(1, c_size));
+
+              matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
+              std::cout << "reduce: " << i << "," << j << std::endl;
+            }
+          }
+        }
+
+        // Schur's compliment between oc and cc blocks
+        for (int i = 0; i < nblocks; ++i) {
+          for (int j = block+1; j < nblocks; ++j) {
+            if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
+              auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+              auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
+                                                    std::vector<int64_t>(1, c_size));
+              auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
+                                                 std::vector<int64_t>(1, c_size));
+              matmul(lower_splits[2], right_splits[0], reduce_splits[2], false, false, -1.0, 1.0);
             }
           }
         }
