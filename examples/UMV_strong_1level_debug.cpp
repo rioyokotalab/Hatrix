@@ -876,9 +876,11 @@ int main(int argc, char** argv) {
 
   L_permuted.print();
   U_permuted.print();
-  (tt - ff).print();
+  double acc = pow(norm(tt - ff), 2);
 
   Hatrix::Context::finalize();
+
+  std::cout << "accuracy: " << acc << std::endl;
 
   // std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
   //           << " construct error: " << construct_error
