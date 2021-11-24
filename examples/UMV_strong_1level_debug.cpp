@@ -709,6 +709,17 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
     }
   }
 
+  // Copy oc parts belonging to the 'upper' parts of the matrix
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = i+1; j < A.nblocks; ++j) {
+      if (!A.is_admissible(i, j)) {
+        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+        L_splits[(i + A.nblocks) * permuted_nblocks + j] = D_splits[2];
+      }
+    }
+  }
+
   return L;
 }
 
@@ -758,6 +769,17 @@ Matrix generate_U_permuted(BLR2& A, Matrix& last) {
       else {
         // Copy S blocks
         U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
+      }
+    }
+  }
+
+  // Cupy co blocks that actually exist in the lower part of the matrix.
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j < i; ++j) {
+      if (!A.is_admissible(i, j)) {
+        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
+                                        std::vector<int64_t>(1, c_size));
+        U_splits[(i) * permuted_nblocks + (j + A.nblocks)] = D_splits[1];
       }
     }
   }
