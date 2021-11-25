@@ -242,11 +242,17 @@ namespace Hatrix {
               std::tie(Utemp, Stemp, Vtemp, error) =
                 Hatrix::truncated_svd(F(i, block), rank);
               Matrix Vbases = matmul(S(i, block), transpose(V(block)));
+              Matrix Vbases_concat = concat(Vbases, matmul(Stemp, Vtemp), 0);
+              Vcol_bases = concat(Vcol_bases, Vbases_concat, 0);
+              F.erase(i, block);
             }
           }
 
           if (Vcol_bases.numel() != 0) {
-
+            std::tie(Utemp, Stemp, Vtemp, error) =
+              Hatrix::truncated_svd(Vcol_bases, rank);
+            V.erase(block);
+            V.insert(block, std::move(transpose(Vtemp)));
           }
         }
 
