@@ -110,7 +110,7 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         // for (int j = 0; j < nblocks; ++j) {
-        is_admissible.insert(i, i, std::abs(i - i) > admis);
+          is_admissible.insert(i, i, std::abs(i - i) > admis);
         // }
       }
 
@@ -197,6 +197,7 @@ namespace Hatrix {
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
+      RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
         for (int j = 0; j < nblocks; ++j) {
@@ -217,8 +218,6 @@ namespace Hatrix {
         auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
         Matrix& Dcc = diagonal_splits[0];
-        Matrix& Dco = diagonal_splits[1];
-        Matrix& Doc = diagonal_splits[2];
         lu(Dcc);
 
         // TRSM with CC blocks on the row
@@ -288,19 +287,25 @@ namespace Hatrix {
           }
         }
 
-        // Schur's compliement between co and cc blocks
+
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
-            if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
-              auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
-                                                 std::vector<int64_t>(1, c_size));
+            if (!is_admissible(block, j) && !is_admissible(i, block)) {
+              // Schur's compliement between co and cc blocks where product exists as dense.
+              if (!is_admissible(i, j)) {
+                auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
+                                                      std::vector<int64_t>(1, c_size));
+                auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
+                                                      std::vector<int64_t>(1, c_size));
+                auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
+                                                   std::vector<int64_t>(1, c_size));
 
-              matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
-              std::cout << "reduce: " << i << "," << j << std::endl;
+                matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
+              }
+              // Schur's compliement between co and cc blocks where a new fill-in is created.
+              else if (is_admissible(i, j)) {
+
+              }
             }
           }
         }

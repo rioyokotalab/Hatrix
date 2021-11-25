@@ -139,13 +139,13 @@ namespace Hatrix {
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
-        // for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, i, std::abs(i - i) > admis);
-        // }
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::abs(i - j) > admis);
+        }
       }
 
-      is_admissible.insert(3, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 3, admis == 1 ? false : true);
+      // is_admissible.insert(3, 2, admis == 1 ? false : true);
+      // is_admissible.insert(2, 3, admis == 1 ? false : true);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -333,7 +333,6 @@ namespace Hatrix {
                                                  std::vector<int64_t>(1, c_size));
 
               matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
-              std::cout << "reduce: " << i << "," << j << std::endl;
             }
           }
         }
@@ -428,45 +427,6 @@ void multiply_compliments(Hatrix::BLR2& A) {
       }
     }
   }
-
-  // for (int block = 0; block < A.nblocks; ++block) {
-  //   if (!A.is_admissible(i, j))
-  //   Matrix U_F = make_complement(A.U(block));
-  //   Matrix V_F = make_complement(A.V(block));
-  //   A.D(block, block) = matmul(matmul(U_F, A.D(block, block), true), V_F);
-
-  //   // Multiplication of UF with block ahead of the diagonal block on the same row
-  //   for (int icol = block+1; icol < A.nblocks; ++icol) {
-  //     if (!A.is_admissible(block, icol)) {
-  //       A.D(block, icol) = matmul(U_F, A.D(block, icol), true);
-  //     }
-  //   }
-
-  //   // Multiplication of VF with block below this diagonal on the same column.
-  //   for (int irow = block+1; irow < A.nblocks; ++irow) {
-  //     if (!A.is_admissible(irow, block)) {
-  //       A.D(irow, block) = matmul(A.D(irow, block), V_F);
-  //     }
-  //   }
-
-  //   // Multiplication of UF with blocks before the diagonal block on the same row
-  //   for (int icol = 0; icol < block; ++icol) {
-  //     if (!A.is_admissible(block, icol)) {
-  //       auto bottom_splits = A.D(block, icol).split({}, std::vector<int64_t>(1, c_size));
-  //       Matrix o = matmul(U_F, bottom_splits[1], true);
-  //       bottom_splits[1] = o;
-  //     }
-  //   }
-
-  //   // Multiplication of VF with blocks before the diagoanl block on the same column.
-  //   for (int irow = 0; irow < block; ++irow) {
-  //     if (!A.is_admissible(irow, block)) {
-  //       auto right_splits = A.D(irow, block).split(std::vector<int64_t>(1, c_size), {});
-  //       Matrix o = matmul(right_splits[1], V_F);
-  //       right_splits[1] = o;
-  //     }
-  //   }
-  // }
 }
 
 Matrix generate_A0(Hatrix::BLR2& A, Hatrix::Matrix& last) {
@@ -876,6 +836,7 @@ int main(int argc, char** argv) {
 
   L_permuted.print();
   U_permuted.print();
+  (tt - ff).print();
   double acc = pow(norm(tt - ff), 2);
 
   Hatrix::Context::finalize();
