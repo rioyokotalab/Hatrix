@@ -197,8 +197,10 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
 
 int64_t Matrix::min_dim() const { return std::min(rows, cols); }
 int64_t Matrix::max_dim() const { return std::max(rows, cols); }
+int64_t Matrix::numel() const { return rows * cols; }
 
 void Matrix::print() const {
+  if (rows == 0 || cols == 0) { return; }
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
       if ((*this)(i, j) > -1e-12 && (*this)(i, j) < 1e-12) {

@@ -205,6 +205,51 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
+        // Recompress fill-ins in the row behind this block.
+        {
+          Matrix Utemp, Stemp, Vtemp; double error;
+          Matrix Urow_bases(block_size, 0);
+
+          for (int j = 0; j < block; ++j) {
+            if (F.exists(block, j)) {
+              std::tie(Utemp, Stemp, Vtemp, error) =
+                Hatrix::truncated_svd(F(block, j), rank);
+              Matrix Ubases = matmul(U(block), S(block, j));
+              Matrix Unew_bases = matmul(Utemp, Stemp);
+              Matrix Ubases_concat = concat(Ubases, Unew_bases, 1);
+
+              Urow_bases = concat(Urow_bases, Ubases_concat, 1);
+
+              F.erase(block, j);
+            }
+          }
+
+          if (Urow_bases.numel() != 0) {
+            std::tie(Utemp, Stemp, Vtemp, error) =
+              Hatrix::truncated_svd(Urow_bases, rank);
+            U.erase(block);
+            U.insert(block, std::move(Utemp));
+          }
+        }
+
+        // Recompress fill-ins in the col above this block
+        {
+          Matrix Utemp, Stemp, Vtemp; double error;
+          Matrix Vcol_bases(0, block_size);
+
+          for (int i = 0; i < block; ++i) {
+            if (F.exists(i, block)) {
+              std::tie(Utemp, Stemp, Vtemp, error) =
+                Hatrix::truncated_svd(F(i, block), rank);
+              Matrix Vbases = matmul(S(i, block), transpose(V(block)));
+            }
+          }
+
+          if (Vcol_bases.numel() != 0) {
+
+          }
+        }
+
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
             Matrix U_F = make_complement(U(block));
@@ -335,6 +380,22 @@ namespace Hatrix {
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
+
+      for (int irow = 0; irow < nblocks; ++irow) {
+        for (int icol = 0; icol < nblocks; ++icol) {
+          if (is_admissible(irow, icol)) {
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                     block_size,
+                                                                     block_size,
+                                                                     irow*block_size,
+                                                                     icol*block_size,
+                                                                     PV);
+            S.erase(irow, icol);
+            S.insert(irow, icol,
+                     Hatrix::matmul(Hatrix::matmul(U(irow), dense, true), V(icol)));
+          }
+        }
+      }
 
 
       // Merge unfactorized portions.

@@ -107,6 +107,7 @@ class Matrix {
 
   int64_t min_dim() const;
   int64_t max_dim() const;
+  int64_t numel() const;
 
   void print() const;
 
