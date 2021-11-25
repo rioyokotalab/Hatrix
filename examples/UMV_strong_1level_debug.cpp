@@ -24,6 +24,12 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   return Hatrix::norm(A - B) / Hatrix::norm(B);
 }
 
+// TODO: Make a better copy constructor for Matrix and replace this macro with a function.
+#define SPLIT_DENSE(dense, c_size)              \
+  dense.split(std::vector<int64_t>(1, c_size),  \
+              std::vector<int64_t>(1, c_size));
+
+
 Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
   Hatrix::Matrix Q_F(Q.rows, Q.rows);
   Hatrix::Matrix Q_full, R;
@@ -139,10 +145,17 @@ namespace Hatrix {
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, std::abs(i - j) > admis);
-        }
+        // for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, i, std::abs(i - i) > admis);
+        // }
       }
+
+      is_admissible.insert(1, 2, admis == 1 ? false : true);
+      is_admissible.insert(2, 1, admis == 1 ? false : true);
+
+      is_admissible.insert(3, 2, admis == 1 ? false : true);
+      is_admissible.insert(2, 3, admis == 1 ? false : true);
+
 
       // is_admissible.insert(3, 2, admis == 1 ? false : true);
       // is_admissible.insert(2, 3, admis == 1 ? false : true);
@@ -250,8 +263,6 @@ namespace Hatrix {
         auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
                                                      std::vector<int64_t>(1, c_size));
         Matrix& Dcc = diagonal_splits[0];
-        Matrix& Dco = diagonal_splits[1];
-        Matrix& Doc = diagonal_splits[2];
         lu(Dcc);
 
         // TRSM with CC blocks on the row
@@ -301,25 +312,33 @@ namespace Hatrix {
               auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
                                                     std::vector<int64_t>(1, c_size));
 
-              matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
+              matmul(lower_splits[0], right_splits[0], reduce_splits[0],
+                     false, false, -1.0, 1.0);
             }
           }
         }
 
+
         // Schur's compliment between oc and co blocks
         for (int i = 0; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
-            if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
-              auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
-                                                 std::vector<int64_t>(1, c_size));
-              matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+            if (!is_admissible(block, j) && !is_admissible(i, block)) {
+              auto lower_splits = SPLIT_DENSE(D(i, block), c_size);
+              auto right_splits = SPLIT_DENSE(D(block, j), c_size);
+              if (!is_admissible(i, j)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size);
+                matmul(lower_splits[2], right_splits[1],
+                       reduce_splits[3], false, false, -1.0, 1.0);
+              }
+              else {
+                std::cout << "block: " << block << " i: " << i << " j: " << j << std::endl;
+                matmul(lower_splits[2], right_splits[1],
+                       S(i, j), false, false, -1.0, 1.0);
+              }
             }
           }
         }
+
 
         // Schur's compliement between co and cc blocks
         for (int i = block+1; i < nblocks; ++i) {
@@ -332,7 +351,8 @@ namespace Hatrix {
               auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
                                                  std::vector<int64_t>(1, c_size));
 
-              matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
+              matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false,
+                     -1.0, 1.0);
             }
           }
         }
@@ -347,7 +367,8 @@ namespace Hatrix {
                                                     std::vector<int64_t>(1, c_size));
               auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
                                                  std::vector<int64_t>(1, c_size));
-              matmul(lower_splits[2], right_splits[0], reduce_splits[2], false, false, -1.0, 1.0);
+              matmul(lower_splits[2], right_splits[0], reduce_splits[2],
+                     false, false, -1.0, 1.0);
             }
           }
         }
