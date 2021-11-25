@@ -235,7 +235,7 @@ namespace Hatrix {
                                                          0*block_size,
                                                          1*block_size,
                                                          PV);
-          Matrix Dhat31 = D31 + F(3, 1);
+          Matrix Dhat31 = D31; //+ F(3, 1);
           Matrix row = concat(D30, Dhat31, 1);
           Matrix col = concat(D01, Dhat31, 0);
           Matrix Uhat3, Vhat1, Stemp, Vtemp; double error;
@@ -273,7 +273,7 @@ namespace Hatrix {
                                                          3*block_size,
                                                          PV);
 
-          Matrix Dhat13 = D13 + F(1, 3);
+          Matrix Dhat13 = D13;// + F(1, 3);
           row = concat(D10, Dhat13, 1);
           col = concat(D03, Dhat13, 0);
           Matrix Uhat1, Vhat3;
@@ -433,6 +433,15 @@ namespace Hatrix {
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
+
+      Matrix D10 =  Hatrix::generate_laplacend_matrix(randpts,
+                                                         block_size,
+                                                         block_size,
+                                                         2*block_size,
+                                                         0*block_size,
+                                                         PV);
+
+      (matmul(matmul(U(1), S(1, 0)), V(0), false, true) - D10).print();
 
 
       // Merge unfactorized portions.
@@ -624,8 +633,8 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
