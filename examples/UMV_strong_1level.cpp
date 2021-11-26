@@ -86,7 +86,7 @@ namespace Hatrix {
         }
 
         c_size_offset += c_size;
-        rank_offset += V(block).cols;
+        rank_offset += col_rank;
       }
 
       x = temp;
@@ -124,8 +124,8 @@ namespace Hatrix {
         // }
       }
 
-      is_admissible.insert(1, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 1, admis == 1 ? false : true);
+      // is_admissible.insert(1, 2, admis == 1 ? false : true);
+      // is_admissible.insert(2, 1, admis == 1 ? false : true);
 
       is_admissible.insert(3, 2, admis == 1 ? false : true);
       is_admissible.insert(2, 3, admis == 1 ? false : true);
@@ -232,7 +232,7 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        if (block == 3) {
+        if (block == 3 && F.exists(3, 1) && F.exists(1,3)) {
           Matrix I = generate_identity_matrix(block_size, block_size);
 
           // Compute row bases from fill-in.
@@ -563,7 +563,7 @@ namespace Hatrix {
         // Apply co block.
         for (int left_col = block-1; left_col >= 0; --left_col) {
           if (!is_admissible(block, left_col)) {
-            int64_t row_split = block_size - U(block).cols, col_split = block_size - V(left_col).cols;
+            int64_t col_split = block_size - V(left_col).cols;
             auto left_splits = SPLIT_DENSE(D(block, left_col), row_split, col_split);
             Matrix x_block(x_split[block]), x_left_col(x_split[left_col]);
 
@@ -581,7 +581,7 @@ namespace Hatrix {
         for (int right_col = nblocks-1; right_col > block; --right_col) {
           if (!is_admissible(block, right_col)) {
             int64_t row_split = block_size - U(block).cols, col_split = block_size - V(right_col).cols;
-            auto right_splits = D(block, right_col).split(std::vector<int64_t>(1, row_split), {});
+            auto right_splits = D(block, right_col).split(std::vector<int64_t>(1, col_split), {});
 
             Matrix x_block(x_split[block]);
             auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
