@@ -454,6 +454,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j)) {
+            S(i, j).print();
             last_splits[i * nblocks + j] = S(i, j);
           }
           else {
