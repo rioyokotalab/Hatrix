@@ -254,8 +254,8 @@ namespace Hatrix {
         // TRSM with CC blocks on the row
         for (int j = block + 1; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
-            auto D_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                    std::vector<int64_t>(1, c_size));
+            inr64_t col_split = block_size - V(j).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
           }
         }
@@ -263,8 +263,8 @@ namespace Hatrix {
         // TRSM with co blocks on this row
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
-            auto D_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                              std::vector<int64_t>(1, c_size));
+            inr64_t col_split = block_size - V(j).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
             solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
           }
         }
@@ -272,8 +272,8 @@ namespace Hatrix {
         // TRSM with cc blocks on the column
         for (int i = block + 1; i < nblocks; ++i) {
           if (!is_admissible(i, block)) {
-            auto D_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                              std::vector<int64_t>(1, c_size));
+            int64_t row_split = block_size - U(i).cols;
+            auto D_splits = SPLIT_DENSE(D(i, block), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Upper, false);
           }
         }
@@ -281,8 +281,8 @@ namespace Hatrix {
         // TRSM with oc blocks on the column
         for (int i = 0; i < nblocks; ++i) {
           if (!is_admissible(i, block)) {
-            auto D_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                              std::vector<int64_t>(1, c_size));
+            int64_t row_split = block_size - U(i).cols;
+            auto D_splits = SPLIT_DENSE(D(i, block), row_split, col_split);
             solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
           }
         }
