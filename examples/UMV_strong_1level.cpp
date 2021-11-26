@@ -96,7 +96,7 @@ namespace Hatrix {
     Matrix make_complement(const Hatrix::Matrix &Q) {
       Matrix Q_F(Q.rows, Q.rows);
       Matrix Q_full, R;
-       std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
 
       for (int i = 0; i < Q_F.rows; ++i) {
         for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
@@ -120,7 +120,7 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         // for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, i, std::abs(i - i) > admis);
+        is_admissible.insert(i, i, std::abs(i - i) > admis);
         // }
       }
 
@@ -501,9 +501,7 @@ namespace Hatrix {
       // forward substitution with cc blocks
       for (int block = 0; block < nblocks; ++block) {
         int64_t row_split = block_size - U(block).cols, col_split = block_size - V(block).cols;
-
         auto block_splits = SPLIT_DENSE(D(block, block), row_split, col_split);
-
         Matrix x_block(x_split[block]);
         auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
         solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
@@ -515,10 +513,12 @@ namespace Hatrix {
         //      Forward with the big c blocks on the lower part.
         for (int irow = block+1; irow < nblocks; ++irow) {
           if (is_admissible(irow, block)) { continue; }
-          auto lower_splits = D(irow, block).split({}, std::vector<int64_t>(1, col_split));
+          int64_t row_split = block_size - U(irow).cols;
+          int64_t col_split = block_size - V(block).cols;
+          auto lower_splits = D(irow, block).split({}, std::vector<int64_t>(1, row_split));
 
           Matrix x_block(x_split[block]);
-          auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+          auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
 
           Matrix x_irow(x_split[irow]);
           matmul(lower_splits[0], x_block_splits[0], x_irow, false, false, -1.0, 1.0);
@@ -530,7 +530,8 @@ namespace Hatrix {
         // Forward with the oc parts of the block that are actually in the upper part of the matrix.
         for (int irow = 0; irow < block; ++irow) {
           if (is_admissible(irow, block)) { continue; }
-          int64_t row_split = U(irow).cols, col_split = V(block).cols;
+          int64_t row_split = block_size - U(irow).cols;
+          int64_t col_split = block_size - V(block).cols;
           auto top_splits = SPLIT_DENSE(D(irow, block), row_split, col_split);
           Matrix x_irow(x_split[irow]), x_block(x_split[block]);
           auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, row_split), {});
@@ -550,10 +551,8 @@ namespace Hatrix {
         offset += block_size - U(i).cols;
       }
       auto permute_splits = x.split(std::vector<int64_t>(1, offset), {});
-
       solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
       solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
-
       permute_back(x, block_size);
 
       // backward substition using cc blocks
@@ -563,10 +562,11 @@ namespace Hatrix {
         // Apply co block.
         for (int left_col = block-1; left_col >= 0; --left_col) {
           if (!is_admissible(block, left_col)) {
+            int64_t row_split = block_size - U(block).cols;
             int64_t col_split = block_size - V(left_col).cols;
             auto left_splits = SPLIT_DENSE(D(block, left_col), row_split, col_split);
-            Matrix x_block(x_split[block]), x_left_col(x_split[left_col]);
 
+            Matrix x_block(x_split[block]), x_left_col(x_split[left_col]);
             auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
             auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, col_split), {});
 
@@ -580,8 +580,8 @@ namespace Hatrix {
         // Apply c block present on the right of this diagonal block.
         for (int right_col = nblocks-1; right_col > block; --right_col) {
           if (!is_admissible(block, right_col)) {
-            int64_t row_split = block_size - U(block).cols, col_split = block_size - V(right_col).cols;
-            auto right_splits = D(block, right_col).split(std::vector<int64_t>(1, col_split), {});
+            int64_t row_split = block_size - U(block).cols;
+            auto right_splits = D(block, right_col).split(std::vector<int64_t>(1, row_split), {});
 
             Matrix x_block(x_split[block]);
             auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
@@ -594,7 +594,7 @@ namespace Hatrix {
         }
 
         Matrix x_block(x_split[block]);
-        auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
+        auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
         matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
         solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
         for (int64_t i = 0; i < block_size; ++i) {
