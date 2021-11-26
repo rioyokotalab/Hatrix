@@ -196,20 +196,20 @@ namespace Hatrix {
           Matrix& Vbig_child1 = Vchild(child1, child_level);
           Matrix& Vbig_child2 = Vchild(child2, child_level);
 
-          Matrix Alevel_plus_node = generate_row_bases(node, leaf_size, randpts, Y, level);
-          std::vector<Matrix> Alevel_plus_node_splits = Alevel_plus_node.split(1, 2);
+          Matrix Vbig = generate_row_bases(node, leaf_size, randpts, Y, level);
+          std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
 
-          Matrix temp(Alevel_plus_node.rows, Vbig_child1.cols + Vbig_child2.cols);
+          Matrix temp(Vbig.rows, Vbig_child1.cols + Vbig_child2.cols);
           std::vector<Matrix> temp_splits = temp.split(1, 2);
 
-          matmul(Alevel_plus_node_splits[0], Vbig_child1, temp_splits[0]);
-          matmul(Alevel_plus_node_splits[1], Vbig_child2, temp_splits[1]);
+          matmul(Vbig_splits[0], Vbig_child1, temp_splits[0]);
+          matmul(Vbig_splits[1], Vbig_child2, temp_splits[1]);
 
           Matrix Ui, Si, Vtransfer; double error;
           std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
           V.insert(node, level, transpose(Vtransfer));
 
-          Vbig_parent.insert(node, level, std::move(Alevel_plus_node));
+          Vbig_parent.insert(node, level, std::move(Vbig));
         }
       }
 
@@ -433,7 +433,7 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::finalize();
 
-  std::cout << "N= " << N << " rank= " << rank
+  std::cout << "N= " << N << " rank= " << rank << " admis= " << admis
             << " height=" << height <<  " const. error=" << error << std::endl;
 
 }
