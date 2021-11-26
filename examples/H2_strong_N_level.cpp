@@ -149,25 +149,18 @@ namespace Hatrix {
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-          Matrix Alevel_node_plus = generate_column_bases(node, leaf_size, randpts, Y, level);
-          std::vector<Matrix> Alevel_node_plus_splits = Alevel_node_plus.split(2, 1);
+          Matrix Ubig = generate_column_bases(node, leaf_size, randpts, Y, level);
+          std::vector<Matrix> Ubig_splits = Ubig.split(2, 1);
 
-          Matrix temp(Ubig_child1.cols + Ubig_child2.cols, Alevel_node_plus.cols);
+          Matrix temp(Ubig_child1.cols + Ubig_child2.cols, Ubig.cols);
           std::vector<Matrix> temp_splits = temp.split(2, 1);
 
-          matmul(Ubig_child1, Alevel_node_plus_splits[0], temp_splits[0], true, false, 1, 0);
-          matmul(Ubig_child2, Alevel_node_plus_splits[1], temp_splits[1], true, false, 1, 0);
+          matmul(Ubig_child1, Ubig_splits[0], temp_splits[0], true, false, 1, 0);
+          matmul(Ubig_child2, Ubig_splits[1], temp_splits[1], true, false, 1, 0);
 
           Matrix Utransfer, Si, Vi; double error;
           std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
           U.insert(node, level, std::move(Utransfer));
-
-          // Generate the full bases for passing onto the upper level.
-          std::vector<Matrix> Utransfer_splits = U(node, level).split(2, 1);
-          Matrix Ubig(leaf_size, rank);
-          std::vector<Matrix> Ubig_splits = Ubig.split(2, 1);
-          matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
-          matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
 
           // Save the actual basis into the temporary Map to pass to generate
           // the S block and pass it to higher levels.
@@ -192,15 +185,7 @@ namespace Hatrix {
           std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
           V.insert(node, level, transpose(Vtransfer));
 
-          // Generate the full bases for passing onto the upper level.
-          std::vector<Matrix> Vtransfer_splits = V(node, level).split(2, 1);
-          Matrix Vbig(rank, leaf_size);
-          std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
-
-          matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
-          matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
-
-          Vbig_parent.insert(node, level, transpose(Vbig));
+          Vbig_parent.insert(node, level, std::move(Alevel_plus_node));
         }
       }
 
@@ -412,12 +397,12 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  // randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  // randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
-  A.print_structure();
+  // A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
