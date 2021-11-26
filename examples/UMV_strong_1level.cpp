@@ -24,9 +24,9 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
 }
 
 // TODO: Make a better copy constructor for Matrix and replace this macro with a function.
-#define SPLIT_DENSE(dense, c_size)              \
-  dense.split(std::vector<int64_t>(1, c_size),  \
-              std::vector<int64_t>(1, c_size));
+#define SPLIT_DENSE(dense, row_split, col_split)        \
+  dense.split(std::vector<int64_t>(1, row_split),       \
+              std::vector<int64_t>(1, col_split));
 
 namespace Hatrix {
   class BLR2 {
@@ -213,83 +213,18 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-
         if (block == 3) {
-          // Recompress row fill-in
-          Matrix D31 = Hatrix::generate_laplacend_matrix(randpts,
-                                                         block_size,
-                                                         block_size,
-                                                         3*block_size,
-                                                         1*block_size,
-                                                         PV);
+          // Compute row bases from fill-in.
 
-          Matrix D30 = Hatrix::generate_laplacend_matrix(randpts,
-                                                         block_size,
-                                                         block_size,
-                                                         3*block_size,
-                                                         0*block_size,
-                                                         PV);
-          Matrix D01 = Hatrix::generate_laplacend_matrix(randpts,
-                                                         block_size,
-                                                         block_size,
-                                                         0*block_size,
-                                                         1*block_size,
-                                                         PV);
-          Matrix Dhat31 = D31; //+ F(3, 1);
-          Matrix row = concat(D30, Dhat31, 1);
-          Matrix col = concat(D01, Dhat31, 0);
-          Matrix Uhat3, Vhat1, Stemp, Vtemp; double error;
-          std::tie(Uhat3, Stemp, Vtemp, error) = Hatrix::truncated_svd(row, rank);
-          std::tie(Vhat1, Stemp, Vtemp, error) = Hatrix::truncated_svd(transpose(col), rank);
-
-          Matrix Shat31 = matmul(matmul(Uhat3, Dhat31, true), Vhat1);
-
-          U.erase(3);
-          U.insert(3, std::move(Uhat3));
-
-          V.erase(1);
-          V.insert(1, std::move(Vhat1));
-
-          S.erase(3, 1);
-          S.insert(3, 1, std::move(Shat31));
-
-          // Recompress column fill-in
-          Matrix D13 = Hatrix::generate_laplacend_matrix(randpts,
-                                                         block_size,
-                                                         block_size,
-                                                         1*block_size,
-                                                         3*block_size,
-                                                         PV);
-          Matrix D10 = Hatrix::generate_laplacend_matrix(randpts,
-                                                         block_size,
-                                                         block_size,
-                                                         1*block_size,
-                                                         0*block_size,
-                                                         PV);
-          Matrix D03 = Hatrix::generate_laplacend_matrix(randpts,
-                                                         block_size,
-                                                         block_size,
-                                                         0*block_size,
-                                                         3*block_size,
-                                                         PV);
-
-          Matrix Dhat13 = D13;// + F(1, 3);
-          row = concat(D10, Dhat13, 1);
-          col = concat(D03, Dhat13, 0);
-          Matrix Uhat1, Vhat3;
-          std::tie(Uhat1, Stemp, Vtemp, error) = Hatrix::truncated_svd(row, rank);
-          std::tie(Vhat3, Stemp, Vtemp, error) = Hatrix::truncated_svd(transpose(col), rank);
-
-          Matrix Shat13 = matmul(matmul(Uhat1, Dhat13, true), Vhat3);
-
-          U.erase(1);
-          U.insert(1, std::move(Uhat1));
-
-          V.erase(3);
-          V.insert(3, std::move(Vhat3));
-
-          S.erase(1, 3);
-          S.insert(1, 3, std::move(Shat13));
+          Matrix gramian = matmul(F(3, 1), F(3, 1), false, true);
+          Matrix range = matmul(U(3), U(3), false, true);
+          Matrix I = generate_identity_matrix(block_size, block_size);
+          Matrix diff = I - range;
+          Matrix G31 = matmul(matmul(diff, gramian), diff, false, true);
+          G31.print();
+          F(3,1).print();
+          Matrix U3_add, _S, _V; double error;
+          std::tie(U3_add, _S, _V, error) = truncated_svd(G31, rank);
 
         }
 
@@ -307,9 +242,12 @@ namespace Hatrix {
           }
         }
 
+        int64_t row_rank = U(block).cols, col_rank = V(block).cols;
+        int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
+
+
         // The diagonal block is split along the row and column.
-        auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
-                                                     std::vector<int64_t>(1, c_size));
+        auto diagonal_splits = SPLIT_DENSE(D(block, block), row_split, col_split);
         Matrix& Dcc = diagonal_splits[0];
         lu(Dcc);
 
@@ -370,16 +308,21 @@ namespace Hatrix {
         for (int i = 0; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), c_size);
-              auto right_splits = SPLIT_DENSE(D(block, j), c_size);
+              auto lower_splits = SPLIT_DENSE(D(i, block), c_size, c_size);
+              auto right_splits = SPLIT_DENSE(D(block, j), c_size, c_size);
               if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size);
+                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size, c_size);
                 matmul(lower_splits[2], right_splits[1],
                        reduce_splits[3], false, false, -1.0, 1.0);
               }
               else {
+                // Generate the fill-in block that holds the product here and that from
+                // Schur's compliment present below this block.
+                Matrix fill_in(block_size, block_size);
+                auto fill_splits = SPLIT_DENSE(fill_in, c_size, c_size);
                 matmul(lower_splits[2], right_splits[1],
-                       S(i, j), false, false, -1.0, 1.0);
+                       fill_splits[3], false, false, -1.0, 1.0);
+                F.insert(i, j, std::move(fill_in));
               }
             }
           }
@@ -388,22 +331,19 @@ namespace Hatrix {
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), c_size);
-              auto right_splits = SPLIT_DENSE(D(block, j), c_size);
+              auto lower_splits = SPLIT_DENSE(D(i, block), c_size, c_size);
+              auto right_splits = SPLIT_DENSE(D(block, j), c_size, c_size);
               // Schur's compliement between co and cc blocks where product exists as dense.
               if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size);
+                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size, c_size);
                 matmul(lower_splits[0], right_splits[1], reduce_splits[1],
                        false, false, -1.0, 1.0);
               }
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               else {
-                Matrix fill_in(block_size, block_size);
-                auto fill_splits = SPLIT_DENSE(fill_in, c_size);
-                matmul(lower_splits[0], right_splits[1], fill_splits[1],
-                       false, false, -1.0, 1.0);
-                fill_in.print();
-                F.insert(i, j, std::move(fill_in));
+                Matrix& fill_in = F(i, j);
+                auto fill_splits = SPLIT_DENSE(fill_in, c_size, c_size);
+                matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
               }
             }
           }
@@ -413,36 +353,24 @@ namespace Hatrix {
         for (int i = 0; i < nblocks; ++i) {
           for (int j = block+1; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), c_size);
-              auto right_splits = SPLIT_DENSE(D(block, j), c_size);
+              auto lower_splits = SPLIT_DENSE(D(i, block), c_size, c_size);
+              auto right_splits = SPLIT_DENSE(D(block, j), c_size, c_size);
               // Schur's compliement between co and cc blocks where product exists as dense.
               if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size);
+                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size, c_size);
                 matmul(lower_splits[2], right_splits[0], reduce_splits[2],
                        false, false, -1.0, 1.0);
               }
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               else {
-                Matrix fill_in(block_size, block_size);
-                auto fill_splits = SPLIT_DENSE(fill_in, c_size);
-                matmul(lower_splits[2], right_splits[0], fill_splits[2],
-                       false, false, -1.0, 1.0);
-                F.insert(i, j, std::move(fill_in));
+                Matrix& fill_in = F(i, j);
+                auto fill_splits = SPLIT_DENSE(fill_in, c_size, c_size);
+                matmul(lower_splits[2], right_splits[0], fill_splits[2], false, false, -1.0, 1.0);
               }
             }
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
-
-      Matrix D10 =  Hatrix::generate_laplacend_matrix(randpts,
-                                                         block_size,
-                                                         block_size,
-                                                         2*block_size,
-                                                         0*block_size,
-                                                         PV);
-
-      (matmul(matmul(U(1), S(1, 0)), V(0), false, true) - D10).print();
-
 
       // Merge unfactorized portions.
       Matrix last(nblocks * rank, nblocks * rank);
@@ -654,6 +582,7 @@ int main(int argc, char** argv) {
 
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  // Adense.print();
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   // std::cout << "x solve:\n";

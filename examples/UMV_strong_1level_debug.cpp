@@ -153,13 +153,6 @@ namespace Hatrix {
       is_admissible.insert(1, 2, admis == 1 ? false : true);
       is_admissible.insert(2, 1, admis == 1 ? false : true);
 
-      is_admissible.insert(3, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 3, admis == 1 ? false : true);
-
-
-      // is_admissible.insert(3, 2, admis == 1 ? false : true);
-      // is_admissible.insert(2, 3, admis == 1 ? false : true);
-
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible.exists(i, j)) {
@@ -243,6 +236,7 @@ namespace Hatrix {
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
+      int64_t oversampling = 5;
 
       for (int block = 0; block < nblocks; ++block) {
         for (int j = 0; j < nblocks; ++j) {
@@ -331,7 +325,6 @@ namespace Hatrix {
                        reduce_splits[3], false, false, -1.0, 1.0);
               }
               else {
-                std::cout << "block: " << block << " i: " << i << " j: " << j << std::endl;
                 matmul(lower_splits[2], right_splits[1],
                        S(i, j), false, false, -1.0, 1.0);
               }
@@ -373,7 +366,6 @@ namespace Hatrix {
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
-
 
       // Merge unfactorized portions.
       Matrix last(nblocks * rank, nblocks * rank);
@@ -855,8 +847,11 @@ int main(int argc, char** argv) {
   Matrix tt = matmul(L_permuted, U_permuted);
   Matrix ff = generate_full_permuted(A_expected);
 
-  L_permuted.print();
-  U_permuted.print();
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  // Adense.print();
+
+  // L_permuted.print();
+  // U_permuted.print();
   (tt - ff).print();
   double acc = pow(norm(tt - ff), 2);
 
