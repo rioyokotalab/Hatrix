@@ -124,8 +124,8 @@ namespace Hatrix {
         // }
       }
 
-      // is_admissible.insert(1, 2, admis == 1 ? false : true);
-      // is_admissible.insert(2, 1, admis == 1 ? false : true);
+      is_admissible.insert(1, 2, admis == 1 ? false : true);
+      is_admissible.insert(2, 1, admis == 1 ? false : true);
 
       is_admissible.insert(3, 2, admis == 1 ? false : true);
       is_admissible.insert(2, 3, admis == 1 ? false : true);

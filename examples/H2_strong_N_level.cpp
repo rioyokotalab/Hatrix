@@ -337,7 +337,8 @@ namespace Hatrix {
             bool admis_block = true;
             for (int c1 = 0; c1 < 2; ++c1) {
               for (int c2 = 0; c2 < 2; ++c2) {
-                if (!is_admissible(row_children[c1], col_children[c2], child_level)) {
+                if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
+                    !is_admissible(row_children[c1], col_children[c2], child_level)) {
                   admis_block = false;
                 }
               }
@@ -346,7 +347,7 @@ namespace Hatrix {
             if (admis_block) {
               for (int c1 = 0; c1 < 2; ++c1) {
                 for (int c2 = 0; c2 < 2; ++c2) {
-                  // is_admissible.erase(row_children[c1], row_children[c2], child_level);
+                  is_admissible.erase(row_children[c1], col_children[c2], child_level);
                 }
               }
             }
@@ -364,12 +365,13 @@ namespace Hatrix {
       int64_t nodes = pow(2, level);
       std::cout << "LEVEL: " << level << std::endl;
       for (int i = 0; i < nodes; ++i) {
+        std::cout << "| " ;
         for (int j = 0; j < nodes; ++j) {
           if (is_admissible.exists(i, j, level)) {
             std::cout << is_admissible(i, j, level) << " | " ;
           }
           else {
-            std::cout << " | ";
+            std::cout << "  | ";
           }
         }
         std::cout << std::endl;
@@ -384,6 +386,7 @@ namespace Hatrix {
        int64_t _admis) :
       N(_N), rank(_rank), height(_height), admis(_admis) {
       compute_matrix_structure(height);
+      print_structure();
 
       RowLevelMap Ugen; ColLevelMap Vgen;
       std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
