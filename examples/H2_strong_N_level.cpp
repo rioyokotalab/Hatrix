@@ -124,9 +124,11 @@ namespace Hatrix {
       ColLevelMap Ugen;
       RowLevelMap Vgen;
 
+      std::cout << "leaf : " << block_size << std::endl;
+
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (!is_admissible(i, j, height)) {
+          if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
             D.insert(i, j, height,
                      Hatrix::generate_laplacend_matrix(randpts,
                                                        block_size, block_size,
@@ -150,12 +152,11 @@ namespace Hatrix {
       for (int64_t i = 0; i < nblocks; ++i) {
         Hatrix::Matrix AY(block_size, rank + oversampling);
         for (int64_t j = 0; j < nblocks; ++j) {
-          if (is_admissible(i, j, height)) {
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                     block_size, block_size,
-                                                                     i*block_size, j*block_size);
-            Hatrix::matmul(dense, Y[j], AY);
-          }
+          if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) { continue; }
+          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                   block_size, block_size,
+                                                                   i*block_size, j*block_size);
+          Hatrix::matmul(dense, Y[j], AY);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
         U.insert(i, height, std::move(Utemp));
@@ -165,12 +166,11 @@ namespace Hatrix {
       for (int64_t j = 0; j < nblocks; ++j) {
         Hatrix::Matrix YtA(rank + oversampling, block_size);
         for (int64_t i = 0; i < nblocks; ++i) {
-          if (is_admissible(i, j, height)) {
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                     block_size, block_size,
-                                                                     i*block_size, j*block_size);
-            Hatrix::matmul(Y[i], dense, YtA, true);
-          }
+          if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) { continue; }
+          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                   block_size, block_size,
+                                                                   i*block_size, j*block_size);
+          Hatrix::matmul(Y[i], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(transpose(YtA), rank);
         V.insert(j, height, std::move(Utemp));
@@ -179,7 +179,7 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (is_admissible(i, j, height)) {
+          if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
                                                                      i*block_size, j*block_size);
@@ -307,10 +307,11 @@ namespace Hatrix {
       }
 
       for (int row = 0; row < num_nodes; ++row) {
-        int col = row % 2 == 0 ? row + 1 : row - 1;
-        if (is_admissible(row, col, level)) {
-          S.insert(row, col, level,
-                   generate_coupling_matrix(randvec, row, col, level));
+        for (int col = 0; col < num_nodes; ++col) {
+          if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+            S.insert(row, col, level,
+                     generate_coupling_matrix(randvec, row, col, level));
+          }
         }
       }
 
@@ -386,7 +387,6 @@ namespace Hatrix {
        int64_t _admis) :
       N(_N), rank(_rank), height(_height), admis(_admis) {
       compute_matrix_structure(height);
-      print_structure();
 
       RowLevelMap Ugen; ColLevelMap Vgen;
       std::tie(Ugen, Vgen) = generate_leaf_nodes(randpts);
@@ -402,8 +402,7 @@ namespace Hatrix {
       int num_nodes = pow(2, height);
       for (int i = 0; i < num_nodes; ++i) {
         for (int j = 0; j < num_nodes; ++j) {
-          if (!is_admissible(i, j, height)) {
-            std::cout << "D-> r: " << i << " c: " << j << std::endl;
+          if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
             int slice = N / num_nodes;
             double diagonal_error =
               rel_error(D(i, j, height),
@@ -420,20 +419,18 @@ namespace Hatrix {
         int slice = N / num_nodes;
 
         for (int row = 0; row < num_nodes; ++row) {
-          int col = row % 2 == 0 ? row + 1 : row - 1;
-
-          if (is_admissible(row, col, level)) {
-            Matrix Ubig = get_Ubig(row, level);
-            Matrix Vbig = get_Vbig(col, level);
-            int block_nrows = Ubig.rows;
-            int block_ncols = Vbig.rows;
-            Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-            Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
-                                                              row * slice, col * slice);
-            double offD_error = rel_error(expected, actual);
-
-            std::cout << "r: " << row << " c: " << col << std::endl;
-            error += pow(offD_error, 2);
+          for (int col = 0; col < num_nodes; ++col) {
+            if (is_admissible.exists(row, col, height) && is_admissible(row, col, level)) {
+              Matrix Ubig = get_Ubig(row, level);
+              Matrix Vbig = get_Vbig(col, level);
+              int block_nrows = Ubig.rows;
+              int block_ncols = Vbig.rows;
+              Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+              Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
+                                                                row * slice, col * slice);
+              double offD_error = rel_error(expected, actual);
+              error += pow(offD_error, 2);
+            }
           }
         }
       }
@@ -462,12 +459,12 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  // randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  // randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
-  A.print_structure();
+  // A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
