@@ -240,9 +240,7 @@ namespace Hatrix {
           U3_add.shrink(block_size, nbases);
           Matrix U3_copy(U(3));
           U.erase(3);
-          U3_copy.print();
           U.insert(3, concat(U3_copy, U3_add, 1));
-          U(3).print();
 
           // Compute col bases from fill-in.
           gramian = matmul(F(1, 3), F(1, 3), false, true);
@@ -256,7 +254,6 @@ namespace Hatrix {
           Matrix V3_copy(V(3));
           V.erase(3);
           V.insert(3, concat(V3_copy, V3_add, 1));
-          V(3).print();
         }
 
         for (int j = 0; j < nblocks; ++j) {
@@ -413,7 +410,30 @@ namespace Hatrix {
         }
       } // for (int block = 0; block < nblocks; ++block)
 
-      // Update S blocks
+      // Append zeros to admissible blocks in the same row as a fill-in. This is detected
+      // when there is a dimension mismatch between the number of bases and the nrows of
+      // S block.
+      for (int ib = 0; ib < nblocks; ++ib) {
+        int64_t row_rank = U(ib).cols;
+        for (int jb = 0; jb < nblocks; ++jb) {
+          int64_t col_rank = V(jb).cols;
+          if (is_admissible(ib, jb)) {
+            Matrix& oldS = S(ib, jb);
+            Matrix newS(row_rank, col_rank);
+            if (S(ib, jb).rows != row_rank || S(ib, jb).cols != col_rank) {
+              // Zero-pad the rows of this S block.
+              for (int i = 0; i < oldS.rows; ++i) {
+                for (int j = 0; j < oldS.cols; ++j) {
+                  newS(i, j) = oldS(i, j);
+                }
+              }
+
+              S.erase(ib, jb);
+              S.insert(ib, jb, std::move(newS));
+            }
+          }
+        }
+      }
 
       // Merge unfactorized portions.
       std::vector<int64_t> row_splits, col_splits;
@@ -434,7 +454,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j)) {
-            // last_splits[i * nblocks + j] = S(i, j);
+            last_splits[i * nblocks + j] = S(i, j);
           }
           else {
             std::cout << "r: " << last_splits[i * nblocks + j].rows << " c: " << last_splits[i * nblocks + j].cols << std::endl;
