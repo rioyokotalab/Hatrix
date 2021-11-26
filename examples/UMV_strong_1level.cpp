@@ -206,6 +206,19 @@ namespace Hatrix {
       }
     }
 
+    int significant_bases(const Matrix& Sa) {
+      int nbases = 0;
+      for (int i = 0; i < Sa.rows; ++i) {
+        if (Sa(i, i) > 1e-2) {
+          nbases += 1;
+        }
+        else {
+          break;
+        }
+      }
+      return nbases;
+    }
+
     // Perform factorization assuming the permuted form of the BLR2 matrix.
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
@@ -245,7 +258,6 @@ namespace Hatrix {
         int64_t row_rank = U(block).cols, col_rank = V(block).cols;
         int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
 
-
         // The diagonal block is split along the row and column.
         auto diagonal_splits = SPLIT_DENSE(D(block, block), row_split, col_split);
         Matrix& Dcc = diagonal_splits[0];
@@ -254,7 +266,7 @@ namespace Hatrix {
         // TRSM with CC blocks on the row
         for (int j = block + 1; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
-            inr64_t col_split = block_size - V(j).cols;
+            int64_t col_split = block_size - V(j).cols;
             auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
           }
@@ -263,7 +275,7 @@ namespace Hatrix {
         // TRSM with co blocks on this row
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
-            inr64_t col_split = block_size - V(j).cols;
+            int64_t col_split = block_size - V(j).cols;
             auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
             solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
           }
@@ -281,8 +293,7 @@ namespace Hatrix {
         // TRSM with oc blocks on the column
         for (int i = 0; i < nblocks; ++i) {
           if (!is_admissible(i, block)) {
-            int64_t row_split = block_size - U(i).cols;
-            auto D_splits = SPLIT_DENSE(D(i, block), row_split, col_split);
+            auto D_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
             solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
           }
         }
@@ -291,15 +302,17 @@ namespace Hatrix {
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = block+1; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
-              auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
+              auto lower_splits = SPLIT_DENSE(D(i, block),
+                                              block_size - U(i).cols,
+                                              col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j),
+                                              row_split,
+                                              block_size - V(j).cols);
+              auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                               row_split,
+                                               col_split);
 
-              matmul(lower_splits[0], right_splits[0], reduce_splits[0],
-                     false, false, -1.0, 1.0);
+              matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
             }
           }
         }
@@ -308,20 +321,23 @@ namespace Hatrix {
         for (int i = 0; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), c_size, c_size);
-              auto right_splits = SPLIT_DENSE(D(block, j), c_size, c_size);
+              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
+
               if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size, c_size);
-                matmul(lower_splits[2], right_splits[1],
-                       reduce_splits[3], false, false, -1.0, 1.0);
+                auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                                 block_size - U(i).cols,
+                                                 block_size - V(j).cols);
+                matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
               }
               else {
                 // Generate the fill-in block that holds the product here and that from
                 // Schur's compliment present below this block.
                 Matrix fill_in(block_size, block_size);
-                auto fill_splits = SPLIT_DENSE(fill_in, c_size, c_size);
-                matmul(lower_splits[2], right_splits[1],
-                       fill_splits[3], false, false, -1.0, 1.0);
+                auto fill_splits = SPLIT_DENSE(fill_in,
+                                               block_size - U(i).cols,
+                                               block_size - V(j).cols);
+                matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, -1.0, 1.0);
                 F.insert(i, j, std::move(fill_in));
               }
             }
@@ -331,18 +347,21 @@ namespace Hatrix {
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), c_size, c_size);
-              auto right_splits = SPLIT_DENSE(D(block, j), c_size, c_size);
+              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
               // Schur's compliement between co and cc blocks where product exists as dense.
               if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size, c_size);
-                matmul(lower_splits[0], right_splits[1], reduce_splits[1],
-                       false, false, -1.0, 1.0);
+                auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                                 block_size - U(i).cols,
+                                                 block_size - V(j).cols);
+                matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
               }
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               else {
                 Matrix& fill_in = F(i, j);
-                auto fill_splits = SPLIT_DENSE(fill_in, c_size, c_size);
+                auto fill_splits = SPLIT_DENSE(fill_in,
+                                               block_size - U(i).cols,
+                                               block_size - V(j).cols);
                 matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
               }
             }
@@ -353,18 +372,22 @@ namespace Hatrix {
         for (int i = 0; i < nblocks; ++i) {
           for (int j = block+1; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), c_size, c_size);
-              auto right_splits = SPLIT_DENSE(D(block, j), c_size, c_size);
+              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
               // Schur's compliement between co and cc blocks where product exists as dense.
               if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size, c_size);
+                auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                                 block_size - U(i).cols,
+                                                 block_size - V(j).cols);
                 matmul(lower_splits[2], right_splits[0], reduce_splits[2],
                        false, false, -1.0, 1.0);
               }
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               else {
                 Matrix& fill_in = F(i, j);
-                auto fill_splits = SPLIT_DENSE(fill_in, c_size, c_size);
+                auto fill_splits = SPLIT_DENSE(fill_in,
+                                               block_size - U(i).cols,
+                                               block_size - V(j).cols);
                 matmul(lower_splits[2], right_splits[0], fill_splits[2], false, false, -1.0, 1.0);
               }
             }
