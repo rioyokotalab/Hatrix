@@ -47,18 +47,19 @@ namespace Hatrix {
       }
 
       for (int block = 0; block < nblocks; ++block) {
+        int64_t row_rank = U(block).cols;
         int64_t c_size = block_size - U(block).cols;
         // Copy the compliment part of the RHS vector.
         for (int i = 0; i < c_size; ++i) {
           temp(c_size_offset + i, 0) = x(block_size * block + i, 0);
         }
         // Copy the rank part of the RHS vector.
-        for (int i = 0; i < rank; ++i) {
+        for (int i = 0; i < row_rank; ++i) {
           temp(rank_offset + offset + i, 0) = x(block_size * block + c_size + i, 0);
         }
 
         c_size_offset += c_size;
-        rank_offset += U(block).cols;
+        rank_offset += row_rank;
       }
 
       x = temp;
@@ -71,7 +72,8 @@ namespace Hatrix {
 
       int64_t c_size_offset = 0, rank_offset = 0;
       for (int block = 0; block < nblocks; ++block) {
-        int64_t c_size = block_size - V(block).cols;
+        int64_t col_rank = V(block).cols;
+        int64_t c_size = block_size - col_rank;
 
         // Copy the compliment part of the vector.
         for (int i = 0; i < c_size; ++i) {
@@ -79,7 +81,7 @@ namespace Hatrix {
         }
 
         // Copy the rank part of the vector.
-        for (int i = 0; i < rank; ++i) {
+        for (int i = 0; i < col_rank; ++i) {
           temp(block_size * block + c_size + i, 0) = x(offset + rank_offset + i, 0);
         }
 
