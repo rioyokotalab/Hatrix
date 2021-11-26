@@ -206,10 +206,10 @@ namespace Hatrix {
       }
     }
 
-    int significant_bases(const Matrix& Sa) {
+    int significant_bases(const Matrix& Sa, double eta=1e-13) {
       int nbases = 0;
       for (int i = 0; i < Sa.rows; ++i) {
-        if (Sa(i, i) > 1e-2) {
+        if (Sa(i, i) > eta) {
           nbases += 1;
         }
         else {
@@ -227,18 +227,36 @@ namespace Hatrix {
 
       for (int block = 0; block < nblocks; ++block) {
         if (block == 3) {
-          // Compute row bases from fill-in.
+          Matrix I = generate_identity_matrix(block_size, block_size);
 
+          // Compute row bases from fill-in.
           Matrix gramian = matmul(F(3, 1), F(3, 1), false, true);
           Matrix range = matmul(U(3), U(3), false, true);
-          Matrix I = generate_identity_matrix(block_size, block_size);
           Matrix diff = I - range;
           Matrix G31 = matmul(matmul(diff, gramian), diff, false, true);
-          G31.print();
-          F(3,1).print();
           Matrix U3_add, _S, _V; double error;
           std::tie(U3_add, _S, _V, error) = truncated_svd(G31, rank);
+          int nbases = significant_bases(_S);
+          U3_add.shrink(block_size, nbases);
+          Matrix U3_copy(U(3));
+          U.erase(3);
+          U3_copy.print();
+          U.insert(3, concat(U3_copy, U3_add, 1));
+          U(3).print();
 
+          // Compute col bases from fill-in.
+          gramian = matmul(F(1, 3), F(1, 3), false, true);
+          range = matmul(V(3), V(3), false, true);
+          diff = I - range;
+          Matrix G13 = matmul(matmul(diff, gramian), diff, false, true);
+          Matrix V3_add;
+          std::tie(V3_add, _S, _V, error) = truncated_svd(G13, rank);
+          nbases = significant_bases(_S);
+          V3_add.shrink(block_size, nbases);
+          Matrix V3_copy(V(3));
+          V.erase(3);
+          V.insert(3, concat(V3_copy, V3_add, 1));
+          V(3).print();
         }
 
         for (int j = 0; j < nblocks; ++j) {
@@ -395,18 +413,34 @@ namespace Hatrix {
         }
       } // for (int block = 0; block < nblocks; ++block)
 
+      // Update S blocks
+
       // Merge unfactorized portions.
-      Matrix last(nblocks * rank, nblocks * rank);
-      auto last_splits = last.split(nblocks, nblocks);
+      std::vector<int64_t> row_splits, col_splits;
+      int64_t nrows = 0, ncols = 0;
+      for (int i = 0; i < nblocks; ++i) {
+        int64_t row_rank = U(i).cols, col_rank = V(i).cols;
+        row_splits.push_back(nrows + row_rank);
+        col_splits.push_back(ncols + col_rank);
+        nrows += row_rank;
+        ncols += col_rank;
+      }
+
+      std::cout << "nrows: " << nrows << std::endl;
+
+      Matrix last(nrows, ncols);
+      auto last_splits = last.split(row_splits, col_splits);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j)) {
-            last_splits[i * nblocks + j] = S(i, j);
+            // last_splits[i * nblocks + j] = S(i, j);
           }
           else {
-            auto D_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
-                                          std::vector<int64_t>(1, c_size));
+            std::cout << "r: " << last_splits[i * nblocks + j].rows << " c: " << last_splits[i * nblocks + j].cols << std::endl;
+            auto D_splits = SPLIT_DENSE(D(i, j),
+                                        block_size - U(i).cols,
+                                        block_size - V(j).cols);
             last_splits[i * nblocks + j] = D_splits[3];
           }
         }
