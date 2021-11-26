@@ -39,12 +39,15 @@ namespace Hatrix {
     RowColMap<Matrix> Loc, Uco;      // fill-ins of the small strips on the top and bottom.
 
     void permute_forward(Matrix& x, int64_t block_size) {
-      int64_t c_size = block_size - rank;
-      int64_t offset = c_size * nblocks;
-      Matrix temp(x);
-
       int64_t c_size_offset = 0, rank_offset = 0;
+      Matrix temp(x);
+      int64_t offset = 0;
+      for (int i = 0; i < nblocks; ++i) {
+        offset += block_size - U(i).cols;
+      }
+
       for (int block = 0; block < nblocks; ++block) {
+        int64_t c_size = block_size - U(block).cols;
         // Copy the compliment part of the RHS vector.
         for (int i = 0; i < c_size; ++i) {
           temp(c_size_offset + i, 0) = x(block_size * block + i, 0);
@@ -55,7 +58,7 @@ namespace Hatrix {
         }
 
         c_size_offset += c_size;
-        rank_offset += rank;
+        rank_offset += U(block).cols;
       }
 
       x = temp;
@@ -590,10 +593,6 @@ namespace Hatrix {
 
         Matrix x_block(x_split[block]);
         auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
-        block_splits[1].print_meta();
-        x_block_splits[0].print_meta();
-        std::cout << "U block: " << block << " " << V(block).cols << std::endl;
-        std::cout << "rs: " << row_split << " cs: " << col_split << std::endl;
         matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
         solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
         for (int64_t i = 0; i < block_size; ++i) {
