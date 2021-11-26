@@ -446,19 +446,15 @@ namespace Hatrix {
         ncols += col_rank;
       }
 
-      std::cout << "nrows: " << nrows << std::endl;
-
       Matrix last(nrows, ncols);
       auto last_splits = last.split(row_splits, col_splits);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j)) {
-            S(i, j).print();
             last_splits[i * nblocks + j] = S(i, j);
           }
           else {
-            std::cout << "r: " << last_splits[i * nblocks + j].rows << " c: " << last_splits[i * nblocks + j].cols << std::endl;
             auto D_splits = SPLIT_DENSE(D(i, j),
                                         block_size - U(i).cols,
                                         block_size - V(j).cols);
