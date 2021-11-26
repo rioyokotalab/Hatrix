@@ -24,11 +24,11 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   return Hatrix::norm(A - B) / Hatrix::norm(B);
 }
 
-// TODO: Make a better copy constructor for Matrix and replace this macro with a function.
-#define SPLIT_DENSE(dense, c_size)              \
-  dense.split(std::vector<int64_t>(1, c_size),  \
-              std::vector<int64_t>(1, c_size));
 
+// TODO: Make a better copy constructor for Matrix and replace this macro with a function.
+#define SPLIT_DENSE(dense, row_split, col_split)        \
+  dense.split(std::vector<int64_t>(1, row_split),       \
+              std::vector<int64_t>(1, col_split));
 
 Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
   Hatrix::Matrix Q_F(Q.rows, Q.rows);
@@ -86,6 +86,10 @@ namespace Hatrix {
     RowColMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;
     RowColMap<Matrix> Loc, Uco;      // fill-ins of the small strips on the top and bottom.
+
+    int significant_bases(const Matrix& Sa, double eta=1e-13) {
+      return 2;
+    }
 
     void permute_forward(Matrix& x, int64_t block_size) {
       int64_t c_size = block_size - rank;
@@ -146,7 +150,7 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         // for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, i, std::abs(i - i) > admis);
+        is_admissible.insert(i, i, std::abs(i - i) > admis);
         // }
       }
 
@@ -236,9 +240,39 @@ namespace Hatrix {
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
-      int64_t oversampling = 5;
+      RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
+        if (block == 3 && F.exists(3, 1) && F.exists(1,3)) {
+          Matrix I = generate_identity_matrix(block_size, block_size);
+
+          // Compute row bases from fill-in.
+          Matrix gramian = matmul(F(3, 1), F(3, 1), false, true);
+          Matrix range = matmul(U(3), U(3), false, true);
+          Matrix diff = I - range;
+          Matrix G31 = matmul(matmul(diff, gramian), diff, false, true);
+          Matrix U3_add, _S, _V; double error;
+          std::tie(U3_add, _S, _V, error) = truncated_svd(G31, rank);
+          int nbases = significant_bases(_S);
+          U3_add.shrink(block_size, nbases);
+          Matrix U3_copy(U(3));
+          U.erase(3);
+          U.insert(3, concat(U3_copy, U3_add, 1));
+
+          // Compute col bases from fill-in.
+          gramian = matmul(F(1, 3), F(1, 3), false, true);
+          range = matmul(V(3), V(3), false, true);
+          diff = I - range;
+          Matrix G13 = matmul(matmul(diff, gramian), diff, false, true);
+          Matrix V3_add;
+          std::tie(V3_add, _S, _V, error) = truncated_svd(G13, rank);
+          nbases = significant_bases(_S);
+          V3_add.shrink(block_size, nbases);
+          Matrix V3_copy(V(3));
+          V.erase(3);
+          V.insert(3, concat(V3_copy, V3_add, 1));
+        }
+
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
             Matrix U_F = make_complement(U(block));
@@ -253,17 +287,19 @@ namespace Hatrix {
           }
         }
 
+        int64_t row_rank = U(block).cols, col_rank = V(block).cols;
+        int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
+
         // The diagonal block is split along the row and column.
-        auto diagonal_splits = D(block, block).split(std::vector<int64_t>(1, c_size),
-                                                     std::vector<int64_t>(1, c_size));
+        auto diagonal_splits = SPLIT_DENSE(D(block, block), row_split, col_split);
         Matrix& Dcc = diagonal_splits[0];
         lu(Dcc);
 
         // TRSM with CC blocks on the row
         for (int j = block + 1; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
-            auto D_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                    std::vector<int64_t>(1, c_size));
+            int64_t col_split = block_size - V(j).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
           }
         }
@@ -271,8 +307,8 @@ namespace Hatrix {
         // TRSM with co blocks on this row
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
-            auto D_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                              std::vector<int64_t>(1, c_size));
+            int64_t col_split = block_size - V(j).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
             solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
           }
         }
@@ -280,8 +316,8 @@ namespace Hatrix {
         // TRSM with cc blocks on the column
         for (int i = block + 1; i < nblocks; ++i) {
           if (!is_admissible(i, block)) {
-            auto D_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                              std::vector<int64_t>(1, c_size));
+            int64_t row_split = block_size - U(i).cols;
+            auto D_splits = SPLIT_DENSE(D(i, block), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Upper, false);
           }
         }
@@ -289,8 +325,7 @@ namespace Hatrix {
         // TRSM with oc blocks on the column
         for (int i = 0; i < nblocks; ++i) {
           if (!is_admissible(i, block)) {
-            auto D_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                              std::vector<int64_t>(1, c_size));
+            auto D_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
             solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
           }
         }
@@ -299,53 +334,68 @@ namespace Hatrix {
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = block+1; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
-              auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
+              auto lower_splits = SPLIT_DENSE(D(i, block),
+                                              block_size - U(i).cols,
+                                              col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j),
+                                              row_split,
+                                              block_size - V(j).cols);
+              auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                               row_split,
+                                               col_split);
 
-              matmul(lower_splits[0], right_splits[0], reduce_splits[0],
-                     false, false, -1.0, 1.0);
+              matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
             }
           }
         }
-
 
         // Schur's compliment between oc and co blocks
         for (int i = 0; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), c_size);
-              auto right_splits = SPLIT_DENSE(D(block, j), c_size);
+              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
+
               if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j), c_size);
-                matmul(lower_splits[2], right_splits[1],
-                       reduce_splits[3], false, false, -1.0, 1.0);
+                auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                                 block_size - U(i).cols,
+                                                 block_size - V(j).cols);
+                matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
               }
               else {
-                matmul(lower_splits[2], right_splits[1],
-                       S(i, j), false, false, -1.0, 1.0);
+                // Generate the fill-in block that holds the product here and that from
+                // Schur's compliment present below this block.
+                Matrix fill_in(block_size, block_size);
+                auto fill_splits = SPLIT_DENSE(fill_in,
+                                               block_size - U(i).cols,
+                                               block_size - V(j).cols);
+                matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, -1.0, 1.0);
+                F.insert(i, j, std::move(fill_in));
               }
             }
           }
         }
 
-
-        // Schur's compliement between co and cc blocks
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
-            if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
-              auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
-                                                 std::vector<int64_t>(1, c_size));
-
-              matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false,
-                     -1.0, 1.0);
+            if (!is_admissible(block, j) && !is_admissible(i, block)) {
+              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
+              // Schur's compliement between co and cc blocks where product exists as dense.
+              if (!is_admissible(i, j)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                                 block_size - U(i).cols,
+                                                 block_size - V(j).cols);
+                matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
+              }
+              // Schur's compliement between co and cc blocks where a new fill-in is created.
+              else {
+                Matrix& fill_in = F(i, j);
+                auto fill_splits = SPLIT_DENSE(fill_in,
+                                               block_size - U(i).cols,
+                                               block_size - V(j).cols);
+                matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+              }
             }
           }
         }
@@ -353,23 +403,78 @@ namespace Hatrix {
         // Schur's compliment between oc and cc blocks
         for (int i = 0; i < nblocks; ++i) {
           for (int j = block+1; j < nblocks; ++j) {
-            if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
-              auto lower_splits = D(i, block).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto right_splits = D(block, j).split(std::vector<int64_t>(1, c_size),
-                                                    std::vector<int64_t>(1, c_size));
-              auto reduce_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
-                                                 std::vector<int64_t>(1, c_size));
-              matmul(lower_splits[2], right_splits[0], reduce_splits[2],
-                     false, false, -1.0, 1.0);
+            if (!is_admissible(block, j) && !is_admissible(i, block)) {
+              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
+              // Schur's compliement between co and cc blocks where product exists as dense.
+              if (!is_admissible(i, j)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                                 block_size - U(i).cols,
+                                                 block_size - V(j).cols);
+                matmul(lower_splits[2], right_splits[0], reduce_splits[2],
+                       false, false, -1.0, 1.0);
+              }
+              // Schur's compliement between co and cc blocks where a new fill-in is created.
+              else {
+                Matrix& fill_in = F(i, j);
+                auto fill_splits = SPLIT_DENSE(fill_in,
+                                               block_size - U(i).cols,
+                                               block_size - V(j).cols);
+                matmul(lower_splits[2], right_splits[0], fill_splits[2], false, false, -1.0, 1.0);
+              }
             }
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
 
+      // Append zeros to admissible blocks in the same row as a fill-in. This is detected
+      // when there is a dimension mismatch between the number of bases and the nrows of
+      // S block.
+      for (int ib = 0; ib < nblocks; ++ib) {
+        int64_t row_rank = U(ib).cols;
+        for (int jb = 0; jb < nblocks; ++jb) {
+          int64_t col_rank = V(jb).cols;
+          if (is_admissible(ib, jb)) {
+            Matrix& oldS = S(ib, jb);
+            Matrix newS(row_rank, col_rank);
+            if (S(ib, jb).rows != row_rank || S(ib, jb).cols != col_rank) {
+              // Zero-pad the rows of this S block.
+              for (int i = 0; i < oldS.rows; ++i) {
+                for (int j = 0; j < oldS.cols; ++j) {
+                  newS(i, j) = oldS(i, j);
+                }
+              }
+
+              S.erase(ib, jb);
+              S.insert(ib, jb, std::move(newS));
+            }
+          }
+        }
+      }
+
+      // Update S blocks for admissible blocks that have fill-ins.
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (F.exists(i, j)) {
+            Matrix& newS = S(i, j);
+            newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
+          }
+        }
+      }
+
       // Merge unfactorized portions.
-      Matrix last(nblocks * rank, nblocks * rank);
-      auto last_splits = last.split(nblocks, nblocks);
+      std::vector<int64_t> row_splits, col_splits;
+      int64_t nrows = 0, ncols = 0;
+      for (int i = 0; i < nblocks; ++i) {
+        int64_t row_rank = U(i).cols, col_rank = V(i).cols;
+        row_splits.push_back(nrows + row_rank);
+        col_splits.push_back(ncols + col_rank);
+        nrows += row_rank;
+        ncols += col_rank;
+      }
+
+      Matrix last(nrows, ncols);
+      auto last_splits = last.split(row_splits, col_splits);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -377,8 +482,9 @@ namespace Hatrix {
             last_splits[i * nblocks + j] = S(i, j);
           }
           else {
-            auto D_splits = D(i, j).split(std::vector<int64_t>(1, c_size),
-                                          std::vector<int64_t>(1, c_size));
+            auto D_splits = SPLIT_DENSE(D(i, j),
+                                        block_size - U(i).cols,
+                                        block_size - V(j).cols);
             last_splits[i * nblocks + j] = D_splits[3];
           }
         }
@@ -764,7 +870,7 @@ Matrix generate_full_permuted(BLR2& A) {
   Matrix M(A.N, A.N);
   int64_t block_size = A.N / A.nblocks;
   int64_t c_size = block_size - A.rank;
- std::vector<int64_t> row_offsets, col_offsets;
+  std::vector<int64_t> row_offsets, col_offsets;
   for (int i = 0; i < A.nblocks; ++i) {
     row_offsets.push_back((i+1) * c_size);
     col_offsets.push_back((i+1) * c_size);
