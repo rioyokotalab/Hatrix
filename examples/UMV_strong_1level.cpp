@@ -435,6 +435,16 @@ namespace Hatrix {
         }
       }
 
+      // Update S blocks for admissible blocks that have fill-ins.
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (F.exists(i, j)) {
+            Matrix& newS = S(i, j);
+            newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
+          }
+        }
+      }
+
       // Merge unfactorized portions.
       std::vector<int64_t> row_splits, col_splits;
       int64_t nrows = 0, ncols = 0;
