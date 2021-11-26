@@ -37,6 +37,30 @@ namespace Hatrix {
     int64_t oversampling = 5;
 
   private:
+    bool row_has_admissible_blocks(int row, int level) {
+      bool has_admis = false;
+      for (int i = 0; i < pow(2, level); ++i) {
+        if (is_admissible.exists(row, i, level) && is_admissible(row, i, level)) {
+          has_admis = true;
+          break;
+        }
+      }
+
+      return has_admis;
+    }
+
+    bool col_has_admissible_blocks(int col, int level) {
+      bool has_admis = false;
+      for (int j = 0; j < pow(2, level); ++j) {
+        if (is_admissible.exists(j, col, level) && is_admissible(j, col, level)) {
+          has_admis = true;
+          break;
+        }
+      }
+
+      return has_admis;
+    }
+
     // Generate U for the leaf.
     Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
       // Row slice since column bases should be cutting across the columns.
@@ -144,7 +168,7 @@ namespace Hatrix {
         int child1 = node * 2;
         int child2 = node * 2 + 1;
 
-        {
+        if (row_has_admissible_blocks(node, level)) {
           // Generate U transfer matrix.
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
@@ -167,7 +191,7 @@ namespace Hatrix {
           Ubig_parent.insert(node, level, std::move(Ubig));
         }
 
-        {
+        if (col_has_admissible_blocks(node, level)) {
           // Generate V transfer matrix.
           Matrix& Vbig_child1 = Vchild(child1, child_level);
           Matrix& Vbig_child2 = Vchild(child2, child_level);
@@ -402,7 +426,7 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
-  // A.print_structure();
+  A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
