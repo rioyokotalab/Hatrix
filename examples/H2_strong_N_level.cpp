@@ -197,17 +197,17 @@ namespace Hatrix {
           Matrix& Vbig_child2 = Vchild(child2, child_level);
 
           Matrix Vbig = generate_row_bases(node, leaf_size, randpts, Y, level);
-          std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
+          std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
 
-          Matrix temp(Vbig.rows, Vbig_child1.cols + Vbig_child2.cols);
-          std::vector<Matrix> temp_splits = temp.split(1, 2);
+          Matrix temp(Vbig_child1.cols + Vbig_child2.cols, Vbig.cols);
+          std::vector<Matrix> temp_splits = temp.split(2, 1);
 
-          matmul(Vbig_splits[0], Vbig_child1, temp_splits[0]);
-          matmul(Vbig_splits[1], Vbig_child2, temp_splits[1]);
+          matmul(Vbig_splits[0], Vbig_child1, temp_splits[0], true, false, 1, 0);
+          matmul(Vbig_splits[1], Vbig_child2, temp_splits[1], true, false, 1, 0);
 
           Matrix Ui, Si, Vtransfer; double error;
-          std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
-          V.insert(node, level, transpose(Vtransfer));
+          std::tie(Vtransfer, Si, Ui, error) = truncated_svd(temp, rank);
+          V.insert(node, level, std::move(Vtransfer));
 
           Vbig_parent.insert(node, level, std::move(Vbig));
         }
@@ -265,7 +265,6 @@ namespace Hatrix {
       Matrix Vbig_child2 = get_Vbig(child2, level+1);
 
       int leaf_size = Vbig_child1.rows + Vbig_child2.rows;
-      //int rank = leaf_size;
 
       Matrix Vbig(leaf_size, rank);
 
@@ -361,16 +360,15 @@ namespace Hatrix {
     double construction_relative_error(const randvec_t& randvec) {
       // verify diagonal matrix block constructions at the leaf level.
       double error = 0;
+      double actual = 0, expected = 0;
       int num_nodes = pow(2, height);
       for (int i = 0; i < num_nodes; ++i) {
         for (int j = 0; j < num_nodes; ++j) {
           if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
             int slice = N / num_nodes;
-            double diagonal_error =
-              rel_error(D(i, j, height),
-                        Hatrix::generate_laplacend_matrix(randvec, slice, slice,
-                                                          slice * i, slice * j));
-            error += pow(diagonal_error, 2);
+            actual += norm(Hatrix::generate_laplacend_matrix(randvec, slice, slice,
+                                                             slice * i, slice * j));
+            expected += norm(D(i, j, height));
           }
         }
       }
@@ -387,17 +385,17 @@ namespace Hatrix {
               Matrix Vbig = get_Vbig(col, level);
               int block_nrows = Ubig.rows;
               int block_ncols = Vbig.rows;
-              Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-              Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
+              Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+              Matrix actual_matrix = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
                                                                 row * slice, col * slice);
-              double offD_error = rel_error(expected, actual);
-              error += pow(offD_error, 2);
+              actual += norm(actual_matrix);
+              expected += norm(expected_matrix);
             }
           }
         }
       }
 
-      return std::sqrt(error);
+      return std::sqrt(pow(std::abs(actual - expected) / expected, 2));
     }
 
     void print_structure() {
@@ -426,7 +424,7 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
-  A.print_structure();
+  // A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
