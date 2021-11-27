@@ -584,7 +584,7 @@ Matrix generate_A0(Hatrix::BLR2& A, Hatrix::Matrix& last) {
   return A0;
 }
 
-Matrix generate_L0(BLR2& A) {
+Matrix generate_L1(BLR2& A) {
   int64_t nblocks = A.nblocks;
   int64_t block_size = A.N / nblocks;
   int64_t c_size = block_size - A.rank;
@@ -631,13 +631,13 @@ Matrix generate_L0(BLR2& A) {
   return L0;
 }
 
-Matrix generate_U0(BLR2& A) {
-  Matrix U0(A.N, A.N);
+Matrix generate_U1(BLR2& A) {
+  Matrix U1(A.N, A.N);
   int64_t nblocks = A.nblocks;
   int64_t block_size = A.N / A.nblocks;
   int64_t c_size = block_size - A.rank;
 
-  auto U0_splits = U0.split(A.nblocks, A.nblocks);
+  auto U1_splits = U1.split(A.nblocks, A.nblocks);
   for (int i = 0; i < A.nblocks; ++i) {
     Matrix block = generate_identity_matrix(block_size, block_size);
     auto block_splits = block.split(std::vector<int64_t>(1, c_size),
@@ -646,7 +646,7 @@ Matrix generate_U0(BLR2& A) {
                                     std::vector<int64_t>(1, c_size));
     block_splits[0] = upper(D_splits[0]);
     block_splits[1] = D_splits[1];
-    U0_splits[i * nblocks + i] = block;
+    U1_splits[i * nblocks + i] = block;
 
     // Populate the columns to the right of the block diagonal
     for (int icol = i + 1; icol < nblocks; ++icol) {
@@ -656,7 +656,7 @@ Matrix generate_U0(BLR2& A) {
         auto block_splits = block.split(std::vector<int64_t>(1, c_size), {});
         block_splits[0] = D_splits[0];
 
-        U0_splits[i * nblocks + icol] = block;
+        U1_splits[i * nblocks + icol] = block;
       }
     }
 
@@ -669,13 +669,13 @@ Matrix generate_U0(BLR2& A) {
                                         std::vector<int64_t>(1, c_size));
         block_splits[1] = D_splits[1];
 
-        U0_splits[i * nblocks + icol] = block;
+        U1_splits[i * nblocks + icol] = block;
       }
     }
   }
 
 
-  return U0;
+  return U1;
 }
 
 double factorization_accuracy(Matrix& full_matrix, BLR2& A_expected) {
@@ -945,29 +945,17 @@ int main(int argc, char** argv) {
 
   multiply_compliments(A_expected);
 
-  // Matrix A0 = generate_A0(A, last);
-  // Matrix L1 = generate_L0(A);
-  // Matrix U1 = generate_U0(A);
-  // Matrix full_dense = matmul(matmul(L1, A0), U1);
-  // L1.print();
-  // U1.print();
-  // // Matrix full_dense = matmul(L0, U0);
-
-  // double A0_accuracy = check_A0_accuracy(A0, A_expected);
-  // double factorize_error = factorization_accuracy(full_dense, A_expected);
-
-
   Matrix L_permuted = generate_L_permuted(A, last);
   Matrix U_permuted = generate_U_permuted(A, last);
   Matrix tt = matmul(L_permuted, U_permuted);
   Matrix ff = generate_full_permuted(A_expected);
 
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  // Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   // Adense.print();
 
   // L_permuted.print();
   // U_permuted.print();
-  (tt - ff).print();
+  // (tt - ff).print();
   double acc = pow(norm(tt - ff), 2);
 
   Hatrix::Context::finalize();
