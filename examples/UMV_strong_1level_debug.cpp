@@ -156,6 +156,9 @@ namespace Hatrix {
 
       is_admissible.insert(1, 2, admis == 1 ? false : true);
       is_admissible.insert(2, 1, admis == 1 ? false : true);
+      is_admissible.insert(3, 2, admis == 1 ? false : true);
+      is_admissible.insert(2, 3, admis == 1 ? false : true);
+
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -775,15 +778,18 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
 
         // Copy the oo parts
         if (i == j) {
-          L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = lower(last_splits[i * A.nblocks + j]);
+          L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+            lower(last_splits[i * A.nblocks + j]);
         }
         else {
-          L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
+          L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+            last_splits[i * A.nblocks + j];
         }
       }
       else {
         // Copy S blocks into the lower right corner
-        L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
+        L_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+          last_splits[i * A.nblocks + j];
       }
     }
   }
@@ -839,15 +845,18 @@ Matrix generate_U_permuted(BLR2& A, Matrix& last) {
 
         // Copy the oo parts
         if (i == j) {
-          U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = upper(last_splits[i * A.nblocks + j]);
+          U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+            upper(last_splits[i * A.nblocks + j]);
         }
         else {
-          U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
+          U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+            last_splits[i * A.nblocks + j];
         }
       }
       else {
         // Copy S blocks
-        U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] = last_splits[i * A.nblocks + j];
+        U_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+          last_splits[i * A.nblocks + j];
       }
     }
   }
