@@ -239,14 +239,14 @@ namespace Hatrix {
       }
     }
 
-    // Perform factorization assuming the permuted form of the BLR2 matrix.
+        // Perform factorization assuming the permuted form of the BLR2 matrix.
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       int c_size = block_size - rank;
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        if (block == 3 && F.exists(3, 1) && F.exists(1,3)) {
+        if (block == 3) {
           Matrix I = generate_identity_matrix(block_size, block_size);
 
           // Compute row bases from fill-in.
@@ -372,7 +372,7 @@ namespace Hatrix {
                 auto fill_splits = SPLIT_DENSE(fill_in,
                                                block_size - U(i).cols,
                                                block_size - V(j).cols);
-                matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, -1.0, 1.0);
+                matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, 1.0, 1.0);
                 F.insert(i, j, std::move(fill_in));
               }
             }
@@ -397,7 +397,7 @@ namespace Hatrix {
                 auto fill_splits = SPLIT_DENSE(fill_in,
                                                block_size - U(i).cols,
                                                block_size - V(j).cols);
-                matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, 1.0, 1.0);
               }
             }
           }
@@ -423,7 +423,7 @@ namespace Hatrix {
                 auto fill_splits = SPLIT_DENSE(fill_in,
                                                block_size - U(i).cols,
                                                block_size - V(j).cols);
-                matmul(lower_splits[2], right_splits[0], fill_splits[2], false, false, -1.0, 1.0);
+                matmul(lower_splits[2], right_splits[0], fill_splits[2], false, false, 1.0, 1.0);
               }
             }
           }
@@ -537,8 +537,6 @@ namespace Hatrix {
 
 void multiply_compliments(Hatrix::BLR2& A) {
   int64_t nblocks = A.nblocks;
-  int64_t block_size = A.N / nblocks;
-  int64_t c_size = block_size - A.rank;
 
   for (int i = 0; i < nblocks; ++i) {
     for (int j = 0; j < nblocks; ++j) {
@@ -551,131 +549,34 @@ void multiply_compliments(Hatrix::BLR2& A) {
   }
 }
 
-Matrix generate_A0(Hatrix::BLR2& A, Hatrix::Matrix& last) {
+Matrix generate_UFbar_permuted(Hatrix::BLR2& A) {
   int64_t block_size = A.N / A.nblocks;
-  int64_t c_size = block_size - A.rank;
-  double expected = 0, diff = 0;
+  Matrix UFbar(A.N, A.N);
+  std::vector<int64_t> row_offsets, col_offsets;
 
-  Hatrix::Matrix A0(A.N, A.N);
-  auto A0_splits = A0.split(A.nblocks, A.nblocks);
-
+  int64_t c_size_offset_rows = 0, c_size_offset_cols = 0;
   for (int i = 0; i < A.nblocks; ++i) {
-    A0_splits[i * A.nblocks + i] = Hatrix::generate_identity_matrix(block_size, block_size);
-  }
-  Hatrix::Matrix last_lower = lower(last);
-  Hatrix::Matrix last_upper = upper(last);
-  Hatrix::Matrix result = matmul(last_lower, last_upper);
+    int64_t c_size_rows = block_size - A.U(i).cols;
+    int64_t c_size_cols = block_size - A.V(i).cols;
+    row_offsets.push_back((i+1) * c_size_rows);
+    col_offsets.push_back((i+1) * c_size_cols);
 
-  // Assemble the permuted matrix of Aoo and S blocks.
-  auto result_splits = result.split(A.nblocks, A.nblocks);
+    c_size_offset_rows += c_size_rows;
+    c_size_offset_cols += c_size_cols;
+  }
+
+  for (int i = 0; i < A.nblocks-1; ++i) {
+    row_offsets.push_back(c_size_offset_rows + (i+1) * A.U(i).cols);
+    col_offsets.push_back(c_size_offset_cols + (i+1) * A.V(i).cols );
+  }
+
+  auto UFbar_splits = UFbar.split(row_offsets, col_offsets);
   for (int i = 0; i < A.nblocks; ++i) {
-    for (int j = 0; j < A.nblocks; ++j) {
-      Matrix block(block_size, block_size);
-      if (i == j) {
-        block = generate_identity_matrix(block_size, block_size);
-      }
-      auto block_splits = block.split(std::vector<int64_t>(1, c_size),
-                                      std::vector<int64_t>(1, c_size));
-      block_splits[3] = result_splits[i * A.nblocks + j];
-      A0_splits[i * A.nblocks + j] = block;
-    }
+    Matrix U_F = make_complement(A.U(i));
+    int64_t row_rank = A.U(i).cols;
   }
 
-  return A0;
-}
-
-Matrix generate_L1(BLR2& A) {
-  int64_t nblocks = A.nblocks;
-  int64_t block_size = A.N / nblocks;
-  int64_t c_size = block_size - A.rank;
-  Hatrix::Matrix L0(A.N, A.N);
-
-  auto L0_splits = L0.split(nblocks, nblocks);
-  for (int i = 0; i < nblocks; ++i) {
-    Matrix block = generate_identity_matrix(block_size, block_size);
-    auto block_splits = block.split(std::vector<int64_t>(1, c_size),
-                                    std::vector<int64_t>(1, c_size));
-    auto D_splits = A.D(i, i).split(std::vector<int64_t>(1, c_size),
-                                    std::vector<int64_t>(1, c_size));
-
-    block_splits[0] = lower(D_splits[0]);
-    block_splits[2] = D_splits[2];
-    L0_splits[i * nblocks + i] = block;
-
-    // Populate the blocks c blocks below the diagonal.
-    for (int irow = i + 1; irow < nblocks; ++irow) {
-      if (!A.is_admissible(irow, i)) {
-        Matrix block(block_size, block_size);
-        auto D_splits = A.D(irow, i).split({}, std::vector<int64_t>(1, c_size));
-        auto block_splits = block.split({}, std::vector<int64_t>(1, c_size));
-
-        block_splits[0] = D_splits[0];
-        L0_splits[irow * nblocks + i] = block;
-      }
-    }
-
-    // Populate the rows above the diagonal block with oc strips.
-    for (int irow = 0; irow < i; ++irow) {
-      if (!A.is_admissible(irow, i)) {
-        Matrix block(block_size, block_size);
-        auto D_splits = A.D(irow, i).split(std::vector<int64_t>(1, c_size),
-                                           std::vector<int64_t>(1, c_size));
-        auto block_splits = block.split(std::vector<int64_t>(1, c_size),
-                                        std::vector<int64_t>(1, c_size));
-        block_splits[2] = D_splits[2];
-        L0_splits[irow * nblocks + i] = block;
-      }
-    }
-  }
-
-  return L0;
-}
-
-Matrix generate_U1(BLR2& A) {
-  Matrix U1(A.N, A.N);
-  int64_t nblocks = A.nblocks;
-  int64_t block_size = A.N / A.nblocks;
-  int64_t c_size = block_size - A.rank;
-
-  auto U1_splits = U1.split(A.nblocks, A.nblocks);
-  for (int i = 0; i < A.nblocks; ++i) {
-    Matrix block = generate_identity_matrix(block_size, block_size);
-    auto block_splits = block.split(std::vector<int64_t>(1, c_size),
-                                    std::vector<int64_t>(1, c_size));
-    auto D_splits = A.D(i, i).split(std::vector<int64_t>(1, c_size),
-                                    std::vector<int64_t>(1, c_size));
-    block_splits[0] = upper(D_splits[0]);
-    block_splits[1] = D_splits[1];
-    U1_splits[i * nblocks + i] = block;
-
-    // Populate the columns to the right of the block diagonal
-    for (int icol = i + 1; icol < nblocks; ++icol) {
-      if (!A.is_admissible(i, icol))  {
-        Matrix block(block_size, block_size);
-        auto D_splits = A.D(i, icol).split(std::vector<int64_t>(1, c_size), {});
-        auto block_splits = block.split(std::vector<int64_t>(1, c_size), {});
-        block_splits[0] = D_splits[0];
-
-        U1_splits[i * nblocks + icol] = block;
-      }
-    }
-
-    for (int icol = 0; icol < i; ++icol) {
-      if (!A.is_admissible(i, icol)) {
-        Matrix block(block_size, block_size);
-        auto D_splits = A.D(i, icol).split(std::vector<int64_t>(1, c_size),
-                                           std::vector<int64_t>(1, c_size));
-        auto block_splits = block.split(std::vector<int64_t>(1, c_size),
-                                        std::vector<int64_t>(1, c_size));
-        block_splits[1] = D_splits[1];
-
-        U1_splits[i * nblocks + icol] = block;
-      }
-    }
-  }
-
-
-  return U1;
+  return UFbar;
 }
 
 double factorization_accuracy(Matrix& full_matrix, BLR2& A_expected) {
@@ -706,37 +607,6 @@ double factorization_accuracy(Matrix& full_matrix, BLR2& A_expected) {
   std::cout << "S diff: " << s_diff << " D diff: " << d_diff << std::endl;
 
   return std::sqrt((s_diff + d_diff) / actual);
-}
-
-double check_A0_accuracy(Matrix& A0, BLR2& A) {
-  int64_t nblocks = A.nblocks;
-  int64_t block_size = A.N / nblocks;
-  int64_t c_size = block_size - A.rank;
-  double s_diff = 0, d_diff = 0, actual = 0;
-  auto A0_splits = A0.split(nblocks, nblocks);
-
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      Matrix block(A0_splits[i * nblocks + j]);
-      auto block_splits = block.split(std::vector<int64_t>(1, c_size),
-                                      std::vector<int64_t>(1, c_size));
-      Matrix oo(block_splits[3]);
-      actual += pow(norm(oo), 2);
-      if (A.is_admissible(i, j)) {
-        s_diff += pow(norm(A.S(i, j) - oo), 2);
-      }
-      else {
-        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
-                                        std::vector<int64_t>(1, c_size));
-        // (D_splits[3] - oo).print();
-        d_diff += pow(norm(D_splits[3] - oo), 2);
-      }
-    }
-  }
-
-  std::cout << "A0 acc d: " << d_diff << " s: " << s_diff << std::endl;
-
-  return std::sqrt((d_diff + s_diff) / actual);
 }
 
 Matrix generate_L_permuted(BLR2& A, Matrix& last) {
@@ -945,25 +815,15 @@ int main(int argc, char** argv) {
 
   multiply_compliments(A_expected);
 
+  Matrix UFbar_permuted = generate_UFbar_permuted(A);
   Matrix L_permuted = generate_L_permuted(A, last);
   Matrix U_permuted = generate_U_permuted(A, last);
   Matrix tt = matmul(L_permuted, U_permuted);
   Matrix ff = generate_full_permuted(A_expected);
 
-  // Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  // Adense.print();
-
-  // L_permuted.print();
-  // U_permuted.print();
-  // (tt - ff).print();
   double acc = pow(norm(tt - ff), 2);
 
   Hatrix::Context::finalize();
 
   std::cout << "accuracy: " << acc << std::endl;
-
-  // std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
-  //           << " construct error: " << construct_error
-  //           << " factorization error: " << factorize_error
-  //           << " A0 error: " << A0_accuracy << "\n";
 }

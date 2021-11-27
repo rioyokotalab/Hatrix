@@ -232,7 +232,7 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        if (block == 3 && F.exists(3, 1) && F.exists(1,3)) {
+        if (block == 3) {
           Matrix I = generate_identity_matrix(block_size, block_size);
 
           // Compute row bases from fill-in.
