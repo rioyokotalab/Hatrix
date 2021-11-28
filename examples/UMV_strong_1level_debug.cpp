@@ -936,9 +936,8 @@ int main(int argc, char** argv) {
   Matrix VFbar_permuted = generate_VFbar_permuted(A);
   Matrix L_permuted = generate_L_permuted(A, last);
   Matrix U_permuted = generate_U_permuted(A, last);
-  Matrix tt = matmul(L_permuted, U_permuted);
+  Matrix tt = matmul(matmul(UFbar_permuted, matmul(L_permuted, U_permuted)), VFbar_permuted, false, true);
   Matrix ff = generate_full_permuted(A_expected);
-
   double acc = pow(norm(tt - ff), 2);
 
   Hatrix::Context::finalize();
