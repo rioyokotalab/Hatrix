@@ -602,7 +602,49 @@ Matrix generate_UFbar_permuted(Hatrix::BLR2& A) {
 Matrix generate_VFbar_permuted(Hatrix::BLR2& A) {
   int64_t block_size = A.N / A.nblocks;
   Matrix VFbar(A.N, A.N);
+  std::vector<int64_t> row_offsets, col_offsets;
 
+  int64_t c_size_offset_rows = 0, c_size_offset_cols = 0;
+  for (int i = 0; i < A.nblocks; ++i) {
+    int64_t c_size_rows = block_size - A.U(i).cols;
+    int64_t c_size_cols = block_size - A.V(i).cols;
+    row_offsets.push_back(c_size_offset_rows + c_size_rows);
+    col_offsets.push_back(c_size_offset_cols + c_size_cols);
+
+    c_size_offset_rows += c_size_rows;
+    c_size_offset_cols += c_size_cols;
+  }
+
+  for (int i = 0; i < A.nblocks-1; ++i) {
+    row_offsets.push_back(c_size_offset_rows + (i+1) * A.U(i).cols);
+    col_offsets.push_back(c_size_offset_cols + (i+1) * A.V(i).cols );
+  }
+
+  auto VFbar_splits = VFbar.split(row_offsets, col_offsets);
+  int64_t permuted_nblocks = 2 * A.nblocks;
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    Matrix V_F = make_complement(A.V(i));
+    int64_t row_split = block_size - A.U(i).cols, col_split = block_size - A.V(i).cols;
+
+    auto VF_splits = V_F.split(std::vector<int64_t>(1, row_split),
+                               std::vector<int64_t>(1, col_split));
+
+    // Copy cc block.
+    VFbar_splits[i * permuted_nblocks + i] = VF_splits[0];
+
+    // Copy oc block.
+    VFbar_splits[(i + A.nblocks) * permuted_nblocks + i].print_meta();
+    VF_splits[2].print_meta();
+
+    VFbar_splits[(i + A.nblocks) * permuted_nblocks + i] = VF_splits[2];
+
+    // Copy co block.
+    VFbar_splits[i * permuted_nblocks + i + A.nblocks] = VF_splits[1];
+
+    // Copy oo block.
+    VFbar_splits[(i + A.nblocks) * permuted_nblocks + i + A.nblocks] = VF_splits[3];
+  }
 
   return VFbar;
 }
