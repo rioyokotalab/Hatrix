@@ -154,8 +154,8 @@ namespace Hatrix {
         // }
       }
 
-      is_admissible.insert(1, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 1, admis == 1 ? false : true);
+      // is_admissible.insert(1, 2, admis == 1 ? false : true);
+      // is_admissible.insert(2, 1, admis == 1 ? false : true);
       is_admissible.insert(3, 2, admis == 1 ? false : true);
       is_admissible.insert(2, 3, admis == 1 ? false : true);
 
@@ -548,26 +548,6 @@ void multiply_compliments(Hatrix::BLR2& A) {
   }
 }
 
-Matrix generate_UFbar(Hatrix::BLR2& A) {
-  Matrix UFbar(A.N, A.N);
-  auto UFbar_splits = UFbar.split(A.nblocks, A.nblocks);
-
-  for (int i = 0; i < A.nblocks; ++i) {
-    UFbar_splits[i * A.nblocks + i] = make_complement(A.U(i));
-  }
-
-  return UFbar;
-}
-
-Matrix generate_VFbar(Hatrix::BLR2& A) {
-  Matrix VFbar(A.N, A.N);
-  auto VFbar_splits = VFbar.split(A.nblocks, A.nblocks);
-  for (int i = 0; i < A.nblocks; ++i) {
-    VFbar_splits[i * A.nblocks + i] = make_complement(A.V(i));
-  }
-  return VFbar;
-}
-
 // Take the permuted matrix Aperm and produce an unpermuted matrix A.
 // Ablr provides various structure information.
 Matrix generate_unpermuted(Hatrix::Matrix Aperm, Hatrix::BLR2& Ablr) {
@@ -634,135 +614,6 @@ Matrix generate_unpermuted(Hatrix::Matrix Aperm, Hatrix::BLR2& Ablr) {
   return A;
 }
 
-Matrix generate_UFbar_permuted(Hatrix::BLR2& A) {
-  int64_t block_size = A.N / A.nblocks;
-  Matrix UFbar(A.N, A.N);
-  std::vector<int64_t> row_offsets, col_offsets;
-
-  int64_t c_size_offset_rows = 0, c_size_offset_cols = 0;
-  for (int i = 0; i < A.nblocks; ++i) {
-    int64_t c_size_rows = block_size - A.U(i).cols;
-    int64_t c_size_cols = block_size - A.V(i).cols;
-    row_offsets.push_back(c_size_offset_rows + c_size_rows);
-    col_offsets.push_back(c_size_offset_cols + c_size_cols);
-
-    c_size_offset_rows += c_size_rows;
-    c_size_offset_cols += c_size_cols;
-  }
-
-  for (int i = 0; i < A.nblocks-1; ++i) {
-    row_offsets.push_back(c_size_offset_rows + (i+1) * A.U(i).cols);
-    col_offsets.push_back(c_size_offset_cols + (i+1) * A.V(i).cols );
-  }
-
-  auto UFbar_splits = UFbar.split(row_offsets, col_offsets);
-  int64_t permuted_nblocks = 2 * A.nblocks;
-
-  for (int i = 0; i < A.nblocks; ++i) {
-    Matrix U_F = make_complement(A.U(i));
-    int64_t row_split = block_size - A.U(i).cols, col_split = block_size - A.V(i).cols;
-
-    auto UF_splits = U_F.split(std::vector<int64_t>(1, row_split),
-                               std::vector<int64_t>(1, col_split));
-
-    // Copy cc block.
-    UFbar_splits[i * permuted_nblocks + i] = UF_splits[0];
-
-    // Copy oc block.
-    UFbar_splits[(i + A.nblocks) * permuted_nblocks + i].print_meta();
-    UF_splits[2].print_meta();
-
-    UFbar_splits[(i + A.nblocks) * permuted_nblocks + i] = UF_splits[2];
-
-    // Copy co block.
-    UFbar_splits[i * permuted_nblocks + i + A.nblocks] = UF_splits[1];
-
-    // Copy oo block.
-    UFbar_splits[(i + A.nblocks) * permuted_nblocks + i + A.nblocks] = UF_splits[3];
-  }
-
-  return UFbar;
-}
-
-Matrix generate_VFbar_permuted(Hatrix::BLR2& A) {
-  int64_t block_size = A.N / A.nblocks;
-  Matrix VFbar(A.N, A.N);
-  std::vector<int64_t> row_offsets, col_offsets;
-
-  int64_t c_size_offset_rows = 0, c_size_offset_cols = 0;
-  for (int i = 0; i < A.nblocks; ++i) {
-    int64_t c_size_rows = block_size - A.U(i).cols;
-    int64_t c_size_cols = block_size - A.V(i).cols;
-    row_offsets.push_back(c_size_offset_rows + c_size_rows);
-    col_offsets.push_back(c_size_offset_cols + c_size_cols);
-
-    c_size_offset_rows += c_size_rows;
-    c_size_offset_cols += c_size_cols;
-  }
-
-  for (int i = 0; i < A.nblocks-1; ++i) {
-    row_offsets.push_back(c_size_offset_rows + (i+1) * A.U(i).cols);
-    col_offsets.push_back(c_size_offset_cols + (i+1) * A.V(i).cols );
-  }
-
-  auto VFbar_splits = VFbar.split(row_offsets, col_offsets);
-  int64_t permuted_nblocks = 2 * A.nblocks;
-
-  for (int i = 0; i < A.nblocks; ++i) {
-    Matrix V_F = make_complement(A.V(i));
-    int64_t row_split = block_size - A.U(i).cols, col_split = block_size - A.V(i).cols;
-
-    auto VF_splits = V_F.split(std::vector<int64_t>(1, row_split),
-                               std::vector<int64_t>(1, col_split));
-
-    // Copy cc block.
-    VFbar_splits[i * permuted_nblocks + i] = VF_splits[0];
-
-    // Copy oc block.
-    VFbar_splits[(i + A.nblocks) * permuted_nblocks + i].print_meta();
-    VF_splits[2].print_meta();
-
-    VFbar_splits[(i + A.nblocks) * permuted_nblocks + i] = VF_splits[2];
-
-    // Copy co block.
-    VFbar_splits[i * permuted_nblocks + i + A.nblocks] = VF_splits[1];
-
-    // Copy oo block.
-    VFbar_splits[(i + A.nblocks) * permuted_nblocks + i + A.nblocks] = VF_splits[3];
-  }
-
-  return VFbar;
-}
-
-double factorization_accuracy(Matrix& full_matrix, BLR2& A_expected) {
-  double s_diff = 0, d_diff = 0, actual = 0;
-  int64_t nblocks = A_expected.nblocks;
-  int64_t block_size = A_expected.N / nblocks;
-  int64_t c_size = block_size - A_expected.rank;
-  auto full_splits = full_matrix.split(nblocks, nblocks);
-
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      Matrix block(full_splits[i * nblocks + j]);
-      if (A_expected.is_admissible(i, j)) {
-        auto block_splits = block.split(std::vector<int64_t>(1, c_size),
-                                        std::vector<int64_t>(1, c_size));
-        actual += pow(norm(A_expected.S(i, j)), 2);
-        s_diff += pow(norm(block_splits[3] - A_expected.S(i, j)), 2);
-      }
-      else {
-        std::cout << " i-> " << i+1 << " j-> " << j+1 << std::endl;
-        (block - A_expected.D(i, j)).print();
-        actual += pow(norm(block), 2);
-        d_diff += pow(norm(block - A_expected.D(i, j)), 2);
-      }
-    }
-  }
-
-  std::cout << "S diff: " << s_diff << " D diff: " << d_diff << std::endl;
-
-  return std::sqrt((s_diff + d_diff) / actual);
-}
 
 Matrix generate_L_permuted(BLR2& A, Matrix& last) {
   int64_t block_size = A.N / A.nblocks;
@@ -952,14 +803,27 @@ Matrix generate_full_permuted(BLR2& A) {
   Matrix M(A.N, A.N);
   int64_t block_size = A.N / A.nblocks;
   int64_t c_size = block_size - A.rank;
+
+  int64_t c_size_offset_rows = 0, c_size_offset_cols = 0;
   std::vector<int64_t> row_offsets, col_offsets;
   for (int i = 0; i < A.nblocks; ++i) {
-    row_offsets.push_back((i+1) * c_size);
-    col_offsets.push_back((i+1) * c_size);
+    int64_t row_split = block_size - A.U(i).cols;
+    int64_t col_split = block_size - A.V(i).cols;
+
+    row_offsets.push_back(c_size_offset_rows + row_split);
+    col_offsets.push_back(c_size_offset_cols + col_split);
+
+    c_size_offset_rows += row_split;
+    c_size_offset_cols += col_split;
   }
+
+  int64_t row_rank_offset = 0, col_rank_offset = 0;
   for (int i = 0; i < A.nblocks-1; ++i) {
-    row_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
-    col_offsets.push_back(c_size*(A.nblocks) + (i+1) * A.rank);
+    row_offsets.push_back(c_size_offset_rows + row_rank_offset + A.U(i).cols);
+    col_offsets.push_back(c_size_offset_cols + col_rank_offset + A.V(i).cols);
+
+    row_rank_offset += A.U(i).cols;
+    col_rank_offset += A.V(i).cols;
   }
 
   auto M_splits = M.split(row_offsets, col_offsets);
@@ -967,10 +831,11 @@ Matrix generate_full_permuted(BLR2& A) {
 
   for (int i = 0; i < A.nblocks; ++i) {
     for (int j = 0; j < A.nblocks; ++j) {
+      int64_t row_split = block_size - A.U(i).cols;
+      int64_t col_split = block_size - A.V(i).cols;
 
       if (!A.is_admissible(i, j)) {
-        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, c_size),
-                                        std::vector<int64_t>(1, c_size));
+        auto D_splits = SPLIT_DENSE(A.D(i, j), row_split, col_split);
         // Copy cc blocks
         M_splits[i * permuted_nblocks + j] = D_splits[0];
 
@@ -1016,27 +881,18 @@ int main(int argc, char** argv) {
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
 
+  // Multiply by UF and VF.
   multiply_compliments(A_expected_blr);
   Matrix A_expected = generate_full_permuted(A_expected_blr);
-
-  // Generate unpermuted UF and VF dense matrices.
-  // Matrix UFbar = generate_UFbar(A);
-  // Matrix VFbar = generate_VFbar(A);
 
   // Generate permuted L and U matrices.
   Matrix L_permuted = generate_L_permuted(A, last);
   Matrix U_permuted = generate_U_permuted(A, last);
   Matrix A_actual = matmul(L_permuted, U_permuted);
 
-  // Multiply permuted L and U and produce an unpermuted dense matrix.
-  // Matrix A1 = generate_unpermuted(matmul(L_permuted, U_permuted), A);
-
-  // // Multiply above matrix with UF and VF.
-  // Matrix A_actual = matmul(matmul(UFbar, A1), VFbar, false, true);
-
-  // Matrix A_expected = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   (A_actual - A_expected).print();
-  double acc = norm(A_actual - A_expected);
+
+  double acc = norm(A_actual - A_expected) / norm(A_expected);
 
   Hatrix::Context::finalize();
 
