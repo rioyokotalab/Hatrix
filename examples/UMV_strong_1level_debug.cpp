@@ -572,12 +572,13 @@ Matrix generate_VFbar(Hatrix::BLR2& A) {
 // Ablr provides various structure information.
 Matrix generate_unpermuted(Hatrix::Matrix Aperm, Hatrix::BLR2& Ablr) {
   Matrix A(Ablr.N, Ablr.N);
+  int64_t block_size = Ablr.N / Ablr.nblocks;
   std::vector<int64_t> row_offsets, col_offsets;
 
   int64_t c_size_offset_rows = 0, c_size_offset_cols = 0;
-  for (int i = 0; i < A.nblocks; ++i) {
-    int64_t c_size_rows = block_size - A.U(i).cols;
-    int64_t c_size_cols = block_size - A.V(i).cols;
+  for (int i = 0; i < Ablr.nblocks; ++i) {
+    int64_t c_size_rows = block_size - Ablr.U(i).cols;
+    int64_t c_size_cols = block_size - Ablr.V(i).cols;
     row_offsets.push_back(c_size_offset_rows + c_size_rows);
     col_offsets.push_back(c_size_offset_cols + c_size_cols);
 
@@ -585,19 +586,47 @@ Matrix generate_unpermuted(Hatrix::Matrix Aperm, Hatrix::BLR2& Ablr) {
     c_size_offset_cols += c_size_cols;
   }
 
-  for (int i = 0; i < A.nblocks-1; ++i) {
-    row_offsets.push_back(c_size_offset_rows + (i+1) * A.U(i).cols);
-    col_offsets.push_back(c_size_offset_cols + (i+1) * A.V(i).cols );
+  int64_t row_rank_offset = 0, col_rank_offset = 0;
+  for (int i = 0; i < Ablr.nblocks-1; ++i) {
+    row_offsets.push_back(c_size_offset_rows + row_rank_offset + Ablr.U(i).cols);
+    col_offsets.push_back(c_size_offset_cols + col_rank_offset +  Ablr.V(i).cols );
+
+    row_rank_offset += Ablr.U(i).cols;
+    col_rank_offset += Ablr.V(i).cols;
   }
 
-  auto A_splits = A.split(row_offfsets, col_offsets);
-  auto Aperm_splits = Aperm.split(row_offfsets, col_offsets);
+  auto A_splits = A.split(Ablr.nblocks, Ablr.nblocks);
+  auto Aperm_splits = Aperm.split(row_offsets, col_offsets);
+
+  int64_t permuted_nblocks = Ablr.nblocks * 2;
 
   for (int i = 0; i < Ablr.nblocks; ++i) {
     for (int j = 0; j < Ablr.nblocks; ++j) {
-      if (!Ablr.is_admissible(i, j)) {
+      int64_t row_split = block_size - Ablr.U(i).cols;
+      int64_t col_split = block_size - Ablr.V(i).cols;
 
+      Matrix block(block_size, block_size);
+      auto block_splits = SPLIT_DENSE(block, row_split, col_split);
+
+      if (!Ablr.is_admissible(i, j)) {
+        // Copy cc blocks
+        block_splits[0] = Aperm_splits[i * permuted_nblocks + j];
+
+        // Copy oc blocks
+        block_splits[2] = Aperm_splits[(i + Ablr.nblocks) * permuted_nblocks + j];
+
+        // Copy co blocks
+        block_splits[1] = Aperm_splits[i * permuted_nblocks + j + Ablr.nblocks];
+
+        // Copy oo blocks
+        block_splits[3] = Aperm_splits[(i + Ablr.nblocks) * permuted_nblocks + j + Ablr.nblocks];
       }
+      else {
+        // Copy S parts
+        block_splits[3] = Aperm_splits[(i + Ablr.nblocks) * permuted_nblocks + j + Ablr.nblocks];
+      }
+
+      A_splits[i * Ablr.nblocks + j] = block;
     }
   }
 
@@ -918,6 +947,7 @@ Matrix generate_U_permuted(BLR2& A, Matrix& last) {
   return U;
 }
 
+// Take a BLR2 matrix A as argument and generate a permuted dense matrix.
 Matrix generate_full_permuted(BLR2& A) {
   Matrix M(A.N, A.N);
   int64_t block_size = A.N / A.nblocks;
@@ -982,33 +1012,33 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  Hatrix::BLR2 A_actual(A);
+  Hatrix::BLR2 A_expected_blr(A);
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
 
-  // multiply_compliments(A_expected);
+  multiply_compliments(A_expected_blr);
+  Matrix A_expected = generate_full_permuted(A_expected_blr);
 
   // Generate unpermuted UF and VF dense matrices.
-  Matrix UFbar = generate_UFbar(A);
-  Matrix VFbar = generate_VFbar(A);
+  // Matrix UFbar = generate_UFbar(A);
+  // Matrix VFbar = generate_VFbar(A);
 
   // Generate permuted L and U matrices.
   Matrix L_permuted = generate_L_permuted(A, last);
   Matrix U_permuted = generate_U_permuted(A, last);
+  Matrix A_actual = matmul(L_permuted, U_permuted);
 
   // Multiply permuted L and U and produce an unpermuted dense matrix.
-  Matrix A1 = generate_unpermuted(matmul(L_permuted, U_permuted), A);
+  // Matrix A1 = generate_unpermuted(matmul(L_permuted, U_permuted), A);
 
-  // Multiply above matrix with UF and VF.
-  Matrix A_expected = matmul(matmul(UFbar, A1), VFbar, false, true);
+  // // Multiply above matrix with UF and VF.
+  // Matrix A_actual = matmul(matmul(UFbar, A1), VFbar, false, true);
 
-  // Matrix tt = matmul(matmul(UFbar_permuted, matmul(L_permuted, U_permuted)), VFbar_permuted, false, true);
-  Matrix ff = generate_full_permuted(A_actual);
-  // (tt - Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV)).print();
-  // (tt - ff).print();
-  double acc = pow(norm(tt - ff), 2);
+  // Matrix A_expected = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  (A_actual - A_expected).print();
+  double acc = norm(A_actual - A_expected);
 
   Hatrix::Context::finalize();
 
-  std::cout << "accuracy: " << acc << std::endl;
+  std::cout << "accuracy: " << acc << " contruct error: " << construct_error  << std::endl;
 }
