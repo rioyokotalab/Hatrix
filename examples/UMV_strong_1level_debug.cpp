@@ -568,6 +568,8 @@ Matrix generate_VFbar(Hatrix::BLR2& A) {
   return VFbar;
 }
 
+// Take the permuted matrix Aperm and produce an unpermuted matrix A.
+// Ablr provides various structure information.
 Matrix generate_unpermuted(Hatrix::Matrix Aperm, Hatrix::BLR2& Ablr) {
   Matrix A(Ablr.N, Ablr.N);
   std::vector<int64_t> row_offsets, col_offsets;
@@ -980,26 +982,28 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  Hatrix::BLR2 A_expected(A);
+  Hatrix::BLR2 A_actual(A);
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
 
   // multiply_compliments(A_expected);
 
-  Matrix UFbar_permuted = generate_UFbar_permuted(A);
-  Matrix VFbar_permuted = generate_VFbar_permuted(A);
-
+  // Generate unpermuted UF and VF dense matrices.
   Matrix UFbar = generate_UFbar(A);
   Matrix VFbar = generate_VFbar(A);
 
+  // Generate permuted L and U matrices.
   Matrix L_permuted = generate_L_permuted(A, last);
   Matrix U_permuted = generate_U_permuted(A, last);
+
+  // Multiply permuted L and U and produce an unpermuted dense matrix.
   Matrix A1 = generate_unpermuted(matmul(L_permuted, U_permuted), A);
 
-  matmul(matmul(UFbar, A1), VFbar, false, true).print();
+  // Multiply above matrix with UF and VF.
+  Matrix A_expected = matmul(matmul(UFbar, A1), VFbar, false, true);
+
   // Matrix tt = matmul(matmul(UFbar_permuted, matmul(L_permuted, U_permuted)), VFbar_permuted, false, true);
-  Matrix tt = matmul(L_permuted, U_permuted);
-  Matrix ff = generate_full_permuted(A_expected);
+  Matrix ff = generate_full_permuted(A_actual);
   // (tt - Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV)).print();
   // (tt - ff).print();
   double acc = pow(norm(tt - ff), 2);
