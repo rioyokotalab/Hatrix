@@ -154,8 +154,8 @@ namespace Hatrix {
         // }
       }
 
-      // is_admissible.insert(1, 2, admis == 1 ? false : true);
-      // is_admissible.insert(2, 1, admis == 1 ? false : true);
+      is_admissible.insert(1, 2, admis == 1 ? false : true);
+      is_admissible.insert(2, 1, admis == 1 ? false : true);
       is_admissible.insert(3, 2, admis == 1 ? false : true);
       is_admissible.insert(2, 3, admis == 1 ? false : true);
 
@@ -240,7 +240,7 @@ namespace Hatrix {
     }
 
         // Perform factorization assuming the permuted form of the BLR2 matrix.
-    Matrix factorize(const randvec_t &randpts) {
+    std::tuple<Matrix, RowColMap<Matrix>> factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       RowColMap<Matrix> F;      // fill-in blocks.
 
@@ -258,8 +258,8 @@ namespace Hatrix {
           int nbases = significant_bases(_S);
           U3_add.shrink(block_size, nbases);
           Matrix U3_copy(U(3));
-          U.erase(3);
-          U.insert(3, concat(U3_copy, U3_add, 1));
+          // U.erase(3);
+          // U.insert(3, concat(U3_copy, U3_add, 1));
 
           // Compute col bases from fill-in.
           gramian = matmul(F(1, 3), F(1, 3), false, true);
@@ -271,8 +271,8 @@ namespace Hatrix {
           nbases = significant_bases(_S);
           V3_add.shrink(block_size, nbases);
           Matrix V3_copy(V(3));
-          V.erase(3);
-          V.insert(3, concat(V3_copy, V3_add, 1));
+          // V.erase(3);
+          // V.insert(3, concat(V3_copy, V3_add, 1));
         }
 
         for (int j = 0; j < nblocks; ++j) {
@@ -447,8 +447,8 @@ namespace Hatrix {
                 }
               }
 
-              S.erase(ib, jb);
-              S.insert(ib, jb, std::move(newS));
+              // S.erase(ib, jb);
+              // S.insert(ib, jb, std::move(newS));
             }
           }
         }
@@ -458,8 +458,8 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (F.exists(i, j)) {
-            Matrix& newS = S(i, j);
-            newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
+            // Matrix& newS = S(i, j);
+            // newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
           }
         }
       }
@@ -494,7 +494,7 @@ namespace Hatrix {
 
       lu(last);
 
-      return last;
+      return {last, F};
     }
 
     double construction_relative_error(const randvec_t& randpts) {
@@ -615,7 +615,7 @@ Matrix generate_unpermuted(Hatrix::Matrix Aperm, Hatrix::BLR2& Ablr) {
 }
 
 
-Matrix generate_L_permuted(BLR2& A, Matrix& last) {
+Matrix generate_L_permuted(BLR2& A, Matrix& last, RowColMap<Matrix>& F) {
   int64_t block_size = A.N / A.nblocks;
   int64_t c_size = block_size - A.rank;
   Matrix L(A.N, A.N);
@@ -633,9 +633,13 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
     c_size_offset_cols += c_size_cols;
   }
 
+  int64_t rank_offset_rows = 0, rank_offset_cols = 0;
   for (int i = 0; i < A.nblocks-1; ++i) {
-    row_offsets.push_back(c_size_offset_rows + (i+1) * A.U(i).cols);
-    col_offsets.push_back(c_size_offset_cols + (i+1) * A.V(i).cols );
+    row_offsets.push_back(c_size_offset_rows + rank_offset_rows + A.U(i).cols);
+    col_offsets.push_back(c_size_offset_cols + rank_offset_cols + A.V(i).cols);
+
+    rank_offset_rows += A.U(i).cols;
+    rank_offset_cols += A.V(i).cols;
   }
 
   // Merge unfactorized portions.
@@ -691,6 +695,10 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
     }
   }
 
+  if (F.exists(3, 1)) {
+
+  }
+
   // Copy oc parts belonging to the 'upper' parts of the matrix
   for (int i = 0; i < A.nblocks; ++i) {
     for (int j = i+1; j < A.nblocks; ++j) {
@@ -707,7 +715,7 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last) {
   return L;
 }
 
-Matrix generate_U_permuted(BLR2& A, Matrix& last) {
+Matrix generate_U_permuted(BLR2& A, Matrix& last, RowColMap<Matrix>& F) {
   int64_t block_size = A.N / A.nblocks;
   int64_t c_size = block_size - A.rank;
   Matrix U(A.N, A.N);
@@ -725,9 +733,13 @@ Matrix generate_U_permuted(BLR2& A, Matrix& last) {
     c_size_offset_cols += c_size_cols;
   }
 
+  int64_t rank_offset_rows = 0, rank_offset_cols = 0;
   for (int i = 0; i < A.nblocks-1; ++i) {
-    row_offsets.push_back(c_size_offset_rows + (i+1) * A.U(i).cols);
-    col_offsets.push_back(c_size_offset_cols + (i+1) * A.V(i).cols );
+    row_offsets.push_back(c_size_offset_rows + rank_offset_rows + A.U(i).cols);
+    col_offsets.push_back(c_size_offset_cols + rank_offset_cols + A.V(i).cols);
+
+    rank_offset_rows += A.U(i).cols;
+    rank_offset_cols += A.V(i).cols;
   }
 
   // Merge unfactorized portions.
@@ -879,15 +891,16 @@ int main(int argc, char** argv) {
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
   Hatrix::BLR2 A_expected_blr(A);
   double construct_error = A.construction_relative_error(randpts);
-  auto last = A.factorize(randpts);
+  Matrix last; RowColMap<Matrix> F;
+  std::tie(last, F) = A.factorize(randpts);
 
   // Multiply by UF and VF.
   multiply_compliments(A_expected_blr);
   Matrix A_expected = generate_full_permuted(A_expected_blr);
 
   // Generate permuted L and U matrices.
-  Matrix L_permuted = generate_L_permuted(A, last);
-  Matrix U_permuted = generate_U_permuted(A, last);
+  Matrix L_permuted = generate_L_permuted(A, last, F);
+  Matrix U_permuted = generate_U_permuted(A, last, F);
   Matrix A_actual = matmul(L_permuted, U_permuted);
 
   (A_actual - A_expected).print();
