@@ -242,11 +242,10 @@ namespace Hatrix {
         // Perform factorization assuming the permuted form of the BLR2 matrix.
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
-      int c_size = block_size - rank;
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        if (block == 3) {
+        if (block == 3 && admis == 1) {
           Matrix I = generate_identity_matrix(block_size, block_size);
 
           // Compute row bases from fill-in.
@@ -547,6 +546,61 @@ void multiply_compliments(Hatrix::BLR2& A) {
       }
     }
   }
+}
+
+Matrix generate_UFbar(Hatrix::BLR2& A) {
+  Matrix UFbar(A.N, A.N);
+  auto UFbar_splits = UFbar.split(A.nblocks, A.nblocks);
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    UFbar_splits[i * A.nblocks + i] = make_complement(A.U(i));
+  }
+
+  return UFbar;
+}
+
+Matrix generate_VFbar(Hatrix::BLR2& A) {
+  Matrix VFbar(A.N, A.N);
+  auto VFbar_splits = VFbar.split(A.nblocks, A.nblocks);
+  for (int i = 0; i < A.nblocks; ++i) {
+    VFbar_splits[i * A.nblocks + i] = make_complement(A.V(i));
+  }
+  return VFbar;
+}
+
+Matrix generate_unpermuted(Hatrix::Matrix Aperm, Hatrix::BLR2& Ablr) {
+  Matrix A(Ablr.N, Ablr.N);
+  std::vector<int64_t> row_offsets, col_offsets;
+
+  int64_t c_size_offset_rows = 0, c_size_offset_cols = 0;
+  for (int i = 0; i < A.nblocks; ++i) {
+    int64_t c_size_rows = block_size - A.U(i).cols;
+    int64_t c_size_cols = block_size - A.V(i).cols;
+    row_offsets.push_back(c_size_offset_rows + c_size_rows);
+    col_offsets.push_back(c_size_offset_cols + c_size_cols);
+
+    c_size_offset_rows += c_size_rows;
+    c_size_offset_cols += c_size_cols;
+  }
+
+  for (int i = 0; i < A.nblocks-1; ++i) {
+    row_offsets.push_back(c_size_offset_rows + (i+1) * A.U(i).cols);
+    col_offsets.push_back(c_size_offset_cols + (i+1) * A.V(i).cols );
+  }
+
+  auto A_splits = A.split(row_offfsets, col_offsets);
+  auto Aperm_splits = Aperm.split(row_offfsets, col_offsets);
+
+  for (int i = 0; i < Ablr.nblocks; ++i) {
+    for (int j = 0; j < Ablr.nblocks; ++j) {
+      if (!Ablr.is_admissible(i, j)) {
+
+      }
+    }
+  }
+
+
+  return A;
 }
 
 Matrix generate_UFbar_permuted(Hatrix::BLR2& A) {
@@ -934,10 +988,20 @@ int main(int argc, char** argv) {
 
   Matrix UFbar_permuted = generate_UFbar_permuted(A);
   Matrix VFbar_permuted = generate_VFbar_permuted(A);
+
+  Matrix UFbar = generate_UFbar(A);
+  Matrix VFbar = generate_VFbar(A);
+
   Matrix L_permuted = generate_L_permuted(A, last);
   Matrix U_permuted = generate_U_permuted(A, last);
-  Matrix tt = matmul(matmul(UFbar_permuted, matmul(L_permuted, U_permuted)), VFbar_permuted, false, true);
+  Matrix A1 = generate_unpermuted(matmul(L_permuted, U_permuted), A);
+
+  matmul(matmul(UFbar, A1), VFbar, false, true).print();
+  // Matrix tt = matmul(matmul(UFbar_permuted, matmul(L_permuted, U_permuted)), VFbar_permuted, false, true);
+  Matrix tt = matmul(L_permuted, U_permuted);
   Matrix ff = generate_full_permuted(A_expected);
+  // (tt - Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV)).print();
+  // (tt - ff).print();
   double acc = pow(norm(tt - ff), 2);
 
   Hatrix::Context::finalize();
