@@ -258,8 +258,8 @@ namespace Hatrix {
           int nbases = significant_bases(_S);
           U3_add.shrink(block_size, nbases);
           Matrix U3_copy(U(3));
-          // U.erase(3);
-          // U.insert(3, concat(U3_copy, U3_add, 1));
+          U.erase(3);
+          U.insert(3, concat(U3_copy, U3_add, 1));
 
           // Compute col bases from fill-in.
           gramian = matmul(F(1, 3), F(1, 3), false, true);
@@ -271,8 +271,8 @@ namespace Hatrix {
           nbases = significant_bases(_S);
           V3_add.shrink(block_size, nbases);
           Matrix V3_copy(V(3));
-          // V.erase(3);
-          // V.insert(3, concat(V3_copy, V3_add, 1));
+          V.erase(3);
+          V.insert(3, concat(V3_copy, V3_add, 1));
         }
 
         for (int j = 0; j < nblocks; ++j) {
@@ -447,8 +447,8 @@ namespace Hatrix {
                 }
               }
 
-              // S.erase(ib, jb);
-              // S.insert(ib, jb, std::move(newS));
+              S.erase(ib, jb);
+              S.insert(ib, jb, std::move(newS));
             }
           }
         }
@@ -458,8 +458,8 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (F.exists(i, j)) {
-            // Matrix& newS = S(i, j);
-            // newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
+            Matrix& newS = S(i, j);
+            newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
           }
         }
       }
@@ -695,10 +695,6 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last, RowColMap<Matrix>& F) {
     }
   }
 
-  if (F.exists(3, 1)) {
-
-  }
-
   // Copy oc parts belonging to the 'upper' parts of the matrix
   for (int i = 0; i < A.nblocks; ++i) {
     for (int j = i+1; j < A.nblocks; ++j) {
@@ -710,6 +706,14 @@ Matrix generate_L_permuted(BLR2& A, Matrix& last, RowColMap<Matrix>& F) {
         L_splits[(i + A.nblocks) * permuted_nblocks + j] = D_splits[2];
       }
     }
+  }
+
+  if (F.exists(3, 1) && F.exists(1, 3)) {
+    int64_t row_split = block_size - A.U(3).cols;
+    int64_t col_split = block_size - A.V(1).cols;
+
+    auto bot_splits = SPLIT_DENSE(F(1, 3), row_split, col_split);
+    // L_splits[(1 + A.nblocks) * permuted_nblocks + 3] = bot_splits[2];
   }
 
   return L;
@@ -805,6 +809,14 @@ Matrix generate_U_permuted(BLR2& A, Matrix& last, RowColMap<Matrix>& F) {
         U_splits[(i) * permuted_nblocks + (j + A.nblocks)] = D_splits[1];
       }
     }
+  }
+
+  if (F.exists(1, 3) && F.exists(3, 1)) {
+    int64_t row_split = block_size - A.U(1).cols;
+    int64_t col_split = block_size - A.V(3).cols;
+
+    auto up_splits = SPLIT_DENSE(F(3, 1), row_split, col_split);
+    // U_splits[(3) * permuted_nblocks + 1 + A.nblocks] = up_splits[1];
   }
 
   return U;
