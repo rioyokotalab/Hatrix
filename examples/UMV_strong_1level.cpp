@@ -228,38 +228,37 @@ namespace Hatrix {
     // Perform factorization assuming the permuted form of the BLR2 matrix.
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
-      int c_size = block_size - rank;
       RowColMap<Matrix> F;      // fill-in blocks.
+      int64_t fill_in_rank = 2;
 
       for (int block = 0; block < nblocks; ++block) {
         if (block == 3) {
-          Matrix I = generate_identity_matrix(block_size, block_size);
+          // Compute for the F(3,1) block.
+          Matrix UF, SF, VF; double error;
+          std::tie(UF, SF, VF, error) = Hatrix::truncated_svd(F(3, 1), fill_in_rank);
 
-          // Compute row bases from fill-in.
-          Matrix gramian = matmul(F(3, 1), F(3, 1), false, true);
-          Matrix range = matmul(U(3), U(3), false, true);
-          Matrix diff = I - range;
-          Matrix G31 = matmul(matmul(diff, gramian), diff, false, true);
-          Matrix U3_add, _S, _V; double error;
-          std::tie(U3_add, _S, _V, error) = truncated_svd(G31, rank);
-          int nbases = significant_bases(_S);
-          U3_add.shrink(block_size, nbases);
-          Matrix U3_copy(U(3));
-          U.erase(3);
-          U.insert(3, concat(U3_copy, U3_add, 1));
+          // Compute column bases.
+          Matrix C;
+          C = concat(matmul(U(3), S(3, 0)), matmul(U(3), S(3, 1)), 1);
+          C = concat(C, matmul(UF, SF), 1);
 
-          // Compute col bases from fill-in.
-          gramian = matmul(F(1, 3), F(1, 3), false, true);
-          range = matmul(V(3), V(3), false, true);
-          diff = I - range;
-          Matrix G13 = matmul(matmul(diff, gramian), diff, false, true);
-          Matrix V3_add;
-          std::tie(V3_add, _S, _V, error) = truncated_svd(G13, rank);
-          nbases = significant_bases(_S);
-          V3_add.shrink(block_size, nbases);
-          Matrix V3_copy(V(3));
-          V.erase(3);
-          V.insert(3, concat(V3_copy, V3_add, 1));
+          Matrix UC, SC, VC;
+          std::tie(UC, SC, VC, error) = truncated_svd(C, rank);
+          auto VC_splits = VC.split({}, {rank, rank*2});
+
+          Matrix invS30(S(3, 0));
+          inverse(invS30);
+          Matrix r30 = matmul(matmul(SC, VC_splits[0]), S(3, 0));
+
+          // Compute row bases.
+          Matrix B;
+          B = concat(matmul(S(0, 1), transpose(V(1))), matmul(S(3, 1), transpose(V(1))), 0);
+          B = concat(B, matmul(SF, VF), 0);
+
+          Matrix UB, SB, VB;
+          std::tie(UB, SB, VB, error) = truncated_svd(B, rank);
+
+          // Update S blocks.
         }
 
         for (int j = 0; j < nblocks; ++j) {
@@ -419,37 +418,37 @@ namespace Hatrix {
       // Append zeros to admissible blocks in the same row as a fill-in. This is detected
       // when there is a dimension mismatch between the number of bases and the nrows of
       // S block.
-      for (int ib = 0; ib < nblocks; ++ib) {
-        int64_t row_rank = U(ib).cols;
-        for (int jb = 0; jb < nblocks; ++jb) {
-          int64_t col_rank = V(jb).cols;
-          if (is_admissible(ib, jb)) {
-            Matrix& oldS = S(ib, jb);
-            Matrix newS(row_rank, col_rank);
-            if (S(ib, jb).rows != row_rank || S(ib, jb).cols != col_rank) {
-              // Zero-pad the rows of this S block.
-              for (int i = 0; i < oldS.rows; ++i) {
-                for (int j = 0; j < oldS.cols; ++j) {
-                  newS(i, j) = oldS(i, j);
-                }
-              }
+      // for (int ib = 0; ib < nblocks; ++ib) {
+      //   int64_t row_rank = U(ib).cols;
+      //   for (int jb = 0; jb < nblocks; ++jb) {
+      //     int64_t col_rank = V(jb).cols;
+      //     if (is_admissible(ib, jb)) {
+      //       Matrix& oldS = S(ib, jb);
+      //       Matrix newS(row_rank, col_rank);
+      //       if (S(ib, jb).rows != row_rank || S(ib, jb).cols != col_rank) {
+      //         // Zero-pad the rows of this S block.
+      //         for (int i = 0; i < oldS.rows; ++i) {
+      //           for (int j = 0; j < oldS.cols; ++j) {
+      //             newS(i, j) = oldS(i, j);
+      //           }
+      //         }
 
-              S.erase(ib, jb);
-              S.insert(ib, jb, std::move(newS));
-            }
-          }
-        }
-      }
+      //         S.erase(ib, jb);
+      //         S.insert(ib, jb, std::move(newS));
+      //       }
+      //     }
+      //   }
+      // }
 
-      // Update S blocks for admissible blocks that have fill-ins.
-      for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          if (F.exists(i, j)) {
-            Matrix& newS = S(i, j);
-            newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
-          }
-        }
-      }
+      // // Update S blocks for admissible blocks that have fill-ins.
+      // for (int i = 0; i < nblocks; ++i) {
+      //   for (int j = 0; j < nblocks; ++j) {
+      //     if (F.exists(i, j)) {
+      //       Matrix& newS = S(i, j);
+      //       newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
+      //     }
+      //   }
+      // }
 
       // Merge unfactorized portions.
       std::vector<int64_t> row_splits, col_splits;
@@ -671,7 +670,7 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b, last);
@@ -684,24 +683,24 @@ int main(int argc, char** argv) {
   // Adense.print();
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-  std::cout << "x solve:\n";
-  auto res = x - x_solve;
-  std::cout << "---- 0 ----\n";
-  for (int i = 0; i < N/4; ++i) {
-    std::cout << res(i, 0) << std::endl;
-  }
-  std::cout << "---- 1 ----\n";
-  for (int i = N/4; i < N/2; ++i) {
-    std::cout << res(i, 0) << std::endl;
-  }
-  std::cout << "---- 2 ----\n";
-  for (int i = N/2; i < 3 * N / 4; ++i) {
-    std::cout << res(i, 0) << std::endl;
-  }
-  std::cout << "---- 3 ----\n";
-  for (int i = 3*N/4; i < N; ++i) {
-    std::cout << res(i, 0) << std::endl;
-  }
+  // std::cout << "x solve:\n";
+  // auto res = x - x_solve;
+  // std::cout << "---- 0 ----\n";
+  // for (int i = 0; i < N/4; ++i) {
+  //   std::cout << res(i, 0) << std::endl;
+  // }
+  // std::cout << "---- 1 ----\n";
+  // for (int i = N/4; i < N/2; ++i) {
+  //   std::cout << res(i, 0) << std::endl;
+  // }
+  // std::cout << "---- 2 ----\n";
+  // for (int i = N/2; i < 3 * N / 4; ++i) {
+  //   std::cout << res(i, 0) << std::endl;
+  // }
+  // std::cout << "---- 3 ----\n";
+  // for (int i = 3*N/4; i < N; ++i) {
+  //   std::cout << res(i, 0) << std::endl;
+  // }
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 

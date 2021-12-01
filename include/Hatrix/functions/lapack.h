@@ -11,6 +11,8 @@ namespace Lapack {
   enum QR_ret { QAndR, OnlyQ };
 }
 
+// Compute in-place inverse using GETRF + GETRI.
+void inverse(Matrix& A);
 
 // Compute the LU factorization of A and store in L and U. Over-writes A.
 void lu(Matrix& A, Matrix& L, Matrix& U);
