@@ -294,28 +294,6 @@ namespace Hatrix {
           S.erase(3, 1);
           S.insert(3, 1, std::move(Sbar31));
 
-          Matrix D30 = generate_laplacend_matrix(randpts,
-                                                 block_size,
-                                                 block_size,
-                                                 3 * block_size,
-                                                 0 * block_size);
-          Matrix diff = matmul(matmul(U(3), S(3, 0)), V(0), false, true) - D30;
-
-          std::cout << "D30 rel err: " << norm(diff) / norm(D30) << std::endl;
-
-          Matrix D01 = generate_laplacend_matrix(randpts,
-                                                 block_size,
-                                                 block_size,
-                                                 0 * block_size,
-                                                 1 * block_size);
-
-          diff = matmul(matmul(U(0), S(0, 1)), V(1), false, true) - D01;
-
-          std::cout << "D01 rel err: " << norm(diff) / norm(D01) << std::endl;
-
-          Matrix dd = generate_laplacend_matrix(randpts, block_size, block_size, 3 * block_size, 1 * block_size) + F(3, 1);
-
-          std::cout << "D31 rel error: " << norm(matmul(matmul(U(3), S(3, 1)), V(1), false, true) - dd) /  norm(dd) << std::endl;
         }
 
         for (int j = 0; j < nblocks; ++j) {
@@ -414,7 +392,7 @@ namespace Hatrix {
                 auto fill_splits = SPLIT_DENSE(fill_in,
                                                block_size - U(i).cols,
                                                block_size - V(j).cols);
-                matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, 1.0, 1.0);
+                matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, -1.0, 1.0);
                 F.insert(i, j, std::move(fill_in));
               }
             }
@@ -439,7 +417,7 @@ namespace Hatrix {
                 auto fill_splits = SPLIT_DENSE(fill_in,
                                                block_size - U(i).cols,
                                                block_size - V(j).cols);
-                matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, 1.0, 1.0);
+                matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
               }
             }
           }
@@ -465,7 +443,7 @@ namespace Hatrix {
                 auto fill_splits = SPLIT_DENSE(fill_in,
                                                block_size - U(i).cols,
                                                block_size - V(j).cols);
-                matmul(lower_splits[2], right_splits[0], fill_splits[2], false, false, 1.0, 1.0);
+                matmul(lower_splits[2], right_splits[0], fill_splits[2], false, false, -1.0, 1.0);
               }
             }
           }
