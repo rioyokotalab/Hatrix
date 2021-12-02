@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <tuple>
 #include <vector>
+#include <iostream>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -22,10 +23,15 @@ namespace Hatrix {
 
 void inverse(Matrix& A) {
   std::vector<int> ipiv(A.min_dim());
-  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
-
-  // Determine the ideal workspace size.
-  // LAPACKE_dgetri(LAPACK_COL_MAJOR, A.cols, &A, A.stride, ipiv.data(), );
+  int info;
+  info = LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+  if (info != 0) {
+    std::cout << "DGETRF failed in inverse().\n";
+  }
+  info = LAPACKE_dgetri(LAPACK_COL_MAJOR, A.cols, &A, A.stride, ipiv.data());
+  if (info != 0) {
+    std::cout << "DGETRI failed in inverse().\n";
+  }
 }
 
 void lu(Matrix& A, Matrix& L, Matrix& U) {

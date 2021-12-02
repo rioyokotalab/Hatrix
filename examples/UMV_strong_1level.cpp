@@ -246,9 +246,14 @@ namespace Hatrix {
           std::tie(UC, SC, VC, error) = truncated_svd(C, rank);
           auto VC_splits = VC.split({}, {rank, rank*2});
 
-          Matrix invS30(S(3, 0));
+          Matrix invS30(S(3, 0)), invS31(S(3, 1));
           inverse(invS30);
-          Matrix r30 = matmul(matmul(SC, VC_splits[0]), S(3, 0));
+          inverse(invS31);
+          Matrix r30 = matmul(matmul(SC, VC_splits[0]), invS30);
+          Matrix r31 = matmul(matmul(SC, VC_splits[1]), invS31);
+
+          inverse(SF);
+          Matrix rpF = matmul(matmul(SC, VC_splits[2]), SF);
 
           // Compute row bases.
           Matrix B;
