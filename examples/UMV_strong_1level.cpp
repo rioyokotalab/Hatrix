@@ -262,6 +262,13 @@ namespace Hatrix {
 
           Matrix UB, SB, VB;
           std::tie(UB, SB, VB, error) = truncated_svd(B, rank);
+          auto UB_splits = UB.split({rank, rank*2}, {});
+
+          Matrix invS01(S(0, 1));
+          inverse(invS01);
+          Matrix t01 = matmul(matmul(invS01, UB_splits[0]), SB);
+          Matrix t31 = matmul(matmul(invS31, UB_splits[1]), SB);
+          Matrix tpF = matmul(matmul(SF, UB_splits[2]), SB);
 
           // Update S blocks.
         }
