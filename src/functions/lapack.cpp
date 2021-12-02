@@ -28,7 +28,7 @@ void inverse(Matrix& A) {
   if (info != 0) {
     std::cout << "DGETRF failed in inverse().\n";
   }
-  info = LAPACKE_dgetri(LAPACK_COL_MAJOR, A.cols, &A, A.stride, ipiv.data());
+  info = LAPACKE_dgetri(LAPACK_COL_MAJOR, A.rows, &A, A.stride, ipiv.data());
   if (info != 0) {
     std::cout << "DGETRI failed in inverse().\n";
   }

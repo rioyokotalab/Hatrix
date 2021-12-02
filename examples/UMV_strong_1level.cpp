@@ -235,7 +235,8 @@ namespace Hatrix {
         if (block == 3) {
           // Compute for the F(3,1) block.
           Matrix UF, SF, VF; double error;
-          std::tie(UF, SF, VF, error) = Hatrix::truncated_svd(F(3, 1), fill_in_rank);
+          Matrix F31(F(3, 1));
+          std::tie(UF, SF, VF, error) = Hatrix::truncated_svd(F31, fill_in_rank);
 
           // Compute column bases.
           Matrix C;
@@ -247,13 +248,15 @@ namespace Hatrix {
           auto VC_splits = VC.split({}, {rank, rank*2});
 
           Matrix invS30(S(3, 0)), invS31(S(3, 1));
+
           inverse(invS30);
           inverse(invS31);
           Matrix r30 = matmul(matmul(SC, VC_splits[0]), invS30);
           Matrix r31 = matmul(matmul(SC, VC_splits[1]), invS31);
 
-          inverse(SF);
-          Matrix rpF = matmul(matmul(SC, VC_splits[2]), SF);
+          Matrix invSF(SF);
+          inverse(invSF);
+          Matrix rpF = matmul(matmul(SC, VC_splits[2]), invSF);
 
           // Compute row bases.
           Matrix B;
@@ -268,9 +271,51 @@ namespace Hatrix {
           inverse(invS01);
           Matrix t01 = matmul(matmul(invS01, UB_splits[0]), SB);
           Matrix t31 = matmul(matmul(invS31, UB_splits[1]), SB);
-          Matrix tpF = matmul(matmul(SF, UB_splits[2]), SB);
+          Matrix tpF = matmul(matmul(invSF, UB_splits[2]), SB);
 
           // Update S blocks.
+          Matrix Sbar30 = matmul(r30, S(3, 0));
+          Matrix Sbar01 = matmul(S(0, 1), t01);
+          Matrix Sbar31 = matmul(matmul(r31, S(3,1)), t31) + matmul(matmul(rpF, SF), tpF);
+
+          // Replace existing bases and S blocks
+          U.erase(3);
+          U.insert(3, std::move(UC));
+
+          V.erase(1);
+          V.insert(1, transpose(VB));
+
+          S.erase(3, 0);
+          S.insert(3, 0, std::move(Sbar30));
+
+          S.erase(0, 1);
+          S.insert(0, 1, std::move(Sbar01));
+
+          S.erase(3, 1);
+          S.insert(3, 1, std::move(Sbar31));
+
+          Matrix D30 = generate_laplacend_matrix(randpts,
+                                                 block_size,
+                                                 block_size,
+                                                 3 * block_size,
+                                                 0 * block_size);
+          Matrix diff = matmul(matmul(U(3), S(3, 0)), V(0), false, true) - D30;
+
+          std::cout << "D30 rel err: " << norm(diff) / norm(D30) << std::endl;
+
+          Matrix D01 = generate_laplacend_matrix(randpts,
+                                                 block_size,
+                                                 block_size,
+                                                 0 * block_size,
+                                                 1 * block_size);
+
+          diff = matmul(matmul(U(0), S(0, 1)), V(1), false, true) - D01;
+
+          std::cout << "D01 rel err: " << norm(diff) / norm(D01) << std::endl;
+
+          Matrix dd = generate_laplacend_matrix(randpts, block_size, block_size, 3 * block_size, 1 * block_size) + F(3, 1);
+
+          std::cout << "D31 rel error: " << norm(matmul(matmul(U(3), S(3, 1)), V(1), false, true) - dd) /  norm(dd) << std::endl;
         }
 
         for (int j = 0; j < nblocks; ++j) {
@@ -695,24 +740,24 @@ int main(int argc, char** argv) {
   // Adense.print();
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-  // std::cout << "x solve:\n";
-  // auto res = x - x_solve;
-  // std::cout << "---- 0 ----\n";
-  // for (int i = 0; i < N/4; ++i) {
-  //   std::cout << res(i, 0) << std::endl;
-  // }
-  // std::cout << "---- 1 ----\n";
-  // for (int i = N/4; i < N/2; ++i) {
-  //   std::cout << res(i, 0) << std::endl;
-  // }
-  // std::cout << "---- 2 ----\n";
-  // for (int i = N/2; i < 3 * N / 4; ++i) {
-  //   std::cout << res(i, 0) << std::endl;
-  // }
-  // std::cout << "---- 3 ----\n";
-  // for (int i = 3*N/4; i < N; ++i) {
-  //   std::cout << res(i, 0) << std::endl;
-  // }
+  std::cout << "x solve:\n";
+  auto res = x - x_solve;
+  std::cout << "---- 0 ----\n";
+  for (int i = 0; i < N/4; ++i) {
+    std::cout << res(i, 0) << std::endl;
+  }
+  std::cout << "---- 1 ----\n";
+  for (int i = N/4; i < N/2; ++i) {
+    std::cout << res(i, 0) << std::endl;
+  }
+  std::cout << "---- 2 ----\n";
+  for (int i = N/2; i < 3 * N / 4; ++i) {
+    std::cout << res(i, 0) << std::endl;
+  }
+  std::cout << "---- 3 ----\n";
+  for (int i = 3*N/4; i < N; ++i) {
+    std::cout << res(i, 0) << std::endl;
+  }
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
