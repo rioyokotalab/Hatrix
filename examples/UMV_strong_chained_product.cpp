@@ -624,6 +624,39 @@ Matrix generate_full_permuted(BLR2& A) {
   return M;
 }
 
+std::vector<Matrix> generate_UF_chain(Hatrix::BLR2& A) {
+
+}
+
+std::vector<Matrix> generate_VF_chain(Hatrix::BLR2& A) {
+
+}
+
+std::vector<Matrix> generate_L_chain(Hatrix::BLR2& A) {
+
+}
+
+std::vector<Matrix> generate_U_chain(Hatrix::BLR2& A) {
+
+}
+
+Matrix generate_L0_permuted(Hatrix::BLR2& A, Hatrix::Matrix& last) {
+
+}
+
+Matrix generate_U0_permuted(Hatrix::BLR2& A, Hatrix::Matrix& last) {
+
+}
+
+Matrix chain_product(std::vector<Matrix>& U_F,
+                     std::vector<Matrix>& L,
+                     Matrix& L0, Matrix& U0,
+                     std::vector<Matrix>& U,
+                     std::vector<Matrix>& V_F) {
+
+}
+
+
 int main(int argc, char** argv) {
   int64_t N = atoi(argv[1]);
   int64_t nblocks = atoi(argv[2]);
@@ -653,13 +686,14 @@ int main(int argc, char** argv) {
   Matrix A_expected = generate_full_permuted(A_expected_blr);
 
   // Generate permuted L and U matrices.
-  std::vector<Matrix> U_F = generate_UF_chain(A, last);
-  std::vector<Matrix> V_F = generate_VF_chain(A, last);
+  std::vector<Matrix> U_F = generate_UF_chain(A);
+  std::vector<Matrix> V_F = generate_VF_chain(A);
   std::vector<Matrix> L = generate_L_chain(A);
   std::vector<Matrix> U = generate_U_chain(A);
-  Matrix L0 = generate_L0_permuted(last);
-  Matrix U0 = generate_U0_permuted(last);
+  Matrix L0 = generate_L0_permuted(A, last);
+  Matrix U0 = generate_U0_permuted(A, last);
 
+  Matrix A_actual = chain_product(U_F, L, L0, U0, U, V_F);
 
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 
