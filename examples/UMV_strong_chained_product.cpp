@@ -625,6 +625,8 @@ Matrix generate_full_permuted(BLR2& A) {
 }
 
 std::vector<Matrix> generate_UF_chain(Hatrix::BLR2& A) {
+  std::vector<Matrix> U_F;
+
 
 }
 
