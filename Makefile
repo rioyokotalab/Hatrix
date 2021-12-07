@@ -29,7 +29,8 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	H2_matrix_2level_construct \
 	BLR2_strong_far_dense_construct \
 	UMV_strong_1level_debug \
-	H2_strong_N_level
+	H2_strong_N_level \
+	UMV_strong_chained_product
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
