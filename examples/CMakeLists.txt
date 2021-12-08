@@ -32,6 +32,7 @@ else()
     LDL_weak_Nlevel
     H2_strong_N_level
     UMV_strong_1level_debug
+    UMV_strong_chained_product
   )
 endif()
 
