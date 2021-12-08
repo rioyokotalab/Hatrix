@@ -750,8 +750,6 @@ std::vector<Matrix> generate_L_chain(Hatrix::BLR2& A) {
       }
     }
 
-    L_block.print();
-
     L.push_back(L_block);
   }
 
@@ -760,7 +758,46 @@ std::vector<Matrix> generate_L_chain(Hatrix::BLR2& A) {
 }
 
 std::vector<Matrix> generate_U_chain(Hatrix::BLR2& A) {
+  int64_t block_size = A.N / A.nblocks;
+  int64_t permuted_nblocks = A.nblocks * 2;
+  std::vector<int64_t> row_offsets, col_offsets;
+  std::tie(row_offsets, col_offsets) = generate_offsets(A);
   std::vector<Matrix> U;
+
+  for (int block = 0; block < A.nblocks; ++block) {
+    Matrix U_block = generate_identity_matrix(A.N, A.N);
+    auto U_splits = U_block.split(row_offsets, col_offsets);
+
+    for (int j = block; j < A.nblocks; ++j) {
+      if (!A.is_admissible(block, j)) {
+        int64_t row_split = block_size - A.U(block).cols;
+        int64_t col_split = block_size - A.V(j).cols;
+        auto D_splits = SPLIT_DENSE(A.D(block, j), row_split, col_split);
+
+        // Copy the cc blocks
+        if (block == j) {
+          U_splits[block * permuted_nblocks + j] = upper(D_splits[0]);
+        }
+        else {
+          U_splits[block * permuted_nblocks + j] = D_splits[0];
+        }
+
+        // Copy the co parts
+        U_splits[block * permuted_nblocks + j + A.nblocks] = D_splits[1];
+      }
+    }
+
+    for (int j = 0; j < block; ++j) {
+      if (!A.is_admissible(block, j)) {
+        int64_t row_split = block_size - A.U(block).cols;
+        int64_t col_split = block_size - A.V(j).cols;
+        auto D_splits = SPLIT_DENSE(A.D(block, j), row_split, col_split);
+        U_splits[block * permuted_nblocks + (j + A.nblocks)] = D_splits[1];
+      }
+    }
+
+    U.push_back(U_block);
+  }
 
   return U;
 }
