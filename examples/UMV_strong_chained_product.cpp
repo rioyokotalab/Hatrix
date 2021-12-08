@@ -462,37 +462,37 @@ namespace Hatrix {
       // Append zeros to admissible blocks in the same row as a fill-in. This is detected
       // when there is a dimension mismatch between the number of bases and the nrows of
       // S block.
-      for (int ib = 0; ib < nblocks; ++ib) {
-        int64_t row_rank = U(ib).cols;
-        for (int jb = 0; jb < nblocks; ++jb) {
-          int64_t col_rank = V(jb).cols;
-          if (is_admissible(ib, jb)) {
-            Matrix& oldS = S(ib, jb);
-            Matrix newS(row_rank, col_rank);
-            if (S(ib, jb).rows != row_rank || S(ib, jb).cols != col_rank) {
-              // Zero-pad the rows of this S block.
-              for (int i = 0; i < oldS.rows; ++i) {
-                for (int j = 0; j < oldS.cols; ++j) {
-                  newS(i, j) = oldS(i, j);
-                }
-              }
+      // for (int ib = 0; ib < nblocks; ++ib) {
+      //   int64_t row_rank = U(ib).cols;
+      //   for (int jb = 0; jb < nblocks; ++jb) {
+      //     int64_t col_rank = V(jb).cols;
+      //     if (is_admissible(ib, jb)) {
+      //       Matrix& oldS = S(ib, jb);
+      //       Matrix newS(row_rank, col_rank);
+      //       if (S(ib, jb).rows != row_rank || S(ib, jb).cols != col_rank) {
+      //         // Zero-pad the rows of this S block.
+      //         for (int i = 0; i < oldS.rows; ++i) {
+      //           for (int j = 0; j < oldS.cols; ++j) {
+      //             newS(i, j) = oldS(i, j);
+      //           }
+      //         }
 
-              S.erase(ib, jb);
-              S.insert(ib, jb, std::move(newS));
-            }
-          }
-        }
-      }
+      //         S.erase(ib, jb);
+      //         S.insert(ib, jb, std::move(newS));
+      //       }
+      //     }
+      //   }
+      // }
 
       // Update S blocks for admissible blocks that have fill-ins.
-      for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          if (F.exists(i, j)) {
-            Matrix& newS = S(i, j);
-            newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
-          }
-        }
-      }
+      // for (int i = 0; i < nblocks; ++i) {
+      //   for (int j = 0; j < nblocks; ++j) {
+      //     if (F.exists(i, j)) {
+      //       Matrix& newS = S(i, j);
+      //       newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
+      //     }
+      //   }
+      // }
 
       // Merge unfactorized portions.
       std::vector<int64_t> row_splits, col_splits;
@@ -652,6 +652,21 @@ generate_offsets(BLR2& A) {
   return {row_offsets, col_offsets};
 }
 
+std::tuple<std::vector<int64_t>, std::vector<int64_t> >
+generate_rank_offsets(BLR2& A) {
+  std::vector<int64_t> row_rank_splits, col_rank_splits;
+  int64_t nrows = 0, ncols = 0;
+  for (int i = 0; i < A.nblocks; ++i) {
+    int64_t row_rank = A.U(i).cols, col_rank = A.V(i).cols;
+    row_rank_splits.push_back(nrows + row_rank);
+    col_rank_splits.push_back(ncols + col_rank);
+    nrows += row_rank;
+    ncols += col_rank;
+  }
+
+  return {row_rank_splits, col_rank_splits};
+}
+
 //
 std::vector<Matrix> generate_UF_chain(Hatrix::BLR2& A) {
   std::vector<int64_t> row_offsets, col_offsets;
@@ -689,7 +704,7 @@ std::vector<Matrix> generate_VF_chain(Hatrix::BLR2& A) {
 
   for (int block = 0; block < A.nblocks; ++block) {
     Matrix VF_full = generate_identity_matrix(A.N, A.N);
-    Matrix VF_block = make_complement(A.V(block));
+    Matrix VF_block = transpose(make_complement(A.V(block)));
 
     auto VF_full_splits = VF_full.split(row_offsets, col_offsets);
     auto VF_block_splits = SPLIT_DENSE(VF_block,
@@ -803,13 +818,86 @@ std::vector<Matrix> generate_U_chain(Hatrix::BLR2& A) {
 }
 
 Matrix generate_L0_permuted(Hatrix::BLR2& A, Hatrix::Matrix& last) {
-  Matrix L0(A.N, A.N);
+  int64_t block_size = A.N / A.nblocks;
+  int64_t permuted_nblocks = A.nblocks * 2;
+  std::vector<int64_t> row_offsets, col_offsets;
+  std::tie(row_offsets, col_offsets) = generate_offsets(A);
+
+  Matrix L0 = generate_identity_matrix(A.N, A.N);
+  auto L0_splits = L0.split(row_offsets, col_offsets);
+
+  std::vector<int64_t> row_rank_splits, col_rank_splits;
+  std::tie(row_rank_splits, col_rank_splits)= generate_rank_offsets(A);
+
+  auto last_splits = last.split(row_rank_splits, col_rank_splits);
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j <= i; ++j) {
+      if (!A.is_admissible(i, j)) {
+        int64_t row_split = block_size - A.U(i).cols;
+        int64_t col_split = block_size - A.V(j).cols;
+        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, row_split),
+                                        std::vector<int64_t>(1, col_split));
+
+        // Copy the oo parts
+        if (i == j) {
+          L0_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+            lower(last_splits[i * A.nblocks + j]);
+        }
+        else {
+          L0_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+            last_splits[i * A.nblocks + j];
+        }
+      }
+      else {
+        // Copy S blocks into the lower right corner
+        L0_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+          last_splits[i * A.nblocks + j];
+      }
+    }
+  }
 
   return L0;
 }
 
 Matrix generate_U0_permuted(Hatrix::BLR2& A, Hatrix::Matrix& last) {
-  Matrix U0(A.N, A.N);
+  int64_t block_size = A.N / A.nblocks;
+  int64_t permuted_nblocks = A.nblocks * 2;
+  std::vector<int64_t> row_offsets, col_offsets;
+  std::tie(row_offsets, col_offsets) = generate_offsets(A);
+
+  Matrix U0 = generate_identity_matrix(A.N, A.N);
+  auto U0_splits = U0.split(row_offsets, col_offsets);
+
+  std::vector<int64_t> row_rank_splits, col_rank_splits;
+  std::tie(row_rank_splits, col_rank_splits)= generate_rank_offsets(A);
+  auto last_splits = last.split(row_rank_splits, col_rank_splits);
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = i; j < A.nblocks; ++j) {
+      if (!A.is_admissible(i, j)) {
+        int64_t row_split = block_size - A.U(i).cols;
+        int64_t col_split = block_size - A.V(j).cols;
+        auto D_splits = A.D(i, j).split(std::vector<int64_t>(1, row_split),
+                                        std::vector<int64_t>(1, col_split));
+
+        // Copy the oo parts
+        if (i == j) {
+          U0_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+            upper(last_splits[i * A.nblocks + j]);
+        }
+        else {
+          U0_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+            last_splits[i * A.nblocks + j];
+        }
+      }
+      else {
+        // Copy S blocks
+        U0_splits[(i + A.nblocks) * permuted_nblocks + (j + A.nblocks)] =
+          last_splits[i * A.nblocks + j];
+      }
+    }
+  }
 
   return U0;
 }
@@ -821,6 +909,25 @@ Matrix chain_product(BLR2& A,
                      std::vector<Matrix>& U,
                      std::vector<Matrix>& V_F) {
   Matrix product(A.N, A.N);
+
+  product = matmul(U_F[0], L[0]);
+  // Multiply UF and L blocks.
+  for (int i = 1; i < A.nblocks; ++i) {
+    product = matmul(product, U_F[i]);
+    product = matmul(product, L[i]);
+  }
+
+  product = matmul(product, L0);
+  product = matmul(product, U0);
+
+  // matmul(L0, U0).print();
+
+  for (int i = A.nblocks-1; i >= 0; --i) {
+    product = matmul(product, U[i]);
+    product = matmul(product, V_F[i]);
+  }
+
+  product.print();
 
   return product;
 }
@@ -835,8 +942,8 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -852,7 +959,7 @@ int main(int argc, char** argv) {
   std::tie(last, F) = A.factorize(randpts);
 
   // Multiply by UF and VF.
-  Matrix A_expected = generate_full_permuted(A_expected_blr);
+  Matrix A_expected = generate_laplacend_matrix(randpts, A.N, A.N, 0, 0);//generate_full_permuted(A_expected_blr);
 
   // Generate permuted L and U matrices.
   std::vector<Matrix> U_F = generate_UF_chain(A);
@@ -865,6 +972,7 @@ int main(int argc, char** argv) {
   Matrix A_actual = chain_product(A, U_F, L, L0, U0, U, V_F);
 
   double acc = norm(A_actual - A_expected) / norm(A_expected);
+
 
   Hatrix::Context::finalize();
 

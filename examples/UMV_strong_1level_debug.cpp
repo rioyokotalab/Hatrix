@@ -951,6 +951,8 @@ int main(int argc, char** argv) {
 
   (A_actual - A_expected).print();
 
+
+
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 
   Hatrix::Context::finalize();
