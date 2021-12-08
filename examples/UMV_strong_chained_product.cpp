@@ -522,6 +522,7 @@ namespace Hatrix {
         }
       }
 
+
       lu(last);
 
       return {last, F};
@@ -920,16 +921,20 @@ Matrix chain_product(BLR2& A,
   product = matmul(product, L0);
   product = matmul(product, U0);
 
-  // matmul(L0, U0).print();
+  product.print();
 
   for (int i = A.nblocks-1; i >= 0; --i) {
     product = matmul(product, U[i]);
     product = matmul(product, V_F[i]);
   }
 
-  product.print();
-
   return product;
+}
+
+Matrix unpermute_matrix(Matrix& PA, BLR2& A) {
+  Matrix M(A.N, A.N);
+
+  return M;
 }
 
 
@@ -969,7 +974,7 @@ int main(int argc, char** argv) {
   Matrix L0 = generate_L0_permuted(A, last);
   Matrix U0 = generate_U0_permuted(A, last);
 
-  Matrix A_actual = chain_product(A, U_F, L, L0, U0, U, V_F);
+  Matrix A_actual = unpermute_matrix(chain_product(A, U_F, L, L0, U0, U, V_F));
 
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 
