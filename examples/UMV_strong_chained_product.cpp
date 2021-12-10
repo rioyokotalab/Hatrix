@@ -931,8 +931,31 @@ Matrix chain_product(BLR2& A,
   return product;
 }
 
-Matrix unpermute_matrix(Matrix& PA, BLR2& A) {
+Matrix unpermute_matrix(Matrix PA, BLR2& A) {
   Matrix M(A.N, A.N);
+  int64_t block_size = A.N / A.nblocks;
+  int64_t permuted_nblocks = A.nblocks * 2;
+  std::vector<int64_t> row_offsets, col_offsets;
+  std::tie(row_offsets, col_offsets) = generate_offsets(A);
+
+  auto PA_splits = PA.split(row_offsets, col_offsets);
+  auto M_splits = M.split(A.nblocks, A.nblocks);
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j < A.nblocks; ++j) {
+      Matrix block(block_size, block_size);
+      auto block_splits = SPLIT_DENSE(block,
+                                      block_size - A.U(i).cols,
+                                      block_size - A.V(j).cols);
+
+      block_splits[0] = PA_splits[(i) * permuted_nblocks + j];
+      block_splits[1] = PA_splits[i * permuted_nblocks + j + A.nblocks];
+      block_splits[2] = PA_splits[(i + A.nblocks) * permuted_nblocks + j];
+      block_splits[3] = PA_splits[(i + A.nblocks) * permuted_nblocks + j + A.nblocks];
+
+      M_splits[i * A.nblocks + j] = block;
+    }
+  }
 
   return M;
 }
@@ -974,8 +997,9 @@ int main(int argc, char** argv) {
   Matrix L0 = generate_L0_permuted(A, last);
   Matrix U0 = generate_U0_permuted(A, last);
 
-  Matrix A_actual = unpermute_matrix(chain_product(A, U_F, L, L0, U0, U, V_F));
+  Matrix A_actual = unpermute_matrix(chain_product(A, U_F, L, L0, U0, U, V_F), A);
 
+  (A_actual - A_expected).print();
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 
 
