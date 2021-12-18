@@ -150,8 +150,8 @@ namespace Hatrix {
         // }
       }
 
-      // is_admissible.insert(1, 2, admis == 1 ? false : true);
-      // is_admissible.insert(2, 1, admis == 1 ? false : true);
+      is_admissible.insert(1, 2, admis == 1 ? false : true);
+      is_admissible.insert(2, 1, admis == 1 ? false : true);
       is_admissible.insert(3, 2, admis == 1 ? false : true);
       is_admissible.insert(2, 3, admis == 1 ? false : true);
 
@@ -244,65 +244,74 @@ namespace Hatrix {
       for (int block = 0; block < nblocks; ++block) {
         if (block == 3 && admis == 1 && F.exists(3,1) && F.exists(1, 3)) {
           // Compute for the F(3,1) block.
-          Matrix UF, SF, VF; double error;
-          Matrix F31(F(3, 1));
-          std::tie(UF, SF, VF, error) = Hatrix::truncated_svd(F31, fill_in_rank);
+          {
+            Matrix Fp = matmul(F(3, 1), V(1), false, true);
+            Matrix B = concat(matmul(U(3), S(3, 0)), matmul(U(3), S(3, 1)), 1);
+            B = concat(B, Fp, 1);
 
-          // Compute column bases.
-          Matrix C;
-          C = concat(matmul(U(3), S(3, 0)), matmul(U(3), S(3, 1)), 1);
-          C = concat(C, matmul(UF, SF), 1);
+            Matrix UN1, SN1, VN1T; double error;
+            std::tie(UN1, SN1, VN1T, error) = truncated_svd(B, rank);
 
-          Matrix UC, SC, VC;
-          std::tie(UC, SC, VC, error) = truncated_svd(C, rank);
-          auto VC_splits = VC.split({}, {rank, rank*2});
+            auto VN1T_splits = VN1T.split({}, {rank, rank*2});
 
-          Matrix invS30(S(3, 0)), invS31(S(3, 1));
+            Matrix invS30(S(3, 0));
+            inverse(invS30);
+            auto r30 = matmul(matmul(SN1, VN1T_splits[0]), invS30);
 
-          inverse(invS30);
-          inverse(invS31);
-          Matrix r30 = matmul(matmul(SC, VC_splits[0]), invS30);
-          Matrix r31 = matmul(matmul(SC, VC_splits[1]), invS31);
+            Matrix invS31(S(3, 1));
+            inverse(invS31);
+            auto r31 = matmul(matmul(SN1, VN1T_splits[1]), invS31);
 
-          Matrix invSF(SF);
-          inverse(invSF);
-          Matrix rpF = matmul(matmul(SC, VC_splits[2]), invSF);
+            Matrix SpF = matmul(matmul(UN1, Fp, true, false), V(1));
 
-          // Compute row bases.
-          Matrix B;
-          B = concat(matmul(S(0, 1), transpose(V(1))), matmul(S(3, 1), transpose(V(1))), 0);
-          B = concat(B, matmul(SF, VF), 0);
+            Matrix Sbar30 = matmul(r30, S(3, 0));
+            Matrix Sbar31 = matmul(r31, S(3, 1)) + SpF;
 
-          Matrix UB, SB, VB;
-          std::tie(UB, SB, VB, error) = truncated_svd(B, rank);
-          auto UB_splits = UB.split({rank, rank*2}, {});
+            U.erase(3);
+            U.insert(3, std::move(UN1));
 
-          Matrix invS01(S(0, 1));
-          inverse(invS01);
-          Matrix t01 = matmul(matmul(invS01, UB_splits[0]), SB);
-          Matrix t31 = matmul(matmul(invS31, UB_splits[1]), SB);
-          Matrix tpF = matmul(matmul(invSF, UB_splits[2]), SB);
+            S.erase(3, 0);
+            S.insert(3, 0, std::move(Sbar30));
 
-          // Update S blocks.
-          Matrix Sbar30 = matmul(r30, S(3, 0));
-          Matrix Sbar01 = matmul(S(0, 1), t01);
-          Matrix Sbar31 = matmul(matmul(r31, S(3,1)), t31) + matmul(matmul(rpF, SF), tpF);
+            S.erase(3, 1);
+            S.insert(3, 1, std::move(Sbar31));
+          }
 
-          // Replace existing bases and S blocks
-          U.erase(3);
-          U.insert(3, std::move(UC));
+          // Compute for the F(1, 3) block.
+          {
+            Matrix Fp = matmul(U(1), F(1, 3));
+            Matrix B = concat(matmul(S(0, 3), V(3), false, true),
+                              matmul(S(1, 3), V(3), false, true), 0);
+            B = concat(B, Fp, 0);
 
-          V.erase(1);
-          V.insert(1, transpose(VB));
+            Matrix UN2, SN2, VN2T; double error;
+            std::tie(UN2, SN2, VN2T, error) = truncated_svd(B, rank);
 
-          S.erase(3, 0);
-          S.insert(3, 0, std::move(Sbar30));
+            auto UN2_splits = UN2.split({rank, rank*2}, {});
 
-          S.erase(0, 1);
-          S.insert(0, 1, std::move(Sbar01));
+            Matrix invS03(S(0, 3));
+            inverse(invS03);
+            auto t03 = matmul(matmul(invS03, UN2_splits[0]), SN2);
 
-          S.erase(3, 1);
-          S.insert(3, 1, std::move(Sbar31));
+            Matrix invS13(S(1, 3));
+            inverse(invS13);
+            auto t13 = matmul(matmul(invS13, UN2_splits[1]), SN2);
+
+            Matrix SpF = matmul(matmul(U(1), Fp, true, false), VN2T, false, true);
+
+            auto Sbar03 = matmul(S(0, 3), t03);
+            auto Sbar13 = matmul(S(1, 3), t13) + SpF;
+
+            V.erase(3);
+            V.insert(3, transpose(VN2T));
+
+            S.erase(0, 3);
+            S.insert(0, 3, std::move(Sbar03));
+
+            S.erase(1, 3);
+            S.insert(1, 3, std::move(Sbar13));
+
+          }
         }
 
         for (int j = 0; j < nblocks; ++j) {
@@ -397,12 +406,12 @@ namespace Hatrix {
               else {
                 // Generate the fill-in block that holds the product here and that from
                 // Schur's compliment present below this block.
-                Matrix fill_in(block_size, block_size);
-                auto fill_splits = SPLIT_DENSE(fill_in,
-                                               block_size - U(i).cols,
-                                               block_size - V(j).cols);
-                matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, -1.0, 1.0);
-                F.insert(i, j, std::move(fill_in));
+                // Matrix fill_in(block_size, block_size);
+                // auto fill_splits = SPLIT_DENSE(fill_in,
+                //                                block_size - U(i).cols,
+                //                                block_size - V(j).cols);
+                // matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, -1.0, 1.0);
+                // F.insert(i, j, std::move(fill_in));
               }
             }
           }
@@ -421,12 +430,17 @@ namespace Hatrix {
                 matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
               }
               // Schur's compliement between co and cc blocks where a new fill-in is created.
+              // The product is a (co; oo)-sized matrix.
               else {
-                Matrix& fill_in = F(i, j);
-                auto fill_splits = SPLIT_DENSE(fill_in,
-                                               block_size - U(i).cols,
-                                               block_size - V(j).cols);
-                matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                Matrix fill_in(block_size, rank);
+                auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
+                // Update the co block within the fill-in.
+                matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
+
+                // Update the oo block within the fill-in.
+                matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+
+                F.insert(i, j, std::move(fill_in));
               }
             }
           }
@@ -447,17 +461,55 @@ namespace Hatrix {
                        false, false, -1.0, 1.0);
               }
               // Schur's compliement between co and cc blocks where a new fill-in is created.
+              // The product is a (oc, oo)-sized block.
               else {
-                Matrix& fill_in = F(i, j);
-                auto fill_splits = SPLIT_DENSE(fill_in,
-                                               block_size - U(i).cols,
-                                               block_size - V(j).cols);
-                matmul(lower_splits[2], right_splits[0], fill_splits[2], false, false, -1.0, 1.0);
+                Matrix fill_in(rank, block_size);
+                auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
+                // Update the oc block within the fill-ins.
+                matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
+                // Update the oo block within the fill-ins.
+                matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                F.insert(i, j, std::move(fill_in));
               }
             }
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
+
+      // Append zeros to admissible blocks in the same row as a fill-in. This is detected
+      // when there is a dimension mismatch between the number of bases and the nrows of
+      // S block.
+      // for (int ib = 0; ib < nblocks; ++ib) {
+      //   int64_t row_rank = U(ib).cols;
+      //   for (int jb = 0; jb < nblocks; ++jb) {
+      //     int64_t col_rank = V(jb).cols;
+      //     if (is_admissible(ib, jb)) {
+      //       Matrix& oldS = S(ib, jb);
+      //       Matrix newS(row_rank, col_rank);
+      //       if (S(ib, jb).rows != row_rank || S(ib, jb).cols != col_rank) {
+      //         // Zero-pad the rows of this S block.
+      //         for (int i = 0; i < oldS.rows; ++i) {
+      //           for (int j = 0; j < oldS.cols; ++j) {
+      //             newS(i, j) = oldS(i, j);
+      //           }
+      //         }
+
+      //         S.erase(ib, jb);
+      //         S.insert(ib, jb, std::move(newS));
+      //       }
+      //     }
+      //   }
+      // }
+
+      // // Update S blocks for admissible blocks that have fill-ins.
+      // for (int i = 0; i < nblocks; ++i) {
+      //   for (int j = 0; j < nblocks; ++j) {
+      //     if (F.exists(i, j)) {
+      //       Matrix& newS = S(i, j);
+      //       newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
+      //     }
+      //   }
+      // }
 
       // Merge unfactorized portions.
       std::vector<int64_t> row_splits, col_splits;
@@ -645,6 +697,8 @@ std::vector<Matrix> generate_UF_chain(Hatrix::BLR2& A) {
     Matrix UF_full = generate_identity_matrix(A.N, A.N);
     Matrix UF_block = make_complement(A.U(block));
 
+    std::cout << "UF chain b-> " << block << " cols: " << A.U(block).cols << std::endl;
+
     auto UF_full_splits = UF_full.split(row_offsets, col_offsets);
     auto UF_block_splits = SPLIT_DENSE(UF_block,
                                        block_size - A.U(block).cols,
@@ -701,22 +755,21 @@ std::vector<Matrix> generate_L_chain(Hatrix::BLR2& A) {
     Matrix L_block = generate_identity_matrix(A.N, A.N);
     auto L_splits = L_block.split(row_offsets, col_offsets);
 
-    for (int i = block; i < A.nblocks; ++i) {
-      if (!A.is_admissible(i, block)) {
-        int64_t row_split = block_size - A.U(i).cols;
-        int64_t col_split = block_size - A.V(block).cols;
-        auto D_splits = SPLIT_DENSE(A.D(i, block), row_split, col_split);
+    for (int j = 0; j <= block; ++j) {
+      if (!A.is_admissible(block, j)) {
+        int64_t row_split = block_size - A.U(block).cols;
+        int64_t col_split = block_size - A.V(j).cols;
+        auto D_splits = SPLIT_DENSE(A.D(block, j), row_split, col_split);
 
         // Copy the cc parts
-        if (block == i) {
-          L_splits[i * permuted_nblocks + block] = lower(D_splits[0]);
+        if (block == j) {
+          L_splits[block * permuted_nblocks + j] = lower(D_splits[0]);
         }
         else {
-          L_splits[i * permuted_nblocks + block] = D_splits[0];
+          L_splits[block * permuted_nblocks + j] = D_splits[0];
         }
 
-        // Copy the oc parts
-        L_splits[(i + A.nblocks) * permuted_nblocks + block] = D_splits[2];
+        L_splits[(block + A.nblocks) * permuted_nblocks + j] = D_splits[2];
       }
     }
 
@@ -748,22 +801,22 @@ std::vector<Matrix> generate_U_chain(Hatrix::BLR2& A) {
     Matrix U_block = generate_identity_matrix(A.N, A.N);
     auto U_splits = U_block.split(row_offsets, col_offsets);
 
-    for (int j = block; j < A.nblocks; ++j) {
-      if (!A.is_admissible(block, j)) {
-        int64_t row_split = block_size - A.U(block).cols;
-        int64_t col_split = block_size - A.V(j).cols;
-        auto D_splits = SPLIT_DENSE(A.D(block, j), row_split, col_split);
+    for (int i = 0; i <= block; ++i) {
+      if (!A.is_admissible(i, block)) {
+        int64_t row_split = block_size - A.U(i).cols;
+        int64_t col_split = block_size - A.V(block).cols;
+        auto D_splits = SPLIT_DENSE(A.D(i, block), row_split, col_split);
 
         // Copy the cc blocks
-        if (block == j) {
-          U_splits[block * permuted_nblocks + j] = upper(D_splits[0]);
+        if (block == i) {
+          U_splits[i * permuted_nblocks + block] = upper(D_splits[0]);
         }
         else {
-          U_splits[block * permuted_nblocks + j] = D_splits[0];
+          U_splits[i * permuted_nblocks + block] = D_splits[0];
         }
 
         // Copy the co parts
-        U_splits[block * permuted_nblocks + j + A.nblocks] = D_splits[1];
+        U_splits[i * permuted_nblocks + block + A.nblocks] = D_splits[1];
       }
     }
 
@@ -875,18 +928,47 @@ Matrix chain_product(BLR2& A,
                      std::vector<Matrix>& V_F) {
   Matrix product(A.N, A.N);
 
+  // product = matmul(U_F[0], U_F[1]);
+  // product = matmul(product, U_F[2]);
+  // product = matmul(product, U_F[3]);
+
+
+  // product = matmul(product, L[0]);
+  // product = matmul(product, L[1]);
+  // product = matmul(product, L[2]);
+  // product = matmul(product, L[3]);
+
   product = matmul(U_F[0], L[0]);
+  product = matmul(product, U_F[1]);
+  product = matmul(product, L[1]);
+  product = matmul(product, U_F[2]);
+  product = matmul(product, L[2]);
+  product = matmul(product, U_F[3]);
+  product = matmul(product, L[3]);
+
+
   // Multiply UF and L blocks.
-  for (int i = 1; i < A.nblocks; ++i) {
-    product = matmul(product, U_F[i]);
-    product = matmul(product, L[i]);
-  }
+  // for (int i = 1; i < 2; ++i) {
+  //   product = matmul(product, U_F[i]);
+  // }
+
+  // for (int i = 1; i < 2; ++i) {
+  //   product = matmul(product, L[i]);
+  // }
+
+  // product = matmul(product, L[2]);
+  // product = matmul(product, U_F[2]);
 
   product = matmul(product, L0);
   product = matmul(product, U0);
 
+
+
   for (int i = A.nblocks-1; i >= 0; --i) {
     product = matmul(product, U[i]);
+  }
+
+  for (int i = A.nblocks-1; i >= 0; --i) {
     product = matmul(product, V_F[i]);
   }
 
@@ -976,7 +1058,8 @@ int main(int argc, char** argv) {
   std::tie(last, F) = A.factorize(randpts);
 
   // Multiply by UF and VF.
-  Matrix A_expected = generate_laplacend_matrix(randpts, A.N, A.N, 0, 0);//generate_full_permuted(A_expected_blr);
+  Matrix A_expected = generate_laplacend_matrix(randpts, A.N, A.N, 0, 0);
+  //generate_full_permuted(A_expected_blr);
 
   // Generate permuted L and U matrices.
   std::vector<Matrix> U_F = generate_UF_chain(A);
@@ -991,10 +1074,24 @@ int main(int argc, char** argv) {
 
   Matrix A_actual = unpermute_matrix(chain_product(A, U_F, L, L0, U0, U, V_F), A);
 
-  (A_actual - A_expected).print();
+  Matrix diff = (A_actual - A_expected);
+  auto d_splits = diff.split(A.nblocks, A.nblocks);
+  auto m_splits = A_expected.split(A.nblocks, A.nblocks);
+
+  int idx = 3 * A.nblocks + 1;
+  std::cout << "(3,1) block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+
+  idx = 1 * A.nblocks + 3;
+  std::cout << "(1,3) block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+
+  idx = 3 * A.nblocks + 3;
+  std::cout << "(3,3) block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+
+
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 
   Hatrix::Context::finalize();
 
-  std::cout << "A0 accuracy: " << A0_acc << " full accuracy: " << acc << " contruct error: " << construct_error  << std::endl;
+  std::cout << "A0 accuracy: " << A0_acc << " full accuracy: "
+            << acc << " contruct error: " << construct_error  << std::endl;
 }
