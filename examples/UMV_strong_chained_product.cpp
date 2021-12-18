@@ -145,9 +145,9 @@ namespace Hatrix {
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
-        // for (int j = 0; j < nblocks; ++j) {
+         // for (int j = 0; j < nblocks; ++j) {
         is_admissible.insert(i, i, std::abs(i - i) > admis);
-        // }
+         // }
       }
 
       is_admissible.insert(1, 2, admis == 1 ? false : true);
@@ -245,36 +245,77 @@ namespace Hatrix {
         if (block == 3 && admis == 1 && F.exists(3,1) && F.exists(1, 3)) {
           // Compute for the F(3,1) block.
           {
-            Matrix Fp = matmul(F(3, 1), V(1), false, true);
-            Matrix B = concat(matmul(U(3), S(3, 0)), matmul(U(3), S(3, 1)), 1);
-            B = concat(B, Fp, 1);
+            // Scan for fill-ins in the same row as this diagonal block.
+            Matrix row_concat(block_size, 0);
+            std::vector<int64_t> VN1_col_splits;
+            int64_t ncol = 0;
+            for (int j = 0; j < block; ++j) {
+              if (is_admissible(block, j)) {
+                row_concat = concat(row_concat, matmul(U(block), S(block, j)), 1);
+
+                ncol += rank;
+                VN1_col_splits.push_back(ncol);
+                if (F.exists(block, j)) {
+                  Matrix Fp = matmul(F(3, 1), V(1), false, true);
+                  row_concat = concat(row_concat, Fp, 1);
+
+                  ncol += block_size;
+                  VN1_col_splits.push_back(ncol);
+                }
+              }
+
+            }
 
             Matrix UN1, SN1, VN1T; double error;
-            std::tie(UN1, SN1, VN1T, error) = truncated_svd(B, rank);
+            std::tie(UN1, SN1, VN1T, error) = truncated_svd(row_concat, rank);
+            auto VN1T_splits = VN1T.split({}, VN1_col_splits);
 
-            auto VN1T_splits = VN1T.split({}, {rank, rank*2});
+            for (int j = 0; j < block; ++j) {
+              if (is_admissible(block, j)) {
+                Matrix invS_block_j(S(block, j));
+                inverse(invS_block_j);
 
-            Matrix invS30(S(3, 0));
-            inverse(invS30);
-            auto r30 = matmul(matmul(SN1, VN1T_splits[0]), invS30);
+                Matrix r_block_j = matmul(matmul(SN1, VN1T_splits[j]), invS_block_j);
+                Matrix Sbar_block_j = matmul(r_block_j, S(block, j));
 
-            Matrix invS31(S(3, 1));
-            inverse(invS31);
-            auto r31 = matmul(matmul(SN1, VN1T_splits[1]), invS31);
+                Matrix SpF(rank, rank);
+                if (F.exists(block, j)) {
+                  Matrix Fp = matmul(F(3, 1), V(1), false, true);
+                  // SpF = matmul(matmul(UN1, Fp, true, false), V())
+                }
+              }
+            }
 
-            Matrix SpF = matmul(matmul(UN1, Fp, true, false), V(1));
+            // Matrix Fp = matmul(F(3, 1), V(1), false, true);
+            // Matrix B = concat(matmul(U(3), S(3, 0)), matmul(U(3), S(3, 1)), 1);
+            // B = concat(B, Fp, 1);
 
-            Matrix Sbar30 = matmul(r30, S(3, 0));
-            Matrix Sbar31 = matmul(r31, S(3, 1)) + SpF;
+            // Matrix UN1, SN1, VN1T; double error;
+            // std::tie(UN1, SN1, VN1T, error) = truncated_svd(B, rank);
 
-            U.erase(3);
-            U.insert(3, std::move(UN1));
+            // auto VN1T_splits = VN1T.split({}, {rank, rank*2});
 
-            S.erase(3, 0);
-            S.insert(3, 0, std::move(Sbar30));
+            // Matrix invS30(S(3, 0));
+            // inverse(invS30);
+            // auto r30 = matmul(matmul(SN1, VN1T_splits[0]), invS30);
 
-            S.erase(3, 1);
-            S.insert(3, 1, std::move(Sbar31));
+            // Matrix invS31(S(3, 1));
+            // inverse(invS31);
+            // auto r31 = matmul(matmul(SN1, VN1T_splits[1]), invS31);
+
+            // Matrix SpF = matmul(matmul(UN1, Fp, true, false), V(1));
+
+            // Matrix Sbar30 = matmul(r30, S(3, 0));
+            // Matrix Sbar31 = matmul(r31, S(3, 1)) + SpF;
+
+            // U.erase(3);
+            // U.insert(3, std::move(UN1));
+
+            // S.erase(3, 0);
+            // S.insert(3, 0, std::move(Sbar30));
+
+            // S.erase(3, 1);
+            // S.insert(3, 1, std::move(Sbar31));
           }
 
           // Compute for the F(1, 3) block.
@@ -1052,6 +1093,7 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
+  A.print_structure();
   Hatrix::BLR2 A_expected_blr(A);
   double construct_error = A.construction_relative_error(randpts);
   Matrix last; RowColMap<Matrix> F;

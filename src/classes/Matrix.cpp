@@ -158,6 +158,15 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
   std::vector<int64_t> row_split_indices(_row_split_indices),
     col_split_indices(_col_split_indices);
 
+  // Allow specifying vectors where the last element is the value of the dimension.
+  if (row_split_indices.size() > 1 && row_split_indices[row_split_indices.size()-1] == rows) {
+    row_split_indices.pop_back();
+  }
+
+  if (col_split_indices.size() > 1 && col_split_indices[col_split_indices.size()-1] == cols) {
+    col_split_indices.pop_back();
+  }
+
   auto row_iter = row_split_indices.cbegin();
   int64_t row_start = 0;
 
