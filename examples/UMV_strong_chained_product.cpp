@@ -281,10 +281,17 @@ namespace Hatrix {
                 Matrix SpF(rank, rank);
                 if (F.exists(block, j)) {
                   Matrix Fp = matmul(F(3, 1), V(1), false, true);
-                  // SpF = matmul(matmul(UN1, Fp, true, false), V())
+                  SpF = matmul(matmul(UN1, Fp, true, false), V(j));
+                  Sbar_block_j = Sbar_block_j + SpF;
                 }
+
+                S.erase(block, j);
+                S.insert(block, j, std::move(Sbar_block_j));
               }
             }
+
+            U.erase(block);
+            U.insert(block, std::move(UN1));
 
             // Matrix Fp = matmul(F(3, 1), V(1), false, true);
             // Matrix B = concat(matmul(U(3), S(3, 0)), matmul(U(3), S(3, 1)), 1);
