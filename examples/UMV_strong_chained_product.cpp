@@ -308,7 +308,6 @@ namespace Hatrix {
             }
           }
 
-          // Compute for the F(1, 3) block.
           {
             // Scan for fill-ins in the same col as this diagonal block.
             Matrix col_concat(0, block_size);
@@ -318,11 +317,12 @@ namespace Hatrix {
             for (int i = 0; i < block; ++i) {
               if (F.exists(i, block)) {
                 found_col_fill_in = true;
+                break;
               }
             }
 
             if (found_col_fill_in) {
-              for (int i = 0; i < block; ++i) {
+              for (int i = 0; i < nblocks; ++i) {
                 if (is_admissible(i, block)) {
                   col_concat = concat(col_concat, matmul(S(i, block), transpose(V(block))), 0);
 
@@ -344,12 +344,13 @@ namespace Hatrix {
               std::tie(UN2, SN2, VN2T, error) = truncated_svd(col_concat, rank);
               auto UN2_splits = UN2.split(UN2_row_splits, {});
 
-              for (int i = 0; i < block; ++i) {
+              int split_index = 0;
+              for (int i = 0; i < nblocks; ++i) {
                 if (is_admissible(i, block)) {
                   Matrix invS_i_block(S(i, block));
                   inverse(invS_i_block);
 
-                  Matrix t_i_block = matmul(matmul(invS_i_block, UN2_splits[i]), SN2);
+                  Matrix t_i_block = matmul(matmul(invS_i_block, UN2_splits[split_index]), SN2);
                   Matrix Sbar_i_block = matmul(S(i, block), t_i_block);
 
                   Matrix SpF;
@@ -359,8 +360,10 @@ namespace Hatrix {
                     Sbar_i_block = Sbar_i_block + SpF;
 
                     F.erase(i, block);
+                    split_index++;
                   }
 
+                  split_index++;
                   S.erase(i, block);
                   S.insert(i, block, std::move(Sbar_i_block));
                 }
