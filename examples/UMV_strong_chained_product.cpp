@@ -145,15 +145,15 @@ namespace Hatrix {
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, std::abs(i - j) > admis);
-        }
+        // for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, i, std::abs(i - i) > admis);
+        // }
       }
 
-      // is_admissible.insert(0, 1, admis == 1 ? false : true);
-      // is_admissible.insert(1, 0, admis == 1 ? false : true);
-      // is_admissible.insert(1, 2, admis == 1 ? false : true);
-      // is_admissible.insert(2, 1, admis == 1 ? false : true);
+      is_admissible.insert(0, 1, admis == 1 ? false : true);
+      is_admissible.insert(1, 0, admis == 1 ? false : true);
+      is_admissible.insert(1, 2, admis == 1 ? false : true);
+      is_admissible.insert(2, 1, admis == 1 ? false : true);
       // is_admissible.insert(3, 2, admis == 1 ? false : true);
       // is_admissible.insert(2, 3, admis == 1 ? false : true);
 
@@ -241,11 +241,9 @@ namespace Hatrix {
     std::tuple<Matrix, RowColMap<Matrix>> factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       RowColMap<Matrix> F;      // fill-in blocks.
-      int64_t fill_in_rank = 2;
 
       for (int block = 0; block < nblocks; ++block) {
         if (block > 0) {
-          // Compute for the F(3,1) block.
           {
             // Scan for fill-ins in the same row as this diagonal block.
             Matrix row_concat(block_size, 0);
@@ -253,33 +251,40 @@ namespace Hatrix {
             int64_t ncol = 0;
             bool found_row_fill_in = false;
             for (int j = 0; j < block; ++j) {
-              if (is_admissible(block, j)) {
-                row_concat = concat(row_concat, matmul(U(block), S(block, j)), 1);
-
-                ncol += rank;
-                VN1_col_splits.push_back(ncol);
-                if (F.exists(block, j)) {
-                  found_row_fill_in = true;
-                  Matrix Fp = matmul(F(block, j), V(j), false, true);
-                  row_concat = concat(row_concat, Fp, 1);
-
-                  ncol += block_size;
-                  VN1_col_splits.push_back(ncol);
-                }
+              if (F.exists(block, j)) {
+                found_row_fill_in = true;
+                break;
               }
             }
 
             if (found_row_fill_in) {
+              for (int j = 0; j < nblocks; ++j) {
+                if (is_admissible(block, j)) {
+                  row_concat = concat(row_concat, matmul(U(block), S(block, j)), 1);
+
+                  ncol += rank;
+                  VN1_col_splits.push_back(ncol);
+                  if (F.exists(block, j)) {
+                    Matrix Fp = matmul(F(block, j), V(j), false, true);
+                    row_concat = concat(row_concat, Fp, 1);
+
+                    ncol += block_size;
+                    VN1_col_splits.push_back(ncol);
+                  }
+                }
+              }
+
               Matrix UN1, SN1, VN1T; double error;
               std::tie(UN1, SN1, VN1T, error) = truncated_svd(row_concat, rank);
               auto VN1T_splits = VN1T.split({}, VN1_col_splits);
 
-              for (int j = 0; j < block; ++j) {
+              int split_index = 0;
+              for (int j = 0; j < nblocks; ++j) {
                 if (is_admissible(block, j)) {
                   Matrix invS_block_j(S(block, j));
                   inverse(invS_block_j);
 
-                  Matrix r_block_j = matmul(matmul(SN1, VN1T_splits[j]), invS_block_j);
+                  Matrix r_block_j = matmul(matmul(SN1, VN1T_splits[split_index]), invS_block_j);
                   Matrix Sbar_block_j = matmul(r_block_j, S(block, j));
 
                   Matrix SpF(rank, rank);
@@ -287,8 +292,12 @@ namespace Hatrix {
                     Matrix Fp = matmul(F(block, j), V(j), false, true);
                     SpF = matmul(matmul(UN1, Fp, true, false), V(j));
                     Sbar_block_j = Sbar_block_j + SpF;
+                    F.erase(block, j);
+
+                    split_index++;
                   }
 
+                  split_index++;
                   S.erase(block, j);
                   S.insert(block, j, std::move(Sbar_block_j));
                 }
@@ -306,26 +315,30 @@ namespace Hatrix {
             std::vector<int64_t> UN2_row_splits;
             int64_t nrow = 0;
             bool found_col_fill_in = false;
-
             for (int i = 0; i < block; ++i) {
-              if (is_admissible(i, block)) {
-                col_concat = concat(col_concat, matmul(S(i, block), transpose(V(block))), 0);
-
-                nrow += rank;
-                UN2_row_splits.push_back(nrow);
-
-                if (F.exists(i, block)) {
-                  found_col_fill_in = true;
-                  Matrix Fp = matmul(U(i), F(i, block));
-                  col_concat = concat(col_concat, Fp, 0);
-
-                  nrow += block_size;
-                  UN2_row_splits.push_back(nrow);
-                }
+              if (F.exists(i, block)) {
+                found_col_fill_in = true;
               }
             }
 
             if (found_col_fill_in) {
+              for (int i = 0; i < block; ++i) {
+                if (is_admissible(i, block)) {
+                  col_concat = concat(col_concat, matmul(S(i, block), transpose(V(block))), 0);
+
+                  nrow += rank;
+                  UN2_row_splits.push_back(nrow);
+
+                  if (F.exists(i, block)) {
+                    Matrix Fp = matmul(U(i), F(i, block));
+                    col_concat = concat(col_concat, Fp, 0);
+
+                    nrow += block_size;
+                    UN2_row_splits.push_back(nrow);
+                  }
+                }
+              }
+
 
               Matrix UN2, SN2, VN2T; double error;
               std::tie(UN2, SN2, VN2T, error) = truncated_svd(col_concat, rank);
@@ -344,6 +357,8 @@ namespace Hatrix {
                     Matrix Fp = matmul(U(i), F(i, block));
                     SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
+
+                    F.erase(i, block);
                   }
 
                   S.erase(i, block);
@@ -353,7 +368,6 @@ namespace Hatrix {
 
               V.erase(block);
               V.insert(block, transpose(VN2T));
-
             }
           }
         }
@@ -447,16 +461,6 @@ namespace Hatrix {
                                                  block_size - V(j).cols);
                 matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
               }
-              else {
-                // Generate the fill-in block that holds the product here and that from
-                // Schur's compliment present below this block.
-                // Matrix fill_in(block_size, block_size);
-                // auto fill_splits = SPLIT_DENSE(fill_in,
-                //                                block_size - U(i).cols,
-                //                                block_size - V(j).cols);
-                // matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, -1.0, 1.0);
-                // F.insert(i, j, std::move(fill_in));
-              }
             }
           }
         }
@@ -496,7 +500,7 @@ namespace Hatrix {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
               auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
               auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
-              // Schur's compliement between co and cc blocks where product exists as dense.
+              // Schur's compliement between oc and cc blocks where product exists as dense.
               if (!is_admissible(i, j)) {
                 auto reduce_splits = SPLIT_DENSE(D(i, j),
                                                  block_size - U(i).cols,
@@ -519,41 +523,6 @@ namespace Hatrix {
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
-
-      // Append zeros to admissible blocks in the same row as a fill-in. This is detected
-      // when there is a dimension mismatch between the number of bases and the nrows of
-      // S block.
-      // for (int ib = 0; ib < nblocks; ++ib) {
-      //   int64_t row_rank = U(ib).cols;
-      //   for (int jb = 0; jb < nblocks; ++jb) {
-      //     int64_t col_rank = V(jb).cols;
-      //     if (is_admissible(ib, jb)) {
-      //       Matrix& oldS = S(ib, jb);
-      //       Matrix newS(row_rank, col_rank);
-      //       if (S(ib, jb).rows != row_rank || S(ib, jb).cols != col_rank) {
-      //         // Zero-pad the rows of this S block.
-      //         for (int i = 0; i < oldS.rows; ++i) {
-      //           for (int j = 0; j < oldS.cols; ++j) {
-      //             newS(i, j) = oldS(i, j);
-      //           }
-      //         }
-
-      //         S.erase(ib, jb);
-      //         S.insert(ib, jb, std::move(newS));
-      //       }
-      //     }
-      //   }
-      // }
-
-      // // Update S blocks for admissible blocks that have fill-ins.
-      // for (int i = 0; i < nblocks; ++i) {
-      //   for (int j = 0; j < nblocks; ++j) {
-      //     if (F.exists(i, j)) {
-      //       Matrix& newS = S(i, j);
-      //       newS = S(i, j) + matmul(matmul(U(i), F(i, j), true), V(j));
-      //     }
-      //   }
-      // }
 
       // Merge unfactorized portions.
       std::vector<int64_t> row_splits, col_splits;
@@ -972,47 +941,19 @@ Matrix chain_product(BLR2& A,
                      std::vector<Matrix>& V_F) {
   Matrix product(A.N, A.N);
 
-  // product = matmul(U_F[0], U_F[1]);
-  // product = matmul(product, U_F[2]);
-  // product = matmul(product, U_F[3]);
-
-
-  // product = matmul(product, L[0]);
-  // product = matmul(product, L[1]);
-  // product = matmul(product, L[2]);
-  // product = matmul(product, L[3]);
-
   product = matmul(U_F[0], L[0]);
-  product = matmul(product, U_F[1]);
-  product = matmul(product, L[1]);
-  product = matmul(product, U_F[2]);
-  product = matmul(product, L[2]);
-  product = matmul(product, U_F[3]);
-  product = matmul(product, L[3]);
-
 
   // Multiply UF and L blocks.
-  // for (int i = 1; i < 2; ++i) {
-  //   product = matmul(product, U_F[i]);
-  // }
-
-  // for (int i = 1; i < 2; ++i) {
-  //   product = matmul(product, L[i]);
-  // }
-
-  // product = matmul(product, L[2]);
-  // product = matmul(product, U_F[2]);
+  for (int i = 1; i < A.nblocks; ++i) {
+    product = matmul(product, U_F[i]);
+    product = matmul(product, L[i]);
+  }
 
   product = matmul(product, L0);
   product = matmul(product, U0);
 
-
-
   for (int i = A.nblocks-1; i >= 0; --i) {
     product = matmul(product, U[i]);
-  }
-
-  for (int i = A.nblocks-1; i >= 0; --i) {
     product = matmul(product, V_F[i]);
   }
 
