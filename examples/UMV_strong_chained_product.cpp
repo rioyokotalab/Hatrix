@@ -150,6 +150,8 @@ namespace Hatrix {
         }
       }
 
+      // is_admissible.insert(0, 1, admis == 1 ? false : true);
+      // is_admissible.insert(1, 0, admis == 1 ? false : true);
       // is_admissible.insert(1, 2, admis == 1 ? false : true);
       // is_admissible.insert(2, 1, admis == 1 ? false : true);
       // is_admissible.insert(3, 2, admis == 1 ? false : true);
@@ -242,13 +244,14 @@ namespace Hatrix {
       int64_t fill_in_rank = 2;
 
       for (int block = 0; block < nblocks; ++block) {
-        if (block == 3 && admis == 1 && F.exists(3,1) && F.exists(1, 3)) {
+        if (block > 0) {
           // Compute for the F(3,1) block.
           {
             // Scan for fill-ins in the same row as this diagonal block.
             Matrix row_concat(block_size, 0);
             std::vector<int64_t> VN1_col_splits;
             int64_t ncol = 0;
+            bool found_row_fill_in = false;
             for (int j = 0; j < block; ++j) {
               if (is_admissible(block, j)) {
                 row_concat = concat(row_concat, matmul(U(block), S(block, j)), 1);
@@ -256,7 +259,8 @@ namespace Hatrix {
                 ncol += rank;
                 VN1_col_splits.push_back(ncol);
                 if (F.exists(block, j)) {
-                  Matrix Fp = matmul(F(3, 1), V(1), false, true);
+                  found_row_fill_in = true;
+                  Matrix Fp = matmul(F(block, j), V(j), false, true);
                   row_concat = concat(row_concat, Fp, 1);
 
                   ncol += block_size;
@@ -265,32 +269,34 @@ namespace Hatrix {
               }
             }
 
-            Matrix UN1, SN1, VN1T; double error;
-            std::tie(UN1, SN1, VN1T, error) = truncated_svd(row_concat, rank);
-            auto VN1T_splits = VN1T.split({}, VN1_col_splits);
+            if (found_row_fill_in) {
+              Matrix UN1, SN1, VN1T; double error;
+              std::tie(UN1, SN1, VN1T, error) = truncated_svd(row_concat, rank);
+              auto VN1T_splits = VN1T.split({}, VN1_col_splits);
 
-            for (int j = 0; j < block; ++j) {
-              if (is_admissible(block, j)) {
-                Matrix invS_block_j(S(block, j));
-                inverse(invS_block_j);
+              for (int j = 0; j < block; ++j) {
+                if (is_admissible(block, j)) {
+                  Matrix invS_block_j(S(block, j));
+                  inverse(invS_block_j);
 
-                Matrix r_block_j = matmul(matmul(SN1, VN1T_splits[j]), invS_block_j);
-                Matrix Sbar_block_j = matmul(r_block_j, S(block, j));
+                  Matrix r_block_j = matmul(matmul(SN1, VN1T_splits[j]), invS_block_j);
+                  Matrix Sbar_block_j = matmul(r_block_j, S(block, j));
 
-                Matrix SpF(rank, rank);
-                if (F.exists(block, j)) {
-                  Matrix Fp = matmul(F(3, 1), V(1), false, true);
-                  SpF = matmul(matmul(UN1, Fp, true, false), V(j));
-                  Sbar_block_j = Sbar_block_j + SpF;
+                  Matrix SpF(rank, rank);
+                  if (F.exists(block, j)) {
+                    Matrix Fp = matmul(F(block, j), V(j), false, true);
+                    SpF = matmul(matmul(UN1, Fp, true, false), V(j));
+                    Sbar_block_j = Sbar_block_j + SpF;
+                  }
+
+                  S.erase(block, j);
+                  S.insert(block, j, std::move(Sbar_block_j));
                 }
-
-                S.erase(block, j);
-                S.insert(block, j, std::move(Sbar_block_j));
               }
-            }
 
-            U.erase(block);
-            U.insert(block, std::move(UN1));
+              U.erase(block);
+              U.insert(block, std::move(UN1));
+            }
 
             // Matrix Fp = matmul(F(3, 1), V(1), false, true);
             // Matrix B = concat(matmul(U(3), S(3, 0)), matmul(U(3), S(3, 1)), 1);
@@ -330,6 +336,7 @@ namespace Hatrix {
             Matrix col_concat(0, block_size);
             std::vector<int64_t> UN2_row_splits;
             int64_t nrow = 0;
+            bool found_col_fill_in = false;
 
             for (int i = 0; i < block; ++i) {
               if (is_admissible(i, block)) {
@@ -339,6 +346,7 @@ namespace Hatrix {
                 UN2_row_splits.push_back(nrow);
 
                 if (F.exists(i, block)) {
+                  found_col_fill_in = true;
                   Matrix Fp = matmul(U(i), F(i, block));
                   col_concat = concat(col_concat, Fp, 0);
 
@@ -348,32 +356,36 @@ namespace Hatrix {
               }
             }
 
-            Matrix UN2, SN2, VN2T; double error;
-            std::tie(UN2, SN2, VN2T, error) = truncated_svd(col_concat, rank);
-            auto UN2_splits = UN2.split(UN2_row_splits, {});
+            if (found_col_fill_in) {
 
-            for (int i = 0; i < block; ++i) {
-              if (is_admissible(i, block)) {
-                Matrix invS_i_block(S(i, block));
-                inverse(invS_i_block);
+              Matrix UN2, SN2, VN2T; double error;
+              std::tie(UN2, SN2, VN2T, error) = truncated_svd(col_concat, rank);
+              auto UN2_splits = UN2.split(UN2_row_splits, {});
 
-                Matrix t_i_block = matmul(matmul(invS_i_block, UN2_splits[i]), SN2);
-                Matrix Sbar_i_block = matmul(S(i, block), t_i_block);
+              for (int i = 0; i < block; ++i) {
+                if (is_admissible(i, block)) {
+                  Matrix invS_i_block(S(i, block));
+                  inverse(invS_i_block);
 
-                Matrix SpF;
-                if (F.exists(i, block)) {
-                  Matrix Fp = matmul(U(i), F(i, block));
-                  SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
-                  Sbar_i_block = Sbar_i_block + SpF;
+                  Matrix t_i_block = matmul(matmul(invS_i_block, UN2_splits[i]), SN2);
+                  Matrix Sbar_i_block = matmul(S(i, block), t_i_block);
+
+                  Matrix SpF;
+                  if (F.exists(i, block)) {
+                    Matrix Fp = matmul(U(i), F(i, block));
+                    SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
+                    Sbar_i_block = Sbar_i_block + SpF;
+                  }
+
+                  S.erase(i, block);
+                  S.insert(i, block, std::move(Sbar_i_block));
                 }
-
-                S.erase(i, block);
-                S.insert(i, block, std::move(Sbar_i_block));
               }
-            }
 
-            V.erase(block);
-            V.insert(block, transpose(VN2T));
+              V.erase(block);
+              V.insert(block, transpose(VN2T));
+
+            }
 
             // Matrix Fp = matmul(U(1), F(1, 3));
             // Matrix B = concat(matmul(S(0, 3), V(3), false, true),
