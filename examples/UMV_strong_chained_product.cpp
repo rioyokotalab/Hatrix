@@ -145,15 +145,15 @@ namespace Hatrix {
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
-         // for (int j = 0; j < nblocks; ++j) {
-        is_admissible.insert(i, i, std::abs(i - i) > admis);
-         // }
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::abs(i - j) > admis);
+        }
       }
 
-      is_admissible.insert(1, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 1, admis == 1 ? false : true);
-      is_admissible.insert(3, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 3, admis == 1 ? false : true);
+      // is_admissible.insert(1, 2, admis == 1 ? false : true);
+      // is_admissible.insert(2, 1, admis == 1 ? false : true);
+      // is_admissible.insert(3, 2, admis == 1 ? false : true);
+      // is_admissible.insert(2, 3, admis == 1 ? false : true);
 
 
       for (int i = 0; i < nblocks; ++i) {
@@ -263,7 +263,6 @@ namespace Hatrix {
                   VN1_col_splits.push_back(ncol);
                 }
               }
-
             }
 
             Matrix UN1, SN1, VN1T; double error;
@@ -327,37 +326,86 @@ namespace Hatrix {
 
           // Compute for the F(1, 3) block.
           {
-            Matrix Fp = matmul(U(1), F(1, 3));
-            Matrix B = concat(matmul(S(0, 3), V(3), false, true),
-                              matmul(S(1, 3), V(3), false, true), 0);
-            B = concat(B, Fp, 0);
+            // Scan for fill-ins in the same col as this diagonal block.
+            Matrix col_concat(0, block_size);
+            std::vector<int64_t> UN2_row_splits;
+            int64_t nrow = 0;
+
+            for (int i = 0; i < block; ++i) {
+              if (is_admissible(i, block)) {
+                col_concat = concat(col_concat, matmul(S(i, block), transpose(V(block))), 0);
+
+                nrow += rank;
+                UN2_row_splits.push_back(nrow);
+
+                if (F.exists(i, block)) {
+                  Matrix Fp = matmul(U(i), F(i, block));
+                  col_concat = concat(col_concat, Fp, 0);
+
+                  nrow += block_size;
+                  UN2_row_splits.push_back(nrow);
+                }
+              }
+            }
 
             Matrix UN2, SN2, VN2T; double error;
-            std::tie(UN2, SN2, VN2T, error) = truncated_svd(B, rank);
+            std::tie(UN2, SN2, VN2T, error) = truncated_svd(col_concat, rank);
+            auto UN2_splits = UN2.split(UN2_row_splits, {});
 
-            auto UN2_splits = UN2.split({rank, rank*2}, {});
+            for (int i = 0; i < block; ++i) {
+              if (is_admissible(i, block)) {
+                Matrix invS_i_block(S(i, block));
+                inverse(invS_i_block);
 
-            Matrix invS03(S(0, 3));
-            inverse(invS03);
-            auto t03 = matmul(matmul(invS03, UN2_splits[0]), SN2);
+                Matrix t_i_block = matmul(matmul(invS_i_block, UN2_splits[i]), SN2);
+                Matrix Sbar_i_block = matmul(S(i, block), t_i_block);
 
-            Matrix invS13(S(1, 3));
-            inverse(invS13);
-            auto t13 = matmul(matmul(invS13, UN2_splits[1]), SN2);
+                Matrix SpF;
+                if (F.exists(i, block)) {
+                  Matrix Fp = matmul(U(i), F(i, block));
+                  SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
+                  Sbar_i_block = Sbar_i_block + SpF;
+                }
 
-            Matrix SpF = matmul(matmul(U(1), Fp, true, false), VN2T, false, true);
+                S.erase(i, block);
+                S.insert(i, block, std::move(Sbar_i_block));
+              }
+            }
 
-            auto Sbar03 = matmul(S(0, 3), t03);
-            auto Sbar13 = matmul(S(1, 3), t13) + SpF;
+            V.erase(block);
+            V.insert(block, transpose(VN2T));
 
-            V.erase(3);
-            V.insert(3, transpose(VN2T));
+            // Matrix Fp = matmul(U(1), F(1, 3));
+            // Matrix B = concat(matmul(S(0, 3), V(3), false, true),
+            //                   matmul(S(1, 3), V(3), false, true), 0);
+            // B = concat(B, Fp, 0);
 
-            S.erase(0, 3);
-            S.insert(0, 3, std::move(Sbar03));
+            // Matrix UN2, SN2, VN2T; double error;
+            // std::tie(UN2, SN2, VN2T, error) = truncated_svd(B, rank);
 
-            S.erase(1, 3);
-            S.insert(1, 3, std::move(Sbar13));
+            // auto UN2_splits = UN2.split({rank, rank*2}, {});
+
+            // Matrix invS03(S(0, 3));
+            // inverse(invS03);
+            // auto t03 = matmul(matmul(invS03, UN2_splits[0]), SN2);
+
+            // Matrix invS13(S(1, 3));
+            // inverse(invS13);
+            // auto t13 = matmul(matmul(invS13, UN2_splits[1]), SN2);
+
+            // Matrix SpF = matmul(matmul(U(1), Fp, true, false), VN2T, false, true);
+
+            // auto Sbar03 = matmul(S(0, 3), t03);
+            // auto Sbar13 = matmul(S(1, 3), t13) + SpF;
+
+            // V.erase(3);
+            // V.insert(3, transpose(VN2T));
+
+            // S.erase(0, 3);
+            // S.insert(0, 3, std::move(Sbar03));
+
+            // S.erase(1, 3);
+            // S.insert(1, 3, std::move(Sbar13));
 
           }
         }
@@ -1127,15 +1175,14 @@ int main(int argc, char** argv) {
   auto d_splits = diff.split(A.nblocks, A.nblocks);
   auto m_splits = A_expected.split(A.nblocks, A.nblocks);
 
-  int idx = 3 * A.nblocks + 1;
-  std::cout << "(3,1) block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+  int idx;
 
-  idx = 1 * A.nblocks + 3;
-  std::cout << "(1,3) block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
-
-  idx = 3 * A.nblocks + 3;
-  std::cout << "(3,3) block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
-
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      int idx = i * A.nblocks + j;
+      std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+    }
+  }
 
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 
