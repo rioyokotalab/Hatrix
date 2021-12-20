@@ -297,37 +297,6 @@ namespace Hatrix {
               U.erase(block);
               U.insert(block, std::move(UN1));
             }
-
-            // Matrix Fp = matmul(F(3, 1), V(1), false, true);
-            // Matrix B = concat(matmul(U(3), S(3, 0)), matmul(U(3), S(3, 1)), 1);
-            // B = concat(B, Fp, 1);
-
-            // Matrix UN1, SN1, VN1T; double error;
-            // std::tie(UN1, SN1, VN1T, error) = truncated_svd(B, rank);
-
-            // auto VN1T_splits = VN1T.split({}, {rank, rank*2});
-
-            // Matrix invS30(S(3, 0));
-            // inverse(invS30);
-            // auto r30 = matmul(matmul(SN1, VN1T_splits[0]), invS30);
-
-            // Matrix invS31(S(3, 1));
-            // inverse(invS31);
-            // auto r31 = matmul(matmul(SN1, VN1T_splits[1]), invS31);
-
-            // Matrix SpF = matmul(matmul(UN1, Fp, true, false), V(1));
-
-            // Matrix Sbar30 = matmul(r30, S(3, 0));
-            // Matrix Sbar31 = matmul(r31, S(3, 1)) + SpF;
-
-            // U.erase(3);
-            // U.insert(3, std::move(UN1));
-
-            // S.erase(3, 0);
-            // S.insert(3, 0, std::move(Sbar30));
-
-            // S.erase(3, 1);
-            // S.insert(3, 1, std::move(Sbar31));
           }
 
           // Compute for the F(1, 3) block.
@@ -386,39 +355,6 @@ namespace Hatrix {
               V.insert(block, transpose(VN2T));
 
             }
-
-            // Matrix Fp = matmul(U(1), F(1, 3));
-            // Matrix B = concat(matmul(S(0, 3), V(3), false, true),
-            //                   matmul(S(1, 3), V(3), false, true), 0);
-            // B = concat(B, Fp, 0);
-
-            // Matrix UN2, SN2, VN2T; double error;
-            // std::tie(UN2, SN2, VN2T, error) = truncated_svd(B, rank);
-
-            // auto UN2_splits = UN2.split({rank, rank*2}, {});
-
-            // Matrix invS03(S(0, 3));
-            // inverse(invS03);
-            // auto t03 = matmul(matmul(invS03, UN2_splits[0]), SN2);
-
-            // Matrix invS13(S(1, 3));
-            // inverse(invS13);
-            // auto t13 = matmul(matmul(invS13, UN2_splits[1]), SN2);
-
-            // Matrix SpF = matmul(matmul(U(1), Fp, true, false), VN2T, false, true);
-
-            // auto Sbar03 = matmul(S(0, 3), t03);
-            // auto Sbar13 = matmul(S(1, 3), t13) + SpF;
-
-            // V.erase(3);
-            // V.insert(3, transpose(VN2T));
-
-            // S.erase(0, 3);
-            // S.insert(0, 3, std::move(Sbar03));
-
-            // S.erase(1, 3);
-            // S.insert(1, 3, std::move(Sbar13));
-
           }
         }
 
