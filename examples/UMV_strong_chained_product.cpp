@@ -281,12 +281,9 @@ namespace Hatrix {
                   Matrix SpF(rank, rank);
                   if (F.exists(block, j)) {
                     Matrix Fp = matmul(F(block, j), V(j), false, true);
-
                     SpF = matmul(matmul(UN1, Fp, true, false), V(j));
                     Sbar_block_j = Sbar_block_j + SpF;
                   }
-
-                  std::cout << "UPDATE ROW S: " << block << ", " << j << std::endl;
 
                   S.erase(block, j);
                   S.insert(block, j, std::move(Sbar_block_j));
@@ -336,11 +333,8 @@ namespace Hatrix {
                     Matrix Fp = matmul(U(i), F(i, block));
                     Matrix SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
-
                     F.erase(i, block);
                   }
-
-                  // std::cout << "UPDATE S COL: " << i << ", " << block << std::endl;
 
                   S.erase(i, block);
                   S.insert(i, block, std::move(Sbar_i_block));
@@ -1005,8 +999,8 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -1016,7 +1010,7 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  A.print_structure();
+  // A.print_structure();
   Hatrix::BLR2 A_expected_blr(A);
   double construct_error = A.construction_relative_error(randpts);
   Matrix last; RowColMap<Matrix> F;
@@ -1045,12 +1039,12 @@ int main(int argc, char** argv) {
 
   int idx;
 
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      int idx = i * A.nblocks + j;
-      std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
-    }
-  }
+  // for (int i = 0; i < nblocks; ++i) {
+  //   for (int j = 0; j < nblocks; ++j) {
+  //     int idx = i * A.nblocks + j;
+  //     std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+  //   }
+  // }
 
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 
