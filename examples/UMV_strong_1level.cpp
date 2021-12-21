@@ -16,7 +16,7 @@
 // Accuracy Directly Controlled Fast Direct Solution of General H^2-matrices and Its
 // Application to Solving Electrodynamics Volume Integral Equations
 
-constexpr double PV = 1e-3;
+constexpr double PV = 1;
 using randvec_t = std::vector<std::vector<double> >;
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
@@ -408,6 +408,9 @@ namespace Hatrix {
           }
         }
 
+
+
+
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
@@ -423,15 +426,25 @@ namespace Hatrix {
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               // The product is a (co; oo)-sized matrix.
               else {
-                Matrix fill_in(block_size, rank);
-                auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
-                // Update the co block within the fill-in.
-                matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
+                if (!F.exists(i, j)) {
+                  Matrix fill_in(block_size, rank);
+                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
+                  // Update the co block within the fill-in.
+                  matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
 
-                // Update the oo block within the fill-in.
-                matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-in.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
 
-                F.insert(i, j, std::move(fill_in));
+                  F.insert(i, j, std::move(fill_in));
+                }
+                else {
+                  Matrix &fill_in = F(i, j);
+                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
+                  // Update the co block within the fill-in.
+                  matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-in.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                }
               }
             }
           }
@@ -454,18 +467,27 @@ namespace Hatrix {
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               // The product is a (oc, oo)-sized block.
               else {
-                Matrix fill_in(rank, block_size);
-                auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
-                // Update the oc block within the fill-ins.
-                matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
-                // Update the oo block within the fill-ins.
-                matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
-                F.insert(i, j, std::move(fill_in));
+                if (!F.exists(i, j)) {
+                  Matrix fill_in(rank, block_size);
+                  auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                  F.insert(i, j, std::move(fill_in));
+                }
+                else {
+                  Matrix& fill_in = F(i, j);
+                  auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                }
               }
             }
           }
         }
-
       } // for (int block = 0; block < nblocks; ++block)
 
       // Merge unfactorized portions.
@@ -676,9 +698,9 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
   randvec_t randpts;
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  // randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 2D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
