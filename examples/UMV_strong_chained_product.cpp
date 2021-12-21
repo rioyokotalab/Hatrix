@@ -145,19 +145,19 @@ namespace Hatrix {
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
-        // for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, i, std::abs(i - i) > admis);
-        // }
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::abs(i - j) > admis);
+        }
       }
 
-      is_admissible.insert(0, 1, admis == 1 ? false : true);
-      is_admissible.insert(1, 0, admis == 1 ? false : true);
-      is_admissible.insert(1, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 1, admis == 1 ? false : true);
-      is_admissible.insert(3, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 3, admis == 1 ? false : true);
-      is_admissible.insert(4, 3, admis == 1 ? false : true);
-      is_admissible.insert(3, 4, admis == 1 ? false : true);
+      // is_admissible.insert(0, 1, admis == 1 ? false : true);
+      // is_admissible.insert(1, 0, admis == 1 ? false : true);
+      // is_admissible.insert(1, 2, admis == 1 ? false : true);
+      // is_admissible.insert(2, 1, admis == 1 ? false : true);
+      // is_admissible.insert(3, 2, admis == 1 ? false : true);
+      // is_admissible.insert(2, 3, admis == 1 ? false : true);
+      // is_admissible.insert(4, 3, admis == 1 ? false : true);
+      // is_admissible.insert(3, 4, admis == 1 ? false : true);
 
 
 
@@ -251,7 +251,6 @@ namespace Hatrix {
             // Scan for fill-ins in the same row as this diagonal block.
             Matrix row_concat(block_size, 0);
             std::vector<int64_t> VN1_col_splits;
-            int64_t ncol = 0;
             bool found_row_fill_in = false;
             for (int j = 0; j < nblocks; ++j) {
               if (F.exists(block, j)) {
@@ -264,7 +263,6 @@ namespace Hatrix {
               for (int j = 0; j < nblocks; ++j) {
                 if (is_admissible(block, j)) {
                   row_concat = concat(row_concat, matmul(U(block), S(block, j)), 1);
-                  ncol += rank;
                   if (F.exists(block, j)) {
                     Matrix Fp = matmul(F(block, j), V(j), false, true);
                     row_concat = concat(row_concat, Fp, 1);
@@ -275,7 +273,6 @@ namespace Hatrix {
               Matrix UN1, _SN1, _VN1T; double error;
               std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
-              int split_index = 0;
               for (int j = 0; j < nblocks; ++j) {
                 if (is_admissible(block, j)) {
                   Matrix r_block_j = matmul(UN1, U(block), true, false);
@@ -283,14 +280,14 @@ namespace Hatrix {
 
                   Matrix SpF(rank, rank);
                   if (F.exists(block, j)) {
-                    split_index++;
                     Matrix Fp = matmul(F(block, j), V(j), false, true);
 
                     SpF = matmul(matmul(UN1, Fp, true, false), V(j));
                     Sbar_block_j = Sbar_block_j + SpF;
                   }
 
-                  split_index++;
+                  std::cout << "UPDATE ROW S: " << block << ", " << j << std::endl;
+
                   S.erase(block, j);
                   S.insert(block, j, std::move(Sbar_block_j));
 
@@ -309,7 +306,6 @@ namespace Hatrix {
             // Scan for fill-ins in the same col as this diagonal block.
             Matrix col_concat(0, block_size);
             std::vector<int64_t> UN2_row_splits;
-            int64_t nrow = 0;
             bool found_col_fill_in = false;
             for (int i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
@@ -332,13 +328,11 @@ namespace Hatrix {
               Matrix _UN2, _SN2, VN2T; double error;
               std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
 
-              int split_index = 0;
               for (int i = 0; i < nblocks; ++i) {
                 if (is_admissible(i, block)) {
                   Matrix t_i_block = matmul(V(block), VN2T, true, true);
                   Matrix Sbar_i_block = matmul(S(i, block), t_i_block);
                   if (F.exists(i, block)) {
-                    split_index++;
                     Matrix Fp = matmul(U(i), F(i, block));
                     Matrix SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
@@ -346,7 +340,8 @@ namespace Hatrix {
                     F.erase(i, block);
                   }
 
-                  split_index++;
+                  // std::cout << "UPDATE S COL: " << i << ", " << block << std::endl;
+
                   S.erase(i, block);
                   S.insert(i, block, std::move(Sbar_i_block));
                 }
