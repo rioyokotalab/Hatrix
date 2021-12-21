@@ -119,16 +119,10 @@ namespace Hatrix {
 
 
       for (int i = 0; i < nblocks; ++i) {
-        // for (int j = 0; j < nblocks; ++j) {
-        is_admissible.insert(i, i, std::abs(i - i) > admis);
-        // }
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::abs(i - j) > admis);
+        }
       }
-
-      is_admissible.insert(1, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 1, admis == 1 ? false : true);
-
-      is_admissible.insert(3, 2, admis == 1 ? false : true);
-      is_admissible.insert(2, 3, admis == 1 ? false : true);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
