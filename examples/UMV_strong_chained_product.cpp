@@ -249,7 +249,6 @@ namespace Hatrix {
         if (block > 0) {
           {
             // Scan for fill-ins in the same row as this diagonal block.
-            std::cout << "START BLOCK: " << block << std::endl;
             Matrix row_concat(block_size, 0);
             std::vector<int64_t> VN1_col_splits;
             bool found_row_fill_in = false;
