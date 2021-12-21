@@ -264,69 +264,35 @@ namespace Hatrix {
               for (int j = 0; j < nblocks; ++j) {
                 if (is_admissible(block, j)) {
                   row_concat = concat(row_concat, matmul(U(block), S(block, j)), 1);
-
                   ncol += rank;
-                  VN1_col_splits.push_back(ncol);
                   if (F.exists(block, j)) {
                     Matrix Fp = matmul(F(block, j), V(j), false, true);
                     row_concat = concat(row_concat, Fp, 1);
-
-                    ncol += block_size;
-                    VN1_col_splits.push_back(ncol);
                   }
                 }
               }
 
-              Matrix UN1, SN1, VN1T; double error;
-              std::tie(UN1, SN1, VN1T, error) = truncated_svd(row_concat, rank);
-              auto VN1T_splits = VN1T.split({}, VN1_col_splits);
+              Matrix UN1, _SN1, _VN1T; double error;
+              std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
               int split_index = 0;
               for (int j = 0; j < nblocks; ++j) {
                 if (is_admissible(block, j)) {
-                  Matrix invS_block_j(S(block, j));
-                  inverse(invS_block_j);
-
-                  Matrix r_block_j = matmul(matmul(SN1, VN1T_splits[split_index]), invS_block_j);
+                  Matrix r_block_j = matmul(UN1, U(block), true, false);
                   Matrix Sbar_block_j = matmul(r_block_j, S(block, j));
 
                   Matrix SpF(rank, rank);
-                  int f_index;
                   if (F.exists(block, j)) {
                     split_index++;
-                    Matrix Fp = matmul(matmul(UN1, SN1), VN1T_splits[split_index]);
-                    // Matrix Fp = matmul(F(block, j), V(j), false, true);
+                    Matrix Fp = matmul(F(block, j), V(j), false, true);
 
                     SpF = matmul(matmul(UN1, Fp, true, false), V(j));
                     Sbar_block_j = Sbar_block_j + SpF;
-
                   }
-
-                  // std::cout << "BLOCK: <" << block << "," << j << ">\n" ;
-
-                  // std::cout << "Norm V: b-> " << block << " e->" <<
-                  //   norm(generate_identity_matrix(rank, rank) -
-                  //        matmul(V(j), V(j), true, false)) << std::endl;
-                  // std::cout << "Norm U: b-> " << block << " e->" <<
-                  //   norm(generate_identity_matrix(rank, rank) -
-                  //        matmul(U(block), U(block), true, false)) << std::endl;
 
                   split_index++;
                   S.erase(block, j);
                   S.insert(block, j, std::move(Sbar_block_j));
-
-                  if (block == nblocks-1 && F.exists(block, j)) {
-                    Matrix A_block_j = Hatrix::generate_laplacend_matrix(randpts,
-                                                                         block_size, block_size,
-                                                                         block * block_size,
-                                                                         j * block_size, PV);
-                    auto Fp = matmul(F(block, j), V(j), false, true);
-                    Matrix Sbar_block_j = matmul(matmul(UN1, A_block_j, true, false), V(j)) +
-                      matmul(matmul(UN1, Fp, true, false), V(j));
-
-                    // S.erase(block, j);
-                    // S.insert(block, j, std::move(Sbar_block_j));
-                  }
 
                   if (F.exists(block, j)) {
                     F.erase(block, j);
@@ -356,38 +322,25 @@ namespace Hatrix {
               for (int i = 0; i < nblocks; ++i) {
                 if (is_admissible(i, block)) {
                   col_concat = concat(col_concat, matmul(S(i, block), transpose(V(block))), 0);
-
-                  nrow += rank;
-                  UN2_row_splits.push_back(nrow);
-
                   if (F.exists(i, block)) {
                     Matrix Fp = matmul(U(i), F(i, block));
                     col_concat = concat(col_concat, Fp, 0);
-
-                    nrow += block_size;
-                    UN2_row_splits.push_back(nrow);
                   }
                 }
               }
 
-              Matrix UN2, SN2, VN2T; double error;
-              std::tie(UN2, SN2, VN2T, error) = truncated_svd(col_concat, rank);
-              auto UN2_splits = UN2.split(UN2_row_splits, {});
+              Matrix _UN2, _SN2, VN2T; double error;
+              std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
 
               int split_index = 0;
               for (int i = 0; i < nblocks; ++i) {
                 if (is_admissible(i, block)) {
-                  Matrix invS_i_block(S(i, block));
-                  inverse(invS_i_block);
-
-                  Matrix t_i_block = matmul(matmul(invS_i_block, UN2_splits[split_index]), SN2);
+                  Matrix t_i_block = matmul(V(block), VN2T, true, true);
                   Matrix Sbar_i_block = matmul(S(i, block), t_i_block);
-
-                  Matrix SpF;
                   if (F.exists(i, block)) {
                     split_index++;
-                    Matrix Fp = matmul(matmul(UN2_splits[split_index], SN2), VN2T);
-                    SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
+                    Matrix Fp = matmul(U(i), F(i, block));
+                    Matrix SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
 
                     F.erase(i, block);
@@ -398,7 +351,6 @@ namespace Hatrix {
                   S.insert(i, block, std::move(Sbar_i_block));
                 }
               }
-
               V.erase(block);
               V.insert(block, transpose(VN2T));
             }
