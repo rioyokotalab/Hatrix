@@ -163,9 +163,9 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (!is_admissible.exists(i, j)) {
-            is_admissible.insert(i, j, true);
-          }
+          // if (!is_admissible.exists(i, j)) {
+          //   is_admissible.insert(i, j, true);
+          // }
           if (!is_admissible(i, j)) {
             D.insert(i, j,
                      Hatrix::generate_laplacend_matrix(randpts,
@@ -249,6 +249,7 @@ namespace Hatrix {
         if (block > 0) {
           {
             // Scan for fill-ins in the same row as this diagonal block.
+            std::cout << "START BLOCK: " << block << std::endl;
             Matrix row_concat(block_size, 0);
             std::vector<int64_t> VN1_col_splits;
             bool found_row_fill_in = false;
@@ -289,6 +290,7 @@ namespace Hatrix {
                   S.insert(block, j, std::move(Sbar_block_j));
 
                   if (F.exists(block, j)) {
+                    std::cout << "F ERASE: b-> " << block << " j-> " << j << std::endl;
                     F.erase(block, j);
                   }
                 }
@@ -333,6 +335,8 @@ namespace Hatrix {
                     Matrix Fp = matmul(U(i), F(i, block));
                     Matrix SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
+
+                    std::cout << "FILL IN erase i-> " << i << " bl -> " << block << std::endl;
                     F.erase(i, block);
                   }
 
@@ -454,15 +458,25 @@ namespace Hatrix {
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               // The product is a (co; oo)-sized matrix.
               else {
-                Matrix fill_in(block_size, rank);
-                auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
-                // Update the co block within the fill-in.
-                matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
+                if (!F.exists(i, j)) {
+                  Matrix fill_in(block_size, rank);
+                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
+                  // Update the co block within the fill-in.
+                  matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
 
-                // Update the oo block within the fill-in.
-                matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-in.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
 
-                F.insert(i, j, std::move(fill_in));
+                  F.insert(i, j, std::move(fill_in));
+                }
+                else {
+                  Matrix &fill_in = F(i, j);
+                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
+                  // Update the co block within the fill-in.
+                  matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-in.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                }
               }
             }
           }
@@ -485,13 +499,23 @@ namespace Hatrix {
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               // The product is a (oc, oo)-sized block.
               else {
-                Matrix fill_in(rank, block_size);
-                auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
-                // Update the oc block within the fill-ins.
-                matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
-                // Update the oo block within the fill-ins.
-                matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
-                F.insert(i, j, std::move(fill_in));
+                if (!F.exists(i, j)) {
+                  Matrix fill_in(rank, block_size);
+                  auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                  F.insert(i, j, std::move(fill_in));
+                }
+                else {
+                  Matrix& fill_in = F(i, j);
+                  auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                }
               }
             }
           }
@@ -1010,7 +1034,7 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  // A.print_structure();
+  A.print_structure();
   Hatrix::BLR2 A_expected_blr(A);
   double construct_error = A.construction_relative_error(randpts);
   Matrix last; RowColMap<Matrix> F;
