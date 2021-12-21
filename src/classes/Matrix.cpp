@@ -31,12 +31,14 @@ class Matrix::DataHandler {
   void resize(int64_t size) { data_.resize(size); }
 };
 
+// Copy constructor.
 Matrix::Matrix(const Matrix& A)
     : rows(A.rows),
       cols(A.cols),
-      stride(A.stride),
       data(std::make_shared<DataHandler>(rows * cols, 0)),
       data_ptr(data->get_ptr()) {
+  // Reinitilize the stride to number of rows if its a view.
+  stride = A.rows;
   // Need the for loop and cannot init directly in the initializer list because
   // the object might be a view and therefore will not get copied properly.
   for (int i = 0; i < A.rows; ++i) {
@@ -46,6 +48,33 @@ Matrix::Matrix(const Matrix& A)
   }
 }
 
+// Move assignment constructor.
+Matrix& Matrix::operator=(Matrix&& A) {
+  // Need to perform a manual copy (vs. swapping) since A might be
+  // being assigned to a view.
+  if (is_view) {
+    assert((*this).rows == A.rows);
+    assert((*this).cols == A.cols);
+    for (int i = 0; i < A.rows; ++i) {
+      for (int j = 0; j < A.cols; ++j) {
+        (*this)(i, j) = A(i, j);
+      }
+    }
+  }
+  else {
+    std::swap(rows, A.rows);
+    std::swap(cols, A.cols);
+    std::swap(stride, A.stride);
+    std::swap(data, A.data);
+    std::swap(data_ptr, A.data_ptr);
+    std::swap(is_view, A.is_view);
+  }
+
+  return *this;
+}
+
+
+// Copy assignment operator.
 Matrix& Matrix::operator=(const Matrix& A) {
   // Manual copy. We dont simply assign the data pointer since we want to
   // the ability to work with Matrix objects that might be views of an
@@ -59,6 +88,7 @@ Matrix& Matrix::operator=(const Matrix& A) {
   }
   return *this;
 }
+
 
 Matrix::Matrix(int64_t rows, int64_t cols)
     : rows(rows),
@@ -125,7 +155,17 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
                                   const std::vector<int64_t>& _col_split_indices,
                                   bool copy) const {
   std::vector<Matrix> parts;
-  std::vector<int64_t> row_split_indices(_row_split_indices), col_split_indices(_col_split_indices);
+  std::vector<int64_t> row_split_indices(_row_split_indices),
+    col_split_indices(_col_split_indices);
+
+  // Allow specifying vectors where the last element is the value of the dimension.
+  if (row_split_indices.size() > 1 && row_split_indices[row_split_indices.size()-1] == rows) {
+    row_split_indices.pop_back();
+  }
+
+  if (col_split_indices.size() > 1 && col_split_indices[col_split_indices.size()-1] == cols) {
+    col_split_indices.pop_back();
+  }
 
   auto row_iter = row_split_indices.cbegin();
   int64_t row_start = 0;
@@ -152,6 +192,7 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
         part_of_this.rows = n_rows;
         part_of_this.cols = n_cols;
         part_of_this.stride = stride;
+        part_of_this.is_view = true;
         part_of_this.data = std::make_shared<DataHandler>(*data);
         part_of_this.data_ptr = &data_ptr[col_start * stride + row_start];
       }
@@ -165,16 +206,18 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
 
 int64_t Matrix::min_dim() const { return std::min(rows, cols); }
 int64_t Matrix::max_dim() const { return std::max(rows, cols); }
+int64_t Matrix::numel() const { return rows * cols; }
 
 void Matrix::print() const {
+  if (rows == 0 || cols == 0) { return; }
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
-      // if ((*this)(i, j) > -1e-14 && (*this)(i, j) < 1e-14) {
-      //   std::cout << std::setw(10) << 0 << " ";
-      // }
-      // else {
+      if ((*this)(i, j) > -1e-12 && (*this)(i, j) < 1e-12) {
+        std::cout << std::setw(10) << 0 << " ";
+      }
+      else {
         std::cout << std::setprecision(3) << std::setw(10) <<  (*this)(i, j) << " ";
-      // }
+        }
     }
     std::cout << "\n";
   }

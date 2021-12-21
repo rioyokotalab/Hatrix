@@ -15,6 +15,12 @@ namespace Hatrix {
   }
 
   Matrix concat(const Matrix& A, const Matrix& B, const int axis) {
+    if (A.numel() == 0) {
+      return Matrix(B);
+    }
+    if (B.numel() == 0) {
+      return Matrix(A);
+    }
     if (axis == 0) {
       assert(A.cols == B.cols);
       Matrix matrix(A.rows + B.rows, A.cols);

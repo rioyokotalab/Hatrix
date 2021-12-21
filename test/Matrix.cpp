@@ -67,6 +67,27 @@ TEST(MatrixTests, MoveAssignment) {
   }
 }
 
+TEST(MatrixTests, ViewMoveAssigment) {
+  int64_t block_size = 100, sub_block = 25;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(block_size, block_size);
+  Hatrix::Matrix A_copy(block_size, block_size);
+
+  auto A_copy_splits = A_copy.split(4, 4);
+  // Assign an rvalue into a slice of a matrix.
+  A_copy_splits[1] = Hatrix::generate_identity_matrix(sub_block, sub_block);
+
+  for (int64_t i = 0; i < sub_block; ++i) {
+    for (int64_t j = 0; j < sub_block; ++j) {
+      if (i == j)  {
+        EXPECT_EQ(A_copy(i, j + sub_block), 1);
+      }
+      else {
+        EXPECT_EQ(A_copy(i, j + sub_block), 0);
+      }
+    }
+  }
+}
+
 TEST(MatrixTests, shrink) {
   int64_t block_size = 16;
   Hatrix::Matrix A = Hatrix::generate_random_matrix(block_size, block_size);

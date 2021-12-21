@@ -11,6 +11,8 @@ namespace Lapack {
   enum QR_ret { QAndR, OnlyQ };
 }
 
+// Compute in-place inverse using GETRF + GETRI.
+void inverse(Matrix& A);
 
 // Compute the LU factorization of A and store in L and U. Over-writes A.
 void lu(Matrix& A, Matrix& L, Matrix& U);
@@ -38,6 +40,9 @@ void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
 std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
+                                                         int64_t rank);
+
+std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
                                                          int64_t rank);
 
 // Compute truncated SVD for given accuracy threshold.

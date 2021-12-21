@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <tuple>
 #include <vector>
+#include <iostream>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -19,6 +20,19 @@
 #include "Hatrix/functions/blas.h"
 
 namespace Hatrix {
+
+void inverse(Matrix& A) {
+  std::vector<int> ipiv(A.min_dim());
+  int info;
+  info = LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
+  if (info != 0) {
+    std::cout << "DGETRF failed in inverse().\n";
+  }
+  info = LAPACKE_dgetri(LAPACK_COL_MAJOR, A.rows, &A, A.stride, ipiv.data());
+  if (info != 0) {
+    std::cout << "DGETRI failed in inverse().\n";
+  }
+}
 
 void lu(Matrix& A, Matrix& L, Matrix& U) {
   // check dimensions
@@ -191,6 +205,11 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
   Matrix V(A.min_dim(), A.cols);
   double expected_err = truncated_svd(A, U, S, V, rank);
   return {std::move(U), std::move(S), std::move(V), expected_err};
+}
+
+std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t rank) {
+  Matrix Ac = std::move(A);
+  return truncated_svd(Ac, rank);
 }
 
 std::tuple<Matrix, Matrix, Matrix> truncated_svd(Matrix& A, double error) {

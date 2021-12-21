@@ -139,6 +139,12 @@ T RowColLevelMap<T>::extract(const std::tuple<int64_t, int64_t, int64_t>& key) {
 }
 
 template <class T>
+void RowColLevelMap<T>::erase(int64_t row, int64_t col, int64_t level) {
+  map.erase({row, col, level});
+}
+
+
+template <class T>
 bool RowColLevelMap<T>::exists(int64_t row, int64_t col, int64_t level) const {
   return map.count({row, col, level}) == 0 ? false : true;
 }

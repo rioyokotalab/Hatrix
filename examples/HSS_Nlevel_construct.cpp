@@ -50,8 +50,9 @@ namespace Hatrix {
       Matrix right_slice = generate_laplacend_matrix(randvec, leaf_size, ncols_right_slice,
                                                      diagonal_offset, (block+1) * slice);
 
-      std::vector<Matrix> row_slice_parts = row_slice.split(std::vector<int64_t>(1, 0),
-                                                            std::vector<int64_t>(1, ncols_left_slice));
+      std::vector<Matrix> row_slice_parts =
+        row_slice.split(std::vector<int64_t>(1, 0),
+                        std::vector<int64_t>(1, ncols_left_slice));
 
       // concat left and right slices
       for (int i = 0; i < leaf_size; ++i) {
@@ -177,7 +178,8 @@ namespace Hatrix {
 
       Matrix Ubig(rank, leaf_size);
 
-      std::vector<Matrix> Ubig_splits = Ubig.split({}, std::vector<int64_t>(1, Ubig_child1.rows));
+      std::vector<Matrix> Ubig_splits =
+        Ubig.split({}, std::vector<int64_t>(1, Ubig_child1.rows));
       std::vector<Matrix> U_splits = U(p, level).split(2, 1);
 
       matmul(U_splits[0], Ubig_child1, Ubig_splits[0], true, true);
@@ -202,7 +204,8 @@ namespace Hatrix {
 
       Matrix Vbig(leaf_size, rank);
 
-      std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
+      std::vector<Matrix> Vbig_splits =
+        Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
       std::vector<Matrix> V_splits = V(p, level).split(2, 1);
 
       matmul(Vbig_child1, V_splits[0], Vbig_splits[0]);
@@ -211,8 +214,10 @@ namespace Hatrix {
       return Vbig;
     }
 
-    std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const randvec_t& randvec, RowLevelMap& Ugen,
-                                                                    ColLevelMap& Vgen, const int level) {
+    std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const randvec_t& randvec,
+                                                                    RowLevelMap& Ugen,
+                                                                    ColLevelMap& Vgen,
+                                                                    const int level) {
       Matrix Ui, Si, Vi; double error;
       RowLevelMap Ugen_transfer; ColLevelMap Vgen_transfer;
       int num_nodes = pow(2, level);
@@ -226,11 +231,13 @@ namespace Hatrix {
         Matrix& Ugen_upper = Ugen(child1, child_level);
         Matrix& Ugen_lower = Ugen(child2, child_level);
         // Use max since the last block might differ in length.
-        Matrix Ugen_concat(Ugen_upper.rows + Ugen_lower.rows, std::max(Ugen_upper.cols, Ugen_lower.cols));
+        Matrix Ugen_concat(Ugen_upper.rows + Ugen_lower.rows,
+                           std::max(Ugen_upper.cols, Ugen_lower.cols));
         // int rank = Ugen_concat.rows;
         std::vector<Matrix> Ugen_slices = Ugen_concat.split(2, 1);
 
-        // cannot use slices since the large matrix can have a larger dimension than the smaller ones.
+        // Cannot use slices since the large matrix can have a larger
+        //   dimension than the smaller ones.
         for (int i = 0; i < Ugen_upper.rows; i++) {
           for (int j = 0; j < Ugen_upper.cols; j++) {
             Ugen_slices[0](i, j) = Ugen_upper(i, j);
@@ -249,7 +256,8 @@ namespace Hatrix {
         // Generate V transfer matrix.
         Matrix& Vgen_upper = Vgen(child1, child_level);
         Matrix& Vgen_lower = Vgen(child2, child_level);
-        Matrix Vgen_concat(Vgen_upper.rows + Vgen_lower.rows, std::max(Vgen_upper.cols, Vgen_lower.cols));
+        Matrix Vgen_concat(Vgen_upper.rows + Vgen_lower.rows,
+                           std::max(Vgen_upper.cols, Vgen_lower.cols));
         std::vector<Matrix> Vgen_slices = Vgen_concat.split(2, 1);
         for (int i = 0; i < Vgen_upper.rows; i++) {
           for (int j = 0; j < Vgen_upper.cols; j++) {
@@ -297,9 +305,10 @@ namespace Hatrix {
         int diagonal_offset = slice * block;
         int leaf_size = (block == (num_nodes-1)) ? (N - (slice * block)) :  slice;
 
-        double diagonal_error = rel_error(D(block, block, height),
-                                          Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
-                                                                            diagonal_offset, diagonal_offset));
+        double diagonal_error =
+          rel_error(D(block, block, height),
+                    Hatrix::generate_laplacend_matrix(randvec, leaf_size, leaf_size,
+                                                      diagonal_offset, diagonal_offset));
         error += pow(diagonal_error, 2);
       }
 
@@ -333,7 +342,8 @@ int main(int argc, char *argv[]) {
   int height = atoi(argv[3]);
 
   if (rank > int(N / pow(2, height))) {
-    std::cout << N << " % " << pow(2, height) << " != 0 || rank > leaf(" << int(N / pow(2, height))  << ")\n";
+    std::cout << N << " % " << pow(2, height)
+              << " != 0 || rank > leaf(" << int(N / pow(2, height))  << ")\n";
     abort();
   }
 
@@ -351,7 +361,8 @@ int main(int argc, char *argv[]) {
 
   std::ofstream file;
   file.open("output.txt", std::ios::app | std::ios::out);
-  std::cout << "N= " << N << " rank= " << rank << " height=" << height <<  " const. error=" << error << std::endl;
+  std::cout << "N= " << N << " rank= " << rank
+            << " height=" << height <<  " const. error=" << error << std::endl;
   file.close();
 
 }

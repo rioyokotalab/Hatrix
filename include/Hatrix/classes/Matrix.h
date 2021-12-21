@@ -11,6 +11,7 @@ class Matrix {
   int64_t rows = 0;
   int64_t cols = 0;
   int64_t stride = 0;
+  bool is_view = false;
 
  private:
   class DataHandler;
@@ -26,9 +27,9 @@ class Matrix {
 
   Matrix& operator=(const Matrix& A);
 
-  Matrix(Matrix&& A) = default;
+  Matrix& operator=(Matrix&& A);
 
-  Matrix& operator=(Matrix&& A) = default;
+  Matrix(Matrix&& A) = default;
 
   Matrix(int64_t rows, int64_t cols);
 
@@ -106,6 +107,7 @@ class Matrix {
 
   int64_t min_dim() const;
   int64_t max_dim() const;
+  int64_t numel() const;
 
   void print() const;
 
