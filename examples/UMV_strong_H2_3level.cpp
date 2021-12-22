@@ -453,6 +453,7 @@ namespace Hatrix {
           int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
           int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
 
+          // Step 3: Partial LU factorization
           auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
           Matrix& Dcc = diagonal_splits[0];
           lu(Dcc);
@@ -510,7 +511,42 @@ namespace Hatrix {
             }
           }
         }
+
+        // Merge the unfactorized parts.
+        int64_t parent_level = level - 1;
+        for (int i = 0; i < int(pow(2, parent_levll)); ++i) {
+          for (int j = 0; j < int(pow(2, parent_level)); ++j) {
+            if (is_admissible.exists(i, j, parent_level)) {
+              int64_t child1 = i * 2; int64_t child2 = j * 2 + 1;
+
+              if (is_admissible(i, j, parent_level)) {
+
+              }
+              else {
+              }
+            }
+          }
+        }
+
+        for (int64_t i = 0; i < int64_t(pow(2, parent_level)); ++i) {
+          Hatrix::Matrix D_unsolved(rank * 2, rank * 2);
+          std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
+
+          int64_t child1 = block * 2; int64_t child2 = block * 2 + 1;
+          D_unsolved_splits[0] = unsolved_chunk(child1, level, rank);
+          D_unsolved_splits[3] = unsolved_chunk(child2, level, rank);
+
+          int64_t col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
+          int64_t col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
+
+          D_unsolved_splits[1] = S(child1, col_child1, level);
+          D_unsolved_splits[2] = S(child2, col_child2, level);
+
+          D.insert(block, block, parent_level, std::move(D_unsolved));
+        }
       }
+
+      Hatrix::lu(D(0, 0, 0));
     }
 
     Matrix solve(Matrix& b) {
