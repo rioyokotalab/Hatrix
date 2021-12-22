@@ -426,7 +426,7 @@ namespace Hatrix {
     }
 
     void factorize(const randvec_t &randpts) {
-      for (int64_t level = height; level > height-1; --level) {
+      for (int64_t level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
         int64_t block_size = N / num_nodes;
 
@@ -510,44 +510,47 @@ namespace Hatrix {
               }
             }
           }
+
+          std::cout << "block: " << block << std::endl;
+          D(block, block, level).print();
         }
 
         // Merge the unfactorized parts.
         int64_t parent_level = level - 1;
-        for (int i = 0; i < int(pow(2, parent_levll)); ++i) {
+        for (int i = 0; i < int(pow(2, parent_level)); ++i) {
           for (int j = 0; j < int(pow(2, parent_level)); ++j) {
-            if (is_admissible.exists(i, j, parent_level)) {
-              int64_t child1 = i * 2; int64_t child2 = j * 2 + 1;
+            if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
+              std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
+              Matrix D_unelim(rank*2, rank*2);
+              auto D_unelim_splits = D_unelim.split(2, 2);
 
-              if (is_admissible(i, j, parent_level)) {
+              for (int ic1 = 0; ic1 < 2; ++ic1) {
+                for (int jc2 = 0; jc2 < 2; ++jc2) {
+                  int64_t c1 = i_children[ic1], c2 = j_children[jc2];
 
+                  if (!is_admissible(c1, c2, level)) {
+                    int64_t row_splits = U(c1, level).rows - U(c1, level).cols,
+                      col_splits = V(c2, level).rows - V(c2, level).cols;
+
+                    auto D_splits = SPLIT_DENSE(D(c1, c2, level), row_splits, col_splits);
+                    D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
+                  }
+                  else {
+                    D_unelim_splits[ic1 * 2 + jc2] = S(c1, c2, level);
+                  }
+                }
               }
-              else {
-              }
+
+              D_unelim.print();
+
+              D.insert(i, j, parent_level, std::move(D_unelim));
             }
           }
         }
-
-        for (int64_t i = 0; i < int64_t(pow(2, parent_level)); ++i) {
-          Hatrix::Matrix D_unsolved(rank * 2, rank * 2);
-          std::vector<Hatrix::Matrix> D_unsolved_splits = D_unsolved.split(2, 2);
-
-          int64_t child1 = block * 2; int64_t child2 = block * 2 + 1;
-          D_unsolved_splits[0] = unsolved_chunk(child1, level, rank);
-          D_unsolved_splits[3] = unsolved_chunk(child2, level, rank);
-
-          int64_t col_child1 = child1 % 2 == 0 ? child1 + 1 : child1 - 1;
-          int64_t col_child2 = child2 % 2 == 0 ? child2 + 1 : child2 - 1;
-
-          D_unsolved_splits[1] = S(child1, col_child1, level);
-          D_unsolved_splits[2] = S(child2, col_child2, level);
-
-          D.insert(block, block, parent_level, std::move(D_unsolved));
-        }
       }
 
-      Hatrix::lu(D(0, 0, 0));
-    }
+      // Hatrix::lu(D(0, 0, 0));
+    } // for (int level=height; level > 0; --level)
 
     Matrix solve(Matrix& b) {
       Matrix x(b);
