@@ -451,6 +451,29 @@ namespace Hatrix {
           }
 
           int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
+          int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
+
+          auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
+          Matrix& Dcc = diagonal_splits[0];
+          lu(Dcc);
+
+          // TRSM with other cc blocks on this row
+          for (int j = block + 1; j < num_nodes; ++j) {
+            if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
+              int64_t col_split = block_size - V(j, level).cols;
+              auto D_splits = SPLIT_DENSE(D(block, j, level), row_split, col_split);
+              solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
+            }
+          }
+
+          // TRSM with co blocks on this row.
+          for (int j = 0; j < num_nodes; ++j) {
+            if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
+              int64_t col_split = block_size - V(j, level).cols;
+              auto D_splits = SPLIT_DENSE(D(block, j, level), row_split, col_split);
+              solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
+            }
+          }
         }
       }
     }
@@ -486,17 +509,17 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randpts, N, rank, height, admis);
-  A.factorize(randpts);
+  double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
 
   A.print_structure();
 
+  A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b);
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-  double construct_error = A.construction_relative_error(randpts);
 
   Hatrix::Context::finalize();
 
