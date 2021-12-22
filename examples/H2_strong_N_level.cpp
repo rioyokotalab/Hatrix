@@ -374,7 +374,7 @@ namespace Hatrix {
       }
 
       // regenerate off-diagonal blocks and test for correctness.
-      for (int level = height; level > 1; --level) {
+      for (int level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
         int slice = N / num_nodes;
 
@@ -431,7 +431,7 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::finalize();
 
-  std::cout << "N= " << N << " rank= " << rank << " admis= " << admis
+  std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= " << int(N / pow(2, height))
             << " height=" << height <<  " const. error=" << error << std::endl;
 
 }
