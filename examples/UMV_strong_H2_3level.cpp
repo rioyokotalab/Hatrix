@@ -431,9 +431,26 @@ namespace Hatrix {
         int64_t block_size = N / num_nodes;
 
         for (int64_t block = 0; block < num_nodes; ++block) {
-          // Step 1: generate UF and VF blocks.
+          // Step 0: Recompress fill-ins on the off-diagonals.
+
+          // Step 1: Generate UF and VF blocks.
           Matrix UF = make_complement(U(block, level));
           Matrix VF = make_complement(V(block, level));
+
+          // Step 2: Multiply the A with UF and VF.
+          for (int j = 0; j < num_nodes; ++j) {
+            if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
+              D(block, j, level) = matmul(UF, D(block, j, level), true);
+            }
+          }
+
+          for (int i = 0; i < num_nodes; ++i) {
+            if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
+              D(i, block, level) = matmul(D(i, block, level), VF);
+            }
+          }
+
+          int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
         }
       }
     }
@@ -472,7 +489,7 @@ int main(int argc, char *argv[]) {
   A.factorize(randpts);
   auto stop_construct = std::chrono::system_clock::now();
 
-  // A.print_structure();
+  A.print_structure();
 
   Hatrix::Matrix x = A.solve(b);
 
