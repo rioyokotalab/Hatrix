@@ -374,7 +374,7 @@ namespace Hatrix {
       }
 
       // regenerate off-diagonal blocks and test for correctness.
-      for (int level = height; level > 1; --level) {
+      for (int level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
         int slice = N / num_nodes;
 
@@ -424,14 +424,14 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
-  // A.print_structure();
+  A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
 
   Hatrix::Context::finalize();
 
-  std::cout << "N= " << N << " rank= " << rank << " admis= " << admis
+  std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= " << int(N / pow(2, height))
             << " height=" << height <<  " const. error=" << error << std::endl;
 
 }
