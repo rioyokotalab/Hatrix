@@ -424,7 +424,7 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
-  // A.print_structure();
+  A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
