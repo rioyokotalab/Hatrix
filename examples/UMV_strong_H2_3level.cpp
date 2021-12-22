@@ -474,6 +474,41 @@ namespace Hatrix {
               solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
             }
           }
+
+          // TRSM with cc blocks on the column
+          for (int i = block + 1; i < num_nodes; ++i) {
+            if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
+              int64_t row_split = block_size - U(i, level).cols;
+              auto D_splits = SPLIT_DENSE(D(i, block, level), row_split, col_split);
+              solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Upper, false);
+            }
+          }
+
+          // TRSM with oc blocks on the column
+          for (int i = 0; i < num_nodes; ++i) {
+            if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
+              auto D_splits = SPLIT_DENSE(D(i, block, level), block_size - U(i, level).cols, col_split);
+              solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
+            }
+          }
+
+          // Schur's compliment between oc and co blocks and update into oo block.
+          for (int i = 0; i < num_nodes; ++i) {
+            for (int j = 0; j < num_nodes; ++j) {
+              if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
+                  (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+                auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size - U(i, level).cols, col_split);
+                auto right_splits = SPLIT_DENSE(D(block, j, level), row_split, block_size - V(j, level).cols);
+
+                if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+                  auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                   block_size - U(i, level).cols,
+                                                   block_size - V(j, level).cols);
+                  matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+                }
+              }
+            }
+          }
         }
       }
     }

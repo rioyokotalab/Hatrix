@@ -408,9 +408,6 @@ namespace Hatrix {
           }
         }
 
-
-
-
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
