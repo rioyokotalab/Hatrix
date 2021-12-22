@@ -343,6 +343,26 @@ namespace Hatrix {
       actually_print_structure(level-1);
     }
 
+    Matrix make_complement(const Hatrix::Matrix &Q) {
+      Matrix Q_F(Q.rows, Q.rows);
+      Matrix Q_full, R;
+      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+          Q_F(i, j) = Q_full(i, j + Q.cols);
+        }
+      }
+
+      for (int i = 0; i < Q_F.rows; ++i) {
+        for (int j = 0; j < Q.cols; ++j) {
+          Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+        }
+      }
+      return Q_F;
+    }
+
+
   public:
 
     H2(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height,
@@ -406,7 +426,16 @@ namespace Hatrix {
     }
 
     void factorize(const randvec_t &randpts) {
+      for (int64_t level = height; level > height-1; --level) {
+        int num_nodes = pow(2, level);
+        int64_t block_size = N / num_nodes;
 
+        for (int64_t block = 0; block < num_nodes; ++block) {
+          // Step 1: generate UF and VF blocks.
+          Matrix UF = make_complement(U(block, level));
+          Matrix VF = make_complement(V(block, level));
+        }
+      }
     }
 
     Matrix solve(Matrix& b) {
@@ -443,7 +472,7 @@ int main(int argc, char *argv[]) {
   A.factorize(randpts);
   auto stop_construct = std::chrono::system_clock::now();
 
-  A.print_structure();
+  // A.print_structure();
 
   Hatrix::Matrix x = A.solve(b);
 
