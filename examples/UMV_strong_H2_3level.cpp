@@ -362,6 +362,62 @@ namespace Hatrix {
       return Q_F;
     }
 
+        // permute the vector forward and return the offset at which the new vector begins.
+    int64_t permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) {
+      Matrix copy(x);
+      int64_t num_nodes = int64_t(pow(2, level));
+      int64_t c_offset = rank_offset;
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        rank_offset += D(block, block, level).rows - U(block, level).cols;
+      }
+
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        int64_t rows = D(block, block, level).rows;
+        int64_t rank = U(block, level).cols;
+        int64_t c_size = rows - rank;
+
+        // copy the complement part of the vector into the temporary vector
+        for (int64_t i = 0; i < c_size; ++i) {
+          copy(c_offset + c_size * block + i, 0) = x(c_offset + block * rows + i, 0);
+        }
+        // copy the rank part of the vector into the temporary vector
+        for (int64_t i = 0; i < rank; ++i) {
+          copy(rank_offset + rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return rank_offset;
+    }
+
+    int64_t permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) {
+      Matrix copy(x);
+      int64_t num_nodes = pow(2, level);
+      int64_t c_offset = rank_offset;
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        c_offset -= D(block, block, level).rows - U(block, level).cols;
+      }
+
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        int64_t rows = D(block, block, level).rows;
+        int64_t rank = U(block, level).cols;
+        int64_t c_size = rows - rank;
+
+        for (int64_t i = 0; i < c_size; ++i) {
+          copy(c_offset + block * rows + i, 0) = x(c_offset + block * c_size + i, 0);
+        }
+
+        for (int64_t i = 0; i < rank; ++i) {
+          copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return c_offset;
+    }
+
 
   public:
 
@@ -561,12 +617,23 @@ namespace Hatrix {
       // Forward
       for (int64_t level = height; level > 0; --level) {
         int64_t num_nodes = pow(2, level);
-        x_split = x.split(num_nodes, 1);
 
         // Contrary to the paper, multiply all the UF from the left side before
         // the forward substitution starts.
         for (int block = 0; block < num_nodes; ++block) {
-          Matrix U_F = make_complement(U(block, level));
+          Matrix& Uo = U(block, level);
+          Matrix U_F = make_complement(Uo);
+          c_size = Uo.rows - rank;
+          offset = rhs_offset + block * Uo.rows;
+
+          Matrix temp(Uo.rows, 1);
+          for (int i = 0; i < Uo.rows; ++i) {
+            temp(i, 0) = x(offset + i, 0);
+          }
+          Matrix product = matmul(U_F, temp, true);
+          for (int i = 0; i < Uo.rows; ++i) {
+            x(offset + i, 0) = product(i, 0);
+          }
         }
 
         // Forward with cc blocks.
@@ -575,6 +642,8 @@ namespace Hatrix {
           c_size = Diag.rows - rank;
           offset = rhs_offset + block * Diag.rows;
         }
+
+        rhs_offset = permute_forward(x, level, rhs_offset);
       }
 
       return x;

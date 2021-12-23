@@ -546,7 +546,7 @@ namespace Hatrix {
           x(block * block_size + i, 0) = x_block(i, 0);
         }
 
-        //      Forward with the big c blocks on the lower part.
+        // Forward with the big c blocks on the lower part.
         for (int irow = block+1; irow < nblocks; ++irow) {
           if (is_admissible(irow, block)) { continue; }
           int64_t row_split = block_size - U(irow).cols;
