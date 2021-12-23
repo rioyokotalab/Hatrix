@@ -554,7 +554,28 @@ namespace Hatrix {
     }
 
     Matrix solve(Matrix& b) {
+      int64_t c_size, offset, rhs_offset = 0;
       Matrix x(b);
+      std::vector<Matrix> x_split;
+
+      // Forward
+      for (int64_t level = height; level > 0; --level) {
+        int64_t num_nodes = pow(2, level);
+        x_split = x.split(num_nodes, 1);
+
+        // Contrary to the paper, multiply all the UF from the left side before
+        // the forward substitution starts.
+        for (int block = 0; block < num_nodes; ++block) {
+          Matrix U_F = make_complement(U(block, level));
+        }
+
+        // Forward with cc blocks.
+        for (int block = 0; block < num_nodes; ++block) {
+          Matrix& Diag = D(block, block, level);
+          c_size = Diag.rows - rank;
+          offset = rhs_offset + block * Diag.rows;
+        }
+      }
 
       return x;
     }
