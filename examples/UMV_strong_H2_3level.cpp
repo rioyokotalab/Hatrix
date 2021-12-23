@@ -371,6 +371,8 @@ namespace Hatrix {
       RowLevelMap Uchild; ColLevelMap Vchild;
 
       compute_matrix_structure(height);
+      // Add (0,0,0) as an inadmissible block to aid the last merge + factorize of UMV.
+      is_admissible.insert(0, 0, 0, false);
       generate_leaf_nodes(randpts);
       Uchild = U;
       Vchild = V;
@@ -428,9 +430,10 @@ namespace Hatrix {
     void factorize(const randvec_t &randpts) {
       for (int64_t level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
-        int64_t block_size = N / num_nodes;
 
         for (int64_t block = 0; block < num_nodes; ++block) {
+          // Assume that the block size for this level is the number of rows in the bases.
+          int64_t block_size = U(block, level).rows;
           // Step 0: Recompress fill-ins on the off-diagonals.
 
           // Step 1: Generate UF and VF blocks.
@@ -510,9 +513,6 @@ namespace Hatrix {
               }
             }
           }
-
-          std::cout << "block: " << block << std::endl;
-          D(block, block, level).print();
         }
 
         // Merge the unfactorized parts.
@@ -541,16 +541,17 @@ namespace Hatrix {
                 }
               }
 
-              D_unelim.print();
+              std::cout << "make matrix: "  <<  i << " " << j << " " << parent_level
+                        << " l: " << level << std::endl;
 
               D.insert(i, j, parent_level, std::move(D_unelim));
             }
           }
         }
-      }
+      } // for (int level=height; level > 0; --level)
 
-      // Hatrix::lu(D(0, 0, 0));
-    } // for (int level=height; level > 0; --level)
+      Hatrix::lu(D(0, 0, 0));
+    }
 
     Matrix solve(Matrix& b) {
       Matrix x(b);
