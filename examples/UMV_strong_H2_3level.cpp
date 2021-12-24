@@ -612,7 +612,7 @@ namespace Hatrix {
     Matrix solve(Matrix& b) {
       int64_t c_size, offset, rhs_offset = 0;
       Matrix x(b);
-      std::vector<Matrix> x_split;
+      std::vector<Matrix> x_splits;
 
       // Forward
       for (int64_t level = height; level > 0; --level) {
@@ -636,15 +636,59 @@ namespace Hatrix {
           }
         }
 
+        // Copy part of the workspace vector into x_level so that we can only split
+        // and work with the parts that correspond to the permuted vector that need
+        // to be worked upon.
+        std::cout << "level: " << level << " rhs: " << rhs_offset << std::endl;
+        Matrix x_level(N - rhs_offset, 1);
+        for (int i = 0; i < x_level.rows; ++i) {
+          x_level(i, 0) = x(rhs_offset + i, 0);
+        }
+        auto x_level_splits = x_level.split(num_nodes, 1);
+
         // Forward with cc blocks.
         for (int block = 0; block < num_nodes; ++block) {
-          Matrix& Diag = D(block, block, level);
-          c_size = Diag.rows - rank;
-          offset = rhs_offset + block * Diag.rows;
+          Matrix& Uo = U(block, level);
+          Matrix& Vo = V(block, level);
+          Matrix x_block(x_level_splits[block]);
+
+          int64_t block_size = Uo.rows;
+
+          c_size = block_size - rank;
+          offset = rhs_offset + block * Uo.rows;
+
+          int64_t row_split = Uo.rows - rank, col_split = Vo.rows - rank;
+          auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
+          auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
+
+          std::cout << "offset: " << offset << " block: " << block << " l: " << level << std::endl;
+
+
+          // Forward with the big C block on the lower part. These are the dense blocks
+          // that exist below the diagonal block.
+          for (int irow = block+1; irow < num_nodes; ++irow) {
+
+          }
+
+          // Forward with the oc parts of the block that are actually in the upper part of the matrix.
+          for (int irow = 0; irow < block; ++irow) {
+
+          }
         }
 
         rhs_offset = permute_forward(x, level, rhs_offset);
       }
+
+      x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
+      solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
+
+      // Backward
+      for (int64_t level = 1; level <= height; ++level) {
+        rhs_offset = permute_backward(x, level, rhs_offset);
+        int64_t num_nodes = pow(2, level);
+      }
+
 
       return x;
     }
