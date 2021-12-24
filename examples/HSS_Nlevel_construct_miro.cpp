@@ -7,6 +7,7 @@
 
 #include "Hatrix/Hatrix.h"
 
+constexpr double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -37,10 +38,10 @@ namespace Hatrix {
       Matrix row_slice(nrows, N-nrows);
       int64_t ncols_left_slice = block * nrows;
       Matrix left_slice = generate_laplacend_matrix(randpts, nrows, ncols_left_slice,
-                                                    block * nrows, 0);
+                                                    block * nrows, 0, PV);
       int64_t ncols_right_slice = N - (block+1) * nrows;
       Matrix right_slice = generate_laplacend_matrix(randpts, nrows, ncols_right_slice,
-                                                     block * nrows, (block+1) * nrows);
+                                                     block * nrows, (block+1) * nrows, PV);
 
       // concat left and right slices
       for (int i = 0; i < nrows; ++i) {
@@ -61,10 +62,10 @@ namespace Hatrix {
       Matrix col_slice(N-ncols, ncols);
       int nrows_upper_slice = block * ncols;
       Matrix upper_slice = generate_laplacend_matrix(randpts, nrows_upper_slice, ncols,
-                                                     0, block * ncols);
+                                                     0, block * ncols, PV);
       int nrows_lower_slice = N - (block + 1) * ncols;
       Matrix lower_slice = generate_laplacend_matrix(randpts, nrows_lower_slice, ncols,
-                                                     (block+1) * ncols, block * ncols);
+                                                     (block+1) * ncols, block * ncols, PV);
 
       for (int j = 0; j < col_slice.cols; ++j) {
         for (int i = 0; i < nrows_upper_slice; ++i) {
@@ -106,7 +107,7 @@ namespace Hatrix {
       for (int block = 0; block < nblocks; ++block) {
         D.insert(block, block, height,
                  Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                                   block * leaf_size, block * leaf_size));
+                                                   block * leaf_size, block * leaf_size, PV));
         Matrix Ubig = generate_column_bases(block, leaf_size, randpts);
         U.insert(block, height, std::move(Ubig));
         Matrix Vbig = generate_row_bases(block, leaf_size, randpts);
@@ -116,7 +117,7 @@ namespace Hatrix {
       for (int row = 0; row < nblocks; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
         Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                             row * leaf_size, col * leaf_size);
+                                             row * leaf_size, col * leaf_size, PV);
         S.insert(row, col, height, matmul(matmul(U(row, height), D, true, false), V(col, height)));
       }
     }
@@ -200,7 +201,7 @@ namespace Hatrix {
       for (int row = 0; row < num_nodes; ++row) {
         int col = row % 2 == 0 ? row + 1 : row - 1;
         Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                             row * leaf_size, col * leaf_size);
+                                             row * leaf_size, col * leaf_size, PV);
         S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
                                          Vbig_parent(col, level)));
       }
@@ -301,7 +302,7 @@ namespace Hatrix {
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
           Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
-                                                            row * slice, col * slice);
+                                                            row * slice, col * slice, PV);
 
           error += Hatrix::norm(expected - actual);
         }

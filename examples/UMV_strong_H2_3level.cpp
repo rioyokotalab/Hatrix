@@ -7,7 +7,7 @@
 
 #include "Hatrix/Hatrix.h"
 
-constexpr double PV = 1;
+constexpr double PV = 1e-1;
 using randvec_t = std::vector<std::vector<double> >;
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
@@ -443,15 +443,16 @@ namespace Hatrix {
     double construction_relative_error(const randvec_t& randvec) {
       // verify diagonal matrix block constructions at the leaf level.
       double error = 0;
-      double actual = 0, expected = 0;
+      double dense_norm = 0;
       int num_nodes = pow(2, height);
       for (int i = 0; i < num_nodes; ++i) {
         for (int j = 0; j < num_nodes; ++j) {
           if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
             int slice = N / num_nodes;
-            actual += norm(Hatrix::generate_laplacend_matrix(randvec, slice, slice,
-                                                             slice * i, slice * j, PV));
-            expected += norm(D(i, j, height));
+            Matrix actual = Hatrix::generate_laplacend_matrix(randvec, slice, slice,
+                                                              slice * i, slice * j, PV);
+            error += pow(norm(actual - D(i, j, height)), 2);
+            dense_norm += pow(norm(actual), 2);
           }
         }
       }
@@ -470,15 +471,16 @@ namespace Hatrix {
               int block_ncols = Vbig.rows;
               Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
               Matrix actual_matrix = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
-                                                                row * slice, col * slice);
-              actual += norm(actual_matrix);
-              expected += norm(expected_matrix);
+                                                                       row * slice, col * slice, PV);
+
+              dense_norm += pow(norm(actual_matrix), 2);
+              error += pow(norm(expected_matrix - actual_matrix), 2);
             }
           }
         }
       }
 
-      return std::sqrt(pow(std::abs(actual - expected) / expected, 2));
+      return std::sqrt(error / dense_norm);
     }
 
     void print_structure() {
@@ -516,8 +518,9 @@ namespace Hatrix {
 
           // Step 3: Partial LU factorization
 
-          Matrix DD(D(block, block, level));
-          lu(DD);
+          std::cout << "b: " << block << " l: " << level << " rs: "
+                    << row_split << " cs: " << col_split << std::endl;
+
           auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
           Matrix& Dcc = diagonal_splits[0];
           lu(Dcc);
@@ -608,7 +611,6 @@ namespace Hatrix {
         }
       } // for (int level=height; level > 0; --level)
 
-
       Hatrix::lu(D(0, 0, 0));
     }
 
@@ -628,8 +630,6 @@ namespace Hatrix {
 
         // Contrary to the paper, multiply all the UF from the left side before
         // the forward substitution starts.
-        std::cout << "X PRE\n";
-        x.print();
         for (int block = 0; block < num_nodes; ++block) {
           Matrix& Uo = U(block, level);
           Matrix U_F = make_complement(Uo);
@@ -647,13 +647,9 @@ namespace Hatrix {
           }
         }
 
-        std::cout << "X POST\n";
-        x.print();
-
         // Copy part of the workspace vector into x_level so that we can only split
         // and work with the parts that correspond to the permuted vector that need
         // to be worked upon.
-        // std::cout << "level: " << level << " rhs: " << rhs_offset << std::endl;
         Matrix x_level(N - rhs_offset, 1);
         for (int i = 0; i < x_level.rows; ++i) {
           x_level(i, 0) = x(rhs_offset + i, 0);
@@ -701,22 +697,14 @@ namespace Hatrix {
         rhs_offset = permute_forward(x, level, rhs_offset);
       }
 
-      std::cout << "BEFORE LU 0\n";
-      x.print();
-
       x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
       solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
       solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
-
-      std::cout << "AFTER LU 0\n";
-      x.print();
 
       // Backward
       for (int64_t level = 1; level <= height; ++level) {
         rhs_offset = permute_backward(x, level, rhs_offset);
 
-        std::cout << "AFTER PERMUTE BACK \n";
-        x.print();
         int64_t num_nodes = pow(2, level);
 
         Matrix x_level(N - rhs_offset, 1);
@@ -748,8 +736,6 @@ namespace Hatrix {
           x(rhs_offset + i, 0) = x_level(i, 0);
         }
 
-        std::cout << "VF prints PRE\n";
-        x.print();
         // Multiply VF with the respective block in x
         for (int block = num_nodes-1; block >= 0; --block) {
           Matrix& Vo = V(block, level);
@@ -768,9 +754,6 @@ namespace Hatrix {
             x(offset + i, 0) = product(i, 0);
           }
         }
-
-        std::cout << "VF print POST\n";
-        x.print();
       }
 
 
@@ -805,22 +788,13 @@ int main(int argc, char *argv[]) {
   double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
 
-  A.print_structure();
-
   A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b);
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-
   Hatrix::Context::finalize();
-
-  std::cout << "X :\n";
-  x.print();
-
-  std::cout << "X ANS:\n";
-  x_solve.print();
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 

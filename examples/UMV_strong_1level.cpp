@@ -695,9 +695,9 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
   randvec_t randpts;
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 1D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 2D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 3D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -712,12 +712,8 @@ int main(int argc, char** argv) {
   auto last = A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b, last);
 
-  // std::cout << "x:\n";
-  // x.print();
-
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  // Adense.print();
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
 
