@@ -67,13 +67,15 @@ namespace Hatrix {
       // Row slice since column bases should be cutting across the columns.
       Matrix Ui, Si, Vi; double error;
       int nblocks = pow(2, level);
-      Hatrix::Matrix AY(block_size, rank + oversampling);
+      Hatrix::Matrix AY(block_size, 0);
       for (int64_t j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
         Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                  block_size, block_size,
                                                                  block*block_size, j*block_size, PV);
-        Hatrix::matmul(dense, Y[j], AY);
+
+        AY = concat(AY, dense, 1);
+        // Hatrix::matmul(dense, Y[j], AY);
       }
       std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(AY, rank);
 
@@ -86,17 +88,17 @@ namespace Hatrix {
       int nblocks = pow(2, level);
 
       // Col slice since row bases should be cutting across the rows.
-      Hatrix::Matrix YtA(rank + oversampling, block_size);
+      Hatrix::Matrix YtA(0, block_size);
       for (int64_t i = 0; i < nblocks; ++i) {
         if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
         Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                  block_size, block_size,
                                                                  i*block_size, block*block_size, PV);
-        Hatrix::matmul(Y[i], dense, YtA, true);
+        YtA = concat(YtA, dense, 0);
       }
-      std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(transpose(YtA), rank);
+      std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(YtA, rank);
 
-      return Ui;
+      return transpose(Vi);
     }
 
     void generate_leaf_nodes(const randvec_t& randpts) {
@@ -185,6 +187,9 @@ namespace Hatrix {
 
           U.insert(node, level, std::move(temp));
           Ubig_parent.insert(node, level, std::move(Ubig));
+
+          auto dd = get_Ubig(node, level);
+          matmul(dd, dd, true, false).print();
         }
 
         if (col_has_admissible_blocks(node, level)) {
