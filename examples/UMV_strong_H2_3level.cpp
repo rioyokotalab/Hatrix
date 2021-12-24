@@ -688,6 +688,10 @@ namespace Hatrix {
           }
         }
 
+        for (int i = 0; i < x_level.rows; ++i) {
+          x(rhs_offset + i, 0) = x_level(i, 0);
+        }
+
         rhs_offset = permute_forward(x, level, rhs_offset);
       }
 
@@ -699,6 +703,45 @@ namespace Hatrix {
       for (int64_t level = 1; level <= height; ++level) {
         rhs_offset = permute_backward(x, level, rhs_offset);
         int64_t num_nodes = pow(2, level);
+
+        Matrix x_level(N - rhs_offset, 1);
+        for (int i = 0; i < x_level.rows; ++i) {
+          x_level(i, 0) = x(rhs_offset + i, 0);
+        }
+        auto x_level_splits = x_level.split(num_nodes, 1);
+
+        // Upper triangle solve of the cc blocks.
+        for (int block = num_nodes-1; block >= 0; --block) {
+          Matrix& Uo = U(block, level);
+          Matrix& Vo = V(block, level);
+          Matrix x_block(x_level_splits[block]);
+          int64_t block_size = Vo.rows;
+
+
+          // copy back x_block into the right place in x_level
+          for (int i = 0; i < block_size; ++i) {
+            x_level(block * block_size + i, 0) = x_block(i, 0);
+          }
+        }
+
+        // Multiply VF with the respective block in x
+        for (int block = num_nodes-1; block >= 0; --block) {
+          Matrix& Vo = V(block, level);
+          int64_t block_size = Vo.rows;
+          c_size = block_size - rank;
+          offset = rhs_offset + block * Vo.rows;
+
+          Matrix temp(block_size, 1);
+          for (int i = 0; i < block_size; ++i) {
+            temp(i, 0) = x(offset + i, 0);
+          }
+
+          auto V_F = make_complement(Vo);
+          Matrix product = matmul(V_F, temp);
+          for (int i = 0; i < block_size; ++i) {
+            x(offset + i, 0) = product(i, 0);
+          }
+        }
       }
 
 
