@@ -74,7 +74,7 @@ namespace Hatrix {
         if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
         Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                  leaf_size, leaf_size,
-                                                                 block*leaf_size, j*leaf_size);
+                                                                 block*leaf_size, j*leaf_size, PV);
         Hatrix::matmul(dense, Y[j], AY);
       }
       std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(AY, rank);
@@ -93,7 +93,7 @@ namespace Hatrix {
         if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
         Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                  leaf_size, leaf_size,
-                                                                 i*leaf_size, block*leaf_size);
+                                                                 i*leaf_size, block*leaf_size, PV);
         Hatrix::matmul(Y[i], dense, YtA, true);
       }
       std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(transpose(YtA), rank);
@@ -112,7 +112,8 @@ namespace Hatrix {
             D.insert(i, j, height,
                      Hatrix::generate_laplacend_matrix(randpts,
                                                        block_size, block_size,
-                                                       i*block_size, j*block_size));
+                                                       i*block_size, j*block_size,
+                                                       PV));
           }
         }
       }
@@ -139,7 +140,8 @@ namespace Hatrix {
           if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size);
+                                                                     i*block_size, j*block_size,
+                                                                     PV);
 
             S.insert(i, j, height,
                      Hatrix::matmul(Hatrix::matmul(U(i, height), dense, true), V(j, height)));
@@ -220,7 +222,7 @@ namespace Hatrix {
         for (int col = 0; col < num_nodes; ++col) {
           if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
             Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                                 row * leaf_size, col * leaf_size);
+                                                 row * leaf_size, col * leaf_size, PV);
             S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
                                              Vbig_parent(col, level)));
           }
@@ -448,7 +450,7 @@ namespace Hatrix {
           if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
             int slice = N / num_nodes;
             actual += norm(Hatrix::generate_laplacend_matrix(randvec, slice, slice,
-                                                             slice * i, slice * j));
+                                                             slice * i, slice * j, PV));
             expected += norm(D(i, j, height));
           }
         }
@@ -513,6 +515,9 @@ namespace Hatrix {
           int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
 
           // Step 3: Partial LU factorization
+
+          Matrix DD(D(block, block, level));
+          lu(DD);
           auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
           Matrix& Dcc = diagonal_splits[0];
           lu(Dcc);
@@ -597,14 +602,12 @@ namespace Hatrix {
                 }
               }
 
-              std::cout << "make matrix: "  <<  i << " " << j << " " << parent_level
-                        << " l: " << level << std::endl;
-
               D.insert(i, j, parent_level, std::move(D_unelim));
             }
           }
         }
       } // for (int level=height; level > 0; --level)
+
 
       Hatrix::lu(D(0, 0, 0));
     }
@@ -625,26 +628,32 @@ namespace Hatrix {
 
         // Contrary to the paper, multiply all the UF from the left side before
         // the forward substitution starts.
+        std::cout << "X PRE\n";
+        x.print();
         for (int block = 0; block < num_nodes; ++block) {
           Matrix& Uo = U(block, level);
           Matrix U_F = make_complement(Uo);
-          c_size = Uo.rows - rank;
-          offset = rhs_offset + block * Uo.rows;
+          int64_t block_size = Uo.rows;
+          c_size = block_size - rank;
+          offset = rhs_offset + block * block_size;
 
-          Matrix temp(Uo.rows, 1);
-          for (int i = 0; i < Uo.rows; ++i) {
+          Matrix temp(block_size, 1);
+          for (int i = 0; i < block_size; ++i) {
             temp(i, 0) = x(offset + i, 0);
           }
           Matrix product = matmul(U_F, temp, true);
-          for (int i = 0; i < Uo.rows; ++i) {
+          for (int i = 0; i < block_size; ++i) {
             x(offset + i, 0) = product(i, 0);
           }
         }
 
+        std::cout << "X POST\n";
+        x.print();
+
         // Copy part of the workspace vector into x_level so that we can only split
         // and work with the parts that correspond to the permuted vector that need
         // to be worked upon.
-        std::cout << "level: " << level << " rhs: " << rhs_offset << std::endl;
+        // std::cout << "level: " << level << " rhs: " << rhs_offset << std::endl;
         Matrix x_level(N - rhs_offset, 1);
         for (int i = 0; i < x_level.rows; ++i) {
           x_level(i, 0) = x(rhs_offset + i, 0);
@@ -660,10 +669,8 @@ namespace Hatrix {
           int64_t block_size = Uo.rows;
 
           c_size = block_size - rank;
-          // offset = rhs_offset + block * Uo.rows;
 
-          int64_t row_split = Uo.rows - rank, col_split = Vo.rows - rank;
-          auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
+          auto block_splits = SPLIT_DENSE(D(block, block, level), c_size, c_size);
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
 
           std::cout << "offset: " << offset << " block: " << block << " l: " << level << std::endl;
@@ -672,9 +679,8 @@ namespace Hatrix {
 
           // copy back x_block into the right place in x_level
           for (int i = 0; i < block_size; ++i) {
-            x_level(block * Uo.rows + i, 0) = x_block(i, 0);
+            x_level(block * block_size + i, 0) = x_block(i, 0);
           }
-
 
           // Forward with the big C block on the lower part. These are the dense blocks
           // that exist below the diagonal block.
@@ -695,13 +701,22 @@ namespace Hatrix {
         rhs_offset = permute_forward(x, level, rhs_offset);
       }
 
+      std::cout << "BEFORE LU 0\n";
+      x.print();
+
       x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
       solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
       solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
+      std::cout << "AFTER LU 0\n";
+      x.print();
+
       // Backward
       for (int64_t level = 1; level <= height; ++level) {
         rhs_offset = permute_backward(x, level, rhs_offset);
+
+        std::cout << "AFTER PERMUTE BACK \n";
+        x.print();
         int64_t num_nodes = pow(2, level);
 
         Matrix x_level(N - rhs_offset, 1);
@@ -733,13 +748,14 @@ namespace Hatrix {
           x(rhs_offset + i, 0) = x_level(i, 0);
         }
 
-
+        std::cout << "VF prints PRE\n";
+        x.print();
         // Multiply VF with the respective block in x
         for (int block = num_nodes-1; block >= 0; --block) {
           Matrix& Vo = V(block, level);
           int64_t block_size = Vo.rows;
           c_size = block_size - rank;
-          offset = rhs_offset + block * Vo.rows;
+          offset = rhs_offset + block * block_size;
 
           Matrix temp(block_size, 1);
           for (int i = 0; i < block_size; ++i) {
@@ -752,6 +768,9 @@ namespace Hatrix {
             x(offset + i, 0) = product(i, 0);
           }
         }
+
+        std::cout << "VF print POST\n";
+        x.print();
       }
 
 
@@ -797,7 +816,10 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::finalize();
 
+  std::cout << "X :\n";
   x.print();
+
+  std::cout << "X ANS:\n";
   x_solve.print();
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
