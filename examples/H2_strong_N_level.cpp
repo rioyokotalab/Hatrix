@@ -63,16 +63,16 @@ namespace Hatrix {
     }
 
     // Generate U for the leaf.
-    Matrix generate_column_bases(int block, int leaf_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
+    Matrix generate_column_bases(int block, int block_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
       // Row slice since column bases should be cutting across the columns.
       Matrix Ui, Si, Vi; double error;
       int nblocks = pow(2, level);
-      Hatrix::Matrix AY(leaf_size, rank + oversampling);
+      Hatrix::Matrix AY(block_size, rank + oversampling);
       for (int64_t j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
         Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                 leaf_size, leaf_size,
-                                                                 block*leaf_size, j*leaf_size, PV);
+                                                                 block_size, block_size,
+                                                                 block*block_size, j*block_size, PV);
         Hatrix::matmul(dense, Y[j], AY);
       }
       std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(AY, rank);
@@ -81,17 +81,17 @@ namespace Hatrix {
     }
 
     // Generate V for the leaf.
-    Matrix generate_row_bases(int block, int leaf_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
+    Matrix generate_row_bases(int block, int block_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
       Matrix Ui, Si, Vi; double error;
       int nblocks = pow(2, level);
 
       // Col slice since row bases should be cutting across the rows.
-      Hatrix::Matrix YtA(rank + oversampling, leaf_size);
+      Hatrix::Matrix YtA(rank + oversampling, block_size);
       for (int64_t i = 0; i < nblocks; ++i) {
         if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
         Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                 leaf_size, leaf_size,
-                                                                 i*leaf_size, block*leaf_size, PV);
+                                                                 block_size, block_size,
+                                                                 i*block_size, block*block_size, PV);
         Hatrix::matmul(Y[i], dense, YtA, true);
       }
       std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(transpose(YtA), rank);
@@ -151,7 +151,7 @@ namespace Hatrix {
                              int level, RowLevelMap& Uchild,
                              ColLevelMap& Vchild) {
       int num_nodes = pow(2, level);
-      int leaf_size = N / num_nodes;
+      int block_size = N / num_nodes;
       int child_level = level + 1;
       int c_num_nodes = pow(2, child_level);
       std::vector<Matrix> Y;
@@ -162,7 +162,7 @@ namespace Hatrix {
 
       for (int i = 0; i < num_nodes; ++i) {
         Y.push_back(
-                    Hatrix::generate_random_matrix(leaf_size, rank + oversampling));
+                    Hatrix::generate_random_matrix(block_size, rank + oversampling));
       }
 
       for (int node = 0; node < num_nodes; ++node) {
@@ -174,21 +174,16 @@ namespace Hatrix {
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-          Matrix Ubig = generate_column_bases(node, leaf_size, randpts, Y, level);
-          std::vector<Matrix> Ubig_splits = Ubig.split(2, 1);
+          Matrix Ubig = generate_column_bases(node, block_size, randpts, Y, level);
+          auto Ubig_splits = Ubig.split(2, 1);
 
           Matrix temp(Ubig_child1.cols + Ubig_child2.cols, Ubig.cols);
-          std::vector<Matrix> temp_splits = temp.split(2, 1);
+          auto temp_splits = temp.split(2, 1);
 
           matmul(Ubig_child1, Ubig_splits[0], temp_splits[0], true, false, 1, 0);
           matmul(Ubig_child2, Ubig_splits[1], temp_splits[1], true, false, 1, 0);
 
-          Matrix Utransfer, Si, Vi; double error;
-          std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
-          U.insert(node, level, std::move(Utransfer));
-
-          // Save the actual basis into the temporary Map to pass to generate
-          // the S block and pass it to higher levels.
+          U.insert(node, level, std::move(temp));
           Ubig_parent.insert(node, level, std::move(Ubig));
         }
 
@@ -197,19 +192,18 @@ namespace Hatrix {
           Matrix& Vbig_child1 = Vchild(child1, child_level);
           Matrix& Vbig_child2 = Vchild(child2, child_level);
 
-          Matrix Vbig = generate_row_bases(node, leaf_size, randpts, Y, level);
-          std::vector<Matrix> Vbig_splits = Vbig.split(2, 1);
+          Matrix Vbig = generate_row_bases(node, block_size, randpts, Y, level);
+
+
+          auto Vbig_splits = Vbig.split(2, 1);
 
           Matrix temp(Vbig_child1.cols + Vbig_child2.cols, Vbig.cols);
-          std::vector<Matrix> temp_splits = temp.split(2, 1);
+          auto temp_splits = temp.split(2, 1);
 
           matmul(Vbig_splits[0], Vbig_child1, temp_splits[0], true, false, 1, 0);
           matmul(Vbig_splits[1], Vbig_child2, temp_splits[1], true, false, 1, 0);
 
-          Matrix Ui, Si, Vtransfer; double error;
-          std::tie(Vtransfer, Si, Ui, error) = truncated_svd(temp, rank);
-          V.insert(node, level, std::move(Vtransfer));
-
+          V.insert(node, level, std::move(temp));
           Vbig_parent.insert(node, level, std::move(Vbig));
         }
       }
@@ -217,8 +211,8 @@ namespace Hatrix {
       for (int row = 0; row < num_nodes; ++row) {
         for (int col = 0; col < num_nodes; ++col) {
           if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
-            Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                                 row * leaf_size, col * leaf_size, PV);
+            Matrix D = generate_laplacend_matrix(randpts, block_size, block_size,
+                                                 row * block_size, col * block_size, PV);
             S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
                                              Vbig_parent(col, level)));
           }
@@ -238,9 +232,9 @@ namespace Hatrix {
       Matrix Ubig_child1 = get_Ubig(child1, level+1);
       Matrix Ubig_child2 = get_Ubig(child2, level+1);
 
-      int leaf_size = Ubig_child1.rows + Ubig_child2.rows;
+      int block_size = Ubig_child1.rows + Ubig_child2.rows;
 
-      Matrix Ubig(leaf_size, rank);
+      Matrix Ubig(block_size, rank);
 
       std::vector<Matrix> Ubig_splits =
         Ubig.split(
@@ -265,9 +259,9 @@ namespace Hatrix {
       Matrix Vbig_child1 = get_Vbig(child1, level+1);
       Matrix Vbig_child2 = get_Vbig(child2, level+1);
 
-      int leaf_size = Vbig_child1.rows + Vbig_child2.rows;
+      int block_size = Vbig_child1.rows + Vbig_child2.rows;
 
-      Matrix Vbig(leaf_size, rank);
+      Matrix Vbig(block_size, rank);
 
       std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
       std::vector<Matrix> V_splits = V(node, level).split(2, 1);
@@ -429,6 +423,7 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
+  A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
