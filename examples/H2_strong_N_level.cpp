@@ -239,10 +239,10 @@ namespace Hatrix {
 
       Matrix Ubig(block_size, rank);
 
-      std::vector<Matrix> Ubig_splits =
-        Ubig.split(
-                   std::vector<int64_t>(1,
-                                        Ubig_child1.rows), {});
+      std::vector<Matrix> Ubig_splits = Ubig.split(
+                                                   std::vector<int64_t>(1,
+                                                                        Ubig_child1.rows),
+                                                   {});
 
       std::vector<Matrix> U_splits = U(node, level).split(2, 1);
 
