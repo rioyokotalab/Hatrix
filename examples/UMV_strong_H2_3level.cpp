@@ -614,6 +614,11 @@ namespace Hatrix {
       Matrix x(b);
       std::vector<Matrix> x_splits;
 
+      // Design philosophy: when working with permuted vectors in a loop, make a copy
+      // of the working vector before starting actual work on it. Then copy into
+      // that local copy for all subsequent operations. Finally copy out the copied
+      // local vector into the overall global vector.
+
       // Forward
       for (int64_t level = height; level > 0; --level) {
         int64_t num_nodes = pow(2, level);
@@ -655,13 +660,20 @@ namespace Hatrix {
           int64_t block_size = Uo.rows;
 
           c_size = block_size - rank;
-          offset = rhs_offset + block * Uo.rows;
+          // offset = rhs_offset + block * Uo.rows;
 
           int64_t row_split = Uo.rows - rank, col_split = Vo.rows - rank;
           auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
 
           std::cout << "offset: " << offset << " block: " << block << " l: " << level << std::endl;
+          solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
+
+          // copy back x_block into the right place in x_level
+          for (int i = 0; i < block_size; ++i) {
+            x_level(block * Uo.rows + i, 0) = x_block(i, 0);
+          }
 
 
           // Forward with the big C block on the lower part. These are the dense blocks
