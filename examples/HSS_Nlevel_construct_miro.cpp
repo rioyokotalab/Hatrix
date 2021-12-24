@@ -282,15 +282,16 @@ namespace Hatrix {
 
     double construction_relative_error(const randvec_t& randpts) {
       double error = 0;
+      double dense = 0;
       int num_nodes = pow(2, height);
 
-      // for (int block = 0; block < num_nodes; ++block) {
-      //   int slice = N / num_nodes;
-      //   double diagonal_error = rel_error(D(block, block, height),
-      //                                     Hatrix::generate_laplacend_matrix(randpts, slice, slice,
-      //                                                                       slice * block, slice * block));
-      //   error += pow(diagonal_error, 2);
-      // }
+      for (int block = 0; block < num_nodes; ++block) {
+        int slice = N / num_nodes;
+        Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
+                                                          slice * block, slice * block, PV);
+        error += pow(norm(D(block, block, height) - actual), 2);
+        dense += pow(norm(actual), 2);
+      }
 
       for (int level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
@@ -304,10 +305,11 @@ namespace Hatrix {
           Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
                                                             row * slice, col * slice, PV);
 
-          error += Hatrix::norm(expected - actual);
+          error += pow(Hatrix::norm(expected - actual), 2);
+          dense += pow(Hatrix::norm(actual), 2);
         }
       }
-      return std::sqrt(error / N / N);
+      return std::sqrt(error / dense);
     }
   };
 }
@@ -325,8 +327,8 @@ int main(int argc, char* argv[]) {
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   Hatrix::HSS A(randpts, N, rank, height);
   double error = A.construction_relative_error(randpts);
