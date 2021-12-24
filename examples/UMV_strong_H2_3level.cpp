@@ -716,13 +716,23 @@ namespace Hatrix {
           Matrix& Vo = V(block, level);
           Matrix x_block(x_level_splits[block]);
           int64_t block_size = Vo.rows;
+          int64_t c_size = block_size - rank;
 
+          auto block_splits = SPLIT_DENSE(D(block, block, level), c_size, c_size);
+          auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
+          matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+          solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
 
           // copy back x_block into the right place in x_level
           for (int i = 0; i < block_size; ++i) {
             x_level(block * block_size + i, 0) = x_block(i, 0);
           }
         }
+
+        for (int i = 0; i < x_level.rows; ++i) {
+          x(rhs_offset + i, 0) = x_level(i, 0);
+        }
+
 
         // Multiply VF with the respective block in x
         for (int block = num_nodes-1; block >= 0; --block) {
@@ -786,6 +796,9 @@ int main(int argc, char *argv[]) {
 
 
   Hatrix::Context::finalize();
+
+  x.print();
+  x_solve.print();
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
