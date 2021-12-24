@@ -188,8 +188,8 @@ namespace Hatrix {
           U.insert(node, level, std::move(temp));
           Ubig_parent.insert(node, level, std::move(Ubig));
 
-          auto dd = get_Ubig(node, level);
-          matmul(dd, dd, true, false).print();
+          // auto dd = get_Ubig(node, level);
+          // matmul(dd, dd, true, false).print();
         }
 
         if (col_has_admissible_blocks(node, level)) {
@@ -426,7 +426,6 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
-  A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);

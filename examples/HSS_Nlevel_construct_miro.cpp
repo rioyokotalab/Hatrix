@@ -324,11 +324,14 @@ int main(int argc, char* argv[]) {
 
   Hatrix::Context::init();
   randvec_t randpts;
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   Hatrix::HSS A(randpts, N, rank, height);
   double error = A.construction_relative_error(randpts);
 
   Hatrix::Context::finalize();
-  std::cout << "N= " << N << " rank= " << rank << " height=" << height <<  " construction error=" << error << std::endl;
+  std::cout << "N= " << N << " rank= " << rank << " leaf=" << N / pow(2, height)
+            << " height=" << height <<  " construction error=" << error << std::endl;
 }
