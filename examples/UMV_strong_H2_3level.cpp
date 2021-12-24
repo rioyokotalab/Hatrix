@@ -7,7 +7,7 @@
 
 #include "Hatrix/Hatrix.h"
 
-constexpr double PV = 1e-1;
+constexpr double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
@@ -473,8 +473,6 @@ namespace Hatrix {
               Matrix actual_matrix = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
                                                                        row * slice, col * slice, PV);
 
-              (expected_matrix - actual_matrix).print();
-
               dense_norm += pow(norm(actual_matrix), 2);
               error += pow(norm(expected_matrix - actual_matrix), 2);
             }
@@ -519,9 +517,6 @@ namespace Hatrix {
           int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
 
           // Step 3: Partial LU factorization
-
-          std::cout << "b: " << block << " l: " << level << " rs: "
-                    << row_split << " cs: " << col_split << std::endl;
 
           auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
           Matrix& Dcc = diagonal_splits[0];
@@ -671,7 +666,6 @@ namespace Hatrix {
           auto block_splits = SPLIT_DENSE(D(block, block, level), c_size, c_size);
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
 
-          std::cout << "offset: " << offset << " block: " << block << " l: " << level << std::endl;
           solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
           matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
 
@@ -790,7 +784,6 @@ int main(int argc, char *argv[]) {
   double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
 
-  A.print_structure();
   A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b);
 
