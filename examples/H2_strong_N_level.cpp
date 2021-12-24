@@ -360,16 +360,20 @@ namespace Hatrix {
 
     double construction_relative_error(const randvec_t& randvec) {
       // verify diagonal matrix block constructions at the leaf level.
-      double error = 0;
-      double actual = 0, expected = 0;
+      double error = 0, dense = 0;
+      // double actual = 0, expected = 0;
       int num_nodes = pow(2, height);
       for (int i = 0; i < num_nodes; ++i) {
         for (int j = 0; j < num_nodes; ++j) {
           if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
-            int slice = N / num_nodes;
-            actual += norm(Hatrix::generate_laplacend_matrix(randvec, slice, slice,
-                                                             slice * i, slice * j, PV));
-            expected += norm(D(i, j, height));
+            int block_size = N / num_nodes;
+
+            Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_size, block_size,
+                                                              block_size * i, block_size * j, PV);
+            Matrix expected = D(i, j, height);
+
+            error += pow(norm(expected - actual), 2);
+            dense += pow(norm(actual), 2);
           }
         }
       }
@@ -377,7 +381,7 @@ namespace Hatrix {
       // regenerate off-diagonal blocks and test for correctness.
       for (int level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
-        int slice = N / num_nodes;
+        int block_size = N / num_nodes;
 
         for (int row = 0; row < num_nodes; ++row) {
           for (int col = 0; col < num_nodes; ++col) {
@@ -386,17 +390,17 @@ namespace Hatrix {
               Matrix Vbig = get_Vbig(col, level);
               int block_nrows = Ubig.rows;
               int block_ncols = Vbig.rows;
-              Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-              Matrix actual_matrix = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
-                                                                       row * slice, col * slice, PV);
-              actual += norm(actual_matrix);
-              expected += norm(expected_matrix);
+              Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+              Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
+                                                                       row * block_size, col * block_size, PV);
+              error += pow(norm(expected - actual), 2);
+              dense += pow(norm(actual), 2);
             }
           }
         }
       }
 
-      return std::sqrt(pow(std::abs(actual - expected) / expected, 2));
+      return std::sqrt(error / dense);
     }
 
     void print_structure() {

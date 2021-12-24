@@ -451,7 +451,8 @@ namespace Hatrix {
             int slice = N / num_nodes;
             Matrix actual = Hatrix::generate_laplacend_matrix(randvec, slice, slice,
                                                               slice * i, slice * j, PV);
-            error += pow(norm(actual - D(i, j, height)), 2);
+            Matrix expected = D(i, j, height);
+            error += pow(norm(actual - expected), 2);
             dense_norm += pow(norm(actual), 2);
           }
         }
@@ -784,15 +785,16 @@ int main(int argc, char *argv[]) {
   double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
 
-  A.factorize(randpts);
-  Hatrix::Matrix x = A.solve(b);
+  // A.factorize(randpts);
+  // Hatrix::Matrix x = A.solve(b);
 
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  Hatrix::Matrix x_solve = lu_solve(Adense, b);
+  // Hatrix::Matrix x(b);
+  // Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   Hatrix::Context::finalize();
 
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  double solve_error =0; //Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= " << int(N / pow(2, height))
             << " height=" << height <<  " const. error="
