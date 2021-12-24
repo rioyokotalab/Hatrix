@@ -464,7 +464,7 @@ namespace Hatrix {
 
         for (int row = 0; row < num_nodes; ++row) {
           for (int col = 0; col < num_nodes; ++col) {
-            if (is_admissible.exists(row, col, height) && is_admissible(row, col, level)) {
+            if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
               Matrix Ubig = get_Ubig(row, level);
               Matrix Vbig = get_Vbig(col, level);
               int block_nrows = Ubig.rows;
@@ -472,6 +472,8 @@ namespace Hatrix {
               Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
               Matrix actual_matrix = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
                                                                        row * slice, col * slice, PV);
+
+              (expected_matrix - actual_matrix).print();
 
               dense_norm += pow(norm(actual_matrix), 2);
               error += pow(norm(expected_matrix - actual_matrix), 2);
@@ -788,6 +790,7 @@ int main(int argc, char *argv[]) {
   double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
 
+  A.print_structure();
   A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b);
 
