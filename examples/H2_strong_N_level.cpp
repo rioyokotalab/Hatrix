@@ -193,8 +193,6 @@ namespace Hatrix {
           Matrix& Vbig_child2 = Vchild(child2, child_level);
 
           Matrix Vbig = generate_row_bases(node, block_size, randpts, Y, level);
-
-
           auto Vbig_splits = Vbig.split(2, 1);
 
           Matrix temp(Vbig_child1.cols + Vbig_child2.cols, Vbig.cols);
