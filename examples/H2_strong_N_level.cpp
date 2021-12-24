@@ -62,12 +62,9 @@ namespace Hatrix {
       return has_admis;
     }
 
-    // Generate U for the leaf.
-    Matrix generate_column_bases(int block, int block_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
-      // Row slice since column bases should be cutting across the columns.
-      Matrix Ui, Si, Vi; double error;
+    Matrix generate_column_block(int block, int block_size, const randvec_t& randpts, int level) {
+      Matrix AY(block_size, 0);
       int nblocks = pow(2, level);
-      Hatrix::Matrix AY(block_size, 0);
       for (int64_t j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
         Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
@@ -75,8 +72,17 @@ namespace Hatrix {
                                                                  block*block_size, j*block_size, PV);
 
         AY = concat(AY, dense, 1);
-        // Hatrix::matmul(dense, Y[j], AY);
       }
+      return AY;
+    }
+
+    // Generate U for the leaf.
+    Matrix generate_column_bases(int block, int block_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
+      // Row slice since column bases should be cutting across the columns.
+      Matrix AY = generate_column_block(block, block_size, randpts, level);
+
+      AY.print();
+      Matrix Ui, Si, Vi; double error;
       std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(AY, rank);
 
       return Ui;
@@ -176,20 +182,29 @@ namespace Hatrix {
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-          Matrix Ubig = generate_column_bases(node, block_size, randpts, Y, level);
-          auto Ubig_splits = Ubig.split(2, 1);
+          // Shown as Alevel_node_plus on miro.
+          Matrix col_block = generate_column_block(node, block_size, randpts, level);
+          auto col_block_splits = col_block.split(2, 1);
 
-          Matrix temp(Ubig_child1.cols + Ubig_child2.cols, Ubig.cols);
+          Matrix temp(Ubig_child1.cols + Ubig_child2.cols, col_block.cols);
           auto temp_splits = temp.split(2, 1);
 
-          matmul(Ubig_child1, Ubig_splits[0], temp_splits[0], true, false, 1, 0);
-          matmul(Ubig_child2, Ubig_splits[1], temp_splits[1], true, false, 1, 0);
+          matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
+          matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
 
-          U.insert(node, level, std::move(temp));
+          Matrix Utransfer, Si, Vi; double error;
+          std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
+          U.insert(node, level, std::move(Utransfer));
+
+          // Generate the full bases to pass onto the parent.
+          auto Utransfer_splits = U(node, level).split(2, 1);
+          Matrix Ubig(block_size, rank);
+          auto Ubig_splits = Ubig.split(2, 1);
+
+          matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
+          matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
+
           Ubig_parent.insert(node, level, std::move(Ubig));
-
-          // auto dd = get_Ubig(node, level);
-          // matmul(dd, dd, true, false).print();
         }
 
         if (col_has_admissible_blocks(node, level)) {

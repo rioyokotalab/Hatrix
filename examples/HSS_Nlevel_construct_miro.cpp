@@ -54,6 +54,7 @@ namespace Hatrix {
         }
       }
 
+      row_slice.print();
       return row_slice;
     }
 
@@ -143,6 +144,8 @@ namespace Hatrix {
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
 
+
+          std::cout << "U transfer generate. n-> " << node << " l-> " << level << std::endl;
           Matrix Alevel_node_plus = generate_row_slice(node, leaf_size, randpts);
           std::vector<Matrix> Alevel_node_plus_splits = Alevel_node_plus.split(2, 1);
 
@@ -163,6 +166,8 @@ namespace Hatrix {
           matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
           matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
 
+          auto aa = get_Ubig(node, level);
+          matmul(aa, aa, true, false).print();
           // Save the actual basis into the temporary Map to pass to generate
           // the S block and pass it to higher levels.
           Ubig_parent.insert(node, level, std::move(Ubig));
@@ -327,8 +332,8 @@ int main(int argc, char* argv[]) {
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  // randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
   Hatrix::HSS A(randpts, N, rank, height);
   double error = A.construction_relative_error(randpts);
