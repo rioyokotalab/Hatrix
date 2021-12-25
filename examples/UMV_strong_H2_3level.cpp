@@ -515,11 +515,13 @@ namespace Hatrix {
     }
 
     void factorize(const randvec_t &randpts) {
-      for (int64_t level = height; level > 0; --level) {
+      int64_t level = height;
+      for (; level > 0; --level) {
         int num_nodes = pow(2, level);
 
         for (int64_t block = 0; block < num_nodes; ++block) {
           // Assume that the block size for this level is the number of rows in the bases.
+          if (!U.exists(block, level)) { continue; }
           int64_t block_size = U(block, level).rows;
           // Step 0: Recompress fill-ins on the off-diagonals.
 
@@ -615,12 +617,12 @@ namespace Hatrix {
               for (int ic1 = 0; ic1 < 2; ++ic1) {
                 for (int jc2 = 0; jc2 < 2; ++jc2) {
                   int64_t c1 = i_children[ic1], c2 = j_children[jc2];
+                  if (!U.exists(c1, level)) { continue; }
+
+                  int64_t block_size = U(c1, level).rows;
 
                   if (!is_admissible(c1, c2, level)) {
-                    int64_t row_splits = U(c1, level).rows - U(c1, level).cols,
-                      col_splits = V(c2, level).rows - V(c2, level).cols;
-
-                    auto D_splits = SPLIT_DENSE(D(c1, c2, level), row_splits, col_splits);
+                    auto D_splits = SPLIT_DENSE(D(c1, c2, level), block_size-rank, block_size-rank);
                     D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
                   }
                   else {
@@ -635,7 +637,7 @@ namespace Hatrix {
         }
       } // for (int level=height; level > 0; --level)
 
-      Hatrix::lu(D(0, 0, 0));
+      Hatrix::lu(D(0, 0, level));
     }
 
     Matrix solve(Matrix& b) {
@@ -811,16 +813,17 @@ int main(int argc, char *argv[]) {
   Hatrix::H2 A(randpts, N, rank, height, admis);
   double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
-
+  A.print_structure();
   A.factorize(randpts);
-  Hatrix::Matrix x = A.solve(b);
 
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  Hatrix::Matrix x_solve = lu_solve(Adense, b);
+  // Hatrix::Matrix x = A.solve(b);
 
-  Hatrix::Context::finalize();
+  // Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  // Hatrix::Context::finalize();
+
+  double solve_error = 0;//Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= " << int(N / pow(2, height))
             << " height=" << height <<  " const. error="
