@@ -143,8 +143,6 @@ namespace Hatrix {
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-
-          std::cout << "U transfer generate. n-> " << node << " l-> " << level << std::endl;
           Matrix Alevel_node_plus = generate_row_slice(node, leaf_size, randpts);
           std::vector<Matrix> Alevel_node_plus_splits = Alevel_node_plus.split(2, 1);
 
@@ -290,24 +288,32 @@ namespace Hatrix {
       int num_nodes = pow(2, height);
 
       for (int block = 0; block < num_nodes; ++block) {
-        int slice = N / num_nodes;
-        Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
-                                                          slice * block, slice * block, PV);
+        int block_size = N / num_nodes;
+        Matrix actual = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
+                                                          block_size * block, block_size * block, PV);
         error += pow(norm(D(block, block, height) - actual), 2);
         dense += pow(norm(actual), 2);
       }
 
       for (int level = height; level > 0; --level) {
         int num_nodes = pow(2, level);
-        int slice = N / num_nodes;
+        int block_size = N / num_nodes;
 
         for (int row = 0; row < num_nodes; ++row) {
           int col = row % 2 == 0 ? row + 1 : row - 1;
           Matrix Ubig = get_Ubig(row, level);
           Matrix Vbig = get_Vbig(col, level);
+
+          // std::cout << "U identity: " << row << " " << col
+          //           << norm(generate_identity_matrix(rank, rank) - matmul(Ubig, Ubig, true, false))
+          //           << std::endl;
+
+          // std::cout << "V identity: " << row << " " << col
+          //           << norm(generate_identity_matrix(rank, rank) - matmul(Vbig, Vbig, true, false))
+          //           << std::endl;
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-          Matrix actual = Hatrix::generate_laplacend_matrix(randpts, slice, slice,
-                                                            row * slice, col * slice, PV);
+          Matrix actual = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
+                                                            row * block_size, col * block_size, PV);
 
           error += pow(Hatrix::norm(expected - actual), 2);
           dense += pow(Hatrix::norm(actual), 2);
