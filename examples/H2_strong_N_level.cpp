@@ -81,27 +81,30 @@ namespace Hatrix {
       // Row slice since column bases should be cutting across the columns.
       Matrix AY = generate_column_block(block, block_size, randpts, level);
 
-      AY.print();
       Matrix Ui, Si, Vi; double error;
       std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(AY, rank);
 
       return Ui;
     }
 
-    // Generate V for the leaf.
-    Matrix generate_row_bases(int block, int block_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
-      Matrix Ui, Si, Vi; double error;
-      int nblocks = pow(2, level);
-
-      // Col slice since row bases should be cutting across the rows.
+    Matrix generate_row_block(int block, int block_size, const randvec_t& randpts, int level) {
       Hatrix::Matrix YtA(0, block_size);
-      for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t i = 0; i < pow(2, level); ++i) {
         if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
         Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                  block_size, block_size,
                                                                  i*block_size, block*block_size, PV);
         YtA = concat(YtA, dense, 0);
       }
+
+      return YtA;
+    }
+
+    // Generate V for the leaf.
+    Matrix generate_row_bases(int block, int block_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
+      Matrix YtA = generate_row_block(block, block_size, randpts, level);
+
+      Matrix Ui, Si, Vi; double error;
       std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(YtA, rank);
 
       return transpose(Vi);
@@ -212,17 +215,29 @@ namespace Hatrix {
           Matrix& Vbig_child1 = Vchild(child1, child_level);
           Matrix& Vbig_child2 = Vchild(child2, child_level);
 
-          Matrix Vbig = generate_row_bases(node, block_size, randpts, Y, level);
-          auto Vbig_splits = Vbig.split(2, 1);
+          Matrix row_block = generate_row_block(node, block_size, randpts, level);
+          auto row_block_splits = row_block.split(1, 2);
 
-          Matrix temp(Vbig_child1.cols + Vbig_child2.cols, Vbig.cols);
-          auto temp_splits = temp.split(2, 1);
+          Matrix temp(row_block.rows, Vbig_child1.cols + Vbig_child2.cols);
+          auto temp_splits = temp.split(1, 2);
 
-          matmul(Vbig_splits[0], Vbig_child1, temp_splits[0], true, false, 1, 0);
-          matmul(Vbig_splits[1], Vbig_child2, temp_splits[1], true, false, 1, 0);
+          matmul(row_block_splits[0], Vbig_child1, temp_splits[0]);
+          matmul(row_block_splits[1], Vbig_child2, temp_splits[1]);
 
-          V.insert(node, level, std::move(temp));
-          Vbig_parent.insert(node, level, std::move(Vbig));
+          Matrix Ui, Si, Vtransfer; double error;
+          std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
+          V.insert(node, level, transpose(Vtransfer));
+
+          // Generate the full bases for passing onto the upper level.
+          std::vector<Matrix> Vtransfer_splits = V(node, level).split(2, 1);
+          Matrix Vbig(rank, block_size);
+          std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
+
+          matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
+          matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
+
+          Vbig_parent.insert(node, level, transpose(Vbig));
+
         }
       }
 

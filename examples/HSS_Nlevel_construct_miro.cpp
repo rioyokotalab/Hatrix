@@ -54,7 +54,6 @@ namespace Hatrix {
         }
       }
 
-      row_slice.print();
       return row_slice;
     }
 
@@ -166,8 +165,8 @@ namespace Hatrix {
           matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
           matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
 
-          auto aa = get_Ubig(node, level);
-          matmul(aa, aa, true, false).print();
+          // auto aa = get_Ubig(node, level);
+          // matmul(aa, aa, true, false).print();
           // Save the actual basis into the temporary Map to pass to generate
           // the S block and pass it to higher levels.
           Ubig_parent.insert(node, level, std::move(Ubig));
