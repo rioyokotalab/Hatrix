@@ -746,8 +746,24 @@ namespace Hatrix {
       }
 
       x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
-      solve_triangular(D(0, 0, level), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      solve_triangular(D(0, 0, level), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
+      Matrix x_last(x_splits[1]);
+      int64_t last_nodes = pow(2, level);
+      auto x_last_splits = x_last.split(last_nodes, 1);
+
+      for (int i = 0; i < last_nodes; ++i) {
+        for (int j = 0; j < i; ++j) {
+          matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
+        }
+        solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Lower, true);
+      }
+
+      for (int i = last_nodes-1; i >= 0; --i) {
+        for (int j = last_nodes-1; j > i; --j) {
+          matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
+        }
+        solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Upper, false);
+      }
+      x_splits[1] = x_last;
 
       level++;
       // Backward
@@ -812,7 +828,6 @@ namespace Hatrix {
           }
         }
       }
-
 
       return x;
     }
