@@ -637,10 +637,26 @@ namespace Hatrix {
         }
       } // for (int level=height; level > 0; --level)
 
-      Hatrix::lu(D(0, 0, level));
+      int64_t last_nodes = pow(2, level);
+      for (int d = 0; d < last_nodes; ++d) {
+        lu(D(d, d, level));
+        for (int j = d+1; j < last_nodes; ++j) {
+          solve_triangular(D(d, d, level), D(d, j, level), Hatrix::Left, Hatrix::Lower, true);
+        }
+        for (int i = d+1; i < last_nodes; ++i) {
+          solve_triangular(D(d, d, level), D(i, d, level), Hatrix::Right, Hatrix ::Upper, false);
+        }
+
+        for (int i = d+1; i < last_nodes; ++i) {
+          for (int j = d+1; j < last_nodes; ++j) {
+            matmul(D(i, d, level), D(d, j, level), D(i, j, level), false, false, -1.0, 1.0);
+          }
+        }
+      }
     }
 
     Matrix solve(Matrix& b) {
+      int64_t level = height;
       int64_t c_size, offset, rhs_offset = 0;
       Matrix x(b);
       std::vector<Matrix> x_splits;
@@ -651,8 +667,15 @@ namespace Hatrix {
       // local vector into the overall global vector.
 
       // Forward
-      for (int64_t level = height; level > 0; --level) {
+      for (; level > 0; --level) {
         int64_t num_nodes = pow(2, level);
+        bool lr_exists = false;
+        for (int block = 0; block < num_nodes; ++block) {
+          if (U.exists(block, level)) {
+            lr_exists = true;
+          }
+        }
+        if (!lr_exists) { break; }
 
         // Contrary to the paper, multiply all the UF from the left side before
         // the forward substitution starts.
@@ -723,14 +746,23 @@ namespace Hatrix {
       }
 
       x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
-      solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
-      solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
+      solve_triangular(D(0, 0, level), x_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(D(0, 0, level), x_splits[1], Hatrix::Left, Hatrix::Upper, false);
 
+      level++;
       // Backward
-      for (int64_t level = 1; level <= height; ++level) {
-        rhs_offset = permute_backward(x, level, rhs_offset);
-
+      for (; level <= height; ++level) {
         int64_t num_nodes = pow(2, level);
+
+        bool lr_exists = false;
+        for (int block = 0; block < num_nodes; ++block) {
+          if (V.exists(block, level)) {
+            lr_exists = true;
+          }
+        }
+        if (!lr_exists) { break; }
+
+        rhs_offset = permute_backward(x, level, rhs_offset);
 
         Matrix x_level(N - rhs_offset, 1);
         for (int i = 0; i < x_level.rows; ++i) {
@@ -816,14 +848,14 @@ int main(int argc, char *argv[]) {
   A.print_structure();
   A.factorize(randpts);
 
-  // Hatrix::Matrix x = A.solve(b);
+  Hatrix::Matrix x = A.solve(b);
 
-  // Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-  // Hatrix::Context::finalize();
+  Hatrix::Context::finalize();
 
-  double solve_error = 0;//Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= " << int(N / pow(2, height))
             << " height=" << height <<  " const. error="
