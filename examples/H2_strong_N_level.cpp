@@ -7,7 +7,7 @@
 
 #include "Hatrix/Hatrix.h"
 
-constexpr double PV = 1e-3;
+double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -415,11 +415,9 @@ namespace Hatrix {
             if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
               Matrix Ubig = get_Ubig(row, level);
               Matrix Vbig = get_Vbig(col, level);
-              int block_nrows = Ubig.rows;
-              int block_ncols = Vbig.rows;
               Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-              Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
-                                                                       row * block_size, col * block_size, PV);
+              Matrix actual = Hatrix::generate_laplacend_matrix(randvec, block_size, block_size,
+                                                                row * block_size, col * block_size, PV);
               error += pow(norm(expected - actual), 2);
               dense += pow(norm(actual), 2);
             }
@@ -441,6 +439,7 @@ int main(int argc, char *argv[]) {
   int64_t rank = atoi(argv[2]);
   int64_t height = atoi(argv[3]);
   int64_t admis = atoi(argv[4]);
+  int64_t base = 200;
 
   if (rank > int(N / pow(2, height))) {
     std::cout << N << " % " << pow(2, height)
@@ -453,9 +452,11 @@ int main(int argc, char *argv[]) {
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  PV = 1e-2 * (1 / pow(10, height));
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randvec, N, rank, height, admis);
+  // A.print_structure();
   auto stop_construct = std::chrono::system_clock::now();
 
   double error = A.construction_relative_error(randvec);
