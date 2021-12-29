@@ -524,6 +524,15 @@ namespace Hatrix {
           if (!U.exists(block, level)) { continue; }
           int64_t block_size = U(block, level).rows;
           // Step 0: Recompress fill-ins on the off-diagonals.
+          if (block > 0) {
+            {
+              // Compress fill-ins on the same row as the <block,level> pair.
+              Matrix row_concat(block_size, 0);
+              std::vector<int64_t> VN1_col_splits;
+              bool found_row_fill_in = false;
+
+            }
+          }
 
           // Step 1: Generate UF and VF blocks.
           Matrix UF = make_complement(U(block, level));
