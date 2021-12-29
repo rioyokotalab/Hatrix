@@ -1,5 +1,5 @@
 TOPSRCDIR = .
-include $(TOPSRCDIR)/make.inc
+include $(TOPSRCDIR)/common.mk
 
 DIRS := src/classes src/functions src/util
 OBJLIBS := libfunctions.a libclasses.a libutil.a

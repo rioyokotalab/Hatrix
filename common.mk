@@ -1,4 +1,4 @@
-include $(TOPSRCDIR)/make.inc
+include $(TOPSRCDIR)/make.macos.inc
 
 OBJECTS := $(subst .cpp,.o,$(SOURCES))
 
@@ -11,4 +11,3 @@ $(sublib): $(OBJECTS)
 .PHONY: clean
 clean:
 	$(RM) -f $(OBJECTS) $(sublib)
-
