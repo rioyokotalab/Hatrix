@@ -711,6 +711,32 @@ namespace Hatrix {
                 // Operands are dense and product is fill-in.
                 // The product is a (co; oo)-sized matrix.
                 else {
+                  // Need to create a new fill-in block.
+                  if (!F.exists(i, j, level)) {
+                    Matrix fill_in(block_size, rank);
+                    auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank),
+                                                     {});
+                    // Update the co block within the fill-in.
+                    matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false,
+                           -1.0, 1.0);
+
+                    // Update the oo block within the fill-in.
+                    matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false,
+                           -1.0, 1.0);
+
+                    F.insert(i, j, level, std::move(fill_in));
+                  }
+                  // Update an existing fill-in block.
+                  else {
+                    Matrix &fill_in = F(i, j);
+                    auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
+                    // Update the co block within the fill-in.
+                    matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false,
+                           -1.0, 1.0);
+                    // Update the oo block within the fill-in.
+                    matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false,
+                           -1.0, 1.0);
+                  }
                 }
               }
             }
