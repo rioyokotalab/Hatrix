@@ -744,6 +744,51 @@ namespace Hatrix {
           }
 
           // Schur's compliment between oc and cc blocks.
+          for (int i = 0; i < num_nodes; ++i) {
+            for (int j = block + 1; j < num_nodes; ++j) {
+              if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
+                  (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+                auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
+                                                U(i, level).cols, col_split);
+                auto right_splits = SPLIT_DENSE(D(block, j, level), row_split, block_size -
+                                                V(j, level).cols);
+                if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+                  auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                   block_size - U(i, level).cols,
+                                                   block_size - V(j, level).cols);
+                  matmul(lower_splits[2], right_splits[0], reduce_splits[2],
+                         false, false, -1.0, 1.0);
+                }
+                else {
+                  // Schur's compliement between oc and cc blocks where a new fill-in is created.
+                  // The product is a (oc, oo)-sized block.
+                  if (!F.exists(i, j, level)) {
+                    Matrix fill_in(rank, block_size);
+                    auto fill_splits = fill_in.split({},
+                                                     std::vector<int64_t>(1, block_size - rank));
+                    // Update the oc block within the fill-ins.
+                    matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false,
+                           -1.0, 1.0);
+                    // Update the oo block within the fill-ins.
+                    matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false,
+                           -1.0, 1.0);
+                    F.insert(i, j, level, std::move(fill_in));
+                  }
+                  else {
+                    Matrix& fill_in = F(i, j, level);
+                    auto fill_splits = fill_in.split({},
+                                                     std::vector<int64_t>(1, block_size - rank));
+                    // Update the oc block within the fill-ins.
+                    matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false,
+                           -1.0, 1.0);
+                    // Update the oo block within the fill-ins.
+                    matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false,
+                           -1.0, 1.0);
+                  }
+                }
+              }
+            }
+          }
         } // for (block=0; block < num_nodes; ++block)
 
         // Merge the unfactorized parts.
