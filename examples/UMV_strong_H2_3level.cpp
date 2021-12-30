@@ -690,6 +690,31 @@ namespace Hatrix {
               }
             }
           }
+
+          // Schur's compliment between co and cc block.
+          for (int i = block + 1; i < num_nodes; ++i) {
+            for (int j = 0; j < num_nodes; ++j) {
+              if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
+                  (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+                auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
+                                                U(i, level).cols, col_split);
+                auto right_splits = SPLIT_DENSE(D(block, j, level), row_split, block_size -
+                                                V(j, level).cols);
+                // Product and operands are dense.
+                if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+                  auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                   block_size - U(i, level).cols,
+                                                   block_size - V(j, level).cols);
+                  matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false,
+                         -1.0, 1.0);
+                }
+                // Operands are dense and product is fill-in.
+                // The product is a (co; oo)-sized matrix.
+                else {
+                }
+              }
+            }
+          }
         }
 
         // Merge the unfactorized parts.
