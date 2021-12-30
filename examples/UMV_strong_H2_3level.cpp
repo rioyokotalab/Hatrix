@@ -529,7 +529,7 @@ namespace Hatrix {
           if (!U.exists(block, level)) { continue; }
           int64_t block_size = U(block, level).rows;
           // Step 0: Recompress fill-ins on the off-diagonals.
-          if (block > 0) {
+          if (false) {
             {
               // Compress fill-ins on the same row as the <block,level> pair.
               Matrix row_concat(block_size, 0);
@@ -608,7 +608,7 @@ namespace Hatrix {
                 }
               }
             }
-          }
+          } // if (block > 0)
 
           // Step 1: Generate UF and VF blocks.
           Matrix UF = make_complement(U(block, level));
@@ -915,10 +915,25 @@ namespace Hatrix {
           // Forward with the big C block on the lower part. These are the dense blocks
           // that exist below the diagonal block.
           for (int irow = block+1; irow < num_nodes; ++irow) {
+            if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
+              int64_t block_split = block_size - U(irow, level).cols;
+              auto lower_splits = D(irow, block, level).split({},
+                                                              std::vector<int64_t>(1,
+                                                                                   block_split));
 
+              Matrix x_block(x_level_splits[block]);
+              auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_split), {});
+
+              Matrix x_irow(x_level_splits[irow]);
+              matmul(lower_splits[0], x_block_splits[0], x_irow, false, false, -1.0, 1.0);
+              for (int64_t i = 0; i < block_size; ++i) {
+                x_level(irow * block_size + i, 0) = x_irow(i, 0);
+              }
+            }
           }
 
-          // Forward with the oc parts of the block that are actually in the upper part of the matrix.
+          // Forward with the oc parts of the block that are actually in the upper
+          // part of the matrix.
           for (int irow = 0; irow < block; ++irow) {
 
           }
@@ -1052,6 +1067,10 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
+
+
+  x_solve.print();
+  x.print();
 
   Hatrix::Context::finalize();
 
