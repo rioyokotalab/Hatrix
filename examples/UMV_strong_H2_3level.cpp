@@ -175,7 +175,8 @@ namespace Hatrix {
     }
 
     // Generate U for the leaf.
-    Matrix generate_column_bases(int block, int block_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
+    Matrix generate_column_bases(int block, int block_size, const randvec_t& randpts,
+                                 std::vector<Matrix>& Y, int level) {
       // Row slice since column bases should be cutting across the columns.
       Matrix AY = generate_column_block(block, block_size, randpts, level);
 
@@ -199,7 +200,8 @@ namespace Hatrix {
     }
 
     // Generate V for the leaf.
-    Matrix generate_row_bases(int block, int block_size, const randvec_t& randpts, std::vector<Matrix>& Y, int level) {
+    Matrix generate_row_bases(int block, int block_size, const randvec_t& randpts,
+                              std::vector<Matrix>& Y, int level) {
       Matrix YtA = generate_row_block(block, block_size, randpts, level);
 
       Matrix Ui, Si, Vi; double error;
@@ -497,7 +499,8 @@ namespace Hatrix {
               int block_nrows = Ubig.rows;
               int block_ncols = Vbig.rows;
               Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-              Matrix actual_matrix = Hatrix::generate_laplacend_matrix(randvec, block_nrows, block_ncols,
+              Matrix actual_matrix = Hatrix::generate_laplacend_matrix(randvec, block_nrows,
+                                                                       block_ncols,
                                                                        row * slice, col * slice, PV);
 
               dense_norm += pow(norm(actual_matrix), 2);
