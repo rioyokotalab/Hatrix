@@ -544,7 +544,7 @@ namespace Hatrix {
 
               if (found_row_fill_in) {
                 for (int j = 0; j < num_nodes; ++j) {
-                  if (is_admissible(block, j, level)) {
+                  if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
                     row_concat = concat(row_concat, matmul(U(block, level),
                                                            S(block, j, level)), 1);
                     if (F.exists(block, j, level)) {
@@ -558,7 +558,7 @@ namespace Hatrix {
                 std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
                 for (int j = 0; j < num_nodes; ++j) {
-                  if (is_admissible(block, j, level)) {
+                  if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
                     Matrix r_block_j = matmul(UN1, U(block, level), true, false);
                     Matrix Sbar_block_j = matmul(r_block_j, S(block, j, level));
 
@@ -596,7 +596,7 @@ namespace Hatrix {
 
               if (found_col_fill_in) {
                 for (int i = 0; i < num_nodes; ++i) {
-                  if (is_admissible(i, block, level)) {
+                  if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                     col_concat = concat(col_concat, matmul(S(i, block, level),
                                                            transpose(V(block, level))),
                                         0);
@@ -685,7 +685,8 @@ namespace Hatrix {
                   auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                    block_size - U(i, level).cols,
                                                    block_size - V(j, level).cols);
-                  matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+                  matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false,
+                         -1.0, 1.0);
                 }
               }
             }
@@ -728,7 +729,7 @@ namespace Hatrix {
                   }
                   // Update an existing fill-in block.
                   else {
-                    Matrix &fill_in = F(i, j);
+                    Matrix &fill_in = F(i, j, level);
                     auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
                     // Update the co block within the fill-in.
                     matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false,
@@ -741,7 +742,9 @@ namespace Hatrix {
               }
             }
           }
-        }
+
+          // Schur's compliment between oc and cc blocks.
+        } // for (block=0; block < num_nodes; ++block)
 
         // Merge the unfactorized parts.
         int64_t parent_level = level - 1;
