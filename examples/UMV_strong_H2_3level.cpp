@@ -935,7 +935,23 @@ namespace Hatrix {
           // Forward with the oc parts of the block that are actually in the upper
           // part of the matrix.
           for (int irow = 0; irow < block; ++irow) {
+            if (is_admissible.exists(irow, block, level) &&
+                !is_admissible(irow, block, level)) {
+              int64_t block_split = block_size - V(irow, level).cols;
+              auto top_splits = SPLIT_DENSE(D(irow, block, level), block_split, block_split);
 
+              Matrix x_irow(x_level_splits[irow]), x_block(x_level_splits[block]);
+
+              auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, block_split), {});
+              auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_split), {});
+
+              matmul(top_splits[2], x_block_splits[0], x_irow_splits[1],
+                     false, false, -1.0, 1.0);
+
+              for (int i = 0; i < block_size; ++i) {
+                x_level(irow * block_size + i, 0) = x_irow(i, 0);
+              }
+            }
           }
         }
 
@@ -946,7 +962,7 @@ namespace Hatrix {
         rhs_offset = permute_forward(x, level, rhs_offset);
       }
 
-      std::cout << "rhs offset: " << rhs_offset << std::endl;
+      // Work with L0 and U0
       x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
       Matrix x_last(x_splits[1]);
       int64_t last_nodes = pow(2, level);
@@ -954,18 +970,17 @@ namespace Hatrix {
 
       for (int i = 0; i < last_nodes; ++i) {
         for (int j = 0; j < i; ++j) {
-          // matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
+          matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
         }
         solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Lower, true);
       }
 
       for (int i = last_nodes-1; i >= 0; --i) {
         for (int j = last_nodes-1; j > i; --j) {
-          // matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
+          matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
         }
         solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Upper, false);
       }
-      Matrix xc(x);
       x_splits[1] = x_last;
 
       level++;
@@ -1016,7 +1031,22 @@ namespace Hatrix {
 
           // Apply c block present on the right of this diagonal block.
           for (int right_col = num_nodes-1; right_col > block; --right_col) {
+            if (is_admissible.exists(block, right_col, level) &&
+                !is_admissible(block, right_col, level)) {
+              int64_t block_split = block_size - V(block, level).cols;
+              auto right_splits = D(block, right_col,
+                                    level).split(std::vector<int64_t>(1,
+                                                                      block_split),
+                                                 {});
+              Matrix x_block(x_level_splits[block]);
+              auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_split), {});
 
+              matmul(right_splits[0], x_level_splits[right_col], x_block_splits[0], false, false,
+                     -1.0, 1.0);
+              for (int i = 0; i < block_size; ++i) {
+                x_level(right_col * block_size + i, 0) = x_block(i, 0);
+              }
+            }
           }
 
           Matrix x_block(x_level_splits[block]);
@@ -1062,6 +1092,40 @@ namespace Hatrix {
   };
 } // namespace Hatrix
 
+using namespace Hatrix;
+
+// Build an array of all the UF matrices starting with the leaf level
+// progressing toward upper levels.
+std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> U_F;
+
+  for (int level = A.height; level > 0; --level) {
+    int num_nodes = pow(2, level);
+    for (int block = 0; block < num_nodes; ++block) {
+      if (U.exists(block, level)) {
+        int block_size = U(block, level).rows;
+        Matrix UF_full = generate_identity_matrix(A.N, A.N);
+        Matrix UF_block = make_complement(A.U(block, level));
+
+
+      }
+    }
+  }
+}
+
+std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
+}
+
+
+Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
+  Matrix product(A.N, A.N);
+
+  std::vector<Hatrix::Matrix> U_F = generate_UF_chain(A);
+  std::vector<Hatrix::Matrix> V_F = generate_VF_chain(A);
+
+  return product;
+}
+
 int main(int argc, char *argv[]) {
   int64_t N = atoi(argv[1]);
   int64_t rank = atoi(argv[2]);
@@ -1089,24 +1153,29 @@ int main(int argc, char *argv[]) {
   auto stop_construct = std::chrono::system_clock::now();
   A.factorize(randpts);
 
-  Hatrix::Matrix x = A.solve(b);
-
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  Hatrix::Matrix x_solve = lu_solve(Adense, b);
+  auto A_factorize_verify = verify_factorization(A);
+
+  double factorization_error = Hatrix::norm(A_factorize_verify - Adense) / Hatrix::norm(Adense);
+
+  // Hatrix::Matrix x = A.solve(b);
+  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
 
-  std::cout << "X solve\n";
-  x_solve.print();
-  std::cout << "B-X\n";
-  (x-x_solve).print();
+  // std::cout << "X solve\n";
+  // x_solve.print();
+  // std::cout << "X-X_solve\n";
+  // (x-x_solve).print();
 
   Hatrix::Context::finalize();
 
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  double solve_error = 0;// Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= "
             << int(N / pow(2, height))
             << " height=" << height <<  " const. error="
-            << construct_error << " solve error=" << solve_error << std::endl;
+            << construct_error
+            << " factorization error= " << factorization_error
+            << " solve error=" << solve_error << std::endl;
 
 }
