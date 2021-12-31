@@ -946,6 +946,7 @@ namespace Hatrix {
         rhs_offset = permute_forward(x, level, rhs_offset);
       }
 
+      std::cout << "rhs offset: " << rhs_offset << std::endl;
       x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
       Matrix x_last(x_splits[1]);
       int64_t last_nodes = pow(2, level);
@@ -953,17 +954,18 @@ namespace Hatrix {
 
       for (int i = 0; i < last_nodes; ++i) {
         for (int j = 0; j < i; ++j) {
-          matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
+          // matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
         }
         solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Lower, true);
       }
 
       for (int i = last_nodes-1; i >= 0; --i) {
         for (int j = last_nodes-1; j > i; --j) {
-          matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
+          // matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
         }
         solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Upper, false);
       }
+      Matrix xc(x);
       x_splits[1] = x_last;
 
       level++;
@@ -1049,7 +1051,7 @@ namespace Hatrix {
           auto V_F = make_complement(Vo);
           Matrix product = matmul(V_F, temp);
           for (int i = 0; i < block_size; ++i) {
-            x(offset + i, 0) = product(i, 0);
+            // x(offset + i, 0) = product(i, 0);
           }
         }
       }
@@ -1091,6 +1093,12 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
+
+
+  std::cout << "X solve\n";
+  x_solve.print();
+  std::cout << "B-X\n";
+  (x-x_solve).print();
 
   Hatrix::Context::finalize();
 
