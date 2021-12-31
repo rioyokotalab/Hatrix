@@ -989,11 +989,35 @@ namespace Hatrix {
 
         // Upper triangle solve of the cc blocks.
         for (int block = num_nodes-1; block >= 0; --block) {
-          Matrix& Uo = U(block, level);
           Matrix& Vo = V(block, level);
-          Matrix x_block(x_level_splits[block]);
           int64_t block_size = Vo.rows;
           int64_t c_size = block_size - rank;
+          // Apply co block part of the dense blocks to the corresponding parts
+          // in the RHS.
+          for (int left_col = block-1; left_col >= 0; --left_col) {
+            if (is_admissible.exists(block, left_col, level) &&
+                !is_admissible(block, left_col, level)) {
+              int64_t block_split = block_size - V(left_col, level).cols;
+              auto left_splits = SPLIT_DENSE(D(block, left_col, level), block_split, block_split);
+
+              Matrix x_block(x_level_splits[block]), x_left_col(x_level_splits[left_col]);
+              auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_split), {});
+              auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, block_split), {});
+
+              matmul(left_splits[1], x_left_col_splits[1], x_block_splits[0], false, false,
+                     -1.0, 1.0);
+              for (int i = 0; i < block_size; ++i) {
+                x_level(left_col * block_size + i, 0) = x_left_col(i, 0);
+              }
+            }
+          }
+
+          // Apply c block present on the right of this diagonal block.
+          for (int right_col = num_nodes-1; right_col > block; --right_col) {
+
+          }
+
+          Matrix x_block(x_level_splits[block]);
 
           auto block_splits = SPLIT_DENSE(D(block, block, level), c_size, c_size);
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
@@ -1068,15 +1092,12 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-
-  x_solve.print();
-  x.print();
-
   Hatrix::Context::finalize();
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
-  std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= " << int(N / pow(2, height))
+  std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= "
+            << int(N / pow(2, height))
             << " height=" << height <<  " const. error="
             << construct_error << " solve error=" << solve_error << std::endl;
 
