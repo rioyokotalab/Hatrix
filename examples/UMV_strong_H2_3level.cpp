@@ -1121,18 +1121,18 @@ generate_offsets(Hatrix::H2& A, int level) {
 // Build an array of all the UF matrices starting with the leaf level
 // progressing toward upper levels.
 std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
-
   std::vector<Hatrix::Matrix> U_F;
 
   for (int level = A.height; level > 0; --level) {
     int num_nodes = pow(2, level);
-    std::vector<int64_t> dim_offsets = generate_offsets(A, level);
     for (int block = 0; block < num_nodes; ++block) {
       if (A.U.exists(block, level)) {
+        std::vector<int64_t> dim_offsets = generate_offsets(A, level);
         int block_size = A.U(block, level).rows;
         Matrix UF_full = generate_identity_matrix(A.N, A.N);
         Matrix UF_block = make_complement(A.U(block, level));
 
+        auto UF_full_splits = UF_full.split(dim_offsets, dim_offsets);
 
       }
     }
