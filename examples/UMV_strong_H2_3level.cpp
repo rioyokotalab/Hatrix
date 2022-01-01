@@ -539,6 +539,15 @@ namespace Hatrix {
 
       for (; level > 0; --level) {
         int num_nodes = pow(2, level);
+        bool is_all_dense_level = false;
+        for (int i = 0; i < num_nodes; ++i) {
+          if (!U.exists(i, level)) {
+            is_all_dense_level = true;
+          }
+        }
+        if (is_all_dense_level) {
+          break;
+        }
 
         for (int64_t block = 0; block < num_nodes; ++block) {
           // Assume that the block size for this level is the number of rows in the bases.
@@ -833,6 +842,7 @@ namespace Hatrix {
                 }
               }
 
+              std::cout << "D <" << i << "," << j << "," << parent_level << ">\n";
               D.insert(i, j, parent_level, std::move(D_unelim));
             }
           }
@@ -841,6 +851,7 @@ namespace Hatrix {
 
       int64_t last_nodes = pow(2, level);
       for (int d = 0; d < last_nodes; ++d) {
+        D(d, d, level).print_meta();
         lu(D(d, d, level));
         for (int j = d+1; j < last_nodes; ++j) {
           solve_triangular(D(d, d, level), D(d, j, level), Hatrix::Left, Hatrix::Lower, true);
@@ -1143,6 +1154,13 @@ generate_offsets(Hatrix::H2& A, int level) {
   return offsets;
 }
 
+// Generate offsets for the large dense matrix that will hold the last
+// block that is factorized by the UMV.
+std::vector<int64_t>
+generate_top_level_offsets(Hatrix::H2& A, int level) {
+
+}
+
 // Build an array of all the UF matrices starting with the leaf level
 // progressing toward upper levels.
 std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
@@ -1326,6 +1344,7 @@ std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
   return U;
 }
 
+// Generate L0 by collecting blocks that correspond to L0 in the factorized matrix A.
 Hatrix::Matrix generate_L0_permuted(H2& A) {
   Matrix L0(A.N, A.N);
 
