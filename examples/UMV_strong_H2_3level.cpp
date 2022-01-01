@@ -1157,8 +1157,30 @@ generate_offsets(Hatrix::H2& A, int level) {
 // Generate offsets for the large dense matrix that will hold the last
 // block that is factorized by the UMV.
 std::vector<int64_t>
-generate_top_level_offsets(Hatrix::H2& A, int level) {
+generate_top_level_offsets(Hatrix::H2& A) {
+  std::vector<int64_t> offsets;
+  int size_offset = 0;
+  int level = A.height;
 
+  for (; level > 0; --level) {
+    if (A.U.exists(0, level)) {
+      size_offset += (A.U(0, level).rows -
+                      A.U(0, level).cols) * pow(2, level);
+      offsets.push_back(size_offset);
+    }
+    else {
+      break;
+    }
+  }
+
+  int num_nodes = pow(2, level);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    size_offset += A.D(i, i, level).rows;
+    offsets.push_back(size_offset);
+  }
+
+  return offsets;
 }
 
 // Build an array of all the UF matrices starting with the leaf level
@@ -1347,6 +1369,7 @@ std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
 // Generate L0 by collecting blocks that correspond to L0 in the factorized matrix A.
 Hatrix::Matrix generate_L0_permuted(H2& A) {
   Matrix L0(A.N, A.N);
+  std::vector<int64_t> top_level_offsets = generate_top_level_offsets(A);
 
   return L0;
 }
