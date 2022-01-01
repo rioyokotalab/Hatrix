@@ -38,6 +38,31 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
   return Q_F;
 }
 
+Hatrix::Matrix lower(Hatrix::Matrix A) {
+  Hatrix::Matrix mat(A.rows, A.cols);
+
+  for (int i = 0; i < A.rows; ++i) {
+    mat(i, i) = 1.0;
+    for (int j = 0; j < i; ++j) {
+      mat(i, j) = A(i, j);
+    }
+  }
+
+  return mat;
+}
+
+Hatrix::Matrix upper(Hatrix::Matrix A) {
+  Hatrix::Matrix mat(A.rows, A.cols);
+
+  for (int i = 0; i < A.rows; ++i) {
+    for (int j = i; j < A.cols; ++j) {
+      mat(i, j) = A(i, j);
+    }
+  }
+
+  return mat;
+}
+
 namespace Hatrix {
   class H2 {
   public:
@@ -1099,8 +1124,6 @@ generate_offsets(Hatrix::H2& A, int level) {
     }
   }
 
-  std::cout << "off start: " << size_offset << std::endl;
-
   // add offsets for the layout of the permuted matrix.
   int num_nodes = pow(2, level);
 
@@ -1110,8 +1133,6 @@ generate_offsets(Hatrix::H2& A, int level) {
     size_offset += c_size;
     offsets.push_back(size_offset);
   }
-
-
 
   // offsets for rank sizes.
   for (int i = 1; i < num_nodes; ++i) {
@@ -1198,12 +1219,85 @@ std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
   return V_F;
 }
 
+std::vector<Matrix> generate_L_chain(Hatrix::H2& A) {
+  std::vector<Matrix> L;
+
+  for (int level = A.height; level > 0; --level) {
+    int num_nodes = pow(2, level);
+    for (int block = 0; block < num_nodes; ++block) {
+      Matrix L_block = generate_identity_matrix(A.N, A.N);
+      auto dim_offsets = generate_offsets(A, level);
+      if (A.U.exists(block, level)) {
+        for (int j = 0; j <= block; ++j) {
+          if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
+
+            auto L_block_splits = L_block.split(dim_offsets, dim_offsets);
+
+            int level_offset = A.height - level;
+            int block_split = A.U(block, level).rows - A.U(block, level).cols;
+            int prow = block + level_offset;
+            int pcol = j + level_offset;
+            int permuted_nblocks = dim_offsets.size() + 1;
+
+            auto D_splits = SPLIT_DENSE(A.D(block, j, level), block_split, block_split);
+
+            if (block == j) {
+              L_block_splits[prow * permuted_nblocks + pcol] = lower(D_splits[0]);
+            }
+            else {
+              std::cout << "HELLO NON DIAG\n";
+              L_block_splits[prow * permuted_nblocks + pcol] = D_splits[0];
+            }
+
+            L_block_splits[(prow + num_nodes) * permuted_nblocks + pcol] = D_splits[2];
+          }
+        }
+      }
+
+            // Copy oc parts belonging to the 'upper' parts of the matrix
+      for (int j = block+1; j < num_nodes; ++j) {
+        if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
+        }
+      }
+
+      L_block.print();
+      L.push_back(L_block);
+
+
+    }
+  }
+
+  return L;
+}
+
+std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
+  std::vector<Matrix> U;
+
+  return U;
+}
+
+Hatrix::Matrix generate_L0_permuted(H2& A) {
+  Matrix L0(A.N, A.N);
+
+  return L0;
+}
+
+Hatrix::Matrix generate_U0_permuted(H2& A) {
+  Matrix U0(A.N, A.N);
+
+  return U0;
+}
+
 
 Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   Matrix product(A.N, A.N);
 
-  std::vector<Hatrix::Matrix> U_F = generate_UF_chain(A);
-  std::vector<Hatrix::Matrix> V_F = generate_VF_chain(A);
+  auto U_F = generate_UF_chain(A);
+  auto V_F = generate_VF_chain(A);
+  auto L = generate_L_chain(A);
+  auto U = generate_U_chain(A);
+  auto L0 = generate_L0_permuted(A);
+  auto U0 = generate_U0_permuted(A);
 
   return product;
 }

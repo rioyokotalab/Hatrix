@@ -289,7 +289,6 @@ namespace Hatrix {
                   S.insert(block, j, std::move(Sbar_block_j));
 
                   if (F.exists(block, j)) {
-                    std::cout << "F ERASE: b-> " << block << " j-> " << j << std::endl;
                     F.erase(block, j);
                   }
                 }
@@ -334,8 +333,6 @@ namespace Hatrix {
                     Matrix Fp = matmul(U(i), F(i, block));
                     Matrix SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
-
-                    std::cout << "FILL IN erase i-> " << i << " bl -> " << block << std::endl;
                     F.erase(i, block);
                   }
 
@@ -1033,7 +1030,6 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  A.print_structure();
   Hatrix::BLR2 A_expected_blr(A);
   double construct_error = A.construction_relative_error(randpts);
   Matrix last; RowColMap<Matrix> F;
