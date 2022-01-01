@@ -784,7 +784,7 @@ std::vector<Matrix> generate_L_chain(Hatrix::BLR2& A) {
         int64_t row_split = block_size - A.U(i).cols;
         int64_t col_split = block_size - A.V(block).cols;
         auto D_splits = A.D(i, block).split(std::vector<int64_t>(1, row_split),
-                                        std::vector<int64_t>(1, col_split));
+                                            std::vector<int64_t>(1, col_split));
         L_splits[(i + A.nblocks) * permuted_nblocks + block] = D_splits[2];
       }
     }
@@ -834,7 +834,6 @@ std::vector<Matrix> generate_U_chain(Hatrix::BLR2& A) {
       }
     }
 
-    // U_block.print();
     U.push_back(U_block);
   }
 

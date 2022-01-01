@@ -1225,19 +1225,18 @@ std::vector<Matrix> generate_L_chain(Hatrix::H2& A) {
   for (int level = A.height; level > 0; --level) {
     int num_nodes = pow(2, level);
     for (int block = 0; block < num_nodes; ++block) {
-      Matrix L_block = generate_identity_matrix(A.N, A.N);
-      auto dim_offsets = generate_offsets(A, level);
       if (A.U.exists(block, level)) {
+        Matrix L_block = generate_identity_matrix(A.N, A.N);
+        auto dim_offsets = generate_offsets(A, level);
+        auto L_block_splits = L_block.split(dim_offsets, dim_offsets);
+        int level_offset = A.height - level;
+        int permuted_nblocks = dim_offsets.size() + 1;
+        int prow = block + level_offset;
+
         for (int j = 0; j <= block; ++j) {
           if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
-
-            auto L_block_splits = L_block.split(dim_offsets, dim_offsets);
-
-            int level_offset = A.height - level;
             int block_split = A.U(block, level).rows - A.U(block, level).cols;
-            int prow = block + level_offset;
             int pcol = j + level_offset;
-            int permuted_nblocks = dim_offsets.size() + 1;
 
             auto D_splits = SPLIT_DENSE(A.D(block, j, level), block_split, block_split);
 
@@ -1245,25 +1244,29 @@ std::vector<Matrix> generate_L_chain(Hatrix::H2& A) {
               L_block_splits[prow * permuted_nblocks + pcol] = lower(D_splits[0]);
             }
             else {
-              std::cout << "HELLO NON DIAG\n";
               L_block_splits[prow * permuted_nblocks + pcol] = D_splits[0];
             }
 
             L_block_splits[(prow + num_nodes) * permuted_nblocks + pcol] = D_splits[2];
           }
         }
-      }
 
-            // Copy oc parts belonging to the 'upper' parts of the matrix
-      for (int j = block+1; j < num_nodes; ++j) {
-        if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
+
+        // Copy oc parts belonging to the 'upper' parts of the matrix
+        for (int i = 0; i < block; ++i) {
+          if (A.U.exists(i, level)) {
+            if (A.is_admissible.exists(i, block, level) &&
+                !A.is_admissible(i, block, level)) {
+              int block_split = A.U(i, level).rows - A.U(i, level).cols;
+              int pcol = i + level_offset;
+              auto D_splits = SPLIT_DENSE(A.D(i, block, level), block_split, block_split);
+
+              L_block_splits[(prow + num_nodes) * permuted_nblocks + block] = D_splits[2];
+            }
+          }
         }
+        L.push_back(L_block);
       }
-
-      L_block.print();
-      L.push_back(L_block);
-
-
     }
   }
 
@@ -1272,6 +1275,53 @@ std::vector<Matrix> generate_L_chain(Hatrix::H2& A) {
 
 std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
   std::vector<Matrix> U;
+
+  for (int level = A.height; level > 0; --level) {
+    int num_nodes = pow(2, level);
+
+    for (int block = 0; block < num_nodes; ++block) {
+      if (A.V.exists(block, level)) {
+        Matrix U_block = generate_identity_matrix(A.N, A.N);
+        auto dim_offsets = generate_offsets(A, level);
+        auto U_block_splits = U_block.split(dim_offsets, dim_offsets);
+        int level_offset = A.height - level;
+        int permuted_nblocks = dim_offsets.size() + 1;
+        int prow = block + level_offset;
+        for (int i = 0; i <= block; ++i) {
+          if (A.is_admissible.exists(i, block, level) && !A.is_admissible(i, block, level)) {
+            int block_split = A.U(block, level).rows - A.U(block, level).cols;
+            int pcol = i + level_offset;
+
+            auto D_splits = SPLIT_DENSE(A.D(i, block, level), block_split, block_split);
+
+            // Copy the cc parts
+            if (block == i) {
+              U_block_splits[prow * permuted_nblocks + pcol] = upper(D_splits[0]);
+            }
+            else {
+              U_block_splits[prow * permuted_nblocks + pcol] = D_splits[0];
+            }
+
+            // Copy the co parts
+            U_block_splits[prow * permuted_nblocks + pcol + num_nodes] = D_splits[1];
+          }
+        }
+
+        for (int j = 0; j < block; ++j) {
+          if (A.V.exists(j, level)) {
+            if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
+              int block_split = A.V(j, level).rows - A.V(j, level).cols;
+              int pcol = j + level_offset;
+              auto D_splits = SPLIT_DENSE(A.D(block, j, level), block_split, block_split);
+              U_block_splits[prow * permuted_nblocks + pcol + num_nodes] = D_splits[1];
+            }
+          }
+        }
+
+        U.push_back(U_block);
+      }
+    }
+  }
 
   return U;
 }
