@@ -1188,13 +1188,13 @@ generate_top_level_offsets(Hatrix::H2& A) {
 std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
   std::vector<Hatrix::Matrix> U_F;
 
-  for (int level = A.height; level > 0; --level) {
+  for (int level = 0; level <= A.height; ++level) {
     int num_nodes = pow(2, level);
     for (int block = 0; block < num_nodes; ++block) {
+      Matrix UF_full = generate_identity_matrix(A.N, A.N);
       if (A.U.exists(block, level)) {
         std::vector<int64_t> dim_offsets = generate_offsets(A, level);
         int block_size = A.U(block, level).rows;
-        Matrix UF_full = generate_identity_matrix(A.N, A.N);
         Matrix UF_block = make_complement(A.U(block, level));
 
         auto UF_full_splits = UF_full.split(dim_offsets, dim_offsets);
@@ -1214,8 +1214,9 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
         UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] =
           UF_block_splits[3];
 
-        U_F.push_back(UF_block);
+
       }
+      U_F.push_back(UF_full);
     }
   }
 
@@ -1225,18 +1226,18 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
 std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
   std::vector<Hatrix::Matrix> V_F;
 
-  for (int level = A.height; level > 0; --level) {
+  for (int level = 0; level <= A.height; ++level) {
     int num_nodes = pow(2, level);
     for (int block = 0; block < num_nodes; ++block) {
+      auto VF_full = generate_identity_matrix(A.N, A.N);
       if (A.V.exists(block, level)) {
         std::vector<int64_t> dim_offsets = generate_offsets(A, level);
         int block_size = A.V(block, level).rows;
-        auto VF_full = generate_identity_matrix(A.N, A.N);
-        Matrix VF_block = make_complement(A.U(block, level));
+        Matrix VF_block = transpose(make_complement(A.V(block, level)));
 
         auto VF_full_splits = VF_full.split(dim_offsets, dim_offsets);
-        auto VF_block_splits = SPLIT_DENSE(VF_block, block_size - A.U(block, level).cols,
-                                           block_size - A.U(block, level).cols);
+        auto VF_block_splits = SPLIT_DENSE(VF_block, block_size - A.V(block, level).cols,
+                                           block_size - A.V(block, level).cols);
 
 
         int permuted_nblocks = dim_offsets.size() + 1;
@@ -1251,8 +1252,9 @@ std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
         VF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] =
           VF_block_splits[3];
 
-        V_F.push_back(VF_block);
       }
+
+      V_F.push_back(VF_full);
     }
   }
 
@@ -1262,11 +1264,11 @@ std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
 std::vector<Matrix> generate_L_chain(Hatrix::H2& A) {
   std::vector<Matrix> L;
 
-  for (int level = A.height; level > 0; --level) {
+  for (int level = 0; level <= A.height; ++level) {
     int num_nodes = pow(2, level);
     for (int block = 0; block < num_nodes; ++block) {
+      Matrix L_block = generate_identity_matrix(A.N, A.N);
       if (A.U.exists(block, level)) {
-        Matrix L_block = generate_identity_matrix(A.N, A.N);
         auto dim_offsets = generate_offsets(A, level);
         auto L_block_splits = L_block.split(dim_offsets, dim_offsets);
         int level_offset = A.height - level;
@@ -1305,8 +1307,8 @@ std::vector<Matrix> generate_L_chain(Hatrix::H2& A) {
             }
           }
         }
-        L.push_back(L_block);
       }
+      L.push_back(L_block);
     }
   }
 
@@ -1316,12 +1318,12 @@ std::vector<Matrix> generate_L_chain(Hatrix::H2& A) {
 std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
   std::vector<Matrix> U;
 
-  for (int level = A.height; level > 0; --level) {
+  for (int level = 0; level <= A.height; ++level) {
     int num_nodes = pow(2, level);
 
     for (int block = 0; block < num_nodes; ++block) {
+      Matrix U_block = generate_identity_matrix(A.N, A.N);
       if (A.V.exists(block, level)) {
-        Matrix U_block = generate_identity_matrix(A.N, A.N);
         auto dim_offsets = generate_offsets(A, level);
         auto U_block_splits = U_block.split(dim_offsets, dim_offsets);
         int level_offset = A.height - level;
@@ -1357,9 +1359,8 @@ std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
             }
           }
         }
-
-        U.push_back(U_block);
       }
+      U.push_back(U_block);
     }
   }
 
@@ -1368,7 +1369,7 @@ std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
 
 // Generate L0 by collecting blocks that correspond to L0 in the factorized matrix A.
 Hatrix::Matrix generate_L0_permuted(H2& A) {
-  Matrix L0(A.N, A.N);
+  Matrix L0 = generate_identity_matrix(A.N, A.N);
   std::vector<int64_t> top_level_offsets = generate_top_level_offsets(A);
 
   int level = A.height;
@@ -1400,7 +1401,7 @@ Hatrix::Matrix generate_L0_permuted(H2& A) {
 }
 
 Hatrix::Matrix generate_U0_permuted(H2& A) {
-  Matrix U0(A.N, A.N);
+  Matrix U0 = generate_identity_matrix(A.N, A.N);
   std::vector<int64_t> top_level_offsets = generate_top_level_offsets(A);
 
   int level = A.height;
@@ -1442,11 +1443,10 @@ Matrix chained_product(std::vector<Matrix>& U_F,
   Matrix product = generate_identity_matrix(A.N, A.N);
 
   for (int level = A.height; level > 0; --level) {
-    if (!A.U.exists(0, level)) {
+    if (A.U.exists(0, level)) {
       int num_nodes = pow(2, level);
       for (int i = 0; i < num_nodes; ++i) {
-        int index = pow(2, A.height - level) + i;
-
+        int index = pow(2, level) + i - 1;
         product = matmul(product, U_F[index]);
         product = matmul(product, L[index]);
       }
@@ -1458,6 +1458,20 @@ Matrix chained_product(std::vector<Matrix>& U_F,
 
   product = matmul(product, L0);
   product = matmul(product, U0);
+
+  for (int level = 1; level <= A.height; ++level) {
+    if (A.V.exists(0, level)) {
+      int num_nodes = pow(2, level);
+      for (int i = num_nodes-1; i >= 0; --i) {
+        int index = pow(2, level) + i - 1;
+        product = matmul(product, U[index]);
+        product = matmul(product, V_F[index]);
+      }
+    }
+    else {
+      break;
+    }
+  }
 
   return product;
 }
