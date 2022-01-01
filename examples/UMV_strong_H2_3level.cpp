@@ -1099,6 +1099,8 @@ generate_offsets(Hatrix::H2& A, int level) {
     }
   }
 
+  std::cout << "off start: " << size_offset << std::endl;
+
   // add offsets for the layout of the permuted matrix.
   int num_nodes = pow(2, level);
 
@@ -1108,6 +1110,8 @@ generate_offsets(Hatrix::H2& A, int level) {
     size_offset += c_size;
     offsets.push_back(size_offset);
   }
+
+
 
   // offsets for rank sizes.
   for (int i = 1; i < num_nodes; ++i) {
@@ -1133,7 +1137,23 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
         Matrix UF_block = make_complement(A.U(block, level));
 
         auto UF_full_splits = UF_full.split(dim_offsets, dim_offsets);
+        auto UF_block_splits = SPLIT_DENSE(UF_block, block_size - A.U(block, level).cols,
+                                           block_size - A.U(block, level).cols);
 
+
+        int permuted_nblocks = dim_offsets.size() + 1;
+        int level_offset = A.height - level;
+
+        int prow = block + level_offset;
+        int pcol = block + level_offset;
+
+        UF_full_splits[prow * permuted_nblocks + pcol] = UF_block_splits[0];
+        UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol] = UF_block_splits[2];
+        UF_full_splits[prow * permuted_nblocks + (pcol + num_nodes)] = UF_block_splits[1];
+        UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] =
+          UF_block_splits[3];
+
+        U_F.push_back(UF_block);
       }
     }
   }
@@ -1143,6 +1163,37 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
 
 std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
   std::vector<Hatrix::Matrix> V_F;
+
+  for (int level = A.height; level > 0; --level) {
+    int num_nodes = pow(2, level);
+    for (int block = 0; block < num_nodes; ++block) {
+      if (A.V.exists(block, level)) {
+        std::vector<int64_t> dim_offsets = generate_offsets(A, level);
+        int block_size = A.V(block, level).rows;
+        auto VF_full = generate_identity_matrix(A.N, A.N);
+        Matrix VF_block = make_complement(A.U(block, level));
+
+        auto VF_full_splits = VF_full.split(dim_offsets, dim_offsets);
+        auto VF_block_splits = SPLIT_DENSE(VF_block, block_size - A.U(block, level).cols,
+                                           block_size - A.U(block, level).cols);
+
+
+        int permuted_nblocks = dim_offsets.size() + 1;
+        int level_offset = A.height - level;
+
+        int prow = block + level_offset;
+        int pcol = block + level_offset;
+
+        VF_full_splits[prow * permuted_nblocks + pcol] = VF_block_splits[0];
+        VF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol] = VF_block_splits[2];
+        VF_full_splits[prow * permuted_nblocks + (pcol + num_nodes)] = VF_block_splits[1];
+        VF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] =
+          VF_block_splits[3];
+
+        V_F.push_back(VF_block);
+      }
+    }
+  }
 
   return V_F;
 }
