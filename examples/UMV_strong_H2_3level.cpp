@@ -1432,10 +1432,43 @@ Hatrix::Matrix generate_U0_permuted(H2& A) {
   return U0;
 }
 
+Matrix chained_product(std::vector<Matrix>& U_F,
+                       std::vector<Matrix>& L,
+                       Matrix& L0,
+                       Matrix& U0,
+                       std::vector<Matrix>& U,
+                       std::vector<Matrix>& V_F,
+                       H2& A) {
+  Matrix product = generate_identity_matrix(A.N, A.N);
+
+  for (int level = A.height; level > 0; --level) {
+    if (!A.U.exists(0, level)) {
+      int num_nodes = pow(2, level);
+      for (int i = 0; i < num_nodes; ++i) {
+        int index = pow(2, A.height - level) + i;
+
+        product = matmul(product, U_F[index]);
+        product = matmul(product, L[index]);
+      }
+    }
+    else {
+      break;
+    }
+  }
+
+  product = matmul(product, L0);
+  product = matmul(product, U0);
+
+  return product;
+}
+
+Matrix unpermute_matrix(Matrix permuted, H2& A) {
+  Matrix unpermuted(A.N, A.N);
+
+  return unpermuted;
+}
 
 Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
-  Matrix product(A.N, A.N);
-
   auto U_F = generate_UF_chain(A);
   auto V_F = generate_VF_chain(A);
   auto L = generate_L_chain(A);
@@ -1443,7 +1476,9 @@ Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto L0 = generate_L0_permuted(A);
   auto U0 = generate_U0_permuted(A);
 
-  return product;
+  Matrix A_actual = unpermute_matrix(chained_product(U_F, L, L0, U0, U, V_F, A), A);
+
+  return A_actual;
 }
 
 int main(int argc, char *argv[]) {
