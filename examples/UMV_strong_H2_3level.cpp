@@ -1371,6 +1371,34 @@ Hatrix::Matrix generate_L0_permuted(H2& A) {
   Matrix L0(A.N, A.N);
   std::vector<int64_t> top_level_offsets = generate_top_level_offsets(A);
 
+  int level = A.height;
+  for (; level > 0; --level) {
+    if (!A.U.exists(0, level)) {
+      break;
+    }
+  }
+
+  std::cout << "level : " << level << std::endl;
+  auto L0_splits = L0.split(top_level_offsets, top_level_offsets);
+  int num_nodes = pow(2, level);
+  int level_offset = A.height - level;
+  int permuted_nblocks = num_nodes + level_offset;
+
+  for (int i = 0; i < num_nodes; ++i) {
+    for (int j = 0; j <= i; ++j) {
+      int prow = i + level_offset;
+      int pcol = j + level_offset;
+      if (i == j) {
+        L0_splits[prow * permuted_nblocks + pcol] = lower(A.D(i, j, level));
+      }
+      else {
+        L0_splits[prow * permuted_nblocks + pcol] = A.D(i, j, level);
+      }
+    }
+  }
+
+  L0.print();
+
   return L0;
 }
 
