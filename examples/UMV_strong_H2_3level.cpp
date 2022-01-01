@@ -19,13 +19,23 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   dense.split(std::vector<int64_t>(1, row_split),       \
               std::vector<int64_t>(1, col_split));
 
-std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
-  std::vector<double> res(N, 0.0);
-  double rnge = maxVal - minVal;
-  for(int i=0; i<N; i++) {
-    res[i] = minVal + ((double)i/(double)rnge);
+Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
+  Hatrix::Matrix Q_F(Q.rows, Q.rows);
+  Hatrix::Matrix Q_full, R;
+  std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+
+  for (int i = 0; i < Q_F.rows; ++i) {
+    for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+      Q_F(i, j) = Q_full(i, j + Q.cols);
+    }
   }
-  return res;
+
+  for (int i = 0; i < Q_F.rows; ++i) {
+    for (int j = 0; j < Q.cols; ++j) {
+      Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+    }
+  }
+  return Q_F;
 }
 
 namespace Hatrix {
@@ -59,25 +69,6 @@ namespace Hatrix {
       }
 
       actually_print_structure(level-1);
-    }
-
-    Matrix make_complement(const Hatrix::Matrix &Q) {
-      Matrix Q_F(Q.rows, Q.rows);
-      Matrix Q_full, R;
-      std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
-
-      for (int i = 0; i < Q_F.rows; ++i) {
-        for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
-          Q_F(i, j) = Q_full(i, j + Q.cols);
-        }
-      }
-
-      for (int i = 0; i < Q_F.rows; ++i) {
-        for (int j = 0; j < Q.cols; ++j) {
-          Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
-        }
-      }
-      return Q_F;
     }
 
         // permute the vector forward and return the offset at which the new vector begins.
@@ -1094,16 +1085,51 @@ namespace Hatrix {
 
 using namespace Hatrix;
 
+std::vector<int64_t>
+generate_offsets(Hatrix::H2& A, int level) {
+  std::vector<int64_t> offsets;
+  int c_size = A.N / pow(2, A.height) - A.rank;
+  int size_offset = 0;
+
+  // add offsets for level offet
+  for (int l = A.height; l > level; --l) {
+    if (A.U.exists(0, l)) {
+      size_offset += (A.U(0, l).rows - A.U(0, l).cols) * pow(2, l);
+      offsets.push_back(size_offset);
+    }
+  }
+
+  // add offsets for the layout of the permuted matrix.
+  int num_nodes = pow(2, level);
+
+  // offsets for compliment sizes.
+  for (int i = 0; i < num_nodes; ++i) {
+    c_size = A.U(i, level).rows - A.U(i, level).cols;
+    size_offset += c_size;
+    offsets.push_back(size_offset);
+  }
+
+  // offsets for rank sizes.
+  for (int i = 1; i < num_nodes; ++i) {
+    size_offset += (A.U(i, level).cols);
+    offsets.push_back(size_offset);
+  }
+
+  return offsets;
+}
+
 // Build an array of all the UF matrices starting with the leaf level
 // progressing toward upper levels.
 std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
+
   std::vector<Hatrix::Matrix> U_F;
 
   for (int level = A.height; level > 0; --level) {
     int num_nodes = pow(2, level);
+    std::vector<int64_t> dim_offsets = generate_offsets(A, level);
     for (int block = 0; block < num_nodes; ++block) {
-      if (U.exists(block, level)) {
-        int block_size = U(block, level).rows;
+      if (A.U.exists(block, level)) {
+        int block_size = A.U(block, level).rows;
         Matrix UF_full = generate_identity_matrix(A.N, A.N);
         Matrix UF_block = make_complement(A.U(block, level));
 
@@ -1111,9 +1137,14 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
       }
     }
   }
+
+  return U_F;
 }
 
 std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> V_F;
+
+  return V_F;
 }
 
 
