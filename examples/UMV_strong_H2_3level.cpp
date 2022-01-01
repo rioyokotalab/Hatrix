@@ -1378,7 +1378,6 @@ Hatrix::Matrix generate_L0_permuted(H2& A) {
     }
   }
 
-  std::cout << "level : " << level << std::endl;
   auto L0_splits = L0.split(top_level_offsets, top_level_offsets);
   int num_nodes = pow(2, level);
   int level_offset = A.height - level;
@@ -1397,13 +1396,38 @@ Hatrix::Matrix generate_L0_permuted(H2& A) {
     }
   }
 
-  L0.print();
-
   return L0;
 }
 
 Hatrix::Matrix generate_U0_permuted(H2& A) {
   Matrix U0(A.N, A.N);
+  std::vector<int64_t> top_level_offsets = generate_top_level_offsets(A);
+
+  int level = A.height;
+  for (; level > 0; --level) {
+    if (!A.V.exists(0, level)) {
+      break;
+    }
+  }
+
+  auto U0_splits = U0.split(top_level_offsets, top_level_offsets);
+  int num_nodes = pow(2, level);
+  int level_offset = A.height - level;
+  int permuted_nblocks = num_nodes + level_offset;
+
+  for (int i = 0; i < num_nodes; ++i) {
+    for (int j = i;  j < num_nodes; ++j) {
+      int prow = i + level_offset;
+      int pcol = j + level_offset;
+
+      if (i == j) {
+        U0_splits[prow * permuted_nblocks + pcol] = upper(A.D(i, j, level));
+      }
+      else {
+        U0_splits[prow * permuted_nblocks + pcol] = A.D(i, j, level);
+      }
+    }
+  }
 
   return U0;
 }
