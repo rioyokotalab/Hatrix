@@ -4,6 +4,7 @@
 #include <cassert>
 #include <chrono>
 #include <fstream>
+#include <numeric>
 
 #include "Hatrix/Hatrix.h"
 
@@ -152,7 +153,7 @@ namespace Hatrix {
       return c_offset;
     }
 
-        bool row_has_admissible_blocks(int row, int level) {
+    bool row_has_admissible_blocks(int row, int level) {
       bool has_admis = false;
       for (int i = 0; i < pow(2, level); ++i) {
         if (is_admissible.exists(row, i, level) && is_admissible(row, i, level)) {
@@ -1477,7 +1478,7 @@ Matrix chained_product(std::vector<Matrix>& U_F,
 }
 
 Matrix unpermute_matrix(Matrix permuted, H2& A) {
-  Matrix unpermuted(A.N, A.N);
+  Matrix unpermuted(permuted);
 
   return unpermuted;
 }
@@ -1490,9 +1491,65 @@ Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto L0 = generate_L0_permuted(A);
   auto U0 = generate_U0_permuted(A);
 
-  Matrix A_actual = unpermute_matrix(chained_product(U_F, L, L0, U0, U, V_F, A), A);
+  Matrix A_actual_permuted = chained_product(U_F, L, L0, U0, U, V_F, A);
 
-  return A_actual;
+  return A_actual_permuted;
+}
+
+Matrix permutation_matrix(H2& A) {
+  Matrix P = generate_identity_matrix(A.N, A.N);
+
+  std::vector<int64_t> array(A.N);
+  std::vector<int64_t> new_array(A.N);
+  std::iota(array.begin(), array.end(), 0);
+
+  for (int level = A.height; level > 1; --level) {
+    if (A.U.exists(0, level)) {
+      int block_size = A.U(0, level).rows;
+      int rank = A.U(0, level).cols;
+      int c_size = block_size - rank;
+      int num_nodes = pow(2, level);
+
+      int index, post_rank_index, new_index = 0;
+
+      for (int b = 0; b < num_nodes; ++b) {
+        index = b * c_size;
+        new_index = index;
+
+        for (int c = 0; c < c_size; ++c) {
+          new_array[new_index] = array[index];
+          ++index;
+          ++new_index;
+        }
+
+        post_rank_index = index + rank;
+
+        for (int i = 0; i < (A.N - (b+1) * block_size) + rank * b; ++i) {
+          new_array[new_index] = array[post_rank_index];
+          post_rank_index += 1;
+          ++new_index;
+        }
+
+        for (int r = 0; r < rank; ++r) {
+          new_array[new_index] = array[index];
+          index += 1;
+          new_index += 1;
+        }
+
+        array = new_array;
+      }
+    }
+  }
+
+  return P;
+}
+
+Matrix permute_dense(Matrix& Adense, H2& A) {
+  Matrix A_permuted(Adense);
+
+  Matrix P_level = permutation_matrix(A);
+
+  return A_permuted;
 }
 
 int main(int argc, char *argv[]) {
@@ -1523,9 +1580,13 @@ int main(int argc, char *argv[]) {
   A.factorize(randpts);
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  auto A_factorize_verify = verify_factorization(A);
+  auto A_actual_permuted = verify_factorization(A);
 
-  double factorization_error = Hatrix::norm(A_factorize_verify - Adense) / Hatrix::norm(Adense);
+  auto Adense_permuted = permute_dense(Adense, A);
+
+  // (A_actual_permuted - Adense_permuted).print();
+
+  double factorization_error = Hatrix::norm(A_actual_permuted - Adense) / Hatrix::norm(Adense);
 
   // Hatrix::Matrix x = A.solve(b);
   // Hatrix::Matrix x_solve = lu_solve(Adense, b);

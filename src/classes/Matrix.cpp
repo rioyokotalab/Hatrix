@@ -212,7 +212,7 @@ void Matrix::print() const {
   if (rows == 0 || cols == 0) { return; }
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
-      if ((*this)(i, j) > -1e-12 && (*this)(i, j) < 1e-12) {
+      if ((*this)(i, j) > -1e-10 && (*this)(i, j) < 1e-10) {
         std::cout << std::setw(10) << 0 << " ";
       }
       else {
