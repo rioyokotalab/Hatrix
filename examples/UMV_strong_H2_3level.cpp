@@ -628,10 +628,18 @@ namespace Hatrix {
     actually_print_structure(height);
   }
 
+  Matrix A1_global;
+
   void H2::factorize(const randvec_t &randpts) {
     // For verification of A1 matrix.
-    Matrix A1(N, N);
+    A1_global = generate_identity_matrix(N, N);
     auto dim_offsets = generate_offsets(*this, 1);
+    auto A1_global_splits = A1_global.split(dim_offsets, dim_offsets);
+
+    for (int i = 0; i < dim_offsets.size(); ++i) {
+      std::cout <<  dim_offsets[i] <<  " ";
+    }
+    std::cout << std::endl;
 
     int64_t level = height;
     RowColLevelMap<Matrix> F;
@@ -749,6 +757,25 @@ namespace Hatrix {
           if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
             D(i, block, level) = matmul(D(i, block, level), VF);
           }
+        }
+
+        // debug code to check the A1_global matrix
+        if (level == 1 && block == 0) {
+          int block_size = N / pow(2, level+1);
+          int block_split = rank;
+          auto D0_splits = SPLIT_DENSE(D(0,0,1), block_split, block_split);
+          A1_global_splits[1 * 5 + 1] =  D0_splits[0];
+          A1_global_splits[1 * 5 + 3] = D0_splits[1];
+          A1_global_splits[3 * 5 + 1] = D0_splits[2];
+        }
+
+        if (level == 1 && block == 1) {
+          int block_size = N / pow(2, level+1);
+          int block_split = rank;
+          auto D1_splits = SPLIT_DENSE(D(1,1,1), block_split, block_split);
+          A1_global_splits[2 * 5 + 2] =  D1_splits[0];
+          A1_global_splits[2 * 5 + 4] = D1_splits[1];
+          A1_global_splits[4 * 5 + 2] = D1_splits[2];
         }
 
         int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
@@ -932,6 +959,7 @@ namespace Hatrix {
                 int64_t block_size = U(c1, level).rows;
 
                 if (!is_admissible(c1, c2, level)) {
+                  std::cout << "c1: " << c1 << " c2: " << c2 << " l: " <<  level << std::endl;
                   auto D_splits = SPLIT_DENSE(D(c1, c2, level), block_size-rank, block_size-rank);
                   D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
                 }
@@ -1245,8 +1273,6 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
         UF_full_splits[prow * permuted_nblocks + (pcol + num_nodes)] = UF_block_splits[1];
         UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] =
           UF_block_splits[3];
-
-
       }
       U_F.push_back(UF_full);
     }
@@ -1547,34 +1573,28 @@ void verify_A1(Matrix& A0, std::vector<Matrix>& L,
                std::vector<Matrix>& V_F, H2& A) {
   // Check if the product L1 x L2 x A0 x U2 x U1 is equal to the corresponding parts
   // in the factorized matrix.
-  Matrix& L1 = L[1];
-  Matrix& L2 = L[2];
-  Matrix& U1 = U[1];
-  Matrix& U2 = U[2];
-  Matrix& U_F1 = U_F[1];
-  Matrix& U_F2 = U_F[2];
-  Matrix& V_F1 = V_F[1];
-  Matrix& V_F2 = V_F[2];
-
   std::vector<int64_t> level1_offsets = generate_offsets(A, 1);
-  Matrix A1 = generate_identity_matrix(A.N, A.N);
-  auto A1_splits = A1.split(level1_offsets, level1_offsets);
-  A1_splits[3 * 5 + 4] = A.S(0, 1, 1);
-  A1_splits[4 * 5 + 3] = A.S(1, 0, 1);
-
-  A1_splits[1 * 5 + 3] = A.S(0, 1, 2);
-
   auto D0_split = SPLIT_DENSE(A.D(0, 0, 1), A.rank, A.rank);
   auto D1_split = SPLIT_DENSE(A.D(1, 1, 1), A.rank, A.rank);
 
-  A1_splits[1 * 5 + 1] = D0_split[0];
-  A1_splits[2 * 5 + 2] = D1_split[0];
-  A1_splits[3 * 5 + 3] = D0_split[3];
-  A1_splits[4 * 5 + 4] = D1_split[3];
+  L[1].print();
+  L[2].print();
+  U[2].print();
+  U[1].print();
 
-  auto A1_actual = matmul(matmul(matmul(U_F[1], L[1]), U_F[2]), L[2]);
-  A1_actual = matmul(A1_actual, A0);
-  A1_actual = matmul(matmul(matmul(matmul(A1_actual, U[2]), V_F[2]), U[1]), V_F[1]);
+  auto A1_actual = matmul(matmul(matmul(matmul(L[1], L[2]), A0), U[1]), U[2]);
+
+  auto dim_offsets = generate_offsets(A, 1);
+  auto A1_global_splits = A1_global.split(dim_offsets, dim_offsets);
+  auto A0_splits = A0.split(dim_offsets, dim_offsets);
+
+  // Set these blocks here because they represent the pre-LU factorized last block.
+  A1_global_splits[3 * 5 + 3] = D0_split[3];
+  A1_global_splits[3 * 5 + 4] = A.S(0, 1, 1);
+  A1_global_splits[4 * 5 + 3] = A.S(1, 0, 1);
+  A1_global_splits[4 * 5 + 4] = D1_split[3];
+
+  std::cout << "norm: " << norm(A1_actual - A1_global) << std::endl;
 }
 
 Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
@@ -1586,6 +1606,10 @@ Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto U0 = generate_U0_permuted(A);
 
   Matrix A_actual_permuted = chained_product(U_F, L, L0, U0, U, V_F, A);
+
+  auto A0 = verify_A0(L0, U0, A);
+
+  verify_A1(A0, L, U, U_F, V_F, A);
 
   return A_actual_permuted;
 }
