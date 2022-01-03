@@ -1513,13 +1513,19 @@ Matrix verify_A0(Matrix& L0, Matrix& U0, H2& A) {
 }
 
 void verify_A1(Matrix& A0, std::vector<Matrix>& L,
-               std::vector<Matrix>& U, H2& A) {
+               std::vector<Matrix>& U,
+               std::vector<Matrix>& U_F,
+               std::vector<Matrix>& V_F, H2& A) {
   // Check if the product L1 x L2 x A0 x U2 x U1 is equal to the corresponding parts
   // in the factorized matrix.
   Matrix& L1 = L[1];
   Matrix& L2 = L[2];
   Matrix& U1 = U[1];
   Matrix& U2 = U[2];
+  Matrix& U_F1 = U_F[1];
+  Matrix& U_F2 = U_F[2];
+  Matrix& V_F1 = V_F[1];
+  Matrix& V_F2 = V_F[2];
 
   std::vector<int64_t> level1_offsets = generate_offsets(A, 1);
   Matrix A1 = generate_identity_matrix(A.N, A.N);
@@ -1537,10 +1543,17 @@ void verify_A1(Matrix& A0, std::vector<Matrix>& L,
   A1_splits[3 * 5 + 3] = D0_split[3];
   A1_splits[4 * 5 + 4] = D1_split[3];
 
-  auto A1_actual = matmul(matmul(matmul(matmul(L1, L2), A0), U2), U1);
+  auto A1_actual = matmul(matmul(matmul(U_F[1], L[1]), U_F[2]), L[2]);
+  A1_actual = matmul(A1_actual, A0);
+  A1_actual = matmul(matmul(matmul(matmul(A1_actual, U[2]), V_F[2]), U[1]), V_F[1]);
+
+  std::cout << "ACTUAL --- \n";
   A1_actual.print();
+
+  std::cout << "A1 --- \n";
   A1.print();
 
+  std::cout << "DIFF --- \n";
   (A1_actual - A1).print();
 
 
@@ -1560,7 +1573,7 @@ Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto U0 = generate_U0_permuted(A);
 
   auto A0 = verify_A0(L0, U0, A);
-  verify_A1(A0, L, U, A);
+  verify_A1(A0, L, U, U_F, V_F, A);
 
   Matrix A_actual_permuted = chained_product(U_F, L, L0, U0, U, V_F, A);
 
@@ -1654,6 +1667,7 @@ int main(int argc, char *argv[]) {
   Hatrix::H2 A_copy(A);
   double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
+
   A.factorize(randpts);
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
