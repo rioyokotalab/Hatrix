@@ -20,10 +20,34 @@ namespace Hatrix {
     RowColLevelMap<bool> is_admissible;
     int64_t oversampling = 5;
 
+  private:
     void actually_print_structure(int64_t level);
     int64_t permute_forward(Matrix& x, const int64_t level, int64_t rank_offset);
+    int64_t permute_backward(Matrix& x, const int64_t level, int64_t rank_offset);
+    bool row_has_admissible_blocks(int row, int level);
+    bool col_has_admissible_blocks(int col, int level);
+    Matrix generate_column_block(int block, int block_size, const randvec_t& randpts, int level);
+    Matrix generate_column_bases(int block, int block_size, const randvec_t& randpts,
+                                       std::vector<Matrix>& Y, int level);
+    Matrix generate_row_block(int block, int block_size, const randvec_t& randpts, int level);
+    Matrix generate_row_bases(int block, int block_size, const randvec_t& randpts,
+                              std::vector<Matrix>& Y, int level);
+    void generate_leaf_nodes(const randvec_t& randpts);
+    std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const randvec_t& randpts,
+                                                                    int level, RowLevelMap& Uchild,
+                                                                    ColLevelMap& Vchild);
+    Matrix get_Ubig(int node, int level);
+    Matrix get_Vbig(int node, int level);
+    void compute_matrix_structure(int64_t level);
 
-  private:
+  public:
+    H2(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height,
+             int64_t _admis);
+    H2(const H2& A);
+    double construction_relative_error(const randvec_t& randvec);
+    void print_structure();
+    void factorize(const randvec_t &randpts);
+    Matrix solve(Matrix& b);
   };
 }
 
