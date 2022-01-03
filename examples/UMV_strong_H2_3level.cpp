@@ -1546,22 +1546,6 @@ void verify_A1(Matrix& A0, std::vector<Matrix>& L,
   auto A1_actual = matmul(matmul(matmul(U_F[1], L[1]), U_F[2]), L[2]);
   A1_actual = matmul(A1_actual, A0);
   A1_actual = matmul(matmul(matmul(matmul(A1_actual, U[2]), V_F[2]), U[1]), V_F[1]);
-
-  std::cout << "ACTUAL --- \n";
-  A1_actual.print();
-
-  std::cout << "A1 --- \n";
-  A1.print();
-
-  std::cout << "DIFF --- \n";
-  (A1_actual - A1).print();
-
-
-  for (int i = 0; i < level1_offsets.size(); ++i) {
-    std::cout << level1_offsets[i] << " ";
-  }
-  std::cout << std::endl;
-
 }
 
 Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
@@ -1571,9 +1555,6 @@ Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto U = generate_U_chain(A);
   auto L0 = generate_L0_permuted(A);
   auto U0 = generate_U0_permuted(A);
-
-  auto A0 = verify_A0(L0, U0, A);
-  verify_A1(A0, L, U, U_F, V_F, A);
 
   Matrix A_actual_permuted = chained_product(U_F, L, L0, U0, U, V_F, A);
 
