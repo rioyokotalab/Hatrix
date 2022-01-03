@@ -485,6 +485,9 @@ namespace Hatrix {
       }
     }
 
+    H2(const H2& A) : N(A.N), rank(A.rank), height(A.height), admis(A.admis),
+                      U(A.U), V(A.V), D(A.D), S(A.S), is_admissible(A.is_admissible) {}
+
     double construction_relative_error(const randvec_t& randvec) {
       // verify diagonal matrix block constructions at the leaf level.
       double error = 0;
@@ -1519,6 +1522,27 @@ void verify_A1(Matrix& A0, std::vector<Matrix>& L,
   Matrix& U2 = U[2];
 
   std::vector<int64_t> level1_offsets = generate_offsets(A, 1);
+  Matrix A1 = generate_identity_matrix(A.N, A.N);
+  auto A1_splits = A1.split(level1_offsets, level1_offsets);
+  A1_splits[3 * 5 + 4] = A.S(0, 1, 1);
+  A1_splits[4 * 5 + 3] = A.S(1, 0, 1);
+
+  A1_splits[1 * 5 + 3] = A.S(0, 1, 2);
+
+  auto D0_split = SPLIT_DENSE(A.D(0, 0, 1), A.rank, A.rank);
+  auto D1_split = SPLIT_DENSE(A.D(1, 1, 1), A.rank, A.rank);
+
+  A1_splits[1 * 5 + 1] = D0_split[0];
+  A1_splits[2 * 5 + 2] = D1_split[0];
+  A1_splits[3 * 5 + 3] = D0_split[3];
+  A1_splits[4 * 5 + 4] = D1_split[3];
+
+  auto A1_actual = matmul(matmul(matmul(matmul(L1, L2), A0), U2), U1);
+  A1_actual.print();
+  A1.print();
+
+  (A1_actual - A1).print();
+
 
   for (int i = 0; i < level1_offsets.size(); ++i) {
     std::cout << level1_offsets[i] << " ";
@@ -1627,6 +1651,7 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randpts, N, rank, height, admis);
+  Hatrix::H2 A_copy(A);
   double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
   A.factorize(randpts);
