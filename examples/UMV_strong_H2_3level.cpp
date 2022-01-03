@@ -852,7 +852,6 @@ namespace Hatrix {
 
       int64_t last_nodes = pow(2, level);
       for (int d = 0; d < last_nodes; ++d) {
-        D(d, d, level).print_meta();
         lu(D(d, d, level));
         for (int j = d+1; j < last_nodes; ++j) {
           solve_triangular(D(d, d, level), D(d, j, level), Hatrix::Left, Hatrix::Lower, true);
@@ -1304,11 +1303,12 @@ std::vector<Matrix> generate_L_chain(Hatrix::H2& A) {
               int pcol = i + level_offset;
               auto D_splits = SPLIT_DENSE(A.D(i, block, level), block_split, block_split);
 
-              L_block_splits[(prow + num_nodes) * permuted_nblocks + block] = D_splits[2];
+              L_block_splits[(prow + num_nodes) * permuted_nblocks + pcol] = D_splits[2];
             }
           }
         }
       }
+
       L.push_back(L_block);
     }
   }
@@ -1483,6 +1483,50 @@ Matrix unpermute_matrix(Matrix permuted, H2& A) {
   return unpermuted;
 }
 
+Matrix verify_A0(Matrix& L0, Matrix& U0, H2& A) {
+  Matrix A0_actual = generate_identity_matrix(A.N, A.N);
+  std::vector<int64_t> top_level_offsets = generate_top_level_offsets(A);
+
+  auto A0_actual_splits = A0_actual.split(top_level_offsets, top_level_offsets);
+  auto A0_expected = matmul(L0, U0);
+
+  Matrix temp(A.rank * 2, A.rank * 2);
+  auto temp_split = temp.split(2, 2);
+  temp_split[1] = A.S(0, 1, 1);
+  temp_split[2] = A.S(1, 0, 1);
+
+  int block_split = A.U(0, 2).rows - A.U(0, 2).cols;
+
+  auto D0_split = SPLIT_DENSE(A.D(0, 0, 1), A.rank, A.rank);
+  auto D1_split = SPLIT_DENSE(A.D(1, 1, 1), A.rank, A.rank);
+
+  temp_split[0] = D0_split[3];
+  temp_split[3] = D1_split[3];
+
+  A0_actual_splits[8] = temp;
+
+  std::cout << "A0 verification norm -> " << Hatrix::norm(A0_expected - A0_actual) << std::endl;
+  return A0_actual;
+}
+
+void verify_A1(Matrix& A0, std::vector<Matrix>& L,
+               std::vector<Matrix>& U, H2& A) {
+  // Check if the product L1 x L2 x A0 x U2 x U1 is equal to the corresponding parts
+  // in the factorized matrix.
+  Matrix& L1 = L[1];
+  Matrix& L2 = L[2];
+  Matrix& U1 = U[1];
+  Matrix& U2 = U[2];
+
+  std::vector<int64_t> level1_offsets = generate_offsets(A, 1);
+
+  for (int i = 0; i < level1_offsets.size(); ++i) {
+    std::cout << level1_offsets[i] << " ";
+  }
+  std::cout << std::endl;
+
+}
+
 Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto U_F = generate_UF_chain(A);
   auto V_F = generate_VF_chain(A);
@@ -1491,13 +1535,16 @@ Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto L0 = generate_L0_permuted(A);
   auto U0 = generate_U0_permuted(A);
 
+  auto A0 = verify_A0(L0, U0, A);
+  verify_A1(A0, L, U, A);
+
   Matrix A_actual_permuted = chained_product(U_F, L, L0, U0, U, V_F, A);
 
   return A_actual_permuted;
 }
 
 Matrix permutation_matrix(H2& A) {
-  Matrix P = generate_identity_matrix(A.N, A.N);
+  Matrix P(A.N, A.N);
 
   std::vector<int64_t> array(A.N);
   std::vector<int64_t> new_array(A.N);
@@ -1541,13 +1588,18 @@ Matrix permutation_matrix(H2& A) {
     }
   }
 
+  // Generate P according to new_array
+  for (int i = 0; i < A.N; ++i) {
+    P(i, new_array[i]) = 1.0;
+  }
+
   return P;
 }
 
 Matrix permute_dense(Matrix& Adense, H2& A) {
-  Matrix A_permuted(Adense);
-
   Matrix P_level = permutation_matrix(A);
+
+  Matrix A_permuted = matmul(matmul(P_level, Adense), P_level, false, true);
 
   return A_permuted;
 }
@@ -1583,8 +1635,6 @@ int main(int argc, char *argv[]) {
   auto A_actual_permuted = verify_factorization(A);
 
   auto Adense_permuted = permute_dense(Adense, A);
-
-  // (A_actual_permuted - Adense_permuted).print();
 
   double factorization_error = Hatrix::norm(A_actual_permuted - Adense) / Hatrix::norm(Adense);
 
