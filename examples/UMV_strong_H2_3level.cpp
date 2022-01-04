@@ -769,19 +769,20 @@ namespace Hatrix {
           A1_global_splits[3 * 5 + 1] = D0_splits[2];
         }
 
-        if (level == 1 && block == 1) {
-          int block_size = N / pow(2, level+1);
-          int block_split = rank;
-          auto D1_splits = SPLIT_DENSE(D(1,1,1), block_split, block_split);
-          A1_global_splits[2 * 5 + 2] =  D1_splits[0];
-          A1_global_splits[2 * 5 + 4] = D1_splits[1];
-          A1_global_splits[4 * 5 + 2] = D1_splits[2];
-        }
+        // if (level == 1 && block == 1) {
+        //   int block_size = N / pow(2, level+1);
+        //   int block_split = rank;
+        //   auto D1_splits = SPLIT_DENSE(D(1,1,1), block_split, block_split);
+        //   A1_global_splits[2 * 5 + 2] =  D1_splits[0];
+        //   A1_global_splits[2 * 5 + 4] = D1_splits[1];
+        //   A1_global_splits[4 * 5 + 2] = D1_splits[2];
+        // }
 
         int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
         int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
 
         // Step 3: Partial LU factorization
+        std::cout << "performing partial LU: " << block << " l: " << level << std::endl;
         auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
         Matrix& Dcc = diagonal_splits[0];
         lu(Dcc);
@@ -1233,7 +1234,7 @@ namespace Hatrix {
         auto V_F = make_complement(Vo);
         Matrix product = matmul(V_F, temp);
         for (int i = 0; i < block_size; ++i) {
-          // x(offset + i, 0) = product(i, 0);
+          x(offset + i, 0) = product(i, 0);
         }
       }
     }
@@ -1567,7 +1568,7 @@ Matrix verify_A0(Matrix& L0, Matrix& U0, H2& A) {
   return A0_actual;
 }
 
-void verify_A1(Matrix& A0, std::vector<Matrix>& L,
+Matrix verify_A1(Matrix& A0, std::vector<Matrix>& L,
                std::vector<Matrix>& U,
                std::vector<Matrix>& U_F,
                std::vector<Matrix>& V_F, H2& A) {
@@ -1577,12 +1578,7 @@ void verify_A1(Matrix& A0, std::vector<Matrix>& L,
   auto D0_split = SPLIT_DENSE(A.D(0, 0, 1), A.rank, A.rank);
   auto D1_split = SPLIT_DENSE(A.D(1, 1, 1), A.rank, A.rank);
 
-  L[1].print();
-  L[2].print();
-  U[2].print();
-  U[1].print();
-
-  auto A1_actual = matmul(matmul(matmul(matmul(L[1], L[2]), A0), U[1]), U[2]);
+  auto A1_actual = matmul(matmul(matmul(matmul(L[1], L[2]), A0), U[2]), U[1]);
 
   auto dim_offsets = generate_offsets(A, 1);
   auto A1_global_splits = A1_global.split(dim_offsets, dim_offsets);
@@ -1595,6 +1591,25 @@ void verify_A1(Matrix& A0, std::vector<Matrix>& L,
   A1_global_splits[4 * 5 + 4] = D1_split[3];
 
   std::cout << "norm: " << norm(A1_actual - A1_global) << std::endl;
+
+  return A1_actual;
+}
+
+Matrix verify_A2(Matrix& A0, Matrix& A1, std::vector<Matrix>& L,
+                 std::vector<Matrix>& U,
+                 std::vector<Matrix>& U_F,
+                 std::vector<Matrix>& V_F, H2& A) {
+  std::cout << "L3 print \n";
+  L[3].print();
+  std::cout << "U3 print \n";
+  U[3].print();
+  // auto M = matmul(matmul(L[3], A1_global), U[3]);
+  auto L_prod = matmul(matmul(matmul(L[3], L[4]), L[5]), L[6]);
+  auto M = matmul(matmul(matmul(matmul(matmul(L_prod, A1), U[6]), U[5]), U[4]), U[3]);
+
+  (M - A1_global).print();
+
+  return M;
 }
 
 Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
@@ -1609,7 +1624,9 @@ Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
 
   auto A0 = verify_A0(L0, U0, A);
 
-  verify_A1(A0, L, U, U_F, V_F, A);
+  auto A1 = verify_A1(A0, L, U, U_F, V_F, A);
+
+  verify_A2(A0, A1, L, U, U_F, V_F, A);
 
   return A_actual_permuted;
 }
@@ -1708,11 +1725,10 @@ int main(int argc, char *argv[]) {
   auto A_actual_permuted = verify_factorization(A);
 
   auto Adense_permuted = permute_dense(Adense, A);
-
   double factorization_error = Hatrix::norm(A_actual_permuted - Adense) / Hatrix::norm(Adense);
 
-  // Hatrix::Matrix x = A.solve(b);
-  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
+  Hatrix::Matrix x = A.solve(b);
+  Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
 
   // std::cout << "X solve\n";
@@ -1722,7 +1738,7 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::finalize();
 
-  double solve_error = 0;// Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= "
             << int(N / pow(2, height))
