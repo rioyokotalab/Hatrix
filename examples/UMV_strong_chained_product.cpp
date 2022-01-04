@@ -931,12 +931,10 @@ Matrix chain_product(BLR2& A,
                      Matrix& L0, Matrix& U0,
                      std::vector<Matrix>& U,
                      std::vector<Matrix>& V_F) {
-  Matrix product(A.N, A.N);
-
-  product = matmul(U_F[0], L[0]);
+  Matrix product = generate_identity_matrix(A.N, A.N);
 
   // Multiply UF and L blocks.
-  for (int i = 1; i < A.nblocks; ++i) {
+  for (int i = 0; i < A.nblocks; ++i) {
     product = matmul(product, U_F[i]);
     product = matmul(product, L[i]);
   }
@@ -1068,6 +1066,6 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::finalize();
 
-  std::cout << "A0 accuracy: " << A0_acc << " full accuracy: "
+  std::cout << "A0 accuracy: " << A0_acc << " factorize accuracy: "
             << acc << " contruct error: " << construct_error  << std::endl;
 }

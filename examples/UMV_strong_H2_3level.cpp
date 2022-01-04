@@ -1506,7 +1506,7 @@ Matrix chained_product(std::vector<Matrix>& U_F,
     if (A.U.exists(0, level)) {
       int num_nodes = pow(2, level);
       for (int i = 0; i < num_nodes; ++i) {
-        int index = pow(2, level) + i - 1;
+        int index = num_nodes + i - 1;
         product = matmul(product, U_F[index]);
         product = matmul(product, L[index]);
       }
@@ -1523,7 +1523,7 @@ Matrix chained_product(std::vector<Matrix>& U_F,
     if (A.V.exists(0, level)) {
       int num_nodes = pow(2, level);
       for (int i = num_nodes-1; i >= 0; --i) {
-        int index = pow(2, level) + i - 1;
+        int index = num_nodes + i - 1;
         product = matmul(product, U[index]);
         product = matmul(product, V_F[index]);
       }
@@ -1599,10 +1599,10 @@ Matrix verify_A2(Matrix& A0, Matrix& A1, std::vector<Matrix>& L,
                  std::vector<Matrix>& U,
                  std::vector<Matrix>& U_F,
                  std::vector<Matrix>& V_F, H2& A) {
-  std::cout << "L3 print \n";
-  L[3].print();
-  std::cout << "U3 print \n";
-  U[3].print();
+  // std::cout << "L3 print \n";
+  // L[3].print();
+  // std::cout << "U3 print \n";
+  // U[3].print();
   // auto M = matmul(matmul(L[3], A1_global), U[3]);
   auto L_prod = matmul(matmul(matmul(L[3], L[4]), L[5]), L[6]);
   auto M = matmul(matmul(matmul(matmul(matmul(L_prod, A1), U[6]), U[5]), U[4]), U[3]);
@@ -1725,6 +1725,10 @@ int main(int argc, char *argv[]) {
   auto A_actual_permuted = verify_factorization(A);
 
   auto Adense_permuted = permute_dense(Adense, A);
+  // Adense_permuted.print();
+
+  A_actual_permuted.print();
+  (A_actual_permuted - Adense_permuted).print();
   double factorization_error = Hatrix::norm(A_actual_permuted - Adense) / Hatrix::norm(Adense);
 
   Hatrix::Matrix x = A.solve(b);
