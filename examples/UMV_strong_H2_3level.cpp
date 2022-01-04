@@ -1745,12 +1745,8 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   auto A_actual_permuted = verify_factorization(A);
-
   auto Adense_permuted = permute_dense(Adense, A);
-  // Adense_permuted.print();
 
-  A_actual_permuted.print();
-  (A_actual_permuted - Adense_permuted).print();
   double factorization_error = Hatrix::norm(A_actual_permuted - Adense) / Hatrix::norm(Adense);
 
   Hatrix::Matrix x = A.solve(b);
