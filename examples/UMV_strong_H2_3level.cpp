@@ -752,8 +752,8 @@ namespace Hatrix {
           int block_split = rank;
           auto D0_splits = SPLIT_DENSE(D(0,0,1), block_split, block_split);
           A1_global_splits[1 * 5 + 1] =  D0_splits[0];
-          // A1_global_splits[1 * 5 + 3] = D0_splits[1];
-          // A1_global_splits[3 * 5 + 1] = D0_splits[2];
+          A1_global_splits[1 * 5 + 3] = D0_splits[1];
+          A1_global_splits[3 * 5 + 1] = D0_splits[2];
           A1_global_splits[3 * 5 + 3] =  D0_splits[3];
         }
 
@@ -762,8 +762,8 @@ namespace Hatrix {
           int block_split = rank;
           auto D1_splits = SPLIT_DENSE(D(1,1,1), block_split, block_split);
           A1_global_splits[2 * 5 + 2] =  D1_splits[0];
-          // A1_global_splits[2 * 5 + 4] = D1_splits[1];
-          // A1_global_splits[4 * 5 + 2] = D1_splits[2];
+          A1_global_splits[2 * 5 + 4] = D1_splits[1];
+          A1_global_splits[4 * 5 + 2] = D1_splits[2];
           A1_global_splits[4 * 5 + 4] =  D1_splits[3];
         }
 
@@ -780,8 +780,6 @@ namespace Hatrix {
             D(i, block, level) = matmul(D(i, block, level), VF);
           }
         }
-
-
 
         int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
         int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
@@ -1597,11 +1595,17 @@ Matrix verify_A1(Matrix& A0, std::vector<Matrix>& L,
   auto U_side = matmul(matmul(matmul(U[2], V_F[2]), U[1]), V_F[1]);
   auto A1_actual = matmul(matmul(L_side, A0), U_side);
 
-  // auto A1_actual = matmul(matmul(matmul(matmul(L[1], L[2]), A0), U[2]), U[1]);
-
   auto dim_offsets = generate_offsets(A, 1);
   auto A1_global_splits = A1_global.split(dim_offsets, dim_offsets);
   auto A0_splits = A0.split(dim_offsets, dim_offsets);
+
+  auto A1_01 = matmul(matmul(A.U(0, 1), A.S(0, 1, 1)), A.V(1, 1), false, true);
+  auto A1_01_splits = A1_01.split(2, 2);
+
+  A1_global_splits[1 * 5 + 2] = A1_01_splits[0];
+  A1_global_splits[1 * 5 + 4] = A1_01_splits[1];
+  A1_global_splits[3 * 5 + 2] = A1_01_splits[2];
+  A1_global_splits[3 * 5 + 4] = A1_01_splits[3];
 
   // Set these blocks here because they represent the pre-LU factorized last block.
   // A1_global_splits[3 * 5 + 3] = D0_splits[3];
@@ -1620,11 +1624,6 @@ Matrix verify_A2(Matrix& A0, Matrix& A1, std::vector<Matrix>& L,
                  std::vector<Matrix>& U,
                  std::vector<Matrix>& U_F,
                  std::vector<Matrix>& V_F, H2& A) {
-  // std::cout << "L3 print \n";
-  // L[3].print();
-  // std::cout << "U3 print \n";
-  // U[3].print();
-  // auto M = matmul(matmul(L[3], A1_global), U[3]);
   auto L_prod = matmul(matmul(matmul(L[3], L[4]), L[5]), L[6]);
   auto M = matmul(matmul(matmul(matmul(matmul(L_prod, A1), U[6]), U[5]), U[4]), U[3]);
 
