@@ -1608,10 +1608,14 @@ Matrix verify_A1(Matrix& A0, std::vector<Matrix>& L,
   A1_global_splits[3 * 5 + 4] = A1_01_splits[3];
 
   // Set these blocks here because they represent the pre-LU factorized last block.
-  // A1_global_splits[3 * 5 + 3] = D0_splits[3];
-  // A1_global_splits[3 * 5 + 4] = A.S(0, 1, 1);
-  // A1_global_splits[4 * 5 + 3] = A.S(1, 0, 1);
-  // A1_global_splits[4 * 5 + 4] = D1_split[3];
+
+  auto A1_10 = matmul(matmul(A.U(1, 1), A.S(1, 0, 1)), A.V(0, 1), false, true);
+  auto A1_10_splits = A1_10.split(2, 2);
+
+  A1_global_splits[2 * 5 + 1] = A1_10_splits[0];
+  A1_global_splits[4 * 5 + 1] = A1_10_splits[1];
+  A1_global_splits[2 * 5 + 3] = A1_10_splits[2];
+  A1_global_splits[4 * 5 + 3] = A1_10_splits[3];
 
   (A1_actual - A1_global).print();
 
