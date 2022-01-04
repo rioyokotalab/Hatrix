@@ -746,6 +746,28 @@ namespace Hatrix {
         Matrix UF = make_complement(U(block, level));
         Matrix VF = make_complement(V(block, level));
 
+                // debug code to check the A1_global matrix
+        if (level == 1 && block == 0) {
+          int block_size = N / pow(2, level+1);
+          int block_split = rank;
+          auto D0_splits = SPLIT_DENSE(D(0,0,1), block_split, block_split);
+          A1_global_splits[1 * 5 + 1] =  D0_splits[0];
+          // A1_global_splits[1 * 5 + 3] = D0_splits[1];
+          // A1_global_splits[3 * 5 + 1] = D0_splits[2];
+          A1_global_splits[3 * 5 + 3] =  D0_splits[3];
+        }
+
+        if (level == 1 && block == 1) {
+          int block_size = N / pow(2, level+1);
+          int block_split = rank;
+          auto D1_splits = SPLIT_DENSE(D(1,1,1), block_split, block_split);
+          A1_global_splits[2 * 5 + 2] =  D1_splits[0];
+          // A1_global_splits[2 * 5 + 4] = D1_splits[1];
+          // A1_global_splits[4 * 5 + 2] = D1_splits[2];
+          A1_global_splits[4 * 5 + 4] =  D1_splits[3];
+        }
+
+
         // Step 2: Multiply the A with UF and VF.
         for (int j = 0; j < num_nodes; ++j) {
           if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
@@ -759,24 +781,7 @@ namespace Hatrix {
           }
         }
 
-        // debug code to check the A1_global matrix
-        if (level == 1 && block == 0) {
-          int block_size = N / pow(2, level+1);
-          int block_split = rank;
-          auto D0_splits = SPLIT_DENSE(D(0,0,1), block_split, block_split);
-          A1_global_splits[1 * 5 + 1] =  D0_splits[0];
-          A1_global_splits[1 * 5 + 3] = D0_splits[1];
-          A1_global_splits[3 * 5 + 1] = D0_splits[2];
-        }
 
-        // if (level == 1 && block == 1) {
-        //   int block_size = N / pow(2, level+1);
-        //   int block_split = rank;
-        //   auto D1_splits = SPLIT_DENSE(D(1,1,1), block_split, block_split);
-        //   A1_global_splits[2 * 5 + 2] =  D1_splits[0];
-        //   A1_global_splits[2 * 5 + 4] = D1_splits[1];
-        //   A1_global_splits[4 * 5 + 2] = D1_splits[2];
-        // }
 
         int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
         int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
@@ -822,6 +827,14 @@ namespace Hatrix {
             solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
           }
         }
+
+        if (level == 1 && block == 1) {
+          int block_size = N / pow(2, level+1);
+          int block_split = rank;
+          auto D1_splits = SPLIT_DENSE(D(1,1,1), block_split, block_split);
+          // A1_global_splits[2 * 5 + 2] =  D1_splits[0];
+        }
+
 
         // Schur's compliment between oc and co blocks and update into oo block.
         for (int i = 0; i < num_nodes; ++i) {
@@ -1388,11 +1401,11 @@ std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
         auto U_block_splits = U_block.split(dim_offsets, dim_offsets);
         int level_offset = A.height - level;
         int permuted_nblocks = dim_offsets.size() + 1;
-        int prow = block + level_offset;
+        int pcol = block + level_offset;
         for (int i = 0; i <= block; ++i) {
           if (A.is_admissible.exists(i, block, level) && !A.is_admissible(i, block, level)) {
             int block_split = A.U(block, level).rows - A.U(block, level).cols;
-            int pcol = i + level_offset;
+            int prow = i + level_offset;
 
             auto D_splits = SPLIT_DENSE(A.D(i, block, level), block_split, block_split);
 
@@ -1413,6 +1426,7 @@ std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
           if (A.V.exists(j, level)) {
             if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
               int block_split = A.V(j, level).rows - A.V(j, level).cols;
+              int prow = block + level_offset;
               int pcol = j + level_offset;
               auto D_splits = SPLIT_DENSE(A.D(block, j, level), block_split, block_split);
               U_block_splits[prow * permuted_nblocks + pcol + num_nodes] = D_splits[1];
@@ -1420,6 +1434,7 @@ std::vector<Matrix> generate_U_chain(Hatrix::H2& A) {
           }
         }
       }
+
       U.push_back(U_block);
     }
   }
@@ -1578,17 +1593,23 @@ Matrix verify_A1(Matrix& A0, std::vector<Matrix>& L,
   auto D0_split = SPLIT_DENSE(A.D(0, 0, 1), A.rank, A.rank);
   auto D1_split = SPLIT_DENSE(A.D(1, 1, 1), A.rank, A.rank);
 
-  auto A1_actual = matmul(matmul(matmul(matmul(L[1], L[2]), A0), U[2]), U[1]);
+  auto L_side = matmul(matmul(matmul(U_F[1], L[1]), U_F[2]), L[2]);
+  auto U_side = matmul(matmul(matmul(U[2], V_F[2]), U[1]), V_F[1]);
+  auto A1_actual = matmul(matmul(L_side, A0), U_side);
+
+  // auto A1_actual = matmul(matmul(matmul(matmul(L[1], L[2]), A0), U[2]), U[1]);
 
   auto dim_offsets = generate_offsets(A, 1);
   auto A1_global_splits = A1_global.split(dim_offsets, dim_offsets);
   auto A0_splits = A0.split(dim_offsets, dim_offsets);
 
   // Set these blocks here because they represent the pre-LU factorized last block.
-  A1_global_splits[3 * 5 + 3] = D0_split[3];
-  A1_global_splits[3 * 5 + 4] = A.S(0, 1, 1);
-  A1_global_splits[4 * 5 + 3] = A.S(1, 0, 1);
-  A1_global_splits[4 * 5 + 4] = D1_split[3];
+  // A1_global_splits[3 * 5 + 3] = D0_splits[3];
+  // A1_global_splits[3 * 5 + 4] = A.S(0, 1, 1);
+  // A1_global_splits[4 * 5 + 3] = A.S(1, 0, 1);
+  // A1_global_splits[4 * 5 + 4] = D1_split[3];
+
+  (A1_actual - A1_global).print();
 
   std::cout << "norm: " << norm(A1_actual - A1_global) << std::endl;
 
@@ -1607,7 +1628,7 @@ Matrix verify_A2(Matrix& A0, Matrix& A1, std::vector<Matrix>& L,
   auto L_prod = matmul(matmul(matmul(L[3], L[4]), L[5]), L[6]);
   auto M = matmul(matmul(matmul(matmul(matmul(L_prod, A1), U[6]), U[5]), U[4]), U[3]);
 
-  (M - A1_global).print();
+  // (M - A1_global).print();
 
   return M;
 }
