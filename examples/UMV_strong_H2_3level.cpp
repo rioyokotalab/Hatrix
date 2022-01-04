@@ -1613,13 +1613,11 @@ Matrix verify_A1(Matrix& A0, std::vector<Matrix>& L,
   auto A1_10_splits = A1_10.split(2, 2);
 
   A1_global_splits[2 * 5 + 1] = A1_10_splits[0];
-  A1_global_splits[4 * 5 + 1] = A1_10_splits[1];
-  A1_global_splits[2 * 5 + 3] = A1_10_splits[2];
+  A1_global_splits[4 * 5 + 1] = A1_10_splits[2];
+  A1_global_splits[2 * 5 + 3] = A1_10_splits[1];
   A1_global_splits[4 * 5 + 3] = A1_10_splits[3];
 
-  (A1_actual - A1_global).print();
-
-  std::cout << "norm: " << norm(A1_actual - A1_global) << std::endl;
+  std::cout << "A1 verification: " << norm(A1_actual - A1_global) << std::endl;
 
   return A1_actual;
 }
