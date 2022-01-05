@@ -587,7 +587,7 @@ namespace Hatrix {
         if (!U.exists(block, level)) { continue; }
         int64_t block_size = U(block, level).rows;
         // Step 0: Recompress fill-ins on the off-diagonals.
-        if (false) {
+        if (block > 0) {
           {
             // Compress fill-ins on the same row as the <block,level> pair.
             Matrix row_concat(block_size, 0);
@@ -601,6 +601,7 @@ namespace Hatrix {
             }
 
             if (found_row_fill_in) {
+              // Recompress and update the basis on the same level.
               for (int j = 0; j < num_nodes; ++j) {
                 if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
                   row_concat = concat(row_concat, matmul(U(block, level),
@@ -653,6 +654,7 @@ namespace Hatrix {
             }
 
             if (found_col_fill_in) {
+              // Recompress and update the column on the same level.
               for (int i = 0; i < num_nodes; ++i) {
                 if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                   col_concat = concat(col_concat, matmul(S(i, block, level),
@@ -664,6 +666,28 @@ namespace Hatrix {
                   }
                 }
               }
+
+              Matrix _UN2, _SN2, VN2T; double error;
+              std::tie(_UN2, _SN2, VN2T, error)= truncated_svd(col_concat, rank);
+
+              for (int i = 0; i < num_nodes; ++i) {
+                if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
+                  Matrix t_i_block = matmul(V(block, level), VN2T, true, true);
+                  Matrix Sbar_i_block = matmul(S(i, block, level), t_i_block);
+
+                  if (F.exists(i, block, level)) {
+                    Matrix Fp = matmul(U(i, level), F(i, block, level));
+                    Matrix SpF = matmul(matmul(U(i, level), Fp, true, false), VN2T, false, true);
+                    Sbar_i_block = Sbar_i_block + SpF;
+                    F.erase(i, block, level);
+                  }
+
+                  S.erase(i, block, level);
+                  S.insert(i, block, level, std::move(Sbar_i_block));
+                }
+              }
+              V.erase(block, level);
+              V.insert(block, level, transpose(VN2T));
             }
           }
         } // if (block > 0)
