@@ -616,9 +616,9 @@ namespace Hatrix {
               Matrix UN1, _SN1, _VN1T; double error;
               std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
+              Matrix r_block_j = matmul(UN1, U(block, level), true, false);
               for (int j = 0; j < num_nodes; ++j) {
                 if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                  Matrix r_block_j = matmul(UN1, U(block, level), true, false);
                   Matrix Sbar_block_j = matmul(r_block_j, S(block, j, level));
 
                   Matrix SpF(rank, rank);
@@ -632,10 +632,22 @@ namespace Hatrix {
                   S.erase(block, j, level);
                   S.insert(block, j, level, std::move(Sbar_block_j));
 
+                  // Update transfer matrix one level higher.
                   if (F.exists(block, j, level)) {
                     F.erase(block, j, level);
                   }
                 }
+              }
+
+              // Update a part of the corresponding part of the transfer matrix
+              // one level higher.
+              int parent_level = level - 1;
+              int parent_node = block / 2;
+              int slice_index = block % 2;
+              if (U.exists(parent_node, parent_level)) {
+                auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
+                auto Utransfer_new_part = matmul(Utransfer_splits[slice_index], r_block_j);
+                Utransfer_splits[slice_index] = Utransfer_new_part;
               }
             }
           }
@@ -670,9 +682,9 @@ namespace Hatrix {
               Matrix _UN2, _SN2, VN2T; double error;
               std::tie(_UN2, _SN2, VN2T, error)= truncated_svd(col_concat, rank);
 
+              Matrix t_i_block = matmul(V(block, level), VN2T, true, true);
               for (int i = 0; i < num_nodes; ++i) {
                 if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                  Matrix t_i_block = matmul(V(block, level), VN2T, true, true);
                   Matrix Sbar_i_block = matmul(S(i, block, level), t_i_block);
 
                   if (F.exists(i, block, level)) {
@@ -688,11 +700,22 @@ namespace Hatrix {
               }
               V.erase(block, level);
               V.insert(block, level, transpose(VN2T));
+
+              // Update a part of the corresponding part of the transfer matrix
+              // one level higher.
+              int parent_level = level - 1;
+              int parent_node = block / 2;
+              int slice_index = block % 2;
+              if (V.exists(parent_node, parent_level)) {
+                auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
+                auto Vtransfer_new_part = matmul(Vtransfer_splits[slice_index], t_i_block);
+                Vtransfer_splits[slice_index] = Vtransfer_new_part;
+              }
             }
           }
         } // if (block > 0)
 
-          // Step 1: Generate UF and VF blocks.
+        // Step 1: Generate UF and VF blocks.
         Matrix UF = make_complement(U(block, level));
         Matrix VF = make_complement(V(block, level));
 
