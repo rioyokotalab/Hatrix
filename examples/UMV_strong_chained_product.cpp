@@ -944,7 +944,7 @@ Matrix chain_product(BLR2& A,
 
   for (int i = A.nblocks-1; i >= 0; --i) {
     product = matmul(product, U[i]);
-    product = matmul(product, V_F[i]);
+    product = matmul(product, V_F[i], false, true);
   }
 
   return product;

@@ -1283,9 +1283,9 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
         UF_full_splits[prow * permuted_nblocks + pcol] = UF_block_splits[0];
         UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol] = UF_block_splits[2];
         UF_full_splits[prow * permuted_nblocks + (pcol + num_nodes)] = UF_block_splits[1];
-        UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] =
-          UF_block_splits[3];
+        UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] = UF_block_splits[3];
       }
+
       U_F.push_back(UF_full);
     }
   }
@@ -1321,7 +1321,6 @@ std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
         VF_full_splits[prow * permuted_nblocks + (pcol + num_nodes)] = VF_block_splits[1];
         VF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] =
           VF_block_splits[3];
-
       }
 
       V_F.push_back(VF_full);
@@ -1518,7 +1517,7 @@ Matrix chained_product(std::vector<Matrix>& U_F,
   for (int level = A.height; level > 0; --level) {
     if (A.U.exists(0, level)) {
       int num_nodes = pow(2, level);
-      for (int i = 0; i < num_nodes; ++i) {
+      for (int i = 0; i <= num_nodes - 1; ++i) {
         int index = num_nodes + i - 1;
         product = matmul(product, U_F[index]);
         product = matmul(product, L[index]);
@@ -1532,13 +1531,14 @@ Matrix chained_product(std::vector<Matrix>& U_F,
   product = matmul(product, L0);
   product = matmul(product, U0);
 
+
   for (int level = 1; level <= A.height; ++level) {
     if (A.V.exists(0, level)) {
       int num_nodes = pow(2, level);
-      for (int i = num_nodes-1; i >= 0; --i) {
+      for (int i = num_nodes - 1; i >= 0; --i) {
         int index = num_nodes + i - 1;
         product = matmul(product, U[index]);
-        product = matmul(product, V_F[index]);
+        product = matmul(product, V_F[index], false, true);
       }
     }
     else {
@@ -1622,18 +1622,6 @@ Matrix verify_A1(Matrix& A0, std::vector<Matrix>& L,
   return A1_actual;
 }
 
-Matrix verify_A2(Matrix& A0, Matrix& A1, std::vector<Matrix>& L,
-                 std::vector<Matrix>& U,
-                 std::vector<Matrix>& U_F,
-                 std::vector<Matrix>& V_F, H2& A) {
-  auto L_prod = matmul(matmul(matmul(L[3], L[4]), L[5]), L[6]);
-  auto M = matmul(matmul(matmul(matmul(matmul(L_prod, A1), U[6]), U[5]), U[4]), U[3]);
-
-  // (M - A1_global).print();
-
-  return M;
-}
-
 Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto U_F = generate_UF_chain(A);
   auto V_F = generate_VF_chain(A);
@@ -1647,8 +1635,6 @@ Hatrix::Matrix verify_factorization(Hatrix::H2& A) {
   auto A0 = verify_A0(L0, U0, A);
 
   auto A1 = verify_A1(A0, L, U, U_F, V_F, A);
-
-  verify_A2(A0, A1, L, U, U_F, V_F, A);
 
   return A_actual_permuted;
 }
@@ -1745,18 +1731,19 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   auto A_actual_permuted = verify_factorization(A);
+
   auto Adense_permuted = permute_dense(Adense, A);
+
+  // Adense_permuted.print();
+
+  std::cout << "OVERALL EVERYTHING\n";
+  A_actual_permuted.print();
+  (Adense_permuted).print();
 
   double factorization_error = Hatrix::norm(A_actual_permuted - Adense) / Hatrix::norm(Adense);
 
   Hatrix::Matrix x = A.solve(b);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
-
-
-  // std::cout << "X solve\n";
-  // x_solve.print();
-  // std::cout << "X-X_solve\n";
-  // (x-x_solve).print();
 
   Hatrix::Context::finalize();
 
