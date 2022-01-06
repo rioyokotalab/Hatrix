@@ -729,7 +729,7 @@ std::vector<Matrix> generate_VF_chain(Hatrix::BLR2& A) {
 
   for (int block = 0; block < A.nblocks; ++block) {
     Matrix VF_full = generate_identity_matrix(A.N, A.N);
-    Matrix VF_block = transpose(make_complement(A.V(block)));
+    Matrix VF_block = make_complement(A.V(block));
 
     auto VF_full_splits = VF_full.split(row_offsets, col_offsets);
     auto VF_block_splits = SPLIT_DENSE(VF_block,
@@ -1052,16 +1052,17 @@ int main(int argc, char** argv) {
   auto d_splits = diff.split(A.nblocks, A.nblocks);
   auto m_splits = A_expected.split(A.nblocks, A.nblocks);
 
-  int idx;
+  // int idx;
 
-  // for (int i = 0; i < nblocks; ++i) {
-  //   for (int j = 0; j < nblocks; ++j) {
-  //     int idx = i * A.nblocks + j;
-  //     std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
-  //   }
-  // }
+  std::cout << "-- BLR2 verification --\n";
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      int idx = i * A.nblocks + j;
+      std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+    }
+  }
 
-  (A_actual - A_expected).print();
+  // (A_actual - A_expected).print();
 
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 

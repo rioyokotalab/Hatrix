@@ -657,6 +657,9 @@ namespace Hatrix {
             if (D.exists(i, j, level)) {
               A2_expected_splits[i * 4 + j] = D(i, j, level);
             }
+            else {
+              A2_expected_splits[i * 4 + j] = matmul(matmul(U(i, level), S(i, j, level)), V(j, level), false, true);
+            }
           }
         }
       }
@@ -723,11 +726,11 @@ namespace Hatrix {
               int parent_level = level - 1;
               int parent_node = block / 2;
               int slice_index = block % 2;
-              if (U.exists(parent_node, parent_level)) {
-                auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
-                auto Utransfer_new_part = matmul(Utransfer_splits[slice_index], r_block_j);
-                Utransfer_splits[slice_index] = Utransfer_new_part;
-              }
+              // if (U.exists(parent_node, parent_level)) {
+              //   auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
+              //   auto Utransfer_new_part = matmul(Utransfer_splits[slice_index], r_block_j);
+              //   Utransfer_splits[slice_index] = Utransfer_new_part;
+              // }
             }
           }
 
@@ -785,11 +788,11 @@ namespace Hatrix {
               int parent_level = level - 1;
               int parent_node = block / 2;
               int slice_index = block % 2;
-              if (V.exists(parent_node, parent_level)) {
-                auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
-                auto Vtransfer_new_part = matmul(Vtransfer_splits[slice_index], t_i_block);
-                Vtransfer_splits[slice_index] = Vtransfer_new_part;
-              }
+              // if (V.exists(parent_node, parent_level)) {
+              //   auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
+              //   auto Vtransfer_new_part = matmul(Vtransfer_splits[slice_index], t_i_block);
+              //   Vtransfer_splits[slice_index] = Vtransfer_new_part;
+              // }
             }
           }
         } // if (block > 0)
@@ -1541,8 +1544,22 @@ Matrix unpermute_matrix(Matrix PA, H2& A) {
 void verify_A1_factorization(Hatrix::H2& A) {
   Matrix L1 = generate_L1(A);
   Matrix U1 = generate_U1(A);
+  Matrix A1_actual = matmul(L1, U1);
 
-  std::cout << "A1 error: " << norm(matmul(L1, U1) - A1_expected) << std::endl;
+  Matrix diff = A1_actual - A1_expected;
+  int nblocks = 4;
+  auto d_splits = diff.split(nblocks, nblocks);
+  auto m_splits = A1_expected.split(nblocks, nblocks);
+
+  std::cout << "A1 rel error: " << norm(diff) / norm(A1_expected) << std::endl;
+
+  std::cout << "A1 block errors:\n";
+  for (int i = 2; i < nblocks; ++i) {
+    for (int j = 2; j < nblocks; ++j) {
+      int idx = i * nblocks + j;
+      std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+    }
+  }
 }
 
 void verify_A2_factorization(Hatrix::H2& A) {
@@ -1570,9 +1587,21 @@ void verify_A2_factorization(Hatrix::H2& A) {
 
   auto A2_actual = unpermute_matrix(product, A);
 
-  (A2_expected - A2_actual).print();
-}
+  std::cout << "A2 error: " <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
 
+  Matrix diff = (A2_actual - A2_expected);
+  int nblocks = 4;
+  auto d_splits = diff.split(nblocks, nblocks);
+  auto m_splits = A2_expected.split(nblocks, nblocks);
+
+  std::cout << "A2 block errors:\n";
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      int idx = i * nblocks + j;
+      std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+    }
+  }
+}
 
 int main(int argc, char *argv[]) {
   int64_t N = atoi(argv[1]);
@@ -1603,6 +1632,7 @@ int main(int argc, char *argv[]) {
 
   A.factorize(randpts);
 
+  std::cout << "-- H2 verification --\n";
   verify_A1_factorization(A);
   verify_A2_factorization(A);
 
