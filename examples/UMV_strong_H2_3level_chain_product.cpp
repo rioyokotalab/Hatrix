@@ -843,14 +843,6 @@ namespace Hatrix {
           }
         }
 
-        if (level == 1 && block == 1) {
-          int block_size = N / pow(2, level+1);
-          int block_split = rank;
-          auto D1_splits = SPLIT_DENSE(D(1,1,1), block_split, block_split);
-          // A1_global_splits[2 * 5 + 2] =  D1_splits[0];
-        }
-
-
         // Schur's compliment between oc and co blocks and update into oo block.
         for (int i = 0; i < num_nodes; ++i) {
           for (int j = 0; j < num_nodes; ++j) {
@@ -1463,11 +1455,66 @@ Hatrix::Matrix generate_U1(Hatrix::H2& A) {
 
   for (int i = 0; i < num_nodes; ++i) {
     for (int j = i; j < num_nodes; ++j) {
+      std::vector<int> row_children({i * 2 + 4, i * 2 + 1 + 4});
+      std::vector<int> col_children({j * 2 + 4, j * 2 + 1 + 4});
 
+      auto D_split = A.D(i, j, level).split(2, 2);
+
+      if (i == j) {
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = c1; c2 < 2; ++c2) {
+            if (c1 == c2) {
+              U1_splits[row_children[c1] * 8 + col_children[c2]] = upper(D_split[c1 * 2 + c2]);
+            }
+            else {
+              U1_splits[row_children[c1] * 8 + col_children[c2]] = D_split[c1 * 2 + c2];
+            }
+          }
+        }
+      }
+      else {
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = 0; c2 < 2; ++c2) {
+            U1_splits[row_children[c1] * 8 + col_children[c2]] = D_split[c1 * 2 + c2];
+          }
+        }
+      }
     }
   }
 
   return U1;
+}
+
+Matrix unpermute_matrix(Matrix PA, H2& A) {
+  Matrix M(A.rank * 8, A.rank * 8);
+
+  int level = 2;
+  int64_t block_size = A.rank * 2;
+  int64_t permuted_nblocks = 8;
+  std::vector<int64_t> row_offsets, col_offsets;
+  int num_nodes = pow(2, level);
+
+  auto PA_splits = PA.split(8, 8);
+  auto M_splits = M.split(4, 4);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    for (int j = 0; j < num_nodes; ++j) {
+      Matrix block(block_size, block_size);
+      auto block_splits = SPLIT_DENSE(block,
+                                      block_size - A.rank,
+                                      block_size - A.rank);
+
+      block_splits[0] = PA_splits[(i) * permuted_nblocks + j];
+      block_splits[1] = PA_splits[i * permuted_nblocks + j + num_nodes];
+      block_splits[2] = PA_splits[(i + num_nodes) * permuted_nblocks + j];
+      block_splits[3] = PA_splits[(i + num_nodes) * permuted_nblocks + j + num_nodes];
+
+      M_splits[i * num_nodes + j] = block;
+    }
+  }
+
+
+  return M;
 }
 
 void verify_A2_factorization(Hatrix::H2& A) {
@@ -1477,7 +1524,25 @@ void verify_A2_factorization(Hatrix::H2& A) {
   auto U2 = generate_U2_chain(A);
   Hatrix::Matrix L1 = generate_L1(A);
   Hatrix::Matrix U1 = generate_U1(A);
+
+  auto product = generate_identity_matrix(A.rank * 8, A.rank * 8);
+
+  for (int i = 0; i < 4; ++i) {
+    product = matmul(product, UF[i]);
+    product = matmul(product, L2[i]);
+  }
+
+  product = matmul(product, L1);
+  product = matmul(product, U1);
+
+  for (int i = 3; i >= 0; --i) {
+    product = matmul(product, U2[i]);
+    product = matmul(product, VF[i], false, true);
+  }
+
+  auto A2_actual = unpermute_matrix(product, A);
 }
+
 
 int main(int argc, char *argv[]) {
   int64_t N = atoi(argv[1]);
