@@ -627,14 +627,15 @@ namespace Hatrix {
     actually_print_structure(height);
   }
 
-  Matrix A1_global;
+  Matrix A2_global;
 
   void H2::factorize(const randvec_t &randpts) {
     // For verification of A1 matrix.
     int64_t level = height;
     RowColLevelMap<Matrix> F;
-    A1_global = generate_identity_matrix(N, N);
-
+    A2_global = generate_identity_matrix(N, N);
+    auto A2_offsets = generate_offsets(*this, 2);
+    auto A2_global_splits = A2_global.split(A2_offsets, A2_offsets);
 
     for (; level > 0; --level) {
       int num_nodes = pow(2, level);
