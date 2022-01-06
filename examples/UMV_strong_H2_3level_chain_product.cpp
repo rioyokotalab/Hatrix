@@ -627,15 +627,17 @@ namespace Hatrix {
     actually_print_structure(height);
   }
 
-  Matrix A2_global;
+  Matrix A2_expected, A1_expected;
 
   void H2::factorize(const randvec_t &randpts) {
     // For verification of A1 matrix.
     int64_t level = height;
     RowColLevelMap<Matrix> F;
-    A2_global = generate_identity_matrix(N, N);
-    auto A2_offsets = generate_offsets(*this, 2);
-    auto A2_global_splits = A2_global.split(A2_offsets, A2_offsets);
+    A2_expected = generate_identity_matrix(rank * 8, rank * 8);
+    auto A2_expected_splits = A2_expected.split(4, 4);
+
+    A1_expected = generate_identity_matrix(rank * 8, rank * 8);
+    auto A1_expected_splits = A1_expected.split(4, 4);
 
     for (; level > 0; --level) {
       int num_nodes = pow(2, level);
@@ -647,6 +649,16 @@ namespace Hatrix {
       }
       if (is_all_dense_level) {
         break;
+      }
+
+      if (level == 2) {
+        for (int i = 0; i < 4; ++i) {
+          for (int j = 0; j < 4; ++j) {
+            if (D.exists(i, j, level)) {
+              A2_expected_splits[i * 4 + j] = D(i, j, level);
+            }
+          }
+        }
       }
 
       for (int64_t block = 0; block < num_nodes; ++block) {
@@ -996,6 +1008,15 @@ namespace Hatrix {
     } // for (int level=height; level > 0; --level)
 
     int64_t last_nodes = pow(2, level);
+
+    // Capture unfactorized A1 block.
+    for (int i = 0; i < last_nodes; ++i) {
+      for (int j = 0; j < last_nodes; ++j) {
+        A1_expected_splits[(i + 2) * 4 + j + 2] = D(i, j, level);
+      }
+    }
+
+
     for (int d = 0; d < last_nodes; ++d) {
       lu(D(d, d, level));
       for (int j = d+1; j < last_nodes; ++j) {
@@ -1517,6 +1538,13 @@ Matrix unpermute_matrix(Matrix PA, H2& A) {
   return M;
 }
 
+void verify_A1_factorization(Hatrix::H2& A) {
+  Matrix L1 = generate_L1(A);
+  Matrix U1 = generate_U1(A);
+
+  std::cout << "A1 error: " << norm(matmul(L1, U1) - A1_expected) << std::endl;
+}
+
 void verify_A2_factorization(Hatrix::H2& A) {
   auto UF = generate_UF_chain(A);
   auto VF = generate_VF_chain(A);
@@ -1541,6 +1569,8 @@ void verify_A2_factorization(Hatrix::H2& A) {
   }
 
   auto A2_actual = unpermute_matrix(product, A);
+
+  (A2_expected - A2_actual).print();
 }
 
 
@@ -1573,6 +1603,7 @@ int main(int argc, char *argv[]) {
 
   A.factorize(randpts);
 
+  verify_A1_factorization(A);
   verify_A2_factorization(A);
 
   Hatrix::Context::finalize();
