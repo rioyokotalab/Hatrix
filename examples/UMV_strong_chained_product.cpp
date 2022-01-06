@@ -745,7 +745,6 @@ std::vector<Matrix> generate_VF_chain(Hatrix::BLR2& A) {
     V_F.push_back(VF_full);
   }
 
-
   return V_F;
 }
 

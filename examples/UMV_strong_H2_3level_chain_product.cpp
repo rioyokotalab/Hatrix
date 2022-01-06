@@ -1303,8 +1303,127 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
   return U_F;
 }
 
+std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> V_F;
+  int level = 2;
+
+  int num_nodes = pow(2, level);
+  for (int block = 0; block < num_nodes; ++block) {
+    Matrix VF_full = generate_identity_matrix(A.rank * 8, A.rank * 8);
+    auto VF_full_splits = VF_full.split(8, 8);
+
+    if (A.V.exists(block, level)) {
+      int block_size = A.V(block, level).rows;
+      Matrix VF_block = make_complement(A.V(block, level));
+
+      auto VF_block_splits = SPLIT_DENSE(VF_block, block_size - A.V(block, level).cols,
+                                         block_size - A.V(block, level).cols);
+
+      int permuted_nblocks = 8;
+
+      VF_full_splits[block * permuted_nblocks + block] = VF_block_splits[0];
+      VF_full_splits[(block + num_nodes) * permuted_nblocks + block] = VF_block_splits[2];
+      VF_full_splits[block * permuted_nblocks + (block + num_nodes)] = VF_block_splits[1];
+      VF_full_splits[(block + num_nodes) * permuted_nblocks + block + num_nodes] =
+        VF_block_splits[3];
+    }
+
+    V_F.push_back(VF_full);
+  }
+
+  return V_F;
+
+}
+
+std::vector<Hatrix::Matrix> generate_L2_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> L2;
+  int block_size = A.rank;
+  int permuted_nblocks = 8;
+  int level = 2;
+  int nblocks = pow(2, level);
+
+  for (int block = 0; block < nblocks; ++block) {
+    Matrix L_block = generate_identity_matrix(A.rank * 8, A.rank * 8);
+    auto L_block_splits = L_block.split(8, 8);
+
+    for (int j = 0; j <= block; ++j) {
+      if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
+        auto D_splits = A.D(block, j, level).split(2, 2);
+
+        // Copy the cc parts
+        if (block == j) {
+          L_block_splits[block * permuted_nblocks + j] = lower(D_splits[0]);
+        }
+        else {
+          L_block_splits[block * permuted_nblocks + j] = D_splits[0];
+        }
+
+        L_block_splits[(block + nblocks) * permuted_nblocks + j] = D_splits[2];
+      }
+    }
+
+    // Copy oc parts belonging to the 'upper' parts of the matrix
+    for (int i = 0; i < block; ++i) {
+      if (A.is_admissible.exists(i, block, level) && !A.is_admissible(i, block, level)) {
+        auto D_splits = A.D(i, block, level).split(2, 2);
+        L_block_splits[(i + nblocks) * permuted_nblocks + block] = D_splits[2];
+      }
+    }
+
+    L2.push_back(L_block);
+  }
+
+  return L2;
+}
+
+std::vector<Hatrix::Matrix> generate_U2_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> U2;
+  int block_size = A.rank;
+  int permuted_nblocks = 8;
+  int level = 2;
+  int nblocks = pow(2, level);
+
+  for (int block = 0; block < nblocks; ++block) {
+    Matrix U_block = generate_identity_matrix(A.rank * 8, A.rank * 8);
+    auto U_splits = U_block.split(8, 8);
+
+    for (int i = 0; i <= block; ++i) {
+      if (A.is_admissible.exists(i, block, level) && !A.is_admissible(i, block, level)) {
+        auto D_splits = A.D(i, block, level).split(2, 2);
+
+        // Copy the cc blocks
+        if (block == i) {
+          U_splits[i * permuted_nblocks + block] = upper(D_splits[0]);
+        }
+        else {
+          U_splits[i * permuted_nblocks + block] = D_splits[0];
+        }
+
+        // Copy the co parts
+        U_splits[i * permuted_nblocks + block + nblocks] = D_splits[1];
+      }
+    }
+
+    for (int j = 0; j < block; ++j) {
+      if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
+        auto D_splits = A.D(block, j, level).split(2, 2);
+        U_splits[block * permuted_nblocks + (j + nblocks)] = D_splits[1];
+      }
+    }
+
+    U2.push_back(U_block);
+  }
+
+  return U2;
+}
+
+
+
 void verify_A2_factorization(Hatrix::H2& A) {
   auto UF = generate_UF_chain(A);
+  auto VF = generate_VF_chain(A);
+  auto L2 = generate_L2_chain(A);
+  auto U2 = generate_U2_chain(A);
 }
 
 int main(int argc, char *argv[]) {
