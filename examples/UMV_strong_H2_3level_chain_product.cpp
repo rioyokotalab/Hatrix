@@ -1424,15 +1424,29 @@ Hatrix::Matrix generate_L1(Hatrix::H2& A) {
   int num_nodes = pow(2, level);
 
   for (int i = 0; i < num_nodes; ++i) {
-    std::vector<int> row_children({i * 2, i * 2 + 1});
-    for (int j = 0; j < num_nodes; ++j) {
-      std::vector<int> col_children({j * 2, j * 2 + 1});
+    for (int j = 0; j <= i; ++j) {
+      std::vector<int> row_children({i * 2 + 4, i * 2 + 1 + 4});
+      std::vector<int> col_children({j * 2 + 4, j * 2 + 1 + 4});
 
       auto D_split = A.D(i, j, level).split(2, 2);
-      for (int c1 = 0; c1 < 2; ++c1) {
-        for (int c2 = 0; c2 < 2; ++c2) {
-          L1_splits[row_children[c1] * 8 + col_children[c2]] =
-            D_split[c1 * 2 + c2];
+
+      if (i == j) {
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = 0; c2 <= c1; ++c2) {
+            if (c1 == c2) {
+              L1_splits[row_children[c1] * 8 + col_children[c2]] = lower(D_split[c1 * 2 + c2]);
+            }
+            else {
+              L1_splits[row_children[c1] * 8 + col_children[c2]] = D_split[c1 * 2 + c2];
+            }
+          }
+        }
+      }
+      else {
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = 0; c2 < 2; ++c2) {
+            L1_splits[row_children[c1] * 8 + col_children[c2]] = D_split[c1 * 2 + c2];
+          }
         }
       }
     }
@@ -1443,6 +1457,15 @@ Hatrix::Matrix generate_L1(Hatrix::H2& A) {
 
 Hatrix::Matrix generate_U1(Hatrix::H2& A) {
   Matrix U1 = generate_identity_matrix(A.rank * 8, A.rank * 8);
+  auto U1_splits = U1.split(8, 8);
+  int level = 1;
+  int num_nodes = pow(2, level);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    for (int j = i; j < num_nodes; ++j) {
+
+    }
+  }
 
   return U1;
 }
