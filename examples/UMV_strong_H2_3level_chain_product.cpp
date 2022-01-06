@@ -106,6 +106,68 @@ Hatrix::Matrix upper(Hatrix::Matrix A) {
   return mat;
 }
 
+std::vector<int64_t>
+generate_offsets(Hatrix::H2& A, int level) {
+  std::vector<int64_t> offsets;
+  int c_size = A.N / pow(2, A.height) - A.rank;
+  int size_offset = 0;
+
+  // add offsets for level offet
+  for (int l = A.height; l > level; --l) {
+    if (A.U.exists(0, l)) {
+      size_offset += (A.U(0, l).rows - A.U(0, l).cols) * pow(2, l);
+      offsets.push_back(size_offset);
+    }
+  }
+
+  // add offsets for the layout of the permuted matrix.
+  int num_nodes = pow(2, level);
+
+  // offsets for compliment sizes.
+  for (int i = 0; i < num_nodes; ++i) {
+    c_size = A.U(i, level).rows - A.U(i, level).cols;
+    size_offset += c_size;
+    offsets.push_back(size_offset);
+  }
+
+  // offsets for rank sizes.
+  for (int i = 1; i < num_nodes; ++i) {
+    size_offset += (A.U(i, level).cols);
+    offsets.push_back(size_offset);
+  }
+
+  return offsets;
+}
+
+// Generate offsets for the large dense matrix that will hold the last
+// block that is factorized by the UMV.
+std::vector<int64_t>
+generate_top_level_offsets(Hatrix::H2& A) {
+  std::vector<int64_t> offsets;
+  int size_offset = 0;
+  int level = A.height;
+
+  for (; level > 0; --level) {
+    if (A.U.exists(0, level)) {
+      size_offset += (A.U(0, level).rows -
+                      A.U(0, level).cols) * pow(2, level);
+      offsets.push_back(size_offset);
+    }
+    else {
+      break;
+    }
+  }
+
+  int num_nodes = pow(2, level);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    size_offset += A.D(i, i, level).rows;
+    offsets.push_back(size_offset);
+  }
+
+  return offsets;
+}
+
 namespace Hatrix {
   void H2::actually_print_structure(int64_t level) {
     if (level == 0) { return; }
@@ -565,10 +627,14 @@ namespace Hatrix {
     actually_print_structure(height);
   }
 
+  Matrix A1_global;
+
   void H2::factorize(const randvec_t &randpts) {
     // For verification of A1 matrix.
     int64_t level = height;
     RowColLevelMap<Matrix> F;
+    A1_global = generate_identity_matrix(N, N);
+
 
     for (; level > 0; --level) {
       int num_nodes = pow(2, level);
