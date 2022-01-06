@@ -1283,7 +1283,8 @@ std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
         UF_full_splits[prow * permuted_nblocks + pcol] = UF_block_splits[0];
         UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol] = UF_block_splits[2];
         UF_full_splits[prow * permuted_nblocks + (pcol + num_nodes)] = UF_block_splits[1];
-        UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] = UF_block_splits[3];
+        UF_full_splits[(prow + num_nodes) * permuted_nblocks + pcol + num_nodes] =
+          UF_block_splits[3];
       }
 
       U_F.push_back(UF_full);

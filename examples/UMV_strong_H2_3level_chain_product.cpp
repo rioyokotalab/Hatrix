@@ -1271,8 +1271,40 @@ namespace Hatrix {
 
 } // namespace Hatrix
 
-void verify_factorization(Hatrix::H2& A) {
+// Generates UF chain for the A2 matrix.
+std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> U_F;
+  int level = 2;
 
+  int num_nodes = pow(2, level);
+  for (int block = 0; block < num_nodes; ++block) {
+    Matrix UF_full = generate_identity_matrix(A.rank * 8, A.rank * 8);
+    auto UF_full_splits = UF_full.split(8, 8);
+
+    if (A.U.exists(block, level)) {
+      int block_size = A.U(block, level).rows;
+      Matrix UF_block = make_complement(A.U(block, level));
+
+      auto UF_block_splits = SPLIT_DENSE(UF_block, block_size - A.U(block, level).cols,
+                                         block_size - A.U(block, level).cols);
+
+      int permuted_nblocks = 8;
+
+      UF_full_splits[block * permuted_nblocks + block] = UF_block_splits[0];
+      UF_full_splits[(block + num_nodes) * permuted_nblocks + block] = UF_block_splits[2];
+      UF_full_splits[block * permuted_nblocks + (block + num_nodes)] = UF_block_splits[1];
+      UF_full_splits[(block + num_nodes) * permuted_nblocks + block + num_nodes] =
+        UF_block_splits[3];
+    }
+
+    U_F.push_back(UF_full);
+  }
+
+  return U_F;
+}
+
+void verify_A2_factorization(Hatrix::H2& A) {
+  auto UF = generate_UF_chain(A);
 }
 
 int main(int argc, char *argv[]) {
@@ -1304,7 +1336,7 @@ int main(int argc, char *argv[]) {
 
   A.factorize(randpts);
 
-  verify_factorization(A);
+  verify_A2_factorization(A);
 
   Hatrix::Context::finalize();
 
