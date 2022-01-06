@@ -1417,13 +1417,43 @@ std::vector<Hatrix::Matrix> generate_U2_chain(Hatrix::H2& A) {
   return U2;
 }
 
+Hatrix::Matrix generate_L1(Hatrix::H2& A) {
+  Matrix L1 = generate_identity_matrix(A.rank * 8, A.rank * 8);
+  auto L1_splits = L1.split(8, 8);
+  int level = 1;
+  int num_nodes = pow(2, level);
 
+  for (int i = 0; i < num_nodes; ++i) {
+    std::vector<int> row_children({i * 2, i * 2 + 1});
+    for (int j = 0; j < num_nodes; ++j) {
+      std::vector<int> col_children({j * 2, j * 2 + 1});
+
+      auto D_split = A.D(i, j, level).split(2, 2);
+      for (int c1 = 0; c1 < 2; ++c1) {
+        for (int c2 = 0; c2 < 2; ++c2) {
+          L1_splits[row_children[c1] * 8 + col_children[c2]] =
+            D_split[c1 * 2 + c2];
+        }
+      }
+    }
+  }
+
+  return L1;
+}
+
+Hatrix::Matrix generate_U1(Hatrix::H2& A) {
+  Matrix U1 = generate_identity_matrix(A.rank * 8, A.rank * 8);
+
+  return U1;
+}
 
 void verify_A2_factorization(Hatrix::H2& A) {
   auto UF = generate_UF_chain(A);
   auto VF = generate_VF_chain(A);
   auto L2 = generate_L2_chain(A);
   auto U2 = generate_U2_chain(A);
+  Hatrix::Matrix L1 = generate_L1(A);
+  Hatrix::Matrix U1 = generate_U1(A);
 }
 
 int main(int argc, char *argv[]) {
