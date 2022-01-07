@@ -40,6 +40,7 @@ namespace Hatrix {
     Matrix get_Vbig(int node, int level);
     void compute_matrix_structure(int64_t level);
     void solve_forward_level(Matrix& x_level, int level);
+    void solve_backward_level(Matrix& x_level, int level);
 
   public:
     H2(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height,
@@ -1109,6 +1110,68 @@ namespace Hatrix {
     }
   }
 
+  void H2::solve_backward_level(Matrix& x_level, int level) {
+    int nblocks = pow(2, level);
+    std::vector<Matrix> x_level_split = x_level.split(nblocks, 1);
+
+    // backward substition using cc blocks
+    for (int block = nblocks-1; block >= 0; --block) {
+      int block_size = V(block, level).rows;
+      int64_t row_split = block_size - U(block, level).cols, col_split = block_size - V(block, level).cols;
+      auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
+      // Apply co block.
+      for (int left_col = block-1; left_col >= 0; --left_col) {
+        if (is_admissible.exists(block, left_col, level) && !is_admissible(block, left_col, level)) {
+          int64_t row_split = block_size - U(block, level).cols;
+          int64_t col_split = block_size - V(left_col, level).cols;
+          auto left_splits = SPLIT_DENSE(D(block, left_col, level), row_split, col_split);
+
+          Matrix x_block(x_level_split[block]), x_left_col(x_level_split[left_col]);
+          auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+          auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, col_split), {});
+
+          matmul(left_splits[1], x_left_col_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+          for (int64_t i = 0; i < block_size; ++i) {
+            x_level(block * block_size + i, 0) = x_block(i, 0);
+          }
+        }
+      }
+
+      // Apply c block present on the right of this diagonal block.
+      for (int right_col = nblocks-1; right_col > block; --right_col) {
+        if (is_admissible.exists(block, right_col, level) && !is_admissible(block, right_col, level)) {
+          int64_t row_split = block_size - U(block, level).cols;
+          auto right_splits = D(block, right_col, level).split(std::vector<int64_t>(1, row_split), {});
+
+          Matrix x_block(x_level_split[block]);
+          auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+
+          matmul(right_splits[0], x_level_split[right_col], x_block_splits[0], false, false, -1.0, 1.0);
+          for (int64_t i = 0; i < block_size; ++i) {
+            x_level(block * block_size + i, 0) = x_block(i, 0);
+          }
+        }
+      }
+
+      Matrix x_block(x_level_split[block]);
+      auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+      matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+      solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
+      for (int64_t i = 0; i < block_size; ++i) {
+        x_level(block * block_size + i, 0) = x_block(i, 0);
+      }
+    }
+
+    for (int block = nblocks-1; block >= 0; --block) {
+      int block_size = V(block, level).rows;
+      auto V_F = make_complement(V(block, level));
+      Matrix prod = matmul(V_F, x_level_split[block]);
+      for (int i = 0; i < block_size; ++i) {
+        x_level(block * block_size + i, 0) = prod(i, 0);
+      }
+    }
+  }
+
   Matrix H2::solve(Matrix& b, int _level) {
     int level = _level;
     int64_t c_size, offset, rhs_offset = 0;
@@ -1173,95 +1236,7 @@ namespace Hatrix {
 
       rhs_offset = permute_backward(x, level, rhs_offset);
 
-      std::cout << "BCK rhs offset: " << rhs_offset << std::endl;
-      int n = 0;
-      for (int i = 0; i < num_nodes; ++i) { n += U(i, level).rows; }
-      Matrix x_level(n - rhs_offset, 1);
-      for (int i = 0; i < x_level.rows; ++i) {
-        x_level(i, 0) = x(rhs_offset + i, 0);
-      }
-      auto x_level_splits = x_level.split(num_nodes, 1);
-
-      // Upper triangle solve of the cc blocks.
-      for (int block = num_nodes-1; block >= 0; --block) {
-        Matrix& Vo = V(block, level);
-        int64_t block_size = Vo.rows;
-        int64_t c_size = block_size - rank;
-        // Apply co block part of the dense blocks to the corresponding parts
-        // in the RHS.
-        for (int left_col = block-1; left_col >= 0; --left_col) {
-          if (is_admissible.exists(block, left_col, level) &&
-              !is_admissible(block, left_col, level)) {
-            int64_t block_split = block_size - V(left_col, level).cols;
-            auto left_splits = SPLIT_DENSE(D(block, left_col, level), block_split, block_split);
-
-            Matrix x_block(x_level_splits[block]), x_left_col(x_level_splits[left_col]);
-            auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_split), {});
-            auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, block_split), {});
-
-            matmul(left_splits[1], x_left_col_splits[1], x_block_splits[0], false, false,
-                   -1.0, 1.0);
-            for (int i = 0; i < block_size; ++i) {
-              x_level(left_col * block_size + i, 0) = x_left_col(i, 0);
-            }
-          }
-        }
-
-        // Apply c block present on the right of this diagonal block.
-        for (int right_col = num_nodes-1; right_col > block; --right_col) {
-          if (is_admissible.exists(block, right_col, level) &&
-              !is_admissible(block, right_col, level)) {
-            int64_t block_split = block_size - V(block, level).cols;
-            auto right_splits = D(block, right_col,
-                                  level).split(std::vector<int64_t>(1,
-                                                                    block_split),
-                                               {});
-            Matrix x_block(x_level_splits[block]);
-            auto x_block_splits = x_block.split(std::vector<int64_t>(1, block_split), {});
-
-            matmul(right_splits[0], x_level_splits[right_col], x_block_splits[0], false, false,
-                   -1.0, 1.0);
-
-            for (int i = 0; i < block_size; ++i) {
-              x_level(right_col * block_size + i, 0) = x_block(i, 0);
-            }
-          }
-        }
-
-        Matrix x_block(x_level_splits[block]);
-
-        auto block_splits = SPLIT_DENSE(D(block, block, level), c_size, c_size);
-        auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
-        matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
-        solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
-
-        // copy back x_block into the right place in x_level
-        for (int i = 0; i < block_size; ++i) {
-          x_level(block * block_size + i, 0) = x_block(i, 0);
-        }
-      }
-
-      for (int i = 0; i < x_level.rows; ++i) {
-        x(rhs_offset + i, 0) = x_level(i, 0);
-      }
-
-      // Multiply VF with the respective block in x
-      for (int block = num_nodes-1; block >= 0; --block) {
-        Matrix& Vo = V(block, level);
-        int64_t block_size = Vo.rows;
-        offset = rhs_offset + block * block_size;
-
-        Matrix temp(block_size, 1);
-        for (int i = 0; i < block_size; ++i) {
-          temp(i, 0) = x(offset + i, 0);
-        }
-
-        auto V_F = make_complement(Vo);
-        Matrix product = matmul(V_F, temp);
-        for (int i = 0; i < block_size; ++i) {
-          x(offset + i, 0) = product(i, 0);
-        }
-      }
+      solve_backward_level(x, level);
     }
 
     return x;
