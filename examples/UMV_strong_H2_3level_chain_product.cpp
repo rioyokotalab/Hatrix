@@ -1635,16 +1635,22 @@ int main(int argc, char *argv[]) {
   auto stop_construct = std::chrono::system_clock::now();
 
   A.factorize(randpts);
+  Hatrix::Matrix x = A.solve(b);
 
-  std::cout << "-- H2 verification --\n";
-  verify_A1_factorization(A);
-  verify_A2_factorization(A);
+  // std::cout << "-- H2 verification --\n";
+  // verify_A1_factorization(A);
+  // verify_A2_factorization(A);
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  Hatrix::Matrix x_solve = lu_solve(Adense, b);
+
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
 
   std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= "
             << int(N / pow(2, height))
-            << " height=" << height <<  " const. error="
-            << construct_error << std::endl;
+            << " height=" << height
+            << " const. error=" << construct_error
+            << " solve error=" << solve_error << std::endl;
 
 }
