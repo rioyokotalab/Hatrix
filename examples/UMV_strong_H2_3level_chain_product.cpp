@@ -669,7 +669,7 @@ namespace Hatrix {
         if (!U.exists(block, level)) { continue; }
         int64_t block_size = U(block, level).rows;
         // Step 0: Recompress fill-ins on the off-diagonals.
-        if (block > 0) {
+        if (false) {
           {
             // Compress fill-ins on the same row as the <block,level> pair.
             Matrix row_concat(block_size, 0);
@@ -1041,7 +1041,7 @@ namespace Hatrix {
   }
 
   Matrix H2::solve(Matrix& b) {
-    int64_t level = height;
+    int64_t level = 2;
     int64_t c_size, offset, rhs_offset = 0;
     Matrix x(b);
     std::vector<Matrix> x_splits;
@@ -1084,7 +1084,9 @@ namespace Hatrix {
       // Copy part of the workspace vector into x_level so that we can only split
       // and work with the parts that correspond to the permuted vector that need
       // to be worked upon.
-      Matrix x_level(N - rhs_offset, 1);
+      int n = 0;
+      for (int i = 0; i < num_nodes; ++i) { n += U(i, level).rows; }
+      Matrix x_level(n - rhs_offset, 1);
       for (int i = 0; i < x_level.rows; ++i) {
         x_level(i, 0) = x(rhs_offset + i, 0);
       }
@@ -1171,6 +1173,8 @@ namespace Hatrix {
       for (int j = 0; j < i; ++j) {
         matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
       }
+      std::cout << "THIS TRIANGLE i-> " << i << " level -> " << level << std::endl;
+      x_last_splits[i].print_meta();
       solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Lower, true);
     }
 
@@ -1178,13 +1182,14 @@ namespace Hatrix {
       for (int j = last_nodes-1; j > i; --j) {
         matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
       }
+      std::cout << "THIS TRIANGLE 1\n";
       solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Upper, false);
     }
     x_splits[1] = x_last;
 
     level++;
     // Backward
-    for (; level <= height; ++level) {
+    for (; level <= 2; ++level) {
       int64_t num_nodes = pow(2, level);
 
       bool lr_exists = false;
@@ -1197,7 +1202,9 @@ namespace Hatrix {
 
       rhs_offset = permute_backward(x, level, rhs_offset);
 
-      Matrix x_level(N - rhs_offset, 1);
+      int n = 0;
+      for (int i = 0; i < num_nodes; ++i) { n += U(i, level).rows; }
+      Matrix x_level(n - rhs_offset, 1);
       for (int i = 0; i < x_level.rows; ++i) {
         x_level(i, 0) = x(rhs_offset + i, 0);
       }
@@ -1253,6 +1260,7 @@ namespace Hatrix {
         auto block_splits = SPLIT_DENSE(D(block, block, level), c_size, c_size);
         auto x_block_splits = x_block.split(std::vector<int64_t>(1, c_size), {});
         matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+        std::cout << "THIS TRIANGLE 2\n";
         solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
 
         // copy back x_block into the right place in x_level
@@ -1565,6 +1573,15 @@ void verify_A1_factorization(Hatrix::H2& A) {
   }
 }
 
+void verify_A2_solve(Matrix& A2, H2& A) {
+  Matrix b = generate_random_matrix(A.rank * 8, 1);
+  auto x2_dense = lu_solve(A2, b);
+
+  auto x2_h2 = A.solve(b);
+
+  (x2_h2 - x2_dense).print();
+}
+
 void verify_A2_factorization(Hatrix::H2& A) {
   auto UF = generate_UF_chain(A);
   auto VF = generate_VF_chain(A);
@@ -1591,6 +1608,8 @@ void verify_A2_factorization(Hatrix::H2& A) {
   auto A2_actual = unpermute_matrix(product, A);
 
   std::cout << "A2 error: " <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
+
+  verify_A2_solve(A2_actual, A);
 
   // Matrix diff = (A2_actual - A2_expected);
   // int nblocks = 4;
@@ -1635,15 +1654,19 @@ int main(int argc, char *argv[]) {
   auto stop_construct = std::chrono::system_clock::now();
 
   A.factorize(randpts);
-  Hatrix::Matrix x = A.solve(b);
 
-  // std::cout << "-- H2 verification --\n";
-  // verify_A1_factorization(A);
-  // verify_A2_factorization(A);
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  Hatrix::Matrix x_solve = lu_solve(Adense, b);
+  std::cout << "-- H2 verification --\n";
+  verify_A1_factorization(A);
+  verify_A2_factorization(A);
 
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  // Hatrix::Matrix x = A.solve(b);
+  // Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
+
+  // std::cout << "X - X_SOLVE\n";
+  // (x - x_solve).print();
+
+  double solve_error = 0;// Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
 
