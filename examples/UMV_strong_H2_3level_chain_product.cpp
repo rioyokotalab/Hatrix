@@ -721,16 +721,19 @@ namespace Hatrix {
                 }
               }
 
+              U.erase(block, level);
+              U.insert(block, level, std::move(UN1));
+
               // Update a part of the corresponding part of the transfer matrix
               // one level higher.
               int parent_level = level - 1;
               int parent_node = block / 2;
               int slice_index = block % 2;
-              // if (U.exists(parent_node, parent_level)) {
-              //   auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
-              //   auto Utransfer_new_part = matmul(Utransfer_splits[slice_index], r_block_j);
-              //   Utransfer_splits[slice_index] = Utransfer_new_part;
-              // }
+              if (U.exists(parent_node, parent_level)) {
+                auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
+                auto Utransfer_new_part = matmul(r_block_j, Utransfer_splits[slice_index]);
+                Utransfer_splits[slice_index] = Utransfer_new_part;
+              }
             }
           }
 
@@ -788,11 +791,11 @@ namespace Hatrix {
               int parent_level = level - 1;
               int parent_node = block / 2;
               int slice_index = block % 2;
-              // if (V.exists(parent_node, parent_level)) {
-              //   auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
-              //   auto Vtransfer_new_part = matmul(Vtransfer_splits[slice_index], t_i_block);
-              //   Vtransfer_splits[slice_index] = Vtransfer_new_part;
-              // }
+              if (V.exists(parent_node, parent_level)) {
+                auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
+                auto Vtransfer_new_part = matmul(t_i_block, Vtransfer_splits[slice_index]);
+                Vtransfer_splits[slice_index] = Vtransfer_new_part;
+              }
             }
           }
         } // if (block > 0)
@@ -1589,18 +1592,19 @@ void verify_A2_factorization(Hatrix::H2& A) {
 
   std::cout << "A2 error: " <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
 
-  Matrix diff = (A2_actual - A2_expected);
-  int nblocks = 4;
-  auto d_splits = diff.split(nblocks, nblocks);
-  auto m_splits = A2_expected.split(nblocks, nblocks);
+  // Matrix diff = (A2_actual - A2_expected);
+  // int nblocks = 4;
+  // auto d_splits = diff.split(nblocks, nblocks);
+  // auto m_splits = A2_expected.split(nblocks, nblocks);
+  // auto n_splits = A2_actual.split(nblocks, nblocks);
 
-  std::cout << "A2 block errors:\n";
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      int idx = i * nblocks + j;
-      std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
-    }
-  }
+  // std::cout << "A2 block errors:\n";
+  // for (int i = 0; i < nblocks; ++i) {
+  //   for (int j = 0; j < nblocks; ++j) {
+  //     int idx = i * nblocks + j;
+  //     std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+  //   }
+  // }
 }
 
 int main(int argc, char *argv[]) {
