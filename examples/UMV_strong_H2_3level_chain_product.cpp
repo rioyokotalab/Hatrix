@@ -1194,7 +1194,19 @@ namespace Hatrix {
       }
       if (!lr_exists) { break; }
 
-      solve_forward_level(x, level);
+      int n = 0;
+      for (int i = 0; i < num_nodes; ++i) { n += U(i, level).rows; }
+      Matrix x_level(n, 1);
+      for (int i = 0; i < x_level.rows; ++i) {
+        x_level(i, 0) = x(rhs_offset + i, 0);
+      }
+
+      solve_forward_level(x_level, level);
+
+      for (int i = 0; i < x_level.rows; ++i) {
+        x(rhs_offset + i, 0) = x_level(i, 0);
+      }
+
       rhs_offset = permute_forward(x, level, rhs_offset);
     }
 
@@ -1233,8 +1245,23 @@ namespace Hatrix {
       }
       if (!lr_exists) { break; }
 
+      int n = 0;
+      for (int i = 0; i < num_nodes; ++i) {
+        n += V(i, level).rows;
+      }
+      Matrix x_level(n, 1);
+
       rhs_offset = permute_backward(x, level, rhs_offset);
-      solve_backward_level(x, level);
+
+      for (int i = 0; i < x_level.rows; ++i) {
+        x_level(i, 0) = x(rhs_offset + i, 0);
+      }
+
+      solve_backward_level(x_level, level);
+
+      for (int i = 0; i < x_level.rows; ++i) {
+        x(rhs_offset + i, 0) = x_level(i, 0);
+      }
     }
 
     return x;
@@ -1597,18 +1624,18 @@ int main(int argc, char *argv[]) {
 
   A.factorize(randpts);
 
-  std::cout << "-- H2 verification --\n";
-  verify_A1_factorization(A, randpts);
-  verify_A2_factorization(A, randpts);
+  // std::cout << "-- H2 verification --\n";
+  // verify_A1_factorization(A, randpts);
+  // verify_A2_factorization(A, randpts);
 
-  // Hatrix::Matrix x = A.solve(b);
-  // Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
+  Hatrix::Matrix x = A.solve(b, A.height);
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   // std::cout << "X - X_SOLVE\n";
   // (x - x_solve).print();
 
-  double solve_error = 0;// Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  double solve_error =  Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
 
