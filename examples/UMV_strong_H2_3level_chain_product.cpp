@@ -671,7 +671,7 @@ namespace Hatrix {
         if (!U.exists(block, level)) { continue; }
         int64_t block_size = U(block, level).rows;
         // Step 0: Recompress fill-ins on the off-diagonals.
-        if (false) {
+        if (block > 0) {
           {
             // Compress fill-ins on the same row as the <block,level> pair.
             Matrix row_concat(block_size, 0);
@@ -1195,7 +1195,6 @@ namespace Hatrix {
       if (!lr_exists) { break; }
 
       solve_forward_level(x, level);
-
       rhs_offset = permute_forward(x, level, rhs_offset);
     }
 
@@ -1235,7 +1234,6 @@ namespace Hatrix {
       if (!lr_exists) { break; }
 
       rhs_offset = permute_backward(x, level, rhs_offset);
-
       solve_backward_level(x, level);
     }
 
@@ -1535,12 +1533,6 @@ void verify_A2_solve(Matrix& A2, H2& A, const randvec_t& randpts) {
   Matrix b = generate_laplacend_matrix(randpts, A.rank * 8, 1, 0, 0, PV);
   auto x2_dense = lu_solve(A2, b);
   auto x2_h2 = A.solve(b, 2);
-
-  std::cout << "X2 DENSE\n";
-  x2_dense.print();
-
-  std::cout << "X2 H2\n";
-  x2_h2.print();
 
   std::cout << "A2 solve error: " << norm(x2_h2 - x2_dense) / norm(x2_dense) << std::endl;
 }
