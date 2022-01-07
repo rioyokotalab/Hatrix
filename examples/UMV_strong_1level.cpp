@@ -553,10 +553,9 @@ namespace Hatrix {
           int64_t col_split = block_size - V(block).cols;
           auto lower_splits = D(irow, block).split({}, std::vector<int64_t>(1, row_split));
 
-          Matrix x_block(x_split[block]);
+          Matrix x_block(x_split[block]), x_irow(x_split[irow]);
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
 
-          Matrix x_irow(x_split[irow]);
           matmul(lower_splits[0], x_block_splits[0], x_irow, false, false, -1.0, 1.0);
           for (int64_t i = 0; i < block_size; ++i) {
             x(irow * block_size + i, 0) = x_irow(i, 0);
