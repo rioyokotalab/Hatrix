@@ -1624,13 +1624,23 @@ int main(int argc, char *argv[]) {
 
   A.factorize(randpts);
 
-  // std::cout << "-- H2 verification --\n";
-  // verify_A1_factorization(A, randpts);
-  // verify_A2_factorization(A, randpts);
+  std::cout << "-- H2 verification --\n";
+  verify_A1_factorization(A, randpts);
+  verify_A2_factorization(A, randpts);
 
   Hatrix::Matrix x = A.solve(b, A.height);
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
+
+  int num_nodes = pow(2, A.height);
+
+  auto x_splits = x.split(num_nodes, 1);
+  auto x_solve_splits = x_solve.split(num_nodes, 1);
+
+  std::cout << "BLOCK WISE SOLVE ACCURACY:\n";
+  for (int i = 0; i < num_nodes; ++i) {
+    std::cout << "i -> " << i << " " <<  norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
+  }
 
   // std::cout << "X - X_SOLVE\n";
   // (x - x_solve).print();
