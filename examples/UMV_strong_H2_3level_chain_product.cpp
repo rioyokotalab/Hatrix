@@ -659,9 +659,6 @@ namespace Hatrix {
             if (D.exists(i, j, level)) {
               A2_expected_splits[i * 4 + j] = D(i, j, level);
             }
-            else {
-              A2_expected_splits[i * 4 + j] = matmul(matmul(U(i, level), S(i, j, level)), V(j, level), false, true);
-            }
           }
         }
       }
@@ -794,13 +791,37 @@ namespace Hatrix {
               int parent_node = block / 2;
               int slice_index = block % 2;
               if (V.exists(parent_node, parent_level)) {
+                std::cout << "\npre transfer matrix update:\n";
+                std::cout << " ---- bloc -> " << block << " lvl -> " << level << " nrm -> "
+                          <<  norm(generate_identity_matrix(rank, rank) -
+                                   matmul(V(parent_node, parent_level),
+                                          V(parent_node, parent_level), true, false));
+
                 auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
                 auto Vtransfer_new_part = matmul(t_i_block, Vtransfer_splits[slice_index]);
                 Vtransfer_splits[slice_index] = Vtransfer_new_part;
+
+                std::cout << "\npost transfer matrix update:\n";
+                std::cout << " ---- bloc -> " << block << " lvl -> " << level << " nrm -> "
+                          <<  norm(generate_identity_matrix(rank, rank) -
+                                   matmul(V(parent_node, parent_level),
+                                          V(parent_node, parent_level), true, false));
               }
+
+
             }
           }
         } // if (block > 0)
+
+        if (level == 2) {
+          for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+              if (!D.exists(i, j, level)) {
+                A2_expected_splits[i * 4 + j] = matmul(matmul(U(i, level), S(i, j, level)), V(j, level), false, true);
+              }
+            }
+          }
+        }
 
         // Step 1: Generate UF and VF blocks.
         Matrix UF = make_complement(U(block, level));
@@ -1639,7 +1660,8 @@ int main(int argc, char *argv[]) {
 
   std::cout << "BLOCK WISE SOLVE ACCURACY:\n";
   for (int i = 0; i < num_nodes; ++i) {
-    std::cout << "i -> " << i << " " <<  norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
+    std::cout << "i -> " << i << " "
+              <<  norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
   }
 
   // std::cout << "X - X_SOLVE\n";
