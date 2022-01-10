@@ -791,21 +791,18 @@ namespace Hatrix {
               int parent_node = block / 2;
               int slice_index = block % 2;
               if (V.exists(parent_node, parent_level)) {
-                std::cout << "\npre transfer matrix update:\n";
-                std::cout << " ---- bloc -> " << block << " lvl -> " << level << " nrm -> "
-                          <<  norm(generate_identity_matrix(rank, rank) -
-                                   matmul(V(parent_node, parent_level),
-                                          V(parent_node, parent_level), true, false));
-
                 auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
                 auto Vtransfer_new_part = matmul(t_i_block, Vtransfer_splits[slice_index]);
                 Vtransfer_splits[slice_index] = Vtransfer_new_part;
 
-                std::cout << "\npost transfer matrix update:\n";
-                std::cout << " ---- bloc -> " << block << " lvl -> " << level << " nrm -> "
-                          <<  norm(generate_identity_matrix(rank, rank) -
-                                   matmul(V(parent_node, parent_level),
-                                          V(parent_node, parent_level), true, false));
+                // std::cout << "\npre transfer matrix update:\n";
+                // std::cout << " ---- p bloc -> " << parent_node << " p lvl -> "
+                //           << parent_level
+                //           << " block -> " << block << " level -> " << level
+                //           << " nrm -> "
+                //           <<  norm(generate_identity_matrix(rank, rank) -
+                //                    matmul(V(parent_node, parent_level),
+                //                           V(parent_node, parent_level), true, false));
               }
 
 
@@ -814,13 +811,12 @@ namespace Hatrix {
         } // if (block > 0)
 
         if (level == 2) {
-          for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
-              if (!D.exists(i, j, level)) {
-                A2_expected_splits[i * 4 + j] = matmul(matmul(U(i, level), S(i, j, level)), V(j, level), false, true);
-              }
-            }
-          }
+          std::cout << "block -> "
+                    << block << " nrm -> "
+                    << norm(generate_identity_matrix(rank, rank) -
+                            matmul(U(block, level), U(block, level),
+                                   true, false)) << std::endl;
+
         }
 
         // Step 1: Generate UF and VF blocks.
@@ -1061,6 +1057,32 @@ namespace Hatrix {
         }
       }
     }
+
+    for (int i = 0; i < 4; ++i) {
+      for (int j = 0; j < 4; ++j) {
+        if (!D.exists(i, j, 2)) {
+          A2_expected_splits[i * 4 + j] =
+            matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
+        }
+      }
+    }
+
+    std::cout << "post factorization U transfer matrices\n";
+    for (int i = 0; i < 4; ++i) {
+      std::cout << "i -> "
+                << i << " "
+                << norm(generate_identity_matrix(rank, rank) - matmul(U(i, 2), U(i, 2),
+                                                                      true, false)) << "\n";
+    }
+
+
+
+    std::cout << "post factorization V transfer matrices\n";
+    for (int i = 0; i < 4; ++i) {
+      std::cout << "i -> "
+                << i << norm(generate_identity_matrix(rank, rank) - matmul(V(i, 2), V(i, 2),
+                                                                      true, false)) << "\n";
+    }
   }
 
   void H2::solve_forward_level(Matrix& x_level, int level) {
@@ -1081,7 +1103,8 @@ namespace Hatrix {
       int block_size = U(block, level).rows;
       int c_size = block_size - rank;
 
-      int64_t row_split = block_size - U(block, level).cols, col_split = block_size - V(block, level).cols;
+      int64_t row_split = block_size - U(block, level).cols,
+        col_split = block_size - V(block, level).cols;
       auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
 
       Matrix x_block(x_level_split[block]);
@@ -1138,7 +1161,8 @@ namespace Hatrix {
     // backward substition using cc blocks
     for (int block = nblocks-1; block >= 0; --block) {
       int block_size = V(block, level).rows;
-      int64_t row_split = block_size - U(block, level).cols, col_split = block_size - V(block, level).cols;
+      int64_t row_split = block_size - U(block, level).cols,
+        col_split = block_size - V(block, level).cols;
       auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
       // Apply co block.
       for (int left_col = block-1; left_col >= 0; --left_col) {
@@ -1160,14 +1184,17 @@ namespace Hatrix {
 
       // Apply c block present on the right of this diagonal block.
       for (int right_col = nblocks-1; right_col > block; --right_col) {
-        if (is_admissible.exists(block, right_col, level) && !is_admissible(block, right_col, level)) {
+        if (is_admissible.exists(block, right_col, level) &&
+            !is_admissible(block, right_col, level)) {
           int64_t row_split = block_size - U(block, level).cols;
-          auto right_splits = D(block, right_col, level).split(std::vector<int64_t>(1, row_split), {});
+          auto right_splits = D(block, right_col, level).
+            split(std::vector<int64_t>(1, row_split), {});
 
           Matrix x_block(x_level_split[block]);
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
 
-          matmul(right_splits[0], x_level_split[right_col], x_block_splits[0], false, false, -1.0, 1.0);
+          matmul(right_splits[0], x_level_split[right_col],
+                 x_block_splits[0], false, false, -1.0, 1.0);
           for (int64_t i = 0; i < block_size; ++i) {
             x_level(block * block_size + i, 0) = x_block(i, 0);
           }
@@ -1611,7 +1638,23 @@ void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
 
   auto A2_actual = unpermute_matrix(product, A);
 
-  std::cout << "A2 factorization error: " <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
+  auto diff = (A2_expected - A2_actual);
+
+  auto diff_splits = diff.split(4, 4);
+  auto A2_expected_splits = A2_expected.split(4, 4);
+
+  std::cout << "A2 factorization error: "
+            <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
+
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      std::cout << "<i, j>: " << i << ", " << j
+                << " nrm -> " << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
+                << std::endl;
+    }
+  }
+
+
 
   verify_A2_solve(A2_actual, A, randpts);
 }
