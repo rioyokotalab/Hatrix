@@ -720,6 +720,10 @@ namespace Hatrix {
                 }
               }
 
+              // if (level == 2) {
+              //   std::cout << "block : " << block << std::endl;
+              //   UN1.print();
+              // }
               U.erase(block, level);
               U.insert(block, level, std::move(UN1));
 
@@ -794,18 +798,7 @@ namespace Hatrix {
                 auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
                 auto Vtransfer_new_part = matmul(t_i_block, Vtransfer_splits[slice_index]);
                 Vtransfer_splits[slice_index] = Vtransfer_new_part;
-
-                // std::cout << "\npre transfer matrix update:\n";
-                // std::cout << " ---- p bloc -> " << parent_node << " p lvl -> "
-                //           << parent_level
-                //           << " block -> " << block << " level -> " << level
-                //           << " nrm -> "
-                //           <<  norm(generate_identity_matrix(rank, rank) -
-                //                    matmul(V(parent_node, parent_level),
-                //                           V(parent_node, parent_level), true, false));
               }
-
-
             }
           }
         } // if (block > 0)
@@ -1075,13 +1068,12 @@ namespace Hatrix {
                                                                       true, false)) << "\n";
     }
 
-
-
     std::cout << "post factorization V transfer matrices\n";
     for (int i = 0; i < 4; ++i) {
       std::cout << "i -> "
-                << i << norm(generate_identity_matrix(rank, rank) - matmul(V(i, 2), V(i, 2),
-                                                                      true, false)) << "\n";
+                << i << " "
+                <<  norm(generate_identity_matrix(rank, rank) - matmul(V(i, 2), V(i, 2),
+                                                                       true, false)) << "\n";
     }
   }
 
@@ -1649,12 +1641,11 @@ void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       std::cout << "<i, j>: " << i << ", " << j
-                << " nrm -> " << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
-                << std::endl;
+                << " -- " << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
+                << "   ";
     }
+    std::cout << std::endl;
   }
-
-
 
   verify_A2_solve(A2_actual, A, randpts);
 }
