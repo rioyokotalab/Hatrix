@@ -733,6 +733,8 @@ namespace Hatrix {
               int parent_node = block / 2;
               int slice_index = block % 2;
               if (U.exists(parent_node, parent_level)) {
+                std::cout << "Update U parent parent_node: " <<  parent_node
+                          << " parent level: " << parent_level << std::endl;
                 auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
                 auto Utransfer_new_part = matmul(r_block_j, Utransfer_splits[slice_index]);
                 Utransfer_splits[slice_index] = Utransfer_new_part;
