@@ -635,6 +635,7 @@ namespace Hatrix {
     // For verification of A1 matrix.
     int64_t level = height;
     RowColLevelMap<Matrix> F;
+    RowMap r, t;     // matrices for storing the updates for coupling blocks at each level.
     A2_expected = generate_identity_matrix(rank * 8, rank * 8);
     auto A2_expected_splits = A2_expected.split(4, 4);
 
@@ -674,13 +675,14 @@ namespace Hatrix {
             Matrix row_concat(block_size, 0);
             std::vector<int64_t> VN1_col_splits;
             bool found_row_fill_in = false;
-            for (int j = 0; j < num_nodes; ++j) {
+            for (int j = 0; j < block; ++j) {
               if (F.exists(block, j, level)) {
                 found_row_fill_in = true;
                 break;
               }
             }
 
+            // if (found_row_fill_in || level != height) {
             if (found_row_fill_in) {
               // Recompress and update the basis on the same level.
               for (int j = 0; j < num_nodes; ++j) {
@@ -692,53 +694,22 @@ namespace Hatrix {
                     row_concat = concat(row_concat, Fp, 1);
                   }
                 }
+                else if (!is_admissible.exists(block, j, level)) { // if you have an off-diagonal dense block,
+                  // std::cout << "include block: " << block << ", " << j << ", " << level << std::endl;
+                  Matrix lr_block = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
+                                                                   block * block_size, j * block_size, PV);
+                  row_concat = concat(row_concat, lr_block, 1);
+                }
               }
 
               Matrix UN1, _SN1, _VN1T; double error;
               std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
-              Matrix r_block_j = matmul(UN1, U(block, level), true, false);
-              for (int j = 0; j < num_nodes; ++j) {
-                if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                  Matrix Sbar_block_j = matmul(r_block_j, S(block, j, level));
+              Matrix r_block = matmul(UN1, U(block, level), true, false);
+              r.insert(block, std::move(r_block));
 
-                  Matrix SpF(rank, rank);
-                  if (F.exists(block, j, level)) {
-                    Matrix Fp = matmul(F(block, j, level), V(j, level), false, true);
-
-                    SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
-                    Sbar_block_j = Sbar_block_j + SpF;
-                  }
-
-                  S.erase(block, j, level);
-                  S.insert(block, j, level, std::move(Sbar_block_j));
-
-                  // Update transfer matrix one level higher.
-                  if (F.exists(block, j, level)) {
-                    F.erase(block, j, level);
-                  }
-                }
-              }
-
-              // if (level == 2) {
-              //   std::cout << "block : " << block << std::endl;
-              //   UN1.print();
-              // }
               U.erase(block, level);
               U.insert(block, level, std::move(UN1));
-
-              // Update a part of the corresponding part of the transfer matrix
-              // one level higher.
-              int parent_level = level - 1;
-              int parent_node = block / 2;
-              int slice_index = block % 2;
-              if (U.exists(parent_node, parent_level)) {
-                std::cout << "Update U parent parent_node: " <<  parent_node
-                          << " parent level: " << parent_level << std::endl;
-                auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
-                auto Utransfer_new_part = matmul(r_block_j, Utransfer_splits[slice_index]);
-                Utransfer_splits[slice_index] = Utransfer_new_part;
-              }
             }
           }
 
@@ -748,13 +719,14 @@ namespace Hatrix {
             std::vector<int64_t> UN2_row_splits;
             bool found_col_fill_in = false;
 
-            for (int i = 0; i < num_nodes; ++i) {
+            for (int i = 0; i < block; ++i) {
               if (F.exists(i, block, level)) {
                 found_col_fill_in = true;
                 break;
               }
             }
 
+            // if (found_col_fill_in || level != height) {
             if (found_col_fill_in) {
               // Recompress and update the column on the same level.
               for (int i = 0; i < num_nodes; ++i) {
@@ -767,40 +739,22 @@ namespace Hatrix {
                     col_concat = concat(col_concat, Fp, 0);
                   }
                 }
+                else if (!is_admissible.exists(i, block, level)) {
+                  Matrix lr_block = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
+                                                                      i * block_size, block * block_size, PV);
+                  col_concat = concat(col_concat, lr_block, 0);
+                }
               }
 
               Matrix _UN2, _SN2, VN2T; double error;
               std::tie(_UN2, _SN2, VN2T, error)= truncated_svd(col_concat, rank);
 
-              Matrix t_i_block = matmul(V(block, level), VN2T, true, true);
-              for (int i = 0; i < num_nodes; ++i) {
-                if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                  Matrix Sbar_i_block = matmul(S(i, block, level), t_i_block);
+              Matrix t_block = matmul(V(block, level), VN2T, true, true);
 
-                  if (F.exists(i, block, level)) {
-                    Matrix Fp = matmul(U(i, level), F(i, block, level));
-                    Matrix SpF = matmul(matmul(U(i, level), Fp, true, false), VN2T, false, true);
-                    Sbar_i_block = Sbar_i_block + SpF;
-                    F.erase(i, block, level);
-                  }
+              t.insert(block, std::move(t_block));
 
-                  S.erase(i, block, level);
-                  S.insert(i, block, level, std::move(Sbar_i_block));
-                }
-              }
               V.erase(block, level);
               V.insert(block, level, transpose(VN2T));
-
-              // Update a part of the corresponding part of the transfer matrix
-              // one level higher.
-              int parent_level = level - 1;
-              int parent_node = block / 2;
-              int slice_index = block % 2;
-              if (V.exists(parent_node, parent_level)) {
-                auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
-                auto Vtransfer_new_part = matmul(t_i_block, Vtransfer_splits[slice_index]);
-                Vtransfer_splits[slice_index] = Vtransfer_new_part;
-              }
             }
           }
         } // if (block > 0)
@@ -976,6 +930,7 @@ namespace Hatrix {
                   // Update the oo block within the fill-ins.
                   matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false,
                          -1.0, 1.0);
+                  std::cout << "inserting fill in i-> " << i << ", " << j << ", " << level << std::endl;
                   F.insert(i, j, level, std::move(fill_in));
                 }
                 else {
@@ -995,8 +950,68 @@ namespace Hatrix {
         }
       } // for (block=0; block < num_nodes; ++block)
 
-        // Merge the unfactorized parts.
-      int64_t parent_level = level - 1;
+      int parent_level = level - 1;
+      for (int block = 0; block < num_nodes; ++block) {
+        // Update coupling matrices on the row for this level.
+        if (r.exists(block)) {
+          Matrix &r_block = r(block);
+          for (int j = 0; j < block; ++j) {
+            if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
+              Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
+
+              Matrix SpF(rank, rank);
+              if (F.exists(block, j, level)) {
+                std::cout << "block: " << block << " j: " << j << " lvel: " << level << std::endl;
+                Matrix Fp = matmul(F(block, j, level), V(j, level), false, true);
+                SpF = matmul(matmul(U(block, level), Fp, true, false), V(j, level));
+                Sbar_block_j = Sbar_block_j + SpF;
+                F.erase(block, j, level);
+              }
+              S.erase(block, j, level);
+              S.insert(block, j, level, std::move(Sbar_block_j));
+            }
+          }
+
+          int parent_node = block / 2;
+          int slice_index = block % 2;
+          if (U.exists(parent_node, parent_level)) {
+            auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
+            auto Utransfer_new_part = matmul(r_block, Utransfer_splits[slice_index]);
+            Utransfer_splits[slice_index] = Utransfer_new_part;
+          }
+          r.erase(block);
+        }
+
+        if (t.exists(block)) {
+          Matrix& t_block = t(block);
+          for (int i = 0; i < block; ++i) {
+            if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
+              Matrix Sbar_i_block = matmul(S(i, block, level), t_block);
+
+              if (F.exists(i, block, level)) {
+                Matrix Fp = matmul(U(i, level), F(i, block, level));
+                Matrix SpF = matmul(matmul(U(i, level), Fp, true, false), V(block, level));
+                Sbar_i_block = Sbar_i_block + SpF;
+                F.erase(i, block, level);
+              }
+
+              S.erase(i, block, level);
+              S.insert(i, block, level, std::move(Sbar_i_block));
+            }
+          }
+
+          int parent_node = block / 2;
+          int slice_index = block % 2;
+          if (V.exists(parent_node, parent_level)) {
+            auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
+            auto Vtransfer_new_part = matmul(t_block, Vtransfer_splits[slice_index]);
+            Vtransfer_splits[slice_index] = Vtransfer_new_part;
+          }
+          t.erase(block);
+        }
+      }
+
+      // Merge the unfactorized parts.
       for (int i = 0; i < int(pow(2, parent_level)); ++i) {
         for (int j = 0; j < int(pow(2, parent_level)); ++j) {
           if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
@@ -1022,6 +1037,15 @@ namespace Hatrix {
             }
 
             D.insert(i, j, parent_level, std::move(D_unelim));
+          }
+        }
+      }
+
+      for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+          if (!D.exists(i, j, 2)) {
+            A2_expected_splits[i * 4 + j] =
+              matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
           }
         }
       }
@@ -1053,14 +1077,7 @@ namespace Hatrix {
       }
     }
 
-    for (int i = 0; i < 4; ++i) {
-      for (int j = 0; j < 4; ++j) {
-        if (!D.exists(i, j, 2)) {
-          A2_expected_splits[i * 4 + j] =
-            matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
-        }
-      }
-    }
+
 
     std::cout << "post factorization U transfer matrices\n";
     for (int i = 0; i < 4; ++i) {
@@ -1640,10 +1657,11 @@ void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
   std::cout << "A2 factorization error: "
             <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
 
+  std::cout << "A2 block wise factorization error: \n";
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       std::cout << "<i, j>: " << i << ", " << j
-                << " -- " << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
+                << " -- " << std::setprecision(8) << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
                 << "   ";
     }
     std::cout << std::endl;

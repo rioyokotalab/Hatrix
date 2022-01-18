@@ -139,6 +139,8 @@ namespace Hatrix {
             Matrix expected = matmul(matmul(Ubig, S(i, j)), Vbig, false, true);
             Matrix actual = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
                                                               i * block_size, j * block_size, PV);
+            // std::cout << "rel err: " << Hatrix::norm(actual - expected) / Hatrix::norm(expected) << std::endl;
+
             error += pow(Hatrix::norm(expected - actual), 2);
           }
         }
