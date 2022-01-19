@@ -379,6 +379,10 @@ namespace Hatrix {
     Matrix col_block = generate_column_block(node, block_size, randpts, level);
     auto col_block_splits = col_block.split(2, 1);
 
+    col_block.print_meta();
+
+    std::cout << "level: " << level << " node: " << node << " bl: " << block_size << std::endl;
+
     Matrix temp(Ubig_child1.cols + Ubig_child2.cols, col_block.cols);
     auto temp_splits = temp.split(2, 1);
 
@@ -668,16 +672,6 @@ namespace Hatrix {
 
   void H2::factorize(const randvec_t &randpts) {
     // For verification of A1 matrix.
-    Matrix mat(200, 5);
-    auto mat_split = mat.split(2, 1);
-    auto Utransfer_splits = U(1, 2).split(2, 1);
-    matmul(U(2, 3), Utransfer_splits[0], mat_split[0]);
-    matmul(U(3, 3), Utransfer_splits[1], mat_split[1]);
-
-
-    std::cout << "PRE FACTOR Ubig23: " << norm(generate_identity_matrix(rank, rank) - matmul(mat, mat, true, false)) << std::endl;;
-
-
     int64_t level = height;
     RowColLevelMap<Matrix> F;
     RowMap r, t;     // matrices for storing the updates for coupling blocks at each level.
@@ -1033,24 +1027,6 @@ namespace Hatrix {
               S.insert(block, j, level, std::move(Sbar_block_j));
             }
           }
-
-          // int parent_node = block / 2;
-          // int slice_index = block % 2;
-          // if (U.exists(parent_node, parent_level)) {
-
-          //   // if (block == 2 && level == 3) {
-          //   //   auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
-          //   //   auto Uhat_big_23 = matmul(Ubig_23, Utransfer_splits[0]);
-          //   //   auto proj = matmul(U(2, 3), U(2, 3), true, false);
-          //   //   std::cout << "ident: " << norm(generate_identity_matrix(rank, rank) - matmul(Uhat_big_23, Uhat_big_23, true, false)) << std::endl;;
-          //   // }
-          //   if (block == 2 && level == 3) {
-          //     std::cout << "NORM OF NEW MATRIX: " << norm(generate_identity_matrix(rank, rank) - matmul(U(2, 3), U(2, 3), true, false)) << std::endl;
-          //   }
-          //   auto Utransfer_splits = U(parent_node, parent_level).split(2, 1);
-          //   auto Utransfer_new_part = matmul(r_block, Utransfer_splits[slice_index]);
-          //   Utransfer_splits[slice_index] = Utransfer_new_part;
-          // }
           r.erase(block);
         }
 
@@ -1072,24 +1048,38 @@ namespace Hatrix {
               S.insert(i, block, level, std::move(Sbar_i_block));
             }
           }
-
-          // int parent_node = block / 2;
-          // int slice_index = block % 2;
-          // if (V.exists(parent_node, parent_level)) {
-          //   auto Vtransfer_splits = V(parent_node, parent_level).split(2, 1);
-          //   auto Vtransfer_new_part = matmul(t_block, Vtransfer_splits[slice_index]);
-          //   Vtransfer_splits[slice_index] = Vtransfer_new_part;
-          // }
           t.erase(block);
         }
       } // for (int block = 0; block < num_nodes; ++block)
 
       // Update transfer matrices.
-      for (int block = 0; block < num_nodes; ++block) {
+      int parent_nodes = pow(2, parent_level);
+      for (int block = 0; block < num_nodes; block += 2) {
         int parent_node = block / 2;
-        int slice_index = block % 2;
+        int c1 = block;
+        int c2 = block+1;
 
+        if (row_has_admissible_blocks(parent_node, parent_level)) {
+          auto Ubig_child1 = get_Ubig(c1, level);
+          auto Ubig_child2 = get_Ubig(c2, level);
 
+          int parent_block_size = N / parent_nodes;
+          Matrix Utransfer = generate_U_transfer_matrix(Ubig_child1, Ubig_child2, parent_node,
+                                                        parent_block_size, randpts, parent_level);
+          U.erase(parent_node, parent_level);
+          U.insert(parent_node, parent_level, std::move(Utransfer));
+        }
+
+        if (col_has_admissible_blocks(parent_node, parent_level)) {
+          auto Vbig_child1 = get_Vbig(c1, level);
+          auto Vbig_child2 = get_Vbig(c2, level);
+
+          int parent_block_size = N / parent_nodes;
+          Matrix Vtransfer = generate_V_transfer_matrix(Vbig_child1, Vbig_child2, parent_node,
+                                                        parent_block_size, randpts, parent_level);
+          V.erase(parent_node, parent_level);
+          V.insert(parent_node, parent_level, std::move(Vtransfer));
+        }
       }
 
       if (level == 3) {
@@ -1102,18 +1092,6 @@ namespace Hatrix {
           }
         }
       }
-
-      if (level == 3) {
-        for (int b = 0; b < 4; ++b) {
-          std::cout << "POST UPDATE block -> "
-                    << b << " nrm -> "
-                    << norm(generate_identity_matrix(rank, rank) -
-                            matmul(U(b, 2), U(b, 2),
-                                   true, false)) << std::endl;
-        }
-
-      }
-
 
       // Merge the unfactorized parts.
       for (int i = 0; i < int(pow(2, parent_level)); ++i) {
@@ -1171,22 +1149,6 @@ namespace Hatrix {
         }
       }
     }
-
-    // std::cout << "post factorization U transfer matrices\n";
-    // for (int i = 0; i < 4; ++i) {
-    //   std::cout << "i -> "
-    //             << i << " "
-    //             << norm(generate_identity_matrix(rank, rank) - matmul(U(i, 2), U(i, 2),
-    //                                                                   true, false)) << "\n";
-    // }
-
-    // std::cout << "post factorization V transfer matrices\n";
-    // for (int i = 0; i < 4; ++i) {
-    //   std::cout << "i -> "
-    //             << i << " "
-    //             <<  norm(generate_identity_matrix(rank, rank) - matmul(V(i, 2), V(i, 2),
-    //                                                                    true, false)) << "\n";
-    // }
   }
 
   void H2::solve_forward_level(Matrix& x_level, int level) {
