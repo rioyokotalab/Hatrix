@@ -43,6 +43,8 @@ namespace Hatrix {
     void solve_backward_level(Matrix& x_level, int level);
     Matrix generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int node,
                                       int block_size, const randvec_t& randpts, int level);
+    Matrix generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int node,
+                                      int block_size, const randvec_t& randpts, int level);
 
   public:
     H2(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height,
@@ -370,7 +372,8 @@ namespace Hatrix {
     }
   }
 
-  Matrix H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int node,
+  Matrix
+  H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int node,
                                         int block_size, const randvec_t& randpts, int level) {
     // Shown as Alevel_node_plus on miro.
     Matrix col_block = generate_column_block(node, block_size, randpts, level);
@@ -386,6 +389,24 @@ namespace Hatrix {
     std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
 
     return Utransfer;
+  }
+
+  Matrix
+  H2::generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int node,
+                                        int block_size, const randvec_t& randpts, int level) {
+    Matrix row_block = generate_row_block(node, block_size, randpts, level);
+    auto row_block_splits = row_block.split(1, 2);
+
+    Matrix temp(row_block.rows, Vbig_child1.cols + Vbig_child2.cols);
+    auto temp_splits = temp.split(1, 2);
+
+    matmul(row_block_splits[0], Vbig_child1, temp_splits[0]);
+    matmul(row_block_splits[1], Vbig_child2, temp_splits[1]);
+
+    Matrix Ui, Si, Vtransfer; double error;
+    std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
+
+    return transpose(Vtransfer);
   }
 
   std::tuple<RowLevelMap, ColLevelMap>
@@ -436,18 +457,9 @@ namespace Hatrix {
         Matrix& Vbig_child1 = Vchild(child1, child_level);
         Matrix& Vbig_child2 = Vchild(child2, child_level);
 
-        Matrix row_block = generate_row_block(node, block_size, randpts, level);
-        auto row_block_splits = row_block.split(1, 2);
-
-        Matrix temp(row_block.rows, Vbig_child1.cols + Vbig_child2.cols);
-        auto temp_splits = temp.split(1, 2);
-
-        matmul(row_block_splits[0], Vbig_child1, temp_splits[0]);
-        matmul(row_block_splits[1], Vbig_child2, temp_splits[1]);
-
-        Matrix Ui, Si, Vtransfer; double error;
-        std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
-        V.insert(node, level, transpose(Vtransfer));
+        Matrix Vtransfer = generate_V_transfer_matrix(Vbig_child1, Vbig_child2, node,
+                                                      block_size, randpts, level);
+        V.insert(node, level, std::move(Vtransfer));
 
         // Generate the full bases for passing onto the upper level.
         std::vector<Matrix> Vtransfer_splits = V(node, level).split(2, 1);
