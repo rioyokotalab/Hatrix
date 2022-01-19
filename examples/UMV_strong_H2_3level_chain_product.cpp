@@ -707,14 +707,6 @@ namespace Hatrix {
         // Assume that the block size for this level is the number of rows in the bases.
         if (!U.exists(block, level)) { continue; }
         int64_t block_size = U(block, level).rows;
-        if (level == 2) {
-          std::cout << "PRE CLUSTER UPDATE: block -> "
-                    << block << " nrm -> "
-                    << norm(generate_identity_matrix(rank, rank) -
-                            matmul(U(block, level), U(block, level),
-                                   true, false)) << std::endl;
-
-        }
         // Step 0: Recompress fill-ins on the off-diagonals.
         if (block > 0) {
           {
@@ -805,15 +797,6 @@ namespace Hatrix {
             }
           }
         } // if (block > 0)
-
-        if (level == 2) {
-          std::cout << "POST CLUSTER UPDATE block -> "
-                    << block << " nrm -> "
-                    << norm(generate_identity_matrix(rank, rank) -
-                            matmul(U(block, level), U(block, level),
-                                   true, false)) << std::endl;
-
-        }
 
         // Step 1: Generate UF and VF blocks.
         Matrix UF = make_complement(U(block, level));
@@ -997,17 +980,9 @@ namespace Hatrix {
       } // for (block=0; block < num_nodes; ++block)
 
       int parent_level = level - 1;
-      if (level == 3) {
-        for (int b = 0; b < 4; ++b) {
-          std::cout << "PRE UPDATE block -> "
-                    << b << " nrm -> "
-                    << norm(generate_identity_matrix(rank, rank) -
-                            matmul(U(b, 2), U(b, 2),
-                                   true, false)) << std::endl;
-        }
-      }
 
-      // Update coupling matrices on this level and transfer matrices one level higher.
+
+      // Update coupling matrices on this level.
       for (int block = 0; block < num_nodes; ++block) {
         if (r.exists(block)) {
           Matrix &r_block = r(block);
@@ -1017,7 +992,6 @@ namespace Hatrix {
 
               Matrix SpF(rank, rank);
               if (F.exists(block, j, level)) {
-                // std::cout << "block: " << block << " j: " << j << " lvel: " << level << std::endl;
                 Matrix Fp = matmul(F(block, j, level), V(j, level), false, true);
                 SpF = matmul(matmul(U(block, level), Fp, true, false), V(j, level));
                 Sbar_block_j = Sbar_block_j + SpF;
@@ -1037,7 +1011,6 @@ namespace Hatrix {
               Matrix Sbar_i_block = matmul(S(i, block, level), t_block);
 
               if (F.exists(i, block, level)) {
-                // std::cout << "i-> " << i << " block-> " << block << " level-> " << level << std::endl;
                 Matrix Fp = matmul(U(i, level), F(i, block, level));
                 Matrix SpF = matmul(matmul(U(i, level), Fp, true, false), V(block, level));
                 Sbar_i_block = Sbar_i_block + SpF;
@@ -1052,7 +1025,7 @@ namespace Hatrix {
         }
       } // for (int block = 0; block < num_nodes; ++block)
 
-      // Update transfer matrices.
+      // Update transfer matrices on one level higher.
       int parent_nodes = pow(2, parent_level);
       for (int block = 0; block < num_nodes; block += 2) {
         int parent_node = block / 2;
@@ -1080,7 +1053,7 @@ namespace Hatrix {
           V.erase(parent_node, parent_level);
           V.insert(parent_node, parent_level, std::move(Vtransfer));
         }
-      }
+      } // for (int block = 0; block < num_nodes; block += 2)
 
       if (level == 3) {
         for (int i = 0; i < 4; ++i) {
@@ -1132,7 +1105,6 @@ namespace Hatrix {
         A1_expected_splits[(i + 2) * 4 + j + 2] = D(i, j, level);
       }
     }
-
 
     for (int d = 0; d < last_nodes; ++d) {
       lu(D(d, d, level));
@@ -1659,14 +1631,6 @@ void verify_A1_factorization(Hatrix::H2& A, const randvec_t& randpts) {
 
   std::cout << "A1 factorization rel error: " << norm(diff) / norm(A1_expected) << std::endl;
 
-  // std::cout << "A1 block errors:\n";
-  // for (int i = 2; i < nblocks; ++i) {
-  //   for (int j = 2; j < nblocks; ++j) {
-  //     int idx = i * nblocks + j;
-  //     std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
-  //   }
-  // }
-
   verify_A1_solve(A1_actual, A, randpts);
 }
 
@@ -1709,7 +1673,6 @@ void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
   auto diff_splits = diff.split(4, 4);
   auto A2_expected_splits = A2_expected.split(4, 4);
 
-  (A2_expected - A2_actual).print();
   std::cout << "A2 factorization error: "
             <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
 
