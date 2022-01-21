@@ -698,7 +698,7 @@ int main(int argc, char** argv) {
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
-  PV = 1e-2 * ((N / 100) / 4);
+  PV = 1e-3 * * (1 / pow(10, N / 800));
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";

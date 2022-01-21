@@ -1706,7 +1706,7 @@ int main(int argc, char *argv[]) {
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
-  PV = 1e-2 * (1 / pow(10, height));
+  PV = 1e-3 * (1 / pow(10, N/800));
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
@@ -1754,6 +1754,7 @@ int main(int argc, char *argv[]) {
 
   std::ofstream file;
   file.open("h2_matrix_umv.csv", std::ios::app | std::ios::out);
-  file << N << "," << rank << "," << admis << "," << leaf << "," << height << "," << construct_error << "," << solve_error << std::endl;
+  file << N << "," << rank << "," << admis << "," << leaf << "," << height
+       << "," << construct_error << "," << solve_error << std::endl;
   file.close();
 }
