@@ -1743,12 +1743,17 @@ int main(int argc, char *argv[]) {
 
   double solve_error =  Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
+  int leaf = int(N / pow(2, height));
   Hatrix::Context::finalize();
 
   std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= "
-            << int(N / pow(2, height))
+            << leaf
             << " height=" << height
             << " const. error=" << construct_error
             << " solve error=" << solve_error << std::endl;
 
+  std::ofstream file;
+  file.open("h2_matrix_umv.csv", std::ios::app | std::ios::out);
+  file << N << "," << rank << "," << admis << "," << leaf << "," << height << "," << construct_error << "," << solve_error << std::endl;
+  file.close();
 }
