@@ -15,7 +15,7 @@
 // "Accuracy Controlled Direct Integral Equation Solver of Linear Complexity with Change
 // of Basis for Large-Scale Interconnect Extraction"
 
-constexpr double PV = 1e-3;
+double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -566,6 +566,7 @@ int main(int argc, char* argv[]) {
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  PV = 1e-2 * (1 / pow(10, height));
 
   Hatrix::HSS A(randpts, N, rank, height);
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
@@ -584,9 +585,17 @@ int main(int argc, char* argv[]) {
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  int leaf = int(N / pow(2, height));
 
   Hatrix::Context::finalize();
   std::cout << "N= " << N << " rank= " << rank << " height=" << height
             << " construction error=" << construct_error
             << " solve error=" << solve_error << std::endl;
+
+  int admis = 0;
+  std::ofstream file;
+  file.open("hss_matrix_umv.csv", std::ios::app | std::ios::out);
+  file << N << "," << rank << "," << admis << "," << leaf << ","
+       << height << "," << construct_error << "," << solve_error << std::endl;
+  file.close();
 }

@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 #include <cassert>
+#include <fstream>
 
 #include "Hatrix/Hatrix.h"
 
@@ -16,7 +17,7 @@
 // Accuracy Directly Controlled Fast Direct Solution of General H^2-matrices and Its
 // Application to Solving Electrodynamics Volume Integral Equations
 
-constexpr double PV = 1;
+double PV = 1;
 using randvec_t = std::vector<std::vector<double> >;
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
@@ -697,6 +698,7 @@ int main(int argc, char** argv) {
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  PV = 1e-2 * ((N / 100) / 4);
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -718,7 +720,15 @@ int main(int argc, char** argv) {
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
+  int leaf = N / nblocks;
 
   std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
+            << " leaf: " << leaf
             << " construct error: " << construct_error << " solve error: " << solve_error << "\n";
+
+  std::ofstream file;
+  file.open("blr2_matrix_umv.csv", std::ios::app | std::ios::out);
+  file << N << "," << rank << "," << nblocks << "," << "," << admis
+       << leaf << "," << construct_error << "," << solve_error << std::endl;
+  file.close();
 }
