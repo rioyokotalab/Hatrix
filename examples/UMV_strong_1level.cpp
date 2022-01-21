@@ -692,13 +692,14 @@ int main(int argc, char** argv) {
   int64_t nblocks = atoi(argv[2]);
   int64_t rank = atoi(argv[3]);
   int64_t admis = atoi(argv[4]);
+  int multiplier = atoi(argv[5]);
 
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
-  PV = 1e-3 * * (1 / pow(10, N / 800));
+  PV = 1e-3 * (1 / pow(1, multiplier));
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -728,7 +729,7 @@ int main(int argc, char** argv) {
 
   std::ofstream file;
   file.open("blr2_matrix_umv.csv", std::ios::app | std::ios::out);
-  file << N << "," << rank << "," << nblocks << "," << "," << admis
+  file << N << "," << rank << "," << nblocks << "," << admis << ","
        << leaf << "," << construct_error << "," << solve_error << std::endl;
   file.close();
 }
