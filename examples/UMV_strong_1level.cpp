@@ -213,7 +213,6 @@ namespace Hatrix {
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       RowColMap<Matrix> F;      // fill-in blocks.
-      RowMap r, t;              // Matrices for storing updates to the S blocks.
 
       for (int block = 0; block < nblocks; ++block) {
         if (block > 0) {
@@ -245,27 +244,21 @@ namespace Hatrix {
               std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
               Matrix r_block = matmul(UN1, U(block, level), true, false);
-              r.insert(block, std::move(r_block));
 
               for (int j = 0; j < nblocks; ++j) {
                 if (is_admissible(block, j, level)) {
-                  Matrix r_block_j = matmul(UN1, U(block, level), true, false);
-                  Matrix Sbar_block_j = matmul(r_block_j, S(block, j, level));
+                  Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
 
                   Matrix SpF(rank, rank);
                   if (F.exists(block, j)) {
                     Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-
                     SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
                     Sbar_block_j = Sbar_block_j + SpF;
+                    F.erase(block, j);
                   }
 
                   S.erase(block, j, level);
                   S.insert(block, j, level, std::move(Sbar_block_j));
-
-                  if (F.exists(block, j)) {
-                    F.erase(block, j);
-                  }
                 }
               }
 
@@ -302,24 +295,23 @@ namespace Hatrix {
               std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
 
               Matrix t_block = matmul(V(block, level), VN2T, true, true);
-              t.insert(block, std::move(t_block));
 
               for (int i = 0; i < nblocks; ++i) {
                 if (is_admissible(i, block, level)) {
-                  Matrix t_i_block = matmul(V(block, level), VN2T, true, true);
-                  Matrix Sbar_i_block = matmul(S(i, block, level), t_i_block);
+                  Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
                   if (F.exists(i, block)) {
-                    Matrix Fp = matmul(U(i, level), F(i, block));
-                    Matrix SpF = matmul(matmul(U(i, level), Fp, true, false), VN2T, false, true);
+                    Matrix Fp = matmul(U(i,level), F(i, block));
+                    Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
 
                     F.erase(i, block);
                   }
 
                   S.erase(i, block, level);
-                  S.insert(i, block, level,std::move(Sbar_i_block));
+                  S.insert(i, block, level, std::move(Sbar_i_block));
                 }
               }
+
               V.erase(block, level);
               V.insert(block, level, transpose(VN2T));
             }
