@@ -1265,11 +1265,6 @@ namespace Hatrix {
     Matrix x(b);
     std::vector<Matrix> x_splits;
 
-    // Design philosophy: when working with permuted vectors in a loop, make a copy
-    // of the working vector before starting actual work on it. Then copy into
-    // that local copy for all subsequent operations. Finally copy out the copied
-    // local vector into the overall global vector.
-
     // Forward
     for (; level > 0; --level) {
       int64_t num_nodes = pow(2, level);
@@ -1297,7 +1292,6 @@ namespace Hatrix {
       rhs_offset = permute_forward(x, level, rhs_offset);
     }
 
-    // std::cout << "rhs offset: " << rhs_offset << std::endl;
     // Work with L0 and U0
     x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
     Matrix x_last(x_splits[1]);
@@ -1670,7 +1664,6 @@ void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
   auto A2_actual = unpermute_matrix(product, A);
 
   auto diff = (A2_expected - A2_actual);
-  diff.print();
 
   auto diff_splits = diff.split(4, 4);
   auto A2_expected_splits = A2_expected.split(4, 4);
@@ -1737,10 +1730,17 @@ int main(int argc, char *argv[]) {
   auto x_solve_splits = x_solve.split(num_nodes, 1);
 
   std::cout << "BLOCK WISE SOLVE ACCURACY:\n";
+  double err = 0;
   for (int i = 0; i < num_nodes; ++i) {
+    if (i != 4 && i != 5) {
+      err += norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]);
+    }
+
     std::cout << "i -> " << i << " "
               <<  norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
   }
+
+  err = err / num_nodes;
 
   // std::cout << "X - X_SOLVE\n";
   // (x - x_solve).print();
@@ -1754,7 +1754,8 @@ int main(int argc, char *argv[]) {
             << leaf
             << " height=" << height
             << " const. error=" << construct_error
-            << " solve error=" << solve_error << std::endl;
+            << " solve error=" << solve_error
+            << " blockwise error: " << err << std::endl;
 
   std::ofstream file;
   file.open("h2_matrix_umv.csv", std::ios::app | std::ios::out);

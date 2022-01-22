@@ -39,5 +39,9 @@ namespace Hatrix {
 
       return matrix;
     }
+    else {
+      std::cout << "concat axis must be 0 or 1, not axis=" << axis << std::endl;
+      abort();
+    }
   }
 }

@@ -8,6 +8,7 @@
 #include <vector>
 #include <cassert>
 #include <fstream>
+#include <map>
 
 #include "Hatrix/Hatrix.h"
 
@@ -38,6 +39,10 @@ namespace Hatrix {
     RowColMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;
     RowColMap<Matrix> Loc, Uco;      // fill-ins of the small strips on the top and bottom.
+
+    enum RowCol { ROW, COL };
+
+    std::multimap<std::tuple<int, int, RowCol>, int> admis_blocks, inadmis_blocks;
 
     void permute_forward(Matrix& x, int64_t block_size) {
       int64_t c_size_offset = 0, rank_offset = 0;
@@ -316,16 +321,17 @@ namespace Hatrix {
           }
         }
 
+        Matrix U_F = make_complement(U(block));
+        Matrix V_F = make_complement(V(block));
+
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(block, j)) {
-            Matrix U_F = make_complement(U(block));
             D(block, j) = matmul(U_F, D(block, j), true);
           }
         }
 
         for (int i = 0; i < nblocks; ++i) {
           if (!is_admissible(i, block)) {
-            Matrix V_F = make_complement(V(block));
             D(i, block) = matmul(D(i, block), V_F);
           }
         }
@@ -409,6 +415,7 @@ namespace Hatrix {
           }
         }
 
+        // Fill in between co and cc blocks.
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
             if (!is_admissible(block, j) && !is_admissible(i, block)) {
