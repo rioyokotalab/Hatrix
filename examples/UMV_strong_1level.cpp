@@ -205,10 +205,15 @@ namespace Hatrix {
       }
     }
 
+    void factorize_level(int level) {
+
+    }
+
     // Perform factorization assuming the permuted form of the BLR2 matrix.
     Matrix factorize(const randvec_t &randpts) {
       int block_size = N / nblocks;
       RowColMap<Matrix> F;      // fill-in blocks.
+      RowMap r, t;              // Matrices for storing updates to the S blocks.
 
       for (int block = 0; block < nblocks; ++block) {
         if (block > 0) {
@@ -238,6 +243,9 @@ namespace Hatrix {
 
               Matrix UN1, _SN1, _VN1T; double error;
               std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
+
+              Matrix r_block = matmul(UN1, U(block, level), true, false);
+              r.insert(block, std::move(r_block));
 
               for (int j = 0; j < nblocks; ++j) {
                 if (is_admissible(block, j, level)) {
@@ -293,6 +301,9 @@ namespace Hatrix {
               Matrix _UN2, _SN2, VN2T; double error;
               std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
 
+              Matrix t_block = matmul(V(block, level), VN2T, true, true);
+              t.insert(block, std::move(t_block));
+
               for (int i = 0; i < nblocks; ++i) {
                 if (is_admissible(i, block, level)) {
                   Matrix t_i_block = matmul(V(block, level), VN2T, true, true);
@@ -305,8 +316,6 @@ namespace Hatrix {
                     F.erase(i, block);
                   }
 
-                  // std::cout << "UPDATE S COL: " << i << ", " << block << std::endl;
-
                   S.erase(i, block, level);
                   S.insert(i, block, level,std::move(Sbar_i_block));
                 }
@@ -317,16 +326,17 @@ namespace Hatrix {
           }
         }
 
+        Matrix U_F = make_complement(U(block, level));
+        Matrix V_F = make_complement(V(block, level));
+
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(block, j, level)) {
-            Matrix U_F = make_complement(U(block, level));
             D(block, j, level) = matmul(U_F, D(block, j, level), true);
           }
         }
 
         for (int i = 0; i < nblocks; ++i) {
           if (!is_admissible(i, block, level)) {
-            Matrix V_F = make_complement(V(block, level));
             D(i, block, level) = matmul(D(i, block, level), V_F);
           }
         }
