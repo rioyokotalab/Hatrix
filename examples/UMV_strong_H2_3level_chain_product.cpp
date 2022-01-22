@@ -607,12 +607,6 @@ namespace Hatrix {
     for (int level = height-1; level > 0; --level) {
       std::tie(Uchild, Vchild) = generate_transfer_matrices(randpts, level, Uchild, Vchild);
     }
-
-    // std::cout << "CONSTRUCTION UPDATE block -> "
-    //           << 1 << " nrm -> "
-    //           << norm(generate_identity_matrix(rank, rank) -
-    //                   matmul(U(1, 2), U(1, 2),
-    //                          true, false)) << std::endl;
   }
 
   // Copy constructor.
@@ -725,7 +719,8 @@ namespace Hatrix {
             if (found_row_fill_in) {
               // Recompress and update the basis on the same level.
               for (int j = 0; j < num_nodes; ++j) {
-                if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
+                if (is_admissible.exists(block, j, level) &&
+                    is_admissible(block, j, level)) {
                   row_concat = concat(row_concat, matmul(U(block, level),
                                                          S(block, j, level)), 1);
                   if (F.exists(block, j, level)) {
@@ -733,10 +728,13 @@ namespace Hatrix {
                     row_concat = concat(row_concat, Fp, 1);
                   }
                 }
-                else if (!is_admissible.exists(block, j, level)) { // if you have an off-diagonal dense block,
-                  // std::cout << "include block: " << block << ", " << j << ", " << level << std::endl;
-                  Matrix lr_block = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
-                                                                   block * block_size, j * block_size, PV);
+                else if (!is_admissible.exists(block, j, level)) {
+                  // if you have an off-diagonal dense block,
+                  Matrix lr_block = Hatrix::generate_laplacend_matrix(randpts,
+                                                                      block_size,
+                                                                      block_size,
+                                                                      block * block_size,
+                                                                      j * block_size, PV);
                   row_concat = concat(row_concat, lr_block, 1);
                 }
               }
@@ -769,7 +767,8 @@ namespace Hatrix {
             if (found_col_fill_in) {
               // Recompress and update the column on the same level.
               for (int i = 0; i < num_nodes; ++i) {
-                if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
+                if (is_admissible.exists(i, block, level) &&
+                    is_admissible(i, block, level)) {
                   col_concat = concat(col_concat, matmul(S(i, block, level),
                                                          transpose(V(block, level))),
                                       0);
@@ -779,8 +778,10 @@ namespace Hatrix {
                   }
                 }
                 else if (!is_admissible.exists(i, block, level)) {
-                  Matrix lr_block = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
-                                                                      i * block_size, block * block_size, PV);
+                  Matrix lr_block = Hatrix::generate_laplacend_matrix(randpts,
+                                                                      block_size, block_size,
+                                                                      i * block_size,
+                                                                      block * block_size, PV);
                   col_concat = concat(col_concat, lr_block, 0);
                 }
               }
@@ -1669,6 +1670,7 @@ void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
   auto A2_actual = unpermute_matrix(product, A);
 
   auto diff = (A2_expected - A2_actual);
+  diff.print();
 
   auto diff_splits = diff.split(4, 4);
   auto A2_expected_splits = A2_expected.split(4, 4);
@@ -1680,7 +1682,9 @@ void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       std::cout << "<i, j>: " << i << ", " << j
-                << " -- " << std::setprecision(8) << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
+                << " -- "
+                << std::setprecision(8)
+                << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
                 << "   ";
     }
     std::cout << std::endl;
