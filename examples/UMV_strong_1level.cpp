@@ -31,24 +31,24 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
 namespace Hatrix {
   class BLR2 {
   private:
-    RowMap U;
-    ColMap V;
-    RowColMap<bool> is_admissible;
-    RowColMap<Matrix> D, S;
+    RowLevelMap U;
+    ColLevelMap V;
+    RowColLevelMap<bool> is_admissible;
+    RowColLevelMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;
-    RowColMap<Matrix> Loc, Uco;      // fill-ins of the small strips on the top and bottom.
+    const int64_t level = 1;
 
     void permute_forward(Matrix& x, int64_t block_size) {
       int64_t c_size_offset = 0, rank_offset = 0;
       Matrix temp(x);
       int64_t offset = 0;
       for (int i = 0; i < nblocks; ++i) {
-        offset += block_size - U(i).cols;
+        offset += block_size - U(i, level).cols;
       }
 
       for (int block = 0; block < nblocks; ++block) {
-        int64_t row_rank = U(block).cols;
-        int64_t c_size = block_size - U(block).cols;
+        int64_t row_rank = U(block, level).cols;
+        int64_t c_size = block_size - U(block, level).cols;
         // Copy the compliment part of the RHS vector.
         for (int i = 0; i < c_size; ++i) {
           temp(c_size_offset + i, 0) = x(block_size * block + i, 0);
@@ -67,12 +67,12 @@ namespace Hatrix {
 
     void permute_back(Matrix& x, int64_t block_size) {
       int64_t offset = 0;
-      for (int i = 0; i < nblocks; ++i) { offset += (block_size - V(i).cols); }
+      for (int i = 0; i < nblocks; ++i) { offset += (block_size - V(i, level).cols); }
       Matrix temp(x);
 
       int64_t c_size_offset = 0, rank_offset = 0;
       for (int block = 0; block < nblocks; ++block) {
-        int64_t col_rank = V(block).cols;
+        int64_t col_rank = V(block, level).cols;
         int64_t c_size = block_size - col_rank;
 
         // Copy the compliment part of the vector.
@@ -120,17 +120,17 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, std::abs(i - j) > admis);
+          is_admissible.insert(i, j, level, std::abs(i - j) > admis);
         }
       }
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (!is_admissible.exists(i, j)) {
-            is_admissible.insert(i, j, true);
+          if (!is_admissible.exists(i, j, level)) {
+            is_admissible.insert(i, j, level, true);
           }
-          if (!is_admissible(i, j)) {
-            D.insert(i, j,
+          if (!is_admissible(i, j, level)) {
+            D.insert(i, j, level,
                      Hatrix::generate_laplacend_matrix(randpts,
                                                        block_size, block_size,
                                                        i*block_size, j*block_size, PV));
@@ -153,7 +153,7 @@ namespace Hatrix {
         Hatrix::Matrix AY(block_size, rank + oversampling);
         bool admissible_found = false;
         for (int64_t j = 0; j < nblocks; ++j) {
-          if (is_admissible(i, j)) {
+          if (is_admissible(i, j, level)) {
             admissible_found = true;
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size,
@@ -166,7 +166,7 @@ namespace Hatrix {
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
 
         if (admissible_found) {
-          U.insert(i, std::move(Utemp));
+          U.insert(i, level, std::move(Utemp));
         }
       }
 
@@ -174,7 +174,7 @@ namespace Hatrix {
         Hatrix::Matrix YtA(rank + oversampling, block_size);
         bool admissible_found = false;
         for (int64_t i = 0; i < nblocks; ++i) {
-          if (is_admissible(i, j)) {
+          if (is_admissible(i, j, level)) {
             admissible_found = true;
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size,
@@ -187,19 +187,19 @@ namespace Hatrix {
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
 
         if (admissible_found) {
-          V.insert(j, std::move(transpose(Vtemp)));
+          V.insert(j, level, std::move(transpose(Vtemp)));
         }
       }
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (is_admissible(i, j)) {
+          if (is_admissible(i, j, level)) {
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
                                                                      i*block_size,
                                                                      j*block_size, PV);
-            S.insert(i, j,
-                     Hatrix::matmul(Hatrix::matmul(U(i), dense, true), V(j)));
+            S.insert(i, j, level,
+                     Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(j, level)));
           }
         }
       }
@@ -226,10 +226,11 @@ namespace Hatrix {
 
             if (found_row_fill_in) {
               for (int j = 0; j < nblocks; ++j) {
-                if (is_admissible(block, j)) {
-                  row_concat = concat(row_concat, matmul(U(block), S(block, j)), 1);
+                if (is_admissible(block, j, level)) {
+                  row_concat = concat(row_concat, matmul(U(block, level),
+                                                         S(block, j, level)), 1);
                   if (F.exists(block, j)) {
-                    Matrix Fp = matmul(F(block, j), V(j), false, true);
+                    Matrix Fp = matmul(F(block, j), V(j, level), false, true);
                     row_concat = concat(row_concat, Fp, 1);
                   }
                 }
@@ -239,20 +240,20 @@ namespace Hatrix {
               std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
               for (int j = 0; j < nblocks; ++j) {
-                if (is_admissible(block, j)) {
-                  Matrix r_block_j = matmul(UN1, U(block), true, false);
-                  Matrix Sbar_block_j = matmul(r_block_j, S(block, j));
+                if (is_admissible(block, j, level)) {
+                  Matrix r_block_j = matmul(UN1, U(block, level), true, false);
+                  Matrix Sbar_block_j = matmul(r_block_j, S(block, j, level));
 
                   Matrix SpF(rank, rank);
                   if (F.exists(block, j)) {
-                    Matrix Fp = matmul(F(block, j), V(j), false, true);
+                    Matrix Fp = matmul(F(block, j), V(j, level), false, true);
 
-                    SpF = matmul(matmul(UN1, Fp, true, false), V(j));
+                    SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
                     Sbar_block_j = Sbar_block_j + SpF;
                   }
 
-                  S.erase(block, j);
-                  S.insert(block, j, std::move(Sbar_block_j));
+                  S.erase(block, j, level);
+                  S.insert(block, j, level, std::move(Sbar_block_j));
 
                   if (F.exists(block, j)) {
                     F.erase(block, j);
@@ -260,8 +261,8 @@ namespace Hatrix {
                 }
               }
 
-              U.erase(block);
-              U.insert(block, std::move(UN1));
+              U.erase(block, level);
+              U.insert(block, level, std::move(UN1));
             }
           }
 
@@ -279,10 +280,11 @@ namespace Hatrix {
 
             if (found_col_fill_in) {
               for (int i = 0; i < nblocks; ++i) {
-                if (is_admissible(i, block)) {
-                  col_concat = concat(col_concat, matmul(S(i, block), transpose(V(block))), 0);
+                if (is_admissible(i, block, level)) {
+                  col_concat = concat(col_concat, matmul(S(i, block, level),
+                                                         transpose(V(block, level))), 0);
                   if (F.exists(i, block)) {
-                    Matrix Fp = matmul(U(i), F(i, block));
+                    Matrix Fp = matmul(U(i, level), F(i, block));
                     col_concat = concat(col_concat, Fp, 0);
                   }
                 }
@@ -292,12 +294,12 @@ namespace Hatrix {
               std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
 
               for (int i = 0; i < nblocks; ++i) {
-                if (is_admissible(i, block)) {
-                  Matrix t_i_block = matmul(V(block), VN2T, true, true);
-                  Matrix Sbar_i_block = matmul(S(i, block), t_i_block);
+                if (is_admissible(i, block, level)) {
+                  Matrix t_i_block = matmul(V(block, level), VN2T, true, true);
+                  Matrix Sbar_i_block = matmul(S(i, block, level), t_i_block);
                   if (F.exists(i, block)) {
-                    Matrix Fp = matmul(U(i), F(i, block));
-                    Matrix SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
+                    Matrix Fp = matmul(U(i, level), F(i, block));
+                    Matrix SpF = matmul(matmul(U(i, level), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
 
                     F.erase(i, block);
@@ -305,69 +307,69 @@ namespace Hatrix {
 
                   // std::cout << "UPDATE S COL: " << i << ", " << block << std::endl;
 
-                  S.erase(i, block);
-                  S.insert(i, block, std::move(Sbar_i_block));
+                  S.erase(i, block, level);
+                  S.insert(i, block, level,std::move(Sbar_i_block));
                 }
               }
-              V.erase(block);
-              V.insert(block, transpose(VN2T));
+              V.erase(block, level);
+              V.insert(block, level, transpose(VN2T));
             }
           }
         }
 
         for (int j = 0; j < nblocks; ++j) {
-          if (!is_admissible(block, j)) {
-            Matrix U_F = make_complement(U(block));
-            D(block, j) = matmul(U_F, D(block, j), true);
+          if (!is_admissible(block, j, level)) {
+            Matrix U_F = make_complement(U(block, level));
+            D(block, j, level) = matmul(U_F, D(block, j, level), true);
           }
         }
 
         for (int i = 0; i < nblocks; ++i) {
-          if (!is_admissible(i, block)) {
-            Matrix V_F = make_complement(V(block));
-            D(i, block) = matmul(D(i, block), V_F);
+          if (!is_admissible(i, block, level)) {
+            Matrix V_F = make_complement(V(block, level));
+            D(i, block, level) = matmul(D(i, block, level), V_F);
           }
         }
 
-        int64_t row_rank = U(block).cols, col_rank = V(block).cols;
+        int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
         int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
 
         // The diagonal block is split along the row and column.
-        auto diagonal_splits = SPLIT_DENSE(D(block, block), row_split, col_split);
+        auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
         Matrix& Dcc = diagonal_splits[0];
         lu(Dcc);
 
         // TRSM with CC blocks on the row
         for (int j = block + 1; j < nblocks; ++j) {
-          if (!is_admissible(block, j)) {
-            int64_t col_split = block_size - V(j).cols;
-            auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
+          if (!is_admissible(block, j, level)) {
+            int64_t col_split = block_size - V(j, level).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
           }
         }
 
         // TRSM with co blocks on this row
         for (int j = 0; j < nblocks; ++j) {
-          if (!is_admissible(block, j)) {
-            int64_t col_split = block_size - V(j).cols;
-            auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
+          if (!is_admissible(block, j, level)) {
+            int64_t col_split = block_size - V(j, level).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
           }
         }
 
         // TRSM with cc blocks on the column
         for (int i = block + 1; i < nblocks; ++i) {
-          if (!is_admissible(i, block)) {
-            int64_t row_split = block_size - U(i).cols;
-            auto D_splits = SPLIT_DENSE(D(i, block), row_split, col_split);
+          if (!is_admissible(i, block, level)) {
+            int64_t row_split = block_size - U(i, level).cols;
+            auto D_splits = SPLIT_DENSE(D(i, block, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Upper, false);
           }
         }
 
         // TRSM with oc blocks on the column
         for (int i = 0; i < nblocks; ++i) {
-          if (!is_admissible(i, block)) {
-            auto D_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
+          if (!is_admissible(i, block, level)) {
+            auto D_splits = SPLIT_DENSE(D(i, block, level), block_size - U(i, level).cols, col_split);
             solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
           }
         }
@@ -375,14 +377,16 @@ namespace Hatrix {
         // Schur's compliment between cc blocks
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = block+1; j < nblocks; ++j) {
-            if (!is_admissible(block, j) && !is_admissible(i, block) && !is_admissible(i, j)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block),
-                                              block_size - U(i).cols,
+            if (!is_admissible(block, j, level) &&
+                !is_admissible(i, block, level) &&
+                !is_admissible(i, j, level)) {
+              auto lower_splits = SPLIT_DENSE(D(i, block, level),
+                                              block_size - U(i, level).cols,
                                               col_split);
-              auto right_splits = SPLIT_DENSE(D(block, j),
+              auto right_splits = SPLIT_DENSE(D(block, j, level),
                                               row_split,
-                                              block_size - V(j).cols);
-              auto reduce_splits = SPLIT_DENSE(D(i, j),
+                                              block_size - V(j, level).cols);
+              auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                row_split,
                                                col_split);
 
@@ -394,14 +398,17 @@ namespace Hatrix {
         // Schur's compliment between oc and co blocks
         for (int i = 0; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
-            if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
-              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
+            if (!is_admissible(block, j, level) &&
+                !is_admissible(i, block, level)) {
+              auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
+                                              U(i, level).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j, level), row_split,
+                                              block_size - V(j, level).cols);
 
-              if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j),
-                                                 block_size - U(i).cols,
-                                                 block_size - V(j).cols);
+              if (!is_admissible(i, j, level)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                 block_size - U(i, level).cols,
+                                                 block_size - V(j, level).cols);
                 matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
               }
             }
@@ -409,18 +416,19 @@ namespace Hatrix {
         }
 
 
-
-
         for (int i = block+1; i < nblocks; ++i) {
           for (int j = 0; j < nblocks; ++j) {
-            if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
-              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
+            if (!is_admissible(block, j, level) &&
+                !is_admissible(i, block, level)) {
+              auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
+                                              U(i, level).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j, level), row_split, block_size -
+                                              V(j, level).cols);
               // Schur's compliement between co and cc blocks where product exists as dense.
-              if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j),
-                                                 block_size - U(i).cols,
-                                                 block_size - V(j).cols);
+              if (!is_admissible(i, j, level)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                 block_size - U(i, level).cols,
+                                                 block_size - V(j, level).cols);
                 matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
               }
               // Schur's compliement between co and cc blocks where a new fill-in is created.
@@ -453,14 +461,17 @@ namespace Hatrix {
         // Schur's compliment between oc and cc blocks
         for (int i = 0; i < nblocks; ++i) {
           for (int j = block+1; j < nblocks; ++j) {
-            if (!is_admissible(block, j) && !is_admissible(i, block)) {
-              auto lower_splits = SPLIT_DENSE(D(i, block), block_size - U(i).cols, col_split);
-              auto right_splits = SPLIT_DENSE(D(block, j), row_split, block_size - V(j).cols);
+            if (!is_admissible(block, j, level) &&
+                !is_admissible(i, block, level)) {
+              auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
+                                              U(i, level).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j, level),
+                                              row_split, block_size - V(j, level).cols);
               // Schur's compliement between oc and cc blocks where product exists as dense.
-              if (!is_admissible(i, j)) {
-                auto reduce_splits = SPLIT_DENSE(D(i, j),
-                                                 block_size - U(i).cols,
-                                                 block_size - V(j).cols);
+              if (!is_admissible(i, j, level)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                 block_size - U(i, level).cols,
+                                                 block_size - V(j, level).cols);
                 matmul(lower_splits[2], right_splits[0], reduce_splits[2],
                        false, false, -1.0, 1.0);
               }
@@ -494,7 +505,7 @@ namespace Hatrix {
       std::vector<int64_t> row_splits, col_splits;
       int64_t nrows = 0, ncols = 0;
       for (int i = 0; i < nblocks; ++i) {
-        int64_t row_rank = U(i).cols, col_rank = V(i).cols;
+        int64_t row_rank = U(i, level).cols, col_rank = V(i, level).cols;
         row_splits.push_back(nrows + row_rank);
         col_splits.push_back(ncols + col_rank);
         nrows += row_rank;
@@ -506,13 +517,13 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (is_admissible(i, j)) {
-            last_splits[i * nblocks + j] = S(i, j);
+          if (is_admissible(i, j, level)) {
+            last_splits[i * nblocks + j] = S(i, j, level);
           }
           else {
-            auto D_splits = SPLIT_DENSE(D(i, j),
-                                        block_size - U(i).cols,
-                                        block_size - V(j).cols);
+            auto D_splits = SPLIT_DENSE(D(i, j, level),
+                                        block_size - U(i, level).cols,
+                                        block_size - V(j, level).cols);
             last_splits[i * nblocks + j] = D_splits[3];
           }
         }
@@ -530,7 +541,7 @@ namespace Hatrix {
       std::vector<Matrix> x_split = x.split(nblocks, 1);
 
       for (int block = 0; block < nblocks; ++block) {
-        Matrix U_F = make_complement(U(block));
+        Matrix U_F = make_complement(U(block, level));
         Matrix prod = matmul(U_F, x_split[block], true);
         for (int64_t i = 0; i < block_size; ++i) {
           x(block * block_size + i, 0) = prod(i, 0);
@@ -539,8 +550,10 @@ namespace Hatrix {
 
       // forward substitution with cc blocks
       for (int block = 0; block < nblocks; ++block) {
-        int64_t row_split = block_size - U(block).cols, col_split = block_size - V(block).cols;
-        auto block_splits = SPLIT_DENSE(D(block, block), row_split, col_split);
+        int64_t row_split = block_size - U(block, level).cols,
+          col_split = block_size - V(block, level).cols;
+
+        auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
         Matrix x_block(x_split[block]);
         auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
         solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
@@ -551,10 +564,10 @@ namespace Hatrix {
 
         //      Forward with the big c blocks on the lower part.
         for (int irow = block+1; irow < nblocks; ++irow) {
-          if (is_admissible(irow, block)) { continue; }
-          int64_t row_split = block_size - U(irow).cols;
-          int64_t col_split = block_size - V(block).cols;
-          auto lower_splits = D(irow, block).split({}, std::vector<int64_t>(1, row_split));
+          if (is_admissible(irow, block, level)) { continue; }
+          int64_t row_split = block_size - U(irow, level).cols;
+          int64_t col_split = block_size - V(block, level).cols;
+          auto lower_splits = D(irow, block, level).split({}, std::vector<int64_t>(1, row_split));
 
           Matrix x_block(x_split[block]);
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
@@ -568,10 +581,10 @@ namespace Hatrix {
 
         // Forward with the oc parts of the block that are actually in the upper part of the matrix.
         for (int irow = 0; irow < block; ++irow) {
-          if (is_admissible(irow, block)) { continue; }
-          int64_t row_split = block_size - U(irow).cols;
-          int64_t col_split = block_size - V(block).cols;
-          auto top_splits = SPLIT_DENSE(D(irow, block), row_split, col_split);
+          if (is_admissible(irow, block, level)) { continue; }
+          int64_t row_split = block_size - U(irow, level).cols;
+          int64_t col_split = block_size - V(block, level).cols;
+          auto top_splits = SPLIT_DENSE(D(irow, block, level), row_split, col_split);
           Matrix x_irow(x_split[irow]), x_block(x_split[block]);
           auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, row_split), {});
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
@@ -587,7 +600,7 @@ namespace Hatrix {
       permute_forward(x, block_size);
       int64_t offset = 0;
       for (int i = 0; i < nblocks; ++i) {
-        offset += block_size - U(i).cols;
+        offset += block_size - U(i, level).cols;
       }
       auto permute_splits = x.split(std::vector<int64_t>(1, offset), {});
       solve_triangular(last, permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
@@ -596,14 +609,15 @@ namespace Hatrix {
 
       // backward substition using cc blocks
       for (int block = nblocks-1; block >= 0; --block) {
-        int64_t row_split = block_size - U(block).cols, col_split = block_size - V(block).cols;
-        auto block_splits = SPLIT_DENSE(D(block, block), row_split, col_split);
+        int64_t row_split = block_size - U(block, level).cols,
+          col_split = block_size - V(block, level).cols;
+        auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
         // Apply co block.
         for (int left_col = block-1; left_col >= 0; --left_col) {
-          if (!is_admissible(block, left_col)) {
-            int64_t row_split = block_size - U(block).cols;
-            int64_t col_split = block_size - V(left_col).cols;
-            auto left_splits = SPLIT_DENSE(D(block, left_col), row_split, col_split);
+          if (!is_admissible(block, left_col, level)) {
+            int64_t row_split = block_size - U(block, level).cols;
+            int64_t col_split = block_size - V(left_col, level).cols;
+            auto left_splits = SPLIT_DENSE(D(block, left_col, level), row_split, col_split);
 
             Matrix x_block(x_split[block]), x_left_col(x_split[left_col]);
             auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
@@ -618,9 +632,10 @@ namespace Hatrix {
 
         // Apply c block present on the right of this diagonal block.
         for (int right_col = nblocks-1; right_col > block; --right_col) {
-          if (!is_admissible(block, right_col)) {
-            int64_t row_split = block_size - U(block).cols;
-            auto right_splits = D(block, right_col).split(std::vector<int64_t>(1, row_split), {});
+          if (!is_admissible(block, right_col, level)) {
+            int64_t row_split = block_size - U(block, level).cols;
+            auto right_splits = D(block, right_col, level).
+              split(std::vector<int64_t>(1, row_split), {});
 
             Matrix x_block(x_split[block]);
             auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
@@ -642,7 +657,7 @@ namespace Hatrix {
       }
 
       for (int block = nblocks-1; block >= 0; --block) {
-        auto V_F = make_complement(V(block));
+        auto V_F = make_complement(V(block, level));
         Matrix prod = matmul(V_F, x_split[block]);
         for (int i = 0; i < block_size; ++i) {
           x(block * block_size + i, 0) = prod(i, 0);
@@ -663,13 +678,13 @@ namespace Hatrix {
                                                             i * block_size, j * block_size, PV);
           dense_norm += pow(Hatrix::norm(actual), 2);
 
-          if (!is_admissible(i, j)) {
-            error += pow(Hatrix::norm(D(i, j) - actual), 2);
+          if (!is_admissible(i, j, level)) {
+            error += pow(Hatrix::norm(D(i, j, level) - actual), 2);
           }
           else {
-            Matrix& Ubig = U(i);
-            Matrix& Vbig = V(j);
-            Matrix expected = matmul(matmul(Ubig, S(i, j)), Vbig, false, true);
+            Matrix& Ubig = U(i, level);
+            Matrix& Vbig = V(j, level);
+            Matrix expected = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
 
             error += pow(Hatrix::norm(expected - actual), 2);
           }
@@ -682,7 +697,7 @@ namespace Hatrix {
       std::cout << "BLR " << nblocks << " x " << nblocks << std::endl;
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          std::cout << " | " << is_admissible(i, j);
+          std::cout << " | " << is_admissible(i, j, level);
         }
         std::cout << " | \n";
       }
@@ -715,14 +730,10 @@ int main(int argc, char** argv) {
   auto last = A.factorize(randpts);
   Hatrix::Matrix x = A.solve(b, last);
 
-  // std::cout << "x:\n";
-  // x.print();
-
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   // Adense.print();
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
-
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
