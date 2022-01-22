@@ -206,15 +206,10 @@ namespace Hatrix {
     }
 
     void factorize_level(int level) {
-
-    }
-
-    // Perform factorization assuming the permuted form of the BLR2 matrix.
-    Matrix factorize(const randvec_t &randpts) {
-      int block_size = N / nblocks;
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
+        int64_t block_size = U(block, level).rows;
         if (block > 0) {
           {
             // Scan for fill-ins in the same row as this diagonal block.
@@ -502,6 +497,14 @@ namespace Hatrix {
           }
         }
       } // for (int block = 0; block < nblocks; ++block)
+
+    }
+
+    // Perform factorization assuming the permuted form of the BLR2 matrix.
+    Matrix factorize(const randvec_t &randpts) {
+      int block_size = N / nblocks;
+
+      factorize_level(level);
 
       // Merge unfactorized portions.
       std::vector<int64_t> row_splits, col_splits;
