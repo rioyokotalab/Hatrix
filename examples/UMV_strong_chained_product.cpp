@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <tuple>
 #include <unordered_map>
@@ -1055,11 +1056,15 @@ int main(int argc, char** argv) {
   // int idx;
 
   std::cout << "-- BLR2 verification --\n";
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      int idx = i * A.nblocks + j;
-      std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      std::cout << "<i, j>: " << i << ", " << j
+                << " -- "
+                << std::setprecision(8)
+                << norm(d_splits[i * 4 + j]) / norm(m_splits[i * 4 + j])
+                << "   ";
     }
+    std::cout << std::endl;
   }
 
   // (A_actual - A_expected).print();

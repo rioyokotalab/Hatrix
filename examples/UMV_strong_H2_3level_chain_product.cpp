@@ -870,7 +870,6 @@ namespace Hatrix {
         }
       }
 
-
       for (int i = block+1; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
@@ -956,7 +955,6 @@ namespace Hatrix {
       }
     } // for (int block = 0; block < nblocks; ++block)
   }
-
 
   Matrix A2_expected, A1_expected;
 
@@ -1703,7 +1701,7 @@ int main(int argc, char *argv[]) {
   std::cout << "BLOCK WISE SOLVE ACCURACY:\n";
   double err = 0;
   for (int i = 0; i < num_nodes; ++i) {
-    if (i != 4 && i != 5) {
+    if (i != 6 && i != 7) {
       err += norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]);
     }
 

@@ -1737,9 +1737,9 @@ int main(int argc, char *argv[]) {
 
   // Adense_permuted.print();
 
-  std::cout << "OVERALL EVERYTHING\n";
-  A_actual_permuted.print();
-  (Adense_permuted).print();
+  // std::cout << "OVERALL EVERYTHING\n";
+  // A_actual_permuted.print();
+  // (Adense_permuted).print();
 
   double factorization_error = Hatrix::norm(A_actual_permuted - Adense) / Hatrix::norm(Adense);
 
