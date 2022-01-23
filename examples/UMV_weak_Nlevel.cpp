@@ -426,8 +426,9 @@ namespace Hatrix {
           if (rank == diagonal.rows) { continue; }
 
           int64_t c_size = diagonal.rows - rank;
-          std::vector<Hatrix::Matrix> diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
-                                                                       std::vector<int64_t>(1, c_size));
+          std::vector<Hatrix::Matrix> diagonal_splits =
+            diagonal.split(std::vector<int64_t>(1, c_size),
+                           std::vector<int64_t>(1, c_size));
           Hatrix::Matrix& Dcc = diagonal_splits[0];
           Hatrix::Matrix& Dco = diagonal_splits[1];
           Hatrix::Matrix& Doc = diagonal_splits[2];
