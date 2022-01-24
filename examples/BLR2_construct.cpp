@@ -25,7 +25,7 @@
 // N: 1000 rank: 10 nblocks: 10 admis: 3 construct error: 2.01124e-14
 // N: 2000 rank: 10 nblocks: 20 admis: 3 construct error: 1.39202e-13
 // N: 4000 rank: 10 nblocks: 40 admis: 3 construct error: 5.52532e-13
-
+constexpr double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -63,7 +63,7 @@ namespace Hatrix {
             D.insert(i, j,
                      Hatrix::generate_laplacend_matrix(randpts,
                                                        block_size, block_size,
-                                                       i*block_size, j*block_size));
+                                                       i*block_size, j*block_size, PV));
           }
         }
       }
@@ -85,7 +85,7 @@ namespace Hatrix {
           if (is_admissible(i, j)) {
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size);
+                                                                     i*block_size, j*block_size, PV);
             Hatrix::matmul(dense, Y[j], AY);
           }
         }
@@ -99,7 +99,7 @@ namespace Hatrix {
           if (is_admissible(i, j)) {
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size);
+                                                                     i*block_size, j*block_size, PV);
             Hatrix::matmul(Y[i], dense, YtA, true);
           }
         }
@@ -112,7 +112,7 @@ namespace Hatrix {
           if (is_admissible(i, j)) {
             Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                      block_size, block_size,
-                                                                     i*block_size, j*block_size);
+                                                                     i*block_size, j*block_size, PV);
             S.insert(i, j,
                      Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[j]));
           }
@@ -128,8 +128,12 @@ namespace Hatrix {
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(i, j)) {
             double dense_error = Hatrix::norm(D(i, j) -
-                                           Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
-                                                                             block_size * i, block_size * j));
+                                           Hatrix::generate_laplacend_matrix(randpts,
+                                                                             block_size,
+                                                                             block_size,
+                                                                             block_size * i,
+                                                                             block_size * j,
+                                                                             PV));
             error += pow(dense_error, 2);
           }
           else {
@@ -137,7 +141,9 @@ namespace Hatrix {
             Matrix& Vbig = V(j);
             Matrix expected = matmul(matmul(Ubig, S(i, j)), Vbig, false, true);
             Matrix actual = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
-                                                              i * block_size, j * block_size);
+                                                              i * block_size, j * block_size, PV);
+            // std::cout << "rel err: " << Hatrix::norm(actual - expected) / Hatrix::norm(expected) << std::endl;
+
             error += pow(Hatrix::norm(expected - actual), 2);
           }
         }

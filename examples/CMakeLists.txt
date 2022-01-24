@@ -33,6 +33,10 @@ else()
     H2_strong_N_level
     UMV_strong_1level_debug
     UMV_strong_chained_product
+    UMV_strong_H2_3level_hss_chain_product
+    UMV_strong_H2_3level_chain_product
+    UMV_strong_H2_Nlevel
+    UMV_strong_1level_better_index
   )
 endif()
 

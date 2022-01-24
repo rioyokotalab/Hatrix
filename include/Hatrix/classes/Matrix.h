@@ -11,11 +11,15 @@ class Matrix {
   int64_t rows = 0;
   int64_t cols = 0;
   int64_t stride = 0;
+  // Shows whether a Matrix is a view of an object or the actual copy.
   bool is_view = false;
 
  private:
   class DataHandler;
   std::shared_ptr<DataHandler> data;
+  // data_ptr is a pointer to the memory within data. This is done
+  // for easily tracking the location to an offset of data if this Matrix
+  // is a view of another matrix.
   double* data_ptr = nullptr;
 
  public:

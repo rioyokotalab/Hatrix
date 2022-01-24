@@ -3,11 +3,9 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(policies)
 set_policies()
 
+set(default_build_type "Release")
 option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
 option(Hatrix_CPU_ONLY "Build Hatrix without GPU usage." ON)
-
-include(host_specific_settings)
-host_specific_settings()
 
 project(NewStructure
   LANGUAGES CXX
@@ -33,6 +31,11 @@ add_library(Hatrix
   src/util/helpers.cpp
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
+
+# Adding this here because it finds openMP and does not work without a CXX.
+include(host_specific_settings)
+host_specific_settings()
+
 target_include_directories(Hatrix
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
@@ -63,7 +66,7 @@ else()
     src/functions/lapack.cpp
     src/util/context.cpp
   )
-  target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+  target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} OpenMP::OpenMP_CXX)
 endif()
 
 add_subdirectory(examples)

@@ -15,6 +15,7 @@
 // "Accuracy Controlled Direct Integral Equation Solver of Linear Complexity with Change
 // of Basis for Large-Scale Interconnect Extraction"
 
+double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
@@ -45,10 +46,10 @@ namespace Hatrix {
       Matrix row_slice(nrows, N-nrows);
       int64_t ncols_left_slice = block * nrows;
       Matrix left_slice = generate_laplacend_matrix(randpts, nrows, ncols_left_slice,
-                                                    block * nrows, 0);
+                                                    block * nrows, 0, PV);
       int64_t ncols_right_slice = N - (block+1) * nrows;
       Matrix right_slice = generate_laplacend_matrix(randpts, nrows, ncols_right_slice,
-                                                     block * nrows, (block+1) * nrows);
+                                                     block * nrows, (block+1) * nrows, PV);
 
       // concat left and right slices
       for (int64_t i = 0; i < nrows; ++i) {
@@ -69,10 +70,10 @@ namespace Hatrix {
       Matrix col_slice(N-ncols, ncols);
       int64_t nrows_upper_slice = block * ncols;
       Matrix upper_slice = generate_laplacend_matrix(randpts, nrows_upper_slice, ncols,
-                                                     0, block * ncols);
+                                                     0, block * ncols, PV);
       int64_t nrows_lower_slice = N - (block + 1) * ncols;
       Matrix lower_slice = generate_laplacend_matrix(randpts, nrows_lower_slice, ncols,
-                                                     (block+1) * ncols, block * ncols);
+                                                     (block+1) * ncols, block * ncols, PV);
 
       for (int64_t j = 0; j < col_slice.cols; ++j) {
         for (int64_t i = 0; i < nrows_upper_slice; ++i) {
@@ -114,7 +115,7 @@ namespace Hatrix {
       for (int64_t block = 0; block < nblocks; ++block) {
         D.insert(block, block, height,
                  Hatrix::generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                                   block * leaf_size, block * leaf_size));
+                                                   block * leaf_size, block * leaf_size, PV));
         Matrix Ubig = generate_column_bases(block, leaf_size, randpts);
         U.insert(block, height, std::move(Ubig));
         Matrix Vbig = generate_row_bases(block, leaf_size, randpts);
@@ -124,7 +125,7 @@ namespace Hatrix {
       for (int64_t row = 0; row < nblocks; ++row) {
         int64_t col = row % 2 == 0 ? row + 1 : row - 1;
         Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                             row * leaf_size, col * leaf_size);
+                                             row * leaf_size, col * leaf_size, PV);
         S.insert(row, col, height, matmul(matmul(U(row, height), D, true, false), V(col, height)));
       }
     }
@@ -208,7 +209,7 @@ namespace Hatrix {
       for (int64_t row = 0; row < num_nodes; ++row) {
         int64_t col = row % 2 == 0 ? row + 1 : row - 1;
         Matrix D = generate_laplacend_matrix(randpts, leaf_size, leaf_size,
-                                             row * leaf_size, col * leaf_size);
+                                             row * leaf_size, col * leaf_size, PV);
         S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
                                          Vbig_parent(col, level)));
       }
@@ -372,13 +373,19 @@ namespace Hatrix {
     }
 
     double construction_relative_error(const randvec_t& randpts) {
-      double error = 0;
+      double error = 0, dense = 0;
       int64_t num_nodes = pow(2, height);
+      double expected_norm = 0, actual_norm = 0;
 
       for (int64_t block = 0; block < num_nodes; ++block) {
         int64_t slice = N / num_nodes;
-        error += norm(D(block, block, height) - generate_laplacend_matrix(randpts, slice, slice,
-                                                                                          slice * block, slice * block));
+        Matrix expected_matrix = generate_laplacend_matrix(randpts, slice, slice,
+                                                            slice * block, slice * block,
+                                                            PV);
+        Matrix actual_matrix = D(block, block, height);
+
+        error += pow(norm(expected_matrix - actual_matrix), 2);
+        dense += pow(norm(actual_matrix), 2);
       }
 
       for (int64_t level = height; level > height-1; --level) {
@@ -391,11 +398,14 @@ namespace Hatrix {
           Matrix Vbig = get_Vbig(col, level);
           Matrix expected = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
           Matrix actual = generate_laplacend_matrix(randpts, slice, slice,
-                                                            row * slice, col * slice);
-          error += norm(expected - actual);
+                                                    row * slice, col * slice, PV);
+
+          error += pow(norm(expected - actual), 2);
+          dense += pow(norm(actual), 2);
         }
       }
-      return std::sqrt(error / N / N);
+
+      return std::sqrt(error / dense);
     }
 
     // UMV factorization of this HSS matrix.
@@ -416,8 +426,9 @@ namespace Hatrix {
           if (rank == diagonal.rows) { continue; }
 
           int64_t c_size = diagonal.rows - rank;
-          std::vector<Hatrix::Matrix> diagonal_splits = diagonal.split(std::vector<int64_t>(1, c_size),
-                                                                       std::vector<int64_t>(1, c_size));
+          std::vector<Hatrix::Matrix> diagonal_splits =
+            diagonal.split(std::vector<int64_t>(1, c_size),
+                           std::vector<int64_t>(1, c_size));
           Hatrix::Matrix& Dcc = diagonal_splits[0];
           Hatrix::Matrix& Dco = diagonal_splits[1];
           Hatrix::Matrix& Doc = diagonal_splits[2];
@@ -553,7 +564,10 @@ int main(int argc, char* argv[]) {
 
   Hatrix::Context::init();
   randvec_t randpts;
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  PV = 1e-3 * (1 / pow(10, height));
 
   Hatrix::HSS A(randpts, N, rank, height);
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
@@ -565,16 +579,24 @@ int main(int argc, char* argv[]) {
   Hatrix::Matrix x = A.solve(b);
 
   // Verification with dense solver.
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve(b);
   Hatrix::lu(Adense);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Lower, true);
   Hatrix::solve_triangular(Adense, x_solve, Hatrix::Left, Hatrix::Upper, false);
 
-  double solve_error = std::sqrt(Hatrix::norm(x - x_solve) / N);
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  int leaf = int(N / pow(2, height));
 
   Hatrix::Context::finalize();
   std::cout << "N= " << N << " rank= " << rank << " height=" << height
             << " construction error=" << construct_error
             << " solve error=" << solve_error << std::endl;
+
+  int admis = 0;
+  std::ofstream file;
+  file.open("hss_matrix_umv.csv", std::ios::app | std::ios::out);
+  file << N << "," << rank << "," << admis << "," << leaf << ","
+       << height << "," << construct_error << "," << solve_error << std::endl;
+  file.close();
 }

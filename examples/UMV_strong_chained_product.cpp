@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iomanip>
 #include <iostream>
 #include <tuple>
 #include <unordered_map>
@@ -289,7 +290,6 @@ namespace Hatrix {
                   S.insert(block, j, std::move(Sbar_block_j));
 
                   if (F.exists(block, j)) {
-                    std::cout << "F ERASE: b-> " << block << " j-> " << j << std::endl;
                     F.erase(block, j);
                   }
                 }
@@ -334,8 +334,6 @@ namespace Hatrix {
                     Matrix Fp = matmul(U(i), F(i, block));
                     Matrix SpF = matmul(matmul(U(i), Fp, true, false), VN2T, false, true);
                     Sbar_i_block = Sbar_i_block + SpF;
-
-                    std::cout << "FILL IN erase i-> " << i << " bl -> " << block << std::endl;
                     F.erase(i, block);
                   }
 
@@ -732,7 +730,7 @@ std::vector<Matrix> generate_VF_chain(Hatrix::BLR2& A) {
 
   for (int block = 0; block < A.nblocks; ++block) {
     Matrix VF_full = generate_identity_matrix(A.N, A.N);
-    Matrix VF_block = transpose(make_complement(A.V(block)));
+    Matrix VF_block = make_complement(A.V(block));
 
     auto VF_full_splits = VF_full.split(row_offsets, col_offsets);
     auto VF_block_splits = SPLIT_DENSE(VF_block,
@@ -747,7 +745,6 @@ std::vector<Matrix> generate_VF_chain(Hatrix::BLR2& A) {
 
     V_F.push_back(VF_full);
   }
-
 
   return V_F;
 }
@@ -787,7 +784,7 @@ std::vector<Matrix> generate_L_chain(Hatrix::BLR2& A) {
         int64_t row_split = block_size - A.U(i).cols;
         int64_t col_split = block_size - A.V(block).cols;
         auto D_splits = A.D(i, block).split(std::vector<int64_t>(1, row_split),
-                                        std::vector<int64_t>(1, col_split));
+                                            std::vector<int64_t>(1, col_split));
         L_splits[(i + A.nblocks) * permuted_nblocks + block] = D_splits[2];
       }
     }
@@ -837,7 +834,6 @@ std::vector<Matrix> generate_U_chain(Hatrix::BLR2& A) {
       }
     }
 
-    // U_block.print();
     U.push_back(U_block);
   }
 
@@ -935,12 +931,10 @@ Matrix chain_product(BLR2& A,
                      Matrix& L0, Matrix& U0,
                      std::vector<Matrix>& U,
                      std::vector<Matrix>& V_F) {
-  Matrix product(A.N, A.N);
-
-  product = matmul(U_F[0], L[0]);
+  Matrix product = generate_identity_matrix(A.N, A.N);
 
   // Multiply UF and L blocks.
-  for (int i = 1; i < A.nblocks; ++i) {
+  for (int i = 0; i < A.nblocks; ++i) {
     product = matmul(product, U_F[i]);
     product = matmul(product, L[i]);
   }
@@ -950,7 +944,7 @@ Matrix chain_product(BLR2& A,
 
   for (int i = A.nblocks-1; i >= 0; --i) {
     product = matmul(product, U[i]);
-    product = matmul(product, V_F[i]);
+    product = matmul(product, V_F[i], false, true);
   }
 
   return product;
@@ -1033,7 +1027,6 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
-  A.print_structure();
   Hatrix::BLR2 A_expected_blr(A);
   double construct_error = A.construction_relative_error(randpts);
   Matrix last; RowColMap<Matrix> F;
@@ -1060,19 +1053,26 @@ int main(int argc, char** argv) {
   auto d_splits = diff.split(A.nblocks, A.nblocks);
   auto m_splits = A_expected.split(A.nblocks, A.nblocks);
 
-  int idx;
+  // int idx;
 
-  // for (int i = 0; i < nblocks; ++i) {
-  //   for (int j = 0; j < nblocks; ++j) {
-  //     int idx = i * A.nblocks + j;
-  //     std::cout << "(" << i << "," << j << ") block rel error: " << (norm(d_splits[idx]) / norm(m_splits[idx])) << std::endl;
-  //   }
-  // }
+  std::cout << "-- BLR2 verification --\n";
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      std::cout << "<i, j>: " << i << ", " << j
+                << " -- "
+                << std::setprecision(8)
+                << norm(d_splits[i * 4 + j]) / norm(m_splits[i * 4 + j])
+                << "   ";
+    }
+    std::cout << std::endl;
+  }
+
+  // (A_actual - A_expected).print();
 
   double acc = norm(A_actual - A_expected) / norm(A_expected);
 
   Hatrix::Context::finalize();
 
-  std::cout << "A0 accuracy: " << A0_acc << " full accuracy: "
+  std::cout << "A0 accuracy: " << A0_acc << " factorize accuracy: "
             << acc << " contruct error: " << construct_error  << std::endl;
 }

@@ -164,9 +164,7 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_
       return {Q, R};
     }
   }
-  else {
-    abort();
-  }
+  abort();
 }
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {

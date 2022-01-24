@@ -1,5 +1,5 @@
 TOPSRCDIR = .
-include $(TOPSRCDIR)/make.inc
+include $(TOPSRCDIR)/common.mk
 
 DIRS := src/classes src/functions src/util
 OBJLIBS := libfunctions.a libclasses.a libutil.a
@@ -30,7 +30,11 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	BLR2_strong_far_dense_construct \
 	UMV_strong_1level_debug \
 	H2_strong_N_level \
-	UMV_strong_chained_product
+	UMV_strong_chained_product \
+	UMV_strong_H2_3level_hss_chain_product \
+	UMV_strong_H2_3level_chain_product \
+	UMV_strong_H2_Nlevel \
+	UMV_strong_1level_better_index
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
