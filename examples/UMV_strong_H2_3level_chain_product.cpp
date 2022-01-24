@@ -5,6 +5,7 @@
 #include <chrono>
 #include <fstream>
 #include <numeric>
+#include <iomanip>
 
 #include "Hatrix/Hatrix.h"
 

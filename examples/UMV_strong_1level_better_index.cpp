@@ -9,6 +9,9 @@
 #include <cassert>
 #include <fstream>
 #include <map>
+#include <chrono>
+
+#include "omp.h"
 
 #include "Hatrix/Hatrix.h"
 
@@ -175,6 +178,7 @@ namespace Hatrix {
 
       compute_admis_conditions();
 
+      #pragma omp parallel for
       for (int row = 0; row < nblocks; ++row) {
         auto col_iter = inadmis_blocks.equal_range({row, height, ROW});
         for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
@@ -211,6 +215,7 @@ namespace Hatrix {
                     Hatrix::generate_random_matrix(block_size, rank + oversampling));
       }
 
+      #pragma omp parallel for
       for (int64_t row = 0; row < nblocks; ++row) {
         Hatrix::Matrix AY(block_size, rank + oversampling);
         bool admissible_found = false;
@@ -235,6 +240,7 @@ namespace Hatrix {
         }
       }
 
+      #pragma omp parallel for
       for (int64_t col = 0; col < nblocks; ++col) {
         Hatrix::Matrix YtA(rank + oversampling, block_size);
         bool admissible_found = false;
@@ -258,6 +264,7 @@ namespace Hatrix {
         }
       }
 
+      #pragma omp parallel for
       for (int row = 0; row < nblocks; ++row) {
         auto col_iter = admis_blocks.equal_range({row, height, ROW});
         for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
@@ -781,7 +788,12 @@ int main(int argc, char** argv) {
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
+  auto blr2_start = std::chrono::system_clock::now();
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
+  auto blr2_stop = std::chrono::system_clock::now();
+
+  double blr2_construct_time = std::chrono::duration_cast
+    <std::chrono::milliseconds>(blr2_stop - blr2_start).count();
   // A.print_structure();
   double construct_error = A.construction_relative_error(randpts);
   auto last = A.factorize(randpts);
@@ -796,13 +808,19 @@ int main(int argc, char** argv) {
   Hatrix::Context::finalize();
   int leaf = N / nblocks;
 
+  int threads = omp_get_max_threads();
+
   std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
             << " leaf: " << leaf
-            << " construct error: " << construct_error << " solve error: " << solve_error << "\n";
+            << " blr2 construct time: " << blr2_construct_time
+            << " threads: " << threads
+            << " construct error: " << construct_error
+            << " solve error: " << solve_error << "\n";
 
   std::ofstream file;
   file.open("blr2_matrix_umv.csv", std::ios::app | std::ios::out);
   file << N << "," << rank << "," << nblocks << "," << admis << ","
-       << leaf << "," << construct_error << "," << solve_error << std::endl;
+       << leaf << "," <<  blr2_construct_time << ","
+       << threads << "," << construct_error << "," << solve_error << std::endl;
   file.close();
 }
