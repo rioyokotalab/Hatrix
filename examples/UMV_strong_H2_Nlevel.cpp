@@ -117,14 +117,14 @@ namespace Hatrix {
   // permute the vector forward and return the offset at which the new vector begins.
   int64_t H2::permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) {
     Matrix copy(x);
-    int64_t num_nodes = int64_t(pow(2, level));
+    int64_t num_nodes = pow(2, level);
     int64_t c_offset = rank_offset;
     for (int64_t block = 0; block < num_nodes; ++block) {
       rank_offset += D(block, block, level).rows - U(block, level).cols;
     }
 
     for (int64_t block = 0; block < num_nodes; ++block) {
-      int64_t rows = D(block, block, level).rows;
+      int64_t rows = U(block, level).rows;
       int64_t rank = U(block, level).cols;
       int64_t c_size = rows - rank;
 
@@ -152,7 +152,7 @@ namespace Hatrix {
     }
 
     for (int64_t block = 0; block < num_nodes; ++block) {
-      int64_t rows = D(block, block, level).rows;
+      int64_t rows = U(block, level).rows;
       int64_t rank = U(block, level).cols;
       int64_t c_size = rows - rank;
 
@@ -262,7 +262,6 @@ namespace Hatrix {
       }
     }
 
-    Hatrix::Matrix Utemp, Stemp, Vtemp;
     double error;
 
     // Generate a bunch of random matrices.
@@ -272,12 +271,14 @@ namespace Hatrix {
     }
 
     for (int64_t i = 0; i < nblocks; ++i) {
+      Hatrix::Matrix Utemp, Stemp;
       std::tie(Utemp, Stemp) = generate_column_bases(i, block_size, randpts, Y, height);
       U.insert(i, height, std::move(Utemp));
       // Scol.insert(i, height, std::move(Stemp));
     }
 
     for (int64_t j = 0; j < nblocks; ++j) {
+      Matrix Stemp, Vtemp;
       std::tie(Stemp, Vtemp) = generate_row_bases(j, block_size, randpts, Y, height);
       V.insert(j, height, std::move(Vtemp));
       // Srow.insert(j, height, std::move(Stemp));
@@ -586,11 +587,11 @@ namespace Hatrix {
 
     for (int block = 0; block < nblocks; ++block) {
       int64_t block_size = U(block, level).rows;
+      int64_t rank = U(block, level).cols;
       if (block > 0) {
         {
           // Scan for fill-ins in the same row as this diagonal block.
           Matrix row_concat(block_size, 0);
-          std::vector<int64_t> VN1_col_splits;
           bool found_row_fill_in = false;
           for (int j = 0; j < nblocks; ++j) {
             if (F.exists(block, j)) {
@@ -642,7 +643,6 @@ namespace Hatrix {
                 S.insert(block, j, level, std::move(Sbar_block_j));
               }
             }
-
             U.erase(block, level);
             U.insert(block, level, std::move(UN1));
           }
@@ -723,8 +723,7 @@ namespace Hatrix {
         }
       }
 
-      int64_t row_rank = U(block, level).cols, col_rank = V(block, level).cols;
-      int64_t row_split = block_size - row_rank, col_split = block_size - col_rank;
+      int64_t row_split = block_size - rank, col_split = block_size - rank;
 
       // The diagonal block is split along the row and column.
       auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
@@ -761,7 +760,8 @@ namespace Hatrix {
       // TRSM with oc blocks on the column
       for (int i = 0; i < nblocks; ++i) {
         if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
-          auto D_splits = SPLIT_DENSE(D(i, block, level), block_size - U(i, level).cols, col_split);
+          auto D_splits = SPLIT_DENSE(D(i, block, level),
+                                      block_size - U(i, level).cols, col_split);
           solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
         }
       }
@@ -944,7 +944,7 @@ namespace Hatrix {
 
           int parent_block_size = N / parent_nodes;
 
-          Matrix Vtransfer, Si;
+          Matrix Si, Vtransfer;
           std::tie(Si, Vtransfer) =
             generate_V_transfer_matrix(Vbig_child1, Vbig_child2, parent_node,
                                        parent_block_size, randpts, parent_level);
@@ -1041,7 +1041,6 @@ namespace Hatrix {
       // Forward with the big c blocks on the lower part.
       for (int irow = block+1; irow < nblocks; ++irow) {
         if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
-          // std::cout << "FWD BIG C: ir -> " << irow << " blo -> " << block << std::endl;
           int64_t row_split = block_size - U(irow, level).cols;
           int64_t col_split = block_size - V(block, level).cols;
           auto lower_splits = D(irow, block, level).split({}, std::vector<int64_t>(1, row_split));
@@ -1059,7 +1058,6 @@ namespace Hatrix {
       // Forward with the oc parts of the block that are actually in the upper part of the matrix.
       for (int irow = 0; irow < block; ++irow) {
         if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
-          // std::cout << "FWD OC: ir -> " << irow << " blo -> " << block << std::endl;
           int64_t row_split = block_size - U(irow, level).cols;
           int64_t col_split = block_size - V(block, level).cols;
           auto top_splits = SPLIT_DENSE(D(irow, block, level), row_split, col_split);
@@ -1092,9 +1090,6 @@ namespace Hatrix {
       for (int left_col = block-1; left_col >= 0; --left_col) {
         if (is_admissible.exists(block, left_col, level) &&
             !is_admissible(block, left_col, level)) {
-          // std::cout << "BCK CO: blk-> " << block << " lcol -> " << left_col << std::endl;
-          int64_t row_split = block_size - U(block, level).cols;
-          int64_t col_split = block_size - V(left_col, level).cols;
           auto left_splits = SPLIT_DENSE(D(block, left_col, level), row_split, col_split);
 
           Matrix x_block(x_level_split[block]), x_left_col(x_level_split[left_col]);
@@ -1215,9 +1210,7 @@ namespace Hatrix {
       if (!lr_exists) { break; }
 
       int n = 0;
-      for (int i = 0; i < num_nodes; ++i) {
-        n += V(i, level).rows;
-      }
+      for (int i = 0; i < num_nodes; ++i) { n += V(i, level).rows; }
       Matrix x_level(n, 1);
 
       rhs_offset = permute_backward(x, level, rhs_offset);
