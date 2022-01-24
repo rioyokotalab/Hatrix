@@ -128,8 +128,11 @@ namespace Hatrix {
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(i, j)) {
             double dense_error = Hatrix::norm(D(i, j) -
-                                           Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
-                                                                             block_size * i, block_size * j,
+                                           Hatrix::generate_laplacend_matrix(randpts,
+                                                                             block_size,
+                                                                             block_size,
+                                                                             block_size * i,
+                                                                             block_size * j,
                                                                              PV));
             error += pow(dense_error, 2);
           }

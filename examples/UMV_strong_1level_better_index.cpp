@@ -410,28 +410,14 @@ namespace Hatrix {
         // TRSM with CC blocks on the row
         // TODO: this is ugly. make better!
 
-        // for (int j = block + 1; j < nblocks; ++j) {
-        //   if (!is_admissible(block, j)) {
-        //     int64_t col_split = block_size - V(j).cols;
-        //     auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
-        //     solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
-
-        //   }
-        // }
-
-        col_iter = inadmis_blocks.equal_range({block, height, COL});
         auto itr = col_iter.first;
         while (itr->second != block+1 && itr != col_iter.second) { ++itr; }
 
-        while (itr != col_iter.second) {
-          int64_t col = itr->second;
+        for (auto itr1 = itr; itr1 != col_iter.second; ++itr1) {
+          int64_t col = itr1->second;
           auto D_splits = SPLIT_DENSE(D(block, col), row_split, col_split);
           solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
-          ++itr;
         }
-        // for (; itr != col_iter.second; ++itr) {
-
-        // }
 
         // TRSM with co blocks on this row
         for (int j = 0; j < nblocks; ++j) {

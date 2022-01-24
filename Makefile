@@ -33,7 +33,8 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_strong_chained_product \
 	UMV_strong_H2_3level_hss_chain_product \
 	UMV_strong_H2_3level_chain_product \
-	UMV_strong_H2_Nlevel
+	UMV_strong_H2_Nlevel \
+	UMV_strong_1level_better_index
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)

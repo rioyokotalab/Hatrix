@@ -46,10 +46,10 @@ namespace Hatrix {
     void solve_backward_level(Matrix& x_level, int level);
     std::tuple<Matrix, Matrix>
     generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int node,
-                                      int block_size, const randvec_t& randpts, int level);
+                               int block_size, const randvec_t& randpts, int level);
     std::tuple<Matrix, Matrix>
     generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int node,
-                                      int block_size, const randvec_t& randpts, int level);
+                               int block_size, const randvec_t& randpts, int level);
     void factorize_level(int level, int nblocks, const randvec_t& randpts);
 
   public:
