@@ -194,14 +194,16 @@ namespace Hatrix {
     return has_admis;
   }
 
-  Matrix H2::generate_column_block(int block, int block_size, const randvec_t& randpts, int level) {
+  Matrix H2::generate_column_block(int block, int block_size, const randvec_t& randpts,
+                                   int level) {
     Matrix AY(block_size, 0);
     int nblocks = pow(2, level);
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
       Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
                                                                block_size, block_size,
-                                                               block*block_size, j*block_size, PV);
+                                                               block*block_size,
+                                                               j*block_size, PV);
 
       AY = concat(AY, dense, 1);
     }
@@ -1203,9 +1205,7 @@ namespace Hatrix {
 
       bool lr_exists = false;
       for (int block = 0; block < num_nodes; ++block) {
-        if (V.exists(block, level)) {
-          lr_exists = true;
-        }
+        if (V.exists(block, level)) { lr_exists = true; }
       }
       if (!lr_exists) { break; }
 
