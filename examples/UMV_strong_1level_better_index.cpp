@@ -171,22 +171,51 @@ namespace Hatrix {
       }
     }
 
+    void preallocate_data() {
+      int block_size = N / nblocks;
+      for (int row = 0; row < nblocks; ++row) {
+        auto col_iter = inadmis_blocks.equal_range({row, height, ROW});
+        for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
+          int64_t col = itr->second;
+          D.insert(row, col, Matrix(block_size, block_size));
+        }
+      }
+
+      for (int64_t row = 0; row < nblocks; ++row) {
+        U.insert(row, Matrix(block_size, rank));
+      }
+
+      for (int64_t col = 0; col < nblocks; ++col) {
+        V.insert(col, Matrix(block_size, rank));
+      }
+
+      for (int row = 0; row < nblocks; ++row) {
+        auto col_iter = admis_blocks.equal_range({row, height, ROW});
+        for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
+          int col = itr->second;
+          S.insert(row, col, Matrix(rank, rank));
+        }
+      }
+    }
+
   public:
     BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
       N(N), nblocks(nblocks), rank(rank), admis(admis) {
       int block_size = N / nblocks;
 
       compute_admis_conditions();
+      preallocate_data();
 
-      #pragma omp parallel for
+      #pragma omp parallel
+      #pragma omp single
       for (int row = 0; row < nblocks; ++row) {
         auto col_iter = inadmis_blocks.equal_range({row, height, ROW});
         for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
           int64_t col = itr->second;
-          D.insert(row, col,
-                   Hatrix::generate_laplacend_matrix(randpts,
+          #pragma omp task
+          D(row, col) = Hatrix::generate_laplacend_matrix(randpts,
                                                      block_size, block_size,
-                                                     row*block_size, col*block_size, PV));
+                                                     row*block_size, col*block_size, PV);
         }
       }
 
@@ -215,66 +244,79 @@ namespace Hatrix {
                     Hatrix::generate_random_matrix(block_size, rank + oversampling));
       }
 
-      #pragma omp parallel for
+
+      #pragma omp parallel
+      #pragma omp single
       for (int64_t row = 0; row < nblocks; ++row) {
-        Hatrix::Matrix AY(block_size, rank + oversampling);
-        bool admissible_found = false;
-        auto col_iter = admis_blocks.equal_range({row, height, ROW});
-        for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
-          int64_t col = itr->second;
+        #pragma omp task
+        {
+          Hatrix::Matrix AY(block_size, rank + oversampling);
+          bool admissible_found = false;
+          auto col_iter = admis_blocks.equal_range({row, height, ROW});
+          for (multi_map_t::iterator itr = col_iter.first; itr != col_iter.second; ++itr) {
+            int64_t col = itr->second;
 
-          admissible_found = true;
-          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                   block_size,
-                                                                   block_size,
-                                                                   row*block_size,
-                                                                   col*block_size, PV);
-          Hatrix::matmul(dense, Y[col], AY);
-        }
+            admissible_found = true;
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                     block_size,
+                                                                     block_size,
+                                                                     row*block_size,
+                                                                     col*block_size, PV);
+            Hatrix::matmul(dense, Y[col], AY);
+          }
 
-        Matrix Utemp, _S, _V;
-        std::tie(Utemp, _S, _V, error) = Hatrix::truncated_svd(AY, rank);
+          Matrix Utemp, _S, _V;
+          std::tie(Utemp, _S, _V, error) = Hatrix::truncated_svd(AY, rank);
 
-        if (admissible_found) {
-          U.insert(row, std::move(Utemp));
+          if (admissible_found) {
+            U(row) = Utemp;
+          }
         }
       }
 
-      #pragma omp parallel for
+      #pragma omp parallel
+      #pragma omp single
       for (int64_t col = 0; col < nblocks; ++col) {
-        Hatrix::Matrix YtA(rank + oversampling, block_size);
-        bool admissible_found = false;
-        auto row_iter = admis_blocks.equal_range({col, height, COL});
-        for (auto itr = row_iter.first; itr != row_iter.second; ++itr) {
-          int row = itr->second;
-          admissible_found = true;
-          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                   block_size,
-                                                                   block_size,
-                                                                   row*block_size,
-                                                                   col*block_size, PV);
-          Hatrix::matmul(Y[row], dense, YtA, true);
-        }
+        #pragma omp task
+        {
 
-        Matrix _U, _S, Vtemp;
-        std::tie(_U, _S, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
+          Hatrix::Matrix YtA(rank + oversampling, block_size);
+          bool admissible_found = false;
+          auto row_iter = admis_blocks.equal_range({col, height, COL});
+          for (auto itr = row_iter.first; itr != row_iter.second; ++itr) {
+            int row = itr->second;
+            admissible_found = true;
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                     block_size,
+                                                                     block_size,
+                                                                     row*block_size,
+                                                                     col*block_size, PV);
+            Hatrix::matmul(Y[row], dense, YtA, true);
+          }
 
-        if (admissible_found) {
-          V.insert(col, std::move(transpose(Vtemp)));
+          Matrix _U, _S, Vtemp;
+          std::tie(_U, _S, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
+
+          if (admissible_found) {
+            V(col) = transpose(Vtemp);
+          }
         }
       }
 
-      #pragma omp parallel for
+      #pragma omp parallel
+      #pragma omp single
       for (int row = 0; row < nblocks; ++row) {
         auto col_iter = admis_blocks.equal_range({row, height, ROW});
         for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
           int col = itr->second;
-          Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                   block_size, block_size,
-                                                                   row*block_size,
-                                                                   col*block_size, PV);
-          S.insert(row, col,
-                   Hatrix::matmul(Hatrix::matmul(U(row), dense, true), V(col)));
+          #pragma omp task
+          {
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
+                                                                     block_size, block_size,
+                                                                     row*block_size,
+                                                                     col*block_size, PV);
+            S(row, col) = Hatrix::matmul(Hatrix::matmul(U(row), dense, true), V(col));
+          }
         }
       }
     }
