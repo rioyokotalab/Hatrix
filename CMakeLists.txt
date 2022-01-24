@@ -3,6 +3,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(policies)
 set_policies()
 
+set(default_build_type "Release")
 option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
 option(Hatrix_CPU_ONLY "Build Hatrix without GPU usage." ON)
 

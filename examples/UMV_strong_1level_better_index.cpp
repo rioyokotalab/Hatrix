@@ -219,20 +219,6 @@ namespace Hatrix {
         }
       }
 
-      for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, std::abs(i - j) > admis);
-        }
-      }
-
-      for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          if (!is_admissible.exists(i, j)) {
-            is_admissible.insert(i, j, true);
-          }
-        }
-      }
-
       const int64_t oversampling = 5;
       Hatrix::Matrix Utemp, Stemp, Vtemp;
       double error;
@@ -775,6 +761,20 @@ namespace Hatrix {
     double construction_relative_error(const randvec_t& randpts) {
       double error = 0, dense_norm = 0;
       int block_size = N / nblocks;
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, std::abs(i - j) > admis);
+        }
+      }
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (!is_admissible.exists(i, j)) {
+            is_admissible.insert(i, j, true);
+          }
+        }
+      }
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
