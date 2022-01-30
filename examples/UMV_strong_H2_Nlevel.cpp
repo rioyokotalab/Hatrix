@@ -499,7 +499,7 @@ namespace Hatrix {
           if (admis_block) {
             for (int c1 = 0; c1 < 2; ++c1) {
               for (int c2 = 0; c2 < 2; ++c2) {
-                //is_admissible.erase(row_children[c1], col_children[c2], child_level);
+                //  is_admissible.erase(row_children[c1], col_children[c2], child_level);
               }
             }
           }
@@ -663,8 +663,6 @@ namespace Hatrix {
           }
 
           if (found_col_fill_in) {
-            // col_concat = concat(col_concat, matmul(Srow(block, level),
-            //                                        transpose(V(block, level))), 0);
             for (int i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                 col_concat = concat(col_concat, matmul(S(i, block, level),
