@@ -262,7 +262,8 @@ namespace Hatrix {
 
       Matrix Vbig(leaf_size, rank);
 
-      std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
+      std::vector<Matrix> Vbig_splits =
+        Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
       std::vector<Matrix> V_splits = V(node, level).split(2, 1);
 
       matmul(Vbig_child1, V_splits[0], Vbig_splits[0]);

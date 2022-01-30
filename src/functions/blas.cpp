@@ -68,7 +68,7 @@ void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
 
 void solve_diagonal(const Matrix& D, Matrix& B, Side side, double alpha) {
   assert(side == Left ? D.cols == B.rows : B.cols == D.rows);
-  
+
   for(int64_t j = 0; j < B.cols; j++) {
     for(int64_t i = 0; i < B.rows; i++) {
       B(i, j) = alpha * B(i, j) / (side == Left ? D(i, i) : D(j, j));
@@ -85,7 +85,7 @@ void scale(Matrix& A, double alpha) {
 void row_scale(Matrix& A, const Matrix& D) {
   assert(D.rows == D.cols);
   assert(D.cols == A.rows);
-  
+
   for(int i = 0; i < A.rows; i++) {
     cblas_dscal(A.cols, D(i, i), &A(i, 0), A.stride);
   }
@@ -94,7 +94,7 @@ void row_scale(Matrix& A, const Matrix& D) {
 void column_scale(Matrix& A, const Matrix& D) {
   assert(D.rows == D.cols);
   assert(D.rows == A.cols);
-  
+
   for(int j = 0; j < A.cols; j++) {
     cblas_dscal(A.rows, D(j, j), &A(0, j), 1);
   }

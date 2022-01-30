@@ -1255,11 +1255,18 @@ int main(int argc, char *argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(randpts, N, rank, height, admis);
-  double construct_error = A.construction_relative_error(randpts);
   auto stop_construct = std::chrono::system_clock::now();
+  auto construct_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_construct - start_construct).count();
+
+  double construct_error = A.construction_relative_error(randpts);
 
   // A.print_structure();
+  auto start_factor = std::chrono::system_clock::now();
   A.factorize(randpts);
+  auto stop_factor = std::chrono::system_clock::now();
+  auto factor_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_factor - start_factor).count();
 
   Hatrix::Matrix x = A.solve(b, A.height);
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
@@ -1270,9 +1277,30 @@ int main(int argc, char *argv[]) {
   int leaf = int(N / pow(2, height));
   Hatrix::Context::finalize();
 
-  std::cout << "N= " << N << " rank= " << rank << " admis= " << admis << " leaf= "
-            << leaf
+  std::ofstream file;
+  file.open("H2_UMV.csv", std::ios::app | std::ios::out);
+
+  std::cout << "N= " << N
+            << " rank= " << rank
+            << " admis= " << admis
+            << " leaf= " << leaf
             << " height=" << height
             << " const. error=" << construct_error
-            << " solve error=" << solve_error << std::endl;
+            << " solve error=" << solve_error
+            << " factor time=" << factor_time
+            << " construct time=" << construct_time
+            << std::endl;
+
+  file << N << ","
+       << rank << ","
+       << admis << ","
+       << leaf << ","
+       << height << ","
+       << construct_error << ","
+       << solve_error << ","
+       << factor_time << ","
+       << construct_time
+       << std::endl;
+
+  file.close();
 }
