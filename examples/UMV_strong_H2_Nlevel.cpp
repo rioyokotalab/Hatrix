@@ -50,7 +50,8 @@ namespace Hatrix {
     std::tuple<Matrix, Matrix>
     generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int node,
                                int block_size, const randvec_t& randpts, int level);
-    void factorize_level(int level, int nblocks, const randvec_t& randpts);
+    void factorize_level(int level, int nblocks, const randvec_t& randpts,
+                         RowMap& r, RowMap& t);
 
   public:
     H2(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height,
@@ -499,7 +500,7 @@ namespace Hatrix {
           if (admis_block) {
             for (int c1 = 0; c1 < 2; ++c1) {
               for (int c2 = 0; c2 < 2; ++c2) {
-                //  is_admissible.erase(row_children[c1], col_children[c2], child_level);
+                // is_admissible.erase(row_children[c1], col_children[c2], child_level);
               }
             }
           }
@@ -584,7 +585,8 @@ namespace Hatrix {
     actually_print_structure(height);
   }
 
-  void H2::factorize_level(int level, int nblocks, const randvec_t& randpts) {
+  void H2::factorize_level(int level, int nblocks, const randvec_t& randpts,
+                           RowMap& r, RowMap& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
 
     for (int block = 0; block < nblocks; ++block) {
@@ -613,21 +615,13 @@ namespace Hatrix {
                   row_concat = concat(row_concat, Fp, 1);
                 }
               }
-              // else if (!is_admissible.exists(block, j, level)) {
-              //   // if you have an off-diagonal dense block,
-              //   Matrix lr_block = Hatrix::generate_laplacend_matrix(randpts,
-              //                                                       block_size,
-              //                                                       block_size,
-              //                                                       block * block_size,
-              //                                                       j * block_size, PV);
-              //   row_concat = concat(row_concat, lr_block, 1);
-              // }
             }
 
             Matrix UN1, _SN1, _VN1T; double error;
             std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
             Matrix r_block = matmul(UN1, U(block, level), true, false);
+            r.insert(block, std::move(r_block));
 
             for (int j = 0; j < nblocks; ++j) {
               if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
@@ -672,19 +666,13 @@ namespace Hatrix {
                   col_concat = concat(col_concat, Fp, 0);
                 }
               }
-              // else if (!is_admissible.exists(i, block, level)) {
-              //   Matrix lr_block = Hatrix::generate_laplacend_matrix(randpts,
-              //                                                       block_size, block_size,
-              //                                                       i * block_size,
-              //                                                       block * block_size, PV);
-              //   col_concat = concat(col_concat, lr_block, 0);
-              // }
             }
 
             Matrix _UN2, _SN2, VN2T; double error;
             std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
 
             Matrix t_block = matmul(V(block, level), VN2T, true, true);
+            t.insert(block, std::move(t_block));
 
             for (int i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
@@ -897,6 +885,7 @@ namespace Hatrix {
     // For verification of A1 matrix.
     int64_t level = height;
     RowColLevelMap<Matrix> F;
+    RowMap r, t;
 
     for (; level > 0; --level) {
       int num_nodes = pow(2, level);
@@ -910,7 +899,7 @@ namespace Hatrix {
         break;
       }
 
-      factorize_level(level, num_nodes, randpts);
+      factorize_level(level, num_nodes, randpts, r, t);
 
       int parent_level = level - 1;
 
@@ -921,21 +910,41 @@ namespace Hatrix {
         int c1 = block;
         int c2 = block+1;
 
-        if (row_has_admissible_blocks(parent_node, parent_level)) {
+        if (row_has_admissible_blocks(parent_node, parent_level) && r.exists(c1) && r.exists(c2)) {
           auto Ubig_child1 = get_Ubig(c1, level);
           auto Ubig_child2 = get_Ubig(c2, level);
 
           int parent_block_size = N / parent_nodes;
-          Matrix Utransfer, Si;
-          std::tie(Utransfer, Si) =
-            generate_U_transfer_matrix(Ubig_child1, Ubig_child2, parent_node,
-                                       parent_block_size, randpts, parent_level);
+          // Matrix Utransfer, Si;
+          // std::tie(Utransfer, Si) =
+          //   generate_U_transfer_matrix(Ubig_child1, Ubig_child2, parent_node,
+          //                              parent_block_size, randpts, parent_level);
 
-          U.erase(parent_node, parent_level);
-          U.insert(parent_node, parent_level, std::move(Utransfer));
+          // U.erase(parent_node, parent_level);
+          // U.insert(parent_node, parent_level, std::move(Utransfer));
 
           // Scol.erase(parent_node, parent_level);
           // Scol.insert(parent_node, parent_level, std::move(Si));
+
+          Matrix& Utransfer = U(parent_node, parent_level);
+          auto Utransfer_splits = Utransfer.split(2, 1);
+
+          Matrix temp(rank*2, rank);
+          auto temp_splits = temp.split(2, 1);
+
+          matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false);
+          matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false);
+
+          std::cout << " level: " << level
+                    << " block: " << block
+                    << " norm: " << Hatrix::norm(generate_identity_matrix(rank, rank) - matmul(temp, temp, true, false))
+                    << std::endl;
+
+          U.erase(parent_node, parent_level);
+          U.insert(parent_node, parent_level, std::move(temp));
+
+          r.erase(c1);
+          r.erase(c2);
         }
 
         if (col_has_admissible_blocks(parent_node, parent_level)) {
