@@ -131,7 +131,8 @@ namespace Hatrix {
     }
 
     std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const randvec_t& randpts,
-                                                                    int64_t level, RowLevelMap& Uchild,
+                                                                    int64_t level,
+                                                                    RowLevelMap& Uchild,
                                                                     ColLevelMap& Vchild) {
       int64_t num_nodes = pow(2, level);
       int64_t leaf_size = N / num_nodes;
