@@ -423,18 +423,19 @@ namespace Hatrix {
         Matrix U_F = make_complement(U(block));
         Matrix V_F = make_complement(V(block));
 
-        col_iter = inadmis_blocks.equal_range({block, height, COL});
-        for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
-          int64_t col = itr->second;
-          {
+        if (admis == 0) {
+          D(block, block) = matmul(matmul(U_F, D(block, block), true), V_F);
+        }
+        else {
+          col_iter = inadmis_blocks.equal_range({block, height, COL});
+          for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
+            int64_t col = itr->second;
             D(block, col) = matmul(U_F, D(block, col), true);
           }
-        }
 
-        row_iter = inadmis_blocks.equal_range({block, height, ROW});
-        for (auto itr = row_iter.first; itr != row_iter.second; ++itr) {
-          int64_t row = itr->second;
-          {
+          row_iter = inadmis_blocks.equal_range({block, height, ROW});
+          for (auto itr = row_iter.first; itr != row_iter.second; ++itr) {
+            int64_t row = itr->second;
             D(row, block) = matmul(D(row, block), V_F);
           }
         }
@@ -450,13 +451,22 @@ namespace Hatrix {
         // TRSM with CC blocks on the row
         // TODO: this is ugly. make better!
 
-        auto itr = col_iter.first;
-        while (itr->second != block+1 && itr != col_iter.second) { ++itr; }
+        // auto itr = col_iter.first;
+        // while (itr->second != block+1 && itr != col_iter.second) { ++itr; }
 
-        for (auto itr1 = itr; itr1 != col_iter.second; ++itr1) {
-          int64_t col = itr1->second;
-          {
-            auto D_splits = SPLIT_DENSE(D(block, col), row_split, col_split);
+        // for (auto itr1 = itr; itr1 != col_iter.second; ++itr1) {
+        //   int64_t col = itr1->second;
+        //   {
+        //     auto D_splits = SPLIT_DENSE(D(block, col), row_split, col_split);
+        //     solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
+        //   }
+        // }
+
+        // TRSM with CC blocks on the row
+        for (int j = block + 1; j < nblocks; ++j) {
+          if (!is_admissible(block, j)) {
+            int64_t col_split = block_size - V(j).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
           }
         }
