@@ -314,8 +314,9 @@ namespace Hatrix {
 
       std::pair<multi_map_t::iterator, multi_map_t::iterator> col_iter, row_iter;
 
+      #pragma omp parallel for if(admis == 0)
       for (int block = 0; block < nblocks; ++block) {
-        if (block > 0) {
+        if (block > 0 && admis != 0) {
           {
             // Scan for fill-ins in the same row as this diagonal block.
             Matrix row_concat(block_size, 0);
@@ -425,13 +426,17 @@ namespace Hatrix {
         col_iter = inadmis_blocks.equal_range({block, height, COL});
         for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
           int64_t col = itr->second;
-          D(block, col) = matmul(U_F, D(block, col), true);
+          {
+            D(block, col) = matmul(U_F, D(block, col), true);
+          }
         }
 
         row_iter = inadmis_blocks.equal_range({block, height, ROW});
         for (auto itr = row_iter.first; itr != row_iter.second; ++itr) {
           int64_t row = itr->second;
-          D(row, block) = matmul(D(row, block), V_F);
+          {
+            D(row, block) = matmul(D(row, block), V_F);
+          }
         }
 
         int64_t row_rank = U(block).cols, col_rank = V(block).cols;
@@ -450,8 +455,10 @@ namespace Hatrix {
 
         for (auto itr1 = itr; itr1 != col_iter.second; ++itr1) {
           int64_t col = itr1->second;
-          auto D_splits = SPLIT_DENSE(D(block, col), row_split, col_split);
-          solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          {
+            auto D_splits = SPLIT_DENSE(D(block, col), row_split, col_split);
+            solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          }
         }
 
         // TRSM with co blocks on this row
@@ -838,7 +845,12 @@ int main(int argc, char** argv) {
     <std::chrono::milliseconds>(blr2_stop - blr2_start).count();
   // A.print_structure();
   double construct_error = A.construction_relative_error(randpts);
+
+  auto factor_start = std::chrono::system_clock::now();
   auto last = A.factorize(randpts);
+  auto factor_stop = std::chrono::system_clock::now();
+  auto factor_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(factor_stop - factor_start).count();
   Hatrix::Matrix x = A.solve(b, last);
 
   // Verification with dense solver.
@@ -857,12 +869,15 @@ int main(int argc, char** argv) {
             << " blr2 construct time: " << blr2_construct_time
             << " threads: " << threads
             << " construct error: " << construct_error
-            << " solve error: " << solve_error << "\n";
+            << " solve error: " << solve_error
+            << " factor time: " << factor_time
+            << "\n";
 
   std::ofstream file;
   file.open("blr2_matrix_umv.csv", std::ios::app | std::ios::out);
   file << N << "," << rank << "," << nblocks << "," << admis << ","
        << leaf << "," <<  blr2_construct_time << ","
-       << threads << "," << construct_error << "," << solve_error << std::endl;
+       << threads << "," << construct_error << ","
+       << solve_error << "," << factor_time << std::endl;
   file.close();
 }
