@@ -694,8 +694,6 @@ namespace Hatrix {
             V.insert(block, level, transpose(VN2T));
             t.insert(block, std::move(t_block));
           }
-
-
         }
       }
 
@@ -913,58 +911,48 @@ namespace Hatrix {
         int c1 = block;
         int c2 = block+1;
 
-        if (row_has_admissible_blocks(parent_node, parent_level)) {
+        if (row_has_admissible_blocks(parent_node, parent_level) && r.exists(c1) && r.exists(c2)) {
           auto Ubig_child1 = get_Ubig(c1, level);
           auto Ubig_child2 = get_Ubig(c2, level);
 
           int parent_block_size = N / parent_nodes;
-          Matrix Utransfer, Si;
-          std::tie(Utransfer, Si) =
-            generate_U_transfer_matrix(Ubig_child1, Ubig_child2, parent_node,
-                                       parent_block_size, randpts, parent_level);
+
+          Matrix& Utransfer = U(parent_node, parent_level);
+          auto Utransfer_splits = Utransfer.split(2, 1);
+
+          Matrix temp(rank*2, rank);
+          auto temp_splits = temp.split(2, 1);
+
+          matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false);
+          matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false);
 
           U.erase(parent_node, parent_level);
-          U.insert(parent_node, parent_level, std::move(Utransfer));
+          U.insert(parent_node, parent_level, std::move(temp));
 
-          // Scol.erase(parent_node, parent_level);
-          // Scol.insert(parent_node, parent_level, std::move(Si));
-
-          // Matrix& Utransfer = U(parent_node, parent_level);
-          // auto Utransfer_splits = Utransfer.split(2, 1);
-
-          // Matrix temp(rank*2, rank);
-          // auto temp_splits = temp.split(2, 1);
-
-          // matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false);
-          // matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false);
-
-          // std::cout << " level: " << level
-          //           << " block: " << block
-          //           << " norm: " << Hatrix::norm(generate_identity_matrix(rank, rank) - matmul(temp, temp, true, false))
-          //           << std::endl;
-
-          // U.erase(parent_node, parent_level);
-          // U.insert(parent_node, parent_level, std::move(temp));
-
-          // r.erase(c1);
-          // r.erase(c2);
+          r.erase(c1);
+          r.erase(c2);
         }
 
-        if (col_has_admissible_blocks(parent_node, parent_level)) {
+        if (col_has_admissible_blocks(parent_node, parent_level) && t.exists(c1) && t.exists(c2)) {
           auto Vbig_child1 = get_Vbig(c1, level);
           auto Vbig_child2 = get_Vbig(c2, level);
 
           int parent_block_size = N / parent_nodes;
 
-          Matrix Si, Vtransfer;
-          std::tie(Si, Vtransfer) =
-            generate_V_transfer_matrix(Vbig_child1, Vbig_child2, parent_node,
-                                       parent_block_size, randpts, parent_level);
-          V.erase(parent_node, parent_level);
-          V.insert(parent_node, parent_level, std::move(Vtransfer));
+          Matrix& Vtransfer = V(parent_node, parent_level);
+          auto Vtransfer_splits = Vtransfer.split(2, 1);
 
-          // Srow.erase(parent_node, parent_level);
-          // Srow.insert(parent_node, parent_level, std::move(Si));
+          Matrix temp(rank*2, rank);
+          auto temp_splits = temp.split(2, 1);
+
+          matmul(t(c1), Vtransfer_splits[0], temp_splits[0], false, false);
+          matmul(t(c2), Vtransfer_splits[1], temp_splits[1], false, false);
+
+          V.erase(parent_node, parent_level);
+          V.insert(parent_node, parent_level, std::move(temp));
+
+          t.erase(c1);
+          t.erase(c2);
         }
       } // for (int block = 0; block < num_nodes; block += 2)
 
