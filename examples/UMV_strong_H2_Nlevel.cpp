@@ -277,14 +277,14 @@ namespace Hatrix {
       Hatrix::Matrix Utemp, Stemp;
       std::tie(Utemp, Stemp) = generate_column_bases(i, block_size, randpts, Y, height);
       U.insert(i, height, std::move(Utemp));
-      // Scol.insert(i, height, std::move(Stemp));
+      Scol.insert(i, height, std::move(Stemp));
     }
 
     for (int64_t j = 0; j < nblocks; ++j) {
       Matrix Stemp, Vtemp;
       std::tie(Stemp, Vtemp) = generate_row_bases(j, block_size, randpts, Y, height);
       V.insert(j, height, std::move(Vtemp));
-      // Srow.insert(j, height, std::move(Stemp));
+      Srow.insert(j, height, std::move(Stemp));
     }
 
     for (int i = 0; i < nblocks; ++i) {
@@ -370,7 +370,7 @@ namespace Hatrix {
         std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1, Ubig_child2, node,
                                                                 block_size, randpts, level);
         U.insert(node, level, std::move(Utransfer));
-        // Scol.insert(node, level, std::move(Stemp));
+        Scol.insert(node, level, std::move(Stemp));
 
         // Generate the full bases to pass onto the parent.
         auto Utransfer_splits = U(node, level).split(2, 1);
@@ -392,7 +392,7 @@ namespace Hatrix {
         std::tie(Stemp, Vtransfer) = generate_V_transfer_matrix(Vbig_child1, Vbig_child2, node,
                                                                 block_size, randpts, level);
         V.insert(node, level, std::move(Vtransfer));
-        // Srow.insert(node, level, std::move(Stemp));
+        Srow.insert(node, level, std::move(Stemp));
 
         // Generate the full bases for passing onto the upper level.
         std::vector<Matrix> Vtransfer_splits = V(node, level).split(2, 1);
@@ -500,7 +500,7 @@ namespace Hatrix {
           if (admis_block) {
             for (int c1 = 0; c1 < 2; ++c1) {
               for (int c2 = 0; c2 < 2; ++c2) {
-                // is_admissible.erase(row_children[c1], col_children[c2], child_level);
+                is_admissible.erase(row_children[c1], col_children[c2], child_level);
               }
             }
           }
@@ -605,11 +605,10 @@ namespace Hatrix {
           }
 
           if (found_row_fill_in) {
+            row_concat = concat(row_concat, matmul(U(block, level),
+                                                   Scol(block, level)), 1);
             for (int j = 0; j < nblocks; ++j) {
               if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                row_concat = concat(row_concat, matmul(U(block, level),
-                                                       S(block, j, level)), 1);
-
                 if (F.exists(block, j)) {
                   Matrix Fp = matmul(F(block, j), V(j, level), false, true);
                   row_concat = concat(row_concat, Fp, 1);
@@ -619,6 +618,8 @@ namespace Hatrix {
 
             Matrix UN1, _SN1, _VN1T; double error;
             std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
+            Scol.erase(block, level);
+            Scol.insert(block, level, std::move(_SN1));
 
             Matrix r_block = matmul(UN1, U(block, level), true, false);
 
@@ -640,7 +641,6 @@ namespace Hatrix {
             }
             U.erase(block, level);
             U.insert(block, level, std::move(UN1));
-
             r.insert(block, std::move(r_block));
           }
         }
@@ -658,10 +658,10 @@ namespace Hatrix {
           }
 
           if (found_col_fill_in) {
+            col_concat = concat(col_concat, matmul(Srow(block, level),
+                                                   transpose(V(block, level))), 0);
             for (int i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                col_concat = concat(col_concat, matmul(S(i, block, level),
-                                                       transpose(V(block, level))), 0);
                 if (F.exists(i, block)) {
                   Matrix Fp = matmul(U(i, level), F(i, block));
                   col_concat = concat(col_concat, Fp, 0);
@@ -671,6 +671,8 @@ namespace Hatrix {
 
             Matrix _UN2, _SN2, VN2T; double error;
             std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
+            Srow.erase(block, level);
+            Srow.insert(block, level, std::move(_SN2));
 
             Matrix t_block = matmul(V(block, level), VN2T, true, true);
 
@@ -1107,8 +1109,6 @@ namespace Hatrix {
       for (int right_col = nblocks-1; right_col > block; --right_col) {
         if (is_admissible.exists(block, right_col, level) &&
             !is_admissible(block, right_col, level)) {
-          // std::cout << "BCK BIG C: blk-> " << block << " rcol -> " << right_col << std::endl;
-
           int64_t row_split = block_size - U(block, level).cols;
           auto right_splits = D(block, right_col, level).
             split(std::vector<int64_t>(1, row_split), {});
