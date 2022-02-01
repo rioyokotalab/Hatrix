@@ -621,7 +621,6 @@ namespace Hatrix {
             std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
             Matrix r_block = matmul(UN1, U(block, level), true, false);
-            r.insert(block, std::move(r_block));
 
             for (int j = 0; j < nblocks; ++j) {
               if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
@@ -641,6 +640,8 @@ namespace Hatrix {
             }
             U.erase(block, level);
             U.insert(block, level, std::move(UN1));
+
+            r.insert(block, std::move(r_block));
           }
         }
 
@@ -672,7 +673,6 @@ namespace Hatrix {
             std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
 
             Matrix t_block = matmul(V(block, level), VN2T, true, true);
-            t.insert(block, std::move(t_block));
 
             for (int i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
@@ -692,7 +692,10 @@ namespace Hatrix {
 
             V.erase(block, level);
             V.insert(block, level, transpose(VN2T));
+            t.insert(block, std::move(t_block));
           }
+
+
         }
       }
 
@@ -910,41 +913,41 @@ namespace Hatrix {
         int c1 = block;
         int c2 = block+1;
 
-        if (row_has_admissible_blocks(parent_node, parent_level) && r.exists(c1) && r.exists(c2)) {
+        if (row_has_admissible_blocks(parent_node, parent_level)) {
           auto Ubig_child1 = get_Ubig(c1, level);
           auto Ubig_child2 = get_Ubig(c2, level);
 
           int parent_block_size = N / parent_nodes;
-          // Matrix Utransfer, Si;
-          // std::tie(Utransfer, Si) =
-          //   generate_U_transfer_matrix(Ubig_child1, Ubig_child2, parent_node,
-          //                              parent_block_size, randpts, parent_level);
+          Matrix Utransfer, Si;
+          std::tie(Utransfer, Si) =
+            generate_U_transfer_matrix(Ubig_child1, Ubig_child2, parent_node,
+                                       parent_block_size, randpts, parent_level);
 
-          // U.erase(parent_node, parent_level);
-          // U.insert(parent_node, parent_level, std::move(Utransfer));
+          U.erase(parent_node, parent_level);
+          U.insert(parent_node, parent_level, std::move(Utransfer));
 
           // Scol.erase(parent_node, parent_level);
           // Scol.insert(parent_node, parent_level, std::move(Si));
 
-          Matrix& Utransfer = U(parent_node, parent_level);
-          auto Utransfer_splits = Utransfer.split(2, 1);
+          // Matrix& Utransfer = U(parent_node, parent_level);
+          // auto Utransfer_splits = Utransfer.split(2, 1);
 
-          Matrix temp(rank*2, rank);
-          auto temp_splits = temp.split(2, 1);
+          // Matrix temp(rank*2, rank);
+          // auto temp_splits = temp.split(2, 1);
 
-          matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false);
-          matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false);
+          // matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false);
+          // matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false);
 
-          std::cout << " level: " << level
-                    << " block: " << block
-                    << " norm: " << Hatrix::norm(generate_identity_matrix(rank, rank) - matmul(temp, temp, true, false))
-                    << std::endl;
+          // std::cout << " level: " << level
+          //           << " block: " << block
+          //           << " norm: " << Hatrix::norm(generate_identity_matrix(rank, rank) - matmul(temp, temp, true, false))
+          //           << std::endl;
 
-          U.erase(parent_node, parent_level);
-          U.insert(parent_node, parent_level, std::move(temp));
+          // U.erase(parent_node, parent_level);
+          // U.insert(parent_node, parent_level, std::move(temp));
 
-          r.erase(c1);
-          r.erase(c2);
+          // r.erase(c1);
+          // r.erase(c2);
         }
 
         if (col_has_admissible_blocks(parent_node, parent_level)) {
