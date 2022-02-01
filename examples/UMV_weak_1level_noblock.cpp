@@ -9,6 +9,7 @@
 #include <fstream>
 #include <functional>
 #include <chrono>
+#include <omp.h>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -21,6 +22,7 @@
 #include "Hatrix/Hatrix.h"
 
 using randvec_t = std::vector<std::vector<double> >;
+double PV = 1e-3;
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   double A_norm = Hatrix::norm(A);
@@ -39,7 +41,8 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-std::tuple<Hatrix::BLR, double> construct_BLR(const randvec_t& randpts, int64_t block_size, int64_t n_blocks,
+std::tuple<Hatrix::BLR, double> construct_BLR(const randvec_t& randpts,
+                                              int64_t block_size, int64_t n_blocks,
                                               int64_t rank, int64_t admis) {
   Hatrix::BLR A;
 
@@ -190,6 +193,7 @@ void partial_lu(Hatrix::Matrix& D, int rank) {
 Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
   Hatrix::Matrix M(rank * nblocks, rank * nblocks);
 
+  // #pragma omp parallel for
   for (int i = 0; i < nblocks; ++i) {
     for (int j = 0; j < nblocks; ++j) {
       if (i == j) {
@@ -214,6 +218,7 @@ Hatrix::Matrix merge_null_spaces(Hatrix::BLR& A, int nblocks, int rank) {
 }
 
 Hatrix::Matrix UMV_factorize(Hatrix::BLR& A, int N, int nblocks, int rank) {
+  // #pragma omp parallel for
   for (int node = 0; node < nblocks; ++node) {
     Hatrix::Matrix U_F = make_complement(A.U[node]);
     Hatrix::Matrix V_F = make_complement(A.V[node]);
@@ -332,6 +337,7 @@ int main(int argc, char *argv[]) {
   int rank = atoi(argv[2]);
   int block_size = atoi(argv[3]);
   const char * fname = argv[4];
+  int multiplier = atoi(argv[5]);
   int nblocks = N / block_size;
 
   if (rank > block_size || N % block_size != 0) {
@@ -342,7 +348,11 @@ int main(int argc, char *argv[]) {
   file.open(fname, std::ios::app | std::ios::out);
 
   randvec_t randpts;
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  PV = 1e-3 * (1 / pow(10, multiplier));
+
 
   Hatrix::Context::init();
   const Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
@@ -372,10 +382,11 @@ int main(int argc, char *argv[]) {
   Hatrix::Matrix x_dense = Hatrix::lu_solve(A_dense, b);
 
   double substitute_error = rel_error(x, x_dense);
+  int threads = omp_get_max_threads();
 
   file << N << "," << rank << "," << block_size << "," << substitute_error << ","
        << construct_error << "," << construct_time << "," << factorize_time << ","
-       << subs_time << std::endl;
+       << subs_time << "," << threads << std::endl;
 
   file.close();
 

@@ -21,7 +21,6 @@
 // Accuracy Directly Controlled Fast Direct Solution of General H^2-matrices and Its
 // Application to Solving Electrodynamics Volume Integral Equations
 
-double PV = 1;
 using randvec_t = std::vector<std::vector<double> >;
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
@@ -63,6 +62,7 @@ namespace Hatrix {
     int64_t N, nblocks, rank, admis;
     RowColMap<Matrix> Loc, Uco;      // fill-ins of the small strips on the top and bottom.
     const int64_t height = 1;
+    double PV;
 
     // The third place in the tuple specifies whether this map represents a row or
     // column. If you specify ROW, you will get the relevant rows. If you say COL,
@@ -199,8 +199,8 @@ namespace Hatrix {
     }
 
   public:
-    BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
-      N(N), nblocks(nblocks), rank(rank), admis(admis) {
+    BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis, double PV) :
+      N(N), nblocks(nblocks), rank(rank), admis(admis), PV(PV) {
       int block_size = N / nblocks;
 
       compute_admis_conditions();
@@ -314,8 +314,9 @@ namespace Hatrix {
 
       std::pair<multi_map_t::iterator, multi_map_t::iterator> col_iter, row_iter;
 
+      #pragma omp parallel for if(admis == 0)
       for (int block = 0; block < nblocks; ++block) {
-        if (block > 0) {
+        if (block > 0 && admis != 0) {
           {
             // Scan for fill-ins in the same row as this diagonal block.
             Matrix row_concat(block_size, 0);
@@ -422,16 +423,21 @@ namespace Hatrix {
         Matrix U_F = make_complement(U(block));
         Matrix V_F = make_complement(V(block));
 
-        col_iter = inadmis_blocks.equal_range({block, height, COL});
-        for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
-          int64_t col = itr->second;
-          D(block, col) = matmul(U_F, D(block, col), true);
+        if (admis == 0) {
+          D(block, block) = matmul(matmul(U_F, D(block, block), true), V_F);
         }
+        else {
+          col_iter = inadmis_blocks.equal_range({block, height, COL});
+          for (auto itr = col_iter.first; itr != col_iter.second; ++itr) {
+            int64_t col = itr->second;
+            D(block, col) = matmul(U_F, D(block, col), true);
+          }
 
-        row_iter = inadmis_blocks.equal_range({block, height, ROW});
-        for (auto itr = row_iter.first; itr != row_iter.second; ++itr) {
-          int64_t row = itr->second;
-          D(row, block) = matmul(D(row, block), V_F);
+          row_iter = inadmis_blocks.equal_range({block, height, ROW});
+          for (auto itr = row_iter.first; itr != row_iter.second; ++itr) {
+            int64_t row = itr->second;
+            D(row, block) = matmul(D(row, block), V_F);
+          }
         }
 
         int64_t row_rank = U(block).cols, col_rank = V(block).cols;
@@ -445,13 +451,24 @@ namespace Hatrix {
         // TRSM with CC blocks on the row
         // TODO: this is ugly. make better!
 
-        auto itr = col_iter.first;
-        while (itr->second != block+1 && itr != col_iter.second) { ++itr; }
+        // auto itr = col_iter.first;
+        // while (itr->second != block+1 && itr != col_iter.second) { ++itr; }
 
-        for (auto itr1 = itr; itr1 != col_iter.second; ++itr1) {
-          int64_t col = itr1->second;
-          auto D_splits = SPLIT_DENSE(D(block, col), row_split, col_split);
-          solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
+        // for (auto itr1 = itr; itr1 != col_iter.second; ++itr1) {
+        //   int64_t col = itr1->second;
+        //   {
+        //     auto D_splits = SPLIT_DENSE(D(block, col), row_split, col_split);
+        //     solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
+        //   }
+        // }
+
+        // TRSM with CC blocks on the row
+        for (int j = block + 1; j < nblocks; ++j) {
+          if (!is_admissible(block, j)) {
+            int64_t col_split = block_size - V(j).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j), row_split, col_split);
+            solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          }
         }
 
         // TRSM with co blocks on this row
@@ -816,6 +833,8 @@ int main(int argc, char** argv) {
   int64_t admis = atoi(argv[4]);
   int multiplier = atoi(argv[5]);
 
+  double PV = 1;
+
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
@@ -831,14 +850,19 @@ int main(int argc, char** argv) {
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
   auto blr2_start = std::chrono::system_clock::now();
-  Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
+  Hatrix::BLR2 A(randpts, N, nblocks, rank, admis, PV);
   auto blr2_stop = std::chrono::system_clock::now();
 
   double blr2_construct_time = std::chrono::duration_cast
     <std::chrono::milliseconds>(blr2_stop - blr2_start).count();
   // A.print_structure();
   double construct_error = A.construction_relative_error(randpts);
+
+  auto factor_start = std::chrono::system_clock::now();
   auto last = A.factorize(randpts);
+  auto factor_stop = std::chrono::system_clock::now();
+  auto factor_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(factor_stop - factor_start).count();
   Hatrix::Matrix x = A.solve(b, last);
 
   // Verification with dense solver.
@@ -857,12 +881,15 @@ int main(int argc, char** argv) {
             << " blr2 construct time: " << blr2_construct_time
             << " threads: " << threads
             << " construct error: " << construct_error
-            << " solve error: " << solve_error << "\n";
+            << " solve error: " << solve_error
+            << " factor time: " << factor_time
+            << "\n";
 
   std::ofstream file;
   file.open("blr2_matrix_umv.csv", std::ios::app | std::ios::out);
   file << N << "," << rank << "," << nblocks << "," << admis << ","
        << leaf << "," <<  blr2_construct_time << ","
-       << threads << "," << construct_error << "," << solve_error << std::endl;
+       << threads << "," << construct_error << ","
+       << solve_error << "," << factor_time << std::endl;
   file.close();
 }
