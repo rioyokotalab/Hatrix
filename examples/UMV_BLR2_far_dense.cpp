@@ -15,6 +15,29 @@
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 double PV = 1e-3;
 
+#define SPLIT_DENSE(dense, row_split, col_split)        \
+  dense.split(std::vector<int64_t>(1, row_split),       \
+              std::vector<int64_t>(1, col_split));
+
+Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
+  Hatrix::Matrix Q_F(Q.rows, Q.rows);
+  Hatrix::Matrix Q_full, R;
+  std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+
+  for (int i = 0; i < Q_F.rows; ++i) {
+    for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+      Q_F(i, j) = Q_full(i, j + Q.cols);
+    }
+  }
+
+  for (int i = 0; i < Q_F.rows; ++i) {
+    for (int j = 0; j < Q.cols; ++j) {
+      Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+    }
+  }
+  return Q_F;
+}
+
 namespace Hatrix {
   class Particle {
   public:
@@ -162,8 +185,8 @@ namespace Hatrix {
     void orthogonal_recursive_bisection_3dim(int64_t start, int64_t end, std::string morton_index,
                                              int64_t nleaf, int64_t axis) {
       std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
-                                                                      return lhs.coords[axis] < rhs.coords[axis];
-                                                                    });
+        return lhs.coords[axis] < rhs.coords[axis];
+      });
       int64_t num_points = end - start;
       if (num_points <= nleaf) {
         if (axis == ndim-1) {
@@ -313,6 +336,8 @@ namespace Hatrix {
 
     std::string admis_kind;
 
+    RowLevelMap Srow, Scol;
+
     void calc_geometry_based_admissibility(const Domain& domain) {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
@@ -360,6 +385,302 @@ namespace Hatrix {
       }
     }
 
+    void factorize_level(int level) {
+      RowColMap<Matrix> F;      // fill-in blocks.
+
+      for (int block = 0; block < nblocks; ++block) {
+        int64_t block_size = U(block, level).rows;
+        int64_t rank = U(block, level).cols;
+        if (block > 0) {
+          {
+            // Scan for fill-ins in the same row as this diagonal block.
+            Matrix row_concat(block_size, 0);
+            bool found_row_fill_in = false;
+            for (int j = 0; j < nblocks; ++j) {
+              if (F.exists(block, j)) {
+                found_row_fill_in = true;
+                break;
+              }
+            }
+
+            if (found_row_fill_in) {
+              row_concat = concat(row_concat, matmul(U(block, level),
+                                                     Scol(block, level)), 1);
+              for (int j = 0; j < nblocks; ++j) {
+                if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
+                  if (F.exists(block, j)) {
+                    Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+                    row_concat = concat(row_concat, Fp, 1);
+                  }
+                }
+              }
+
+              Matrix UN1, _SN1, _VN1T; double error;
+              std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
+              Scol.erase(block, level);
+              Scol.insert(block, level, std::move(_SN1));
+
+              Matrix r_block = matmul(UN1, U(block, level), true, false);
+
+              for (int j = 0; j < nblocks; ++j) {
+                if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
+                  Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
+
+                  Matrix SpF(rank, rank);
+                  if (F.exists(block, j)) {
+                    Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+                    SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
+                    Sbar_block_j = Sbar_block_j + SpF;
+                    F.erase(block, j);
+                  }
+
+                  S.erase(block, j, level);
+                  S.insert(block, j, level, std::move(Sbar_block_j));
+                }
+              }
+              U.erase(block, level);
+              U.insert(block, level, std::move(UN1));            }
+          }
+
+          {
+            // Scan for fill-ins in the same col as this diagonal block.
+            Matrix col_concat(0, block_size);
+            std::vector<int64_t> UN2_row_splits;
+            bool found_col_fill_in = false;
+            for (int i = 0; i < nblocks; ++i) {
+              if (F.exists(i, block)) {
+                found_col_fill_in = true;
+                break;
+              }
+            }
+
+            if (found_col_fill_in) {
+              col_concat = concat(col_concat, matmul(Srow(block, level),
+                                                     transpose(V(block, level))), 0);
+              for (int i = 0; i < nblocks; ++i) {
+                if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
+                  if (F.exists(i, block)) {
+                    Matrix Fp = matmul(U(i, level), F(i, block));
+                    col_concat = concat(col_concat, Fp, 0);
+                  }
+                }
+              }
+
+              Matrix _UN2, _SN2, VN2T; double error;
+              std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
+              Srow.erase(block, level);
+              Srow.insert(block, level, std::move(_SN2));
+
+              Matrix t_block = matmul(V(block, level), VN2T, true, true);
+
+              for (int i = 0; i < nblocks; ++i) {
+                if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
+                  Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
+                  if (F.exists(i, block)) {
+                    Matrix Fp = matmul(U(i,level), F(i, block));
+                    Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
+                    Sbar_i_block = Sbar_i_block + SpF;
+
+                    F.erase(i, block);
+                  }
+
+                  S.erase(i, block, level);
+                  S.insert(i, block, level, std::move(Sbar_i_block));
+                }
+              }
+
+              V.erase(block, level);
+              V.insert(block, level, transpose(VN2T));
+            }
+          }
+        }
+
+        Matrix U_F = make_complement(U(block, level));
+        Matrix V_F = make_complement(V(block, level));
+
+        for (int j = 0; j < nblocks; ++j) {
+          if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
+            D(block, j, level) = matmul(U_F, D(block, j, level), true);
+          }
+        }
+
+        for (int i = 0; i < nblocks; ++i) {
+          if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
+            D(i, block, level) = matmul(D(i, block, level), V_F);
+          }
+        }
+
+        int64_t row_split = block_size - rank, col_split = block_size - rank;
+
+        // The diagonal block is split along the row and column.
+        auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
+        Matrix& Dcc = diagonal_splits[0];
+        lu(Dcc);
+
+        // TRSM with CC blocks on the row
+        for (int j = block + 1; j < nblocks; ++j) {
+          if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
+            int64_t col_split = block_size - V(j, level).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j, level), row_split, col_split);
+            solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
+          }
+        }
+
+        // TRSM with co blocks on this row
+        for (int j = 0; j < nblocks; ++j) {
+          if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
+            int64_t col_split = block_size - V(j, level).cols;
+            auto D_splits = SPLIT_DENSE(D(block, j, level), row_split, col_split);
+            solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
+          }
+        }
+
+        // TRSM with cc blocks on the column
+        for (int i = block + 1; i < nblocks; ++i) {
+          if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
+            int64_t row_split = block_size - U(i, level).cols;
+            auto D_splits = SPLIT_DENSE(D(i, block, level), row_split, col_split);
+            solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Upper, false);
+          }
+        }
+
+        // TRSM with oc blocks on the column
+        for (int i = 0; i < nblocks; ++i) {
+          if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
+            auto D_splits = SPLIT_DENSE(D(i, block, level),
+                                        block_size - U(i, level).cols, col_split);
+            solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
+          }
+        }
+
+        // Schur's compliment between cc blocks
+        for (int i = block+1; i < nblocks; ++i) {
+          for (int j = block+1; j < nblocks; ++j) {
+            if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
+                (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) &&
+                (is_admissible.exists(i, j, level) && !is_admissible(i, j, level))) {
+              auto lower_splits = SPLIT_DENSE(D(i, block, level),
+                                              block_size - U(i, level).cols,
+                                              col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j, level),
+                                              row_split,
+                                              block_size - V(j, level).cols);
+              auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                               row_split,
+                                               col_split);
+
+              matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
+            }
+          }
+        }
+
+        // Schur's compliment between oc and co blocks
+        for (int i = 0; i < nblocks; ++i) {
+          for (int j = 0; j < nblocks; ++j) {
+            if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
+                (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+              auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
+                                              U(i, level).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j, level), row_split,
+                                              block_size - V(j, level).cols);
+
+              if (!is_admissible(i, j, level)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                 block_size - U(i, level).cols,
+                                                 block_size - V(j, level).cols);
+                matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+              }
+            }
+          }
+        }
+
+        for (int i = block+1; i < nblocks; ++i) {
+          for (int j = 0; j < nblocks; ++j) {
+            if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
+                (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+              auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
+                                              U(i, level).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j, level), row_split, block_size -
+                                              V(j, level).cols);
+              // Schur's compliement between co and cc blocks where product exists as dense.
+              if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                 block_size - U(i, level).cols,
+                                                 block_size - V(j, level).cols);
+                matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
+              }
+              // Schur's compliement between co and cc blocks where a new fill-in is created.
+              // The product is a (co; oo)-sized matrix.
+              else {
+                if (!F.exists(i, j)) {
+                  Matrix fill_in(block_size, rank);
+                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
+                  // Update the co block within the fill-in.
+                  matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
+
+                  // Update the oo block within the fill-in.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+
+                  F.insert(i, j, std::move(fill_in));
+                }
+                else {
+                  Matrix &fill_in = F(i, j);
+                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, block_size - rank), {});
+                  // Update the co block within the fill-in.
+                  matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-in.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                }
+              }
+            }
+          }
+        }
+
+        // Schur's compliment between oc and cc blocks
+        for (int i = 0; i < nblocks; ++i) {
+          for (int j = block+1; j < nblocks; ++j) {
+            if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
+                (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+              auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
+                                              U(i, level).cols, col_split);
+              auto right_splits = SPLIT_DENSE(D(block, j, level),
+                                              row_split, block_size - V(j, level).cols);
+              // Schur's compliement between oc and cc blocks where product exists as dense.
+              if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+                auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                                 block_size - U(i, level).cols,
+                                                 block_size - V(j, level).cols);
+                matmul(lower_splits[2], right_splits[0], reduce_splits[2],
+                       false, false, -1.0, 1.0);
+              }
+              // Schur's compliement between co and cc blocks where a new fill-in is created.
+              // The product is a (oc, oo)-sized block.
+              else {
+                if (!F.exists(i, j)) {
+                  Matrix fill_in(rank, block_size);
+                  auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                  F.insert(i, j, std::move(fill_in));
+                }
+                else {
+                  Matrix& fill_in = F(i, j);
+                  auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                }
+              }
+            }
+          }
+        }
+      } // for (int block = 0; block < nblocks; ++block)
+    }
+
+
   public:
     BLR2(const Domain& domain, int64_t N,
          int64_t nleaf, int64_t rank, int64_t ndim, double admis, std::string& admis_kind) :
@@ -401,6 +722,7 @@ namespace Hatrix {
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
         U.insert(i, level, std::move(Utemp));
+        Scol.insert(i, level, std::move(Utemp));
       }
 
       for (int64_t j = 0; j < nblocks; ++j) {
@@ -413,6 +735,7 @@ namespace Hatrix {
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
         V.insert(j, level, std::move(transpose(Vtemp)));
+        Srow.insert(j, level, std::move(Stemp));
       }
 
       for (int i = 0; i < nblocks; ++i) {
@@ -425,7 +748,7 @@ namespace Hatrix {
     }
 
     void factorize(const Domain& domain) {
-
+      factorize_level(level);
     }
 
     double construction_error(const Domain& domain) {
