@@ -245,10 +245,6 @@ namespace Hatrix {
     void divide_domain_and_create_particle_boxes(int64_t nleaf) {
       if (ndim == 1) {
         orthogonal_recursive_bisection_1dim(0, N, std::string(""), nleaf);
-
-        // for (int i = 0; i < boxes.size(); ++i) {
-        //   std::cout << "i: " << i << " center: " << boxes[i].center[0] << std::endl;
-        // }
       }
       else if (ndim == 2) {
         orthogonal_recursive_bisection_2dim(0, N, std::string(""), nleaf, 0);
@@ -301,17 +297,16 @@ namespace Hatrix {
 
   class BLR2 {
   private:
-    // Store the dense blocks in a multimap for faster iteration without hash lookups.
-    std::multimap<int64_t, Matrix> D;
+    const int64_t level = 1;
     // Map of inadmissible indices.
-    RowColMap<bool> is_admissible;
+    RowColLevelMap<bool> is_admissible;
     // Vector of vector for storing the actual indices of all the inadmissible blocks in a given row.
     std::vector<std::vector<int64_t> > inadmissible_row_indices, admissible_row_indices;
     std::vector<std::vector<int64_t> > inadmissible_col_indices, admissible_col_indices;
 
-    RowMap U;
-    ColMap V;
-    RowColMap<Matrix> S;
+    RowLevelMap U;
+    ColLevelMap V;
+    RowColLevelMap<Matrix> D, S;
 
     int64_t N, nleaf, rank, ndim, nblocks;
     double admis;
@@ -321,7 +316,7 @@ namespace Hatrix {
     void calc_geometry_based_admissibility(const Domain& domain) {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
+          is_admissible.insert(i, j, level, std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
                                admis * domain.boxes[i].distance_from(domain.boxes[j]));
         }
       }
@@ -330,7 +325,7 @@ namespace Hatrix {
     void calc_diagonal_based_admissibility() {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, std::abs(i - j) >= admis);
+          is_admissible.insert(i, j, level, std::abs(i - j) >= admis);
         }
       }
     }
@@ -344,7 +339,7 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (is_admissible(i, j)) {
+          if (is_admissible(i, j, level)) {
             admissible_row_indices[i].push_back(j);
           }
           else {
@@ -355,7 +350,7 @@ namespace Hatrix {
 
       for (int j = 0; j < nblocks; ++j) {
         for (int i = 0; i < nblocks; ++i) {
-          if (is_admissible(j, i)) {
+          if (is_admissible(j, i, level)) {
             admissible_col_indices[j].push_back(i);
           }
           else {
@@ -391,8 +386,8 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (!is_admissible(i, j)) {
-            D.insert({i, generate_p2p_interactions(domain, i, j, ndim)});
+          if (!is_admissible(i, j, level)) {
+            D.insert(i, j, level, generate_p2p_interactions(domain, i, j, ndim));
           }
         }
       }
@@ -405,7 +400,7 @@ namespace Hatrix {
           Hatrix::matmul(dense, Y[jcol], AY);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
-        U.insert(i, std::move(Utemp));
+        U.insert(i, level, std::move(Utemp));
       }
 
       for (int64_t j = 0; j < nblocks; ++j) {
@@ -417,32 +412,33 @@ namespace Hatrix {
           Hatrix::matmul(Y[irow], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
-        V.insert(j, std::move(transpose(Vtemp)));
+        V.insert(j, level, std::move(transpose(Vtemp)));
       }
 
       for (int i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
           Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, jcol, ndim);
-          S.insert(i, jcol, Hatrix::matmul(Hatrix::matmul(U[i], dense, true), V[jcol]));
+          S.insert(i, jcol, level, Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(jcol, level)));
         }
       }
+    }
+
+    void factorize(const Domain& domain) {
+
     }
 
     double construction_error(const Domain& domain) {
       // Check dense blocks
       double error = 0; double dense_norm = 0;
 
-      for (int i = 0; i < nblocks; ++i) {
-        std::pair<std::multimap<int64_t, Matrix>::iterator,
-                  std::multimap<int64_t, Matrix>::iterator> row_dense_blocks = D.equal_range(i);
+      for (int row = 0; row < nblocks; ++row) {
 
-        int j = 0;
-        for (std::multimap<int64_t, Matrix>::iterator it = row_dense_blocks.first; it != row_dense_blocks.second; ++it) {
-          int64_t jcol = inadmissible_row_indices[i][j];
-          auto dense = Hatrix::generate_p2p_interactions(domain, i, jcol, ndim);
+        for (int j = 0; j < inadmissible_row_indices[row].size(); ++j) {
+          int64_t col = inadmissible_row_indices[row][j];
+          auto dense = Hatrix::generate_p2p_interactions(domain, row, col, ndim);
           dense_norm += pow(norm(dense), 2);
-          error += pow(norm(it->second -  dense), 2);
+          error += pow(norm(D(row, col, level) -  dense), 2);
           j++;
         }
       }
@@ -451,9 +447,9 @@ namespace Hatrix {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
           auto dense = generate_p2p_interactions(domain, i, jcol, ndim);
-          Matrix& Ubig = U(i);
-          Matrix& Vbig = V(jcol);
-          Matrix expected = matmul(matmul(Ubig, S(i, jcol)), Vbig, false, true);
+          Matrix& Ubig = U(i, level);
+          Matrix& Vbig = V(jcol, level);
+          Matrix expected = matmul(matmul(Ubig, S(i, jcol, level)), Vbig, false, true);
           Matrix actual = generate_p2p_interactions(domain, i, jcol, ndim);
           error += pow(norm(expected - actual), 2);
           dense_norm += pow(norm(actual), 2);
@@ -467,7 +463,7 @@ namespace Hatrix {
       double total = 0, low_rank = 0;
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          if (is_admissible(i, j)) {
+          if (is_admissible(i, j, level)) {
             low_rank += 1;
           }
           total += 1;
@@ -481,7 +477,7 @@ namespace Hatrix {
       std::cout << "BLR " << nblocks << " x " << nblocks << std::endl;
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          std::cout << " | " << is_admissible(i, j);
+          std::cout << " | " << is_admissible(i, j, level);
         }
         std::cout << " | \n";
       }
@@ -509,7 +505,10 @@ int main(int argc, char** argv) {
   }
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
+  A.print_structure();
   double construct_error = A.construction_error(domain);
+
+  A.factorize(domain);
 
   Hatrix::Matrix dense =
     Hatrix::generate_laplacend_matrix(domain.particles, N, N, 1);
