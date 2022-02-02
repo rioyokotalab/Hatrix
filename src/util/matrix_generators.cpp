@@ -20,6 +20,19 @@ Matrix generate_random_matrix(int64_t rows, int64_t cols) {
   return out;
 }
 
+Matrix generate_range_matrix(int64_t rows, int64_t cols, int64_t start_range) {
+  Matrix out(rows, cols);
+  int num = start_range;
+  for (int i = 0; i < rows; ++i) {
+    for (int j = 0; j < cols; ++j) {
+      out(i, j) = num;
+      num++;
+    }
+  }
+
+  return out;
+}
+
 Matrix generate_low_rank_matrix(int64_t rows, int64_t cols) {
   // TODO: Might want more sophisticated method, specify rate of decay of
   // singular values etc...

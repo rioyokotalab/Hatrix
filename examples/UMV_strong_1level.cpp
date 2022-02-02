@@ -16,7 +16,7 @@
 // Accuracy Directly Controlled Fast Direct Solution of General H^2-matrices and Its
 // Application to Solving Electrodynamics Volume Integral Equations
 
-constexpr double PV = 1;
+double PV = 1;
 using randvec_t = std::vector<std::vector<double> >;
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
@@ -30,14 +30,14 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
 
 namespace Hatrix {
   class BLR2 {
-  private:
+  public:
     RowLevelMap U;
     ColLevelMap V;
     RowColLevelMap<bool> is_admissible;
     RowColLevelMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;
     const int64_t level = 1;
-
+  private:
     void permute_forward(Matrix& x, int64_t block_size) {
       int64_t c_size_offset = 0, rank_offset = 0;
       Matrix temp(x);
@@ -210,7 +210,7 @@ namespace Hatrix {
 
       for (int block = 0; block < nblocks; ++block) {
         int64_t block_size = U(block, level).rows;
-        if (block > 0) {
+        if (block > 0 && admis != 0) {
           {
             // Scan for fill-ins in the same row as this diagonal block.
             Matrix row_concat(block_size, 0);
@@ -717,16 +717,17 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
   randvec_t randpts;
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 1D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 2D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0)); // 3D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+  PV = 1e-3;
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
     abort();
   }
 
-  Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Matrix b = Hatrix::generate_range_matrix(N, 1, 0);
 
   Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
   // A.print_structure();
@@ -736,7 +737,6 @@ int main(int argc, char** argv) {
 
   // Verification with dense solver.
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
-  // Adense.print();
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
