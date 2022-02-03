@@ -389,9 +389,8 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        int64_t block_size = U(block, level).rows;
-        int64_t rank = U(block, level).cols;
         if (false) {
+          int block_size = U(block, level).rows;
           {
             // Scan for fill-ins in the same row as this diagonal block.
             Matrix row_concat(block_size, 0);
@@ -623,8 +622,8 @@ namespace Hatrix {
               // The product is a (co; oo)-sized matrix.
               else {
                 if (!F.exists(i, j)) {
-                  Matrix fill_in(block_size, rank);
-                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, V(block, level).rows - rank), {});
+                  Matrix fill_in(V(i, level).rows, rank);
+                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, V(i, level).rows - rank), {});
                   // Update the co block within the fill-in.
                   matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
 
@@ -670,7 +669,7 @@ namespace Hatrix {
               // The product is a (oc, oo)-sized block.
               else {
                 if (!F.exists(i, j)) {
-                  Matrix fill_in(rank, block_size);
+                  Matrix fill_in(rank, U(j, level).rows);
                   auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, U(j, level).rows - rank));
                   // Update the oc block within the fill-ins.
                   matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
