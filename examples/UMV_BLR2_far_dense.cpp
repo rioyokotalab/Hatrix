@@ -549,7 +549,7 @@ namespace Hatrix {
             int64_t row_split = V(i, level).rows - rank;
             auto D_splits = SPLIT_DENSE(D(i, block, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
-          }
+           }
         }
 
         // Schur's compliment between cc blocks
@@ -578,9 +578,9 @@ namespace Hatrix {
           }
         }
 
-        // Schur's compliment between oc and co blocks
-        for (int i = 0; i < nblocks; ++i) {
-          for (int j = 0; j < nblocks; ++j) {
+        // Schur's compliment between oc and co blocks where the results exists before the diagonal block.
+        for (int i = 0; i <= block; ++i) {
+          for (int j = 0; j <= block; ++j) {
             if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
                 (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
               auto lower_splits = SPLIT_DENSE(D(i, block, level),
@@ -600,8 +600,9 @@ namespace Hatrix {
           }
         }
 
+        // Schur's compliment between cc and co blocks where the result exists before the diagonal block.
         for (int i = block+1; i < nblocks; ++i) {
-          for (int j = 0; j < nblocks; ++j) {
+          for (int j = 0; j <= block; ++j) {
             if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
                 (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
               auto lower_splits = SPLIT_DENSE(D(i, block, level),
@@ -610,7 +611,7 @@ namespace Hatrix {
               auto right_splits = SPLIT_DENSE(D(block, j, level),
                                               row_split,
                                               V(j, level).rows - rank);
-              // Schur's compliement between co and cc blocks where product exists as dense.
+              // Schur's compliment between co and cc blocks where product exists as dense.
               if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
                 auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                  V(i, level).rows - rank,
@@ -647,8 +648,8 @@ namespace Hatrix {
           }
         }
 
-        // Schur's compliment between oc and cc blocks
-        for (int i = 0; i < nblocks; ++i) {
+        // Schur's compliment between oc and cc blocks where the result exists before the diagonal blocks.
+        for (int i = 0; i <= block; ++i) {
           for (int j = block+1; j < nblocks; ++j) {
             if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
                 (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
@@ -682,7 +683,9 @@ namespace Hatrix {
                 }
                 else {
                   Matrix& fill_in = F(i, j);
-                  auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, U(j, level).rows - rank));
+                  auto fill_splits =
+                    fill_in.split({},
+                                  std::vector<int64_t>(1, U(j, level).rows - rank));
                   // Update the oc block within the fill-ins.
                   matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
                   // Update the oo block within the fill-ins.
