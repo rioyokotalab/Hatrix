@@ -798,7 +798,11 @@ namespace Hatrix {
 
     void solve_backward_level(Matrix& x_level, int level) {
       std::vector<int64_t> col_offsets;
-      for (int i = 0; i < nblocks; ++i) { col_offsets.push_back(U(i, level).rows); }
+      int64_t nrows = 0;
+      for (int i = 0; i < nblocks; ++i) {
+        col_offsets.push_back(nrows + U(i, level).rows);
+        nrows += U(i, level).rows;
+      }
       std::vector<Matrix> x_level_split = x_level.split(col_offsets, {});
 
       // backward substition using cc blocks
@@ -817,9 +821,7 @@ namespace Hatrix {
             auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, col_split), {});
 
             matmul(left_splits[1], x_left_col_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
-            for (int64_t i = 0; i < block_size; ++i) {
-              x_level(block * block_size + i, 0) = x_block(i, 0);
-            }
+            x_level_split[block] = x_block;
           }
         }
 
@@ -836,9 +838,7 @@ namespace Hatrix {
 
             matmul(right_splits[0], x_level_split[right_col],
                    x_block_splits[0], false, false, -1.0, 1.0);
-            for (int64_t i = 0; i < block_size; ++i) {
-              x_level(block * block_size + i, 0) = x_block(i, 0);
-            }
+            x_level_split[block] = x_block;
           }
         }
 
@@ -846,18 +846,14 @@ namespace Hatrix {
         auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
         matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
         solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
-        for (int64_t i = 0; i < block_size; ++i) {
-          x_level(block * block_size + i, 0) = x_block(i, 0);
-        }
+        x_level_split[block] = x_block;
       }
 
       for (int block = nblocks-1; block >= 0; --block) {
         int block_size = V(block, level).rows;
         auto V_F = make_complement(V(block, level));
         Matrix prod = matmul(V_F, x_level_split[block]);
-        for (int i = 0; i < block_size; ++i) {
-          x_level(block * block_size + i, 0) = prod(i, 0);
-        }
+        x_level_split[block] = prod;
       }
     }
 
@@ -1146,10 +1142,13 @@ int main(int argc, char** argv) {
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(domain.particles, N, N);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+
   Hatrix::Context::finalize();
 
   std::cout << "N: " << N << " rank: " << rank << " nleaf: " << nleaf
             << " admis: " <<  admis << " ndim: " << ndim
             << " construct error: " << construct_error
+            << " solve error: " << solve_error
             << " LR%: " << A.low_rank_block_ratio() * 100 << "%" <<  "\n";
 }
