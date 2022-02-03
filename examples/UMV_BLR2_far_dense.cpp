@@ -574,7 +574,6 @@ namespace Hatrix {
               else {
                 // Fill in between cc blocks.
               }
-
             }
           }
         }
@@ -623,7 +622,8 @@ namespace Hatrix {
               else {
                 if (!F.exists(i, j)) {
                   Matrix fill_in(V(i, level).rows, rank);
-                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, V(i, level).rows - rank), {});
+                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, V(i, level).rows - rank),
+                                                   {});
                   // Update the co block within the fill-in.
                   matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
 
@@ -634,8 +634,9 @@ namespace Hatrix {
                 }
                 else {
                   Matrix &fill_in = F(i, j);
-                  auto fill_splits = fill_in.split(std::vector<int64_t>(1, V(block, level).rows - rank),
-                                                   {});
+                  auto fill_splits =
+                    fill_in.split(std::vector<int64_t>(1, V(block, level).rows - rank),
+                                  {});
                   // Update the co block within the fill-in.
                   matmul(lower_splits[0], right_splits[1], fill_splits[0], false, false, -1.0, 1.0);
                   // Update the oo block within the fill-in.
@@ -670,7 +671,9 @@ namespace Hatrix {
               else {
                 if (!F.exists(i, j)) {
                   Matrix fill_in(rank, U(j, level).rows);
-                  auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, U(j, level).rows - rank));
+                  auto fill_splits =
+                    fill_in.split({},
+                                  std::vector<int64_t>(1, U(j, level).rows - rank));
                   // Update the oc block within the fill-ins.
                   matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
                   // Update the oo block within the fill-ins.
@@ -774,6 +777,37 @@ namespace Hatrix {
 
     void factorize(const Domain& domain) {
       factorize_level(level);
+
+      std::vector<int64_t> row_splits, col_splits;
+      int64_t nrows = 0, ncols = 0;
+      for (int i = 0; i < nblocks; ++i) {
+        int64_t row_rank = U(i, level).cols, col_rank = V(i, level).cols;
+        row_splits.push_back(nrows + row_rank);
+        col_splits.push_back(ncols + col_rank);
+        nrows += row_rank;
+        ncols += col_rank;
+      }
+
+      Matrix last(nrows, ncols);
+      auto last_splits = last.split(row_splits, col_splits);
+
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j, level)) {
+            last_splits[i * nblocks + j] = S(i, j, level);
+          }
+          else {
+            auto D_splits = SPLIT_DENSE(D(i, j, level),
+                                        V(i, level).rows - rank,
+                                        U(j, level).rows - rank);
+            last_splits[i * nblocks + j] = D_splits[3];
+          }
+        }
+      }
+
+      lu(last);
+
+      D.insert(0, 0, 0, std::move(last));
     }
 
     double construction_error(const Domain& domain) {
