@@ -548,7 +548,7 @@ namespace Hatrix {
             int64_t row_split = V(i, level).rows - rank;
             auto D_splits = SPLIT_DENSE(D(i, block, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
-           }
+          }
         }
 
         // Schur's compliment between cc blocks
@@ -697,6 +697,196 @@ namespace Hatrix {
       } // for (int block = 0; block < nblocks; ++block)
     }
 
+    void solve_forward_level(Matrix& x_level, int level) {
+      std::vector<int64_t> row_offsets;
+      for (int i = 0; i < nblocks; ++i) { row_offsets.push_back(U(i, level).rows); }
+      std::vector<Matrix> x_level_split = x_level.split(row_offsets, {});
+
+      for (int block = 0; block < nblocks; ++block) {
+        int block_size = U(block, level).rows;
+        Matrix U_F = make_complement(U(block, level));
+        Matrix prod = matmul(U_F, x_level_split[block], true);
+        for (int64_t i = 0; i < block_size; ++i) {
+          x_level(block * block_size + i, 0) = prod(i, 0);
+        }
+      }
+
+      // forward substitution with cc blocks
+      for (int block = 0; block < nblocks; ++block) {
+        int block_size = V(block, level).rows;
+        int c_size = block_size - rank;
+
+        int64_t row_split = block_size - U(block, level).cols, col_split = block_size - V(block, level).cols;
+        auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
+
+        Matrix x_block(x_level_split[block]);
+        auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+
+        solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
+        matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
+        for (int64_t i = 0; i < block_size; ++i) {
+          x_level(block * block_size + i, 0) = x_block(i, 0);
+        }
+
+        // Forward with the big c blocks on the lower part.
+        for (int irow = block+1; irow < nblocks; ++irow) {
+          if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
+            int64_t row_split = V(irow, level).rows - rank;
+            int64_t col_split = U(block, level).rows - rank;
+            auto lower_splits = D(irow, block, level).split({}, std::vector<int64_t>(1, row_split));
+
+            Matrix x_block(x_level_split[block]), x_level_irow(x_level_split[irow]);
+            auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
+
+            matmul(lower_splits[0], x_block_splits[0], x_level_irow, false, false, -1.0, 1.0);
+            for (int64_t i = 0; i < block_size; ++i) {
+              x_level(irow * block_size + i, 0) = x_level_irow(i, 0);
+            }
+          }
+        }
+
+        // Forward with the oc parts of the block that are actually in the upper part of the matrix.
+        for (int irow = 0; irow < block; ++irow) {
+          if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
+            int64_t row_split = V(irow, level).rows - rank;
+            int64_t col_split = U(block, level).rows - rank;
+            auto top_splits = SPLIT_DENSE(D(irow, block, level), row_split, col_split);
+
+            Matrix x_irow(x_level_split[irow]), x_block(x_level_split[block]);
+            auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, row_split), {});
+            auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
+
+            matmul(top_splits[2], x_block_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
+
+            for (int64_t i = 0; i < block_size; ++i) {
+              x_level(irow * block_size + i, 0) = x_irow(i, 0);
+            }
+          }
+        }
+      }
+    }
+
+    void solve_backward_level(Matrix& x_level, int level) {
+      std::vector<int64_t> col_offsets;
+      for (int i = 0; i < nblocks; ++i) { col_offsets.push_back(U(i, level).rows); }
+      std::vector<Matrix> x_level_split = x_level.split(col_offsets, {});
+
+      // backward substition using cc blocks
+      for (int block = nblocks-1; block >= 0; --block) {
+        int block_size = V(block, level).rows;
+        int64_t row_split = U(block, level).rows - rank, col_split = V(block, level).rows - rank;
+        auto block_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
+        // Apply co block.
+        for (int left_col = block-1; left_col >= 0; --left_col) {
+          if (is_admissible.exists(block, left_col, level) &&
+              !is_admissible(block, left_col, level)) {
+            auto left_splits = SPLIT_DENSE(D(block, left_col, level), row_split, col_split);
+
+            Matrix x_block(x_level_split[block]), x_left_col(x_level_split[left_col]);
+            auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+            auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, col_split), {});
+
+            matmul(left_splits[1], x_left_col_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+            for (int64_t i = 0; i < block_size; ++i) {
+              x_level(block * block_size + i, 0) = x_block(i, 0);
+            }
+          }
+        }
+
+        // Apply c block present on the right of this diagonal block.
+        for (int right_col = nblocks-1; right_col > block; --right_col) {
+          if (is_admissible.exists(block, right_col, level) &&
+              !is_admissible(block, right_col, level)) {
+            int64_t row_split = U(block, level).rows - rank;
+            auto right_splits = D(block, right_col, level).
+              split(std::vector<int64_t>(1, row_split), {});
+
+            Matrix x_block(x_level_split[block]);
+            auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+
+            matmul(right_splits[0], x_level_split[right_col],
+                   x_block_splits[0], false, false, -1.0, 1.0);
+            for (int64_t i = 0; i < block_size; ++i) {
+              x_level(block * block_size + i, 0) = x_block(i, 0);
+            }
+          }
+        }
+
+        Matrix x_block(x_level_split[block]);
+        auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+        matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+        solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
+        for (int64_t i = 0; i < block_size; ++i) {
+          x_level(block * block_size + i, 0) = x_block(i, 0);
+        }
+      }
+
+      for (int block = nblocks-1; block >= 0; --block) {
+        int block_size = V(block, level).rows;
+        auto V_F = make_complement(V(block, level));
+        Matrix prod = matmul(V_F, x_level_split[block]);
+        for (int i = 0; i < block_size; ++i) {
+          x_level(block * block_size + i, 0) = prod(i, 0);
+        }
+      }
+    }
+
+    // permute the vector forward and return the offset at which the new vector begins.
+    int64_t permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) {
+      Matrix copy(x);
+      int64_t num_nodes = pow(2, level);
+      int64_t c_offset = rank_offset;
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        rank_offset += D(block, block, level).rows - U(block, level).cols;
+      }
+
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        int64_t rows = U(block, level).rows;
+        int64_t rank = U(block, level).cols;
+        int64_t c_size = rows - rank;
+
+        // copy the complement part of the vector into the temporary vector
+        for (int64_t i = 0; i < c_size; ++i) {
+          copy(c_offset + c_size * block + i, 0) = x(c_offset + block * rows + i, 0);
+        }
+        // copy the rank part of the vector into the temporary vector
+        for (int64_t i = 0; i < rank; ++i) {
+          copy(rank_offset + rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return rank_offset;
+    }
+
+    int64_t permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) {
+      Matrix copy(x);
+      int64_t num_nodes = pow(2, level);
+      int64_t c_offset = rank_offset;
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        c_offset -= D(block, block, level).rows - U(block, level).cols;
+      }
+
+      for (int64_t block = 0; block < num_nodes; ++block) {
+        int64_t rows = U(block, level).rows;
+        int64_t rank = U(block, level).cols;
+        int64_t c_size = rows - rank;
+
+        for (int64_t i = 0; i < c_size; ++i) {
+          copy(c_offset + block * rows + i, 0) = x(c_offset + block * c_size + i, 0);
+        }
+
+        for (int64_t i = 0; i < rank; ++i) {
+          copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
+        }
+      }
+
+      x = copy;
+
+      return c_offset;
+    }
+
 
   public:
     BLR2(const Domain& domain, int64_t N,
@@ -810,6 +1000,25 @@ namespace Hatrix {
       lu(last);
 
       D.insert(0, 0, 0, std::move(last));
+    }
+
+    Matrix solve(const Matrix& b) {
+      Matrix x(b);
+      int rhs_offset;
+
+      solve_forward_level(x, level);
+
+      rhs_offset = permute_forward(x, level, rhs_offset);
+
+      auto permute_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
+      solve_triangular(D(0,0,0), permute_splits[1], Hatrix::Left, Hatrix::Lower, true);
+      solve_triangular(D(0,0,0), permute_splits[1], Hatrix::Left, Hatrix::Upper, false);
+
+      rhs_offset = permute_backward(x, level, rhs_offset);
+
+      solve_backward_level(x, level);
+
+      return x;
     }
 
     double construction_error(const Domain& domain) {
