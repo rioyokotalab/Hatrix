@@ -469,7 +469,8 @@ namespace Hatrix {
                 }
               }
               U.erase(block, level);
-              U.insert(block, level, std::move(UN1));            }
+              U.insert(block, level, std::move(UN1));
+            }
           }
 
           {
@@ -609,9 +610,9 @@ namespace Hatrix {
           }
         }
 
-        // Schur's compliment between oc and co blocks where the results exists before the diagonal block.
-        for (int i = 0; i <= block; ++i) {
-          for (int j = 0; j <= block; ++j) {
+        // Schur's compliment between oc and co blocks.
+        for (int i = 0; i < nblocks; ++i) {
+          for (int j = 0; j < nblocks; ++j) {
             if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
                 (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
               auto lower_splits = SPLIT_DENSE(D(i, block, level),
@@ -621,11 +622,14 @@ namespace Hatrix {
                                               row_split,
                                               U(j, level).rows - rank);
 
-              if (!is_admissible(i, j, level)) {
+              if (!is_admissible(i, j, level)) { // no fill-in in the oo portion
                 auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                  V(i, level).rows - rank,
                                                  U(j, level).rows - rank);
                 matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
+              }
+              else {            // create a fill-in in the oo portion of the <i, j> block.
+
               }
             }
           }
@@ -741,7 +745,7 @@ namespace Hatrix {
       for (int block = 0; block < nblocks; ++block) {
         int block_size = U(block, level).rows;
         Matrix U_F = make_complement(U(block, level));
-        std::cout << "block -> " << block << " r -> "  << x_level_split[block].rows << std::endl;
+        // std::cout << "block -> " << block << " r -> "  << x_level_split[block].rows << std::endl;
         Matrix prod = matmul(U_F, x_level_split[block], true);
         x_level_split[block] = prod;
       }
