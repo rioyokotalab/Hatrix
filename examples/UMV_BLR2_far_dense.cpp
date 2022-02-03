@@ -898,8 +898,9 @@ namespace Hatrix {
       Matrix copy(x);
       int64_t num_nodes = nblocks;
       int64_t c_offset = rank_offset;
+      int64_t c_size_offset = 0, block_offset = 0;
       for (int64_t block = 0; block < num_nodes; ++block) {
-        c_offset -= D(block, block, level).rows - rank;
+        c_offset -= V(block, level).rows - rank;
       }
 
       for (int64_t block = 0; block < num_nodes; ++block) {
@@ -907,12 +908,15 @@ namespace Hatrix {
         int64_t c_size = rows - rank;
 
         for (int64_t i = 0; i < c_size; ++i) {
-          copy(c_offset + block * rows + i, 0) = x(c_offset + block * c_size + i, 0);
+          copy(c_offset + block_offset + i, 0) = x(c_offset + c_size_offset + i, 0);
         }
 
         for (int64_t i = 0; i < rank; ++i) {
-          copy(c_offset + block * rows + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
+          copy(c_offset + block_offset + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
         }
+
+        block_offset += rows;
+        c_size_offset += c_size;
       }
 
       x = copy;
