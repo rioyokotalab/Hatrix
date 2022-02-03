@@ -731,16 +731,23 @@ namespace Hatrix {
 
     void solve_forward_level(Matrix& x_level, int level) {
       std::vector<int64_t> row_offsets;
-      for (int i = 0; i < nblocks; ++i) { row_offsets.push_back(U(i, level).rows); }
+      int nrows = 0;
+      for (int i = 0; i < nblocks; ++i) {
+        row_offsets.push_back(nrows + U(i, level).rows);
+        nrows += U(i, level).rows;
+      }
       std::vector<Matrix> x_level_split = x_level.split(row_offsets, {});
 
       for (int block = 0; block < nblocks; ++block) {
         int block_size = U(block, level).rows;
         Matrix U_F = make_complement(U(block, level));
+        std::cout << "block -> " << block << " r -> "  << x_level_split[block].rows << std::endl;
         Matrix prod = matmul(U_F, x_level_split[block], true);
-        for (int64_t i = 0; i < block_size; ++i) {
-          x_level(block * block_size + i, 0) = prod(i, 0);
-        }
+        x_level_split[block] = prod;
+
+        // for (int64_t i = 0; i < block_size; ++i) {
+        //   x_level(block * block_size + i, 0) = prod(i, 0);
+        // }
       }
 
       // forward substitution with cc blocks
@@ -1135,11 +1142,11 @@ int main(int argc, char** argv) {
 
   A.factorize(domain);
 
-  // Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
-  // Hatrix::Matrix x = A.solve(b);
+  Hatrix::Matrix x = A.solve(b);
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(domain.particles, N, N);
-  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
+  Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   Hatrix::Context::finalize();
 

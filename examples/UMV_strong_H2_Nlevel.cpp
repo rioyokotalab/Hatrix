@@ -1017,9 +1017,10 @@ namespace Hatrix {
       int block_size = U(block, level).rows;
       Matrix U_F = make_complement(U(block, level));
       Matrix prod = matmul(U_F, x_level_split[block], true);
-      for (int64_t i = 0; i < block_size; ++i) {
-        x_level(block * block_size + i, 0) = prod(i, 0);
-      }
+      x_level_split[block] = prod;
+      // for (int64_t i = 0; i < block_size; ++i) {
+      //   x_level(block * block_size + i, 0) = prod(i, 0);
+      // }
     }
 
     // forward substitution with cc blocks
@@ -1051,9 +1052,7 @@ namespace Hatrix {
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
 
           matmul(lower_splits[0], x_block_splits[0], x_level_irow, false, false, -1.0, 1.0);
-          for (int64_t i = 0; i < block_size; ++i) {
-            x_level(irow * block_size + i, 0) = x_level_irow(i, 0);
-          }
+          x_level_split[irow] = x_level_irow;
         }
       }
 
@@ -1070,9 +1069,7 @@ namespace Hatrix {
 
           matmul(top_splits[2], x_block_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
 
-          for (int64_t i = 0; i < block_size; ++i) {
-            x_level(irow * block_size + i, 0) = x_irow(i, 0);
-          }
+          x_level_split[irow] = x_irow;
         }
       }
     }
@@ -1099,9 +1096,8 @@ namespace Hatrix {
           auto x_left_col_splits = x_left_col.split(std::vector<int64_t>(1, col_split), {});
 
           matmul(left_splits[1], x_left_col_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
-          for (int64_t i = 0; i < block_size; ++i) {
-            x_level(block * block_size + i, 0) = x_block(i, 0);
-          }
+
+          x_level_split[block] = x_block;
         }
       }
 
@@ -1118,9 +1114,7 @@ namespace Hatrix {
 
           matmul(right_splits[0], x_level_split[right_col],
                  x_block_splits[0], false, false, -1.0, 1.0);
-          for (int64_t i = 0; i < block_size; ++i) {
-            x_level(block * block_size + i, 0) = x_block(i, 0);
-          }
+          x_level_split[block] = x_block;
         }
       }
 
@@ -1128,18 +1122,14 @@ namespace Hatrix {
       auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
       matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
       solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
-      for (int64_t i = 0; i < block_size; ++i) {
-        x_level(block * block_size + i, 0) = x_block(i, 0);
-      }
+      x_level_split[block] = x_block;
     }
 
     for (int block = nblocks-1; block >= 0; --block) {
       int block_size = V(block, level).rows;
       auto V_F = make_complement(V(block, level));
       Matrix prod = matmul(V_F, x_level_split[block]);
-      for (int i = 0; i < block_size; ++i) {
-        x_level(block * block_size + i, 0) = prod(i, 0);
-      }
+      x_level_split[block] = prod;
     }
   }
 
