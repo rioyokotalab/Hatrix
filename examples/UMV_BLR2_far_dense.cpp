@@ -744,10 +744,6 @@ namespace Hatrix {
         std::cout << "block -> " << block << " r -> "  << x_level_split[block].rows << std::endl;
         Matrix prod = matmul(U_F, x_level_split[block], true);
         x_level_split[block] = prod;
-
-        // for (int64_t i = 0; i < block_size; ++i) {
-        //   x_level(block * block_size + i, 0) = prod(i, 0);
-        // }
       }
 
       // forward substitution with cc blocks
@@ -763,9 +759,8 @@ namespace Hatrix {
 
         solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
         matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
-        for (int64_t i = 0; i < block_size; ++i) {
-          x_level(block * block_size + i, 0) = x_block(i, 0);
-        }
+
+        x_level_split[block] = x_block;
 
         // Forward with the big c blocks on the lower part.
         for (int irow = block+1; irow < nblocks; ++irow) {
@@ -778,9 +773,7 @@ namespace Hatrix {
             auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
 
             matmul(lower_splits[0], x_block_splits[0], x_level_irow, false, false, -1.0, 1.0);
-            for (int64_t i = 0; i < block_size; ++i) {
-              x_level(irow * block_size + i, 0) = x_level_irow(i, 0);
-            }
+            x_level_split[irow] = x_level_irow;
           }
         }
 
@@ -797,9 +790,7 @@ namespace Hatrix {
 
             matmul(top_splits[2], x_block_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
 
-            for (int64_t i = 0; i < block_size; ++i) {
-              x_level(irow * block_size + i, 0) = x_irow(i, 0);
-            }
+            x_level_split[irow] = x_irow;
           }
         }
       }
@@ -873,25 +864,29 @@ namespace Hatrix {
     // permute the vector forward and return the offset at which the new vector begins.
     int64_t permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) {
       Matrix copy(x);
-      int64_t num_nodes = pow(2, level);
+      int64_t num_nodes = nblocks;
       int64_t c_offset = rank_offset;
+      int64_t c_size_offset = 0, block_offset = 0;
+
       for (int64_t block = 0; block < num_nodes; ++block) {
-        rank_offset += D(block, block, level).rows - U(block, level).cols;
+        rank_offset += U(block, level).rows - rank;
       }
 
       for (int64_t block = 0; block < num_nodes; ++block) {
         int64_t rows = U(block, level).rows;
-        int64_t rank = U(block, level).cols;
         int64_t c_size = rows - rank;
 
         // copy the complement part of the vector into the temporary vector
         for (int64_t i = 0; i < c_size; ++i) {
-          copy(c_offset + c_size * block + i, 0) = x(c_offset + block * rows + i, 0);
+          copy(c_offset + c_size_offset + i, 0) = x(c_offset + block_offset + i, 0);
         }
         // copy the rank part of the vector into the temporary vector
         for (int64_t i = 0; i < rank; ++i) {
-          copy(rank_offset + rank * block + i, 0) = x(c_offset + block * rows + c_size + i, 0);
+          copy(rank_offset + rank * block + i, 0) = x(c_offset + block_offset + c_size + i, 0);
         }
+
+        c_size_offset += c_size;
+        block_offset += rows;
       }
 
       x = copy;
@@ -901,15 +896,14 @@ namespace Hatrix {
 
     int64_t permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) {
       Matrix copy(x);
-      int64_t num_nodes = pow(2, level);
+      int64_t num_nodes = nblocks;
       int64_t c_offset = rank_offset;
       for (int64_t block = 0; block < num_nodes; ++block) {
-        c_offset -= D(block, block, level).rows - U(block, level).cols;
+        c_offset -= D(block, block, level).rows - rank;
       }
 
       for (int64_t block = 0; block < num_nodes; ++block) {
         int64_t rows = U(block, level).rows;
-        int64_t rank = U(block, level).cols;
         int64_t c_size = rows - rank;
 
         for (int64_t i = 0; i < c_size; ++i) {
@@ -1043,7 +1037,7 @@ namespace Hatrix {
 
     Matrix solve(const Matrix& b) {
       Matrix x(b);
-      int rhs_offset;
+      int rhs_offset = 0;
 
       solve_forward_level(x, level);
 
