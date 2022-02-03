@@ -389,11 +389,10 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        if (false) {
-          int block_size = U(block, level).rows;
+        if (block > 0 && admis != 0) {
           {
             // Scan for fill-ins in the same row as this diagonal block.
-            Matrix row_concat(block_size, 0);
+            Matrix row_concat(U(block, level).rows, 0);
             bool found_row_fill_in = false;
             for (int j = 0; j < nblocks; ++j) {
               if (F.exists(block, j)) {
@@ -443,7 +442,7 @@ namespace Hatrix {
 
           {
             // Scan for fill-ins in the same col as this diagonal block.
-            Matrix col_concat(0, block_size);
+            Matrix col_concat(0, V(block, level).rows);
             std::vector<int64_t> UN2_row_splits;
             bool found_col_fill_in = false;
             for (int i = 0; i < nblocks; ++i) {
@@ -740,7 +739,7 @@ namespace Hatrix {
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
         U.insert(i, level, std::move(Utemp));
-        Scol.insert(i, level, std::move(Utemp));
+        Scol.insert(i, level, std::move(Stemp));
       }
 
       for (int64_t j = 0; j < nblocks; ++j) {
