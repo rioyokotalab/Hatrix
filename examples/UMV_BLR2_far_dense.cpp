@@ -296,8 +296,10 @@ namespace Hatrix {
     return out;
   }
 
+  // Generates p2p interactions between the particles of two boxes specified by irow
+  // and icol. ndim specifies the dimensionality of the particles present in domain.
   Matrix generate_p2p_interactions(const Domain& domain,
-                                   int64_t irow, int64_t icol, int64_t ndim) {
+                                   int64_t irow, int64_t icol) {
     Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
 
     for (int64_t i = 0; i < domain.boxes[irow].num_particles; ++i) {
@@ -306,10 +308,9 @@ namespace Hatrix {
         int64_t source = domain.boxes[irow].start_index;
         int64_t target = domain.boxes[icol].start_index;
 
-        for (int64_t k = 0; k < ndim; ++k) {
+        for (int64_t k = 0; k < domain.ndim; ++k) {
           rij += pow(domain.particles[source+i].coords[k] - domain.particles[target+j].coords[k], 2);
         }
-
 
         out(i, j) = 1 / (std::sqrt(rij) + PV);
       }
@@ -915,7 +916,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(i, j, level)) {
-            D.insert(i, j, level, generate_p2p_interactions(domain, i, j, ndim));
+            D.insert(i, j, level, generate_p2p_interactions(domain, i, j));
           }
         }
       }
@@ -924,7 +925,7 @@ namespace Hatrix {
         Hatrix::Matrix AY(domain.boxes[i].num_particles, rank + oversampling);
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = generate_p2p_interactions(domain, i, jcol, ndim);
+          Hatrix::Matrix dense = generate_p2p_interactions(domain, i, jcol);
           Hatrix::matmul(dense, Y[jcol], AY);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
@@ -937,7 +938,7 @@ namespace Hatrix {
 
         for (long unsigned int i = 0; i < admissible_col_indices[j].size(); ++i) {
           int64_t irow = admissible_col_indices[j][i];
-          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, irow, j, ndim);
+          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, irow, j);
           Hatrix::matmul(Y[irow], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
@@ -948,7 +949,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, jcol, ndim);
+          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, jcol);
           S.insert(i, jcol, level, Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(jcol, level)));
         }
       }
@@ -1029,7 +1030,7 @@ namespace Hatrix {
 
         for (int j = 0; j < inadmissible_row_indices[row].size(); ++j) {
           int64_t col = inadmissible_row_indices[row][j];
-          auto dense = Hatrix::generate_p2p_interactions(domain, row, col, ndim);
+          auto dense = Hatrix::generate_p2p_interactions(domain, row, col);
           dense_norm += pow(norm(dense), 2);
           error += pow(norm(D(row, col, level) -  dense), 2);
           j++;
@@ -1039,11 +1040,11 @@ namespace Hatrix {
       for (unsigned i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          auto dense = generate_p2p_interactions(domain, i, jcol, ndim);
+          auto dense = generate_p2p_interactions(domain, i, jcol);
           Matrix& Ubig = U(i, level);
           Matrix& Vbig = V(jcol, level);
           Matrix expected = matmul(matmul(Ubig, S(i, jcol, level)), Vbig, false, true);
-          Matrix actual = generate_p2p_interactions(domain, i, jcol, ndim);
+          Matrix actual = generate_p2p_interactions(domain, i, jcol);
           error += pow(norm(expected - actual), 2);
           dense_norm += pow(norm(actual), 2);
         }
@@ -1103,8 +1104,11 @@ int main(int argc, char** argv) {
 
   A.factorize(domain);
 
-  Hatrix::Matrix dense =
-    Hatrix::generate_laplacend_matrix(domain.particles, N, N, 1);
+  // Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+
+  // Hatrix::Matrix x = A.solve(b);
+  // Hatrix::Matrix Adense = Hatrix::generate_p2p_interactions(domain, 0, 0, 0, 0, PV);
+  // Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   Hatrix::Context::finalize();
 
