@@ -14,4 +14,4 @@ make -j all
 # make UMV_strong_H2_Nlevel_starsh
 
 # ./examples/UMV_strong_1level 40 4 4 0
-./bin/UMV_BLR2_far_dense 100 20 5 2 2 diagonal_admis
+gdb -ex run --args ./bin/UMV_BLR2_far_dense 100 20 5 2 2 diagonal_admis
