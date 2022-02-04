@@ -9,6 +9,7 @@
 #include <vector>
 #include <random>
 #include <string>
+#include <iomanip>
 
 #include "Hatrix/Hatrix.h"
 
@@ -1566,9 +1567,34 @@ int main(int argc, char** argv) {
   Matrix A_actual = unpermute_matrix(chain_product(A, U_F, L, L0, U0, U, V_F), A);
   Matrix A_expected = Hatrix::generate_laplacend_matrix(domain.particles, N, N);
 
+  std::vector<int64_t> M_row_offsets, M_col_offsets;
+  int64_t rows = 0, cols = 0, level = 1;
+
+  for (int i = 0; i < A.nblocks; ++i) {
+    M_row_offsets.push_back(rows + A.V(i, level).rows);
+    M_col_offsets.push_back(cols + A.U(i, level).rows);
+
+    rows += A.V(i, level).rows;
+    cols += A.U(i, level).rows;
+  }
+
   Matrix diff = (A_actual - A_expected);
 
   std::cout << "A: " << norm(diff) << std::endl;
+
+  auto d_splits = diff.split(M_row_offsets, M_col_offsets);
+  auto m_splits = A_expected.split(M_row_offsets, M_col_offsets);
+
+  std::cout << "-- BLR2 verification --\n";
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j < A.nblocks; ++j) {
+      std::cout << "<i, j>: " << i << ", " << j
+                << " -- "
+                << std::setprecision(8)
+                << norm(d_splits[i * A.nblocks + j]) / norm(m_splits[i * A.nblocks + j])
+                << std::endl;
+    }
+  }
 
   double A0_acc = norm(matmul(L0, U0) - A0) / norm(A0);
 
