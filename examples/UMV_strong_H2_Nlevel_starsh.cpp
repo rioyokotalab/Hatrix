@@ -6,11 +6,21 @@
 #include <fstream>
 #include <numeric>
 
+#include <starsh.h>
+#include <starsh-randtlr.h>
+#include <starsh-electrodynamics.h>
+#include <starsh-spatial.h>
+
 #include "Hatrix/Hatrix.h"
 
 double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 namespace Hatrix {
+  int ndim;
+  STARSH_kernel *s_kernel;
+  void *starsh_data;
+  STARSH_int * starsh_index;
+
   class H2 {
   public:
     ColLevelMap U;
@@ -95,6 +105,10 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
 }
 
 namespace Hatrix {
+  void init_starsh() {
+
+  }
+
   void H2::actually_print_structure(int64_t level) {
     if (level == 0) { return; }
     int64_t nodes = pow(2, level);
@@ -1235,6 +1249,7 @@ int main(int argc, char *argv[]) {
   int64_t rank = atoi(argv[2]);
   int64_t height = atoi(argv[3]);
   int64_t admis = atoi(argv[4]);
+  int64_t ndim = atoi(argv[5]); // dimension of stars-h problem.
 
   if (rank > int(N / pow(2, height))) {
     std::cout << N << " % " << pow(2, height)
