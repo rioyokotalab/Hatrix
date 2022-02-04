@@ -462,9 +462,11 @@ namespace Hatrix {
 
                   Matrix SpF(rank, rank);
                   if (F.exists(block, j)) {
-                    Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                    SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
-                    Sbar_block_j = Sbar_block_j + SpF;
+                    if (F(block, j).cols == rank) {
+                      Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+                      SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
+                      Sbar_block_j = Sbar_block_j + SpF;
+                    }
                     F.erase(block, j);
                   }
 
@@ -512,10 +514,11 @@ namespace Hatrix {
                 if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                   Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
                   if (F.exists(i, block)) {
-                    Matrix Fp = matmul(U(i, level), F(i, block));
-                    Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
-                    Sbar_i_block = Sbar_i_block + SpF;
-
+                    if (F(i, block).cols == rank) {
+                      Matrix Fp = matmul(U(i, level), F(i, block));
+                      Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
+                      Sbar_i_block = Sbar_i_block + SpF;
+                    }
                     F.erase(i, block);
                   }
 
