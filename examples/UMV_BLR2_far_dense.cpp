@@ -438,7 +438,11 @@ namespace Hatrix {
             if (found_row_fill_in) {
               row_concat = concat(row_concat, matmul(U(block, level),
                                                      Scol(block, level)), 1);
-              for (int j = 0; j < nblocks; ++j) {
+
+              // Concat the fill-ins before the diagonal block. These fill-ins are all
+              // of size (co; oo) and should be multiplied with Vj before before being
+              // concatenated into the recompression.
+              for (int j = 0; j <= block; ++j) {
                 if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
                   if (F.exists(block, j)) {
                     Matrix Fp = matmul(F(block, j), V(j, level), false, true);
@@ -488,7 +492,9 @@ namespace Hatrix {
             if (found_col_fill_in) {
               col_concat = concat(col_concat, matmul(Srow(block, level),
                                                      transpose(V(block, level))), 0);
-              for (int i = 0; i < nblocks; ++i) {
+              // Concat the fill-ins before the diagonal block. These fill-ins are all
+              // of size (oc, oo) and should be multiplied with U before recompression.
+              for (int i = 0; i <= block; ++i) {
                 if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                   if (F.exists(i, block)) {
                     Matrix Fp = matmul(U(i, level), F(i, block));
@@ -1551,7 +1557,6 @@ int main(int argc, char** argv) {
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
   double construct_error = A.construction_error(domain);
-  A.print_structure();
 
   A.factorize(domain);
 
@@ -1579,11 +1584,7 @@ int main(int argc, char** argv) {
 
   Matrix diff = (A_actual - A_expected);
 
-  std::cout << "factorize error : " << norm(diff) / norm(A_expected) << std::endl;
-
-  double A0_acc = norm(matmul(L0, U0) - A0) / norm(A0);
-
-  std::cout << "A0 acc: " << A0_acc << std::endl;
+  double factorize_error = norm(diff) / norm(A_expected);
 
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
@@ -1600,5 +1601,8 @@ int main(int argc, char** argv) {
             << " admis: " <<  admis << " ndim: " << ndim
             << " construct error: " << construct_error
             << " solve error: " << solve_error
-            << " LR%: " << A.low_rank_block_ratio() * 100 << "%" <<  "\n";
+            << " factorize error: " << factorize_error
+            << " LR%: " << A.low_rank_block_ratio() * 100 << "%"
+            << " admis kind: " << admis_kind
+            <<  "\n";
 }
