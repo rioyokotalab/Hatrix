@@ -56,6 +56,11 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
+UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
+	$(CXX) $< $(OBJLIBS) $(LDFLAGS)  -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
 test: $(TEST_EXECUTABLES)
 	for e in $(TEST_EXECUTABLES); do \
 		./bin/$$e; \

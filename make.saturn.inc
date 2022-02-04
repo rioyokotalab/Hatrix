@@ -1,0 +1,14 @@
+BLAS_INCLUDE = -DMKL_LP64 -I${MKLROOT}/include -DUSE_MKL
+BLAS_LIB     = -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 \
+               -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl \
+               $(shell pkg-config --cflags gtest)
+CXX          = g++ -g -std=c++11 -DUSE_MKL=1
+CXXFLAGS     = -std=c++11 -rdynamic -O0 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
+               $(shell pkg-config --cflags gtest) $(shell pkg-config --cflags gtest_main)
+LDFLAGS      = $(shell pkg-config --libs gtest_main gtest)  $(BLAS_LIB)
+RM           = rm -rf
+AR           = ar
+ARFLAGS      = -rv
+MV           = mv -f
+
+.SUFFIXES: .cpp
