@@ -458,18 +458,20 @@ namespace Hatrix {
 
               for (int j = 0; j < nblocks; ++j) {
                 if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                  Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
+                  if (j <= block) {
+                    Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
 
-                  Matrix SpF(rank, rank);
-                  if (F.exists(block, j)) {
-                    Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                    SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
-                    Sbar_block_j = Sbar_block_j + SpF;
-                    F.erase(block, j);
+                    Matrix SpF(rank, rank);
+                    if (F.exists(block, j)) {
+                      Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+                      SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
+                      Sbar_block_j = Sbar_block_j + SpF;
+                      F.erase(block, j);
+                    }
+
+                    S.erase(block, j, level);
+                    S.insert(block, j, level, std::move(Sbar_block_j));
                   }
-
-                  S.erase(block, j, level);
-                  S.insert(block, j, level, std::move(Sbar_block_j));
                 }
               }
               U.erase(block, level);
@@ -510,17 +512,19 @@ namespace Hatrix {
 
               for (int i = 0; i < nblocks; ++i) {
                 if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                  Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
-                  if (F.exists(i, block)) {
-                    Matrix Fp = matmul(U(i, level), F(i, block));
-                    Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
-                    Sbar_i_block = Sbar_i_block + SpF;
+                  if (i <= block)  {
+                    Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
+                    if (F.exists(i, block)) {
+                      Matrix Fp = matmul(U(i, level), F(i, block));
+                      Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
+                      Sbar_i_block = Sbar_i_block + SpF;
 
-                    F.erase(i, block);
+                      F.erase(i, block);
+                    }
+
+                    S.erase(i, block, level);
+                    S.insert(i, block, level, std::move(Sbar_i_block));
                   }
-
-                  S.erase(i, block, level);
-                  S.insert(i, block, level, std::move(Sbar_i_block));
                 }
               }
 
@@ -545,7 +549,8 @@ namespace Hatrix {
           }
         }
 
-        int64_t row_split = V(block, level).rows - rank, col_split = U(block, level).rows - rank;
+        int64_t row_split = D(block, block, level).rows - rank,
+          col_split = D(block, block, level).cols - rank;
 
         // The diagonal block is split along the row and column.
         auto diagonal_splits = SPLIT_DENSE(D(block, block, level), row_split, col_split);
@@ -555,7 +560,7 @@ namespace Hatrix {
         // TRSM_L with CC blocks on the row
         for (int j = block + 1; j < nblocks; ++j) {
           if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
-            int64_t col_split = U(j, level).rows - rank;
+            int64_t col_split = D(block, j, level).cols - rank;
             auto D_splits = SPLIT_DENSE(D(block, j, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
           }
@@ -564,7 +569,7 @@ namespace Hatrix {
         // TRSM_L with co blocks on this row
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
-            int64_t col_split = U(j, level).rows - rank;
+            int64_t col_split = D(block, j, level).cols - rank;
             auto D_splits = SPLIT_DENSE(D(block, j, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
           }
@@ -573,7 +578,7 @@ namespace Hatrix {
         // TRSM_U with cc blocks on the column
         for (int i = block + 1; i < nblocks; ++i) {
           if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
-            int64_t row_split = V(i, level).rows - rank;
+            int64_t row_split = D(i, block, level).rows - rank;
             auto D_splits = SPLIT_DENSE(D(i, block, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Upper, false);
           }
@@ -582,7 +587,7 @@ namespace Hatrix {
         // TRSM_U with oc blocks on the column
         for (int i = 0; i < nblocks; ++i) {
           if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
-            int64_t row_split = V(i, level).rows - rank;
+            int64_t row_split = D(i, block, level).rows - rank;
             auto D_splits = SPLIT_DENSE(D(i, block, level), row_split, col_split);
             solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
           }
@@ -594,21 +599,34 @@ namespace Hatrix {
             if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
                 (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
               auto lower_splits = SPLIT_DENSE(D(i, block, level),
-                                              V(i, level).rows - rank,
+                                              D(i, block, level).rows - rank,
                                               col_split);
               auto right_splits = SPLIT_DENSE(D(block, j, level),
                                               row_split,
-                                              U(j, level).rows - rank);
+                                              D(block, j, level).cols - rank);
 
               if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
                 auto reduce_splits = SPLIT_DENSE(D(i, j, level),
-                                                 V(i, level).rows - rank,
-                                                 U(j, level).rows - rank);
+                                                 D(i, j, level).rows - rank,
+                                                 D(i, j, level).cols - rank);
 
                 matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
               }
               else {
                 // Fill in between cc blocks.
+                int64_t rows = D(i, block, level).rows;
+                int64_t cols = D(block, j, level).cols;
+                if (F.exists(i, j)) {
+                  Matrix& fill_in = F(i, j);
+                  auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
+                  matmul(lower_splits[0], right_splits[0], fill_in_splits[0], false, false, -1.0, 1.0);
+                }
+                else {
+                  Matrix fill_in(rows, cols);
+                  auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
+                  matmul(lower_splits[0], right_splits[0], fill_in_splits[0], false, false, -1.0, 1.0);
+                  F.insert(i, j, std::move(fill_in));
+                }
               }
             }
           }
@@ -1557,6 +1575,7 @@ int main(int argc, char** argv) {
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
   double construct_error = A.construction_error(domain);
+  A.print_structure();
 
   A.factorize(domain);
 
