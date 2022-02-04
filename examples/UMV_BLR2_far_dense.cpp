@@ -621,6 +621,7 @@ namespace Hatrix {
                   matmul(lower_splits[0], right_splits[0], fill_in_splits[0], false, false, -1.0, 1.0);
                 }
                 else {
+                  std::cout << "make fill: i-> " << i << " j-> " << j << std::endl;
                   Matrix fill_in(rows, cols);
                   auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
                   matmul(lower_splits[0], right_splits[0], fill_in_splits[0], false, false, -1.0, 1.0);
@@ -637,20 +638,17 @@ namespace Hatrix {
             if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
                 (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
               auto lower_splits = SPLIT_DENSE(D(i, block, level),
-                                              V(i, level).rows - rank,
+                                              D(i, block, level).rows - rank,
                                               col_split);
               auto right_splits = SPLIT_DENSE(D(block, j, level),
                                               row_split,
-                                              U(j, level).rows - rank);
+                                              D(block, j, level).cols - rank);
 
               if (!is_admissible(i, j, level)) { // no fill-in in the oo portion. SC into another dense block.
                 auto reduce_splits = SPLIT_DENSE(D(i, j, level),
-                                                 V(i, level).rows - rank,
-                                                 U(j, level).rows - rank);
+                                                 D(i, j, level).rows - rank,
+                                                 D(i, j, level).cols - rank);
                 matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
-              }
-              else {            // create a fill-in in the oo portion of the <i, j> block.
-
               }
             }
           }
@@ -678,6 +676,9 @@ namespace Hatrix {
               // Schur's compliement between co and cc blocks where a new fill-in is created.
               // The product is a (co; oo)-sized matrix.
               else {
+                // The Schur's compliments that are formed before the block index are always
+                // a narrow strip of size nb * rank. These blocks are formed only on the right
+                // part of the permuted matrix in the co section.
                 if (j <= block) {
                   if (!F.exists(i, j)) {
                     Matrix fill_in(V(i, level).rows, rank);
@@ -703,8 +704,25 @@ namespace Hatrix {
                   }
                 }
                 // Schur's compliment between co and cc blocks where the result exists after the diagonal blocks.
-                // The fill-in generated here is always part of a nb*nb dense block.
+                // The fill-in generated here is always part of a nb*nb dense block. Thus we grab the large
+                // fill-in block that was already formed previously in the cc * cc schur's compliment computation,
+                // and add the resulting schur's compliment into that previously generated block.
                 else {
+                  if (F.exists(i, j)) {
+                    Matrix& fill_in = F(i, j);
+                    auto fill_splits = SPLIT_DENSE(fill_in,
+                                                   D(i, block, level).rows - rank,
+                                                   D(block, j, level).cols - rank);
+                    // Update the co block within the fill-in.
+                    matmul(lower_splits[0], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+                    // Update the oo block within the fill-in.
+                    matmul(lower_splits[2], right_splits[1], fill_splits[3], false, false, -1.0, 1.0);
+                  }
+                  else {
+                    std::cout << "A fill-in block for (co;oo) does not exist where it is supposed to at block-> "
+                              << block << " i-> " << i << " j-> " << j << std::endl;
+                    abort();
+                  }
                 }
               }
             }
@@ -766,7 +784,24 @@ namespace Hatrix {
                 // after the diagonal blocks. The fill-in generated here is always part
                 // of a nb*nb dense block.
                 else {
+                  if (F.exists(i, j)) {
+                    Matrix& fill_in = F(i, j);
+                    auto fill_splits = SPLIT_DENSE(fill_in,
+                                                   D(i, block, level).rows - rank,
+                                                   D(block, j, level).cols - rank);
 
+                    // Update the oc block within the fill-ins.
+                    matmul(lower_splits[2], right_splits[0], fill_splits[2],
+                           false, false, -1.0, 1.0);
+                    // Update the oo block within the fill-ins.
+                    matmul(lower_splits[2], right_splits[1], fill_splits[3],
+                           false, false, -1.0, 1.0);
+                  }
+                  else {
+                    std::cout << "A fill-in block for (oc,oo) does not exist where it is supposed to at block-> "
+                              << block << " i-> " << i << " j-> " << j << std::endl;
+                    abort();
+                  }
                 }
               }
             }
@@ -1444,7 +1479,6 @@ std::vector<Matrix> generate_L_chain(Hatrix::BLR2& A) {
 
 std::vector<Matrix> generate_U_chain(Hatrix::BLR2& A) {
   int64_t level = 1;
-  int64_t block_size = A.N / A.nblocks;
   int64_t permuted_nblocks = A.nblocks * 2;
   std::vector<int64_t> row_offsets, col_offsets;
   std::tie(row_offsets, col_offsets) = generate_offsets(A);
