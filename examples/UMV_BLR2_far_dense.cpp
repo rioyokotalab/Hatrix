@@ -445,8 +445,10 @@ namespace Hatrix {
               for (int j = 0; j <= block; ++j) {
                 if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
                   if (F.exists(block, j)) {
-                    Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                    row_concat = concat(row_concat, Fp, 1);
+                    if (F(block, j).cols == rank) {
+                      Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+                      row_concat = concat(row_concat, Fp, 1);
+                    }
                   }
                 }
               }
@@ -466,8 +468,12 @@ namespace Hatrix {
                       Matrix Fp = matmul(F(block, j), V(j, level), false, true);
                       SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
                       Sbar_block_j = Sbar_block_j + SpF;
+                      F.erase(block, j);
                     }
-                    F.erase(block, j);
+                    else {
+
+                    }
+
                   }
 
                   S.erase(block, j, level);
@@ -499,8 +505,11 @@ namespace Hatrix {
               for (int i = 0; i <= block; ++i) {
                 if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                   if (F.exists(i, block)) {
-                    Matrix Fp = matmul(U(i, level), F(i, block));
-                    col_concat = concat(col_concat, Fp, 0);
+                    if (F(i, block).rows == rank) {
+                      Matrix Fp = matmul(U(i, level), F(i, block));
+                      col_concat = concat(col_concat, Fp, 0);
+                    }
+
                   }
                 }
               }
@@ -518,8 +527,8 @@ namespace Hatrix {
                       Matrix Fp = matmul(U(i, level), F(i, block));
                       Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
                       Sbar_i_block = Sbar_i_block + SpF;
+                      F.erase(i, block);
                     }
-                    F.erase(i, block);
                   }
 
                   S.erase(i, block, level);
@@ -621,7 +630,7 @@ namespace Hatrix {
                   matmul(lower_splits[0], right_splits[0], fill_in_splits[0], false, false, -1.0, 1.0);
                 }
                 else {
-                  std::cout << "make fill: i-> " << i << " j-> " << j << std::endl;
+                  std::cout << "MAKE FULL FILL IN: i-> " << i << " j-> " << j << " block -> " << block << std::endl;
                   Matrix fill_in(rows, cols);
                   auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
                   matmul(lower_splits[0], right_splits[0], fill_in_splits[0], false, false, -1.0, 1.0);

@@ -17,7 +17,7 @@ make -j all
 
 ./bin/UMV_BLR2_far_dense 100 20 4 2 2 diagonal_admis
 # echo -n "\n"
-./bin/UMV_BLR2_far_dense 500 100 4 0.8 2 geometry_admis
+gdb -ex run --args ./bin/UMV_BLR2_far_dense 500 100 4 0.8 2 geometry_admis
 ./bin/UMV_BLR2_far_dense 500 100 10 0.8 2 geometry_admis
 # ./bin/UMV_BLR2_far_dense 500 50 4 0.3 2 geometry_admis
 # echo -n "\n"
