@@ -57,9 +57,7 @@ $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
-	$(CXX) $(shell pkg-config --cflags starsh) $< $(OBJLIBS) $(LDFLAGS) $(shell pkg-config --libs starsh) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
+	$(LINK_EXECUTABLE)
 
 test: $(TEST_EXECUTABLES)
 	for e in $(TEST_EXECUTABLES); do \
