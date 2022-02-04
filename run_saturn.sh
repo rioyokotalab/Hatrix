@@ -15,9 +15,9 @@ make -j all
 # make UMV_strong_H2_Nlevel_starsh
 
 
-# ./bin/UMV_BLR2_far_dense 100 20 4 2 2 diagonal_admis
+./bin/UMV_BLR2_far_dense 100 20 4 2 2 diagonal_admis
 # echo -n "\n"
-gdb -ex run --args  ./bin/UMV_BLR2_far_dense 500 50 4 0.3 2 geometry_admis
+./bin/UMV_BLR2_far_dense 500 50 4 0.3 2 geometry_admis
 # echo -n "\n"
 # ./bin/UMV_BLR2_far_dense 500 50 8 0.3 2 geometry_admis
 # echo -n "\n"
