@@ -10,7 +10,8 @@ module load intel-mkl/2020.4.304/gcc-7.3.0-52gb
 # cd build
 # cmake .. -DCMAKE_INSTALL_PREFIX=$PWD
 # make -j
-# make all
-make UMV_strong_H2_Nlevel_starsh
+make -j all
+# make UMV_strong_H2_Nlevel_starsh
 
 # ./examples/UMV_strong_1level 40 4 4 0
+./bin/UMV_BLR2_far_dense 100 20 5 2 2 diagonal_admis
