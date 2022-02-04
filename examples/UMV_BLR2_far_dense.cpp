@@ -1017,11 +1017,11 @@ namespace Hatrix {
       // }
       // std::cout << std::endl;
 
-      // std::cout << "Row dims:\n";
-      // for (int i = 0; i < nblocks; ++i) {
-      //   std::cout << V(i, level).rows << " ";
-      // }
-      // std::cout << std::endl;
+      std::cout << "Row dims:\n";
+      for (int i = 0; i < nblocks; ++i) {
+        std::cout << V(i, level).rows << " ";
+      }
+      std::cout << std::endl;
     }
 
     void factorize(const Domain& domain) {
@@ -1550,8 +1550,8 @@ int main(int argc, char** argv) {
   }
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
-  A.print_structure();
   double construct_error = A.construction_error(domain);
+  A.print_structure();
 
   A.factorize(domain);
 
