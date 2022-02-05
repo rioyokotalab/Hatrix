@@ -13,12 +13,12 @@ using randvec_t = std::vector<std::vector<double> >;
 namespace Hatrix {
   class H2 {
   public:
+    int64_t N, rank, height, admis;
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
-    RowLevelMap Srow, Scol;
-    int64_t N, rank, height, admis;
     RowColLevelMap<bool> is_admissible;
+    RowLevelMap Srow, Scol;
     int64_t oversampling = 5;
 
   private:
@@ -265,8 +265,6 @@ namespace Hatrix {
       }
     }
 
-    double error;
-
     // Generate a bunch of random matrices.
     for (int64_t i = 0; i < nblocks; ++i) {
       Y.push_back(
@@ -345,7 +343,6 @@ namespace Hatrix {
     int num_nodes = pow(2, level);
     int block_size = N / num_nodes;
     int child_level = level + 1;
-    int c_num_nodes = pow(2, child_level);
     std::vector<Matrix> Y;
     // Generate the actual bases for the upper level and pass it to this
     // function again for generating transfer matrices at successive levels.
@@ -629,8 +626,7 @@ namespace Hatrix {
 
                 Matrix SpF(rank, rank);
                 if (F.exists(block, j)) {
-                  Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                  SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
+                  SpF = matmul(UN1, F(block, j), true, false);
                   Sbar_block_j = Sbar_block_j + SpF;
                   F.erase(block, j);
                 }
@@ -680,8 +676,7 @@ namespace Hatrix {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                 Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
                 if (F.exists(i, block)) {
-                  Matrix Fp = matmul(U(i,level), F(i, block));
-                  Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
+                  Matrix SpF = matmul(F(i, block), VN2T, false, true);
                   Sbar_i_block = Sbar_i_block + SpF;
 
                   F.erase(i, block);
@@ -917,8 +912,6 @@ namespace Hatrix {
           auto Ubig_child1 = get_Ubig(c1, level);
           auto Ubig_child2 = get_Ubig(c2, level);
 
-          int parent_block_size = N / parent_nodes;
-
           Matrix& Utransfer = U(parent_node, parent_level);
           auto Utransfer_splits = Utransfer.split(2, 1);
 
@@ -938,8 +931,6 @@ namespace Hatrix {
         if (col_has_admissible_blocks(parent_node, parent_level) && t.exists(c1) && t.exists(c2)) {
           auto Vbig_child1 = get_Vbig(c1, level);
           auto Vbig_child2 = get_Vbig(c2, level);
-
-          int parent_block_size = N / parent_nodes;
 
           Matrix& Vtransfer = V(parent_node, parent_level);
           auto Vtransfer_splits = Vtransfer.split(2, 1);
@@ -1018,15 +1009,11 @@ namespace Hatrix {
       Matrix U_F = make_complement(U(block, level));
       Matrix prod = matmul(U_F, x_level_split[block], true);
       x_level_split[block] = prod;
-      // for (int64_t i = 0; i < block_size; ++i) {
-      //   x_level(block * block_size + i, 0) = prod(i, 0);
-      // }
     }
 
     // forward substitution with cc blocks
     for (int block = 0; block < nblocks; ++block) {
       int block_size = U(block, level).rows;
-      int c_size = block_size - rank;
 
       int64_t row_split = block_size - U(block, level).cols,
         col_split = block_size - V(block, level).cols;
@@ -1037,9 +1024,7 @@ namespace Hatrix {
 
       solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
       matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
-      for (int64_t i = 0; i < block_size; ++i) {
-        x_level(block * block_size + i, 0) = x_block(i, 0);
-      }
+      x_level_split[block] = x_block;
 
       // Forward with the big c blocks on the lower part.
       for (int irow = block+1; irow < nblocks; ++irow) {
@@ -1135,7 +1120,7 @@ namespace Hatrix {
 
   Matrix H2::solve(Matrix& b, int _level) {
     int level = _level;
-    int64_t c_size, offset, rhs_offset = 0;
+    int64_t offset, rhs_offset = 0;
     Matrix x(b);
     std::vector<Matrix> x_splits;
 

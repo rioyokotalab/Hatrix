@@ -199,9 +199,14 @@ namespace Hatrix {
 
 
   // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
-  void Domain::orthogonal_recursive_bisection_1dim(int64_t start, int64_t end, std::string morton_index, int64_t nleaf) {
+  void
+  Domain::orthogonal_recursive_bisection_1dim(int64_t start,
+                                              int64_t end,
+                                              std::string morton_index,
+                                              int64_t nleaf) {
     // Sort the particles only by the X axis since that is the only axis that needs to be bisected.
-    std::sort(particles.begin()+start, particles.begin()+end, [](const Particle& lhs, const Particle& rhs) {
+    std::sort(particles.begin()+start,
+              particles.begin()+end, [](const Particle& lhs, const Particle& rhs) {
       return lhs.coords[0] <= rhs.coords[0];
     });
 
@@ -223,8 +228,14 @@ namespace Hatrix {
     }
   }
 
-  void Domain::orthogonal_recursive_bisection_2dim(int64_t start, int64_t end, std::string morton_index, int64_t nleaf, int64_t axis) {
-    std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
+  void
+  Domain::orthogonal_recursive_bisection_2dim(int64_t start,
+                                              int64_t end,
+                                              std::string morton_index,
+                                              int64_t nleaf,
+                                              int64_t axis) {
+    std::sort(particles.begin() + start,
+              particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
       return lhs.coords[axis] < rhs.coords[axis];
     });
 
@@ -243,7 +254,13 @@ namespace Hatrix {
         double center_x = (particles[start_index].coords[0] + particles[end_index].coords[0]) / 2;
         double center_y = (particles[start_index].coords[1] + particles[end_index].coords[1]) / 2;
 
-        boxes.push_back(Box(diameter, center_x, center_y, start_index, end_index, morton_index, num_points));
+        boxes.push_back(Box(diameter,
+                            center_x,
+                            center_y,
+                            start_index,
+                            end_index,
+                            morton_index,
+                            num_points));
       }
       else {
         orthogonal_recursive_bisection_2dim(start, end, morton_index, nleaf, (axis + 1) % ndim);
@@ -251,14 +268,21 @@ namespace Hatrix {
     }
     else {
       int64_t middle = (start + end) / 2;
-      orthogonal_recursive_bisection_2dim(start, middle, morton_index + "0", nleaf, (axis + 1) % ndim);
+      orthogonal_recursive_bisection_2dim(start,
+                                          middle,
+                                          morton_index + "0",
+                                          nleaf,
+                                          (axis + 1) % ndim);
       orthogonal_recursive_bisection_2dim(middle, end, morton_index + "1", nleaf, (axis + 1) % ndim);
     }
   }
 
-  void Domain::orthogonal_recursive_bisection_3dim(int64_t start, int64_t end, std::string morton_index,
-                                                   int64_t nleaf, int64_t axis) {
-    std::sort(particles.begin() + start, particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
+  void
+  Domain::orthogonal_recursive_bisection_3dim(int64_t start, int64_t end, std::string morton_index,
+                                              int64_t nleaf, int64_t axis) {
+    std::sort(particles.begin() + start,
+              particles.begin() + end,
+              [&](const Particle& lhs, const Particle& rhs) {
       return lhs.coords[axis] < rhs.coords[axis];
     });
     int64_t num_points = end - start;
