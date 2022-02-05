@@ -301,7 +301,14 @@ namespace Hatrix {
         double center_y = (particles[start_index].coords[1] + particles[end_index].coords[1]) / 2;
         double center_z = (particles[start_index].coords[2] + particles[end_index].coords[2]) / 2;
 
-        boxes.push_back(Box(diameter, center_x, center_y, center_z, start_index, end_index, morton_index, num_points));
+        boxes.push_back(Box(diameter,
+                            center_x,
+                            center_y,
+                            center_z,
+                            start_index,
+                            end_index,
+                            morton_index,
+                            num_points));
       }
       else {
         orthogonal_recursive_bisection_3dim(start, end, morton_index, nleaf, (axis+1) % ndim);
@@ -357,7 +364,8 @@ namespace Hatrix {
         double y = radius * sin(phi) * sin(theta);
         double z = radius * cos(phi);
 
-        particles.push_back(Hatrix::Particle(x, y, z, min_val + (double(i) / double(range))));
+        particles.push_back(Hatrix::Particle(x, y, z,
+                                             min_val + (double(i) / double(range))));
       }
     }
   }
@@ -399,7 +407,8 @@ namespace Hatrix {
     void calc_geometry_based_admissibility(const Domain& domain) {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, level, std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
+          is_admissible.insert(i, j, level,
+                               std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
                                admis * domain.boxes[i].distance_from(domain.boxes[j]));
         }
       }
@@ -492,8 +501,7 @@ namespace Hatrix {
                   Matrix SpF(rank, rank);
                   if (F.exists(block, j)) {
                     if (F(block, j).cols == rank) {
-                      Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                      SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
+                      SpF = matmul(UN1, F(block, j), true, false);
                       Sbar_block_j = Sbar_block_j + SpF;
                       F.erase(block, j);
                     }
@@ -554,8 +562,7 @@ namespace Hatrix {
                   if (F.exists(i, block)) {
                     Matrix SpF(rank, rank);
                     if (F(i, block).rows == rank) {
-                      Matrix Fp = matmul(U(i, level), F(i, block));
-                      SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
+                      SpF = matmul(F(i, block), VN2T, false, true);
                       Sbar_i_block = Sbar_i_block + SpF;
                       F.erase(i, block);
                     }
