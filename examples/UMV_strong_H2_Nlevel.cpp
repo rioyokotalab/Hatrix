@@ -174,7 +174,8 @@ namespace Hatrix {
   bool H2::row_has_admissible_blocks(int row, int level) {
     bool has_admis = false;
     for (int i = 0; i < pow(2, level); ++i) {
-      if (is_admissible.exists(row, i, level) && is_admissible(row, i, level)) {
+      if (!is_admissible.exists(row, i, level) ||
+          (is_admissible.exists(row, i, level) && is_admissible(row, i, level))) {
         has_admis = true;
         break;
       }
@@ -186,7 +187,8 @@ namespace Hatrix {
   bool H2::col_has_admissible_blocks(int col, int level) {
     bool has_admis = false;
     for (int j = 0; j < pow(2, level); ++j) {
-      if (is_admissible.exists(j, col, level) && is_admissible(j, col, level)) {
+      if (!is_admissible.exists(j, col, level) ||
+          (is_admissible.exists(j, col, level) && is_admissible(j, col, level))) {
         has_admis = true;
         break;
       }

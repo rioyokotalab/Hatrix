@@ -20,7 +20,9 @@ module load intel-mkl/2020.4.304/gcc-7.3.0-52gb
 
 
 make all
-./bin/UMV_strong_H2_Nlevel 800 5 4 2
+# ./bin/UMV_strong_H2_Nlevel 800 5 4 1
+# ./bin/UMV_strong_H2_Nlevel 800 5 4 2
+./bin/UMV_strong_H2_Nlevel 800 6 4 3
 # ./bin/UMV_strong_H2_Nlevel 1600 5 5 1
 
 # ./bin/UMV_BLR2_far_dense 100 20 4 2 2 diagonal_admis
