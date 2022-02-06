@@ -783,7 +783,7 @@ namespace Hatrix {
             auto right_splits = SPLIT_DENSE(D(block, j, level), row_split,
                                             block_size - V(j, level).cols);
 
-            if (!is_admissible(i, j, level)) {
+            if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
               auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                block_size - U(i, level).cols,
                                                block_size - V(j, level).cols);
@@ -1231,6 +1231,7 @@ int main(int argc, char *argv[]) {
   auto stop_construct = std::chrono::system_clock::now();
   auto construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
+  A.print_structure();
 
   double construct_error = A.construction_relative_error(randpts);
 
