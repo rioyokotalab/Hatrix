@@ -636,11 +636,9 @@ namespace Hatrix {
             row_concat = concat(row_concat, matmul(U(block, level),
                                                    Scol(block, level)), 1);
             for (int j = 0; j < nblocks; ++j) {
-              if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                if (F.exists(block, j)) {
-                  Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                  row_concat = concat(row_concat, Fp, 1);
-                }
+              if (F.exists(block, j)) {
+                Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+                row_concat = concat(row_concat, Fp, 1);
               }
             }
 
@@ -659,7 +657,6 @@ namespace Hatrix {
                 if (F.exists(block, j)) {
                   SpF = matmul(UN1, F(block, j), true, false);
                   Sbar_block_j = Sbar_block_j + SpF;
-                  F.erase(block, j);
                 }
 
                 S.erase(block, j, level);
@@ -688,11 +685,9 @@ namespace Hatrix {
             col_concat = concat(col_concat, matmul(Srow(block, level),
                                                    transpose(V(block, level))), 0);
             for (int i = 0; i < nblocks; ++i) {
-              if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                if (F.exists(i, block)) {
-                  Matrix Fp = matmul(U(i, level), F(i, block));
-                  col_concat = concat(col_concat, Fp, 0);
-                }
+              if (F.exists(i, block)) {
+                Matrix Fp = matmul(U(i, level), F(i, block));
+                col_concat = concat(col_concat, Fp, 0);
               }
             }
 
@@ -709,8 +704,6 @@ namespace Hatrix {
                 if (F.exists(i, block)) {
                   Matrix SpF = matmul(F(i, block), VN2T, false, true);
                   Sbar_i_block = Sbar_i_block + SpF;
-
-                  F.erase(i, block);
                 }
 
                 S.erase(i, block, level);
@@ -724,6 +717,8 @@ namespace Hatrix {
           }
         }
       }
+
+      F.erase_all();
 
       Matrix U_F = make_complement(U(block, level));
       Matrix V_F = make_complement(V(block, level));
@@ -996,8 +991,6 @@ namespace Hatrix {
         }
       } // for (int block = 0; block < num_nodes; block += 2)
 
-      std::cout << "level -> " << level << std::endl;
-
       if (level == 3) {
         for (int i = 0; i < 4; ++i) {
           for (int j = 0; j < 4; ++j) {
@@ -1035,8 +1028,6 @@ namespace Hatrix {
             }
 
             D.insert(i, j, parent_level, std::move(D_unelim));
-            std::cout << "INSERT D: i -> " << i << " j -> " << j
-                      << " parent -> " << parent_level << std::endl;
           }
         }
       }
@@ -1595,17 +1586,17 @@ void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
   std::cout << "A2 factorization error: "
             <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
 
-  std::cout << "A2 block wise factorization error: \n";
-  for (int i = 0; i < 4; ++i) {
-    for (int j = 0; j < 4; ++j) {
-      std::cout << "<i, j>: " << i << ", " << j
-                << " -- "
-                << std::setprecision(8)
-                << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
-                << "   ";
-    }
-    std::cout << std::endl;
-  }
+  // std::cout << "A2 block wise factorization error: \n";
+  // for (int i = 0; i < 4; ++i) {
+  //   for (int j = 0; j < 4; ++j) {
+  //     std::cout << "<i, j>: " << i << ", " << j
+  //               << " -- "
+  //               << std::setprecision(8)
+  //               << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
+  //               << "   ";
+  //   }
+  //   std::cout << std::endl;
+  // }
 
   verify_A2_solve(A2_actual, A, randpts);
 }
