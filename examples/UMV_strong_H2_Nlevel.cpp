@@ -1066,6 +1066,7 @@ namespace Hatrix {
 
     for (int block = 0; block < nblocks; ++block) {
       int block_size = U(block, level).rows;
+      // std::cout << " bl -> " << block << " nr= " << norm(generate_identity_matrix(rank, rank) - matmul(U(block, level), U(block, level), true, false)) << std::endl;
       Matrix U_F = make_complement(U(block, level));
       Matrix prod = matmul(U_F, x_level_split[block], true);
       x_level_split[block] = prod;
