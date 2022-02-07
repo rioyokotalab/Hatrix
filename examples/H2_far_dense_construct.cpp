@@ -26,14 +26,14 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
   Hatrix::Matrix Q_full, R;
   std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
 
-  for (int i = 0; i < Q_F.rows; ++i) {
-    for (int j = 0; j < Q_F.cols - Q.cols; ++j) {
+  for (int64_t i = 0; i < Q_F.rows; ++i) {
+    for (int64_t j = 0; j < Q_F.cols - Q.cols; ++j) {
       Q_F(i, j) = Q_full(i, j + Q.cols);
     }
   }
 
-  for (int i = 0; i < Q_F.rows; ++i) {
-    for (int j = 0; j < Q.cols; ++j) {
+  for (int64_t i = 0; i < Q_F.rows; ++i) {
+    for (int64_t j = 0; j < Q.cols; ++j) {
       Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
     }
   }
@@ -77,8 +77,10 @@ namespace Hatrix {
     int64_t N, ndim;
   private:
     // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
-    void orthogonal_recursive_bisection_1dim(int64_t start, int64_t end, std::string morton_index, int64_t nleaf);
-    void orthogonal_recursive_bisection_2dim(int64_t start, int64_t end, std::string morton_index, int64_t nleaf, int64_t axis);
+    void orthogonal_recursive_bisection_1dim(int64_t start, int64_t end,
+                                             std::string morton_index, int64_t nleaf);
+    void orthogonal_recursive_bisection_2dim(int64_t start, int64_t end,
+                                             std::string morton_index, int64_t nleaf, int64_t axis);
     void orthogonal_recursive_bisection_3dim(int64_t start, int64_t end, std::string morton_index,
                                              int64_t nleaf, int64_t axis);
   public:
@@ -89,7 +91,8 @@ namespace Hatrix {
 
   class H2 {
   public:
-    int64_t N, rank, nleaf, admis;
+    int64_t N, rank, nleaf;
+    double admis;
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
@@ -97,39 +100,40 @@ namespace Hatrix {
     RowLevelMap Srow, Scol;
     int64_t oversampling = 5;
     std::string admis_kind;
-    int64_t height;
+    int64_t height = -1;
 
   private:
     void actually_print_structure(int64_t level);
-    bool row_has_admissible_blocks(int row, int level);
-    bool col_has_admissible_blocks(int col, int level);
-    Matrix generate_column_block(int block, int block_size, const Domain& domain, int level);
+    bool row_has_admissible_blocks(int row, int64_t level);
+    bool col_has_admissible_blocks(int64_t col, int64_t level);
+    Matrix generate_column_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level);
     std::tuple<Matrix, Matrix>
-    generate_column_bases(int block, int block_size, const Domain& domain,
-                          std::vector<Matrix>& Y, int level);
-    Matrix generate_row_block(int block, int block_size, const Domain& domain, int level);
+    generate_column_bases(int64_t block, int64_t block_size, const Domain& domain,
+                          std::vector<Matrix>& Y, int64_t level);
+    Matrix generate_row_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level);
     std::tuple<Matrix, Matrix>
-    generate_row_bases(int block, int block_size, const Domain& domain,
-                       std::vector<Matrix>& Y, int level);
+    generate_row_bases(int64_t block, int64_t block_size, const Domain& domain,
+                       std::vector<Matrix>& Y, int64_t level);
     void generate_leaf_nodes(const Domain& domain);
     std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const Domain& domain,
-                                                                    int level, RowLevelMap& Uchild,
+                                                                    int64_t level, RowLevelMap& Uchild,
                                                                     ColLevelMap& Vchild);
-    Matrix get_Ubig(int node, int level);
-    Matrix get_Vbig(int node, int level);
+    Matrix get_Ubig(int64_t node, int64_t level);
+    Matrix get_Vbig(int64_t node, int64_t level);
     void compute_matrix_structure(int64_t level);
     std::tuple<Matrix, Matrix>
-    generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int node,
-                               int block_size, const Domain& domain, int level);
+    generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
+                               int64_t block_size, const Domain& domain, int64_t level);
     std::tuple<Matrix, Matrix>
-    generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int node,
-                               int block_size, const Domain& domain, int level);
+    generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
+                               int64_t block_size, const Domain& domain, int level);
 
     void
-    calc_geometry_based_admissibility(int level, const Domain& domain);
-    void calc_diagonal_based_admissibility(int level);
+    calc_geometry_based_admissibility(int64_t level, const Domain& domain);
+    void calc_diagonal_based_admissibility(int64_t level);
+    void coarsen_blocks(int64_t level);
   public:
-    H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, int64_t _admis,
+    H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind);
     double construction_relative_error(const Domain& domain);
     void print_structure();
@@ -432,49 +436,70 @@ namespace Hatrix {
   }
 
   void
-  H2::calc_geometry_based_admissibility(int level, const Domain& domain) {
-    int nblocks = pow(2, level);
+  H2::coarsen_blocks(int64_t level) {
+    int64_t child_level = level + 1;
+    int64_t nblocks = pow(2, level);
+    for (int64_t i = 0; i < nblocks; ++i) {
+      std::vector<int64_t> row_children({i * 2, i * 2 + 1});
+      for (int64_t j = 0; j < nblocks; ++j) {
+        std::vector<int64_t> col_children({j * 2, j * 2 + 1});
 
+        bool admis_block = true;
+        for (int64_t c1 = 0; c1 < 2; ++c1) {
+          for (int64_t c2 = 0; c2 < 2; ++c2) {
+            if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
+                !is_admissible(row_children[c1], col_children[c2], child_level)) {
+              admis_block = false;
+            }
+          }
+        }
+
+        if (admis_block) {
+          for (int64_t c1 = 0; c1 < 2; ++c1) {
+            for (int64_t c2 = 0; c2 < 2; ++c2) {
+              is_admissible.erase(row_children[c1], col_children[c2], child_level);
+            }
+          }
+        }
+
+        is_admissible.insert(i, j, level, std::move(admis_block));
+      }
+    }
   }
 
   void
-  H2::calc_diagonal_based_admissibility(int level) {
-    int nblocks = pow(2, level);
+  H2::calc_geometry_based_admissibility(int64_t level, const Domain& domain) {
+    int64_t nblocks = pow(2, level);
+    if (level == 0) { return; }
     if (level == height) {
-      for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, level, std::abs(i - j) >= admis);
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, level,
+                               std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
+                               admis * domain.boxes[i].distance_from(domain.boxes[j]));
         }
       }
     }
     else {
-      int64_t child_level = level + 1;
-      for (int i = 0; i < nblocks; ++i) {
-        std::vector<int> row_children({i * 2, i * 2 + 1});
-        for (int j = 0; j < nblocks; ++j) {
-          std::vector<int> col_children({j * 2, j * 2 + 1});
+      coarsen_blocks(level);
+    }
 
-          bool admis_block = true;
-          for (int c1 = 0; c1 < 2; ++c1) {
-            for (int c2 = 0; c2 < 2; ++c2) {
-              if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
-                  !is_admissible(row_children[c1], col_children[c2], child_level)) {
-                admis_block = false;
-              }
-            }
-          }
+    calc_geometry_based_admissibility(level-1, domain);
+  }
 
-          if (admis_block) {
-            for (int c1 = 0; c1 < 2; ++c1) {
-              for (int c2 = 0; c2 < 2; ++c2) {
-                is_admissible.erase(row_children[c1], col_children[c2], child_level);
-              }
-            }
-          }
-
-          is_admissible.insert(i, j, level, std::move(admis_block));
+  void
+  H2::calc_diagonal_based_admissibility(int64_t level) {
+    if (level == 0) { return; }
+    int64_t nblocks = pow(2, level);
+    if (level == height) {
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, level, std::abs(i - j) > admis);
         }
       }
+    }
+    else {
+      coarsen_blocks(level);
     }
 
     calc_diagonal_based_admissibility(level-1);
@@ -485,9 +510,9 @@ namespace Hatrix {
     if (level == 0) { return; }
     int64_t nblocks = pow(2, level);
     std::cout << "LEVEL: " << level << std::endl;
-    for (int i = 0; i < nblocks; ++i) {
+    for (int64_t i = 0; i < nblocks; ++i) {
       std::cout << "| " ;
-      for (int j = 0; j < nblocks; ++j) {
+      for (int64_t j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(i, j, level)) {
           std::cout << is_admissible(i, j, level) << " | " ;
         }
@@ -502,13 +527,15 @@ namespace Hatrix {
   }
 
 
-  H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, int64_t _admis,
-         std::string& admis_kind) :
+  H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf,
+         double _admis, std::string& admis_kind) :
     N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind) {
     if (admis_kind == "geometry_admis") {
       calc_geometry_based_admissibility(height, domain);
     }
     else if (admis_kind == "diagonal_admis") {
+      height = int64_t(log2(N / nleaf));
+      std::cout << "H: " << height << std::endl;
       calc_diagonal_based_admissibility(height);
     }
 
@@ -528,7 +555,7 @@ int main(int argc, char ** argv) {
   int64_t N = atoi(argv[1]);
   int64_t rank = atoi(argv[2]);
   int64_t nleaf = atoi(argv[3]);
-  int64_t admis = atoi(argv[4]);
+  double admis = atof(argv[4]);
   int64_t ndim = atoi(argv[5]);
   std::string admis_kind(argv[6]);
 

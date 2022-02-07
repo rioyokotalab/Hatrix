@@ -417,7 +417,7 @@ namespace Hatrix {
     void calc_diagonal_based_admissibility() {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, level, std::abs(i - j) >= admis);
+          is_admissible.insert(i, j, level, std::abs(i - j) > admis);
         }
       }
     }
