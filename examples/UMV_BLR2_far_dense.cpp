@@ -483,9 +483,6 @@ namespace Hatrix {
                         Matrix Fp = matmul(F(block, j), V(j, level), false, true);
                         row_concat = concat(row_concat, Fp, 1);
                       }
-                      // else {
-                      //   row_concat = concat(row_concat, F(block, j), 1);
-                      // }
                     }
                   }
                 }
