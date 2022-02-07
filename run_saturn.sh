@@ -3,6 +3,8 @@
 #SBATCH --nodes=1                     # Run on a single CPU
 #SBATCH --time=10:00:00               # Time limit hrs:min:sec
 
+source ~/.bashrc
+
 module load intel-mkl/2020.4.304/gcc-7.3.0-52gb
 # module load valgrind/3.15.0/gcc-7.3.0-74vd
 
@@ -19,23 +21,18 @@ module load intel-mkl/2020.4.304/gcc-7.3.0-52gb
 # done
 
 
-make all
+make UMV_strong_H2_Nlevel_starsh
 # ./bin/UMV_strong_H2_Nlevel 800 5 4 1
 # ./bin/UMV_strong_H2_Nlevel 800 5 4 2
-./bin/UMV_strong_H2_Nlevel 400 6 3 2
+# ./bin/UMV_strong_H2_Nlevel 400 6 3 2
 # ./bin/UMV_strong_H2_Nlevel 1600 5 5 1
 
-# ./bin/UMV_BLR2_far_dense 100 20 4 2 2 diagonal_admis
-# echo -n "\n"
-# gdb -ex run --args ./bin/UMV_BLR2_far_dense 500 100 4 0.8 2 geometry_admis
-# ./bin/UMV_BLR2_far_dense 500 100 10 0.8 2 geometry_admis
 
-
-# ./bin/UMV_BLR2_far_dense 500 50 4 0.3 2 geometry_admis
-# echo -n "\n"
-# ./bin/UMV_BLR2_far_dense 500 50 8 0.3 2 geometry_admis
-# echo -n "\n"
-# ./bin/UMV_BLR2_far_dense 500 50 12 0.3 2 geometry_admis
-
-
-# ./bin/UMV_strong_chained_product 60 4 5 1
+for rank in 6 10 15 20; do
+    for admis in 1 2 3; do
+        ./bin/UMV_strong_H2_Nlevel_starsh 800 $rank  3 $admis 2
+        ./bin/UMV_strong_H2_Nlevel_starsh 1600 $rank 4 $admis 2
+        ./bin/UMV_strong_H2_Nlevel_starsh 3200 $rank 5 $admis 2
+        ./bin/UMV_strong_H2_Nlevel_starsh 6400 $rank 6 $admis 2
+    done
+done

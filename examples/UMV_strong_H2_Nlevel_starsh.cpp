@@ -203,7 +203,8 @@ namespace Hatrix {
   bool H2::row_has_admissible_blocks(int row, int level) {
     bool has_admis = false;
     for (int i = 0; i < pow(2, level); ++i) {
-      if (is_admissible.exists(row, i, level) && is_admissible(row, i, level)) {
+      if (!is_admissible.exists(row, i, level) ||
+          (is_admissible.exists(row, i, level) && is_admissible(row, i, level))) {
         has_admis = true;
         break;
       }
@@ -215,7 +216,8 @@ namespace Hatrix {
   bool H2::col_has_admissible_blocks(int col, int level) {
     bool has_admis = false;
     for (int j = 0; j < pow(2, level); ++j) {
-      if (is_admissible.exists(j, col, level) && is_admissible(j, col, level)) {
+      if (!is_admissible.exists(j, col, level) ||
+          (is_admissible.exists(j, col, level) && is_admissible(j, col, level))) {
         has_admis = true;
         break;
       }
@@ -672,11 +674,9 @@ namespace Hatrix {
             row_concat = concat(row_concat, matmul(U(block, level),
                                                    Scol(block, level)), 1);
             for (int j = 0; j < nblocks; ++j) {
-              if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                if (F.exists(block, j)) {
-                  Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                  row_concat = concat(row_concat, Fp, 1);
-                }
+              if (F.exists(block, j)) {
+                Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+                row_concat = concat(row_concat, Fp, 1);
               }
             }
 
@@ -693,10 +693,8 @@ namespace Hatrix {
 
                 Matrix SpF(rank, rank);
                 if (F.exists(block, j)) {
-                  Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                  SpF = matmul(matmul(UN1, Fp, true, false), V(j, level));
+                  SpF = matmul(UN1, F(block, j), true, false);
                   Sbar_block_j = Sbar_block_j + SpF;
-                  F.erase(block, j);
                 }
 
                 S.erase(block, j, level);
@@ -725,11 +723,9 @@ namespace Hatrix {
             col_concat = concat(col_concat, matmul(Srow(block, level),
                                                    transpose(V(block, level))), 0);
             for (int i = 0; i < nblocks; ++i) {
-              if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                if (F.exists(i, block)) {
-                  Matrix Fp = matmul(U(i, level), F(i, block));
-                  col_concat = concat(col_concat, Fp, 0);
-                }
+              if (F.exists(i, block)) {
+                Matrix Fp = matmul(U(i, level), F(i, block));
+                col_concat = concat(col_concat, Fp, 0);
               }
             }
 
@@ -744,11 +740,8 @@ namespace Hatrix {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                 Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
                 if (F.exists(i, block)) {
-                  Matrix Fp = matmul(U(i,level), F(i, block));
-                  Matrix SpF = matmul(matmul(U(i,level), Fp, true, false), VN2T, false, true);
+                  Matrix SpF = matmul(F(i, block), VN2T, false, true);
                   Sbar_i_block = Sbar_i_block + SpF;
-
-                  F.erase(i, block);
                 }
 
                 S.erase(i, block, level);
@@ -762,6 +755,8 @@ namespace Hatrix {
           }
         }
       }
+
+      F.erase_all();
 
       Matrix U_F = make_complement(U(block, level));
       Matrix V_F = make_complement(V(block, level));
@@ -852,7 +847,7 @@ namespace Hatrix {
             auto right_splits = SPLIT_DENSE(D(block, j, level), row_split,
                                             block_size - V(j, level).cols);
 
-            if (!is_admissible(i, j, level)) {
+            if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
               auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                block_size - U(i, level).cols,
                                                block_size - V(j, level).cols);
@@ -1329,9 +1324,6 @@ int main(int argc, char *argv[]) {
 
   Hatrix::Context::init();
   randvec_t randpts;
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
   PV = 1e-3 * (1 / pow(10, height));
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
