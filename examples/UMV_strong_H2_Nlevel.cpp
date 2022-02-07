@@ -8,6 +8,8 @@
 
 #include "Hatrix/Hatrix.h"
 
+using namespace Hatrix;
+
 double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 namespace Hatrix {
@@ -92,6 +94,33 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
     }
   }
   return Q_F;
+}
+
+Matrix A2_expected, A1_expected;
+
+Hatrix::Matrix lower(Hatrix::Matrix A) {
+  Hatrix::Matrix mat(A.rows, A.cols);
+
+  for (int i = 0; i < A.rows; ++i) {
+    mat(i, i) = 1.0;
+    for (int j = 0; j < i; ++j) {
+      mat(i, j) = A(i, j);
+    }
+  }
+
+  return mat;
+}
+
+Hatrix::Matrix upper(Hatrix::Matrix A) {
+  Hatrix::Matrix mat(A.rows, A.cols);
+
+  for (int i = 0; i < A.rows; ++i) {
+    for (int j = i; j < A.cols; ++j) {
+      mat(i, j) = A(i, j);
+    }
+  }
+
+  return mat;
 }
 
 namespace Hatrix {
@@ -607,11 +636,9 @@ namespace Hatrix {
             row_concat = concat(row_concat, matmul(U(block, level),
                                                    Scol(block, level)), 1);
             for (int j = 0; j < nblocks; ++j) {
-              if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                if (F.exists(block, j)) {
-                  Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                  row_concat = concat(row_concat, Fp, 1);
-                }
+              if (F.exists(block, j)) {
+                Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+                row_concat = concat(row_concat, Fp, 1);
               }
             }
 
@@ -630,7 +657,6 @@ namespace Hatrix {
                 if (F.exists(block, j)) {
                   SpF = matmul(UN1, F(block, j), true, false);
                   Sbar_block_j = Sbar_block_j + SpF;
-                  F.erase(block, j);
                 }
 
                 S.erase(block, j, level);
@@ -659,11 +685,9 @@ namespace Hatrix {
             col_concat = concat(col_concat, matmul(Srow(block, level),
                                                    transpose(V(block, level))), 0);
             for (int i = 0; i < nblocks; ++i) {
-              if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                if (F.exists(i, block)) {
-                  Matrix Fp = matmul(U(i, level), F(i, block));
-                  col_concat = concat(col_concat, Fp, 0);
-                }
+              if (F.exists(i, block)) {
+                Matrix Fp = matmul(U(i, level), F(i, block));
+                col_concat = concat(col_concat, Fp, 0);
               }
             }
 
@@ -680,8 +704,6 @@ namespace Hatrix {
                 if (F.exists(i, block)) {
                   Matrix SpF = matmul(F(i, block), VN2T, false, true);
                   Sbar_i_block = Sbar_i_block + SpF;
-
-                  F.erase(i, block);
                 }
 
                 S.erase(i, block, level);
@@ -695,6 +717,8 @@ namespace Hatrix {
           }
         }
       }
+
+      F.erase_all();
 
       Matrix U_F = make_complement(U(block, level));
       Matrix V_F = make_complement(V(block, level));
@@ -887,6 +911,12 @@ namespace Hatrix {
     RowColLevelMap<Matrix> F;
     RowMap r, t;
 
+    A2_expected = generate_identity_matrix(rank * 8, rank * 8);
+    auto A2_expected_splits = A2_expected.split(4, 4);
+
+    A1_expected = generate_identity_matrix(rank * 8, rank * 8);
+    auto A1_expected_splits = A1_expected.split(4, 4);
+
     for (; level > 0; --level) {
       int num_nodes = pow(2, level);
       bool is_all_dense_level = false;
@@ -897,6 +927,16 @@ namespace Hatrix {
       }
       if (is_all_dense_level) {
         break;
+      }
+
+      if (level == 2) {
+        for (int i = 0; i < 4; ++i) {
+          for (int j = 0; j < 4; ++j) {
+            if (D.exists(i, j, level)) {
+              A2_expected_splits[i * 4 + j] = D(i, j, level);
+            }
+          }
+        }
       }
 
       factorize_level(level, num_nodes, randpts, r, t);
@@ -951,10 +991,20 @@ namespace Hatrix {
         }
       } // for (int block = 0; block < num_nodes; block += 2)
 
+      if (level == 3) {
+        for (int i = 0; i < 4; ++i) {
+          for (int j = 0; j < 4; ++j) {
+            if (is_admissible(i, j, 2)) {
+              A2_expected_splits[i * 4 + j] =
+                matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
+            }
+          }
+        }
+      }
 
       // Merge the unfactorized parts.
-      for (int i = 0; i < int(pow(2, parent_level)); ++i) {
-        for (int j = 0; j < int(pow(2, parent_level)); ++j) {
+      for (int i = 0; i < pow(2, parent_level); ++i) {
+        for (int j = 0; j < pow(2, parent_level); ++j) {
           if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
             std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
             Matrix D_unelim(rank*2, rank*2);
@@ -985,6 +1035,14 @@ namespace Hatrix {
 
     int64_t last_nodes = pow(2, level);
 
+    // Capture unfactorized A1 block.
+    for (int i = 0; i < last_nodes; ++i) {
+      for (int j = 0; j < last_nodes; ++j) {
+        A1_expected_splits[(i + 2) * 4 + j + 2] = D(i, j, level);
+      }
+    }
+
+
     for (int d = 0; d < last_nodes; ++d) {
       lu(D(d, d, level));
       for (int j = d+1; j < last_nodes; ++j) {
@@ -1008,6 +1066,7 @@ namespace Hatrix {
 
     for (int block = 0; block < nblocks; ++block) {
       int block_size = U(block, level).rows;
+      // std::cout << " bl -> " << block << " nr= " << norm(generate_identity_matrix(rank, rank) - matmul(U(block, level), U(block, level), true, false)) << std::endl;
       Matrix U_F = make_complement(U(block, level));
       Matrix prod = matmul(U_F, x_level_split[block], true);
       x_level_split[block] = prod;
@@ -1207,6 +1266,342 @@ namespace Hatrix {
 } // namespace Hatrix
 
 
+Hatrix::Matrix generate_L1(Hatrix::H2& A) {
+  Matrix L1 = generate_identity_matrix(A.rank * 8, A.rank * 8);
+  auto L1_splits = L1.split(8, 8);
+  int level = 1;
+  int num_nodes = pow(2, level);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    for (int j = 0; j <= i; ++j) {
+      std::vector<int> row_children({i * 2 + 4, i * 2 + 1 + 4});
+      std::vector<int> col_children({j * 2 + 4, j * 2 + 1 + 4});
+
+      auto D_split = A.D(i, j, level).split(2, 2);
+
+      if (i == j) {
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = 0; c2 <= c1; ++c2) {
+            if (c1 == c2) {
+              L1_splits[row_children[c1] * 8 + col_children[c2]] = lower(D_split[c1 * 2 + c2]);
+            }
+            else {
+              L1_splits[row_children[c1] * 8 + col_children[c2]] = D_split[c1 * 2 + c2];
+            }
+          }
+        }
+      }
+      else {
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = 0; c2 < 2; ++c2) {
+            L1_splits[row_children[c1] * 8 + col_children[c2]] = D_split[c1 * 2 + c2];
+          }
+        }
+      }
+    }
+  }
+
+  return L1;
+}
+
+Hatrix::Matrix generate_U1(Hatrix::H2& A) {
+  Matrix U1 = generate_identity_matrix(A.rank * 8, A.rank * 8);
+  auto U1_splits = U1.split(8, 8);
+  int level = 1;
+  int num_nodes = pow(2, level);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    for (int j = i; j < num_nodes; ++j) {
+      std::vector<int> row_children({i * 2 + 4, i * 2 + 1 + 4});
+      std::vector<int> col_children({j * 2 + 4, j * 2 + 1 + 4});
+
+      auto D_split = A.D(i, j, level).split(2, 2);
+
+      if (i == j) {
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = c1; c2 < 2; ++c2) {
+            if (c1 == c2) {
+              U1_splits[row_children[c1] * 8 + col_children[c2]] = upper(D_split[c1 * 2 + c2]);
+            }
+            else {
+              U1_splits[row_children[c1] * 8 + col_children[c2]] = D_split[c1 * 2 + c2];
+            }
+          }
+        }
+      }
+      else {
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = 0; c2 < 2; ++c2) {
+            U1_splits[row_children[c1] * 8 + col_children[c2]] = D_split[c1 * 2 + c2];
+          }
+        }
+      }
+    }
+  }
+
+  return U1;
+}
+
+Matrix unpermute_matrix(Matrix PA, H2& A) {
+  Matrix M(A.rank * 8, A.rank * 8);
+
+  int level = 2;
+  int64_t block_size = A.rank * 2;
+  int64_t permuted_nblocks = 8;
+  std::vector<int64_t> row_offsets, col_offsets;
+  int num_nodes = pow(2, level);
+
+  auto PA_splits = PA.split(8, 8);
+  auto M_splits = M.split(4, 4);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    for (int j = 0; j < num_nodes; ++j) {
+      Matrix block(block_size, block_size);
+      auto block_splits = SPLIT_DENSE(block,
+                                      block_size - A.rank,
+                                      block_size - A.rank);
+
+      block_splits[0] = PA_splits[(i) * permuted_nblocks + j];
+      block_splits[1] = PA_splits[i * permuted_nblocks + j + num_nodes];
+      block_splits[2] = PA_splits[(i + num_nodes) * permuted_nblocks + j];
+      block_splits[3] = PA_splits[(i + num_nodes) * permuted_nblocks + j + num_nodes];
+
+      M_splits[i * num_nodes + j] = block;
+    }
+  }
+
+  return M;
+}
+
+void verify_A1_solve(Matrix& A1, H2& A, const randvec_t& randpts) {
+  Matrix b = generate_laplacend_matrix(randpts, A.rank * 4, 1, 0, 0, PV);
+  auto A1_22 = Matrix(A1.split(2, 2)[3]);
+  auto x1_solve = lu_solve(A1_22, b);
+
+  auto x1_h2 = A.solve(b, 1);
+
+  std::cout << "A1 solve error: " << norm(x1_h2 - x1_solve) / norm(x1_solve) << std::endl;
+}
+
+void verify_A1_factorization(Hatrix::H2& A, const randvec_t& randpts) {
+  Matrix L1 = generate_L1(A);
+  Matrix U1 = generate_U1(A);
+  Matrix A1_actual = matmul(L1, U1);
+
+  Matrix diff = A1_actual - A1_expected;
+  int nblocks = 4;
+  auto d_splits = diff.split(nblocks, nblocks);
+  auto m_splits = A1_expected.split(nblocks, nblocks);
+
+  std::cout << "A1 factorization rel error: " << norm(diff) / norm(A1_expected) << std::endl;
+
+  verify_A1_solve(A1_actual, A, randpts);
+}
+
+
+// Generates UF chain for the A2 matrix.
+std::vector<Hatrix::Matrix> generate_UF_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> U_F;
+  int level = 2;
+
+  int num_nodes = pow(2, level);
+  for (int block = 0; block < num_nodes; ++block) {
+    Matrix UF_full = generate_identity_matrix(A.rank * 8, A.rank * 8);
+    auto UF_full_splits = UF_full.split(8, 8);
+
+    if (A.U.exists(block, level)) {
+      int block_size = A.U(block, level).rows;
+      Matrix UF_block = make_complement(A.U(block, level));
+
+      auto UF_block_splits = SPLIT_DENSE(UF_block, block_size - A.U(block, level).cols,
+                                         block_size - A.U(block, level).cols);
+
+      int permuted_nblocks = 8;
+
+      UF_full_splits[block * permuted_nblocks + block] = UF_block_splits[0];
+      UF_full_splits[(block + num_nodes) * permuted_nblocks + block] = UF_block_splits[2];
+      UF_full_splits[block * permuted_nblocks + (block + num_nodes)] = UF_block_splits[1];
+      UF_full_splits[(block + num_nodes) * permuted_nblocks + block + num_nodes] =
+        UF_block_splits[3];
+    }
+
+    U_F.push_back(UF_full);
+  }
+
+  return U_F;
+}
+
+std::vector<Hatrix::Matrix> generate_VF_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> V_F;
+  int level = 2;
+
+  int num_nodes = pow(2, level);
+  for (int block = 0; block < num_nodes; ++block) {
+    Matrix VF_full = generate_identity_matrix(A.rank * 8, A.rank * 8);
+    auto VF_full_splits = VF_full.split(8, 8);
+
+    if (A.V.exists(block, level)) {
+      int block_size = A.V(block, level).rows;
+      Matrix VF_block = make_complement(A.V(block, level));
+
+      auto VF_block_splits = SPLIT_DENSE(VF_block, block_size - A.V(block, level).cols,
+                                         block_size - A.V(block, level).cols);
+
+      int permuted_nblocks = 8;
+
+      VF_full_splits[block * permuted_nblocks + block] = VF_block_splits[0];
+      VF_full_splits[(block + num_nodes) * permuted_nblocks + block] = VF_block_splits[2];
+      VF_full_splits[block * permuted_nblocks + (block + num_nodes)] = VF_block_splits[1];
+      VF_full_splits[(block + num_nodes) * permuted_nblocks + block + num_nodes] =
+        VF_block_splits[3];
+    }
+
+    V_F.push_back(VF_full);
+  }
+
+  return V_F;
+
+}
+
+std::vector<Hatrix::Matrix> generate_L2_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> L2;
+  int block_size = A.rank;
+  int permuted_nblocks = 8;
+  int level = 2;
+  int nblocks = pow(2, level);
+
+  for (int block = 0; block < nblocks; ++block) {
+    Matrix L_block = generate_identity_matrix(A.rank * 8, A.rank * 8);
+    auto L_block_splits = L_block.split(8, 8);
+
+    for (int j = 0; j <= block; ++j) {
+      if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
+        auto D_splits = A.D(block, j, level).split(2, 2);
+
+        // Copy the cc parts
+        if (block == j) {
+          L_block_splits[block * permuted_nblocks + j] = lower(D_splits[0]);
+        }
+        else {
+          L_block_splits[block * permuted_nblocks + j] = D_splits[0];
+        }
+
+        L_block_splits[(block + nblocks) * permuted_nblocks + j] = D_splits[2];
+      }
+    }
+
+    // Copy oc parts belonging to the 'upper' parts of the matrix
+    for (int i = 0; i < block; ++i) {
+      if (A.is_admissible.exists(i, block, level) && !A.is_admissible(i, block, level)) {
+        auto D_splits = A.D(i, block, level).split(2, 2);
+        L_block_splits[(i + nblocks) * permuted_nblocks + block] = D_splits[2];
+      }
+    }
+
+    L2.push_back(L_block);
+  }
+
+  return L2;
+}
+
+std::vector<Hatrix::Matrix> generate_U2_chain(Hatrix::H2& A) {
+  std::vector<Hatrix::Matrix> U2;
+  int block_size = A.rank;
+  int permuted_nblocks = 8;
+  int level = 2;
+  int nblocks = pow(2, level);
+
+  for (int block = 0; block < nblocks; ++block) {
+    Matrix U_block = generate_identity_matrix(A.rank * 8, A.rank * 8);
+    auto U_splits = U_block.split(8, 8);
+
+    for (int i = 0; i <= block; ++i) {
+      if (A.is_admissible.exists(i, block, level) && !A.is_admissible(i, block, level)) {
+        auto D_splits = A.D(i, block, level).split(2, 2);
+
+        // Copy the cc blocks
+        if (block == i) {
+          U_splits[i * permuted_nblocks + block] = upper(D_splits[0]);
+        }
+        else {
+          U_splits[i * permuted_nblocks + block] = D_splits[0];
+        }
+
+        // Copy the co parts
+        U_splits[i * permuted_nblocks + block + nblocks] = D_splits[1];
+      }
+    }
+
+    for (int j = 0; j < block; ++j) {
+      if (A.is_admissible.exists(block, j, level) && !A.is_admissible(block, j, level)) {
+        auto D_splits = A.D(block, j, level).split(2, 2);
+        U_splits[block * permuted_nblocks + (j + nblocks)] = D_splits[1];
+      }
+    }
+
+    U2.push_back(U_block);
+  }
+
+  return U2;
+}
+
+void verify_A2_solve(Matrix& A2, H2& A, const randvec_t& randpts) {
+  Matrix b = generate_laplacend_matrix(randpts, A.rank * 8, 1, 0, 0, PV);
+  auto x2_dense = lu_solve(A2, b);
+  auto x2_h2 = A.solve(b, 2);
+
+  std::cout << "A2 solve error: " << norm(x2_h2 - x2_dense) / norm(x2_dense) << std::endl;
+}
+
+
+void verify_A2_factorization(Hatrix::H2& A, const randvec_t& randpts) {
+  auto UF = generate_UF_chain(A);
+  auto VF = generate_VF_chain(A);
+  auto L2 = generate_L2_chain(A);
+  auto U2 = generate_U2_chain(A);
+  Hatrix::Matrix L1 = generate_L1(A);
+  Hatrix::Matrix U1 = generate_U1(A);
+
+  auto product = generate_identity_matrix(A.rank * 8, A.rank * 8);
+
+  for (int i = 0; i < 4; ++i) {
+    product = matmul(product, UF[i]);
+    product = matmul(product, L2[i]);
+  }
+
+  product = matmul(product, L1);
+  product = matmul(product, U1);
+
+  for (int i = 3; i >= 0; --i) {
+    product = matmul(product, U2[i]);
+    product = matmul(product, VF[i], false, true);
+  }
+
+  auto A2_actual = unpermute_matrix(product, A);
+
+  auto diff = (A2_expected - A2_actual);
+
+  auto diff_splits = diff.split(4, 4);
+  auto A2_expected_splits = A2_expected.split(4, 4);
+
+  std::cout << "A2 factorization error: "
+            <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
+
+  // std::cout << "A2 block wise factorization error: \n";
+  // for (int i = 0; i < 4; ++i) {
+  //   for (int j = 0; j < 4; ++j) {
+  //     std::cout << "<i, j>: " << i << ", " << j
+  //               << " -- "
+  //               << std::setprecision(8)
+  //               << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
+  //               << "   ";
+  //   }
+  //   std::cout << std::endl;
+  // }
+
+  verify_A2_solve(A2_actual, A, randpts);
+}
+
 int main(int argc, char *argv[]) {
   int64_t N = atoi(argv[1]);
   int64_t rank = atoi(argv[2]);
@@ -1243,11 +1638,24 @@ int main(int argc, char *argv[]) {
   auto factor_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factor - start_factor).count();
 
+  std::cout << "-- H2 verification --\n";
+  verify_A1_factorization(A, randpts);
+  verify_A2_factorization(A, randpts);
+
   Hatrix::Matrix x = A.solve(b, A.height);
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   double solve_error =  Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+
+  int blocks = int(pow(2, height));
+  auto x_solve_split = x_solve.split(blocks, 1);
+  auto diff = x - x_solve;
+  auto diff_splits = diff.split(blocks, 1);
+
+  for (int i = 0; i < blocks; ++i) {
+    std::cout << "diff i : " << i << " n -> " << (norm(diff_splits[i]) / norm(x_solve_split[i])) << std::endl;
+  }
 
   int leaf = int(N / pow(2, height));
   Hatrix::Context::finalize();
