@@ -30,9 +30,7 @@ make UMV_strong_H2_Nlevel_starsh
 
 for rank in 6 10 15 20; do
     for admis in 1 2 3; do
-        ./bin/UMV_strong_H2_Nlevel_starsh 800 $rank  3 $admis 2
-        ./bin/UMV_strong_H2_Nlevel_starsh 1600 $rank 4 $admis 2
-        ./bin/UMV_strong_H2_Nlevel_starsh 3200 $rank 5 $admis 2
-        ./bin/UMV_strong_H2_Nlevel_starsh 6400 $rank 6 $admis 2
+        ./bin/UMV_strong_H2_Nlevel_starsh 12800 $rank 6 $admis 2
+        ./bin/UMV_strong_H2_Nlevel_starsh 12800 $rank 6 $admis 3
     done
 done

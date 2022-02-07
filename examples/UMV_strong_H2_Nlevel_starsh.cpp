@@ -1354,7 +1354,7 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::finalize();
 
   std::ofstream file;
-  file.open("H2_UMV.csv", std::ios::app | std::ios::out);
+  file.open("H2_UMV_Nd.csv", std::ios::app | std::ios::out);
 
   std::cout << "N= " << N
             << " rank= " << rank
@@ -1365,6 +1365,7 @@ int main(int argc, char *argv[]) {
             << " solve error=" << solve_error
             << " factor time=" << factor_time
             << " construct time=" << construct_time
+            << " ndim= " << ndim
             << std::endl;
 
   file << N << ","
@@ -1375,7 +1376,8 @@ int main(int argc, char *argv[]) {
        << construct_error << ","
        << solve_error << ","
        << factor_time << ","
-       << construct_time
+       << construct_time << ","
+       << ndim
        << std::endl;
 
   file.close();
