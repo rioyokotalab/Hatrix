@@ -89,13 +89,15 @@ namespace Hatrix {
 
   class H2 {
   public:
-    int64_t N, rank, height, admis;
+    int64_t N, rank, nleaf, admis;
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
     RowColLevelMap<bool> is_admissible;
     RowLevelMap Srow, Scol;
     int64_t oversampling = 5;
+    std::string admis_kind;
+    int64_t height;
 
   private:
     void actually_print_structure(int64_t level);
@@ -123,8 +125,12 @@ namespace Hatrix {
     generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int node,
                                int block_size, const Domain& domain, int level);
 
+    void
+    calc_geometry_based_admissibility(int level, const Domain& domain);
+    void calc_diagonal_based_admissibility(int level);
   public:
-    H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _height, int64_t _admis);
+    H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, int64_t _admis,
+       std::string& admis_kind);
     double construction_relative_error(const Domain& domain);
     void print_structure();
   };
@@ -425,21 +431,120 @@ namespace Hatrix {
     }
   }
 
-  H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _height, int64_t _admis) :
-    N(_N), rank(_rank), height(_height), admis(_admis) {
+  void
+  H2::calc_geometry_based_admissibility(int level, const Domain& domain) {
+    int nblocks = pow(2, level);
+
+  }
+
+  void
+  H2::calc_diagonal_based_admissibility(int level) {
+    int nblocks = pow(2, level);
+    if (level == height) {
+      for (int i = 0; i < nblocks; ++i) {
+        for (int j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, level, std::abs(i - j) >= admis);
+        }
+      }
+    }
+    else {
+      int64_t child_level = level + 1;
+      for (int i = 0; i < nblocks; ++i) {
+        std::vector<int> row_children({i * 2, i * 2 + 1});
+        for (int j = 0; j < nblocks; ++j) {
+          std::vector<int> col_children({j * 2, j * 2 + 1});
+
+          bool admis_block = true;
+          for (int c1 = 0; c1 < 2; ++c1) {
+            for (int c2 = 0; c2 < 2; ++c2) {
+              if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
+                  !is_admissible(row_children[c1], col_children[c2], child_level)) {
+                admis_block = false;
+              }
+            }
+          }
+
+          if (admis_block) {
+            for (int c1 = 0; c1 < 2; ++c1) {
+              for (int c2 = 0; c2 < 2; ++c2) {
+                is_admissible.erase(row_children[c1], col_children[c2], child_level);
+              }
+            }
+          }
+
+          is_admissible.insert(i, j, level, std::move(admis_block));
+        }
+      }
+    }
+
+    calc_diagonal_based_admissibility(level-1);
+  }
+
+  void
+  H2::actually_print_structure(int64_t level) {
+    if (level == 0) { return; }
+    int64_t nblocks = pow(2, level);
+    std::cout << "LEVEL: " << level << std::endl;
+    for (int i = 0; i < nblocks; ++i) {
+      std::cout << "| " ;
+      for (int j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, level)) {
+          std::cout << is_admissible(i, j, level) << " | " ;
+        }
+        else {
+          std::cout << "  | ";
+        }
+      }
+      std::cout << std::endl;
+    }
+
+    actually_print_structure(level-1);
+  }
+
+
+  H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, int64_t _admis,
+         std::string& admis_kind) :
+    N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind) {
+    if (admis_kind == "geometry_admis") {
+      calc_geometry_based_admissibility(height, domain);
+    }
+    else if (admis_kind == "diagonal_admis") {
+      calc_diagonal_based_admissibility(height);
+    }
 
   }
 
   double
   H2::construction_relative_error(const Domain& domain) {
-
+    return 0;
   }
 
   void H2::print_structure() {
-
+    actually_print_structure(height);
   }
 }
 
 int main(int argc, char ** argv) {
+  int64_t N = atoi(argv[1]);
+  int64_t rank = atoi(argv[2]);
+  int64_t nleaf = atoi(argv[3]);
+  int64_t admis = atoi(argv[4]);
+  int64_t ndim = atoi(argv[5]);
+  std::string admis_kind(argv[6]);
+
+  Hatrix::Context::init();
+
+  Hatrix::Domain domain(N, ndim);
+  domain.generate_particles(0.0, 1.0 * N);
+  domain.divide_domain_and_create_particle_boxes(nleaf);
+
+  Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
+  A.print_structure();
+  double construct_error = A.construction_relative_error(domain);
+
+
+  Hatrix::Context::finalize();
+
+  std::cout << "construct error: " << construct_error << std::endl;
 
 }
