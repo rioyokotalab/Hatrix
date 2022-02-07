@@ -1237,7 +1237,6 @@ int main(int argc, char *argv[]) {
 
   double construct_error = A.construction_relative_error(randpts);
 
-  // A.print_structure();
   auto start_factor = std::chrono::system_clock::now();
   A.factorize(randpts);
   auto stop_factor = std::chrono::system_clock::now();
