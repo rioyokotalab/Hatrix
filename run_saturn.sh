@@ -7,6 +7,12 @@ source ~/.bashrc
 
 module load intel-mkl/2020.4.304/gcc-7.3.0-52gb
 
+# gtest pkg-config
+export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/home/v0dro/gitrepos/Hatrix/dependencies/GTest/lib64/pkgconfig"
+
+# stars-h pkg-config
+export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/home/v0dro/gitrepos/stars-h/build/lib/pkgconfig"
+
 
 # mkdir build
 # cd build
@@ -19,4 +25,4 @@ module load intel-mkl/2020.4.304/gcc-7.3.0-52gb
 # make clean
 make -j starsh_programs
 
-./UMV_strong_1level_starsh 1000 10 10 1 1
+./bin/UMV_strong_1level_starsh 1000 10 10 1 0

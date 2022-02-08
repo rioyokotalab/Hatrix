@@ -38,7 +38,7 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_BLR2_far_dense \
 	H2_far_dense_construct
 
-STARSH_EXECS := UMV_strong_H2_Nlevel_starsh \
+STARSH_EXECUTABLES := UMV_strong_H2_Nlevel_starsh \
 	UMV_strong_1level_starsh
 
 .PHONY: dirs $(DIRS)
@@ -46,7 +46,7 @@ dirs: $(DIRS)
 
 all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES)
 
-starsh_programs: $(STARSH_EXECS)
+starsh_programs: $(STARSH_EXECUTABLES)
 
 $(DIRS):
 	$(MAKE) -C $@
@@ -61,6 +61,9 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
+	$(LINK_EXECUTABLE)
+
+$(STARSH_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 test: $(TEST_EXECUTABLES)

@@ -23,25 +23,14 @@
 
 double PV = 1;
 using randvec_t = std::vector<std::vector<double> >;
+randvec_t randpts;
 
 int ndim;
 STARSH_kernel *s_kernel;
 void *starsh_data;
 STARSH_int * starsh_index;
 
-Hatrix::Matrix
-generate_starsh_matrix(int64_t rows, int64_t cols,
-                       int64_t row_start, int64_t col_start) {
-  Hatrix::Matrix out(rows, cols);
 
-  s_kernel(
-         rows, cols,
-         starsh_index + row_start, starsh_index + col_start,
-         starsh_data, starsh_data,
-         &out, out.stride);
-
-  return out;
-}
 
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   return Hatrix::norm(A - B) / Hatrix::norm(B);
@@ -53,6 +42,26 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
               std::vector<int64_t>(1, col_split));
 
 namespace Hatrix {
+  Matrix
+  generate_starsh_matrix(int64_t rows, int64_t cols,
+                         int64_t row_start, int64_t col_start) {
+    Matrix out(rows, cols);
+
+    s_kernel(
+             rows, cols,
+             starsh_index + row_start, starsh_index + col_start,
+             starsh_data, starsh_data,
+             &out, out.stride);
+
+    return out;
+  }
+
+  Matrix
+  generate_laplacend_matrix(int64_t rows, int64_t cols,
+                            int64_t row_start, int64_t col_start) {
+    return generate_laplacend_matrix(randpts, rows, cols, row_start, col_start, PV);
+  }
+
   class BLR2 {
   public:
     RowLevelMap U;
@@ -137,7 +146,7 @@ namespace Hatrix {
     }
 
   public:
-    BLR2(const randvec_t& randpts, int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
+    BLR2(int64_t N, int64_t nblocks, int64_t rank, int64_t admis) :
       N(N), nblocks(nblocks), rank(rank), admis(admis) {
       int block_size = N / nblocks;
 
@@ -155,9 +164,8 @@ namespace Hatrix {
           }
           if (!is_admissible(i, j, level)) {
             D.insert(i, j, level,
-                     Hatrix::generate_laplacend_matrix(randpts,
-                                                       block_size, block_size,
-                                                       i*block_size, j*block_size, PV));
+                     Hatrix::generate_laplacend_matrix(block_size, block_size,
+                                                       i*block_size, j*block_size));
           }
         }
       }
@@ -179,11 +187,10 @@ namespace Hatrix {
         for (int64_t j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j, level)) {
             admissible_found = true;
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                     block_size,
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(block_size,
                                                                      block_size,
                                                                      i*block_size,
-                                                                     j*block_size, PV);
+                                                                     j*block_size);
             Hatrix::matmul(dense, Y[j], AY);
           }
         }
@@ -200,11 +207,10 @@ namespace Hatrix {
         for (int64_t i = 0; i < nblocks; ++i) {
           if (is_admissible(i, j, level)) {
             admissible_found = true;
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                     block_size,
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(block_size,
                                                                      block_size,
                                                                      i*block_size,
-                                                                     j*block_size, PV);
+                                                                     j*block_size);
             Hatrix::matmul(Y[i], dense, YtA, true);
           }
         }
@@ -218,10 +224,9 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j, level)) {
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(randpts,
-                                                                     block_size, block_size,
+            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(block_size, block_size,
                                                                      i*block_size,
-                                                                     j*block_size, PV);
+                                                                     j*block_size);
             S.insert(i, j, level,
                      Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(j, level)));
           }
@@ -524,7 +529,7 @@ namespace Hatrix {
     }
 
     // Perform factorization assuming the permuted form of the BLR2 matrix.
-    Matrix factorize(const randvec_t &randpts) {
+    Matrix factorize() {
       int block_size = N / nblocks;
 
       factorize_level(level, nblocks);
@@ -696,14 +701,14 @@ namespace Hatrix {
     }
 
 
-    double construction_relative_error(const randvec_t& randpts) {
+    double construction_relative_error() {
       double error = 0, dense_norm = 0;
       int block_size = N / nblocks;
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          Matrix actual = Hatrix::generate_laplacend_matrix(randpts, block_size, block_size,
-                                                            i * block_size, j * block_size, PV);
+          Matrix actual = Hatrix::generate_laplacend_matrix(block_size, block_size,
+                                                            i * block_size, j * block_size);
           dense_norm += pow(Hatrix::norm(actual), 2);
 
           if (!is_admissible(i, j, level)) {
@@ -747,11 +752,20 @@ int main(int argc, char** argv) {
   int64_t kernel_func = atoi(argv[5]);
 
   Hatrix::Context::init();
-  randvec_t randpts;
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
-  PV = 1e-3 * (1 / pow(10, multiplier));
+
+  switch(kernel_func) {
+  case 0:
+    randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+    randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+    randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+    PV = 1e-3 * (1 / pow(10, 1));
+    break;
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+    break;
+  };
 
   if (N % nblocks != 0) {
     std::cout << "N % nblocks != 0. Aborting.\n";
@@ -760,14 +774,14 @@ int main(int argc, char** argv) {
 
   Hatrix::Matrix b = Hatrix::generate_range_matrix(N, 1, 0);
 
-  Hatrix::BLR2 A(randpts, N, nblocks, rank, admis);
+  Hatrix::BLR2 A(N, nblocks, rank, admis);
   // A.print_structure();
-  double construct_error = A.construction_relative_error(randpts);
-  auto last = A.factorize(randpts);
+  double construct_error = A.construction_relative_error();
+  auto last = A.factorize();
   Hatrix::Matrix x = A.solve(b, last);
 
   // Verification with dense solver.
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(N, N, 0, 0);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
