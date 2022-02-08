@@ -10,6 +10,20 @@
 // Implements the HSS construction algorithm from
 // Chandrasekaran's 2006 paper.
 
+// N= 100 rank= 10 height=2 const. error=9.77251e-05
+// N= 200 rank= 10 height=3 const. error=0.000164196
+// N= 400 rank= 10 height=4 const. error=0.000194396
+// N= 800 rank= 10 height=5 const. error=0.000191535
+// N= 1600 rank= 10 height=6 const. error=0.000168883
+// N= 3200 rank= 10 height=7 const. error=0.000138579
+// ---- CHANDRA ----
+// N= 100 rank= 15 height=2 const. error=1.28649e-06
+// N= 200 rank= 15 height=3 const. error=6.13982e-06
+// N= 400 rank= 15 height=4 const. error=1.26285e-05
+// N= 800 rank= 15 height=5 const. error=1.75918e-05
+// N= 1600 rank= 15 height=6 const. error=1.96129e-05
+// N= 3200 rank= 15 height=7 const. error=1.89968e-05
+
 using randvec_t = std::vector<std::vector<double> >;
 
 std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {

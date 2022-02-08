@@ -34,7 +34,9 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_strong_H2_3level_hss_chain_product \
 	UMV_strong_H2_3level_chain_product \
 	UMV_strong_H2_Nlevel \
-	UMV_strong_1level_better_index
+	UMV_strong_1level_better_index \
+	UMV_BLR2_far_dense \
+	H2_far_dense_construct
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -54,6 +56,9 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
+	$(LINK_EXECUTABLE)
+
+UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 test: $(TEST_EXECUTABLES)
