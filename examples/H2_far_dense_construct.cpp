@@ -101,6 +101,7 @@ namespace Hatrix {
     int64_t oversampling = 5;
     std::string admis_kind;
     int64_t height = -1;
+    std::vector<int64_t> level_blocks;
 
   private:
     void actually_print_structure(int64_t level);
@@ -132,6 +133,8 @@ namespace Hatrix {
     calc_geometry_based_admissibility(int64_t level, const Domain& domain);
     void calc_diagonal_based_admissibility(int64_t level);
     void coarsen_blocks(int64_t level);
+    int64_t geometry_admis_non_leaf(int64_t nblocks, int64_t level);
+    int64_t calc_geometry_based_admissibility(const Domain& domain);
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind);
@@ -383,7 +386,6 @@ namespace Hatrix {
     if (ndim == 1) {
       auto vec = equally_spaced_vector(N, min_val, max_val);
       for (int64_t i = 0; i < N; ++i) {
-        // std::cout << "adding point: " << vec[i] << std::endl;
         particles.push_back(Hatrix::Particle(vec[i], min_val + (double(i) / double(range))));
       }
     }
@@ -467,24 +469,57 @@ namespace Hatrix {
     }
   }
 
-  void
-  H2::calc_geometry_based_admissibility(int64_t level, const Domain& domain) {
-    int64_t nblocks = pow(2, level);
-    if (level == 0) { return; }
-    if (level == height) {
-      for (int64_t i = 0; i < nblocks; ++i) {
-        for (int64_t j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, level,
-                               std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
-                               admis * domain.boxes[i].distance_from(domain.boxes[j]));
+  int64_t
+  H2::geometry_admis_non_leaf(int64_t nblocks, int64_t level) {
+    int64_t child_level = level - 1;
+
+    if (nblocks == 1) { return level; }
+    level_blocks.push_back(nblocks);
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      std::vector<int64_t> row_children({i * 2, i * 2 + 1});
+      for (int64_t j = 0; j < nblocks; ++j) {
+        std::vector<int64_t> col_children({j * 2, j * 2 + 1});
+
+        bool admis_block = true;
+        for (int64_t c1 = 0; c1 < 2; ++c1) {
+          for (int64_t c2 = 0; c2 < 2; ++c2) {
+            if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
+                !is_admissible(row_children[c1], col_children[c2], child_level)) {
+              admis_block = false;
+            }
+          }
         }
+
+        if (admis_block) {
+          for (int64_t c1 = 0; c1 < 2; ++c1) {
+            for (int64_t c2 = 0; c2 < 2; ++c2) {
+              is_admissible.erase(row_children[c1], col_children[c2], child_level);
+            }
+          }
+        }
+
+        is_admissible.insert(i, j, level, std::move(admis_block));
       }
     }
-    else {
-      coarsen_blocks(level);
+
+    return geometry_admis_non_leaf(nblocks/2, level+1);
+  }
+
+  int64_t
+  H2::calc_geometry_based_admissibility(const Domain& domain) {
+    int64_t nblocks = domain.boxes.size();
+    level_blocks.push_back(nblocks);
+    int64_t level = 0;
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        is_admissible.insert(i, j, level,
+                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
+                             admis * domain.boxes[i].distance_from(domain.boxes[j]));
+      }
     }
 
-    calc_geometry_based_admissibility(level-1, domain);
+    return geometry_admis_non_leaf(nblocks / 2, level+1);
   }
 
   void
@@ -507,8 +542,8 @@ namespace Hatrix {
 
   void
   H2::actually_print_structure(int64_t level) {
-    if (level == 0) { return; }
-    int64_t nblocks = pow(2, level);
+    if (level == height) { return; }
+    int64_t nblocks = level_blocks[level];
     std::cout << "LEVEL: " << level << std::endl;
     for (int64_t i = 0; i < nblocks; ++i) {
       std::cout << "| " ;
@@ -523,7 +558,7 @@ namespace Hatrix {
       std::cout << std::endl;
     }
 
-    actually_print_structure(level-1);
+    actually_print_structure(level+1);
   }
 
 
@@ -531,11 +566,10 @@ namespace Hatrix {
          double _admis, std::string& admis_kind) :
     N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind) {
     if (admis_kind == "geometry_admis") {
-      calc_geometry_based_admissibility(height, domain);
+      height = calc_geometry_based_admissibility(domain);
     }
     else if (admis_kind == "diagonal_admis") {
       height = int64_t(log2(N / nleaf));
-      std::cout << "H: " << height << std::endl;
       calc_diagonal_based_admissibility(height);
     }
 
@@ -547,7 +581,7 @@ namespace Hatrix {
   }
 
   void H2::print_structure() {
-    actually_print_structure(height);
+    actually_print_structure(0);
   }
 }
 
