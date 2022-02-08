@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 #include <cassert>
+#include <functional>
 
 #include <starsh.h>
 #include <starsh-randtlr.h>
@@ -30,8 +31,6 @@ STARSH_kernel *s_kernel;
 void *starsh_data;
 STARSH_int * starsh_index;
 
-
-
 double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   return Hatrix::norm(A - B) / Hatrix::norm(B);
 }
@@ -42,8 +41,10 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
               std::vector<int64_t>(1, col_split));
 
 namespace Hatrix {
+
+
   Matrix
-  generate_starsh_matrix(int64_t rows, int64_t cols,
+  generate_starsh_kernel(int64_t rows, int64_t cols,
                          int64_t row_start, int64_t col_start) {
     Matrix out(rows, cols);
 
@@ -57,10 +58,12 @@ namespace Hatrix {
   }
 
   Matrix
-  generate_laplacend_matrix(int64_t rows, int64_t cols,
+  generate_laplacend_kernel(int64_t rows, int64_t cols,
                             int64_t row_start, int64_t col_start) {
     return generate_laplacend_matrix(randpts, rows, cols, row_start, col_start, PV);
   }
+
+  std::function<Matrix(int64_t, int64_t, int64_t, int64_t)> kernel_function;
 
   class BLR2 {
   public:
@@ -164,7 +167,7 @@ namespace Hatrix {
           }
           if (!is_admissible(i, j, level)) {
             D.insert(i, j, level,
-                     Hatrix::generate_laplacend_matrix(block_size, block_size,
+                     Hatrix::kernel_function(block_size, block_size,
                                                        i*block_size, j*block_size));
           }
         }
@@ -187,7 +190,7 @@ namespace Hatrix {
         for (int64_t j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j, level)) {
             admissible_found = true;
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(block_size,
+            Hatrix::Matrix dense = Hatrix::kernel_function(block_size,
                                                                      block_size,
                                                                      i*block_size,
                                                                      j*block_size);
@@ -207,7 +210,7 @@ namespace Hatrix {
         for (int64_t i = 0; i < nblocks; ++i) {
           if (is_admissible(i, j, level)) {
             admissible_found = true;
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(block_size,
+            Hatrix::Matrix dense = Hatrix::kernel_function(block_size,
                                                                      block_size,
                                                                      i*block_size,
                                                                      j*block_size);
@@ -224,7 +227,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j, level)) {
-            Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(block_size, block_size,
+            Hatrix::Matrix dense = Hatrix::kernel_function(block_size, block_size,
                                                                      i*block_size,
                                                                      j*block_size);
             S.insert(i, j, level,
@@ -707,7 +710,7 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          Matrix actual = Hatrix::generate_laplacend_matrix(block_size, block_size,
+          Matrix actual = Hatrix::kernel_function(block_size, block_size,
                                                             i * block_size, j * block_size);
           dense_norm += pow(Hatrix::norm(actual), 2);
 
@@ -751,19 +754,53 @@ int main(int argc, char** argv) {
   int64_t admis = atoi(argv[4]);
   int64_t kernel_func = atoi(argv[5]);
 
+  double beta = 0.1;
+  double nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
+  double noise = 1.e-1;
+  double sigma = 1.0;
+
   Hatrix::Context::init();
 
+  enum STARSH_PARTICLES_PLACEMENT place = STARSH_PARTICLES_UNIFORM;
+  Hatrix::kernel_function = Hatrix::generate_starsh_kernel;
+  int ndim;
   switch(kernel_func) {
   case 0:
     randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
     randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
     randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
     PV = 1e-3 * (1 / pow(10, 1));
+    Hatrix::kernel_function = Hatrix::generate_laplacend_kernel;
     break;
-  case 1:
+  case 1: {
+    double wave_k = 50;           // default value from hicma_parsec.c
+    double add_diag = 0.0;        // default value from hicma_parsec.c
+    ndim = 2;
+    s_kernel = starsh_eddata_block_sin_kernel_2d;
+    starsh_eddata_generate((STARSH_eddata **)&starsh_data, N, ndim, wave_k,
+                           add_diag, place);
+    break;
+  }
   case 2:
+    ndim = 2;
+    s_kernel = starsh_ssdata_block_sqrexp_kernel_2d;
+    // This function will generate a 2D spatial geometry. Grid.
+    starsh_ssdata_generate((STARSH_ssdata**)&starsh_data, N, ndim, beta,
+                           nu, noise, place, sigma);
+    break;
   case 3:
+    ndim = 3;
+    // This function will generate a 3D spatial geometry. Grid.
+    s_kernel = starsh_ssdata_block_sqrexp_kernel_3d;
+    starsh_ssdata_generate((STARSH_ssdata **)&starsh_data, N, ndim,
+                           beta, nu, noise, place, sigma);
+    break;
   case 4:
+    ndim = 3;
+    s_kernel = starsh_ssdata_block_exp_kernel_3d;
+    starsh_ssdata_generate((STARSH_ssdata **)&starsh_data, N, ndim,
+                           beta, nu, noise, place, sigma);
+
     break;
   };
 
@@ -781,7 +818,7 @@ int main(int argc, char** argv) {
   Hatrix::Matrix x = A.solve(b, last);
 
   // Verification with dense solver.
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(N, N, 0, 0);
+  Hatrix::Matrix Adense = Hatrix::generate_laplacend_kernel(N, N, 0, 0);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
