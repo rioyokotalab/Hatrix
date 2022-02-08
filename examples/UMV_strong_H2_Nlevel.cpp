@@ -528,7 +528,7 @@ namespace Hatrix {
           if (admis_block) {
             for (int c1 = 0; c1 < 2; ++c1) {
               for (int c2 = 0; c2 < 2; ++c2) {
-                // is_admissible.erase(row_children[c1], col_children[c2], child_level);
+                is_admissible.erase(row_children[c1], col_children[c2], child_level);
               }
             }
           }
@@ -718,8 +718,6 @@ namespace Hatrix {
         }
       }
 
-      F.erase_all();
-
       Matrix U_F = make_complement(U(block, level));
       Matrix V_F = make_complement(V(block, level));
 
@@ -871,11 +869,6 @@ namespace Hatrix {
             auto right_splits = SPLIT_DENSE(D(block, j, level),
                                             row_split, block_size - V(j, level).cols);
             // Schur's compliement between co and cc blocks where product exists as dense.
-            // std::cout << "1 ->FILL IN: i-> " << i << " j-> " << j << std::endl;
-            // if (block == 4) {
-            //   std::cout << "FILL IN: i-> " << i << " j-> " << j << " l-> " << level << std::endl;
-            // }
-
             if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
               auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                block_size - U(i, level).cols,
@@ -888,12 +881,6 @@ namespace Hatrix {
             else {
 
               if (!F.exists(i, j)) {
-
-                // if (block == 4) {
-                //   std::cout << ">>> MAKE FILL IN: i-> " << i << " j-> " << j << " l-> " << level << std::endl;
-                // }
-
-
                 Matrix fill_in(rank, block_size);
                 auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
                 // Update the co block within the fill-ins.
@@ -904,7 +891,6 @@ namespace Hatrix {
               }
               else {
                 Matrix& fill_in = F(i, j);
-                // std::cout << "3 -> FILL IN: i-> " << i << " j-> " << j << std::endl;
                 auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
                 // Update the co block within the fill-ins.
                 matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
@@ -916,6 +902,8 @@ namespace Hatrix {
         }
       }
     } // for (int block = 0; block < nblocks; ++block)
+
+    F.erase_all();
   }
 
   void H2::factorize(const randvec_t &randpts) {
@@ -962,44 +950,46 @@ namespace Hatrix {
         int c1 = block;
         int c2 = block+1;
 
-        if (row_has_admissible_blocks(parent_node, parent_level) && r.exists(c1) && r.exists(c2)) {
-          auto Ubig_child1 = get_Ubig(c1, level);
-          auto Ubig_child2 = get_Ubig(c2, level);
-
+        if (row_has_admissible_blocks(parent_node, parent_level)) {
           Matrix& Utransfer = U(parent_node, parent_level);
           auto Utransfer_splits = Utransfer.split(2, 1);
 
-          Matrix temp(rank*2, rank);
+          Matrix temp(Utransfer);
           auto temp_splits = temp.split(2, 1);
 
-          matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false);
-          matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false);
+          if (r.exists(c1)) {
+            matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
+            r.erase(c1);
+          }
+
+          if (r.exists(c2)) {
+            matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
+            r.erase(c2);
+          }
 
           U.erase(parent_node, parent_level);
           U.insert(parent_node, parent_level, std::move(temp));
-
-          r.erase(c1);
-          r.erase(c2);
         }
 
-        if (col_has_admissible_blocks(parent_node, parent_level) && t.exists(c1) && t.exists(c2)) {
-          auto Vbig_child1 = get_Vbig(c1, level);
-          auto Vbig_child2 = get_Vbig(c2, level);
-
+        if (col_has_admissible_blocks(parent_node, parent_level)) {
           Matrix& Vtransfer = V(parent_node, parent_level);
           auto Vtransfer_splits = Vtransfer.split(2, 1);
 
-          Matrix temp(rank*2, rank);
+          Matrix temp(Vtransfer);
           auto temp_splits = temp.split(2, 1);
 
-          matmul(t(c1), Vtransfer_splits[0], temp_splits[0], false, false);
-          matmul(t(c2), Vtransfer_splits[1], temp_splits[1], false, false);
+          if (t.exists(c1)) {
+            matmul(t(c1), Vtransfer_splits[0], temp_splits[0], false, false, 1, 0);
+            t.erase(c1);
+          }
+
+          if (t.exists(c2)) {
+            matmul(t(c2), Vtransfer_splits[1], temp_splits[1], false, false, 1, 0);
+            t.erase(c2);
+          }
 
           V.erase(parent_node, parent_level);
           V.insert(parent_node, parent_level, std::move(temp));
-
-          t.erase(c1);
-          t.erase(c2);
         }
       } // for (int block = 0; block < num_nodes; block += 2)
 
@@ -1100,7 +1090,6 @@ namespace Hatrix {
       // Forward with the big c blocks on the lower part.
       for (int irow = block+1; irow < nblocks; ++irow) {
         if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
-          std::cout << "cc lower: ir -> " << irow << " bl -> " << block << " lvl -> "  << level << std::endl;
           int64_t row_split = block_size - U(irow, level).cols;
           int64_t col_split = block_size - V(block, level).cols;
           auto lower_splits = D(irow, block, level).split({}, std::vector<int64_t>(1, row_split));
@@ -1183,7 +1172,6 @@ namespace Hatrix {
     }
 
     for (int block = nblocks-1; block >= 0; --block) {
-      int block_size = V(block, level).rows;
       auto V_F = make_complement(V(block, level));
       Matrix prod = matmul(V_F, x_level_split[block]);
       x_level_split[block] = prod;
@@ -1638,7 +1626,6 @@ int main(int argc, char *argv[]) {
   auto stop_construct = std::chrono::system_clock::now();
   auto construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
-  A.print_structure();
 
   double construct_error = A.construction_relative_error(randpts);
 
@@ -1662,10 +1649,6 @@ int main(int argc, char *argv[]) {
   auto x_solve_split = x_solve.split(blocks, 1);
   auto diff = x - x_solve;
   auto diff_splits = diff.split(blocks, 1);
-
-  for (int i = 0; i < blocks; ++i) {
-    std::cout << "diff i : " << i << " n -> " << (norm(diff_splits[i]) / norm(x_solve_split[i])) << std::endl;
-  }
 
   int leaf = int(N / pow(2, height));
   Hatrix::Context::finalize();
