@@ -25,6 +25,7 @@ module load intel-mkl/2020.4.304/gcc-7.3.0-52gb
 make -j all
 ./bin/UMV_strong_H2_Nlevel 400 5 3 1
 ./bin/UMV_strong_H2_Nlevel 400 5 3 2
+./bin/UMV_strong_H2_Nlevel 800 5 4 3
 # ./bin/UMV_strong_1level 400 10 5 2 2
 # ./bin/UMV_strong_H2_Nlevel 800 5 4 2
 # ./bin/UMV_strong_H2_Nlevel 400 6 3 2
