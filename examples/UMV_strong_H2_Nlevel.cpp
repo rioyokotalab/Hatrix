@@ -528,7 +528,7 @@ namespace Hatrix {
           if (admis_block) {
             for (int c1 = 0; c1 < 2; ++c1) {
               for (int c2 = 0; c2 < 2; ++c2) {
-                is_admissible.erase(row_children[c1], col_children[c2], child_level);
+                // is_admissible.erase(row_children[c1], col_children[c2], child_level);
               }
             }
           }
@@ -827,15 +827,15 @@ namespace Hatrix {
                                             U(i, level).cols, col_split);
             auto right_splits = SPLIT_DENSE(D(block, j, level), row_split, block_size -
                                             V(j, level).cols);
-            // Schur's compliement between co and cc blocks where product exists as dense.
+            // Schur's compliement between oc and cc blocks where product exists as dense.
             if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
               auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                block_size - U(i, level).cols,
                                                block_size - V(j, level).cols);
               matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
             }
-            // Schur's compliement between co and cc blocks where a new fill-in is created.
-            // The product is a (co; oo)-sized matrix.
+            // Schur's compliement between oc and cc blocks where a new fill-in is created.
+            // The product is a (oc; oo)-sized matrix.
             else {
               if (!F.exists(i, j)) {
                 Matrix fill_in(block_size, rank);
@@ -861,7 +861,7 @@ namespace Hatrix {
         }
       }
 
-      // Schur's compliment between oc and cc blocks
+      // Schur's compliment between co and cc blocks
       for (int i = 0; i < nblocks; ++i) {
         for (int j = block+1; j < nblocks; ++j) {
           if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
@@ -870,7 +870,12 @@ namespace Hatrix {
                                             U(i, level).cols, col_split);
             auto right_splits = SPLIT_DENSE(D(block, j, level),
                                             row_split, block_size - V(j, level).cols);
-            // Schur's compliement between oc and cc blocks where product exists as dense.
+            // Schur's compliement between co and cc blocks where product exists as dense.
+            // std::cout << "1 ->FILL IN: i-> " << i << " j-> " << j << std::endl;
+            // if (block == 4) {
+            //   std::cout << "FILL IN: i-> " << i << " j-> " << j << " l-> " << level << std::endl;
+            // }
+
             if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
               auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                block_size - U(i, level).cols,
@@ -879,12 +884,19 @@ namespace Hatrix {
                      false, false, -1.0, 1.0);
             }
             // Schur's compliement between co and cc blocks where a new fill-in is created.
-            // The product is a (oc, oo)-sized block.
+            // The product is a (co, oo)-sized block.
             else {
+
               if (!F.exists(i, j)) {
+
+                // if (block == 4) {
+                //   std::cout << ">>> MAKE FILL IN: i-> " << i << " j-> " << j << " l-> " << level << std::endl;
+                // }
+
+
                 Matrix fill_in(rank, block_size);
                 auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
-                // Update the oc block within the fill-ins.
+                // Update the co block within the fill-ins.
                 matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
                 // Update the oo block within the fill-ins.
                 matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
@@ -892,8 +904,9 @@ namespace Hatrix {
               }
               else {
                 Matrix& fill_in = F(i, j);
+                // std::cout << "3 -> FILL IN: i-> " << i << " j-> " << j << std::endl;
                 auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
-                // Update the oc block within the fill-ins.
+                // Update the co block within the fill-ins.
                 matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
                 // Update the oo block within the fill-ins.
                 matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
@@ -944,7 +957,6 @@ namespace Hatrix {
       int parent_level = level - 1;
 
       // Update transfer matrices on one level higher.
-      int parent_nodes = pow(2, parent_level);
       for (int block = 0; block < num_nodes; block += 2) {
         int parent_node = block / 2;
         int c1 = block;
@@ -1065,8 +1077,6 @@ namespace Hatrix {
     std::vector<Matrix> x_level_split = x_level.split(nblocks, 1);
 
     for (int block = 0; block < nblocks; ++block) {
-      int block_size = U(block, level).rows;
-      // std::cout << " bl -> " << block << " nr= " << norm(generate_identity_matrix(rank, rank) - matmul(U(block, level), U(block, level), true, false)) << std::endl;
       Matrix U_F = make_complement(U(block, level));
       Matrix prod = matmul(U_F, x_level_split[block], true);
       x_level_split[block] = prod;
@@ -1090,6 +1100,7 @@ namespace Hatrix {
       // Forward with the big c blocks on the lower part.
       for (int irow = block+1; irow < nblocks; ++irow) {
         if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
+          std::cout << "cc lower: ir -> " << irow << " bl -> " << block << " lvl -> "  << level << std::endl;
           int64_t row_split = block_size - U(irow, level).cols;
           int64_t col_split = block_size - V(block, level).cols;
           auto lower_splits = D(irow, block, level).split({}, std::vector<int64_t>(1, row_split));
@@ -1181,7 +1192,7 @@ namespace Hatrix {
 
   Matrix H2::solve(Matrix& b, int _level) {
     int level = _level;
-    int64_t offset, rhs_offset = 0;
+    int64_t rhs_offset = 0;
     Matrix x(b);
     std::vector<Matrix> x_splits;
 
@@ -1506,7 +1517,6 @@ std::vector<Hatrix::Matrix> generate_L2_chain(Hatrix::H2& A) {
 
 std::vector<Hatrix::Matrix> generate_U2_chain(Hatrix::H2& A) {
   std::vector<Hatrix::Matrix> U2;
-  int block_size = A.rank;
   int permuted_nblocks = 8;
   int level = 2;
   int nblocks = pow(2, level);
@@ -1638,9 +1648,9 @@ int main(int argc, char *argv[]) {
   auto factor_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factor - start_factor).count();
 
-  std::cout << "-- H2 verification --\n";
-  verify_A1_factorization(A, randpts);
-  verify_A2_factorization(A, randpts);
+  // std::cout << "-- H2 verification --\n";
+  // verify_A1_factorization(A, randpts);
+  // verify_A2_factorization(A, randpts);
 
   Hatrix::Matrix x = A.solve(b, A.height);
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0, PV);
