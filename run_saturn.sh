@@ -25,4 +25,6 @@ export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/home/v0dro/gitrepos/stars-h/build/lib/
 # make clean
 make -j starsh_programs
 
-./bin/UMV_strong_1level_starsh 1000 10 10 1 0
+# ./bin/UMV_strong_1level_starsh 1000 10 10 1 0
+gdb -ex run --args ./bin/UMV_strong_1level_starsh 1000 10 100 9 1
+# ./bin/UMV_strong_1level_starsh 1000 10 10 1 2

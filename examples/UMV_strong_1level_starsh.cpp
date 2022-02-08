@@ -168,7 +168,7 @@ namespace Hatrix {
           if (!is_admissible(i, j, level)) {
             D.insert(i, j, level,
                      Hatrix::kernel_function(block_size, block_size,
-                                                       i*block_size, j*block_size));
+                                             i*block_size, j*block_size));
           }
         }
       }
@@ -241,7 +241,7 @@ namespace Hatrix {
       RowColMap<Matrix> F;      // fill-in blocks.
 
       for (int block = 0; block < nblocks; ++block) {
-        int64_t block_size = U(block, level).rows;
+        int64_t block_size = D(block, block, level).rows;
         if (block > 0 && admis != 0) {
           {
             // Scan for fill-ins in the same row as this diagonal block.
@@ -763,6 +763,12 @@ int main(int argc, char** argv) {
 
   enum STARSH_PARTICLES_PLACEMENT place = STARSH_PARTICLES_UNIFORM;
   Hatrix::kernel_function = Hatrix::generate_starsh_kernel;
+
+  starsh_index = (STARSH_int*)malloc(sizeof(STARSH_int) * N);
+  for (int j = 0; j < N; ++j) {
+    starsh_index[j] = j;
+  }
+
   int ndim;
   switch(kernel_func) {
   case 0:
@@ -808,12 +814,13 @@ int main(int argc, char** argv) {
     std::cout << "N % nblocks != 0. Aborting.\n";
     abort();
   }
+  double construct_error, solve_error;
 
   Hatrix::Matrix b = Hatrix::generate_range_matrix(N, 1, 0);
 
   Hatrix::BLR2 A(N, nblocks, rank, admis);
-  // A.print_structure();
-  double construct_error = A.construction_relative_error();
+  A.print_structure();
+  construct_error = A.construction_relative_error();
   auto last = A.factorize();
   Hatrix::Matrix x = A.solve(b, last);
 
@@ -821,10 +828,14 @@ int main(int argc, char** argv) {
   Hatrix::Matrix Adense = Hatrix::generate_laplacend_kernel(N, N, 0, 0);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
 
   std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
-            << " construct error: " << construct_error << " solve error: " << solve_error << "\n";
+            << " construct error: " << construct_error << " solve error: " << solve_error
+            << " kernel func: " << kernel_func << "\n";
+
+
+  free(starsh_index);
 }
