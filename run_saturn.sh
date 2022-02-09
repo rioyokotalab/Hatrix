@@ -14,19 +14,11 @@ export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/home/v0dro/gitrepos/Hatrix/dependencie
 export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/home/v0dro/gitrepos/stars-h/build/lib/pkgconfig"
 
 
-# mkdir build
-# cd build
-# cmake .. -DCMAKE_INSTALL_PREFIX=$PWD
-# make -j
-# rm *out
-# make -j all
-# make -j UMV_strong_H2_Nlevel_starsh
-
 # make clean
 make -j starsh_programs
 
-# ./bin/UMV_strong_1level_starsh 1000 10 10 1 0
-# ./bin/UMV_strong_1level_starsh 1000 10 100 9 1
-./bin/UMV_BLR2_far_dense_starsh 1000 100 10 1 2 geometry_admis 0
-./bin/UMV_BLR2_far_dense_starsh 1000 100 10 1 2 geometry_admis 1
+for admis in 0.1 0.2 0.4 0.5 0.7 0.8 1 1.2; do
+    ./bin/UMV_BLR2_far_dense_starsh 4000 400 50 $admis 2 geometry_admis 2
+done
+
 # ./bin/UMV_strong_1level_starsh 1000 10 10 1 2

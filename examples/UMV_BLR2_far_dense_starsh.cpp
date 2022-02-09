@@ -10,6 +10,7 @@
 #include <random>
 #include <string>
 #include <iomanip>
+#include <fstream>
 #include <functional>
 
 #include <starsh.h>
@@ -23,6 +24,8 @@ int ndim;
 STARSH_kernel *s_kernel;
 void *starsh_data;
 STARSH_int * starsh_index;
+
+double beta, nu, noise = 1.e-1, sigma;
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 double PV = 1e-3;
@@ -102,16 +105,59 @@ namespace Hatrix {
 }
 
 namespace Hatrix {
+
+  double sqrexp_2d_kernel(const std::vector<double>& coords_row,
+                          const std::vector<double>& coords_col) {
+    int64_t ndim = coords_row.size();
+    double dist = 0, temp;
+
+    // Copied from kernel_sqrexp.c in stars-H.
+
+    for (int64_t k = 0; k < ndim; ++k) {
+      temp = coords_row[k] - coords_col[k];
+      dist += temp * temp;
+    }
+    dist = dist / beta;
+    if (dist == 0) {
+      return sigma + noise;
+    }
+    else {
+      return sigma * exp(dist);
+    }
+  }
+
   Matrix
   generate_sqrexp_2d_kernel(const Domain& domain,
                          int64_t irow, int64_t icol) {
     Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
 
-    // s_kernel(
-    //          rows, cols,
-    //          starsh_index + row_start, starsh_index + col_start,
-    //          starsh_data, starsh_data,
-    //          &out, out.stride);
+    for (int64_t i = 0; i < out.rows; ++i) {
+      for (int64_t j = 0; j < out.cols; ++j) {
+        int64_t source = domain.boxes[irow].start_index;
+        int64_t target = domain.boxes[icol].start_index;
+
+        out(i, j) = sqrexp_2d_kernel(domain.particles[source+i].coords,
+                                     domain.particles[target+j].coords);
+      }
+    }
+
+    return out;
+  }
+
+  Matrix
+  generate_sqrexp_3d_kernel(const Domain& domain,
+                            int64_t irow, int64_t icol) {
+    Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
+
+    for (int64_t i = 0; i < out.rows; ++i) {
+      for (int64_t j = 0; j < out.cols; ++j) {
+        int64_t source = domain.boxes[irow].start_index;
+        int64_t target = domain.boxes[icol].start_index;
+
+        // out(i, j) = sqrexp_2d_kernel(domain.particles[source+i].coords,
+        //                              domain.particles[target+j].coords);
+      }
+    }
 
     return out;
   }
@@ -1377,6 +1423,7 @@ int main(int argc, char** argv) {
   }
   case 2: {
     ndim = 2;
+    domain.ndim = ndim;
     starsh_ssdata_generate((STARSH_ssdata**)&starsh_data, N, ndim, beta,
                            nu, noise, place, sigma);
     domain.particles_from_starsh(((STARSH_ssdata*)starsh_data)->particles);
@@ -1384,6 +1431,12 @@ int main(int argc, char** argv) {
     break;
   }
   case 3: {
+    ndim = 3;
+    domain.ndim = ndim;
+    starsh_ssdata_generate((STARSH_ssdata **)&starsh_data, N, ndim,
+                           beta, nu, noise, place, sigma);
+    domain.particles_from_starsh(((STARSH_ssdata*)starsh_data)->particles);
+    Hatrix::kernel_function = Hatrix::generate_sqrexp_3d_kernel;
     break;
   }
   case 4: {
@@ -1424,4 +1477,13 @@ int main(int argc, char** argv) {
             << " LR%: " << A.low_rank_block_ratio() * 100 << "%"
             << " admis kind: " << admis_kind
             <<  "\n";
+
+  std::ofstream file;
+  file.open("far_dense_data.csv", std::ios::app | std::ios::out);
+  file << N << "," << rank << "," << nleaf << "," << admis
+       << "," << ndim << "," << construct_error << ","
+       << A.low_rank_block_ratio() * 100 << std::endl;
+  file.close();
+
+
 }
