@@ -17,8 +17,12 @@ export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/home/v0dro/gitrepos/stars-h/build/lib/
 # make clean
 make -j starsh_programs
 
-for admis in 0.1 0.2 0.4 0.5 0.7 0.8 1 1.2; do
-    ./bin/UMV_BLR2_far_dense_starsh 4000 400 50 $admis 2 geometry_admis 2
+for admis in 0.1 0.2 0.4 0.5 0.55 0.6 0.65 0.7 0.8 1 1.2; do
+    ./bin/UMV_BLR2_far_dense_starsh 4000 400 50 $admis 2 geometry_admis 2 sqrexp_2d
+    ./bin/UMV_BLR2_far_dense_starsh 4000 400 50 $admis 3 geometry_admis 3 sqrexp_3d
+
+    ./bin/UMV_BLR2_far_dense_starsh 4000 400 80 $admis 2 geometry_admis 2 sqrexp_2d
+    ./bin/UMV_BLR2_far_dense_starsh 4000 400 80 $admis 3 geometry_admis 3 sqrexp_3d
 done
 
 # ./bin/UMV_strong_1level_starsh 1000 10 10 1 2

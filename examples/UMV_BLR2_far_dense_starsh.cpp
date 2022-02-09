@@ -106,7 +106,7 @@ namespace Hatrix {
 
 namespace Hatrix {
 
-  double sqrexp_2d_kernel(const std::vector<double>& coords_row,
+  double sqrexp_kernel(const std::vector<double>& coords_row,
                           const std::vector<double>& coords_col) {
     int64_t ndim = coords_row.size();
     double dist = 0, temp;
@@ -127,7 +127,7 @@ namespace Hatrix {
   }
 
   Matrix
-  generate_sqrexp_2d_kernel(const Domain& domain,
+  generate_sqrexp_kernel(const Domain& domain,
                          int64_t irow, int64_t icol) {
     Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
 
@@ -136,26 +136,8 @@ namespace Hatrix {
         int64_t source = domain.boxes[irow].start_index;
         int64_t target = domain.boxes[icol].start_index;
 
-        out(i, j) = sqrexp_2d_kernel(domain.particles[source+i].coords,
-                                     domain.particles[target+j].coords);
-      }
-    }
-
-    return out;
-  }
-
-  Matrix
-  generate_sqrexp_3d_kernel(const Domain& domain,
-                            int64_t irow, int64_t icol) {
-    Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
-
-    for (int64_t i = 0; i < out.rows; ++i) {
-      for (int64_t j = 0; j < out.cols; ++j) {
-        int64_t source = domain.boxes[irow].start_index;
-        int64_t target = domain.boxes[icol].start_index;
-
-        // out(i, j) = sqrexp_2d_kernel(domain.particles[source+i].coords,
-        //                              domain.particles[target+j].coords);
+        out(i, j) = sqrexp_kernel(domain.particles[source+i].coords,
+                                  domain.particles[target+j].coords);
       }
     }
 
@@ -1393,6 +1375,7 @@ int main(int argc, char** argv) {
   int64_t ndim = atoi(argv[5]);
   std::string admis_kind(argv[6]);
   int64_t kernel_func = atoi(argv[7]);
+  std::string kernel_string(argv[8]);
 
   double solve_error, construct_error, factorize_error;
 
@@ -1427,7 +1410,7 @@ int main(int argc, char** argv) {
     starsh_ssdata_generate((STARSH_ssdata**)&starsh_data, N, ndim, beta,
                            nu, noise, place, sigma);
     domain.particles_from_starsh(((STARSH_ssdata*)starsh_data)->particles);
-    Hatrix::kernel_function = Hatrix::generate_sqrexp_2d_kernel;
+    Hatrix::kernel_function = Hatrix::generate_sqrexp_kernel;
     break;
   }
   case 3: {
@@ -1436,7 +1419,7 @@ int main(int argc, char** argv) {
     starsh_ssdata_generate((STARSH_ssdata **)&starsh_data, N, ndim,
                            beta, nu, noise, place, sigma);
     domain.particles_from_starsh(((STARSH_ssdata*)starsh_data)->particles);
-    Hatrix::kernel_function = Hatrix::generate_sqrexp_3d_kernel;
+    Hatrix::kernel_function = Hatrix::generate_sqrexp_kernel;
     break;
   }
   case 4: {
@@ -1445,8 +1428,6 @@ int main(int argc, char** argv) {
   }
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
-
-
 
   if (rank > nleaf) {
     std::cout << "rank > nleaf. Aborting.\n";
@@ -1482,7 +1463,9 @@ int main(int argc, char** argv) {
   file.open("far_dense_data.csv", std::ios::app | std::ios::out);
   file << N << "," << rank << "," << nleaf << "," << admis
        << "," << ndim << "," << construct_error << ","
-       << A.low_rank_block_ratio() * 100 << std::endl;
+       << A.low_rank_block_ratio() * 100 << ","
+       << kernel_string
+       << std::endl;
   file.close();
 
 
