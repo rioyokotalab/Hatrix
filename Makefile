@@ -39,7 +39,8 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	H2_far_dense_construct
 
 STARSH_EXECUTABLES := UMV_strong_H2_Nlevel_starsh \
-	UMV_strong_1level_starsh
+	UMV_strong_1level_starsh \
+	UMV_BLR2_far_dense_starsh
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
