@@ -1368,7 +1368,7 @@ int main(int argc, char** argv) {
   switch(kernel_func) {
   case 0: {
     domain.generate_particles(0.0, 1.0 * N);
-    domain.divide_domain_and_create_particle_boxes(nleaf);
+    // domain.divide_domain_and_create_particle_boxes(nleaf);
     Hatrix::kernel_function = Hatrix::generate_laplace_kernel;
     break;
   }
@@ -1391,6 +1391,7 @@ int main(int argc, char** argv) {
   }
   }
 
+  domain.divide_domain_and_create_particle_boxes(nleaf);
 
 
 
