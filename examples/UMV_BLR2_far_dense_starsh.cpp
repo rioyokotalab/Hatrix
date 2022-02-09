@@ -96,13 +96,14 @@ namespace Hatrix {
   public:
     Domain(int64_t N, int64_t ndim);
     void generate_particles(double min_val, double max_vale);
+    void particles_from_starsh(STARSH_particles& particles);
     void divide_domain_and_create_particle_boxes(int64_t nleaf);
   };
 }
 
 namespace Hatrix {
   Matrix
-  generate_starsh_kernel(const Domain& domain,
+  generate_sqrexp_2d_kernel(const Domain& domain,
                          int64_t irow, int64_t icol) {
     Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
 
@@ -343,7 +344,38 @@ namespace Hatrix {
 
   Domain::Domain(int64_t N, int64_t ndim) : N(N), ndim(ndim) {}
 
-  void Domain::generate_particles(double min_val, double max_val) {
+  void
+  Domain::particles_from_starsh(STARSH_particles& starsh_particles) {
+    double *coords[ndim];
+
+    coords[0] = starsh_particles.point;
+    STARSH_int count = starsh_particles.count;
+
+    for (int k = 1; k < ndim; ++k) {
+      coords[k] = coords[0] + k * count;
+    }
+
+    if (ndim == 2) {
+      for (int64_t i = 0; i < N; ++i) {
+        double x = coords[0][starsh_index[i]];
+        double y = coords[1][starsh_index[i]];
+
+        particles.push_back(Hatrix::Particle(x, y, 0));
+      }
+    }
+    else if (ndim == 3) {
+      for (int64_t i = 0; i < N; ++i) {
+        double x = coords[0][starsh_index[i]];
+        double y = coords[1][starsh_index[i]];
+        double z = coords[2][starsh_index[i]];
+
+        particles.push_back(Hatrix::Particle(x, y, z, 0));
+      }
+    }
+  }
+
+  void
+  Domain::generate_particles(double min_val, double max_val) {
     double range = max_val - min_val;
 
     if (ndim == 1) {
@@ -1320,9 +1352,12 @@ int main(int argc, char** argv) {
 
   Hatrix::Context::init();
 
+  double beta = 0.1;
+  double nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
+  double noise = 1.e-1;
+  double sigma = 1.0;
+
   enum STARSH_PARTICLES_PLACEMENT place = STARSH_PARTICLES_UNIFORM;
-
-
   starsh_index = (STARSH_int*)malloc(sizeof(STARSH_int) * N);
   for (int j = 0; j < N; ++j) {
     starsh_index[j] = j;
@@ -1341,6 +1376,11 @@ int main(int argc, char** argv) {
     break;
   }
   case 2: {
+    ndim = 2;
+    starsh_ssdata_generate((STARSH_ssdata**)&starsh_data, N, ndim, beta,
+                           nu, noise, place, sigma);
+    domain.particles_from_starsh(((STARSH_ssdata*)starsh_data)->particles);
+    Hatrix::kernel_function = Hatrix::generate_sqrexp_2d_kernel;
     break;
   }
   case 3: {
