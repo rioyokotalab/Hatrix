@@ -28,4 +28,5 @@ make -j starsh_programs
 # ./bin/UMV_strong_1level_starsh 1000 10 10 1 0
 # ./bin/UMV_strong_1level_starsh 1000 10 100 9 1
 ./bin/UMV_BLR2_far_dense_starsh 1000 100 10 1 2 geometry_admis 0
+./bin/UMV_BLR2_far_dense_starsh 1000 100 10 1 2 geometry_admis 1
 # ./bin/UMV_strong_1level_starsh 1000 10 10 1 2

@@ -132,7 +132,7 @@ namespace Hatrix {
   // Generates p2p interactions between the particles of two boxes specified by irow
   // and icol. ndim specifies the dimensionality of the particles present in domain.
   // Uses a laplace kernel for generating the interaction.
-  Matrix generate_p2p_interactions(const Domain& domain,
+  Matrix generate_laplace_kernel(const Domain& domain,
                                    int64_t irow, int64_t icol) {
     Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
 
@@ -1143,7 +1143,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (!is_admissible(i, j, level)) {
-            D.insert(i, j, level, generate_p2p_interactions(domain, i, j));
+            D.insert(i, j, level, generate_laplace_kernel(domain, i, j));
           }
         }
       }
@@ -1152,7 +1152,7 @@ namespace Hatrix {
         Hatrix::Matrix AY(domain.boxes[i].num_particles, rank + oversampling);
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = generate_p2p_interactions(domain, i, jcol);
+          Hatrix::Matrix dense = generate_laplace_kernel(domain, i, jcol);
           Hatrix::matmul(dense, Y[jcol], AY);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
@@ -1165,7 +1165,7 @@ namespace Hatrix {
 
         for (long unsigned int i = 0; i < admissible_col_indices[j].size(); ++i) {
           int64_t irow = admissible_col_indices[j][i];
-          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, irow, j);
+          Hatrix::Matrix dense = Hatrix::generate_laplace_kernel(domain, irow, j);
           Hatrix::matmul(Y[irow], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
@@ -1176,7 +1176,7 @@ namespace Hatrix {
       for (int i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, jcol);
+          Hatrix::Matrix dense = Hatrix::generate_laplace_kernel(domain, i, jcol);
           S.insert(i, jcol, level,
                    Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(jcol, level)));
         }
@@ -1258,7 +1258,7 @@ namespace Hatrix {
 
         for (unsigned j = 0; j < inadmissible_row_indices[row].size(); ++j) {
           int64_t col = inadmissible_row_indices[row][j];
-          auto dense = Hatrix::generate_p2p_interactions(domain, row, col);
+          auto dense = Hatrix::generate_laplace_kernel(domain, row, col);
           dense_norm += pow(norm(dense), 2);
           error += pow(norm(D(row, col, level) -  dense), 2);
           j++;
@@ -1268,11 +1268,11 @@ namespace Hatrix {
       for (unsigned i = 0; i < nblocks; ++i) {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
-          auto dense = generate_p2p_interactions(domain, i, jcol);
+          auto dense = generate_laplace_kernel(domain, i, jcol);
           Matrix& Ubig = U(i, level);
           Matrix& Vbig = V(jcol, level);
           Matrix expected = matmul(matmul(Ubig, S(i, jcol, level)), Vbig, false, true);
-          Matrix actual = generate_p2p_interactions(domain, i, jcol);
+          Matrix actual = generate_laplace_kernel(domain, i, jcol);
           error += pow(norm(expected - actual), 2);
           dense_norm += pow(norm(actual), 2);
         }
@@ -1321,24 +1321,38 @@ int main(int argc, char** argv) {
   Hatrix::Context::init();
 
   enum STARSH_PARTICLES_PLACEMENT place = STARSH_PARTICLES_UNIFORM;
-  Hatrix::kernel_function = Hatrix::generate_starsh_kernel;
+
 
   starsh_index = (STARSH_int*)malloc(sizeof(STARSH_int) * N);
   for (int j = 0; j < N; ++j) {
     starsh_index[j] = j;
   }
 
+  Hatrix::Domain domain(N, ndim);
 
   switch(kernel_func) {
   case 0: {
-
+    domain.generate_particles(0.0, 1.0 * N);
+    domain.divide_domain_and_create_particle_boxes(nleaf);
+    Hatrix::kernel_function = Hatrix::generate_laplace_kernel;
+    break;
+  }
+  case 1: {
+    break;
+  }
+  case 2: {
+    break;
+  }
+  case 3: {
+    break;
+  }
+  case 4: {
+    break;
   }
   }
 
 
-  Hatrix::Domain domain(N, ndim);
-  domain.generate_particles(0.0, 1.0 * N);
-  domain.divide_domain_and_create_particle_boxes(nleaf);
+
 
   if (rank > nleaf) {
     std::cout << "rank > nleaf. Aborting.\n";
