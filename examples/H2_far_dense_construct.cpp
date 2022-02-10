@@ -561,6 +561,55 @@ namespace Hatrix {
     actually_print_structure(level-1);
   }
 
+  Matrix
+  H2::generate_column_block(int64_t block, int64_t block_size, const Domain& domain,
+                            int64_t level) {
+    Matrix AY(block_size, 0);
+    int64_t nblocks = level_blocks[level-1];
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j);
+      AY = concat(AY, dense, 1);
+    }
+
+    return AY;
+  }
+
+  std::tuple<Matrix, Matrix>
+  H2::generate_column_bases(int64_t block, int64_t block_size, const Domain& domain,
+                            std::vector<Matrix>& Y, int64_t level) {
+    // Row slice since column bases should be cutting across the columns.
+    Matrix AY = generate_column_block(block, block_size, domain, level);
+    Matrix Ui, Si, Vi; double error;
+    std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
+
+    return {std::move(Ui), std::move(Si)};
+  }
+
+  Matrix
+  H2::generate_row_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level) {
+    Hatrix::Matrix YtA(0, block_size);
+    for (int64_t i = 0; i < pow(2, level); ++i) {
+      if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block);
+      YtA = concat(YtA, dense, 0);
+    }
+
+    return YtA;
+  }
+
+
+  std::tuple<Matrix, Matrix>
+  H2::generate_row_bases(int64_t block, int64_t block_size, const Domain& domain,
+                         std::vector<Matrix>& Y, int64_t level) {
+    Matrix YtA = generate_row_block(block, block_size, domain, level);
+
+    Matrix Ui, Si, Vi; double error;
+    std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(YtA, rank);
+
+    return {std::move(Si), transpose(Vi)};
+  }
+
   void
   H2::generate_leaf_nodes(const Domain& domain) {
     int nblocks = level_blocks[height-1];
@@ -581,12 +630,18 @@ namespace Hatrix {
 
     // Generate U leaf blocks
     for (int64_t i = 0; i < nblocks; ++i) {
-
+      Matrix Utemp, Stemp;
+      std::tie(Utemp, Stemp)= generate_column_bases(i, domain.boxes[i].num_particles, domain, Y, height);
+      U.insert(i, height, std::move(Utemp));
+      Scol.insert(i, height, std::move(Stemp));
     }
 
     // Generate V leaf blocks
     for (int64_t j = 0; j < nblocks; ++j) {
-
+      Matrix Stemp, Vtemp;
+      std::tie(Stemp, Vtemp) = generate_row_bases(j, domain.boxes[j].num_particles, domain, Y, height);
+      V.insert(j, height, transpose(Vtemp));
+      Srow.insert(j, height, std::move(Stemp));
     }
 
     // Generate S coupling matrices
