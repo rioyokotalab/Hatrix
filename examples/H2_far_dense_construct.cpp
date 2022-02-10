@@ -658,6 +658,20 @@ namespace Hatrix {
     }
   }
 
+  Matrix
+  H2::get_Ubig(int64_t node, int64_t level) {
+    if (level == height) {
+      return U(node, level);
+    }
+  }
+
+  Matrix
+  H2::get_Vbig(int64_t node, int64_t level) {
+    if (level == height) {
+      return V(node, height);
+    }
+  }
+
 
   H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf,
          double _admis, std::string& admis_kind) :
@@ -697,8 +711,48 @@ namespace Hatrix {
 
   double
   H2::construction_relative_error(const Domain& domain) {
-    return 0;
+    double error = 0;
+    double dense_norm = 0;
+    int64_t nblocks = level_blocks[height-1];
+
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
+          Matrix actual = Hatrix::generate_p2p_interactions(domain, i, j);
+          Matrix expected = D(i, j, height);
+          error += pow(norm(actual - expected), 2);
+          dense_norm += pow(norm(actual), 2);
+        }
+      }
+    }
+
+    for (int level = height; level > height-1; --level) {
+      int64_t nblocks = level_blocks[level-1];
+
+      for (int row = 0; row < nblocks; ++row) {
+        for (int col = 0; col < nblocks; ++col) {
+          if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+            Matrix Ubig = get_Ubig(row, level);
+            Matrix Vbig = get_Vbig(col, level);
+
+            Ubig.print_meta();
+            Vbig.print_meta();
+            S(row, col, level).print_meta();
+
+            Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+            Matrix actual_matrix = Hatrix::generate_p2p_interactions(domain, row, col);
+
+            dense_norm += pow(norm(actual_matrix), 2);
+            error += pow(norm(expected_matrix - actual_matrix), 2);
+          }
+        }
+      }
+    }
+
+    return std::sqrt(error / dense_norm);
   }
+
+
 
   void H2::print_structure() {
     actually_print_structure(height);

@@ -1188,7 +1188,7 @@ namespace Hatrix {
           Hatrix::matmul(Y[irow], dense, YtA, true);
         }
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
-        V.insert(j, level, std::move(transpose(Vtemp)));
+        V.insert(j, level, std::move(Vtemp));
         Srow.insert(j, level, std::move(Stemp));
       }
 
