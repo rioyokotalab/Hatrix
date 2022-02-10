@@ -542,9 +542,9 @@ namespace Hatrix {
 
   void
   H2::actually_print_structure(int64_t level) {
-    if (level == height) { return; }
-    int64_t nblocks = level_blocks[level];
-    std::cout << "LEVEL: " << level << std::endl;
+    if (level == 0) { return; }
+    int64_t nblocks = level_blocks[level-1];
+    std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
     for (int64_t i = 0; i < nblocks; ++i) {
       std::cout << "| " ;
       for (int64_t j = 0; j < nblocks; ++j) {
@@ -558,7 +558,7 @@ namespace Hatrix {
       std::cout << std::endl;
     }
 
-    actually_print_structure(level+1);
+    actually_print_structure(level-1);
   }
 
 
@@ -566,12 +566,35 @@ namespace Hatrix {
          double _admis, std::string& admis_kind) :
     N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind) {
     if (admis_kind == "geometry_admis") {
+      // TODO: use dual tree traversal for this.
       height = calc_geometry_based_admissibility(domain);
+      // reverse the levels stored in the admis blocks.
+      RowColLevelMap<bool> temp_is_admissible;
+
+      for (int level = 0; level < height; ++level) {
+        int64_t nblocks = level_blocks[level];
+
+        for (int64_t i = 0; i < nblocks; ++i) {
+          for (int64_t j = 0; j < nblocks; ++j) {
+            if (is_admissible.exists(i, j, level)) {
+              bool value = is_admissible(i, j, level);
+              temp_is_admissible.insert(i, j, height - level,
+                                        std::move(value));
+            }
+          }
+        }
+      }
+
+      is_admissible = temp_is_admissible;
+      std::reverse(std::begin(level_blocks), std::end(level_blocks));
     }
     else if (admis_kind == "diagonal_admis") {
       height = int64_t(log2(N / nleaf));
       calc_diagonal_based_admissibility(height);
     }
+    is_admissible.insert(0, 0, 0, false);
+
+    // generate_leaf_nodes(randpts);
 
   }
 
@@ -581,7 +604,7 @@ namespace Hatrix {
   }
 
   void H2::print_structure() {
-    actually_print_structure(0);
+    actually_print_structure(height);
   }
 }
 
