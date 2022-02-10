@@ -396,7 +396,7 @@ namespace Hatrix {
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
       for (int64_t i = 0; i < N; ++i) {
-        double theta = dis(gen);
+        double theta = (i * 2.0 * M_PI) / N ;
         double x = radius * cos(theta);
         double y = radius * sin(theta);
 
@@ -514,7 +514,7 @@ namespace Hatrix {
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
         is_admissible.insert(i, j, level,
-                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
+                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <
                              admis * domain.boxes[i].distance_from(domain.boxes[j]));
       }
     }
@@ -672,6 +672,13 @@ namespace Hatrix {
     }
   }
 
+  std::tuple<RowLevelMap, ColLevelMap>
+  H2::generate_transfer_matrices(const Domain& domain,
+                                 int64_t level, RowLevelMap& Uchild,
+                                 ColLevelMap& Vchild) {
+    int64_t nblocks = level_blocks[level-1];
+  }
+
 
   H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf,
          double _admis, std::string& admis_kind) :
@@ -706,7 +713,12 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
 
     generate_leaf_nodes(domain);
+    RowLevelMap Uchild = U;
+    ColLevelMap Vchild = V;
 
+    for (int level = height-1; level > 0; --level) {
+      // std::tie(Uchild, Vchild) = generate_transfer_matrices(domain, level, Uchild, Vchild);
+    }
   }
 
   double
@@ -734,10 +746,6 @@ namespace Hatrix {
           if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
             Matrix Ubig = get_Ubig(row, level);
             Matrix Vbig = get_Vbig(col, level);
-
-            Ubig.print_meta();
-            Vbig.print_meta();
-            S(row, col, level).print_meta();
 
             Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
             Matrix actual_matrix = Hatrix::generate_p2p_interactions(domain, row, col);
