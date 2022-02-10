@@ -640,14 +640,20 @@ namespace Hatrix {
     for (int64_t j = 0; j < nblocks; ++j) {
       Matrix Stemp, Vtemp;
       std::tie(Stemp, Vtemp) = generate_row_bases(j, domain.boxes[j].num_particles, domain, Y, height);
-      V.insert(j, height, transpose(Vtemp));
+      V.insert(j, height, std::move(Vtemp));
       Srow.insert(j, height, std::move(Stemp));
     }
 
     // Generate S coupling matrices
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
+          Matrix dense = generate_p2p_interactions(domain, i, j);
 
+          S.insert(i, j, height,
+                   matmul(matmul(U(i, height), dense, true, false),
+                          V(j, height)));
+        }
       }
     }
   }
