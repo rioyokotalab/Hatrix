@@ -106,7 +106,7 @@ namespace Hatrix {
   private:
     void generate_leaf_nodes(const Domain& domain);
     void actually_print_structure(int64_t level);
-    bool row_has_admissible_blocks(int row, int64_t level);
+    bool row_has_admissible_blocks(int64_t row, int64_t level);
     bool col_has_admissible_blocks(int64_t col, int64_t level);
     Matrix generate_column_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level);
     std::tuple<Matrix, Matrix>
@@ -669,6 +669,29 @@ namespace Hatrix {
     if (level == height) {
       return U(node, level);
     }
+
+    int64_t child1 = node * 2;
+    int64_t child2 = node * 2 + 1;
+
+    Matrix Ubig_child1 = get_Ubig(child1, level+1);
+    Matrix Ubig_child2 = get_Ubig(child2, level+1);
+
+    int block_size = Ubig_child1.rows + Ubig_child2.rows;
+
+    Matrix Ubig(block_size, rank);
+
+    std::vector<Matrix> Ubig_splits = Ubig.split(
+                                                 std::vector<int64_t>(1,
+                                                                      Ubig_child1.rows),
+                                                 {});
+
+    std::vector<Matrix> U_splits = U(node, level).split(2, 1);
+
+    matmul(Ubig_child1, U_splits[0], Ubig_splits[0]);
+    matmul(Ubig_child2, U_splits[1], Ubig_splits[1]);
+
+    return Ubig;
+
   }
 
   Matrix
@@ -676,6 +699,24 @@ namespace Hatrix {
     if (level == height) {
       return V(node, height);
     }
+
+    int child1 = node * 2;
+    int child2 = node * 2 + 1;
+
+    Matrix Vbig_child1 = get_Vbig(child1, level+1);
+    Matrix Vbig_child2 = get_Vbig(child2, level+1);
+
+    int block_size = Vbig_child1.rows + Vbig_child2.rows;
+
+    Matrix Vbig(block_size, rank);
+
+    std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
+    std::vector<Matrix> V_splits = V(node, level).split(2, 1);
+
+    matmul(Vbig_child1, V_splits[0], Vbig_splits[0]);
+    matmul(Vbig_child2, V_splits[1], Vbig_splits[1]);
+
+    return Vbig;
   }
 
   int64_t
@@ -689,6 +730,43 @@ namespace Hatrix {
 
 
     return get_block_size_row(child1, child_level) + get_block_size_row(child2, child_level);
+  }
+
+
+  bool
+  H2::row_has_admissible_blocks(int64_t row, int64_t level) {
+    bool has_admis = false;
+    for (int i = 0; i < pow(2, level); ++i) {
+      if (!is_admissible.exists(row, i, level) ||
+          (is_admissible.exists(row, i, level) && is_admissible(row, i, level))) {
+        has_admis = true;
+        break;
+      }
+    }
+
+    return has_admis;
+  }
+
+  bool
+  H2::col_has_admissible_blocks(int64_t col, int64_t level) {
+    bool has_admis = false;
+    for (int j = 0; j < pow(2, level); ++j) {
+      if (!is_admissible.exists(j, col, level) ||
+          (is_admissible.exists(j, col, level) && is_admissible(j, col, level))) {
+        has_admis = true;
+        break;
+      }
+    }
+
+    return has_admis;
+  }
+
+  std::tuple<Matrix, Matrix>
+  H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
+                                 int64_t block_size, const Domain& domain, int64_t level) {
+    Matrix Utransfer, Si, Vi; double error;
+
+    return {std::move(Utransfer), std::move(Si)};
   }
 
   std::tuple<RowLevelMap, ColLevelMap>
@@ -706,6 +784,39 @@ namespace Hatrix {
     for (int64_t i = 0; i < nblocks; ++i) {
       int64_t block_size = get_block_size_row(i, level);
       Y.push_back(generate_random_matrix(block_size, rank + oversampling));
+    }
+
+    for (int64_t node = 0; node < nblocks; ++node) {
+      int64_t child1 = node * 2;
+      int64_t child2 = node * 2 + 1;
+      int64_t child_level = level + 1;
+      int64_t block_size = get_block_size_row(node, level);
+
+
+      if (row_has_admissible_blocks(node, level)) {
+        Matrix& Ubig_child1 = Uchild(child1, child_level);
+        Matrix& Ubig_child2 = Uchild(child2, child_level);
+
+        Matrix Utransfer, Stemp;
+        std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
+                                                                Ubig_child2,
+                                                                node,
+                                                                block_size,
+                                                                domain,
+                                                                level);
+      }
+
+      if (col_has_admissible_blocks(node, level)) {
+
+      }
+    }
+
+    for (int row = 0; row < nblocks; ++row) {
+      for (int col = 0; col < nblocks; ++col) {
+        if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+
+        }
+      }
     }
 
     return {Ubig_parent, Vbig_parent};
