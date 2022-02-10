@@ -494,13 +494,13 @@ namespace Hatrix {
 
               }
 
-              Matrix UN1, _SN1, _VN1T; double error;
-              std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
+              Matrix UN_block, _SN1, _VN1T; double error;
+              std::tie(UN_block, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
 
-              Matrix r_block = matmul(UN1, U(block, level), true, false);
+              Matrix r_block = matmul(UN_block, U(block, level), true, false);
 
               U.erase(block, level);
-              U.insert(block, level, std::move(UN1));
+              U.insert(block, level, std::move(UN_block));
 
               RowMap t;
 
@@ -566,7 +566,8 @@ namespace Hatrix {
 
           {
             // Scan for fill-ins in the same col as this diagonal block.
-            Matrix col_concat(0, U(block, level).rows);
+            int64_t block_size = U(block, level).rows;
+            Matrix col_concat(0, block_size);
             std::vector<int64_t> UN2_row_splits;
             bool found_col_fill_in = false;
             for (int i = 0; i < nblocks; ++i) {
@@ -577,44 +578,60 @@ namespace Hatrix {
             }
 
             if (found_col_fill_in) {
-              col_concat = concat(col_concat, matmul(Srow(block, level),
-                                                     transpose(V(block, level))), 0);
-              // Concat the fill-ins before the diagonal block.
-              for (int i = 0; i < nblocks; ++i) {
-                if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                  if (F.exists(i, block)) {
-                    if (F(i, block).rows == rank) {
-                      Matrix Fp = matmul(U(i, level), F(i, block));
-                      col_concat = concat(col_concat, Fp, 0);
-                    }
+              // step 1: recompress along the column of factorization.
+              col_concat = concat(col_concat,
+                                  matmul(Srow(block, level), V(block, level), false, true), 0);
+              for (int64_t i = 0; i < nblocks; ++i) {
+                if (F.exists(i, block)) {
+                  if (i < block) {
+                    col_concat = concat(col_concat,
+                                        matmul(U(i, level), F(i, block)), 0);
+                  }
+                  else if (i > block) {
+                    col_concat = concat(col_concat,
+                                        F(i, block), 0);
                   }
                 }
               }
 
-              Matrix _UN2, _SN2, VN2T; double error;
-              std::tie(_UN2, _SN2, VN2T, error) = truncated_svd(col_concat, rank);
+              Matrix _UN2T, _SN2, VNT_block; double error;
+              std::tie(_UN2T, _SN2, VNT_block, error) = truncated_svd(col_concat, rank);
 
-              Matrix t_block = matmul(V(block, level), VN2T, true, true);
-
-              for (int i = 0; i < nblocks; ++i) {
-                if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                  Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
-                  if (F.exists(i, block)) {
-                    Matrix SpF(rank, rank);
-                    if (F(i, block).rows == rank) {
-                      SpF = matmul(F(i, block), VN2T, false, true);
-                      Sbar_i_block = Sbar_i_block + SpF;
-                      F.erase(i, block);
-                    }
-                  }
-
-                  S.erase(i, block, level);
-                  S.insert(i, block, level, std::move(Sbar_i_block));
-                }
-              }
+              Matrix t_block = matmul(VNT_block, V(block, level));
 
               V.erase(block, level);
-              V.insert(block, level, transpose(VN2T));
+              V.insert(block, level, transpose(VNT_block));
+
+              // step 2: recompress rows for larger fill-ins
+
+              RowMap r;
+
+              for (int64_t i = block+1; i < nblocks; ++i) {
+                if (F.exists(i, block)) {
+                  Matrix row_concat = concat(matmul(U(i, level), Scol(i, level)), F(i, block), 1);
+
+                  Matrix UN_i, SN_i, _VNT_block; double error;
+                  std::tie(UN_i, SN_i, VNT_block, error) = truncated_svd(row_concat, rank);
+
+                  Matrix r_i = matmul(UN_i, U(i, level), true, false);
+
+                  U.erase(i, level);
+                  U.insert(i, level, std::move(UN_i));
+
+                  // step 2a: update S blocks in the column except the block within the fill-in.
+                  for (int64_t j = 0; j < nblocks; ++j) {
+                    if (i != j && is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+                      Matrix Sbar_i_j = matmul(r_i, S(i, j, level));
+                      S.erase(i, j, level);
+                      S.insert(i, j, level, std::move(Sbar_i_j));
+                    }
+                  }
+
+                  r.insert(i, std::move(r_i));
+                }
+              }
+
+              // step 3: iterate over the column to update the S blocks
             }
           }
         }
