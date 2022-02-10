@@ -104,6 +104,7 @@ namespace Hatrix {
     std::vector<int64_t> level_blocks;
 
   private:
+    void generate_leaf_nodes(const Domain& domain);
     void actually_print_structure(int64_t level);
     bool row_has_admissible_blocks(int row, int64_t level);
     bool col_has_admissible_blocks(int64_t col, int64_t level);
@@ -115,7 +116,6 @@ namespace Hatrix {
     std::tuple<Matrix, Matrix>
     generate_row_bases(int64_t block, int64_t block_size, const Domain& domain,
                        std::vector<Matrix>& Y, int64_t level);
-    void generate_leaf_nodes(const Domain& domain);
     std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const Domain& domain,
                                                                     int64_t level, RowLevelMap& Uchild,
                                                                     ColLevelMap& Vchild);
@@ -561,6 +561,42 @@ namespace Hatrix {
     actually_print_structure(level-1);
   }
 
+  void
+  H2::generate_leaf_nodes(const Domain& domain) {
+    int nblocks = level_blocks[height-1];
+    std::vector<Hatrix::Matrix> Y;
+
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
+          D.insert(i, j, height,
+                   generate_p2p_interactions(domain, i, j));
+        }
+      }
+    }
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      Y.push_back(generate_random_matrix(domain.boxes[i].num_particles, rank + oversampling));
+    }
+
+    // Generate U leaf blocks
+    for (int64_t i = 0; i < nblocks; ++i) {
+
+    }
+
+    // Generate V leaf blocks
+    for (int64_t j = 0; j < nblocks; ++j) {
+
+    }
+
+    // Generate S coupling matrices
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+
+      }
+    }
+  }
+
 
   H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf,
          double _admis, std::string& admis_kind) :
@@ -594,7 +630,7 @@ namespace Hatrix {
     }
     is_admissible.insert(0, 0, 0, false);
 
-    // generate_leaf_nodes(randpts);
+    generate_leaf_nodes(domain);
 
   }
 
