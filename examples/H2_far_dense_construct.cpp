@@ -135,6 +135,7 @@ namespace Hatrix {
     void coarsen_blocks(int64_t level);
     int64_t geometry_admis_non_leaf(int64_t nblocks, int64_t level);
     int64_t calc_geometry_based_admissibility(const Domain& domain);
+    int64_t get_block_size_row(int64_t i, int64_t level);
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind);
@@ -546,6 +547,9 @@ namespace Hatrix {
     int64_t nblocks = level_blocks[level-1];
     std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
     for (int64_t i = 0; i < nblocks; ++i) {
+      if (level == height) {
+        std::cout << U(i, height).rows << " ";
+      }
       std::cout << "| " ;
       for (int64_t j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(i, j, level)) {
@@ -557,6 +561,8 @@ namespace Hatrix {
       }
       std::cout << std::endl;
     }
+
+    std::cout << std::endl;
 
     actually_print_structure(level-1);
   }
@@ -672,11 +678,37 @@ namespace Hatrix {
     }
   }
 
+  int64_t
+  H2::get_block_size_row(int64_t parent, int64_t level) {
+    if (level == height) {
+      return U(parent, height).rows;
+    }
+    int64_t child_level = level + 1;
+    int64_t child1 = parent * 2;
+    int64_t child2 = parent * 2 + 1;
+
+
+    return get_block_size_row(child1, child_level) + get_block_size_row(child2, child_level);
+  }
+
   std::tuple<RowLevelMap, ColLevelMap>
   H2::generate_transfer_matrices(const Domain& domain,
                                  int64_t level, RowLevelMap& Uchild,
                                  ColLevelMap& Vchild) {
     int64_t nblocks = level_blocks[level-1];
+
+    std::vector<Matrix> Y;
+    // Generate the actual bases for the upper level and pass it to this
+    // function again for generating transfer matrices at successive levels.
+    RowLevelMap Ubig_parent;
+    ColLevelMap Vbig_parent;
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      int64_t block_size = get_block_size_row(i, level);
+      Y.push_back(generate_random_matrix(block_size, rank + oversampling));
+    }
+
+    return {Ubig_parent, Vbig_parent};
   }
 
 
@@ -717,7 +749,7 @@ namespace Hatrix {
     ColLevelMap Vchild = V;
 
     for (int level = height-1; level > 0; --level) {
-      // std::tie(Uchild, Vchild) = generate_transfer_matrices(domain, level, Uchild, Vchild);
+      std::tie(Uchild, Vchild) = generate_transfer_matrices(domain, level, Uchild, Vchild);
     }
   }
 
