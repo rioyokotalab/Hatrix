@@ -191,17 +191,6 @@ namespace Hatrix {
     return out;
   }
 
-
-  Matrix generate_p2p_interactions(const Domain& domain,
-                                   int64_t rows, int64_t cols,
-                                   int64_t irow, int64_t icol,
-                                   int64_t level) {
-    Matrix out(rows, cols);
-
-    return out;
-  }
-
-
   Particle::Particle(double x, double _value) : value(_value)  {
     coords.push_back(x);
   }
@@ -586,9 +575,7 @@ namespace Hatrix {
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
       int64_t col_block_size = get_block_size_col(domain, j, level);
-
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block_size, col_block_size,
-                                                               block, j, level);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j);
       AY = concat(AY, dense, 1);
     }
 
@@ -612,8 +599,7 @@ namespace Hatrix {
     for (int64_t i = 0; i < pow(2, level); ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
       int64_t row_block_size = get_block_size_row(domain, i, level);
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, row_block_size, block_size,
-                                                               i, block, level);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block);
       YtA = concat(YtA, dense, 0);
     }
 
