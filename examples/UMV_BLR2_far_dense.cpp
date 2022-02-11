@@ -570,6 +570,10 @@ namespace Hatrix {
                     Sbar_block_j = matmul(r_block, Sbar_block_j);
                   }
 
+                  std::cout << "UPDATE S with row iteration: i -> " << i
+                            << " block -> " << block << std::endl;
+
+
                   S.erase(block, j, level);
                   S.insert(block, j, level, std::move(Sbar_block_j));
                 }
@@ -667,6 +671,10 @@ namespace Hatrix {
                   else {
                     Sbar_i_block = matmul(S(i, block, level), t_block);
                   }
+
+                  std::cout << "UPDATE S with col iteration: i -> " << i
+                            << " block -> " << block << std::endl;
+
 
                   S.erase(i, block, level);
                   S.insert(i, block, level, std::move(Sbar_i_block));
