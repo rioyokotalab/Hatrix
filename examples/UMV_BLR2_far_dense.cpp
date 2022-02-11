@@ -134,7 +134,6 @@ namespace Hatrix {
     return out;
   }
 
-
   Particle::Particle(double x, double _value) : value(_value)  {
     coords.push_back(x);
   }

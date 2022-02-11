@@ -135,7 +135,8 @@ namespace Hatrix {
     void coarsen_blocks(int64_t level);
     int64_t geometry_admis_non_leaf(int64_t nblocks, int64_t level);
     int64_t calc_geometry_based_admissibility(const Domain& domain);
-    int64_t get_block_size_row(int64_t i, int64_t level);
+    int64_t get_block_size_row(const Domain& domain, int64_t i, int64_t level);
+    int64_t get_block_size_col(const Domain& domain, int64_t parent, int64_t level);
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind);
@@ -186,6 +187,16 @@ namespace Hatrix {
                                    domain.particles[target+j].coords);
       }
     }
+
+    return out;
+  }
+
+
+  Matrix generate_p2p_interactions(const Domain& domain,
+                                   int64_t rows, int64_t cols,
+                                   int64_t irow, int64_t icol,
+                                   int64_t level) {
+    Matrix out(rows, cols);
 
     return out;
   }
@@ -574,7 +585,10 @@ namespace Hatrix {
     int64_t nblocks = level_blocks[level-1];
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j);
+      int64_t col_block_size = get_block_size_col(domain, j, level);
+
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block_size, col_block_size,
+                                                               block, j, level);
       AY = concat(AY, dense, 1);
     }
 
@@ -597,7 +611,9 @@ namespace Hatrix {
     Hatrix::Matrix YtA(0, block_size);
     for (int64_t i = 0; i < pow(2, level); ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block);
+      int64_t row_block_size = get_block_size_row(domain, i, level);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, row_block_size, block_size,
+                                                               i, block, level);
       YtA = concat(YtA, dense, 0);
     }
 
@@ -720,18 +736,28 @@ namespace Hatrix {
   }
 
   int64_t
-  H2::get_block_size_row(int64_t parent, int64_t level) {
+  H2::get_block_size_row(const Domain& domain, int64_t parent, int64_t level) {
     if (level == height) {
-      return U(parent, height).rows;
+      return domain.boxes[parent].num_particles;
     }
     int64_t child_level = level + 1;
     int64_t child1 = parent * 2;
     int64_t child2 = parent * 2 + 1;
 
-
-    return get_block_size_row(child1, child_level) + get_block_size_row(child2, child_level);
+    return get_block_size_row(domain, child1, child_level) + get_block_size_row(domain, child2, child_level);
   }
 
+  int64_t
+  H2::get_block_size_col(const Domain& domain, int64_t parent, int64_t level) {
+    if (level == height) {
+      return domain.boxes[parent].num_particles;
+    }
+    int64_t child_level = level + 1;
+    int64_t child1 = parent * 2;
+    int64_t child2 = parent * 2 + 1;
+
+    return get_block_size_col(domain, child1, child_level) + get_block_size_col(domain, child2, child_level);
+  }
 
   bool
   H2::row_has_admissible_blocks(int64_t row, int64_t level) {
@@ -764,6 +790,7 @@ namespace Hatrix {
   std::tuple<Matrix, Matrix>
   H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
                                  int64_t block_size, const Domain& domain, int64_t level) {
+    Matrix col_block = generate_column_block(node, block_size, domain, level);
     Matrix Utransfer, Si, Vi; double error;
 
     return {std::move(Utransfer), std::move(Si)};
@@ -782,7 +809,7 @@ namespace Hatrix {
     ColLevelMap Vbig_parent;
 
     for (int64_t i = 0; i < nblocks; ++i) {
-      int64_t block_size = get_block_size_row(i, level);
+      int64_t block_size = get_block_size_row(domain, i, level);
       Y.push_back(generate_random_matrix(block_size, rank + oversampling));
     }
 
@@ -790,7 +817,7 @@ namespace Hatrix {
       int64_t child1 = node * 2;
       int64_t child2 = node * 2 + 1;
       int64_t child_level = level + 1;
-      int64_t block_size = get_block_size_row(node, level);
+      int64_t block_size = get_block_size_row(domain, node, level);
 
 
       if (row_has_admissible_blocks(node, level)) {
