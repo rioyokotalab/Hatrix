@@ -38,6 +38,7 @@ else()
     UMV_strong_H2_Nlevel
     UMV_strong_1level_better_index
     UMV_weak_1level_noblock
+    UMV_BLR2_far_dense
   )
 endif()
 
