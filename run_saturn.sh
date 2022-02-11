@@ -14,7 +14,7 @@ make -j all
 # gdb -ex run --args ./bin/H2_far_dense_construct 400 5 80 0.7 2 geometry_admis
 # ./bin/UMV_BLR2_far_dense 200 40 15 1 2 geometry_admis
 # ./bin/UMV_BLR2_far_dense 400 40 15 1.3 2 geometry_admis
-for rank in 5 6 7 8; do
+for rank in 5 6 7 8 10; do
     ./bin/UMV_BLR2_far_dense 4000 100 $rank 0.2 2 geometry_admis
 done
 

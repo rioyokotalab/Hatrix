@@ -500,7 +500,7 @@ namespace Hatrix {
                     row_concat = concat(row_concat, Fp, 1);
                   }
                   else if (j > block) {
-                    assert(F(block, j).rows == block_size && F(block, j).cols == block_size);
+                    assert(F(block, j).rows == block_size && F(block, j).cols == V(j, level).rows);
                     row_concat = concat(row_concat, F(block, j), 1);
                   }
                 }
@@ -564,7 +564,7 @@ namespace Hatrix {
                     }
                     else if (j > block) {
                       assert(F(block, j).rows == block_size &&
-                             F(block, j).cols == block_size);
+                             F(block, j).cols == V(j, level).rows);
                       Sbar_block_j = matmul(matmul(r_block, S(block, j, level)), t(j))
                         + matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
                     }
@@ -669,7 +669,8 @@ namespace Hatrix {
                         matmul(F(i, block), V(block, level));
                     }
                     else if (i > block) {
-                      assert(F(i, block).rows == block_size && F(i, block).cols == block_size);
+                      // assert(F(i, block).rows == U(i, level).rows &&
+                      //        F(i, block).cols == V());
                       Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
                         matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
                     }
@@ -1765,7 +1766,6 @@ int main(int argc, char** argv) {
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
   double construct_error = A.construction_error(domain);
-  A.print_structure();
 
   A.factorize(domain);
 
