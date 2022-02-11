@@ -1769,47 +1769,48 @@ int main(int argc, char** argv) {
 
   A.factorize(domain);
 
-  // std::vector<Matrix> U_F = generate_UF_chain(A);
-  // std::vector<Matrix> V_F = generate_VF_chain(A);
-  // std::vector<Matrix> L = generate_L_chain(A);
-  // std::vector<Matrix> U = generate_U_chain(A);
-  // Matrix L0 = generate_L0_permuted(A);
-  // Matrix U0 = generate_U0_permuted(A);
-  // Matrix A0 = generate_A0_matrix(A);
+  std::vector<Matrix> U_F = generate_UF_chain(A);
+  std::vector<Matrix> V_F = generate_VF_chain(A);
+  std::vector<Matrix> L = generate_L_chain(A);
+  std::vector<Matrix> U = generate_U_chain(A);
+  Matrix L0 = generate_L0_permuted(A);
+  Matrix U0 = generate_U0_permuted(A);
+  Matrix A0 = generate_A0_matrix(A);
 
-  // Matrix A_actual = unpermute_matrix(chain_product(A, U_F, L, L0, U0, U, V_F), A);
-  // Matrix A_expected = Hatrix::generate_laplacend_matrix(domain.particles, N, N);
+  Matrix A_actual = unpermute_matrix(chain_product(A, U_F, L, L0, U0, U, V_F), A);
+  Matrix A_expected = Hatrix::generate_laplacend_matrix(domain.particles, N, N);
 
-  // std::vector<int64_t> M_row_offsets, M_col_offsets;
-  // int64_t rows = 0, cols = 0, level = 1;
+  std::vector<int64_t> M_row_offsets, M_col_offsets;
+  int64_t rows = 0, cols = 0, level = 1;
 
-  // for (int i = 0; i < A.nblocks; ++i) {
-  //   M_row_offsets.push_back(rows + A.V(i, level).rows);
-  //   M_col_offsets.push_back(cols + A.U(i, level).rows);
+  for (int i = 0; i < A.nblocks; ++i) {
+    M_row_offsets.push_back(rows + A.V(i, level).rows);
+    M_col_offsets.push_back(cols + A.U(i, level).rows);
 
-  //   rows += A.V(i, level).rows;
-  //   cols += A.U(i, level).rows;
-  // }
+    rows += A.V(i, level).rows;
+    cols += A.U(i, level).rows;
+  }
 
-  // Matrix diff = (A_actual - A_expected);
+  Matrix diff = (A_actual - A_expected);
 
-  // factorize_error = norm(diff) / norm(A_expected);
+  factorize_error = norm(diff) / norm(A_expected);
 
-  // auto d_splits = diff.split(M_row_offsets, M_col_offsets);
-  // auto m_splits = A_expected.split(M_row_offsets, M_col_offsets);
+  auto d_splits = diff.split(M_row_offsets, M_col_offsets);
+  auto m_splits = A_expected.split(M_row_offsets, M_col_offsets);
 
-  // std::cout << "-- BLR2 verification --\n";
-  // for (int i = 0; i < A.nblocks; ++i) {
-  //   for (int j = 0; j < A.nblocks; ++j) {
-  //     std::cout << "<i, j>: " << i << ", " << j
-  //               << " -- "
-  //               << std::setprecision(5)
-  //               << norm(d_splits[i * 4 + j]) / norm(m_splits[i * 4 + j])
-  //               << std::setw(5)
-  //               << std::endl;
-  //   }
+  std::cout << "-- BLR2 verification --\n";
+  for (int i = 0; i < A.nblocks; ++i) {
+    for (int j = 0; j < A.nblocks; ++j) {
+      std::cout << "<i, j>: " << i << ", " << j
+                << " -- "
+                << std::setprecision(5)
+                << norm(d_splits[i * 4 + j]) / norm(m_splits[i * 4 + j])
+                << std::setw(5)
+                << std::endl;
+    }
 
-  // }
+  }
+
 
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
