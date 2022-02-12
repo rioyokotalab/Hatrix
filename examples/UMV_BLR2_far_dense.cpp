@@ -1801,12 +1801,18 @@ int main(int argc, char** argv) {
   std::cout << "-- BLR2 verification --\n";
   for (int i = 0; i < A.nblocks; ++i) {
     for (int j = 0; j < A.nblocks; ++j) {
-      std::cout << "<i, j>: " << i << ", " << j
+      double error = norm(d_splits[i * A.nblocks + j]) / norm(m_splits[i * A.nblocks + j]);
+
+      if (error > 1e-5) {
+
+        std::cout << "<i, j>: " << i << ", " << j
                 << " -- "
                 << std::setprecision(5)
-                << norm(d_splits[i * 4 + j]) / norm(m_splits[i * 4 + j])
+                << error
                 << std::setw(5)
                 << std::endl;
+      }
+
     }
 
   }
