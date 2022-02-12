@@ -457,36 +457,6 @@ namespace Hatrix {
       }
     }
 
-    void populate_admis_indices() {
-      inadmissible_row_indices.resize(nblocks);
-      admissible_row_indices.resize(nblocks);
-
-      inadmissible_col_indices.resize(nblocks);
-      admissible_col_indices.resize(nblocks);
-
-      for (int i = 0; i < nblocks; ++i) {
-        for (int j = 0; j < nblocks; ++j) {
-          if (is_admissible(i, j, level)) {
-            admissible_row_indices[i].push_back(j);
-          }
-          else {
-            inadmissible_row_indices[i].push_back(j);
-          }
-        }
-      }
-
-      for (int j = 0; j < nblocks; ++j) {
-        for (int i = 0; i < nblocks; ++i) {
-          if (is_admissible(j, i, level)) {
-            admissible_col_indices[j].push_back(i);
-          }
-          else {
-            inadmissible_col_indices[j].push_back(i);
-          }
-        }
-      }
-    }
-
     void factorize_level(const Domain& domain, int level) {
       RowColMap<Matrix> F;      // fill-in blocks.
 
@@ -653,10 +623,6 @@ namespace Hatrix {
 
               Matrix t_block = matmul(V(block, level), VNT_block, true, true);
 
-              // if (block == 4) {
-              //   std::cout << "2 UPDATE V4\n";
-              // }
-
               V.erase(block, level);
               V.insert(block, level, transpose(VNT_block));
 
@@ -664,7 +630,6 @@ namespace Hatrix {
               Srow.insert(block, level, std::move(_SN2));
 
               // step 2: recompress rows for larger fill-ins
-
               RowMap r;
 
               for (int64_t i = block+1; i < nblocks; ++i) {
@@ -693,11 +658,6 @@ namespace Hatrix {
                     if (block != j && is_admissible.exists(i, j, level) &&
                         is_admissible(i, j, level)) {
                       Matrix Sbar_i_j = matmul(r_i, S(i, j, level));
-
-                      // if (i == 0 && j == 4) {
-                      //   std::cout << "3 UPDATE S\n";
-                      // }
-
 
                       S.erase(i, j, level);
                       S.insert(i, j, level, std::move(Sbar_i_j));
@@ -742,8 +702,6 @@ namespace Hatrix {
             }
           }
         }
-
-        // F.erase_all();
 
         Matrix U_F = make_complement(U(block, level));
         Matrix V_F = make_complement(V(block, level));
@@ -973,7 +931,6 @@ namespace Hatrix {
               // Schur's compliement between oc and cc blocks where a new fill-in is created.
               // The product is a (oc, oo)-sized block.
               else {
-                // std::cout << ">>>> FOUND HORZ FILL IN : i-> " << i << " j -> " << j << std::endl;
                 if (i <= block) {
                   if (!F.exists(i, j)) {
                     Matrix fill_in(rank, U(j, level).rows);
@@ -1029,17 +986,6 @@ namespace Hatrix {
             }
           }
         }
-
-        // std::cout << "fill in <1,2> : " << F.exists(1, 2)
-        //           << " <2,1> : " << F.exists(2, 1) << std::endl;
-
-        // int rr = 0, cc = 4;
-        // auto dense = generate_p2p_interactions(domain, rr, cc);
-        // auto test_dense = matmul(matmul(U(rr, level), S(rr, cc, level)), V(cc, level), false, true);
-
-        // std::cout << "block-> " << block
-        //           <<  " <0,4> during factor: " << norm(dense - test_dense) / norm(dense) << std::endl;
-
       } // for (int block = 0; block < nblocks; ++block)
     }
 
@@ -1248,8 +1194,6 @@ namespace Hatrix {
         calc_diagonal_based_admissibility();
       }
 
-      // populate_admis_indices();
-
       int64_t oversampling = 5;
       Hatrix::Matrix Utemp, Stemp, Vtemp;
       double error;
@@ -1322,24 +1266,6 @@ namespace Hatrix {
       Matrix last(nrows, ncols);
       auto last_splits = last.split(row_splits, col_splits);
 
-      Matrix lu_expected(A_expected);
-      lu(lu_expected);
-
-      int rr = 0, cc = 4;
-      std::vector<int64_t> M_row_offsets, M_col_offsets;
-      int64_t rows = 0, cols = 0, level = 1;
-
-      for (int i = 0; i < nblocks; ++i) {
-        M_row_offsets.push_back(rows + D(i, i, level).rows);
-        M_col_offsets.push_back(cols + D(i, i, level).rows);
-
-        rows += D(i, i, level).rows;
-        cols += D(i, i, level).rows;
-      }
-
-      auto lu_expected_splits = lu_expected.split(M_row_offsets, M_col_offsets);
-
-
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j, level)) {
@@ -1354,10 +1280,7 @@ namespace Hatrix {
         }
       }
 
-      lup(last);
-
-
-
+      lu(last);
       D.insert(0, 0, 0, std::move(last));
     }
 
@@ -1404,9 +1327,6 @@ namespace Hatrix {
             Matrix expected = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
             Matrix actual = generate_p2p_interactions(domain, i, j);
 
-            // if (i == 0 && j == 4) {
-            //   std::cout << "<1,4> construct error: " << norm(expected - actual) / norm(actual) << std::endl;
-            // }
             error += pow(norm(expected - actual), 2);
             dense_norm += pow(norm(actual), 2);
           }
