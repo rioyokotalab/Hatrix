@@ -104,8 +104,9 @@ namespace Hatrix {
     std::vector<int64_t> level_blocks;
 
   private:
+    void generate_leaf_nodes(const Domain& domain);
     void actually_print_structure(int64_t level);
-    bool row_has_admissible_blocks(int row, int64_t level);
+    bool row_has_admissible_blocks(int64_t row, int64_t level);
     bool col_has_admissible_blocks(int64_t col, int64_t level);
     Matrix generate_column_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level);
     std::tuple<Matrix, Matrix>
@@ -115,7 +116,6 @@ namespace Hatrix {
     std::tuple<Matrix, Matrix>
     generate_row_bases(int64_t block, int64_t block_size, const Domain& domain,
                        std::vector<Matrix>& Y, int64_t level);
-    void generate_leaf_nodes(const Domain& domain);
     std::tuple<RowLevelMap, ColLevelMap> generate_transfer_matrices(const Domain& domain,
                                                                     int64_t level, RowLevelMap& Uchild,
                                                                     ColLevelMap& Vchild);
@@ -135,6 +135,8 @@ namespace Hatrix {
     void coarsen_blocks(int64_t level);
     int64_t geometry_admis_non_leaf(int64_t nblocks, int64_t level);
     int64_t calc_geometry_based_admissibility(const Domain& domain);
+    int64_t get_block_size_row(const Domain& domain, int64_t i, int64_t level);
+    int64_t get_block_size_col(const Domain& domain, int64_t parent, int64_t level);
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind);
@@ -188,7 +190,6 @@ namespace Hatrix {
 
     return out;
   }
-
 
   Particle::Particle(double x, double _value) : value(_value)  {
     coords.push_back(x);
@@ -396,7 +397,7 @@ namespace Hatrix {
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
       for (int64_t i = 0; i < N; ++i) {
-        double theta = dis(gen);
+        double theta = (i * 2.0 * M_PI) / N ;
         double x = radius * cos(theta);
         double y = radius * sin(theta);
 
@@ -514,7 +515,7 @@ namespace Hatrix {
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
         is_admissible.insert(i, j, level,
-                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
+                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <
                              admis * domain.boxes[i].distance_from(domain.boxes[j]));
       }
     }
@@ -542,10 +543,13 @@ namespace Hatrix {
 
   void
   H2::actually_print_structure(int64_t level) {
-    if (level == height) { return; }
-    int64_t nblocks = level_blocks[level];
-    std::cout << "LEVEL: " << level << std::endl;
+    if (level == 0) { return; }
+    int64_t nblocks = level_blocks[level-1];
+    std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
     for (int64_t i = 0; i < nblocks; ++i) {
+      if (level == height) {
+        std::cout << U(i, height).rows << " ";
+      }
       std::cout << "| " ;
       for (int64_t j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(i, j, level)) {
@@ -558,7 +562,277 @@ namespace Hatrix {
       std::cout << std::endl;
     }
 
-    actually_print_structure(level+1);
+    std::cout << std::endl;
+
+    actually_print_structure(level-1);
+  }
+
+  Matrix
+  H2::generate_column_block(int64_t block, int64_t block_size, const Domain& domain,
+                            int64_t level) {
+    Matrix AY(block_size, 0);
+    int64_t nblocks = level_blocks[level-1];
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
+      int64_t col_block_size = get_block_size_col(domain, j, level);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j);
+      AY = concat(AY, dense, 1);
+    }
+
+    return AY;
+  }
+
+  std::tuple<Matrix, Matrix>
+  H2::generate_column_bases(int64_t block, int64_t block_size, const Domain& domain,
+                            std::vector<Matrix>& Y, int64_t level) {
+    // Row slice since column bases should be cutting across the columns.
+    Matrix AY = generate_column_block(block, block_size, domain, level);
+    Matrix Ui, Si, Vi; double error;
+    std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
+
+    return {std::move(Ui), std::move(Si)};
+  }
+
+  Matrix
+  H2::generate_row_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level) {
+    Hatrix::Matrix YtA(0, block_size);
+    for (int64_t i = 0; i < pow(2, level); ++i) {
+      if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
+      int64_t row_block_size = get_block_size_row(domain, i, level);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block);
+      YtA = concat(YtA, dense, 0);
+    }
+
+    return YtA;
+  }
+
+
+  std::tuple<Matrix, Matrix>
+  H2::generate_row_bases(int64_t block, int64_t block_size, const Domain& domain,
+                         std::vector<Matrix>& Y, int64_t level) {
+    Matrix YtA = generate_row_block(block, block_size, domain, level);
+
+    Matrix Ui, Si, Vi; double error;
+    std::tie(Ui, Si, Vi, error) = Hatrix::truncated_svd(YtA, rank);
+
+    return {std::move(Si), transpose(Vi)};
+  }
+
+  void
+  H2::generate_leaf_nodes(const Domain& domain) {
+    int nblocks = level_blocks[height-1];
+    std::vector<Hatrix::Matrix> Y;
+
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
+          D.insert(i, j, height,
+                   generate_p2p_interactions(domain, i, j));
+        }
+      }
+    }
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      Y.push_back(generate_random_matrix(domain.boxes[i].num_particles, rank + oversampling));
+    }
+
+    // Generate U leaf blocks
+    for (int64_t i = 0; i < nblocks; ++i) {
+      Matrix Utemp, Stemp;
+      std::tie(Utemp, Stemp)= generate_column_bases(i, domain.boxes[i].num_particles, domain, Y, height);
+      U.insert(i, height, std::move(Utemp));
+      Scol.insert(i, height, std::move(Stemp));
+    }
+
+    // Generate V leaf blocks
+    for (int64_t j = 0; j < nblocks; ++j) {
+      Matrix Stemp, Vtemp;
+      std::tie(Stemp, Vtemp) = generate_row_bases(j, domain.boxes[j].num_particles, domain, Y, height);
+      V.insert(j, height, std::move(Vtemp));
+      Srow.insert(j, height, std::move(Stemp));
+    }
+
+    // Generate S coupling matrices
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
+          Matrix dense = generate_p2p_interactions(domain, i, j);
+
+          S.insert(i, j, height,
+                   matmul(matmul(U(i, height), dense, true, false),
+                          V(j, height)));
+        }
+      }
+    }
+  }
+
+  Matrix
+  H2::get_Ubig(int64_t node, int64_t level) {
+    if (level == height) {
+      return U(node, level);
+    }
+
+    int64_t child1 = node * 2;
+    int64_t child2 = node * 2 + 1;
+
+    Matrix Ubig_child1 = get_Ubig(child1, level+1);
+    Matrix Ubig_child2 = get_Ubig(child2, level+1);
+
+    int block_size = Ubig_child1.rows + Ubig_child2.rows;
+
+    Matrix Ubig(block_size, rank);
+
+    std::vector<Matrix> Ubig_splits = Ubig.split(
+                                                 std::vector<int64_t>(1,
+                                                                      Ubig_child1.rows),
+                                                 {});
+
+    std::vector<Matrix> U_splits = U(node, level).split(2, 1);
+
+    matmul(Ubig_child1, U_splits[0], Ubig_splits[0]);
+    matmul(Ubig_child2, U_splits[1], Ubig_splits[1]);
+
+    return Ubig;
+
+  }
+
+  Matrix
+  H2::get_Vbig(int64_t node, int64_t level) {
+    if (level == height) {
+      return V(node, height);
+    }
+
+    int child1 = node * 2;
+    int child2 = node * 2 + 1;
+
+    Matrix Vbig_child1 = get_Vbig(child1, level+1);
+    Matrix Vbig_child2 = get_Vbig(child2, level+1);
+
+    int block_size = Vbig_child1.rows + Vbig_child2.rows;
+
+    Matrix Vbig(block_size, rank);
+
+    std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
+    std::vector<Matrix> V_splits = V(node, level).split(2, 1);
+
+    matmul(Vbig_child1, V_splits[0], Vbig_splits[0]);
+    matmul(Vbig_child2, V_splits[1], Vbig_splits[1]);
+
+    return Vbig;
+  }
+
+  int64_t
+  H2::get_block_size_row(const Domain& domain, int64_t parent, int64_t level) {
+    if (level == height) {
+      return domain.boxes[parent].num_particles;
+    }
+    int64_t child_level = level + 1;
+    int64_t child1 = parent * 2;
+    int64_t child2 = parent * 2 + 1;
+
+    return get_block_size_row(domain, child1, child_level) + get_block_size_row(domain, child2, child_level);
+  }
+
+  int64_t
+  H2::get_block_size_col(const Domain& domain, int64_t parent, int64_t level) {
+    if (level == height) {
+      return domain.boxes[parent].num_particles;
+    }
+    int64_t child_level = level + 1;
+    int64_t child1 = parent * 2;
+    int64_t child2 = parent * 2 + 1;
+
+    return get_block_size_col(domain, child1, child_level) + get_block_size_col(domain, child2, child_level);
+  }
+
+  bool
+  H2::row_has_admissible_blocks(int64_t row, int64_t level) {
+    bool has_admis = false;
+    for (int i = 0; i < pow(2, level); ++i) {
+      if (!is_admissible.exists(row, i, level) ||
+          (is_admissible.exists(row, i, level) && is_admissible(row, i, level))) {
+        has_admis = true;
+        break;
+      }
+    }
+
+    return has_admis;
+  }
+
+  bool
+  H2::col_has_admissible_blocks(int64_t col, int64_t level) {
+    bool has_admis = false;
+    for (int j = 0; j < pow(2, level); ++j) {
+      if (!is_admissible.exists(j, col, level) ||
+          (is_admissible.exists(j, col, level) && is_admissible(j, col, level))) {
+        has_admis = true;
+        break;
+      }
+    }
+
+    return has_admis;
+  }
+
+  std::tuple<Matrix, Matrix>
+  H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
+                                 int64_t block_size, const Domain& domain, int64_t level) {
+    Matrix col_block = generate_column_block(node, block_size, domain, level);
+    Matrix Utransfer, Si, Vi; double error;
+
+    return {std::move(Utransfer), std::move(Si)};
+  }
+
+  std::tuple<RowLevelMap, ColLevelMap>
+  H2::generate_transfer_matrices(const Domain& domain,
+                                 int64_t level, RowLevelMap& Uchild,
+                                 ColLevelMap& Vchild) {
+    int64_t nblocks = level_blocks[level-1];
+
+    std::vector<Matrix> Y;
+    // Generate the actual bases for the upper level and pass it to this
+    // function again for generating transfer matrices at successive levels.
+    RowLevelMap Ubig_parent;
+    ColLevelMap Vbig_parent;
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      int64_t block_size = get_block_size_row(domain, i, level);
+      Y.push_back(generate_random_matrix(block_size, rank + oversampling));
+    }
+
+    for (int64_t node = 0; node < nblocks; ++node) {
+      int64_t child1 = node * 2;
+      int64_t child2 = node * 2 + 1;
+      int64_t child_level = level + 1;
+      int64_t block_size = get_block_size_row(domain, node, level);
+
+
+      if (row_has_admissible_blocks(node, level)) {
+        Matrix& Ubig_child1 = Uchild(child1, child_level);
+        Matrix& Ubig_child2 = Uchild(child2, child_level);
+
+        Matrix Utransfer, Stemp;
+        std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
+                                                                Ubig_child2,
+                                                                node,
+                                                                block_size,
+                                                                domain,
+                                                                level);
+      }
+
+      if (col_has_admissible_blocks(node, level)) {
+
+      }
+    }
+
+    for (int row = 0; row < nblocks; ++row) {
+      for (int col = 0; col < nblocks; ++col) {
+        if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+
+        }
+      }
+    }
+
+    return {Ubig_parent, Vbig_parent};
   }
 
 
@@ -566,22 +840,86 @@ namespace Hatrix {
          double _admis, std::string& admis_kind) :
     N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind) {
     if (admis_kind == "geometry_admis") {
+      // TODO: use dual tree traversal for this.
       height = calc_geometry_based_admissibility(domain);
+      // reverse the levels stored in the admis blocks.
+      RowColLevelMap<bool> temp_is_admissible;
+
+      for (int level = 0; level < height; ++level) {
+        int64_t nblocks = level_blocks[level];
+
+        for (int64_t i = 0; i < nblocks; ++i) {
+          for (int64_t j = 0; j < nblocks; ++j) {
+            if (is_admissible.exists(i, j, level)) {
+              bool value = is_admissible(i, j, level);
+              temp_is_admissible.insert(i, j, height - level,
+                                        std::move(value));
+            }
+          }
+        }
+      }
+
+      is_admissible = temp_is_admissible;
+      std::reverse(std::begin(level_blocks), std::end(level_blocks));
     }
     else if (admis_kind == "diagonal_admis") {
       height = int64_t(log2(N / nleaf));
       calc_diagonal_based_admissibility(height);
     }
+    is_admissible.insert(0, 0, 0, false);
 
+    generate_leaf_nodes(domain);
+    RowLevelMap Uchild = U;
+    ColLevelMap Vchild = V;
+
+    for (int level = height-1; level > 0; --level) {
+      std::tie(Uchild, Vchild) = generate_transfer_matrices(domain, level, Uchild, Vchild);
+    }
   }
 
   double
   H2::construction_relative_error(const Domain& domain) {
-    return 0;
+    double error = 0;
+    double dense_norm = 0;
+    int64_t nblocks = level_blocks[height-1];
+
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
+          Matrix actual = Hatrix::generate_p2p_interactions(domain, i, j);
+          Matrix expected = D(i, j, height);
+          error += pow(norm(actual - expected), 2);
+          dense_norm += pow(norm(actual), 2);
+        }
+      }
+    }
+
+    for (int level = height; level > height-1; --level) {
+      int64_t nblocks = level_blocks[level-1];
+
+      for (int row = 0; row < nblocks; ++row) {
+        for (int col = 0; col < nblocks; ++col) {
+          if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+            Matrix Ubig = get_Ubig(row, level);
+            Matrix Vbig = get_Vbig(col, level);
+
+            Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+            Matrix actual_matrix = Hatrix::generate_p2p_interactions(domain, row, col);
+
+            dense_norm += pow(norm(actual_matrix), 2);
+            error += pow(norm(expected_matrix - actual_matrix), 2);
+          }
+        }
+      }
+    }
+
+    return std::sqrt(error / dense_norm);
   }
 
+
+
   void H2::print_structure() {
-    actually_print_structure(0);
+    actually_print_structure(height);
   }
 }
 
