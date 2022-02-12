@@ -15,10 +15,12 @@ make -j all
 # ./bin/UMV_BLR2_far_dense 200 40 15 1 2 geometry_admis
 # ./bin/UMV_BLR2_far_dense 400 40 15 1.3 2 geometry_admis
 # ./bin/UMV_BLR2_far_dense 500 100 7 0.4 2 geometry_admis
-# ./bin/UMV_BLR2_far_dense 500 100 3 0.4 2 geometry_admis
+./bin/UMV_BLR2_far_dense 500 100 3 0.6 2 geometry_admis
+# ./bin/UMV_BLR2_far_dense 2000 100 7 0.4 2 geometry_admis
 
-./bin/UMV_BLR2_far_dense 250 50 7 0.6 2 geometry_admis
-./bin/UMV_BLR2_far_dense 250 50 7 1 2 diagonal_admis
+
+# ./bin/UMV_BLR2_far_dense 250 50 7 0.6 2 geometry_admis
+# ./bin/UMV_BLR2_far_dense 250 50 7 1 2 diagonal_admis
 # echo "2D CIRCLE"
 # echo "ADMIS 0.4"
 # for rank in 5 7 10 12 20; do
