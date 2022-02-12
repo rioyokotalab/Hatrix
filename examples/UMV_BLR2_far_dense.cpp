@@ -1253,9 +1253,11 @@ namespace Hatrix {
       for (int64_t j = 0; j < nblocks; ++j) {
         Hatrix::Matrix YtA(rank + oversampling, domain.boxes[j].num_particles);
 
-        for (int64_t j = 0; j < nblocks; ++j) {
-          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, j);
-          Hatrix::matmul(Y[i], dense, YtA, true);
+        for (int64_t i = 0; i < nblocks; ++i) {
+          if (is_admissible(i, j, level)) {
+            Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, j);
+            Hatrix::matmul(Y[i], dense, YtA, true);
+          }
         }
 
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
@@ -1267,7 +1269,7 @@ namespace Hatrix {
         for (int j = 0; j < nblocks; ++j) {
           if (is_admissible(i, j, level)) {
             Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, j);
-            S.insert(i, jcol, level,
+            S.insert(i, j, level,
                      Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(j, level)));
           }
         }
