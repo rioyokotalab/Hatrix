@@ -1712,7 +1712,7 @@ int main(int argc, char** argv) {
     std::cout << "rank > nleaf. Aborting.\n";
     abort();
   }
-  A_expected = Hatrix::generate_laplacend_matrix(domain.particles, N, N);
+
 
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
   double construct_error = A.construction_error(domain);
@@ -1720,6 +1720,7 @@ int main(int argc, char** argv) {
   // A.print_structure();
   A.factorize(domain);
 
+  // A_expected = Hatrix::generate_laplacend_matrix(domain.particles, N, N);
   // std::vector<Matrix> U_F = generate_UF_chain(A);
   // std::vector<Matrix> V_F = generate_VF_chain(A);
   // std::vector<Matrix> L = generate_L_chain(A);
