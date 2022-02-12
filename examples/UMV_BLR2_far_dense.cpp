@@ -406,47 +406,13 @@ namespace Hatrix {
   private:
 
     void calc_geometry_based_admissibility(const Domain& domain) {
-      // for (int i = 0; i < nblocks; ++i) {
-      //   is_admissible.insert(i, i, level, false);
-      // }
-
-      // is_admissible.insert(0, 1, level, false);
-      // is_admissible.insert(0, 2, level, false);
-      // is_admissible.insert(1, 0, level, false);
-      // is_admissible.insert(2, 0, level, false);
-
-      // is_admissible.insert(2, 3, level, false);
-      // is_admissible.insert(3, 2, level, false);
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          // if (!is_admissible.exists(i, j, level)) {
-          // is_admissible.insert(i, j, level, true);
-          // }
           is_admissible.insert(i, j, level,
                                std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <
                                admis * domain.boxes[i].distance_from(domain.boxes[j]));
         }
       }
-
-      // is_admissible.erase(0, 2, level);
-      // is_admissible.erase(2, 0, level);
-      // is_admissible.insert(0, 2, level, true);
-      // is_admissible.insert(2, 0, level, true);
-
-      // is_admissible.erase(0, 3, level);
-      // is_admissible.erase(3, 0, level);
-      // is_admissible.insert(0, 3, level, true);
-      // is_admissible.insert(3, 0, level, true);
-
-      // is_admissible.erase(1, 4, level);
-      // is_admissible.erase(4, 1, level);
-      // is_admissible.insert(1, 4, level, true);
-      // is_admissible.insert(4, 1, level, true);
-
-      // is_admissible.erase(6, 3, level);
-      // is_admissible.erase(3, 6, level);
-      // is_admissible.insert(6, 3, level, true);
-      // is_admissible.insert(3, 6, level, true);
     }
 
     void calc_diagonal_based_admissibility() {
@@ -501,10 +467,6 @@ namespace Hatrix {
 
               Matrix r_block = matmul(UN_block, U(block, level), true, false);
 
-              // if (block == 0) {
-              //   std::cout << "1 UPDATE U0\n";
-              // }
-
               U.erase(block, level);
               U.insert(block, level, std::move(UN_block));
 
@@ -523,10 +485,6 @@ namespace Hatrix {
 
                   Matrix t_j = matmul(V(j, level), VN_j, true, true);
 
-                  // if (j == 4) {
-                  //   std::cout << "1 UPDATE V4\n";
-                  // }
-
                   V.erase(j, level);
                   V.insert(j, level, transpose(VN_j));
 
@@ -538,10 +496,6 @@ namespace Hatrix {
                     if (i != block && is_admissible.exists(i, j, level) &&
                         is_admissible(i, j, level)) {
                       Matrix Sbar_i_j = matmul(S(i, j, level), t_j);
-
-                      // if (i == 0 && j == 4) {
-                      //   std::cout << "1 UPDATE S\n";
-                      // }
 
                       S.erase(i, j, level);
                       S.insert(i, j, level, std::move(Sbar_i_j));
@@ -575,11 +529,6 @@ namespace Hatrix {
                     Sbar_block_j = matmul(r_block, S(block, j, level));
                   }
 
-                  // if (block == 0 && j == 4) {
-                  //   std::cout << "2 UPDATE S\n";
-                  // }
-
-
                   S.erase(block, j, level);
                   S.insert(block, j, level, std::move(Sbar_block_j));
                 }
@@ -606,7 +555,6 @@ namespace Hatrix {
                                   matmul(Srow(block, level), V(block, level), false, true), 0);
               for (int64_t i = 0; i < nblocks; ++i) {
                 if (F.exists(i, block)) {
-                  // std::cout << "HORZ FILL-IN i -> " << i << " block -> " << block << std::endl;
                   if (i < block) {
                     col_concat = concat(col_concat,
                                         matmul(U(i, level), F(i, block)), 0);
@@ -641,10 +589,6 @@ namespace Hatrix {
 
                   Matrix r_i = matmul(UN_i, U(i, level), true, false);
 
-                  // if (i == 0) {
-                  //   std::cout << "2 UPDATE U0\n";
-                  // }
-
                   U.erase(i, level);
                   U.insert(i, level, std::move(UN_i));
 
@@ -675,13 +619,10 @@ namespace Hatrix {
                   Matrix Sbar_i_block(rank, rank);
                   if (F.exists(i, block)) {
                     if (i < block) {
-                      assert(F(i, block).rows == rank && F(i, block).cols == block_size);
                       Sbar_i_block = matmul(S(i, block, level), t_block) +
                         matmul(F(i, block), V(block, level));
                     }
                     else if (i > block) {
-                      // assert(F(i, block).rows == U(i, level).rows &&
-                      //        F(i, block).cols == V());
                       Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
                         matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
                     }
@@ -690,10 +631,6 @@ namespace Hatrix {
                   else {
                     Sbar_i_block = matmul(S(i, block, level), t_block);
                   }
-
-                  // if (i == 0 && block == 4) {
-                  //   std::cout << "4 UPDATE S\n";
-                  // }
 
                   S.erase(i, block, level);
                   S.insert(i, block, level, std::move(Sbar_i_block));
@@ -850,7 +787,6 @@ namespace Hatrix {
                 // The Schur's compliments that are formed before the block index are always
                 // a narrow strip of size nb * rank. These blocks are formed only on the right
                 // part of the permuted matrix in the co section.
-                // std::cout << "FILL IN: i-> " << i << " j -> " << j << std::endl;
                 if (j <= block) {
                   if (!F.exists(i, j)) {
                     Matrix fill_in(D(i, block, level).rows, rank);
