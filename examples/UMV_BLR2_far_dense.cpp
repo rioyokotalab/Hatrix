@@ -1238,11 +1238,13 @@ namespace Hatrix {
 
       for (int64_t i = 0; i < nblocks; ++i) {
         Hatrix::Matrix AY(domain.boxes[i].num_particles, rank + oversampling);
-        for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
-          int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = generate_p2p_interactions(domain, i, jcol);
-          Hatrix::matmul(dense, Y[jcol], AY);
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j, level)) {
+            Hatrix::Matrix dense = generate_p2p_interactions(domain, i, j);
+            Hatrix::matmul(dense, Y[j], AY);
+          }
         }
+
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
         U.insert(i, level, std::move(Utemp));
         Scol.insert(i, level, std::move(Stemp));
@@ -1251,24 +1253,23 @@ namespace Hatrix {
       for (int64_t j = 0; j < nblocks; ++j) {
         Hatrix::Matrix YtA(rank + oversampling, domain.boxes[j].num_particles);
 
-        for (long unsigned int i = 0; i < admissible_col_indices[j].size(); ++i) {
-          int64_t irow = admissible_col_indices[j][i];
-          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, irow, j);
-          Hatrix::matmul(Y[irow], dense, YtA, true);
+        for (int64_t j = 0; j < nblocks; ++j) {
+          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, j);
+          Hatrix::matmul(Y[i], dense, YtA, true);
         }
+
         std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(YtA, rank);
         V.insert(j, level, transpose(Vtemp));
         Srow.insert(j, level, std::move(Stemp));
       }
 
       for (int i = 0; i < nblocks; ++i) {
-        for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
-          int64_t jcol = admissible_row_indices[i][j];
-          Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, jcol);
-          // std::cout << "i -> " << i << " jcol -> " << jcol << std::endl;
-          // dense.print_meta();
-          S.insert(i, jcol, level,
-                   Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(jcol, level)));
+        for (int j = 0; j < nblocks; ++j) {
+          if (is_admissible(i, j, level)) {
+            Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, j);
+            S.insert(i, jcol, level,
+                     Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(j, level)));
+          }
         }
       }
     }
