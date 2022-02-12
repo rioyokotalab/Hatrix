@@ -422,7 +422,7 @@ namespace Hatrix {
           // is_admissible.insert(i, j, level, true);
           // }
           is_admissible.insert(i, j, level,
-                               std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <
+                               std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
                                admis * domain.boxes[i].distance_from(domain.boxes[j]));
         }
       }
@@ -512,6 +512,10 @@ namespace Hatrix {
 
               Matrix r_block = matmul(UN_block, U(block, level), true, false);
 
+              if (block == 0) {
+                std::cout << "1 UPDATE U0\n";
+              }
+
               U.erase(block, level);
               U.insert(block, level, std::move(UN_block));
 
@@ -530,6 +534,10 @@ namespace Hatrix {
 
                   Matrix t_j = matmul(V(j, level), VN_j, true, true);
 
+                  if (j == 4) {
+                    std::cout << "1 UPDATE V4\n";
+                  }
+
                   V.erase(j, level);
                   V.insert(j, level, transpose(VN_j));
 
@@ -541,6 +549,10 @@ namespace Hatrix {
                     if (i != block && is_admissible.exists(i, j, level) &&
                         is_admissible(i, j, level)) {
                       Matrix Sbar_i_j = matmul(S(i, j, level), t_j);
+
+                      if (i == 0 && j == 4) {
+                        std::cout << "1 UPDATE S\n";
+                      }
 
                       S.erase(i, j, level);
                       S.insert(i, j, level, std::move(Sbar_i_j));
@@ -573,6 +585,11 @@ namespace Hatrix {
                   else {
                     Sbar_block_j = matmul(r_block, S(block, j, level));
                   }
+
+                  if (block == 0 && j == 4) {
+                    std::cout << "2 UPDATE S\n";
+                  }
+
 
                   S.erase(block, j, level);
                   S.insert(block, j, level, std::move(Sbar_block_j));
@@ -616,6 +633,10 @@ namespace Hatrix {
 
               Matrix t_block = matmul(V(block, level), VNT_block, true, true);
 
+              if (block == 4) {
+                std::cout << "2 UPDATE V4\n";
+              }
+
               V.erase(block, level);
               V.insert(block, level, transpose(VNT_block));
 
@@ -635,6 +656,10 @@ namespace Hatrix {
 
                   Matrix r_i = matmul(UN_i, U(i, level), true, false);
 
+                  if (i == 0) {
+                    std::cout << "2 UPDATE U0\n";
+                  }
+
                   U.erase(i, level);
                   U.insert(i, level, std::move(UN_i));
 
@@ -648,6 +673,12 @@ namespace Hatrix {
                     if (block != j && is_admissible.exists(i, j, level) &&
                         is_admissible(i, j, level)) {
                       Matrix Sbar_i_j = matmul(r_i, S(i, j, level));
+
+                      if (i == 0 && j == 4) {
+                        std::cout << "3 UPDATE S\n";
+                      }
+
+
                       S.erase(i, j, level);
                       S.insert(i, j, level, std::move(Sbar_i_j));
                     }
@@ -679,6 +710,11 @@ namespace Hatrix {
                   else {
                     Sbar_i_block = matmul(S(i, block, level), t_block);
                   }
+
+                  if (i == 0 && block == 4) {
+                    std::cout << "4 UPDATE S\n";
+                  }
+
                   S.erase(i, block, level);
                   S.insert(i, block, level, std::move(Sbar_i_block));
                 }
@@ -1232,6 +1268,8 @@ namespace Hatrix {
         for (unsigned j = 0; j < admissible_row_indices[i].size(); ++j) {
           int64_t jcol = admissible_row_indices[i][j];
           Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, jcol);
+          // std::cout << "i -> " << i << " jcol -> " << jcol << std::endl;
+          // dense.print_meta();
           S.insert(i, jcol, level,
                    Hatrix::matmul(Hatrix::matmul(U(i, level), dense, true), V(jcol, level)));
         }
@@ -1260,8 +1298,8 @@ namespace Hatrix {
           }
           else {
             auto D_splits = SPLIT_DENSE(D(i, j, level),
-                                        V(i, level).rows - rank,
-                                        U(j, level).rows - rank);
+                                        D(i, j, level).rows - rank,
+                                        D(i, j, level).cols - rank);
             last_splits[i * nblocks + j] = D_splits[3];
           }
         }
@@ -1767,6 +1805,7 @@ int main(int argc, char** argv) {
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
   double construct_error = A.construction_error(domain);
 
+  A.print_structure();
   A.factorize(domain);
 
   std::vector<Matrix> U_F = generate_UF_chain(A);
@@ -1798,26 +1837,25 @@ int main(int argc, char** argv) {
   auto d_splits = diff.split(M_row_offsets, M_col_offsets);
   auto m_splits = A_expected.split(M_row_offsets, M_col_offsets);
 
-  std::cout << "-- BLR2 verification --\n";
-  for (int i = 0; i < A.nblocks; ++i) {
-    for (int j = 0; j < A.nblocks; ++j) {
-      double error = norm(d_splits[i * A.nblocks + j]) / norm(m_splits[i * A.nblocks + j]);
+  // std::cout << "-- BLR2 verification --\n";
+  // for (int i = 0; i < A.nblocks; ++i) {
+  //   for (int j = 0; j < A.nblocks; ++j) {
+  //     double error = norm(d_splits[i * A.nblocks + j]) / norm(m_splits[i * A.nblocks + j]);
 
-      if (error > 1e-5) {
+  //       std::cout << "<i, j>: " << i << ", " << j
+  //                 << " -- "
+  //                 << std::setprecision(5)
+  //                 << error
+  //                 << std::setw(5)
+  //                 << std::endl;
 
-        std::cout << "<i, j>: " << i << ", " << j
-                << " -- "
-                << std::setprecision(5)
-                << error
-                << std::setw(5)
-                << std::endl;
-      }
-
-    }
-
-  }
+  //       // if (i == 0 && j == 4) {
+  //       //   d_splits[i * A.nblocks + j].print();
+  //       // }
 
 
+  //   }
+  // }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
