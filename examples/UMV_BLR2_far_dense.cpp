@@ -494,13 +494,10 @@ namespace Hatrix {
                     // Concat the fill-ins before the diagonal block. These fill-ins are all
                     // of size (co; oo) and should be multiplied with Vj before before being
                     // concatenated into the recompression.
-                    assert(F(block, j).rows == block_size && F(block, j).cols == rank);
-
                     Matrix Fp = matmul(F(block, j), V(j, level), false, true);
                     row_concat = concat(row_concat, Fp, 1);
                   }
                   else if (j > block) {
-                    assert(F(block, j).rows == block_size && F(block, j).cols == V(j, level).rows);
                     row_concat = concat(row_concat, F(block, j), 1);
                   }
                 }
@@ -1019,8 +1016,8 @@ namespace Hatrix {
       std::vector<int64_t> row_offsets;
       int nrows = 0;
       for (int i = 0; i < nblocks; ++i) {
-        row_offsets.push_back(nrows + U(i, level).rows);
-        nrows += U(i, level).rows;
+        row_offsets.push_back(nrows + D(i, i, level).rows);
+        nrows += D(i, i, level).rows;
       }
       std::vector<Matrix> x_level_split = x_level.split(row_offsets, {});
 
@@ -1083,8 +1080,8 @@ namespace Hatrix {
       std::vector<int64_t> col_offsets;
       int64_t nrows = 0;
       for (int i = 0; i < nblocks; ++i) {
-        col_offsets.push_back(nrows + U(i, level).rows);
-        nrows += U(i, level).rows;
+        col_offsets.push_back(nrows + D(i, i, level).cols);
+        nrows += D(i, i, level).cols;
       }
       std::vector<Matrix> x_level_split = x_level.split(col_offsets, {});
 
@@ -1150,11 +1147,11 @@ namespace Hatrix {
       int64_t c_size_offset = 0, block_offset = 0;
 
       for (int64_t block = 0; block < num_nodes; ++block) {
-        rank_offset += U(block, level).rows - rank;
+        rank_offset += D(block, block, level).rows - rank;
       }
 
       for (int64_t block = 0; block < num_nodes; ++block) {
-        int64_t rows = U(block, level).rows;
+        int64_t rows = D(block, block, level).rows;
         int64_t c_size = rows - rank;
 
         // copy the complement part of the vector into the temporary vector
@@ -1182,11 +1179,11 @@ namespace Hatrix {
       int64_t c_offset = rank_offset;
       int64_t c_size_offset = 0, block_offset = 0;
       for (int64_t block = 0; block < num_nodes; ++block) {
-        c_offset -= V(block, level).rows - rank;
+        c_offset -= D(block, block, level).cols - rank;
       }
 
       for (int64_t block = 0; block < num_nodes; ++block) {
-        int64_t rows = U(block, level).rows;
+        int64_t rows = D(block, block, level).cols;
         int64_t c_size = rows - rank;
 
         for (int64_t i = 0; i < c_size; ++i) {
