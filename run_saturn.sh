@@ -11,8 +11,15 @@ module load intel-mkl/2020.4.304/gcc-7.3.0-52gb
 
 # make clean
 make -j all
-# ./bin/UMV_BLR2_far_dense 500 100 3 0.6 2 geometry_admis
-gdb -ex run --args ./bin/UMV_BLR2_far_dense 500 100 10 0.6 2 geometry_admis
+# ./bin/UMV_BLR2_far_dense 500 100 3 0.6 2 geometry_
+# gdb -ex run --args
+for rank in 3 4 5 6 7 10 15; do
+    ./bin/UMV_BLR2_far_dense 500 100 $rank 0.6 2 geometry_admis
+    ./bin/UMV_BLR2_far_dense 2000 100 $rank 0.6 2 geometry_admis
+    ./bin/UMV_BLR2_far_dense 4000 100 $rank 0.6 2 geometry_admis
+done
+
+# ./bin/UMV_BLR2_far_dense 500 100 10 0.6 2 geometry_admis
 # ./bin/UMV_BLR2_far_dense 1000 100 3 0.6 2 geometry_admis
 # ./bin/UMV_BLR2_far_dense 2000 100 3 0.6 2 geometry_admis
 # ./bin/UMV_BLR2_far_dense 2000 100 3 0.6 2 geometry_admis
