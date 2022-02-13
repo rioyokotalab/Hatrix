@@ -882,7 +882,7 @@ namespace Hatrix {
                 Matrix fill_in(rank, block_size);
                 auto fill_splits = fill_in.split({},
                                                  std::vector<int64_t>(1,
-                                                                       block_size - rank));
+                                                                      block_size - rank));
                 // Update the co block within the fill-ins.
                 matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
                 // Update the oo block within the fill-ins.
@@ -917,7 +917,7 @@ namespace Hatrix {
     for (; level > 0; --level) {
       int64_t nblocks = level_blocks[level-1];
       bool is_all_dense_level = false;
-      for (int i = 0; i < nblocks; ++i) {
+      for (int64_t i = 0; i < nblocks; ++i) {
         if (!U.exists(i, level)) {
           is_all_dense_level = true;
         }
@@ -928,9 +928,108 @@ namespace Hatrix {
 
       factorize_level(level, nblocks, domain, r, t);
 
+      int parent_level = level - 1;
 
+      // Update transfer matrices on one level higher.
+      for (int block = 0; block < nblocks; block += 2) {
+        int parent_node = block / 2;
+        int c1 = block;
+        int c2 = block+1;
+
+        if (row_has_admissible_blocks(parent_node, parent_level)) {
+          Matrix& Utransfer = U(parent_node, parent_level);
+          auto Utransfer_splits = Utransfer.split(2, 1);
+
+          Matrix temp(Utransfer);
+          auto temp_splits = temp.split(2, 1);
+
+          if (r.exists(c1)) {
+            matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
+            r.erase(c1);
+          }
+
+          if (r.exists(c2)) {
+            matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
+            r.erase(c2);
+          }
+
+          U.erase(parent_node, parent_level);
+          U.insert(parent_node, parent_level, std::move(temp));
+        }
+
+        if (col_has_admissible_blocks(parent_node, parent_level)) {
+          Matrix& Vtransfer = V(parent_node, parent_level);
+          auto Vtransfer_splits = Vtransfer.split(2, 1);
+
+          Matrix temp(Vtransfer);
+          auto temp_splits = temp.split(2, 1);
+
+          if (t.exists(c1)) {
+            matmul(t(c1), Vtransfer_splits[0], temp_splits[0], false, false, 1, 0);
+            t.erase(c1);
+          }
+
+          if (t.exists(c2)) {
+            matmul(t(c2), Vtransfer_splits[1], temp_splits[1], false, false, 1, 0);
+            t.erase(c2);
+          }
+
+          V.erase(parent_node, parent_level);
+          V.insert(parent_node, parent_level, std::move(temp));
+        }
+
+        // Merge the unfactorized parts.
+        int64_t parent_nblocks = level_blocks[parent_level-1];
+        for (int64_t i = 0; i < parent_nblocks; ++i) {
+          for (int64_t j = 0; j < parent_nblocks; ++j) {
+            if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
+              std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
+              Matrix D_unelim(rank*2, rank*2);
+              auto D_unelim_splits = D_unelim.split(2, 2);
+
+              for (int64_t ic1 = 0; ic1 < 2; ++ic1) {
+                for (int64_t jc2 = 0; jc2 < 2; ++jc2) {
+                  int64_t c1 = i_children[ic1], c2 = j_children[jc2];
+                  if (!U.exists(c1, level)) { continue; }
+
+                  if (is_admissible.exists(c1, c2, level) && !is_admissible(c1, c2, level)) {
+                    auto D_splits = SPLIT_DENSE(D(c1, c2, level),
+                                                D(c1, c2, level).rows-rank,
+                                                D(c1, c2, level).cols-rank);
+                    D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
+                  }
+                  else {
+                    D_unelim_splits[ic1 * 2 + jc2] = S(c1, c2, level);
+                  }
+                }
+              }
+
+              // std::cout << "Merge insert: i-> " << i
+              //           << " j -> " << " parent_level -> " << parent_level << std::endl;
+              D.insert(i, j, parent_level, std::move(D_unelim));
+            }
+          }
+        }
+      } // for (block = 0; block < nblocks; block += 2)
+    } // for (; level > 0; --level)
+
+    int64_t last_nodes = level_blocks[level-1];
+
+    for (int64_t d = 0; d < last_nodes; ++d) {
+      lu(D(d, d, level));
+      for (int64_t j = d+1; j < last_nodes; ++j) {
+        solve_triangular(D(d, d, level), D(d, j, level), Hatrix::Left, Hatrix::Lower, true);
+      }
+      for (int64_t i = d+1; i < last_nodes; ++i) {
+        solve_triangular(D(d, d, level), D(i, d, level), Hatrix::Right, Hatrix::Upper, false);
+      }
+
+      for (int64_t i = d+1; i < last_nodes; ++i) {
+        for (int64_t j = d+1; j < last_nodes; ++j) {
+          matmul(D(i, d, level), D(d, j, level), D(i, j, level), false, false, -1.0, 1.0);
+        }
+      }
     }
-
   }
 
   Matrix
@@ -1096,17 +1195,17 @@ namespace Hatrix {
     return {std::move(Ui), std::move(Si)};
   }
 
-    Matrix
-    H2::generate_row_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level) {
-      Hatrix::Matrix YtA(0, block_size);
-      for (int64_t i = 0; i < pow(2, level); ++i) {
-        if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-        Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block, level, height);
-        YtA = concat(YtA, dense, 0);
-      }
-
-      return YtA;
+  Matrix
+  H2::generate_row_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level) {
+    Hatrix::Matrix YtA(0, block_size);
+    for (int64_t i = 0; i < pow(2, level); ++i) {
+      if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block, level, height);
+      YtA = concat(YtA, dense, 0);
     }
+
+    return YtA;
+  }
 
 
   std::tuple<Matrix, Matrix>
