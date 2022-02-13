@@ -21,6 +21,8 @@ double PV = 1e-3;
               std::vector<int64_t>(1, col_split));
 
 
+double beta, nu, noise = 1.e-1, sigma;
+
 Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
   Hatrix::Matrix Q_F(Q.rows, Q.rows);
   Hatrix::Matrix Q_full, R;
@@ -41,6 +43,8 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
 }
 
 namespace Hatrix {
+  std::function<double(const std::vector<double>& coords_row, const std::vector<double>& coords_col)> kernel_function;
+
   class Particle {
   public:
     double value;
@@ -165,7 +169,7 @@ namespace Hatrix {
 
     for (int64_t i = 0; i < nrows; ++i) {
       for (int64_t j = 0; j < ncols; ++j) {
-        out(i, j) = laplace_kernel(particles[i].coords, particles[j].coords);
+        out(i, j) = kernel_function(particles[i].coords, particles[j].coords);
       }
     }
     return out;
@@ -183,7 +187,7 @@ namespace Hatrix {
         int64_t source = domain.boxes[irow].start_index;
         int64_t target = domain.boxes[icol].start_index;
 
-        out(i, j) = laplace_kernel(domain.particles[source+i].coords,
+        out(i, j) = kernel_function(domain.particles[source+i].coords,
                                    domain.particles[target+j].coords);
       }
     }
@@ -242,8 +246,8 @@ namespace Hatrix {
 
     for (int64_t i = 0; i < nrows; ++i) {
       for (int64_t j = 0; j < ncols; ++j) {
-        out(i, j) = laplace_kernel(source_particles[i].coords,
-                                   target_particles[j].coords);
+        out(i, j) = kernel_function(source_particles[i].coords,
+                                    target_particles[j].coords);
       }
     }
 
@@ -1062,12 +1066,33 @@ int main(int argc, char ** argv) {
   double admis = atof(argv[4]);
   int64_t ndim = atoi(argv[5]);
   std::string admis_kind(argv[6]);
+  int64_t kernel_func = atoi(argv[7]);
+
+  beta = 0.1;
+  nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
+  noise = 1.e-1;
+  sigma = 1.0;
 
   Hatrix::Context::init();
 
   Hatrix::Domain domain(N, ndim);
-  domain.generate_particles(0.0, 1.0 * N);
+
+  switch(kernel_func) {
+  case 0: {
+    domain.generate_particles(0.0, 1.0 * N);
+    Hatrix::kernel_function = Hatrix::laplace_kernel;
+    break;
+  }
+  case 1: {                     // sqrexp 2D
+    break;
+  }
+  case 2: {                     // sqrexp 3D
+    break;
+  }
+  }
+
   domain.divide_domain_and_create_particle_boxes(nleaf);
+
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
   // A.print_structure();
