@@ -21,6 +21,8 @@ double PV = 1e-3;
               std::vector<int64_t>(1, col_split));
 
 
+double beta, nu, noise = 1.e-1, sigma;
+
 Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
   Hatrix::Matrix Q_F(Q.rows, Q.rows);
   Hatrix::Matrix Q_full, R;
@@ -41,6 +43,8 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
 }
 
 namespace Hatrix {
+  std::function<double(const std::vector<double>& coords_row, const std::vector<double>& coords_col)> kernel_function;
+
   class Particle {
   public:
     double value;
@@ -49,6 +53,7 @@ namespace Hatrix {
     Particle(double x, double _value);
     Particle(double x, double y, double _value);
     Particle(double x, double y, double z, double _value);
+    Particle(std::vector<double> coords, double _value);
   };
 
   class Box {
@@ -87,6 +92,7 @@ namespace Hatrix {
     Domain(int64_t N, int64_t ndim);
     void generate_particles(double min_val, double max_val);
     void divide_domain_and_create_particle_boxes(int64_t nleaf);
+    void generate_starsh_grid_particles();
   };
 
   class H2 {
@@ -146,6 +152,26 @@ namespace Hatrix {
 }
 
 namespace Hatrix {
+  double sqrexp_kernel(const std::vector<double>& coords_row,
+                       const std::vector<double>& coords_col) {
+    int64_t ndim = coords_row.size();
+    double dist = 0, temp;
+
+    // Copied from kernel_sqrexp.c in stars-H.
+
+    for (int64_t k = 0; k < ndim; ++k) {
+      temp = coords_row[k] - coords_col[k];
+      dist += temp * temp;
+    }
+    dist = dist / beta;
+    if (dist == 0) {
+      return sigma + noise;
+    }
+    else {
+      return sigma * exp(dist);
+    }
+  }
+
   double laplace_kernel(const std::vector<double>& coords_row,
                         const std::vector<double>& coords_col) {
     int64_t ndim = coords_row.size();
@@ -165,7 +191,7 @@ namespace Hatrix {
 
     for (int64_t i = 0; i < nrows; ++i) {
       for (int64_t j = 0; j < ncols; ++j) {
-        out(i, j) = laplace_kernel(particles[i].coords, particles[j].coords);
+        out(i, j) = kernel_function(particles[i].coords, particles[j].coords);
       }
     }
     return out;
@@ -183,7 +209,7 @@ namespace Hatrix {
         int64_t source = domain.boxes[irow].start_index;
         int64_t target = domain.boxes[icol].start_index;
 
-        out(i, j) = laplace_kernel(domain.particles[source+i].coords,
+        out(i, j) = kernel_function(domain.particles[source+i].coords,
                                    domain.particles[target+j].coords);
       }
     }
@@ -242,8 +268,8 @@ namespace Hatrix {
 
     for (int64_t i = 0; i < nrows; ++i) {
       for (int64_t j = 0; j < ncols; ++j) {
-        out(i, j) = laplace_kernel(source_particles[i].coords,
-                                   target_particles[j].coords);
+        out(i, j) = kernel_function(source_particles[i].coords,
+                                    target_particles[j].coords);
       }
     }
 
@@ -265,6 +291,8 @@ namespace Hatrix {
     coords.push_back(z);
   }
 
+  Particle::Particle(std::vector<double> _coords, double _value) :
+    coords(_coords), value(_value) {}
 
   Box::Box() {}
 
@@ -439,6 +467,47 @@ namespace Hatrix {
 
 
   Domain::Domain(int64_t N, int64_t ndim) : N(N), ndim(ndim) {}
+
+  void Domain::generate_starsh_grid_particles() {
+    int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
+    int64_t total = side;
+
+    for (int i = 1; i < ndim; ++i) { total *= side; }
+    int64_t ncoords = ndim * side;
+    std::vector<double> coord(ncoords);
+
+    for (int i = 0; i < side; ++i) {
+      double val = double(i) / side;
+      for (int j = 0; j < ndim; ++j) {
+        coord[j * side + i] = val;
+      }
+    }
+
+    std::vector<int64_t> pivot(ndim, 0);
+
+    int64_t k = 0;
+    for (int64_t i = 0; i < N; ++i) {
+      std::vector<double> points(ndim);
+      for (k = 0; k < ndim; ++k) {
+
+        points[k] = coord[pivot[k] + k * side];
+        std::cout << points[k] << " ";
+      }
+      std::cout << std::endl;
+      particles.push_back(Hatrix::Particle(points, 0));
+
+      k = ndim - 1;
+      pivot[k]++;
+
+      while(pivot[k] == side) {
+        pivot[k] = 0;
+        if (k > 0) {
+          --k;
+          pivot[k]++;
+        }
+      }
+    }
+  }
 
   void Domain::generate_particles(double min_val, double max_val) {
     double range = max_val - min_val;
@@ -1063,15 +1132,35 @@ int main(int argc, char ** argv) {
   double admis = atof(argv[4]);
   int64_t ndim = atoi(argv[5]);
   std::string admis_kind(argv[6]);
+  int64_t kernel_func = atoi(argv[7]);
+
+  beta = 0.1;
+  nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
+  noise = 1.e-1;
+  sigma = 1.0;
 
   Hatrix::Context::init();
 
   Hatrix::Domain domain(N, ndim);
-  domain.generate_particles(0.0, 1.0 * N);
+
+  switch(kernel_func) {
+  case 0: {                     // laplace kernel
+    domain.generate_particles(0.0, 1.0 * N);
+    Hatrix::kernel_function = Hatrix::laplace_kernel;
+    break;
+  }
+  case 1: {                     // sqrexp
+    domain.generate_starsh_grid_particles();
+    Hatrix::kernel_function = Hatrix::sqrexp_kernel;
+    break;
+  }
+  }
+
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
+
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  // A.print_structure();
+  A.print_structure();
   double construct_error = A.construction_relative_error(domain);
 
 
