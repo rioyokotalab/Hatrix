@@ -240,7 +240,12 @@ namespace Hatrix {
       }
     }
 
-
+    for (int64_t i = 0; i < nrows; ++i) {
+      for (int64_t j = 0; j < ncols; ++j) {
+        out(i, j) = laplace_kernel(source_particles[i].coords,
+                                   target_particles[j].coords);
+      }
+    }
 
     return out;
   }
