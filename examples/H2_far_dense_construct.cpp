@@ -10,6 +10,7 @@
 #include <random>
 #include <string>
 #include <iomanip>
+#include <functional>
 
 #include "Hatrix/Hatrix.h"
 
