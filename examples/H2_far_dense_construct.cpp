@@ -148,6 +148,7 @@ namespace Hatrix {
        std::string& admis_kind);
     double construction_relative_error(const Domain& domain);
     void print_structure();
+    double low_rank_block_ratio();
   };
 }
 
@@ -181,19 +182,6 @@ namespace Hatrix {
     }
     double out = 1 / (std::sqrt(rij) + PV);
 
-    return out;
-  }
-
-  // Generate a full dense laplacian matrix assuming unit charges.
-  Matrix generate_laplacend_matrix(const std::vector<Hatrix::Particle>& particles,
-                                   int64_t nrows, int64_t ncols) {
-    Matrix out(nrows, ncols);
-
-    for (int64_t i = 0; i < nrows; ++i) {
-      for (int64_t j = 0; j < ncols; ++j) {
-        out(i, j) = kernel_function(particles[i].coords, particles[j].coords);
-      }
-    }
     return out;
   }
 
@@ -491,9 +479,9 @@ namespace Hatrix {
       for (k = 0; k < ndim; ++k) {
 
         points[k] = coord[pivot[k] + k * side];
-        std::cout << points[k] << " ";
+        // std::cout << points[k] << " ";
       }
-      std::cout << std::endl;
+      // std::cout << std::endl;
       particles.push_back(Hatrix::Particle(points, 0));
 
       k = ndim - 1;
@@ -975,9 +963,9 @@ namespace Hatrix {
                                                                 domain,
                                                                 level);
 
-        std::cout << "level: " << level << " node: " << node
-                  << " U : " << norm(generate_identity_matrix(rank, rank) - matmul(Utransfer, Utransfer, true, false))
-                  << std::endl;
+        // std::cout << "level: " << level << " node: " << node
+        //           << " U : " << norm(generate_identity_matrix(rank, rank) - matmul(Utransfer, Utransfer, true, false))
+        //           << std::endl;
 
         U.insert(node, level, std::move(Utransfer));
         Scol.insert(node, level, std::move(Stemp));
@@ -1122,6 +1110,27 @@ namespace Hatrix {
   void H2::print_structure() {
     actually_print_structure(height);
   }
+
+  double
+  H2::low_rank_block_ratio() {
+    double total = 0, low_rank = 0;
+
+    int nblocks = level_blocks[height-1];
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        if ((is_admissible.exists(i, j, height) && is_admissible(i, j, height)) ||
+            !is_admissible.exists(i, j, height)) {
+          low_rank += 1;
+        }
+
+        total += 1;
+      }
+    }
+
+    std::cout << "LR: " << low_rank << " total: " << total << std::endl;
+
+    return low_rank / total;
+  }
 }
 
 int main(int argc, char ** argv) {
@@ -1159,14 +1168,16 @@ int main(int argc, char ** argv) {
 
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(domain);
 
+  double lr_ratio = A.low_rank_block_ratio();
 
   Hatrix::Context::finalize();
 
   std::cout << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
             << " height= " << A.height << " rank=" << rank
-            << " construct error= " << construct_error << std::endl;
+            << " construct error= " << construct_error
+            << " LR%= " << lr_ratio * 100 << "%" << std::endl;
 
 }
