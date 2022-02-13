@@ -1378,6 +1378,7 @@ namespace Hatrix {
   int64_t
   H2::calc_geometry_based_admissibility(const Domain& domain) {
     int64_t nblocks = domain.boxes.size();
+    std::cout << "nb: " << nblocks << std::endl;
     level_blocks.push_back(nblocks);
     int64_t level = 0;
     for (int64_t i = 0; i < nblocks; ++i) {
@@ -1805,6 +1806,11 @@ namespace Hatrix {
         calc_diagonal_based_admissibility(height);
         std::reverse(std::begin(level_blocks), std::end(level_blocks));
       }
+      else {
+        std::cout << "wrong admis condition: " << admis_kind << std::endl;
+        abort();
+      }
+
       is_admissible.insert(0, 0, 0, false);
       PV = height;
 
