@@ -906,9 +906,9 @@ namespace Hatrix {
                                                                 domain,
                                                                 level);
 
-        std::cout << "level: " << level << " node: " << node
-                  << " U : " << norm(generate_identity_matrix(rank, rank) - matmul(Utransfer, Utransfer, true, false))
-                  << std::endl;
+        // std::cout << "level: " << level << " node: " << node
+        //           << " U : " << norm(generate_identity_matrix(rank, rank) - matmul(Utransfer, Utransfer, true, false))
+        //           << std::endl;
 
         U.insert(node, level, std::move(Utransfer));
         Scol.insert(node, level, std::move(Stemp));
@@ -1001,6 +1001,7 @@ namespace Hatrix {
       std::reverse(std::begin(level_blocks), std::end(level_blocks));
     }
     is_admissible.insert(0, 0, 0, false);
+    PV = height;
 
     generate_leaf_nodes(domain);
     RowLevelMap Uchild = U;
