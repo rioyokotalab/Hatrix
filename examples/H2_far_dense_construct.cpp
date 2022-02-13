@@ -218,8 +218,8 @@ namespace Hatrix {
     std::vector<int64_t> leaf_cols = leaf_indices(icol, level, height);
 
     int64_t nrows = 0, ncols = 0;
-    for (int i = 0; i < leaf_rows.size(); ++i) { nrows += domain.boxes[i].num_particles; }
-    for (int i = 0; i < leaf_cols.size(); ++i) { ncols += domain.boxes[i].num_particles; }
+    for (int i = 0; i < leaf_rows.size(); ++i) { nrows += domain.boxes[leaf_rows[i]].num_particles; }
+    for (int i = 0; i < leaf_cols.size(); ++i) { ncols += domain.boxes[leaf_cols[i]].num_particles; }
 
     Matrix out(nrows, ncols);
 
@@ -590,6 +590,7 @@ namespace Hatrix {
   H2::calc_diagonal_based_admissibility(int64_t level) {
     if (level == 0) { return; }
     int64_t nblocks = pow(2, level);
+    level_blocks.push_back(nblocks);
     if (level == height) {
       for (int64_t i = 0; i < nblocks; ++i) {
         for (int64_t j = 0; j < nblocks; ++j) {
@@ -905,6 +906,10 @@ namespace Hatrix {
                                                                 domain,
                                                                 level);
 
+        std::cout << "level: " << level << " node: " << node
+                  << " U : " << norm(generate_identity_matrix(rank, rank) - matmul(Utransfer, Utransfer, true, false))
+                  << std::endl;
+
         U.insert(node, level, std::move(Utransfer));
         Scol.insert(node, level, std::move(Stemp));
 
@@ -993,6 +998,7 @@ namespace Hatrix {
     else if (admis_kind == "diagonal_admis") {
       height = int64_t(log2(N / nleaf));
       calc_diagonal_based_admissibility(height);
+      std::reverse(std::begin(level_blocks), std::end(level_blocks));
     }
     is_admissible.insert(0, 0, 0, false);
 
@@ -1064,7 +1070,7 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(domain);
 
 
