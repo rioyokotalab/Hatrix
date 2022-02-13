@@ -1072,7 +1072,7 @@ int main(int argc, char ** argv) {
   Hatrix::Context::finalize();
 
   std::cout << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
-            << " height= " << A.height
+            << " height= " << A.height << " rank=" << rank
             << " construct error= " << construct_error << std::endl;
 
 }
