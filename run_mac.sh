@@ -3,7 +3,12 @@
 make -j all
 
 # ./bin/UMV_H2_far_dense 800 10 100 0.7 1 geometry_admis 0
-./bin/UMV_H2_far_dense 1600 10 100 0.7 1 geometry_admis 0
+# ./bin/UMV_H2_far_dense 1600 10 100 0.7 1 geometry_admis 0
+# ./bin/UMV_H2_far_dense 3200 10 100 0.7 1 geometry_admis 0
+
+./bin/UMV_H2_far_dense 800 10 100 2 1 diagonal_admis 0
+./bin/UMV_H2_far_dense 1600 10 100 2 1 diagonal_admis 0
+./bin/UMV_H2_far_dense 3200 10 100 2 1 diagonal_admis 0
 # ./bin/UMV_H2_far_dense 800 20 100 0.7 1 diagonal_admis 0
 # ./bin/UMV_H2_far_dense 1600 20 100 0.7 1 diagonal_admis 0
 
