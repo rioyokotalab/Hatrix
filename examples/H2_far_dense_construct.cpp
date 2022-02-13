@@ -323,7 +323,7 @@ namespace Hatrix {
     // Sort the particles only by the X axis since that is the only axis that needs to be bisected.
     std::sort(particles.begin()+start,
               particles.begin()+end, [](const Particle& lhs, const Particle& rhs) {
-      return lhs.coords[0] <= rhs.coords[0];
+      return lhs.coords[0] < rhs.coords[0];
     });
 
     int64_t num_points = end - start;
@@ -578,7 +578,7 @@ namespace Hatrix {
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
         is_admissible.insert(i, j, level,
-                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <
+                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
                              admis * domain.boxes[i].distance_from(domain.boxes[j]));
       }
     }
@@ -1064,7 +1064,7 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-      // A.print_structure();
+  A.print_structure();
   double construct_error = A.construction_relative_error(domain);
 
 
