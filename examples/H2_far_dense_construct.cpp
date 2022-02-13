@@ -1058,6 +1058,7 @@ namespace Hatrix {
       std::reverse(std::begin(level_blocks), std::end(level_blocks));
     }
     is_admissible.insert(0, 0, 0, false);
+    PV = height;
 
     generate_leaf_nodes(domain);
     RowLevelMap Uchild = U;
