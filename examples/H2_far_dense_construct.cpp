@@ -1128,8 +1128,6 @@ namespace Hatrix {
       }
     }
 
-    std::cout << "LR: " << low_rank << " total: " << total << std::endl;
-
     return low_rank / total;
   }
 }
