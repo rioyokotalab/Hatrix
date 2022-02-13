@@ -191,6 +191,60 @@ namespace Hatrix {
     return out;
   }
 
+  std::vector<int64_t>
+  leaf_indices(int64_t node, int64_t level, int64_t height) {
+    std::vector<int64_t> indices;
+    if (level == height) {
+      std::vector<int64_t> leaf_index{node};
+      return leaf_index;
+    }
+
+    auto c1_indices = leaf_indices(node * 2, level + 1, height);
+    auto c2_indices = leaf_indices(node * 2 + 1, level + 1, height);
+
+    c1_indices.insert(c1_indices.end(), c2_indices.begin(), c2_indices.end());
+
+    return c1_indices;
+  }
+
+  Matrix generate_p2p_interactions(const Domain& domain,
+                                   int64_t irow, int64_t icol,
+                                   int64_t level, int64_t height) {
+    if (level == height) {
+      return generate_p2p_interactions(domain, irow, icol);
+    }
+
+    std::vector<int64_t> leaf_rows = leaf_indices(irow, level, height);
+    std::vector<int64_t> leaf_cols = leaf_indices(icol, level, height);
+
+    int64_t nrows = 0, ncols = 0;
+    for (int i = 0; i < leaf_rows.size(); ++i) { nrows += domain.boxes[i].num_particles; }
+    for (int i = 0; i < leaf_cols.size(); ++i) { ncols += domain.boxes[i].num_particles; }
+
+    Matrix out(nrows, ncols);
+
+    std::vector<Particle> source_particles, target_particles;
+    for (int i = 0; i < leaf_rows.size(); ++i) {
+      int64_t source_box = leaf_rows[i];
+      int64_t source = domain.boxes[source_box].start_index;
+      for (int n = 0; n < domain.boxes[source_box].num_particles; ++n) {
+        source_particles.push_back(domain.particles[source + n]);
+      }
+    }
+
+    for (int i = 0; i < leaf_cols.size(); ++i) {
+      int64_t target_box = leaf_cols[i];
+      int64_t target = domain.boxes[target_box].start_index;
+      for (int n = 0; n < domain.boxes[target_box].num_particles; ++n) {
+        target_particles.push_back(domain.particles[target + n]);
+      }
+    }
+
+
+
+    return out;
+  }
+
   Particle::Particle(double x, double _value) : value(_value)  {
     coords.push_back(x);
   }
@@ -574,8 +628,8 @@ namespace Hatrix {
     int64_t nblocks = level_blocks[level-1];
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-      int64_t col_block_size = get_block_size_col(domain, j, level);
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j);
+      // int64_t col_block_size = get_block_size_col(domain, j, level);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j, level, height);
       AY = concat(AY, dense, 1);
     }
 
@@ -804,7 +858,6 @@ namespace Hatrix {
       int64_t child2 = node * 2 + 1;
       int64_t child_level = level + 1;
       int64_t block_size = get_block_size_row(domain, node, level);
-
 
       if (row_has_admissible_blocks(node, level)) {
         Matrix& Ubig_child1 = Uchild(child1, child_level);
