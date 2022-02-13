@@ -127,7 +127,7 @@ namespace Hatrix {
                                int64_t block_size, const Domain& domain, int64_t level);
     std::tuple<Matrix, Matrix>
     generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
-                               int64_t block_size, const Domain& domain, int level);
+                               int64_t block_size, const Domain& domain, int64_t level);
 
     void
     calc_geometry_based_admissibility(int64_t level, const Domain& domain);
@@ -633,7 +633,6 @@ namespace Hatrix {
     int64_t nblocks = level_blocks[level-1];
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-      // int64_t col_block_size = get_block_size_col(domain, j, level);
       Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j, level, height);
       AY = concat(AY, dense, 1);
     }
@@ -657,8 +656,7 @@ namespace Hatrix {
     Hatrix::Matrix YtA(0, block_size);
     for (int64_t i = 0; i < pow(2, level); ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-      int64_t row_block_size = get_block_size_row(domain, i, level);
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block, level, height);
       YtA = concat(YtA, dense, 0);
     }
 
@@ -850,6 +848,24 @@ namespace Hatrix {
     return {std::move(Utransfer), std::move(Si)};
   }
 
+  std::tuple<Matrix, Matrix>
+  H2::generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
+                                 int64_t block_size, const Domain& domain, int64_t level) {
+    Matrix row_block = generate_row_block(node, block_size, domain, level);
+    auto row_block_splits = row_block.split(1, 2);
+
+    Matrix temp(row_block.rows, Vbig_child1.cols + Vbig_child2.cols);
+    auto temp_splits = temp.split(1, 2);
+
+    matmul(row_block_splits[0], Vbig_child1, temp_splits[0]);
+    matmul(row_block_splits[1], Vbig_child2, temp_splits[1]);
+
+    Matrix Ui, Si, Vtransfer; double error;
+    std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
+
+    return {std::move(Si), transpose(Vtransfer)};
+  }
+
   std::tuple<RowLevelMap, ColLevelMap>
   H2::generate_transfer_matrices(const Domain& domain,
                                  int64_t level, RowLevelMap& Uchild,
@@ -884,11 +900,45 @@ namespace Hatrix {
                                                                 block_size,
                                                                 domain,
                                                                 level);
-        Utransfer.print_meta();
+
+        U.insert(node, level, std::move(Utransfer));
+        Scol.insert(node, level, std::move(Stemp));
+
+        // Generate the full bases to pass onto the parent.
+        auto Utransfer_splits = U(node, level).split(2, 1);
+        Matrix Ubig(block_size, rank);
+        auto Ubig_splits = Ubig.split(2, 1);
+
+        matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
+        matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
+
+        Ubig_parent.insert(node, level, std::move(Ubig));
       }
 
       if (col_has_admissible_blocks(node, level)) {
+        // Generate V transfer matrix.
+        Matrix& Vbig_child1 = Vchild(child1, child_level);
+        Matrix& Vbig_child2 = Vchild(child2, child_level);
 
+        Matrix Vtransfer, Stemp;
+        std::tie(Stemp, Vtransfer) = generate_V_transfer_matrix(Vbig_child1,
+                                                                Vbig_child2,
+                                                                node,
+                                                                block_size,
+                                                                domain,
+                                                                level);
+        V.insert(node, level, std::move(Vtransfer));
+        Srow.insert(node, level, std::move(Stemp));
+
+        // Generate the full bases for passing onto the upper level.
+        std::vector<Matrix> Vtransfer_splits = V(node, level).split(2, 1);
+        Matrix Vbig(rank, block_size);
+        std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
+
+        matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
+        matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
+
+        Vbig_parent.insert(node, level, transpose(Vbig));
       }
     }
 
