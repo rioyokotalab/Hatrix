@@ -1229,6 +1229,8 @@ int main(int argc, char *argv[]) {
   auto construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
 
+  A.print_structure();
+
   double construct_error = A.construction_relative_error(randpts);
 
   auto start_factor = std::chrono::system_clock::now();
