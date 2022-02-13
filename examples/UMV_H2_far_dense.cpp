@@ -153,6 +153,7 @@ namespace Hatrix {
     void print_structure();
     double low_rank_block_ratio();
     void factorize(const Domain& domain);
+    Matrix solve(const Matrix& b);
   };
 }
 
@@ -262,6 +263,20 @@ namespace Hatrix {
       for (int64_t j = 0; j < ncols; ++j) {
         out(i, j) = kernel_function(source_particles[i].coords,
                                     target_particles[j].coords);
+      }
+    }
+
+    return out;
+  }
+
+  Matrix generate_p2p_matrix(const Domain& domain, int64_t rows, int64_t cols,
+                             int64_t row_start, int64_t col_start) {
+    Matrix out(rows, cols);
+
+    for (int64_t i = 0; i < rows; ++i) {
+      for (int64_t j = 0; j < cols; ++j) {
+        out(i, j) = kernel_function(domain.particles[i + row_start].coords,
+                                    domain.particles[j + col_start].coords);
       }
     }
 
@@ -581,6 +596,19 @@ namespace Hatrix {
       orthogonal_recursive_bisection_3dim(0, N, std::string(""), nleaf, 0);
     }
   }
+
+  void
+  H2::factorize(const Domain& domain) {
+
+  }
+
+  Matrix
+  H2::solve(const Matrix& b) {
+    Matrix x(b);
+
+    return x;
+  }
+
 
   void
   H2::coarsen_blocks(int64_t level) {
@@ -1192,8 +1220,16 @@ int main(int argc, char ** argv) {
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
   // A.print_structure();
   double construct_error = A.construction_relative_error(domain);
-
   double lr_ratio = A.low_rank_block_ratio();
+
+  A.factorize(domain);
+
+  Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Matrix x = A.solve(b);
+  Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain, N, N, 0, 0);
+  Hatrix::Matrix x_solve = lu_solve(Adense, b);
+
+  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
 
@@ -1201,4 +1237,5 @@ int main(int argc, char ** argv) {
             << " height= " << A.height << " rank=" << rank
             << " construct error= " << construct_error
             << " LR%= " << lr_ratio * 100 << "%" << std::endl;
+
 }
