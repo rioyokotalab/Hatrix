@@ -1939,6 +1939,7 @@ int main(int argc, char ** argv) {
             << " height= " << A.height << " rank=" << rank
             << " construct error= " << construct_error
             << " solve error= " << solve_error
+            << " kernel func= " << kernel_func
             << " LR%= " << lr_ratio * 100 << "%" << std::endl;
 
 }
