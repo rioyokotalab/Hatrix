@@ -945,7 +945,13 @@ namespace Hatrix {
     for (int row = 0; row < nblocks; ++row) {
       for (int col = 0; col < nblocks; ++col) {
         if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+          int64_t row_block_size = get_block_size_row(domain, row, level);
+          int64_t col_block_size = get_block_size_col(domain, col, level);
 
+          Matrix D = generate_p2p_interactions(domain, row, col, level, height);
+
+          S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
+                                           Vbig_parent(col, level)));
         }
       }
     }
@@ -1012,7 +1018,7 @@ namespace Hatrix {
       }
     }
 
-    for (int level = height; level > height-1; --level) {
+    for (int level = height; level > 0; --level) {
       int64_t nblocks = level_blocks[level-1];
 
       for (int row = 0; row < nblocks; ++row) {
@@ -1022,7 +1028,7 @@ namespace Hatrix {
             Matrix Vbig = get_Vbig(col, level);
 
             Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-            Matrix actual_matrix = Hatrix::generate_p2p_interactions(domain, row, col);
+            Matrix actual_matrix = Hatrix::generate_p2p_interactions(domain, row, col, level, height);
 
             dense_norm += pow(norm(actual_matrix), 2);
             error += pow(norm(expected_matrix - actual_matrix), 2);
