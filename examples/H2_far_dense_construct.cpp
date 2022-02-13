@@ -1065,12 +1065,14 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(domain);
 
 
   Hatrix::Context::finalize();
 
-  std::cout << "construct error: " << construct_error << std::endl;
+  std::cout << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
+            << " height= " << A.height
+            << " construct error= " << construct_error << std::endl;
 
 }
