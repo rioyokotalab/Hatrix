@@ -473,10 +473,11 @@ namespace Hatrix {
       double radius = 1.0;
       for (int64_t i = 0; i < N; ++i) {
         // double phi = dis(gen);
-        // double theta = dis(gen);
+
 
         double phi = (i * 2.0 * M_PI) / N;
-        double theta = (i * 2.0 * M_PI) / N;
+        double theta = dis(gen);
+        // double theta = (i * 2.0 * M_PI) / N;
 
         double x = radius * sin(phi) * cos(theta);
         double y = radius * sin(phi) * sin(theta);
@@ -1043,8 +1044,6 @@ namespace Hatrix {
     return std::sqrt(error / dense_norm);
   }
 
-
-
   void H2::print_structure() {
     actually_print_structure(height);
   }
@@ -1065,7 +1064,7 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  // A.print_structure();
+      // A.print_structure();
   double construct_error = A.construction_relative_error(domain);
 
 
