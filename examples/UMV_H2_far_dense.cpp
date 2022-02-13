@@ -1932,6 +1932,7 @@ int main(int argc, char ** argv) {
   std::cout << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
             << " height= " << A.height << " rank=" << rank
             << " construct error= " << construct_error
+            << " solve error= " << solve_error
             << " LR%= " << lr_ratio * 100 << "%" << std::endl;
 
 }
