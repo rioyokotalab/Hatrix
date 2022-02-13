@@ -836,7 +836,16 @@ namespace Hatrix {
   H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
                                  int64_t block_size, const Domain& domain, int64_t level) {
     Matrix col_block = generate_column_block(node, block_size, domain, level);
+    auto col_block_splits = col_block.split(2, 1);
+
+    Matrix temp(Ubig_child1.cols + Ubig_child2.cols, col_block.cols);
+    auto temp_splits = temp.split(2, 1);
+
+    matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
+    matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
+
     Matrix Utransfer, Si, Vi; double error;
+    std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
 
     return {std::move(Utransfer), std::move(Si)};
   }
@@ -875,6 +884,7 @@ namespace Hatrix {
                                                                 block_size,
                                                                 domain,
                                                                 level);
+        Utransfer.print_meta();
       }
 
       if (col_has_admissible_blocks(node, level)) {
