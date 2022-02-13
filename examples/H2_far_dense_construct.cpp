@@ -11,6 +11,7 @@
 #include <string>
 #include <iomanip>
 #include <functional>
+#include <fstream>
 
 #include "Hatrix/Hatrix.h"
 
@@ -94,6 +95,7 @@ namespace Hatrix {
     void generate_particles(double min_val, double max_val);
     void divide_domain_and_create_particle_boxes(int64_t nleaf);
     void generate_starsh_grid_particles();
+    void print_file(std::string file_name);
   };
 
   class H2 {
@@ -330,6 +332,26 @@ namespace Hatrix {
     return std::sqrt(dist);
   }
 
+  void
+  Domain::print_file(std::string file_name) {
+    std::vector<char> coords{'x', 'y', 'z'};
+
+    std::ofstream file;
+    file.open(file_name, std::ios::app | std::ios::out);
+    for (int k = 0; k < ndim; ++k) {
+      file << coords[k] << ",";
+    }
+    file << std::endl;
+
+    for (int i = 0; i < N; ++i) {
+      for (int k = 0; k < ndim; ++k) {
+        file << particles[i].coords[k] << ",";
+      }
+      file << std::endl;
+    }
+
+    file.close();
+  }
 
   // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
   void
@@ -460,8 +482,8 @@ namespace Hatrix {
   void Domain::generate_starsh_grid_particles() {
     int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
     int64_t total = side;
-
     for (int i = 1; i < ndim; ++i) { total *= side; }
+
     int64_t ncoords = ndim * side;
     std::vector<double> coord(ncoords);
 
@@ -1165,19 +1187,20 @@ int main(int argc, char ** argv) {
   }
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
+  domain.print_file("h2_sqrexp.csv");
 
 
-  Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  // A.print_structure();
-  double construct_error = A.construction_relative_error(domain);
+  // Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
+  // // A.print_structure();
+  // double construct_error = A.construction_relative_error(domain);
 
-  double lr_ratio = A.low_rank_block_ratio();
+  // double lr_ratio = A.low_rank_block_ratio();
 
-  Hatrix::Context::finalize();
+  // Hatrix::Context::finalize();
 
-  std::cout << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
-            << " height= " << A.height << " rank=" << rank
-            << " construct error= " << construct_error
-            << " LR%= " << lr_ratio * 100 << "%" << std::endl;
+  // std::cout << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
+  //           << " height= " << A.height << " rank=" << rank
+  //           << " construct error= " << construct_error
+  //           << " LR%= " << lr_ratio * 100 << "%" << std::endl;
 
 }
