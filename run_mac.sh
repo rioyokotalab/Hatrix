@@ -2,7 +2,7 @@
 
 make -j all
 
-./bin/UMV_H2_far_dense 800 20 50 0.7 2 geometry_admis 1
+./bin/UMV_H2_far_dense 800 20 100 0.7 1 geometry_admis 0
 
 # ./bin/H2_far_dense_construct 800 5 100 2 1 diagonal_admis
 # ./bin/H2_far_dense_construct 1600 5 100 2 1 diagonal_admis
