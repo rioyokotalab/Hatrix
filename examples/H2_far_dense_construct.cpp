@@ -472,8 +472,11 @@ namespace Hatrix {
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
       for (int64_t i = 0; i < N; ++i) {
-        double phi = dis(gen);
-        double theta = dis(gen);
+        // double phi = dis(gen);
+        // double theta = dis(gen);
+
+        double phi = (i * 2.0 * M_PI) / N;
+        double theta = (i * 2.0 * M_PI) / N;
 
         double x = radius * sin(phi) * cos(theta);
         double y = radius * sin(phi) * sin(theta);
