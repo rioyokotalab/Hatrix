@@ -1190,7 +1190,7 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(domain);
 
   double lr_ratio = A.low_rank_block_ratio();
@@ -1201,4 +1201,13 @@ int main(int argc, char ** argv) {
             << " height= " << A.height << " rank=" << rank
             << " construct error= " << construct_error
             << " LR%= " << lr_ratio * 100 << "%" << std::endl;
+
+  std::ofstream file;
+  file.open("h2_matrix_approximation.csv", std::ios::app | std::ios::out);
+  file << N << "," << admis << "," << nleaf << "," << ndim
+       << "," << A.height << "," << rank
+       << "," << construct_error
+       << "," << lr_ratio * 100 << std::endl;
+  file.close();
+
 }
