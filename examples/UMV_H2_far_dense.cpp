@@ -1186,40 +1186,40 @@ namespace Hatrix {
           V.erase(parent_node, parent_level);
           V.insert(parent_node, parent_level, std::move(temp));
         }
+      } // for (block = 0; block < nblocks; block += 2)
 
         // Merge the unfactorized parts.
-        int64_t parent_nblocks = level_blocks[parent_level];
-        for (int64_t i = 0; i < parent_nblocks; ++i) {
-          for (int64_t j = 0; j < parent_nblocks; ++j) {
-            if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
-              std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
-              Matrix D_unelim(rank*2, rank*2);
-              auto D_unelim_splits = D_unelim.split(2, 2);
+      int64_t parent_nblocks = level_blocks[parent_level];
+      for (int64_t i = 0; i < parent_nblocks; ++i) {
+        for (int64_t j = 0; j < parent_nblocks; ++j) {
+          if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
+            std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
+            Matrix D_unelim(rank*2, rank*2);
+            auto D_unelim_splits = D_unelim.split(2, 2);
 
-              for (int64_t ic1 = 0; ic1 < 2; ++ic1) {
-                for (int64_t jc2 = 0; jc2 < 2; ++jc2) {
-                  int64_t c1 = i_children[ic1], c2 = j_children[jc2];
-                  if (!U.exists(c1, level)) { continue; }
+            for (int64_t ic1 = 0; ic1 < 2; ++ic1) {
+              for (int64_t jc2 = 0; jc2 < 2; ++jc2) {
+                int64_t c1 = i_children[ic1], c2 = j_children[jc2];
+                if (!U.exists(c1, level)) { continue; }
 
-                  if (is_admissible.exists(c1, c2, level) && !is_admissible(c1, c2, level)) {
-                    auto D_splits = SPLIT_DENSE(D(c1, c2, level),
-                                                D(c1, c2, level).rows-rank,
-                                                D(c1, c2, level).cols-rank);
-                    D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
-                  }
-                  else {
-                    D_unelim_splits[ic1 * 2 + jc2] = S(c1, c2, level);
-                  }
+                if (is_admissible.exists(c1, c2, level) && !is_admissible(c1, c2, level)) {
+                  auto D_splits = SPLIT_DENSE(D(c1, c2, level),
+                                              D(c1, c2, level).rows-rank,
+                                              D(c1, c2, level).cols-rank);
+                  D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
+                }
+                else {
+                  D_unelim_splits[ic1 * 2 + jc2] = S(c1, c2, level);
                 }
               }
-
-              // std::cout << "Merge insert: i-> " << i
-              //           << " j -> " << " parent_level -> " << parent_level << std::endl;
-              D.insert(i, j, parent_level, std::move(D_unelim));
             }
+
+            // std::cout << "Merge insert: i-> " << i
+            //           << " j -> " << " parent_level -> " << parent_level << std::endl;
+            D.insert(i, j, parent_level, std::move(D_unelim));
           }
         }
-      } // for (block = 0; block < nblocks; block += 2)
+      }
     } // for (; level > 0; --level)
 
     int64_t last_nodes = level_blocks[level];
@@ -1597,6 +1597,7 @@ namespace Hatrix {
   void
   H2::calc_diagonal_based_admissibility(int64_t level) {
     int64_t nblocks = pow(2, level);
+    std::cout << "nblocks: " << nblocks << " level: " << level << std::endl;
     level_blocks.push_back(nblocks);
     if (level == 0) { return; }
     if (level == height) {
@@ -1610,7 +1611,7 @@ namespace Hatrix {
       coarsen_blocks(level);
     }
 
-    calc_diagonal_based_admissibility(level);
+    calc_diagonal_based_admissibility(level-1);
   }
 
   void
