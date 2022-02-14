@@ -459,7 +459,6 @@ namespace Hatrix {
                     row_concat = concat(row_concat, F(block, j), 1);
                   }
                 }
-
               }
 
               Matrix UN_block, _SN1, _VN1T; double error;
@@ -540,7 +539,6 @@ namespace Hatrix {
             // Scan for fill-ins in the same col as this diagonal block.
             int64_t block_size = D(block, block, level).cols;
             Matrix col_concat(0, block_size);
-            std::vector<int64_t> UN2_row_splits;
             bool found_col_fill_in = false;
             for (int i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
