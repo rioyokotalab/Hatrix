@@ -1623,31 +1623,6 @@ namespace Hatrix {
     calc_diagonal_based_admissibility(level-1);
   }
 
-  void
-  H2::actually_print_structure(int64_t level) {
-    if (level == 0) { return; }
-    int64_t nblocks = level_blocks[level];
-    std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
-    for (int64_t i = 0; i < nblocks; ++i) {
-      if (level == height) {
-        std::cout << U(i, height).rows << " ";
-      }
-      std::cout << "| " ;
-      for (int64_t j = 0; j < nblocks; ++j) {
-        if (is_admissible.exists(i, j, level)) {
-          std::cout << is_admissible(i, j, level) << " | " ;
-        }
-        else {
-          std::cout << "  | ";
-        }
-      }
-      std::cout << std::endl;
-    }
-
-    std::cout << std::endl;
-
-    actually_print_structure(level-1);
-  }
 
   Matrix
   H2::generate_column_block(int64_t block, int64_t block_size, const Domain& domain,
@@ -2078,6 +2053,32 @@ namespace Hatrix {
 
     return std::sqrt(error / dense_norm);
   }
+
+    void
+    H2::actually_print_structure(int64_t level) {
+      if (level == 0) { return; }
+      int64_t nblocks = level_blocks[level];
+      std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
+      for (int64_t i = 0; i < nblocks; ++i) {
+        // if (level == height) {
+        //   std::cout << D(i, i, height).rows << " ";
+        // }
+        std::cout << "| " ;
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if (is_admissible.exists(i, j, level)) {
+            std::cout << is_admissible(i, j, level) << " | " ;
+          }
+          else {
+            std::cout << "  | ";
+          }
+        }
+        std::cout << std::endl;
+      }
+
+      std::cout << std::endl;
+
+      actually_print_structure(level-1);
+    }
 
   void H2::print_structure() {
     actually_print_structure(height);
