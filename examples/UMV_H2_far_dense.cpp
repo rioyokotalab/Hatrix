@@ -502,7 +502,13 @@ namespace Hatrix {
   }
 
 
-  Domain::Domain(int64_t N, int64_t ndim) : N(N), ndim(ndim) {}
+  Domain::Domain(int64_t N, int64_t ndim) : N(N), ndim(ndim) {
+    if (ndim <= 0) {
+      std::cout << "invalid ndim : " << ndim << std::endl;
+      abort();
+    }
+
+  }
 
   void Domain::generate_starsh_grid_particles() {
     int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
@@ -1985,6 +1991,7 @@ namespace Hatrix {
     N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind) {
     if (admis_kind == "geometry_admis") {
       // TODO: use dual tree traversal for this.
+      std::cout << "calc geom\n";
       height = calc_geometry_based_admissibility(domain);
       // reverse the levels stored in the admis blocks.
       RowColLevelMap<bool> temp_is_admissible;
@@ -2110,6 +2117,8 @@ int main(int argc, char ** argv) {
   noise = 1.e-1;
   sigma = 1.0;
 
+  std::cout << "init\n";
+
   Hatrix::Context::init();
 
   Hatrix::Domain domain(N, ndim);
@@ -2121,12 +2130,14 @@ int main(int argc, char ** argv) {
     break;
   }
   case 1: {                     // sqrexp
+    std::cout << "gen\n";
     domain.generate_starsh_grid_particles();
     Hatrix::kernel_function = Hatrix::sqrexp_kernel;
     break;
   }
   }
 
+  std::cout << "generate\n";
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
