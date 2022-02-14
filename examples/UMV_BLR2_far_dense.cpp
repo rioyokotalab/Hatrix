@@ -564,8 +564,8 @@ namespace Hatrix {
                 }
               }
 
-              Matrix _UN2T, _SN2, VNT_block; double error;
-              std::tie(_UN2T, _SN2, VNT_block, error) = truncated_svd(col_concat, rank);
+              Matrix _UN2T, SN_block, VNT_block; double error;
+              std::tie(_UN2T, SN_block, VNT_block, error) = truncated_svd(col_concat, rank);
 
               Matrix t_block = matmul(V(block, level), VNT_block, true, true);
 
@@ -573,7 +573,7 @@ namespace Hatrix {
               V.insert(block, level, transpose(VNT_block));
 
               Srow.erase(block, level);
-              Srow.insert(block, level, std::move(_SN2));
+              Srow.insert(block, level, std::move(SN_block));
 
               // step 2: recompress rows for larger fill-ins
               RowMap r;
@@ -624,7 +624,6 @@ namespace Hatrix {
                       Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
                         matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
                     }
-                    F.erase(i, block);
                   }
                   else {
                     Sbar_i_block = matmul(S(i, block, level), t_block);
@@ -632,6 +631,10 @@ namespace Hatrix {
 
                   S.erase(i, block, level);
                   S.insert(i, block, level, std::move(Sbar_i_block));
+                }
+
+                if (F.exists(i, block)) {
+                  F.erase(i, block);
                 }
               }
             }
