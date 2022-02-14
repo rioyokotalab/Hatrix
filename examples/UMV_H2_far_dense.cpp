@@ -616,7 +616,7 @@ namespace Hatrix {
         // row fill-in recompression.
         {
           int64_t block_size = D(block, block, level).rows;
-          int64_t nblocks = level_blocks[level-1];
+          int64_t nblocks = level_blocks[level];
           Matrix row_concat(block_size, 0);
           bool found_row_fill_in = false;
           for (int j = 0; j < nblocks; ++j) {
@@ -728,7 +728,7 @@ namespace Hatrix {
         // col fill-in recompression
         {
           int64_t block_size = D(block, block, level).cols;
-          int64_t nblocks = level_blocks[level-1];
+          int64_t nblocks = level_blocks[level];
           Matrix col_concat(block_size, 0);
           bool found_col_fill_in = false;
           for (int i = 0; i < nblocks; ++i) {
@@ -1124,7 +1124,7 @@ namespace Hatrix {
     RowMap r, t;
 
     for (; level > 0; --level) {
-      int64_t nblocks = level_blocks[level-1];
+      int64_t nblocks = level_blocks[level];
       bool is_all_dense_level = false;
       for (int64_t i = 0; i < nblocks; ++i) {
         if (!U.exists(i, level)) {
@@ -1188,7 +1188,7 @@ namespace Hatrix {
         }
 
         // Merge the unfactorized parts.
-        int64_t parent_nblocks = level_blocks[parent_level-1];
+        int64_t parent_nblocks = level_blocks[parent_level];
         for (int64_t i = 0; i < parent_nblocks; ++i) {
           for (int64_t j = 0; j < parent_nblocks; ++j) {
             if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
@@ -1222,7 +1222,7 @@ namespace Hatrix {
       } // for (block = 0; block < nblocks; block += 2)
     } // for (; level > 0; --level)
 
-    int64_t last_nodes = level_blocks[level-1];
+    int64_t last_nodes = level_blocks[level];
 
     for (int64_t d = 0; d < last_nodes; ++d) {
       lu(D(d, d, level));
@@ -1245,7 +1245,7 @@ namespace Hatrix {
   // permute the vector forward and return the offset at which the new vector begins.
   int64_t H2::permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) {
     Matrix copy(x);
-    int64_t num_nodes = level_blocks[level-1];
+    int64_t num_nodes = level_blocks[level];
     int64_t c_offset = rank_offset;
     for (int64_t block = 0; block < num_nodes; ++block) {
       rank_offset += D(block, block, level).rows - rank;
@@ -1272,7 +1272,7 @@ namespace Hatrix {
 
   int64_t H2::permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) {
     Matrix copy(x);
-    int64_t num_nodes = level_blocks[level-1];
+    int64_t num_nodes = level_blocks[level];
     int64_t c_offset = rank_offset;
     for (int64_t block = 0; block < num_nodes; ++block) {
       c_offset -= D(block, block, level).cols - rank;
@@ -1297,7 +1297,7 @@ namespace Hatrix {
   }
 
   void H2::solve_forward_level(Matrix& x_level, int level) {
-    int nblocks = level_blocks[level-1];
+    int nblocks = level_blocks[level];
     std::vector<int64_t> row_offsets;
     int64_t nrows = 0;
     for (int i = 0; i < nblocks; ++i) {
@@ -1360,7 +1360,7 @@ namespace Hatrix {
   }
 
   void H2::solve_backward_level(Matrix& x_level, int level) {
-    int nblocks = level_blocks[level-1];
+    int nblocks = level_blocks[level];
     std::vector<int64_t> col_offsets;
     int64_t nrows = 0;
     for (int i = 0; i < nblocks; ++i) {
@@ -1431,7 +1431,7 @@ namespace Hatrix {
 
     // Forward
     for (; level > 0; --level) {
-      int64_t nblocks = level_blocks[level-1];
+      int64_t nblocks = level_blocks[level];
       bool lr_exists = false;
       for (int block = 0; block < nblocks; ++block) {
         if (U.exists(block, level)) { lr_exists = true; }
@@ -1457,7 +1457,7 @@ namespace Hatrix {
     // Work with L0 and U0
     x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
     Matrix x_last(x_splits[1]);
-    int64_t last_nodes = level_blocks[level-1];
+    int64_t last_nodes = level_blocks[level];
     auto x_last_splits = x_last.split(last_nodes, 1);
 
     for (int i = 0; i < last_nodes; ++i) {
@@ -1479,7 +1479,7 @@ namespace Hatrix {
 
     // Backward
     for (; level <= _level; ++level) {
-      int64_t nblocks = level_blocks[level-1];
+      int64_t nblocks = level_blocks[level];
 
       bool lr_exists = false;
       for (int block = 0; block < nblocks; ++block) {
@@ -1543,9 +1543,9 @@ namespace Hatrix {
   int64_t
   H2::geometry_admis_non_leaf(int64_t nblocks, int64_t level) {
     int64_t child_level = level - 1;
+    level_blocks.push_back(nblocks);
 
     if (nblocks == 1) { return level; }
-    level_blocks.push_back(nblocks);
 
     for (int64_t i = 0; i < nblocks; ++i) {
       std::vector<int64_t> row_children({i * 2, i * 2 + 1});
@@ -1596,9 +1596,9 @@ namespace Hatrix {
 
   void
   H2::calc_diagonal_based_admissibility(int64_t level) {
-    if (level == 0) { return; }
     int64_t nblocks = pow(2, level);
     level_blocks.push_back(nblocks);
+    if (level == 0) { return; }
     if (level == height) {
       for (int64_t i = 0; i < nblocks; ++i) {
         for (int64_t j = 0; j < nblocks; ++j) {
@@ -1610,13 +1610,13 @@ namespace Hatrix {
       coarsen_blocks(level);
     }
 
-    calc_diagonal_based_admissibility(level-1);
+    calc_diagonal_based_admissibility(level);
   }
 
   void
   H2::actually_print_structure(int64_t level) {
     if (level == 0) { return; }
-    int64_t nblocks = level_blocks[level-1];
+    int64_t nblocks = level_blocks[level];
     std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
     for (int64_t i = 0; i < nblocks; ++i) {
       if (level == height) {
@@ -1643,7 +1643,7 @@ namespace Hatrix {
   H2::generate_column_block(int64_t block, int64_t block_size, const Domain& domain,
                             int64_t level) {
     Matrix AY(block_size, 0);
-    int64_t nblocks = level_blocks[level-1];
+    int64_t nblocks = level_blocks[level];
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
       Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j, level, height);
@@ -1690,7 +1690,7 @@ namespace Hatrix {
 
   void
   H2::generate_leaf_nodes(const Domain& domain) {
-    int nblocks = level_blocks[height-1];
+    int nblocks = level_blocks[height];
     std::vector<Hatrix::Matrix> Y;
 
     for (int i = 0; i < nblocks; ++i) {
@@ -1883,7 +1883,7 @@ namespace Hatrix {
   H2::generate_transfer_matrices(const Domain& domain,
                                  int64_t level, RowLevelMap& Uchild,
                                  ColLevelMap& Vchild) {
-    int64_t nblocks = level_blocks[level-1];
+    int64_t nblocks = level_blocks[level];
 
     std::vector<Matrix> Y;
     // Generate the actual bases for the upper level and pass it to this
@@ -1976,7 +1976,6 @@ namespace Hatrix {
     return {Ubig_parent, Vbig_parent};
   }
 
-
   H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf,
          double _admis, std::string& admis_kind) :
     N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind) {
@@ -2016,6 +2015,11 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
     PV = height;
 
+    for (int i = 0; i < level_blocks.size(); ++i) {
+      std::cout << level_blocks[i] << " ";
+    }
+    std::cout << std::endl;
+
     generate_leaf_nodes(domain);
     RowLevelMap Uchild = U;
     ColLevelMap Vchild = V;
@@ -2029,7 +2033,7 @@ namespace Hatrix {
   H2::construction_relative_error(const Domain& domain) {
     double error = 0;
     double dense_norm = 0;
-    int64_t nblocks = level_blocks[height-1];
+    int64_t nblocks = level_blocks[height];
 
     for (int i = 0; i < nblocks; ++i) {
       for (int j = 0; j < nblocks; ++j) {
@@ -2043,7 +2047,7 @@ namespace Hatrix {
     }
 
     for (int level = height; level > 0; --level) {
-      int64_t nblocks = level_blocks[level-1];
+      int64_t nblocks = level_blocks[level];
 
       for (int row = 0; row < nblocks; ++row) {
         for (int col = 0; col < nblocks; ++col) {
@@ -2072,7 +2076,7 @@ namespace Hatrix {
   H2::low_rank_block_ratio() {
     double total = 0, low_rank = 0;
 
-    int nblocks = level_blocks[height-1];
+    int nblocks = level_blocks[height];
     for (int i = 0; i < nblocks; ++i) {
       for (int j = 0; j < nblocks; ++j) {
         if ((is_admissible.exists(i, j, height) && is_admissible(i, j, height)) ||
