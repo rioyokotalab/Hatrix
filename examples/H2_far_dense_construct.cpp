@@ -1206,6 +1206,7 @@ int main(int argc, char ** argv) {
   file.open("h2_matrix_approximation.csv", std::ios::app | std::ios::out);
   file << N << "," << admis << "," << nleaf << "," << ndim
        << "," << A.height << "," << rank
+       << "," << kernel_func
        << "," << construct_error
        << "," << lr_ratio * 100 << std::endl;
   file.close();
