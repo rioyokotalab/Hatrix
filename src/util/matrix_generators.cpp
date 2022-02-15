@@ -73,8 +73,8 @@ Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
 Matrix generate_sqrexpnd_matrix(const std::vector<std::vector<double>>& x,
                                 int64_t rows, int64_t cols,
                                 int64_t row_start, int64_t col_start,
-                                double beta=0.1, double nu=0.5, double noise=1.e-1,
-                                double sigma=1.0) {
+                                double beta, double nu, double noise,
+                                double sigma) {
   Matrix out(rows, cols);
   double value;
 

@@ -23,7 +23,7 @@ double PV = 1e-3;
               std::vector<int64_t>(1, col_split));
 
 
-double beta, nu, noise = 1.e-1, sigma;
+double beta, nu, noise, sigma;
 
 using namespace Hatrix;
 
@@ -174,15 +174,13 @@ namespace Hatrix {
   double sqrexp_kernel(const std::vector<double>& coords_row,
                        const std::vector<double>& coords_col) {
     int64_t ndim = coords_row.size();
-    double dist = 0, temp;
-
+    double dist = 0;
+    double local_beta = -2 * pow(beta, 2);
     // Copied from kernel_sqrexp.c in stars-H.
-
     for (int64_t k = 0; k < ndim; ++k) {
-      temp = coords_row[k] - coords_col[k];
-      dist += temp * temp;
+      dist += pow(coords_row[k] - coords_col[k], 2);
     }
-    dist = dist / beta;
+    dist = dist / local_beta;
     if (dist == 0) {
       return sigma + noise;
     }
@@ -517,7 +515,7 @@ namespace Hatrix {
   void Domain::generate_starsh_grid_particles() {
     int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
     int64_t total = side;
-    for (int i = 1; i < ndim; ++i) { total *= side; }
+    for (int64_t i = 1; i < ndim; ++i) { total *= side; }
 
     int64_t ncoords = ndim * side;
     std::vector<double> coord(ncoords);
@@ -535,11 +533,8 @@ namespace Hatrix {
     for (int64_t i = 0; i < N; ++i) {
       std::vector<double> points(ndim);
       for (k = 0; k < ndim; ++k) {
-
         points[k] = coord[pivot[k] + k * side];
-        // std::cout << points[k] << " ";
       }
-      // std::cout << std::endl;
       particles.push_back(Hatrix::Particle(points, 0));
 
       k = ndim - 1;
@@ -2553,7 +2548,10 @@ int main(int argc, char ** argv) {
   }
   case 1: {                     // sqrexp
     std::cout << "gen\n";
-    domain.generate_starsh_grid_particles();
+    // domain.generate_starsh_grid_particles();
+    // Hatrix::kernel_function = Hatrix::laplace_kernel;
+    domain.generate_particles(0.0, 1.0 * N);
+
     Hatrix::kernel_function = Hatrix::sqrexp_kernel;
     break;
   }
