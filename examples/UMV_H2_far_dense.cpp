@@ -520,9 +520,9 @@ namespace Hatrix {
     int64_t ncoords = ndim * side;
     std::vector<double> coord(ncoords);
 
-    for (int i = 0; i < side; ++i) {
+    for (int64_t i = 0; i < side; ++i) {
       double val = double(i) / side;
-      for (int j = 0; j < ndim; ++j) {
+      for (int64_t j = 0; j < ndim; ++j) {
         coord[j * side + i] = val;
       }
     }
@@ -2548,10 +2548,7 @@ int main(int argc, char ** argv) {
   }
   case 1: {                     // sqrexp
     std::cout << "gen\n";
-    // domain.generate_starsh_grid_particles();
-    // Hatrix::kernel_function = Hatrix::laplace_kernel;
-    domain.generate_particles(0.0, 1.0 * N);
-
+    domain.generate_starsh_grid_particles();
     Hatrix::kernel_function = Hatrix::sqrexp_kernel;
     break;
   }
@@ -2567,9 +2564,9 @@ int main(int argc, char ** argv) {
 
   A.factorize(domain);
 
-  std::cout << "-- H2 verification --\n";
-  verify_A1_factorization(A, domain);
-  verify_A2_factorization(A, domain);
+  // std::cout << "-- H2 verification --\n";
+  // verify_A1_factorization(A, domain);
+  // verify_A2_factorization(A, domain);
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix x = A.solve(b, A.height);
