@@ -1718,7 +1718,7 @@ int main(int argc, char** argv) {
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
   double construct_error = A.construction_error(domain);
 
-  // A.print_structure();
+  A.print_structure();
   A.factorize(domain);
 
   // A_expected = Hatrix::generate_laplacend_matrix(domain.particles, N, N);
