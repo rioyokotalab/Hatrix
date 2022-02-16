@@ -89,7 +89,7 @@ std::vector<int> lup(Matrix& A) {
   return ipiv;
 }
 
-Matrix lu_solve(Matrix& A, const Matrix& b) {
+Matrix lu_solve(const Matrix& A, const Matrix& b) {
   Matrix x(b);
   Matrix Ac(A);
   std::vector<int> ipiv(Ac.rows);

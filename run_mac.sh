@@ -2,9 +2,9 @@
 
 make -j all
 
-./bin/UMV_H2_far_dense 1024 70 128 1 1 diagonal_admis 0
-./bin/UMV_H2_far_dense 1024 70 128 1 2 diagonal_admis 0
-./bin/UMV_H2_far_dense 1024 100 128 1 3 diagonal_admis 0
+# ./bin/UMV_H2_far_dense 1024 70 128 1 1 diagonal_admis 0
+./bin/UMV_H2_far_dense 256 20 32 1 2 diagonal_admis 0
+./bin/UMV_H2_far_dense 256 20 32 1 3 diagonal_admis 0
 # ./bin/UMV_strong_H2_Nlevel 800 10 3 1
 # ./bin/UMV_H2_far_dense 80 6 10 1 2 geometry_admis 1
 # ./bin/UMV_strong_chained_product 100 4 10 0
