@@ -906,9 +906,9 @@ namespace Hatrix {
                                                D(i, j, level).rows - rank,
                                                D(i, j, level).cols - rank);
 
-              if (level == 2) {
-                std::cout << "Schur compliment i -> " << i << " j -> " << j << std::endl;
-              }
+              // if (level == 2) {
+              //   std::cout << "Schur compliment i -> " << i << " j -> " << j << std::endl;
+              // }
 
               matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
             }
@@ -1173,8 +1173,8 @@ namespace Hatrix {
           auto temp_splits = temp.split(2, 1);
 
           if (r.exists(c1)) {
-            std::cout << "U transfer UPPER update: parent node -> " << parent_node
-                      << " parent level -> " <<  parent_level << std::endl;
+            // std::cout << "U transfer UPPER update: parent node -> " << parent_node
+            //           << " parent level -> " <<  parent_level << std::endl;
 
             matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
             r.erase(c1);
@@ -1182,8 +1182,8 @@ namespace Hatrix {
 
           if (r.exists(c2)) {
 
-            std::cout << "U transfer LOWER update: parent node -> " << parent_node
-                      << " parent level -> " <<  parent_level << std::endl;
+            // std::cout << "U transfer LOWER update: parent node -> " << parent_node
+            //           << " parent level -> " <<  parent_level << std::endl;
             matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
             r.erase(c2);
           }
@@ -2054,10 +2054,10 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
     PV = height;
 
-    for (int i = 0; i < level_blocks.size(); ++i) {
-      std::cout << level_blocks[i] << " ";
-    }
-    std::cout << std::endl;
+    // for (int i = 0; i < level_blocks.size(); ++i) {
+    //   std::cout << level_blocks[i] << " ";
+    // }
+    // std::cout << std::endl;
 
     generate_leaf_nodes(domain);
     RowLevelMap Uchild = U;
@@ -2577,6 +2577,7 @@ int main(int argc, char ** argv) {
   // x.print();
   // std::cout << "X SOLVE\n";
   // x_solve.print();
+  (x - x_solve).print();
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
