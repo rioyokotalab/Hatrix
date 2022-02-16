@@ -1658,7 +1658,7 @@ namespace Hatrix {
   void
   H2::calc_diagonal_based_admissibility(int64_t level) {
     int64_t nblocks = pow(2, level);
-    std::cout << "nblocks: " << nblocks << " level: " << level << std::endl;
+    // std::cout << "nblocks: " << nblocks << " level: " << level << std::endl;
     level_blocks.push_back(nblocks);
     if (level == 0) { return; }
     if (level == height) {
@@ -2534,7 +2534,6 @@ int main(int argc, char ** argv) {
   noise = 1.e-1;
   sigma = 1.0;
 
-  std::cout << "init\n";
 
   Hatrix::Context::init();
 
@@ -2547,14 +2546,12 @@ int main(int argc, char ** argv) {
     break;
   }
   case 1: {                     // sqrexp
-    std::cout << "gen\n";
     domain.generate_starsh_grid_particles();
     Hatrix::kernel_function = Hatrix::sqrexp_kernel;
     break;
   }
   }
 
-  std::cout << "generate\n";
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
@@ -2573,11 +2570,6 @@ int main(int argc, char ** argv) {
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain, N, N, 0, 0);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-  // std::cout << "X\n";
-  // x.print();
-  // std::cout << "X SOLVE\n";
-  // x_solve.print();
-  (x - x_solve).print();
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   Hatrix::Context::finalize();
