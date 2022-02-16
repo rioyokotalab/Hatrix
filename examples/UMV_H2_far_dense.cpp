@@ -713,7 +713,7 @@ namespace Hatrix {
                   // }
                 }
 
-                std::cout << "Change S blocks : block -> " << block << " j -> " << j <<  " level -> "<< level<<  std::endl;
+                // std::cout << "Change S blocks : block -> " << block << " j -> " << j <<  " level -> "<< level<<  std::endl;
 
                 S.erase(block, j, level);
                 S.insert(block, j, level, std::move(Sbar_block_j));
@@ -2558,7 +2558,7 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
 
