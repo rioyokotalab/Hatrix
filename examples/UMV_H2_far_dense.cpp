@@ -618,7 +618,6 @@ namespace Hatrix {
   void H2::factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
                            RowMap& r, RowMap& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
-
     for (int64_t block = 0; block < nblocks; ++block) {
       if (block > 0) {
         // row fill-in recompression.
@@ -634,22 +633,22 @@ namespace Hatrix {
             }
           }
 
-          if (found_row_fill_in) {
+          if (found_row_fill_in || level != height) {
             // step 1: recompress along the row of factorization and update U.
             row_concat = concat(row_concat, matmul(U(block, level),
                                                    Scol(block, level)), 1);
             for (int64_t j = 0; j < nblocks; ++j) {
               if (F.exists(block, j)) {
-                if (j < block) {
+                // if (j < block) {
                   // Concat the fill-ins before the diagonal block. These fill-ins are all
                   // of size (co; oo) and should be multiplied with Vj before before being
                   // concatenated into the recompression.
                   Matrix Fp = matmul(F(block, j), V(j, level), false, true);
                   row_concat = concat(row_concat, Fp, 1);
-                }
-                else if (j > block) {
-                  row_concat = concat(row_concat, F(block, j), 1);
-                }
+                // }
+                // else if (j > block) {
+                //   row_concat = concat(row_concat, F(block, j), 1);
+                // }
               }
             }
 
@@ -666,52 +665,52 @@ namespace Hatrix {
 
             // step 2: recompress along the column where the nb*nb fill-in exists and update V
             // in those respective columns.
-            for (int64_t j = block + 1; j < nblocks; ++j) {
-              // scan where is the fill-in after the diagonal element on this row.
-              if (F.exists(block, j)) {
-                Matrix col_concat = concat(matmul(Srow(j, level), V(j, level), false, true),
-                                           F(block, j), 0);
-                Matrix _UN_j, SN_j, VN_j;
-                std::tie(_UN_j, SN_j, VN_j, error) = truncated_svd(col_concat, rank);
+            // for (int64_t j = block + 1; j < nblocks; ++j) {
+            //   // scan where is the fill-in after the diagonal element on this row.
+            //   if (F.exists(block, j)) {
+            //     Matrix col_concat = concat(matmul(Srow(j, level), V(j, level), false, true),
+            //                                F(block, j), 0);
+            //     Matrix _UN_j, SN_j, VN_j;
+            //     std::tie(_UN_j, SN_j, VN_j, error) = truncated_svd(col_concat, rank);
 
-                Matrix t_j = matmul(V(j, level), VN_j, true, true);
+            //     Matrix t_j = matmul(V(j, level), VN_j, true, true);
 
-                V.erase(j, level);
-                V.insert(j, level, transpose(VN_j));
+            //     V.erase(j, level);
+            //     V.insert(j, level, transpose(VN_j));
 
-                Srow.erase(j, level);
-                Srow.insert(j, level, std::move(SN_j));
+            //     Srow.erase(j, level);
+            //     Srow.insert(j, level, std::move(SN_j));
 
-                // step 2a: Once a fill-in is found, update S blocks in this column except
-                // the block where the fill-in exists since that requires both r and t.
-                for (int64_t i = 0; i < nblocks; ++i) {
-                  if (i != block && is_admissible.exists(i, j, level) &&
-                      is_admissible(i, j, level)) {
-                    Matrix Sbar_i_j = matmul(S(i, j, level), t_j);
+            //     // step 2a: Once a fill-in is found, update S blocks in this column except
+            //     // the block where the fill-in exists since that requires both r and t.
+            //     for (int64_t i = 0; i < nblocks; ++i) {
+            //       if (i != block && is_admissible.exists(i, j, level) &&
+            //           is_admissible(i, j, level)) {
+            //         Matrix Sbar_i_j = matmul(S(i, j, level), t_j);
 
-                    S.erase(i, j, level);
-                    S.insert(i, j, level, std::move(Sbar_i_j));
-                  }
-                }
+            //         S.erase(i, j, level);
+            //         S.insert(i, j, level, std::move(Sbar_i_j));
+            //       }
+            //     }
 
-                t.insert(j, std::move(t_j));
-              }
-            }
+            //     t.insert(j, std::move(t_j));
+            //   }
+            // }
 
             // step 3: iterate over the row to udpate the S blocks.
             for (int64_t j = 0; j < nblocks; ++j) {
               if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
                 Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
                 if (F.exists(block, j)) {
-                  if (j < block) {
+                  // if (j < block) {
                     Sbar_block_j =  Sbar_block_j + matmul(U(block, level), F(block, j), true, false);
-                  }
-                  else if (j > block) {
-                    assert(F(block, j).rows == block_size &&
-                           F(block, j).cols == V(j, level).rows);
-                    Sbar_block_j = matmul(matmul(r_block, S(block, j, level)), t(j))
-                      + matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
-                  }
+                  // }
+                  // else if (j > block) {
+                  //   assert(F(block, j).rows == block_size &&
+                  //          F(block, j).cols == V(j, level).rows);
+                  //   Sbar_block_j = matmul(matmul(r_block, S(block, j, level)), t(j))
+                  //     + matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
+                  // }
                 }
 
                 // std::cout << "Change S blocks : block -> " << block << " j -> " << j <<  " level -> "<< level<<  std::endl;
@@ -742,20 +741,20 @@ namespace Hatrix {
             }
           }
 
-          if (found_col_fill_in) {
+          if (found_col_fill_in || level != height) {
             // step 1: recompress along the column of factorization.
             col_concat = concat(col_concat,
                                 matmul(Srow(block, level), V(block, level), false, true), 0);
             for (int64_t i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
-                if (i < block) {
+                // if (i < block) {
                   col_concat = concat(col_concat,
                                       matmul(U(i, level), F(i, block)), 0);
-                }
-                else if (i > block) {
-                  col_concat = concat(col_concat,
-                                      F(i, block), 0);
-                }
+                // }
+                // else if (i > block) {
+                //   col_concat = concat(col_concat,
+                //                       F(i, block), 0);
+                // }
               }
             }
             Matrix _UN2T, SN_block, VNT_block; double error;
@@ -769,51 +768,51 @@ namespace Hatrix {
             Srow.erase(block, level);
             Srow.insert(block, level, std::move(SN_block));
 
-            // // step 2: recompress rows for larger fill-ins
-            for (int64_t i = block+1; i < nblocks; ++i) {
-              if (F.exists(i, block)) {
-                Matrix row_concat = concat(matmul(U(i, level), Scol(i, level)), F(i, block), 1);
+            // step 2: recompress rows for larger fill-ins
+            // for (int64_t i = block+1; i < nblocks; ++i) {
+            //   if (F.exists(i, block)) {
+            //     Matrix row_concat = concat(matmul(U(i, level), Scol(i, level)), F(i, block), 1);
 
-                Matrix UN_i, SN_i, _VNT_block; double error;
-                std::tie(UN_i, SN_i, VNT_block, error) = truncated_svd(row_concat, rank);
+            //     Matrix UN_i, SN_i, _VNT_block; double error;
+            //     std::tie(UN_i, SN_i, VNT_block, error) = truncated_svd(row_concat, rank);
 
-                Matrix r_i = matmul(UN_i, U(i, level), true, false);
+            //     Matrix r_i = matmul(UN_i, U(i, level), true, false);
 
-                U.erase(i, level);
-                U.insert(i, level, std::move(UN_i));
+            //     U.erase(i, level);
+            //     U.insert(i, level, std::move(UN_i));
 
-                Scol.erase(i, level);
-                Scol.insert(i, level, std::move(SN_i));
+            //     Scol.erase(i, level);
+            //     Scol.insert(i, level, std::move(SN_i));
 
-                // step 2a: update S blocks in the row where this fill-in exists
-                // except the block within the fill-in because it is to be updated
-                // after
-                for (int64_t j = 0; j < nblocks; ++j) {
-                  if (block != j && is_admissible.exists(i, j, level) &&
-                      is_admissible(i, j, level)) {
-                    Matrix Sbar_i_j = matmul(r_i, S(i, j, level));
+            //     // step 2a: update S blocks in the row where this fill-in exists
+            //     // except the block within the fill-in because it is to be updated
+            //     // after
+            //     for (int64_t j = 0; j < nblocks; ++j) {
+            //       if (block != j && is_admissible.exists(i, j, level) &&
+            //           is_admissible(i, j, level)) {
+            //         Matrix Sbar_i_j = matmul(r_i, S(i, j, level));
 
-                    S.erase(i, j, level);
-                    S.insert(i, j, level, std::move(Sbar_i_j));
-                  }
-                }
+            //         S.erase(i, j, level);
+            //         S.insert(i, j, level, std::move(Sbar_i_j));
+            //       }
+            //     }
 
-                r.insert(i, std::move(r_i));
-              }
-            }
+            //     r.insert(i, std::move(r_i));
+            //   }
+            // }
 
             // step 3: iterate over the column to update the S blocks
             for (int64_t i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
                 Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
                 if (F.exists(i, block)) {
-                  if (i < block) {
+                  // if (i < block) {
                     Sbar_i_block = Sbar_i_block + matmul(F(i, block), V(block, level));
-                  }
-                  else if (i > block) {
-                    Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
-                      matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
-                  }
+                  // }
+                  // else if (i > block) {
+                  //   Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
+                  //     matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
+                  // }
                 }
 
                 S.erase(i, block, level);
@@ -828,7 +827,21 @@ namespace Hatrix {
             t.insert(block, std::move(t_block));
           }
         }
+      } // if (block > 0)
+
+      if (level == 2) {
+        auto A2_expected_splits = A2_expected.split(4, 4);
+
+        for (int64_t i = 0; i < 4; ++i) {
+          for (int64_t j = 0; j < 4; ++j) {
+            if (is_admissible(i, j, 2)) {
+              A2_expected_splits[i * 4 + j] =
+                matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
+            }
+          }
+        }
       }
+
 
       Matrix U_F = make_complement(U(block, level));
       Matrix V_F = make_complement(V(block, level));
@@ -907,30 +920,26 @@ namespace Hatrix {
                                                D(i, j, level).rows - rank,
                                                D(i, j, level).cols - rank);
 
-              // if (level == 2) {
-              //   std::cout << "Schur compliment i -> " << i << " j -> " << j << std::endl;
-              // }
-
               matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
             }
-            else {
-              // Fill in between cc blocks.
-              int64_t rows = D(i, block, level).rows;
-              int64_t cols = D(block, j, level).cols;
-              if (F.exists(i, j)) {
-                Matrix& fill_in = F(i, j);
-                auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
-                matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
-                       false, false, -1.0, 1.0);
-              }
-              else {
-                Matrix fill_in(rows, cols);
-                auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
-                matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
-                       false, false, -1.0, 1.0);
-                F.insert(i, j, std::move(fill_in));
-              }
-            }
+            // else {
+            //   // Fill in between cc blocks.
+            //   int64_t rows = D(i, block, level).rows;
+            //   int64_t cols = D(block, j, level).cols;
+            //   if (F.exists(i, j)) {
+            //     Matrix& fill_in = F(i, j);
+            //     auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
+            //     matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
+            //            false, false, -1.0, 1.0);
+            //   }
+            //   else {
+            //     Matrix fill_in(rows, cols);
+            //     auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
+            //     matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
+            //            false, false, -1.0, 1.0);
+            //     F.insert(i, j, std::move(fill_in));
+            //   }
+            // }
           }
         }
       }
@@ -995,6 +1004,7 @@ namespace Hatrix {
                   // Update the oo block within the fill-in.
                   matmul(lower_splits[2], right_splits[1], fill_splits[1],
                          false, false, -1.0, 1.0);
+                  std::cout << "fill in update i -> " << i << " j -> " << j << std::endl;
                   F.insert(i, j, std::move(fill_in));
                 }
                 else {
@@ -1015,25 +1025,25 @@ namespace Hatrix {
               // of a nb*nb dense block. Thus we grab the large fill-in block that was
               // already formed previously in the cc * cc schur's compliment computation,
               // and add the resulting schur's compliment into that previously generated block.
-              else {
-                if (F.exists(i, j)) {
-                  Matrix& fill_in = F(i, j);
-                  auto fill_splits = SPLIT_DENSE(fill_in,
-                                                 D(i, block, level).rows - rank,
-                                                 D(block, j, level).cols - rank);
-                  // Update the co block within the fill-in.
-                  matmul(lower_splits[0], right_splits[1], fill_splits[1],
-                         false, false, -1.0, 1.0);
-                  // Update the oo block within the fill-in.
-                  matmul(lower_splits[2], right_splits[1], fill_splits[3],
-                         false, false, -1.0, 1.0);
-                }
-                else {
-                  std::cout << "A fill-in block for (co;oo) does not exist where it is supposed to at block-> "
-                            << block << " i-> " << i << " j-> " << j << std::endl;
-                  abort();
-                }
-              }
+              // else {
+              //   if (F.exists(i, j)) {
+              //     Matrix& fill_in = F(i, j);
+              //     auto fill_splits = SPLIT_DENSE(fill_in,
+              //                                    D(i, block, level).rows - rank,
+              //                                    D(block, j, level).cols - rank);
+              //     // Update the co block within the fill-in.
+              //     matmul(lower_splits[0], right_splits[1], fill_splits[1],
+              //            false, false, -1.0, 1.0);
+              //     // Update the oo block within the fill-in.
+              //     matmul(lower_splits[2], right_splits[1], fill_splits[3],
+              //            false, false, -1.0, 1.0);
+              //   }
+              //   else {
+              //     std::cout << "A fill-in block for (co;oo) does not exist where it is supposed to at block-> "
+              //               << block << " i-> " << i << " j-> " << j << std::endl;
+              //     abort();
+              //   }
+              // }
             }
           }
         }
@@ -1092,34 +1102,32 @@ namespace Hatrix {
               // Schur's compliment between oc and cc blocks where the result exists
               // after the diagonal blocks. The fill-in generated here is always part
               // of a nb*nb dense block.
-              else {
-                if (F.exists(i, j)) {
-                  Matrix& fill_in = F(i, j);
-                  auto fill_splits = SPLIT_DENSE(fill_in,
-                                                 D(i, block, level).rows - rank,
-                                                 D(block, j, level).cols - rank);
+              // else {
+              //   if (F.exists(i, j)) {
+              //     Matrix& fill_in = F(i, j);
+              //     auto fill_splits = SPLIT_DENSE(fill_in,
+              //                                    D(i, block, level).rows - rank,
+              //                                    D(block, j, level).cols - rank);
 
-                  // Update the oc block within the fill-ins.
-                  matmul(lower_splits[2], right_splits[0], fill_splits[2],
-                         false, false, -1.0, 1.0);
-                  // Update the oo block within the fill-ins.
-                  matmul(lower_splits[2], right_splits[1], fill_splits[3],
-                         false, false, -1.0, 1.0);
-                }
-                else {
-                  std::cout << "A fill-in block for (oc,oo) does not exist where "
-                            << " it is supposed to at block-> "
-                            << block << " i-> " << i << " j-> " << j << std::endl;
-                  abort();
-                }
-              }
+              //     // Update the oc block within the fill-ins.
+              //     matmul(lower_splits[2], right_splits[0], fill_splits[2],
+              //            false, false, -1.0, 1.0);
+              //     // Update the oo block within the fill-ins.
+              //     matmul(lower_splits[2], right_splits[1], fill_splits[3],
+              //            false, false, -1.0, 1.0);
+              //   }
+              //   else {
+              //     std::cout << "A fill-in block for (oc,oo) does not exist where "
+              //               << " it is supposed to at block-> "
+              //               << block << " i-> " << i << " j-> " << j << std::endl;
+              //     abort();
+              //   }
+              // }
             }
           }
         }
       }
     } // for (int64_t block = 0; block < nblocks; ++block)
-
-    // F.erase_all();
   }
 
   void
@@ -1189,9 +1197,9 @@ namespace Hatrix {
           U.erase(parent_node, parent_level);
           U.insert(parent_node, parent_level, std::move(temp));
 
-          // std::cout << "parent_node -> "
-          //           << norm(generate_identity_matrix(rank, rank) - matmul(U(parent_node, parent_level), U(parent_node, parent_level), true, false))
-          //           << std::endl;
+          std::cout << "parent_node -> "
+                    << norm(generate_identity_matrix(rank, rank) - matmul(U(parent_node, parent_level), U(parent_node, parent_level), true, false))
+                    << std::endl;
         }
 
         if (col_has_admissible_blocks(parent_node, parent_level)) {
@@ -1216,16 +1224,6 @@ namespace Hatrix {
         }
       } // for (block = 0; block < nblocks; block += 2)
 
-      if (level == 3) {
-        for (int64_t i = 0; i < 4; ++i) {
-          for (int64_t j = 0; j < 4; ++j) {
-            if (is_admissible(i, j, 2)) {
-              A2_expected_splits[i * 4 + j] =
-                matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
-            }
-          }
-        }
-      }
 
         // Merge the unfactorized parts.
       int64_t parent_nblocks = level_blocks[parent_level];
@@ -1642,15 +1640,20 @@ namespace Hatrix {
     }
 
 
-    // is_admissible.erase(6, 3, level);
-    // is_admissible.erase(3, 6, level);
-    // is_admissible.insert(3, 6, level, true);
-    // is_admissible.insert(6, 3, level, true);
+    is_admissible.erase(6, 2, level);
+    is_admissible.erase(2, 6, level);
+    is_admissible.insert(2, 6, level, true);
+    is_admissible.insert(6, 2, level, true);
 
-    // is_admissible.erase(6, 7, level);
-    // is_admissible.erase(7, 6, level);
-    // is_admissible.insert(7, 6, level, true);
-    // is_admissible.insert(6, 7, level, true);
+    is_admissible.erase(3, 7, level);
+    is_admissible.erase(7, 3, level);
+    is_admissible.insert(7, 3, level, true);
+    is_admissible.insert(3, 7, level, true);
+
+    is_admissible.erase(0, 2, level);
+    is_admissible.erase(2, 0, level);
+    is_admissible.insert(0, 2, level, true);
+    is_admissible.insert(2, 0, level, true);
 
     return geometry_admis_non_leaf(nblocks / 2, level+1);
   }
@@ -2469,8 +2472,8 @@ void verify_A2_solve(Matrix& A2, H2& A, const Domain& domain) {
 
   // b.print();
 
-  (x2_h2).print();
-  x2_dense.print();
+  // (x2_h2).print();
+  // x2_dense.print();
 
   std::cout << "A2 solve error: " << norm(x2_h2 - x2_dense) / norm(x2_dense) << std::endl;
 }
@@ -2567,9 +2570,9 @@ int main(int argc, char ** argv) {
 
   A.factorize(domain);
 
-  // std::cout << "-- H2 verification --\n";
-  // verify_A1_factorization(A, domain);
-  // verify_A2_factorization(A, domain);
+  std::cout << "-- H2 verification --\n";
+  verify_A1_factorization(A, domain);
+  verify_A2_factorization(A, domain);
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix x = A.solve(b, A.height);
@@ -2577,6 +2580,13 @@ int main(int argc, char ** argv) {
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+
+  auto x_splits = x.split(8, 1);
+  auto x_solve_splits = x_solve.split(8, 1);
+
+  for (int i = 0; i < 8; ++i) {
+    std::cout << "i -> " << i << " rel. err. -> " << norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
+  }
 
   // (x - x_solve).print();
 
