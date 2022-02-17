@@ -586,11 +586,11 @@ namespace Hatrix {
       double radius = 1.0;
       for (int64_t i = 0; i < N; ++i) {
         // double phi = dis(gen);
+        // double theta = dis(gen);
 
 
-        double phi = (i * 2.0 * M_PI) / N;
-        double theta = (i * 2.0 * M_PI) / N;// dis(gen);
-        // double theta = (i * 2.0 * M_PI) / N;
+        double phi = dis(gen);
+        double theta = dis(gen);
 
         double x = radius * sin(phi) * cos(theta);
         double y = radius * sin(phi) * sin(theta);
@@ -1145,7 +1145,7 @@ namespace Hatrix {
         }
       }
 
-      std::cout << "all dense level -> " << level << " bool -> " << is_all_dense_level << std::endl;
+      // std::cout << "all dense level -> " << level << " bool -> " << is_all_dense_level << std::endl;
       if (is_all_dense_level) {
         break;
       }
@@ -1265,7 +1265,7 @@ namespace Hatrix {
 
     int64_t last_nodes = level_blocks[level];
 
-    std::cout << "last nodes: " << last_nodes << " level: " << level << std::endl;
+    // std::cout << "last nodes: " << last_nodes << " level: " << level << std::endl;
     // Capture unfactorized A1 block.
     for (int64_t i = 0; i < last_nodes; ++i) {
       for (int64_t j = 0; j < last_nodes; ++j) {
@@ -2562,22 +2562,23 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  A.print_structure();
-  double construct_error = A.construction_relative_error(domain);
-  double lr_ratio = A.low_rank_block_ratio();
+  double construct_error, lr_ratio, solve_error;
+  // A.print_structure();
+  construct_error = A.construction_relative_error(domain);
+  lr_ratio = A.low_rank_block_ratio();
 
   A.factorize(domain);
 
-  std::cout << "-- H2 verification --\n";
-  verify_A1_factorization(A, domain);
-  verify_A2_factorization(A, domain);
+  // std::cout << "-- H2 verification --\n";
+  // verify_A1_factorization(A, domain);
+  // verify_A2_factorization(A, domain);
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix x = A.solve(b, A.height);
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain, N, N, 0, 0);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
-  double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
+  solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   // (x - x_solve).print();
 
