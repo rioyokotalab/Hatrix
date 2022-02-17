@@ -25,6 +25,8 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
   return std::sqrt((diff * diff) / (B_norm * B_norm));
 }
 
+double PV = 1e-3;
+
 namespace Hatrix {
   class HSS {
   public:
@@ -350,6 +352,9 @@ int main(int argc, char *argv[]) {
   Hatrix::Context::init();
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 2D
+  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 3D
+  PV = 1e-3 * (1 / pow(10, height));
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::HSS A(randvec, N, rank, height);

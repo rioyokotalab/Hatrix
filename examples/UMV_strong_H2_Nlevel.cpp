@@ -626,9 +626,8 @@ namespace Hatrix {
               if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
                 Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
 
-                Matrix SpF(rank, rank);
                 if (F.exists(block, j)) {
-                  SpF = matmul(UN1, F(block, j), true, false);
+                  Matrix SpF = matmul(UN1, F(block, j), true, false);
                   Sbar_block_j = Sbar_block_j + SpF;
                 }
 
@@ -639,7 +638,7 @@ namespace Hatrix {
             U.erase(block, level);
             U.insert(block, level, std::move(UN1));
             r.insert(block, std::move(r_block));
-          }
+          } // if (found_row_fill_in)
         }
 
         {
@@ -798,15 +797,15 @@ namespace Hatrix {
                                             U(i, level).cols, col_split);
             auto right_splits = SPLIT_DENSE(D(block, j, level), row_split, block_size -
                                             V(j, level).cols);
-            // Schur's compliement between oc and cc blocks where product exists as dense.
+            // Schur's compliement between co and cc blocks where product exists as dense.
             if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
               auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                block_size - U(i, level).cols,
                                                block_size - V(j, level).cols);
               matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
             }
-            // Schur's compliement between oc and cc blocks where a new fill-in is created.
-            // The product is a (oc; oo)-sized matrix.
+            // Schur's compliement between co and cc blocks where a new fill-in is created.
+            // The product is a (co; oo)-sized matrix.
             else {
               if (!F.exists(i, j)) {
                 Matrix fill_in(block_size, rank);
