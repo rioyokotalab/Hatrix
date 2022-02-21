@@ -1547,8 +1547,8 @@ namespace Hatrix {
     int64_t last_nodes = level_blocks[level];
     auto x_last_splits = x_last.split(last_nodes, 1);
 
-    std::cout << "FINAL TRSM: rhs_offset -> " << rhs_offset << std::endl;
-    D(0, 0, 0).print_meta();
+    // std::cout << "FINAL TRSM: rhs_offset -> " << rhs_offset << std::endl;
+    // D(0, 0, 0).print_meta();
     x_last_splits[0].print_meta();
 
     for (int64_t i = 0; i < last_nodes; ++i) {
