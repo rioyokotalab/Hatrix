@@ -2120,8 +2120,6 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
     PV = 1e-3 * (1 / pow(10, height));
 
-    print_structure();
-
     for (int64_t i = 0; i < level_blocks.size(); ++i) {
       std::cout << level_blocks[i] << " ";
     }
@@ -2695,6 +2693,7 @@ int main(int argc, char ** argv) {
             << " construct error= " << construct_error
             << " solve error= " << solve_error
             << " kernel func= " << kernel_func
-            << " LR%= " << lr_ratio * 100 << "%" << std::endl;
+            << " LR%= " << lr_ratio * 100 << "%"
+            << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
 
 }
