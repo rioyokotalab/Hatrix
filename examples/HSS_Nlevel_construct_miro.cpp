@@ -188,6 +188,7 @@ namespace Hatrix {
           std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
           V.insert(node, level, transpose(Vtransfer));
 
+
           // Generate the full bases for passing onto the upper level.
           std::vector<Matrix> Vtransfer_splits = V(node, level).split(2, 1);
           Matrix Vbig(rank, leaf_size);

@@ -17,6 +17,7 @@
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 double PV = 1e-3;
+enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 
 #define SPLIT_DENSE(dense, row_split, col_split)        \
   dense.split(std::vector<int64_t>(1, row_split),       \
@@ -116,6 +117,7 @@ namespace Hatrix {
     std::string admis_kind;
     int64_t height = -1;
     std::vector<int64_t> level_blocks;
+    int64_t matrix_type;
 
   private:
     int64_t permute_forward(Matrix& x, const int64_t level, int64_t rank_offset);
@@ -164,7 +166,7 @@ namespace Hatrix {
                          RowMap& r, RowMap& t);
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
-       std::string& admis_kind);
+       std::string& admis_kind, int64_t matrix_type);
     double construction_relative_error(const Domain& domain);
     void print_structure();
     double low_rank_block_ratio();
@@ -251,8 +253,10 @@ namespace Hatrix {
     std::vector<int64_t> leaf_cols = leaf_indices(icol, level, height);
 
     int64_t nrows = 0, ncols = 0;
-    for (int64_t i = 0; i < leaf_rows.size(); ++i) { nrows += domain.boxes[leaf_rows[i]].num_particles; }
-    for (int64_t i = 0; i < leaf_cols.size(); ++i) { ncols += domain.boxes[leaf_cols[i]].num_particles; }
+    for (int64_t i = 0; i < leaf_rows.size(); ++i) {
+      nrows += domain.boxes[leaf_rows[i]].num_particles; }
+    for (int64_t i = 0; i < leaf_cols.size(); ++i) {
+      ncols += domain.boxes[leaf_cols[i]].num_particles; }
 
     Matrix out(nrows, ncols);
 
@@ -1212,7 +1216,9 @@ namespace Hatrix {
           U.insert(parent_node, parent_level, std::move(temp));
 
           std::cout << "parent_node -> "
-                    << norm(generate_identity_matrix(rank, rank) - matmul(U(parent_node, parent_level), U(parent_node, parent_level), true, false))
+                    << norm(generate_identity_matrix(rank, rank) -
+                            matmul(U(parent_node, parent_level),
+                                   U(parent_node, parent_level), true, false))
                     << std::endl;
         }
 
@@ -1768,7 +1774,8 @@ namespace Hatrix {
     // Generate U leaf blocks
     for (int64_t i = 0; i < nblocks; ++i) {
       Matrix Utemp, Stemp;
-      std::tie(Utemp, Stemp)= generate_column_bases(i, domain.boxes[i].num_particles, domain, Y, height);
+      std::tie(Utemp, Stemp) =
+        generate_column_bases(i, domain.boxes[i].num_particles, domain, Y, height);
       U.insert(i, height, std::move(Utemp));
       Scol.insert(i, height, std::move(Stemp));
     }
@@ -1776,7 +1783,8 @@ namespace Hatrix {
     // Generate V leaf blocks
     for (int64_t j = 0; j < nblocks; ++j) {
       Matrix Stemp, Vtemp;
-      std::tie(Stemp, Vtemp) = generate_row_bases(j, domain.boxes[j].num_particles, domain, Y, height);
+      std::tie(Stemp, Vtemp) =
+        generate_row_bases(j, domain.boxes[j].num_particles, domain, Y, height);
       V.insert(j, height, std::move(Vtemp));
       Srow.insert(j, height, std::move(Stemp));
     }
@@ -1859,7 +1867,8 @@ namespace Hatrix {
     int64_t child1 = parent * 2;
     int64_t child2 = parent * 2 + 1;
 
-    return get_block_size_row(domain, child1, child_level) + get_block_size_row(domain, child2, child_level);
+    return get_block_size_row(domain, child1, child_level) +
+      get_block_size_row(domain, child2, child_level);
   }
 
   int64_t
@@ -1871,7 +1880,8 @@ namespace Hatrix {
     int64_t child1 = parent * 2;
     int64_t child2 = parent * 2 + 1;
 
-    return get_block_size_col(domain, child1, child_level) + get_block_size_col(domain, child2, child_level);
+    return get_block_size_col(domain, child1, child_level) +
+      get_block_size_col(domain, child2, child_level);
   }
 
   bool
@@ -2036,8 +2046,9 @@ namespace Hatrix {
   }
 
   H2::H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf,
-         double _admis, std::string& admis_kind) :
-    N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind) {
+         double _admis, std::string& admis_kind, int64_t matrix_type) :
+    N(_N), rank(_rank), nleaf(_nleaf), admis(_admis), admis_kind(admis_kind),
+    matrix_type(matrix_type) {
     if (admis_kind == "geometry_admis") {
       // TODO: use dual tree traversal for this.
       height = calc_geometry_based_admissibility(domain);
@@ -2062,9 +2073,22 @@ namespace Hatrix {
       std::reverse(std::begin(level_blocks), std::end(level_blocks));
     }
     else if (admis_kind == "diagonal_admis") {
-      height = int64_t(log2(N / nleaf));
-      calc_diagonal_based_admissibility(height);
-      std::reverse(std::begin(level_blocks), std::end(level_blocks));
+      if (matrix_type == BLR2_MATRIX) {
+        height = 1;
+        int64_t nblocks = domain.boxes.size();
+        for (int64_t i = 0; i < nblocks; ++i) {
+          for (int64_t j = 0; j < nblocks; ++j) {
+            is_admissible.insert(i, j, height, std::abs(i - j) > admis);
+          }
+        }
+        level_blocks.push_back(1);
+        level_blocks.push_back(nblocks);
+      }
+      else if (matrix_type == H2_MATRIX) {
+        height = int64_t(log2(N / nleaf));
+        calc_diagonal_based_admissibility(height);
+        std::reverse(std::begin(level_blocks), std::end(level_blocks));
+      }
     }
     else {
       std::cout << "wrong admis condition: " << admis_kind << std::endl;
@@ -2073,6 +2097,8 @@ namespace Hatrix {
 
     is_admissible.insert(0, 0, 0, false);
     PV = 1e-3 * (1 / pow(10, height));
+
+    print_structure();
 
     for (int64_t i = 0; i < level_blocks.size(); ++i) {
       std::cout << level_blocks[i] << " ";
@@ -2115,10 +2141,15 @@ namespace Hatrix {
             Matrix Vbig = get_Vbig(col, level);
 
             Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-            Matrix actual_matrix = Hatrix::generate_p2p_interactions(domain, row, col, level, height);
+            Matrix actual_matrix =
+              Hatrix::generate_p2p_interactions(domain, row, col, level, height);
 
             dense_norm += pow(norm(actual_matrix), 2);
             error += pow(norm(expected_matrix - actual_matrix), 2);
+
+            std::cout << "row: " << row << " col: " << col
+                      << " level: " << level
+                      << " error: " << error << std::endl;
           }
         }
       }
@@ -2534,11 +2565,9 @@ void verify_A2_factorization(Hatrix::H2& A, const Domain& domain) {
   std::cout << "A2 block wise factorization error: \n";
 
   double err = 0;
+
   for (int64_t i = 0; i < 4; ++i) {
     for (int64_t j = 0; j < 4; ++j) {
-      if (i != 2 && j != 0) {
-        err += norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j]);
-      }
       std::cout << "<i, j>: " << i << ", " << j
                 << " -- "
                 << std::setprecision(8)
@@ -2548,7 +2577,24 @@ void verify_A2_factorization(Hatrix::H2& A, const Domain& domain) {
     std::cout << std::endl;
   }
 
-  std::cout << "fact error: " << err / 15 << std::endl;
+
+  for (int64_t i = 0; i < 4; ++i) {
+    for (int64_t j = 0; j < 4; ++j) {
+      // if (i == 2 && j == 0) {
+      //   diff_splits[i * 4 + j].print();
+
+      // }
+      err += norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j]);
+      // std::cout << "<i, j>: " << i << ", " << j
+      //           << " -- "
+      //           << std::setprecision(8)
+      //           << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
+      //           << "   ";
+    }
+    // std::cout << std::endl;
+  }
+
+  std::cout << "fact error: " << err / 16 << std::endl;
 
   verify_A2_solve(A2_actual, A, domain);
 }
@@ -2562,6 +2608,9 @@ int main(int argc, char ** argv) {
   int64_t ndim = atoi(argv[5]);
   std::string admis_kind(argv[6]);
   int64_t kernel_func = atoi(argv[7]);
+  // 0 - BLR2
+  // 1 - H2 matrix
+  int64_t matrix_type = atoi(argv[8]);
 
   beta = 0.1;
   nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
@@ -2588,7 +2637,7 @@ int main(int argc, char ** argv) {
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
-  Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
+  Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   double construct_error, lr_ratio, solve_error;
   A.print_structure();
   construct_error = A.construction_relative_error(domain);
