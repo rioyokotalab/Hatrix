@@ -1194,7 +1194,7 @@ namespace Hatrix {
         int64_t c1 = block;
         int64_t c2 = block+1;
 
-        if (row_has_admissible_blocks(parent_node, parent_level)) {
+        if (row_has_admissible_blocks(parent_node, parent_level) && height != 1) {
           Matrix& Utransfer = U(parent_node, parent_level);
           auto Utransfer_splits = Utransfer.split(2, 1);
 
@@ -1222,7 +1222,7 @@ namespace Hatrix {
                     << std::endl;
         }
 
-        if (col_has_admissible_blocks(parent_node, parent_level)) {
+        if (col_has_admissible_blocks(parent_node, parent_level) && height != 1) {
           Matrix& Vtransfer = V(parent_node, parent_level);
           auto Vtransfer_splits = Vtransfer.split(2, 1);
 
@@ -1250,12 +1250,32 @@ namespace Hatrix {
       for (int64_t i = 0; i < parent_nblocks; ++i) {
         for (int64_t j = 0; j < parent_nblocks; ++j) {
           if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
-            std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
-            Matrix D_unelim(rank*2, rank*2);
-            auto D_unelim_splits = D_unelim.split(2, 2);
+            // TODO: need to switch to morton indexing so finding the parent is straightforward.
+            std::vector<int64_t> i_children, j_children;
+            int64_t nrows=0, ncols=0;
+            if (matrix_type == BLR2_MATRIX) {
+              for (int n = 0; n < level_blocks[level]; ++n) {
+                i_children.push_back(n);
+                j_children.push_back(n);
 
-            for (int64_t ic1 = 0; ic1 < 2; ++ic1) {
-              for (int64_t jc2 = 0; jc2 < 2; ++jc2) {
+                nrows += rank;
+                ncols += rank;
+              }
+            }
+            else if (matrix_type == H2_MATRIX) {
+              for (int n = 0; n < 2; ++n) {
+                i_children.push_back(i * 2 + n);
+                j_children.push_back(j * 2 + n);
+
+                nrows += rank;
+                ncols += rank;
+              }
+            }
+            Matrix D_unelim(nrows, ncols);
+            auto D_unelim_splits = D_unelim.split(i_children.size(), j_children.size());
+
+            for (int64_t ic1 = 0; ic1 < i_children.size(); ++ic1) {
+              for (int64_t jc2 = 0; jc2 < j_children.size(); ++jc2) {
                 int64_t c1 = i_children[ic1], c2 = j_children[jc2];
                 if (!U.exists(c1, level)) { continue; }
 
@@ -1263,16 +1283,17 @@ namespace Hatrix {
                   auto D_splits = SPLIT_DENSE(D(c1, c2, level),
                                               D(c1, c2, level).rows-rank,
                                               D(c1, c2, level).cols-rank);
-                  D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
+                  D_unelim_splits[ic1 * j_children.size() + jc2] = D_splits[3];
                 }
                 else {
-                  D_unelim_splits[ic1 * 2 + jc2] = S(c1, c2, level);
+                  D_unelim_splits[ic1 * j_children.size() + jc2] = S(c1, c2, level);
                 }
               }
             }
 
-            // std::cout << "Merge insert: i-> " << i
-            //           << " j -> " << " parent_level -> " << parent_level << std::endl;
+            std::cout << "Merge insert: i-> " << i
+                      << " j -> " << " parent_level -> " << parent_level << std::endl;
+            D_unelim.print_meta();
             D.insert(i, j, parent_level, std::move(D_unelim));
           }
         }
@@ -1281,13 +1302,13 @@ namespace Hatrix {
 
     int64_t last_nodes = level_blocks[level];
 
-    // std::cout << "last nodes: " << last_nodes << " level: " << level << std::endl;
+    std::cout << "last nodes: " << last_nodes << " level: " << level << std::endl;
     // Capture unfactorized A1 block.
-    for (int64_t i = 0; i < last_nodes; ++i) {
-      for (int64_t j = 0; j < last_nodes; ++j) {
-        A1_expected_splits[(i + 2) * 4 + j + 2] = D(i, j, level);
-      }
-    }
+    // for (int64_t i = 0; i < last_nodes; ++i) {
+    //   for (int64_t j = 0; j < last_nodes; ++j) {
+    //     A1_expected_splits[(i + 2) * 4 + j + 2] = D(i, j, level);
+    //   }
+    // }
 
 
     for (int64_t d = 0; d < last_nodes; ++d) {
@@ -1526,7 +1547,9 @@ namespace Hatrix {
     int64_t last_nodes = level_blocks[level];
     auto x_last_splits = x_last.split(last_nodes, 1);
 
-    // std::cout << "FINAL TRSM: " <<
+    std::cout << "FINAL TRSM: rhs_offset -> " << rhs_offset << std::endl;
+    D(0, 0, 0).print_meta();
+    x_last_splits[0].print_meta();
 
     for (int64_t i = 0; i < last_nodes; ++i) {
       for (int64_t j = 0; j < i; ++j) {
@@ -1708,8 +1731,7 @@ namespace Hatrix {
   H2::generate_column_block(int64_t block, int64_t block_size, const Domain& domain,
                             int64_t level) {
     Matrix AY(block_size, 0);
-    int64_t nblocks = level_blocks[level];
-    for (int64_t j = 0; j < nblocks; ++j) {
+    for (int64_t j = 0; j < level_blocks[level]; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
       Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j, level, height);
       AY = concat(AY, dense, 1);
@@ -1732,7 +1754,7 @@ namespace Hatrix {
   Matrix
   H2::generate_row_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level) {
     Hatrix::Matrix YtA(0, block_size);
-    for (int64_t i = 0; i < pow(2, level); ++i) {
+    for (int64_t i = 0; i < level_blocks[level]; ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
       Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block, level, height);
       YtA = concat(YtA, dense, 0);
@@ -1971,7 +1993,7 @@ namespace Hatrix {
       int64_t child_level = level + 1;
       int64_t block_size = get_block_size_row(domain, node, level);
 
-      if (row_has_admissible_blocks(node, level)) {
+      if (row_has_admissible_blocks(node, level) && height != 1) {
         Matrix& Ubig_child1 = Uchild(child1, child_level);
         Matrix& Ubig_child2 = Uchild(child2, child_level);
 
@@ -2001,7 +2023,7 @@ namespace Hatrix {
         Ubig_parent.insert(node, level, std::move(Ubig));
       }
 
-      if (col_has_admissible_blocks(node, level)) {
+      if (col_has_admissible_blocks(node, level) && height != 1) {
         // Generate V transfer matrix.
         Matrix& Vbig_child1 = Vchild(child1, child_level);
         Matrix& Vbig_child2 = Vchild(child2, child_level);
@@ -2147,9 +2169,9 @@ namespace Hatrix {
             dense_norm += pow(norm(actual_matrix), 2);
             error += pow(norm(expected_matrix - actual_matrix), 2);
 
-            std::cout << "row: " << row << " col: " << col
-                      << " level: " << level
-                      << " error: " << error << std::endl;
+            // std::cout << "row: " << row << " col: " << col
+            //           << " level: " << level
+            //           << " error: " << error << std::endl;
           }
         }
       }
@@ -2645,11 +2667,12 @@ int main(int argc, char ** argv) {
 
   A.factorize(domain);
 
-  std::cout << "-- H2 verification --\n";
-  verify_A1_factorization(A, domain);
-  verify_A2_factorization(A, domain);
+  // std::cout << "-- H2 verification --\n";
+  // verify_A1_factorization(A, domain);
+  // verify_A2_factorization(A, domain);
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+  std::cout << "--- START SOLVE ----\n";
   Hatrix::Matrix x = A.solve(b, A.height);
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);

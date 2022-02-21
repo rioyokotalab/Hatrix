@@ -7,7 +7,7 @@ make -j all
 # ./bin/HSS_Nlevel_construct 3200 20 5
 
 echo "---- SQ EXP NDIM=2 ADMIS=1 KERNEL FUNC=1 ----"
-lldb -o run -- ./bin/UMV_H2_far_dense 256 20 32 1 2 diagonal_admis 1 0
+./bin/UMV_H2_far_dense 256 20 32 1 2 diagonal_admis 1 0
 
 # echo "---- SQ EXP NDIM=2 ADMIS=2 KERNEL FUNC=1 ----"
 # ./bin/UMV_H2_far_dense 256 20 32 2 2 diagonal_admis 1 0
