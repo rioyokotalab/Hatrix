@@ -24,7 +24,11 @@ enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
               std::vector<int64_t>(1, col_split));
 
 
+// statistics kernels
 double beta, nu, noise, sigma;
+// electrodynamics kernels
+double wave_k, add_diag;
+
 
 using namespace Hatrix;
 
@@ -101,6 +105,7 @@ namespace Hatrix {
     void generate_particles(double min_val, double max_val);
     void divide_domain_and_create_particle_boxes(int64_t nleaf);
     void generate_starsh_grid_particles();
+    void generate_starsh_electrodynamics_particles();
     void print_file(std::string file_name);
   };
 
@@ -176,8 +181,17 @@ namespace Hatrix {
 }
 
 namespace Hatrix {
-  double sqrexp_kernel(const std::vector<double>& coords_row,
-                       const std::vector<double>& coords_col) {
+  double
+  block_sin_2d(const std::vector<double>& coords_row,
+               const std::vector<double>& coords_col) {
+    double out = 0;
+
+    return out;
+  }
+
+  double
+  sqrexp_kernel(const std::vector<double>& coords_row,
+                const std::vector<double>& coords_col) {
     int64_t ndim = coords_row.size();
     double dist = 0;
     double local_beta = -2 * pow(beta, 2);
@@ -567,6 +581,13 @@ namespace Hatrix {
       }
     }
   }
+
+  // stolen from the starsh_eddata_generate function.
+  void
+  Domain::generate_starsh_electrodynamics_particles() {
+
+  }
+
 
   void Domain::generate_particles(double min_val, double max_val) {
     double range = max_val - min_val;
@@ -2632,7 +2653,6 @@ int main(int argc, char ** argv) {
   noise = 1.e-1;
   sigma = 1.0;
 
-
   Hatrix::Context::init();
 
   Hatrix::Domain domain(N, ndim);
@@ -2647,6 +2667,12 @@ int main(int argc, char ** argv) {
     domain.generate_starsh_grid_particles();
     Hatrix::kernel_function = Hatrix::sqrexp_kernel;
     break;
+  }
+  case 2: {                     // sin kernel 2D
+    wave_k = 50;
+    add_diag = N;               // hicma_parsec.c says set add_diag to N.
+    domain.generate_starsh_electrodynamics_particles();
+    Hatrix::kernel_function = Hatrix::block_sin_2d;
   }
   }
 
