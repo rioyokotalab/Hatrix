@@ -107,6 +107,7 @@ namespace Hatrix {
     void generate_starsh_grid_particles();
     void generate_starsh_electrodynamics_particles();
     void print_file(std::string file_name);
+    Matrix generate_rank_heat_map();
   };
 
   class H2 {
@@ -420,6 +421,19 @@ namespace Hatrix {
     }
 
     file.close();
+  }
+
+  Matrix Domain::generate_rank_heat_map() {
+    int64_t nblocks = boxes.size();
+    Matrix out(nblocks, nblocks);
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+
+      }
+    }
+
+    return out;
   }
 
   // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
@@ -1566,10 +1580,6 @@ namespace Hatrix {
     int64_t last_nodes = level_blocks[level];
     auto x_last_splits = x_last.split(last_nodes, 1);
 
-    // std::cout << "FINAL TRSM: rhs_offset -> " << rhs_offset << std::endl;
-    // D(0, 0, 0).print_meta();
-    x_last_splits[0].print_meta();
-
     for (int64_t i = 0; i < last_nodes; ++i) {
       for (int64_t j = 0; j < i; ++j) {
         matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
@@ -2651,10 +2661,7 @@ int main(int argc, char ** argv) {
   // 1 - H2 matrix
   int64_t matrix_type = atoi(argv[8]);
 
-  beta = 0.1;
-  nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
-  noise = 1.e-1;
-  sigma = 1.0;
+
 
   Hatrix::Context::init();
 
@@ -2667,6 +2674,10 @@ int main(int argc, char ** argv) {
     break;
   }
   case 1: {                     // sqrexp
+    beta = 0.1;
+    nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
+    noise = 1.e-1;
+    sigma = 1.0;
     domain.generate_starsh_grid_particles();
     Hatrix::kernel_function = Hatrix::sqrexp_kernel;
     break;
