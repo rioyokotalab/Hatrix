@@ -2657,8 +2657,108 @@ void verify_A2_factorization(Hatrix::H2& A, const Domain& domain) {
   verify_A2_solve(A2_actual, A, domain);
 }
 
+std::tuple<std::vector<int64_t>, std::vector<int64_t> >
+generate_offsets(const Hatrix::H2& A, int64_t nblocks) {
+  int64_t level = 1;
+  std::vector<int64_t> row_offsets, col_offsets;
+  int64_t c_size_offset_rows = 0, c_size_offset_cols = 0;
+  for (int i = 0; i < nblocks; ++i) {
+    int64_t row_split = A.D(i, i, level).rows - A.rank;
+    int64_t col_split = A.D(i, i, level).cols - A.rank;
+
+    row_offsets.push_back(c_size_offset_rows + row_split);
+    col_offsets.push_back(c_size_offset_cols + col_split);
+
+    c_size_offset_rows += row_split;
+    c_size_offset_cols += col_split;
+  }
+
+  int64_t row_rank_offset = 0, col_rank_offset = 0;
+  for (int i = 0; i < nblocks-1; ++i) {
+    row_offsets.push_back(c_size_offset_rows + row_rank_offset + A.rank);
+    col_offsets.push_back(c_size_offset_cols + col_rank_offset + A.rank);
+
+    row_rank_offset += A.rank;
+    col_rank_offset += A.rank;
+  }
+
+  return {row_offsets, col_offsets};
+}
+
+Matrix
+generate_UF(const Hatrix::H2& A, int64_t block, int64_t nblocks) {
+  std::vector<int64_t> row_offsets, col_offsets;
+  std::tie(row_offsets, col_offsets) = generate_offsets(A, nblocks);
+
+  Matrix UF_full = generate_identity_matrix(A.N, A.N);
+  Matrix UF_block = make_complement(A.U(block, A.height));
+
+  auto UF_full_splits = UF_full.split(row_offsets, col_offsets);
+  auto UF_block_splits = SPLIT_DENSE(UF_block,
+                                     A.D(block, block, A.height).rows - A.rank,
+                                     A.D(block, block, A.height).cols - A.rank);
+
+  int64_t permuted_nblocks = nblocks * 2;
+
+  UF_full_splits[block * permuted_nblocks + block] = UF_block_splits[0];
+  UF_full_splits[(block + nblocks) * permuted_nblocks + block] = UF_block_splits[2];
+  UF_full_splits[block * permuted_nblocks + block + nblocks] = UF_block_splits[1];
+  UF_full_splits[(block + nblocks) * permuted_nblocks + block + nblocks] = UF_block_splits[3];
+
+  return UF_full;
+}
+
+Matrix generate_L2(const Hatrix::H2& A, int64_t block, int64_t nblocks) {
+  int64_t permuted_nblocks = nblocks * 2;
+  std::vector<int64_t> row_offsets, col_offsets;
+  std::tie(row_offsets, col_offsets) = generate_offsets(A, nblocks);
+
+  Matrix L2_block = generate_identity_matrix(A.N, A.N);
+  auto L2_splits = L2_block.split(row_offsets, col_offsets);
+
+  for (int j = 0; j <= block; ++j) {
+    if (!A.is_admissible(block, j, A.height)) {
+      int64_t row_split = A.D(block, j, A.height).rows - A.rank;
+      int64_t col_split = A.D(block, j, A.height).cols - A.rank;
+      auto D_splits = SPLIT_DENSE(A.D(block, j, A.height), row_split, col_split);
+
+      // Copy the cc parts
+      if (block == j) {
+        L2_splits[block * permuted_nblocks + j] = lower(D_splits[0]);
+      }
+      else {
+        L2_splits[block * permuted_nblocks + j] = D_splits[0];
+      }
+
+      L2_splits[(block + nblocks) * permuted_nblocks + j] = D_splits[2];
+    }
+  }
+
+  // Copy oc parts belonging to the 'upper' parts of the matrix
+  for (int i = 0; i < block; ++i) {
+    if (!A.is_admissible(i, block, A.height)) {
+      int64_t row_split = A.D(i, block, A.height).rows - A.rank;
+      int64_t col_split = A.D(i, block, A.height).cols - A.rank;
+      auto D_splits = A.D(i, block, A.height).split(std::vector<int64_t>(1, row_split),
+                                                 std::vector<int64_t>(1, col_split));
+      L2_splits[(i + nblocks) * permuted_nblocks + block] = D_splits[2];
+    }
+  }
+
+  return L2_block;
+}
+
 void
 regenerate_BLR2_matrix(const Hatrix::H2& A, const Hatrix::Domain& domain) {
+  int64_t nblocks = domain.boxes.size();
+
+  Matrix out(A.N, A.N);
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    out = matmul(out, generate_UF(A, i, nblocks));
+    out = matmul(out, generate_L2(A, i, nblocks));
+  }
+
 
 }
 
