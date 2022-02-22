@@ -648,14 +648,15 @@ namespace Hatrix {
             }
           }
 
-          if (found_row_fill_in || level != height) {
+          if (found_row_fill_in && level != height) {
             // step 1: recompress along the row of factorization and update U.
             row_concat = concat(row_concat, matmul(U(block, level),
                                                    Scol(block, level)), 1);
             for (int64_t j = 0; j < nblocks; ++j) {
               if (F.exists(block, j)) {
 
-                std::cout << "FILL IN CONCAT: block -> " <<  block << " j -> " << j << std::endl;
+                // std::cout << "FILL IN CONCAT: block -> " <<  block << " j -> " << j
+                //           << " level: " << level << std::endl;
                 // if (j < block) {
                   // Concat the fill-ins before the diagonal block. These fill-ins are all
                   // of size (co; oo) and should be multiplied with Vj before before being
@@ -734,9 +735,6 @@ namespace Hatrix {
 
                 S.erase(block, j, level);
                 S.insert(block, j, level, std::move(Sbar_block_j));
-              }
-
-              if (F.exists(block, j)) {
                 F.erase(block, j);
               }
             }
@@ -758,10 +756,10 @@ namespace Hatrix {
             }
           }
 
-          if (found_col_fill_in || level != height) {
+          if (found_col_fill_in && level != height) {
             // step 1: recompress along the column of factorization.
             col_concat = concat(col_concat,
-                                matmul(Srow(block, level), V(block, level), false, true), 0);
+                                matmul(Srow(block, level), transpose(V(block, level))), 0);
             for (int64_t i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
                 // if (i < block) {
@@ -842,8 +840,8 @@ namespace Hatrix {
             }
 
             t.insert(block, std::move(t_block));
-          }
-        }
+          } // if (found_col_fill_in)
+        } // col fill-in recompress scope
       } // if (block > 0)
 
       if (level == 2) {
@@ -2665,9 +2663,9 @@ int main(int argc, char ** argv) {
 
   A.factorize(domain);
 
-  // std::cout << "-- H2 verification --\n";
-  // verify_A1_factorization(A, domain);
-  // verify_A2_factorization(A, domain);
+  std::cout << "-- H2 verification --\n";
+  verify_A1_factorization(A, domain);
+  verify_A2_factorization(A, domain);
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   std::cout << "--- START SOLVE ----\n";
