@@ -1406,7 +1406,7 @@ namespace Hatrix {
       rank_offset += D(block, block, level).rows - rank;
     }
 
-    int64_t csize_offset = 0, bsize_offset = 0;
+    int64_t csize_offset = 0, bsize_offset = 0, rsize_offset = 0;
     for (int64_t block = 0; block < num_nodes; ++block) {
       int64_t rows = D(block, block, level).rows;
       int64_t c_size = rows - rank;
@@ -1417,11 +1417,12 @@ namespace Hatrix {
       }
       // copy the rank part of the vector into the temporary vector
       for (int64_t i = 0; i < rank; ++i) {
-        copy(rank_offset + rank * block + i, 0) = x(c_offset + bsize_offset + c_size + i, 0);
+        copy(rank_offset + rsize_offset + i, 0) = x(c_offset + bsize_offset + c_size + i, 0);
       }
 
       csize_offset += c_size;
       bsize_offset += rows;
+      rsize_offset += rank;
     }
 
     x = copy;
@@ -1437,7 +1438,7 @@ namespace Hatrix {
       c_offset -= D(block, block, level).cols - rank;
     }
 
-    int64_t csize_offset = 0, bsize_offset = 0;
+    int64_t csize_offset = 0, bsize_offset = 0, rsize_offset = 0;
     for (int64_t block = 0; block < num_nodes; ++block) {
       int64_t cols = D(block, block, level).cols;
       int64_t c_size = cols - rank;
@@ -1447,11 +1448,12 @@ namespace Hatrix {
       }
 
       for (int64_t i = 0; i < rank; ++i) {
-        copy(c_offset + bsize_offset + c_size + i, 0) = x(rank_offset + rank * block + i, 0);
+        copy(c_offset + bsize_offset + c_size + i, 0) = x(rank_offset + rsize_offset + i, 0);
       }
 
       csize_offset += c_size;
       bsize_offset += cols;
+      rsize_offset += rank;
     }
 
     x = copy;
