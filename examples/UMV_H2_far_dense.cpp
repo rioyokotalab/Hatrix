@@ -182,11 +182,21 @@ namespace Hatrix {
 
 namespace Hatrix {
   double
-  block_sin_2d(const std::vector<double>& coords_row,
+  block_sin(const std::vector<double>& coords_row,
                const std::vector<double>& coords_col) {
-    double out = 0;
+    double dist = 0, temp;
+    int64_t ndim = coords_row.size();
 
-    return out;
+    for (int64_t k = 0; k < ndim; ++k) {
+      dist += pow(coords_row[k] - coords_col[k], 2);
+    }
+    if (dist == 0) {
+      return add_diag;
+    }
+    else {
+      dist = std::sqrt(dist);
+      return sin(wave_k * dist) / dist;
+    }
   }
 
   double
@@ -581,13 +591,6 @@ namespace Hatrix {
       }
     }
   }
-
-  // stolen from the starsh_eddata_generate function.
-  void
-  Domain::generate_starsh_electrodynamics_particles() {
-
-  }
-
 
   void Domain::generate_particles(double min_val, double max_val) {
     double range = max_val - min_val;
@@ -2671,8 +2674,8 @@ int main(int argc, char ** argv) {
   case 2: {                     // sin kernel 2D
     wave_k = 50;
     add_diag = N;               // hicma_parsec.c says set add_diag to N.
-    domain.generate_starsh_electrodynamics_particles();
-    Hatrix::kernel_function = Hatrix::block_sin_2d;
+    domain.generate_starsh_grid_particles();
+    Hatrix::kernel_function = Hatrix::block_sin;
   }
   }
 
