@@ -769,7 +769,7 @@ namespace Hatrix {
                 for (int64_t i = 0; i < nblocks; ++i) {
                   if (i != block && is_admissible.exists(i, j, level) &&
                       is_admissible(i, j, level)) {
-                    Matrix Sbar_i_j = matmul(S(i, j, level), t_j);
+                    Matrix Sbar_i_j = matmul(S(i, j, level), t_j, false, true);
 
                     S.erase(i, j, level);
                     S.insert(i, j, level, std::move(Sbar_i_j));
@@ -794,13 +794,17 @@ namespace Hatrix {
                     Sbar_block_j = matmul(matmul(r_block, S(block, j, level)), t(j))
                       + matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
                   }
-                  F.erase(block, j);
+
                 }
 
                 // std::cout << "Change S blocks : block -> " << block << " j -> " << j <<  " level -> "<< level<<  std::endl;
 
                 S.erase(block, j, level);
                 S.insert(block, j, level, std::move(Sbar_block_j));
+              }
+
+              if (F.exists(block, j)) {
+                F.erase(block, j);
               }
             }
 
@@ -827,13 +831,18 @@ namespace Hatrix {
                                 matmul(Srow(block, level), transpose(V(block, level))), 0);
             for (int64_t i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
+                Matrix _U, _S, _V;
+                // Matrix fc(F(i, block));
+                // std::tie(_U, _S, _V) = error_svd(fc, 1e-9);
+                // std::cout << "FILL IN RANK -> i: " << i << " block: " << block << " rank: " << _S.rows << std::endl;
                 if (i < block) {
                   col_concat = concat(col_concat,
                                       matmul(U(i, level), F(i, block)), 0);
                 }
                 else if (i > block) {
-                  col_concat = concat(col_concat,
-                                      F(i, block), 0);
+                  col_concat = concat(col_concat, F(i, block), 0);
+
+                  // col_concat = concat(col_concat, matmul(_S, _V), 0);
                 }
               }
             }
@@ -884,7 +893,7 @@ namespace Hatrix {
             // step 3: iterate over the column to update the S blocks
             for (int64_t i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
+                Matrix Sbar_i_block = matmul(S(i, block,level), t_block, false, true);
                 if (F.exists(i, block)) {
                   if (i < block) {
                     Sbar_i_block = Sbar_i_block + matmul(F(i, block), V(block, level));
@@ -893,11 +902,14 @@ namespace Hatrix {
                     Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
                       matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
                   }
-                  F.erase(i, block);
                 }
 
                 S.erase(i, block, level);
                 S.insert(i, block, level, std::move(Sbar_i_block));
+              }
+
+              if (F.exists(i, block)) {
+                F.erase(i, block);
               }
             }
 
@@ -1151,7 +1163,7 @@ namespace Hatrix {
             else {
               if (i <= block) {
                 if (!F.exists(i, j)) {
-                  Matrix fill_in(rank,D(block, j, level).rows);
+                  Matrix fill_in(rank, D(block, j, level).cols);
                   auto fill_splits =
                     fill_in.split({},
                                   std::vector<int64_t>(1, D(block, j, level).cols - rank));
@@ -1725,85 +1737,85 @@ namespace Hatrix {
     int64_t nblocks = domain.boxes.size();
     level_blocks.push_back(nblocks);
     int64_t level = 0;
-    // for (int64_t i = 0; i < nblocks; ++i) {
-    //   for (int64_t j = 0; j < nblocks; ++j) {
-    //     is_admissible.insert(i, j, level,
-    //                          std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
-    //                          admis * domain.boxes[i].distance_from(domain.boxes[j]));
-    //   }
-    // }
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        is_admissible.insert(i, j, level,
+                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
+                             admis * domain.boxes[i].distance_from(domain.boxes[j]));
+      }
+    }
 
-    is_admissible.insert(0, 0, level, false);
-    is_admissible.insert(0, 1, level, false);
-    is_admissible.insert(0, 2, level, false);
-    is_admissible.insert(0, 3, level, true);
-    is_admissible.insert(0, 4, level, false);
-    is_admissible.insert(0, 5, level, true);
-    is_admissible.insert(0, 6, level, true);
-    is_admissible.insert(0, 7, level, true);
+    // is_admissible.insert(0, 0, level, false);
+    // is_admissible.insert(0, 1, level, false);
+    // is_admissible.insert(0, 2, level, false);
+    // is_admissible.insert(0, 3, level, true);
+    // is_admissible.insert(0, 4, level, false);
+    // is_admissible.insert(0, 5, level, true);
+    // is_admissible.insert(0, 6, level, true);
+    // is_admissible.insert(0, 7, level, true);
 
-    is_admissible.insert(1, 0, level, false);
-    is_admissible.insert(1, 1, level, false);
-    is_admissible.insert(1, 2, level, true);
-    is_admissible.insert(1, 3, level, false);
-    is_admissible.insert(1, 4, level, true);
-    is_admissible.insert(1, 5, level, false);
-    is_admissible.insert(1, 6, level, true);
-    is_admissible.insert(1, 7, level, false);
+    // is_admissible.insert(1, 0, level, false);
+    // is_admissible.insert(1, 1, level, false);
+    // is_admissible.insert(1, 2, level, true);
+    // is_admissible.insert(1, 3, level, false);
+    // is_admissible.insert(1, 4, level, true);
+    // is_admissible.insert(1, 5, level, false);
+    // is_admissible.insert(1, 6, level, true);
+    // is_admissible.insert(1, 7, level, false);
 
-    is_admissible.insert(2, 0, level, false);
-    is_admissible.insert(2, 1, level, true);
-    is_admissible.insert(2, 2, level, false);
-    is_admissible.insert(2, 3, level, false);
-    is_admissible.insert(2, 4, level, false);
-    is_admissible.insert(2, 5, level, true);
-    is_admissible.insert(2, 6, level, false);
-    is_admissible.insert(2, 7, level, true);
+    // is_admissible.insert(2, 0, level, false);
+    // is_admissible.insert(2, 1, level, true);
+    // is_admissible.insert(2, 2, level, false);
+    // is_admissible.insert(2, 3, level, false);
+    // is_admissible.insert(2, 4, level, false);
+    // is_admissible.insert(2, 5, level, true);
+    // is_admissible.insert(2, 6, level, false);
+    // is_admissible.insert(2, 7, level, true);
 
-    is_admissible.insert(3, 0, level, true);
-    is_admissible.insert(3, 1, level, false);
-    is_admissible.insert(3, 2, level, false);
-    is_admissible.insert(3, 3, level, false);
-    is_admissible.insert(3, 4, level, true);
-    is_admissible.insert(3, 5, level, false);
-    is_admissible.insert(3, 6, level, true);
-    is_admissible.insert(3, 7, level, false);
+    // is_admissible.insert(3, 0, level, true);
+    // is_admissible.insert(3, 1, level, false);
+    // is_admissible.insert(3, 2, level, false);
+    // is_admissible.insert(3, 3, level, false);
+    // is_admissible.insert(3, 4, level, true);
+    // is_admissible.insert(3, 5, level, false);
+    // is_admissible.insert(3, 6, level, true);
+    // is_admissible.insert(3, 7, level, false);
 
-    is_admissible.insert(4, 0, level, false);
-    is_admissible.insert(4, 1, level, true);
-    is_admissible.insert(4, 2, level, false);
-    is_admissible.insert(4, 3, level, true);
-    is_admissible.insert(4, 4, level, false);
-    is_admissible.insert(4, 5, level, true);
-    is_admissible.insert(4, 6, level, false);
-    is_admissible.insert(4, 7, level, false);
+    // is_admissible.insert(4, 0, level, false);
+    // is_admissible.insert(4, 1, level, true);
+    // is_admissible.insert(4, 2, level, false);
+    // is_admissible.insert(4, 3, level, true);
+    // is_admissible.insert(4, 4, level, false);
+    // is_admissible.insert(4, 5, level, true);
+    // is_admissible.insert(4, 6, level, false);
+    // is_admissible.insert(4, 7, level, false);
 
-    is_admissible.insert(5, 0, level, true);
-    is_admissible.insert(5, 1, level, false);
-    is_admissible.insert(5, 2, level, true);
-    is_admissible.insert(5, 3, level, false);
-    is_admissible.insert(5, 4, level, true);
-    is_admissible.insert(5, 5, level, false);
-    is_admissible.insert(5, 6, level, true);
-    is_admissible.insert(5, 7, level, false);
+    // is_admissible.insert(5, 0, level, true);
+    // is_admissible.insert(5, 1, level, false);
+    // is_admissible.insert(5, 2, level, true);
+    // is_admissible.insert(5, 3, level, false);
+    // is_admissible.insert(5, 4, level, true);
+    // is_admissible.insert(5, 5, level, false);
+    // is_admissible.insert(5, 6, level, true);
+    // is_admissible.insert(5, 7, level, false);
 
-    is_admissible.insert(6, 0, level, true);
-    is_admissible.insert(6, 1, level, true);
-    is_admissible.insert(6, 2, level, false);
-    is_admissible.insert(6, 3, level, true);
-    is_admissible.insert(6, 4, level, false);
-    is_admissible.insert(6, 5, level, true);
-    is_admissible.insert(6, 6, level, false);
-    is_admissible.insert(6, 7, level, false);
+    // is_admissible.insert(6, 0, level, true);
+    // is_admissible.insert(6, 1, level, true);
+    // is_admissible.insert(6, 2, level, false);
+    // is_admissible.insert(6, 3, level, true);
+    // is_admissible.insert(6, 4, level, false);
+    // is_admissible.insert(6, 5, level, true);
+    // is_admissible.insert(6, 6, level, false);
+    // is_admissible.insert(6, 7, level, false);
 
-    is_admissible.insert(7, 0, level, true);
-    is_admissible.insert(7, 1, level, false);
-    is_admissible.insert(7, 2, level, true);
-    is_admissible.insert(7, 3, level, false);
-    is_admissible.insert(7, 4, level, false);
-    is_admissible.insert(7, 5, level, false);
-    is_admissible.insert(7, 6, level, false);
-    is_admissible.insert(7, 7, level, false);
+    // is_admissible.insert(7, 0, level, true);
+    // is_admissible.insert(7, 1, level, false);
+    // is_admissible.insert(7, 2, level, true);
+    // is_admissible.insert(7, 3, level, false);
+    // is_admissible.insert(7, 4, level, false);
+    // is_admissible.insert(7, 5, level, false);
+    // is_admissible.insert(7, 6, level, false);
+    // is_admissible.insert(7, 7, level, false);
 
     if (matrix_type == BLR2_MATRIX) {
       level_blocks.push_back(1);
@@ -2181,7 +2193,6 @@ namespace Hatrix {
     matrix_type(matrix_type) {
     if (admis_kind == "geometry_admis") {
       // TODO: use dual tree traversal for this.
-
       height = calc_geometry_based_admissibility(domain);
       // reverse the levels stored in the admis blocks.
       RowColLevelMap<bool> temp_is_admissible;
@@ -2229,16 +2240,13 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
     PV = 1e-3 * (1 / pow(10, height));
 
+    // print_structure();
+
     int64_t all_dense_row = find_all_dense_row();
     if (all_dense_row != -1) {
       std::cout << "found all dense row at " << all_dense_row << ". Aborting.\n";
       abort();
     }
-
-    for (int64_t i = 0; i < level_blocks.size(); ++i) {
-      std::cout << level_blocks[i] << " ";
-    }
-    std::cout << std::endl;
 
     generate_leaf_nodes(domain);
     RowLevelMap Uchild = U;
@@ -2299,10 +2307,10 @@ namespace Hatrix {
       int64_t nblocks = level_blocks[level];
       std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
       for (int64_t i = 0; i < nblocks; ++i) {
-        if (level == height) {
+        if (level == height && D.exists(i, i, height)) {
           std::cout << D(i, i, height).rows << " ";
         }
-        std::cout << "| " ;
+        std::cout << "| ";
         for (int64_t j = 0; j < nblocks; ++j) {
           if (is_admissible.exists(i, j, level)) {
             std::cout << is_admissible(i, j, level) << " | " ;
@@ -2859,7 +2867,7 @@ Matrix generate_L0_permuted(const Hatrix::H2& A, int64_t nblocks) {
         int64_t row_split = A.D(i, j, A.height).rows - A.rank;
         int64_t col_split = A.D(i, j, A.height).cols - A.rank;
         auto D_splits = A.D(i, j, A.height).split(std::vector<int64_t>(1, row_split),
-                                               std::vector<int64_t>(1, col_split));
+                                                  std::vector<int64_t>(1, col_split));
 
         // Copy the oo parts
         if (i == j) {
@@ -3095,15 +3103,15 @@ int main(int argc, char ** argv) {
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
-  Matrix rank_map = domain.generate_rank_heat_map();
-  rank_map.print();
+  // Matrix rank_map = domain.generate_rank_heat_map();
+  // rank_map.print();
   // rank_map.out_csv("rank_map.csv");
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   double construct_error, lr_ratio, solve_error;
   construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
-  A.print_structure();
+  // A.print_structure();
   A.factorize(domain);
 
   // std::cout << "-- H2 verification --\n";

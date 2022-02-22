@@ -7,10 +7,11 @@ make -j all
 # ./bin/HSS_Nlevel_construct 3200 20 5
 
 echo "---- SQ EXP NDIM=2 ADMIS=1 KERNEL FUNC=1 ----"
-# ./bin/UMV_H2_far_dense 256 25 32 1 2 diagonal_admis 1 0
-# ./bin/UMV_H2_far_dense 256 25 32 1 1 diagonal_admis 1 0
 
+# ./bin/UMV_H2_far_dense 240 25 30 0.6 2 geometry_admis 2 0
+./bin/UMV_H2_far_dense 2000 25 50 0.4 2 geometry_admis 2 0
+./bin/UMV_H2_far_dense 4000 25 50 0.4 2 geometry_admis 2 0
+# ./bin/UMV_H2_far_dense 1920 20 30 1.6 3 geometry_admis 0 0
 
-./bin/UMV_H2_far_dense 512 30 64 1.3 3 geometry_admis 0 0
 
 # ./bin/UMV_H2_far_dense 64 5 8 1 2 geometry_admis 0 0
