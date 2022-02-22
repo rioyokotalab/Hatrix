@@ -2657,6 +2657,11 @@ void verify_A2_factorization(Hatrix::H2& A, const Domain& domain) {
   verify_A2_solve(A2_actual, A, domain);
 }
 
+void
+regenerate_BLR2_matrix(const Hatrix::H2& A, const Hatrix::Domain& domain) {
+
+}
+
 
 int main(int argc, char ** argv) {
   int64_t N = atoi(argv[1]);
@@ -2714,6 +2719,9 @@ int main(int argc, char ** argv) {
   // std::cout << "-- H2 verification --\n";
   // verify_A1_factorization(A, domain);
   // verify_A2_factorization(A, domain);
+  if (matrix_type == BLR2_MATRIX) {
+    regenerate_BLR2_matrix(A, domain);
+  }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   std::cout << "--- START SOLVE ----\n";
