@@ -1289,9 +1289,6 @@ namespace Hatrix {
               }
             }
 
-            std::cout << "Merge insert: i-> " << i
-                      << " j -> " << " parent_level -> " << parent_level << std::endl;
-            D_unelim.print_meta();
             D.insert(i, j, parent_level, std::move(D_unelim));
           }
         }
@@ -1300,7 +1297,7 @@ namespace Hatrix {
 
     int64_t last_nodes = level_blocks[level];
 
-    std::cout << "last nodes: " << last_nodes << " level: " << level << std::endl;
+    // std::cout << "last nodes: " << last_nodes << " level: " << level << std::endl;
     // Capture unfactorized A1 block.
     // for (int64_t i = 0; i < last_nodes; ++i) {
     //   for (int64_t j = 0; j < last_nodes; ++j) {
