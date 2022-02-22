@@ -1,4 +1,5 @@
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/functions/lapack.h"
 
 #include <algorithm>
 #include <cassert>
@@ -248,5 +249,20 @@ size_t Matrix::memory_used() const { return rows * cols * sizeof(double); }
 size_t Matrix::shared_memory_used() const {
   return data->size() * sizeof(double);
 }
+
+  Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
+    Matrix out(nblocks, nblocks);
+
+    auto this_splits = (*this).split(nblocks, nblocks);
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        Matrix Utemp, Stemp, Vtemp;
+        std::tie(Utemp, Stemp, Vtemp) = Hatrix::error_svd(this_splits[i * nblocks + j], accuracy);
+        out(i, j) = Stemp.rows;
+      }
+    }
+
+    return out;
+  }
 
 }  // namespace Hatrix

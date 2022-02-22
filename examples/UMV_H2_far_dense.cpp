@@ -3019,6 +3019,7 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Matrix rank_map = domain.generate_rank_heat_map();
+  rank_map.print();
   rank_map.out_csv("rank_map.csv");
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
@@ -3037,6 +3038,7 @@ int main(int argc, char ** argv) {
   if (matrix_type == BLR2_MATRIX) {
     Matrix regenA = regenerate_BLR2_matrix(A, domain);
     std::cout << "factorization error = " << norm(regenA - Adense) / norm(Adense) << std::endl;
+    regenA.block_ranks(domain.boxes.size(), 1e-9).print();
   }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
