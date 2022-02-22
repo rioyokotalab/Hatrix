@@ -1734,7 +1734,7 @@ namespace Hatrix {
     // }
 
     is_admissible.insert(0, 0, level, false);
-    is_admissible.insert(0, 1, level, true);
+    is_admissible.insert(0, 1, level, false);
     is_admissible.insert(0, 2, level, false);
     is_admissible.insert(0, 3, level, true);
     is_admissible.insert(0, 4, level, false);
@@ -1742,7 +1742,7 @@ namespace Hatrix {
     is_admissible.insert(0, 6, level, true);
     is_admissible.insert(0, 7, level, true);
 
-    is_admissible.insert(1, 0, level, true);
+    is_admissible.insert(1, 0, level, false);
     is_admissible.insert(1, 1, level, false);
     is_admissible.insert(1, 2, level, true);
     is_admissible.insert(1, 3, level, false);
@@ -1804,88 +1804,6 @@ namespace Hatrix {
     is_admissible.insert(7, 5, level, false);
     is_admissible.insert(7, 6, level, false);
     is_admissible.insert(7, 7, level, false);
-
-//     64 | 0 | 0 | 0 | 1 | 0 | 1 | 1 | 1 |
-// 64 | 0 | 0 | 0 | 0 | 1 | 0 | 1 | 1 |
-// 64 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 |
-// 64 | 1 | 0 | 0 | 0 | 1 | 0 | 1 | 0 |
-// 64 | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 1 |
-// 64 | 1 | 0 | 1 | 0 | 1 | 0 | 1 | 0 |
-// 64 | 1 | 1 | 0 | 1 | 0 | 1 | 0 | 1 |
-// 64 | 1 | 1 | 0 | 0 | 1 | 0 | 1 | 0 |
-
-    // is_admissible.insert(0, 0, level, false);
-    // is_admissible.insert(0, 1, level, false);
-    // is_admissible.insert(0, 2, level, false);
-    // is_admissible.insert(0, 3, level, true);
-    // is_admissible.insert(0, 4, level, false);
-    // is_admissible.insert(0, 5, level, true);
-    // is_admissible.insert(0, 6, level, true);
-    // is_admissible.insert(0, 7, level, true);
-
-    // is_admissible.insert(1, 0, level, false);
-    // is_admissible.insert(1, 1, level, false);
-    // is_admissible.insert(1, 2, level, false);
-    // is_admissible.insert(1, 3, level, false);
-    // is_admissible.insert(1, 4, level, true);
-    // is_admissible.insert(1, 5, level, false);
-    // is_admissible.insert(1, 6, level, true);
-    // is_admissible.insert(1, 7, level, true);
-
-    // is_admissible.insert(2, 0, level, false);
-    // is_admissible.insert(2, 1, level, false);
-    // is_admissible.insert(2, 2, level, false);
-    // is_admissible.insert(2, 3, level, false);
-    // is_admissible.insert(2, 4, level, false);
-    // is_admissible.insert(2, 5, level, true);
-    // is_admissible.insert(2, 6, level, false);
-    // is_admissible.insert(2, 7, level, false);
-
-    // is_admissible.insert(3, 0, level, true);
-    // is_admissible.insert(3, 1, level, false);
-    // is_admissible.insert(3, 2, level, false);
-    // is_admissible.insert(3, 3, level, false);
-    // is_admissible.insert(3, 4, level, true);
-    // is_admissible.insert(3, 5, level, false);
-    // is_admissible.insert(3, 6, level, true);
-    // is_admissible.insert(3, 7, level, false);
-
-    // is_admissible.insert(4, 0, level, false);
-    // is_admissible.insert(4, 1, level, true);
-    // is_admissible.insert(4, 2, level, false);
-    // is_admissible.insert(4, 3, level, true);
-    // is_admissible.insert(4, 4, level, false);
-    // is_admissible.insert(4, 5, level, true);
-    // is_admissible.insert(4, 6, level, false);
-    // is_admissible.insert(4, 7, level, true);
-
-    // is_admissible.insert(5, 0, level, true);
-    // is_admissible.insert(5, 1, level, false);
-    // is_admissible.insert(5, 2, level, true);
-    // is_admissible.insert(5, 3, level, false);
-    // is_admissible.insert(5, 4, level, true);
-    // is_admissible.insert(5, 5, level, false);
-    // is_admissible.insert(5, 6, level, true);
-    // is_admissible.insert(5, 7, level, false);
-
-    // is_admissible.insert(6, 0, level, true);
-    // is_admissible.insert(6, 1, level, true);
-    // is_admissible.insert(6, 2, level, false);
-    // is_admissible.insert(6, 3, level, true);
-    // is_admissible.insert(6, 4, level, false);
-    // is_admissible.insert(6, 5, level, true);
-    // is_admissible.insert(6, 6, level, false);
-    // is_admissible.insert(6, 7, level, true);
-
-    // is_admissible.insert(7, 0, level, true);
-    // is_admissible.insert(7, 1, level, true);
-    // is_admissible.insert(7, 2, level, false);
-    // is_admissible.insert(7, 3, level, false);
-    // is_admissible.insert(7, 4, level, true);
-    // is_admissible.insert(7, 5, level, false);
-    // is_admissible.insert(7, 6, level, true);
-    // is_admissible.insert(7, 7, level, false);
-
 
     if (matrix_type == BLR2_MATRIX) {
       level_blocks.push_back(1);
