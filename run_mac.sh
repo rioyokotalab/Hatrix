@@ -10,7 +10,7 @@ echo "---- SQ EXP NDIM=2 ADMIS=1 KERNEL FUNC=1 ----"
 # ./bin/UMV_H2_far_dense 256 25 32 1 2 diagonal_admis 1 0
 # ./bin/UMV_H2_far_dense 256 25 32 1 1 diagonal_admis 1 0
 
-lldb -o run -- ./bin/UMV_H2_far_dense 512 50 64 1 1 geometry_admis 1 0
+lldb -o run -- ./bin/UMV_H2_far_dense 512 50 64 1 2 geometry_admis 0 0
 # ./bin/UMV_H2_far_dense 512 50 64 2 2 diagonal_admis 1 1
 # ./bin/UMV_H2_far_dense 512 50 64 2 2 diagonal_admis 1 1
 # ./bin/UMV_H2_far_dense 512 50 64 1 1 diagonal_admis 1 0
