@@ -2748,6 +2748,107 @@ Matrix generate_L2(const Hatrix::H2& A, int64_t block, int64_t nblocks) {
   return L2_block;
 }
 
+std::tuple<std::vector<int64_t>, std::vector<int64_t> >
+generate_rank_offsets(const Hatrix::H2& A, int64_t nblocks) {
+  std::vector<int64_t> row_rank_splits, col_rank_splits;
+  int64_t nrows = 0, ncols = 0;
+  for (int i = 0; i < nblocks; ++i) {
+    row_rank_splits.push_back(nrows + A.rank);
+    col_rank_splits.push_back(ncols + A.rank);
+    nrows += A.rank;
+    ncols += A.rank;
+  }
+
+  return {row_rank_splits, col_rank_splits};
+}
+
+Matrix generate_L0_permuted(const Hatrix::H2& A, int64_t nblocks) {
+  int64_t permuted_nblocks = nblocks * 2;
+  int64_t level = 1;
+  std::vector<int64_t> row_offsets, col_offsets;
+  std::tie(row_offsets, col_offsets) = generate_offsets(A, nblocks);
+
+  Matrix L0 = generate_identity_matrix(A.N, A.N);
+  auto L0_splits = L0.split(row_offsets, col_offsets);
+
+  std::vector<int64_t> row_rank_splits, col_rank_splits;
+  std::tie(row_rank_splits, col_rank_splits)= generate_rank_offsets(A, nblocks);
+
+  auto last_splits = A.D(0, 0, 0).split(row_rank_splits, col_rank_splits);
+
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j <= i; ++j) {
+      if (!A.is_admissible(i, j, A.height)) {
+        int64_t row_split = A.D(i, j, A.height).rows - A.rank;
+        int64_t col_split = A.D(i, j, A.height).cols - A.rank;
+        auto D_splits = A.D(i, j, A.height).split(std::vector<int64_t>(1, row_split),
+                                               std::vector<int64_t>(1, col_split));
+
+        // Copy the oo parts
+        if (i == j) {
+          L0_splits[(i + nblocks) * permuted_nblocks + (j + nblocks)] =
+            lower(last_splits[i * nblocks + j]);
+        }
+        else {
+          L0_splits[(i + nblocks) * permuted_nblocks + (j + nblocks)] =
+            last_splits[i * nblocks + j];
+        }
+      }
+      else {
+        // Copy S blocks into the lower right corner
+        L0_splits[(i + nblocks) * permuted_nblocks + (j + nblocks)] =
+          last_splits[i * nblocks + j];
+      }
+    }
+  }
+
+  return L0;
+}
+
+
+Matrix generate_U0_permuted(const Hatrix::H2& A, int64_t nblocks) {
+  int64_t permuted_nblocks = nblocks * 2;
+  int64_t level = 1;
+  std::vector<int64_t> row_offsets, col_offsets;
+  std::tie(row_offsets, col_offsets) = generate_offsets(A, nblocks);
+
+  Matrix U0 = generate_identity_matrix(A.N, A.N);
+  auto U0_splits = U0.split(row_offsets, col_offsets);
+
+  std::vector<int64_t> row_rank_splits, col_rank_splits;
+  std::tie(row_rank_splits, col_rank_splits)= generate_rank_offsets(A, nblocks);
+  auto last_splits = A.D(0, 0, 0).split(row_rank_splits, col_rank_splits);
+
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = i; j < nblocks; ++j) {
+      if (!A.is_admissible(i, j, A.height)) {
+        int64_t row_split = A.D(i, j,  A.height).rows - A.rank;
+        int64_t col_split = A.D(i, j, A.height).cols - A.rank;
+        auto D_splits = A.D(i, j, A.height).split(std::vector<int64_t>(1, row_split),
+                                               std::vector<int64_t>(1, col_split));
+
+        // Copy the oo parts
+        if (i == j) {
+          U0_splits[(i + nblocks) * permuted_nblocks + (j + nblocks)] =
+            upper(last_splits[i * nblocks + j]);
+        }
+        else {
+          U0_splits[(i + nblocks) * permuted_nblocks + (j + nblocks)] =
+            last_splits[i * nblocks + j];
+        }
+      }
+      else {
+        // Copy S blocks
+        U0_splits[(i + nblocks) * permuted_nblocks + (j + nblocks)] =
+          last_splits[i * nblocks + j];
+      }
+    }
+  }
+
+  return U0;
+}
+
+
 void
 regenerate_BLR2_matrix(const Hatrix::H2& A, const Hatrix::Domain& domain) {
   int64_t nblocks = domain.boxes.size();
@@ -2759,7 +2860,8 @@ regenerate_BLR2_matrix(const Hatrix::H2& A, const Hatrix::Domain& domain) {
     out = matmul(out, generate_L2(A, i, nblocks));
   }
 
-
+  out = matmul(out, generate_L0_permuted(A, nblocks));
+  out = matmul(out, generate_U0_permuted(A, nblocks));
 }
 
 
