@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <memory>
 #include <vector>
+#include <fstream>
 
 namespace Hatrix {
 
@@ -226,6 +227,20 @@ void Matrix::print() const {
 
 void Matrix::print_meta() const {
   std::cout << "rows=" << rows << " cols=" << cols << " stride=" << stride << std::endl;
+}
+
+void Matrix::out_csv(std::string out_file) const {
+  std::ofstream file;
+  file.open(out_file, std::ios::out | std::ios::trunc);
+
+  file << "i,j,value" << std::endl;
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      file << i << "," << j << "," << (*this)(i, j) << std::endl;
+    }
+  }
+
+  file.close();
 }
 
 size_t Matrix::memory_used() const { return rows * cols * sizeof(double); }

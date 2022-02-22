@@ -210,7 +210,7 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t ran
   return truncated_svd(Ac, rank);
 }
 
-std::tuple<Matrix, Matrix, Matrix> truncated_svd(Matrix& A, double error) {
+std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error) {
   Matrix U(A.rows, A.min_dim());
   Matrix S(A.min_dim(), A.min_dim());
   Matrix V(A.min_dim(), A.cols);
@@ -219,7 +219,7 @@ std::tuple<Matrix, Matrix, Matrix> truncated_svd(Matrix& A, double error) {
 
   int rank = 1;
   int irow = 1;
-  while (rank < S.rows || S(irow, irow) > error) {
+  while (rank < S.rows && S(irow, irow) > error) {
     rank += 1;
     irow += 1;
   }

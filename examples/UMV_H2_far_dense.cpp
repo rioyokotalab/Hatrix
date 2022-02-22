@@ -429,7 +429,13 @@ namespace Hatrix {
 
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
+        Matrix block = Hatrix::generate_p2p_interactions(*this, i, j);
 
+        Matrix Utemp, Stemp, Vtemp;
+        std::tie(Utemp, Stemp, Vtemp) = error_svd(block, 1e-9);
+        int64_t rank = Stemp.rows;
+
+        out(i, j) = rank;
       }
     }
 
@@ -2693,6 +2699,9 @@ int main(int argc, char ** argv) {
   }
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
+
+  Matrix rank_map = domain.generate_rank_heat_map();
+  rank_map.out_csv("rank_map.csv");
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   double construct_error, lr_ratio, solve_error;
