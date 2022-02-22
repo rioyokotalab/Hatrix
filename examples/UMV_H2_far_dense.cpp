@@ -713,7 +713,7 @@ namespace Hatrix {
             }
           }
 
-          if (found_row_fill_in && level != height) {
+          if (found_row_fill_in) {
             // step 1: recompress along the row of factorization and update U.
             row_concat = concat(row_concat, matmul(U(block, level),
                                                    Scol(block, level)), 1);
@@ -821,7 +821,7 @@ namespace Hatrix {
             }
           }
 
-          if (found_col_fill_in && level != height) {
+          if (found_col_fill_in) {
             // step 1: recompress along the column of factorization.
             col_concat = concat(col_concat,
                                 matmul(Srow(block, level), transpose(V(block, level))), 0);
@@ -906,18 +906,18 @@ namespace Hatrix {
         } // col fill-in recompress scope
       } // if (block > 0)
 
-      if (level == 2) {
-        auto A2_expected_splits = A2_expected.split(4, 4);
+      // if (level == 2) {
+      //   auto A2_expected_splits = A2_expected.split(4, 4);
 
-        for (int64_t i = 0; i < 4; ++i) {
-          for (int64_t j = 0; j < 4; ++j) {
-            if (is_admissible(i, j, 2)) {
-              A2_expected_splits[i * 4 + j] =
-                matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
-            }
-          }
-        }
-      }
+      //   for (int64_t i = 0; i < 4; ++i) {
+      //     for (int64_t j = 0; j < 4; ++j) {
+      //       if (is_admissible(i, j, 2)) {
+      //         A2_expected_splits[i * 4 + j] =
+      //           matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
+      //       }
+      //     }
+      //   }
+      // }
 
 
       Matrix U_F = make_complement(U(block, level));
@@ -1081,7 +1081,6 @@ namespace Hatrix {
                   // Update the oo block within the fill-in.
                   matmul(lower_splits[2], right_splits[1], fill_splits[1],
                          false, false, -1.0, 1.0);
-                  std::cout << "fill in update i -> " << i << " j -> " << j << std::endl;
                   F.insert(i, j, std::move(fill_in));
                 }
 
@@ -2185,8 +2184,6 @@ namespace Hatrix {
       abort();
     }
 
-    print_structure();
-
     for (int64_t i = 0; i < level_blocks.size(); ++i) {
       std::cout << level_blocks[i] << " ";
     }
@@ -2251,9 +2248,9 @@ namespace Hatrix {
       int64_t nblocks = level_blocks[level];
       std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
       for (int64_t i = 0; i < nblocks; ++i) {
-        // if (level == height) {
-        //   std::cout << D(i, i, height).rows << " ";
-        // }
+        if (level == height) {
+          std::cout << D(i, i, height).rows << " ";
+        }
         std::cout << "| " ;
         for (int64_t j = 0; j < nblocks; ++j) {
           if (is_admissible.exists(i, j, level)) {
@@ -3053,10 +3050,9 @@ int main(int argc, char ** argv) {
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   double construct_error, lr_ratio, solve_error;
-  A.print_structure();
   construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
-
+  A.print_structure();
   A.factorize(domain);
 
   // std::cout << "-- H2 verification --\n";
@@ -3064,11 +3060,11 @@ int main(int argc, char ** argv) {
   // verify_A2_factorization(A, domain);
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
 
-  if (matrix_type == BLR2_MATRIX) {
-    Matrix regenA = regenerate_BLR2_matrix(A, domain);
-    std::cout << "factorization error = " << norm(regenA - Adense) / norm(Adense) << std::endl;
-    regenA.block_ranks(domain.boxes.size(), 1e-9).print();
-  }
+  // if (matrix_type == BLR2_MATRIX) {
+  //   Matrix regenA = regenerate_BLR2_matrix(A, domain);
+  //   std::cout << "factorization error = " << norm(regenA - Adense) / norm(Adense) << std::endl;
+  //   regenA.block_ranks(domain.boxes.size(), 1e-9).print();
+  // }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix x = A.solve(b, A.height);
