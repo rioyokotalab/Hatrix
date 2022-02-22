@@ -170,6 +170,7 @@ namespace Hatrix {
     int64_t get_block_size_col(const Domain& domain, int64_t parent, int64_t level);
     void factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
                          RowMap& r, RowMap& t);
+    int64_t find_all_dense_row();
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind, int64_t matrix_type);
@@ -671,6 +672,26 @@ namespace Hatrix {
     else if (ndim == 3) {
       orthogonal_recursive_bisection_3dim(0, N, std::string(""), nleaf, 0);
     }
+  }
+
+  int64_t H2::find_all_dense_row() {
+    int64_t nblocks = level_blocks[height];
+
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      bool all_dense_row = true;
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
+          all_dense_row = false;
+        }
+      }
+
+      if (all_dense_row) {
+        return i;
+      }
+    }
+
+    return -1;
   }
 
 
@@ -2158,6 +2179,14 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
     PV = 1e-3 * (1 / pow(10, height));
 
+    int64_t all_dense_row = find_all_dense_row();
+    if (all_dense_row != -1) {
+      std::cout << "found all dense row at " << all_dense_row << ". Aborting.\n";
+      abort();
+    }
+
+    print_structure();
+
     for (int64_t i = 0; i < level_blocks.size(); ++i) {
       std::cout << level_blocks[i] << " ";
     }
@@ -3020,7 +3049,7 @@ int main(int argc, char ** argv) {
 
   Matrix rank_map = domain.generate_rank_heat_map();
   rank_map.print();
-  rank_map.out_csv("rank_map.csv");
+  // rank_map.out_csv("rank_map.csv");
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   double construct_error, lr_ratio, solve_error;
@@ -3042,19 +3071,16 @@ int main(int argc, char ** argv) {
   }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
-  std::cout << "--- START SOLVE ----\n";
   Hatrix::Matrix x = A.solve(b, A.height);
-
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
-
   solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   auto x_splits = x.split(8, 1);
   auto x_solve_splits = x_solve.split(8, 1);
 
-  for (int i = 0; i < 8; ++i) {
-    std::cout << "i -> " << i << " rel. err. -> " << norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
-  }
+  // for (int i = 0; i < 8; ++i) {
+  //   std::cout << "i -> " << i << " rel. err. -> " << norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
+  // }
 
   // (x - x_solve).print();
 
