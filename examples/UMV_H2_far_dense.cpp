@@ -968,13 +968,13 @@ namespace Hatrix {
                                             row_split,
                                             D(block, j, level).cols - rank);
 
-            // if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+            if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
               auto reduce_splits = SPLIT_DENSE(D(i, j, level),
                                                D(i, j, level).rows - rank,
                                                D(i, j, level).cols - rank);
 
               matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
-            // }
+            }
             // else {
             //   // Fill in between cc blocks.
             //   int64_t rows = D(i, block, level).rows;
@@ -1700,7 +1700,6 @@ namespace Hatrix {
   int64_t
   H2::calc_geometry_based_admissibility(const Domain& domain) {
     int64_t nblocks = domain.boxes.size();
-    std::cout << "nb: " << nblocks << std::endl;
     level_blocks.push_back(nblocks);
     int64_t level = 0;
     for (int64_t i = 0; i < nblocks; ++i) {
@@ -1712,27 +1711,33 @@ namespace Hatrix {
     }
 
 
-    is_admissible.erase(6, 2, level);
-    is_admissible.erase(2, 6, level);
-    is_admissible.insert(2, 6, level, true);
-    is_admissible.insert(6, 2, level, true);
+    // is_admissible.erase(6, 2, level);
+    // is_admissible.erase(2, 6, level);
+    // is_admissible.insert(2, 6, level, true);
+    // is_admissible.insert(6, 2, level, true);
 
-    is_admissible.erase(3, 7, level);
-    is_admissible.erase(7, 3, level);
-    is_admissible.insert(7, 3, level, true);
-    is_admissible.insert(3, 7, level, true);
+    // is_admissible.erase(3, 7, level);
+    // is_admissible.erase(7, 3, level);
+    // is_admissible.insert(7, 3, level, true);
+    // is_admissible.insert(3, 7, level, true);
 
-    is_admissible.erase(0, 2, level);
-    is_admissible.erase(2, 0, level);
-    is_admissible.insert(0, 2, level, true);
-    is_admissible.insert(2, 0, level, true);
+    // is_admissible.erase(0, 2, level);
+    // is_admissible.erase(2, 0, level);
+    // is_admissible.insert(0, 2, level, true);
+    // is_admissible.insert(2, 0, level, true);
 
-    is_admissible.erase(5, 7, level);
-    is_admissible.erase(7, 5, level);
-    is_admissible.insert(5, 7, level, true);
-    is_admissible.insert(7, 5, level, true);
+    // is_admissible.erase(5, 7, level);
+    // is_admissible.erase(7, 5, level);
+    // is_admissible.insert(5, 7, level, true);
+    // is_admissible.insert(7, 5, level, true);
 
-    return geometry_admis_non_leaf(nblocks / 2, level+1);
+    if (matrix_type == BLR2_MATRIX) {
+      level_blocks.push_back(1);
+      return 1;
+    }
+    else {
+      return geometry_admis_non_leaf(nblocks / 2, level+1);
+    }
   }
 
   void
@@ -2102,6 +2107,7 @@ namespace Hatrix {
     matrix_type(matrix_type) {
     if (admis_kind == "geometry_admis") {
       // TODO: use dual tree traversal for this.
+
       height = calc_geometry_based_admissibility(domain);
       // reverse the levels stored in the admis blocks.
       RowColLevelMap<bool> temp_is_admissible;
@@ -2661,8 +2667,6 @@ int main(int argc, char ** argv) {
   // 1 - H2 matrix
   int64_t matrix_type = atoi(argv[8]);
 
-
-
   Hatrix::Context::init();
 
   Hatrix::Domain domain(N, ndim);
@@ -2700,9 +2704,9 @@ int main(int argc, char ** argv) {
 
   A.factorize(domain);
 
-  std::cout << "-- H2 verification --\n";
-  verify_A1_factorization(A, domain);
-  verify_A2_factorization(A, domain);
+  // std::cout << "-- H2 verification --\n";
+  // verify_A1_factorization(A, domain);
+  // verify_A2_factorization(A, domain);
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   std::cout << "--- START SOLVE ----\n";
