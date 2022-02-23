@@ -832,18 +832,19 @@ namespace Hatrix {
             for (int64_t i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
 
-                if (i == 5 && block == 4) {
-                  Matrix _U, _S, _V;
-                  Matrix fc(F(i, block));
-                  std::tie(_U, _S, _V) = error_svd(fc, 1e-9);
-                  std::cout << "FILL IN RANK -> i: " << i << " block: " << block << " rank: " << _S.rows << std::endl;
-                }
+                // if (i == 5 && block == 4) {
+                //   Matrix _U, _S, _V;
+                //   Matrix fc(F(i, block));
+                //   std::tie(_U, _S, _V) = error_svd(fc, 1e-9);
+                //   std::cout << "FILL IN RANK -> i: " << i << " block: " << block << " rank: " << _S.rows << std::endl;
+                // }
 
                 if (i < block) {
                   col_concat = concat(col_concat,
                                       matmul(U(i, level), F(i, block)), 0);
                 }
                 else if (i > block) {
+                  std::cout << "FILL IN: i -> " << i << " block -> " << block << std::endl;
                   col_concat = concat(col_concat, F(i, block), 0);
 
                   // col_concat = concat(col_concat, matmul(_S, _V), 0);
