@@ -33,9 +33,10 @@ echo "SPHERE GEOMETRY"
 #     ./bin/UMV_H2_far_dense 512 $rank 32 1 3 geometry_admis 0 0
 # done
 
-for rank in 18; do
-    ./bin/UMV_H2_far_dense 256 $rank 32 1.3 3 geometry_admis 0 0
-done
+./bin/UMV_H2_far_dense 256 12 32 1.3 3 geometry_admis 0 0
+# for rank in 12 15 18 22 25; do
+#     ./bin/UMV_H2_far_dense 256 $rank 32 1.3 3 geometry_admis 0 0
+# done
 
 # echo "STARSH GRID GEOMETRY DIM=1"
 # for rank in 6 7 8 10 14; do

@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <functional>
 #include <fstream>
+#include <set>
 
 #include "Hatrix/Hatrix.h"
 
@@ -185,7 +186,7 @@ namespace Hatrix {
 namespace Hatrix {
   double
   block_sin(const std::vector<double>& coords_row,
-               const std::vector<double>& coords_col) {
+            const std::vector<double>& coords_col) {
     double dist = 0, temp;
     int64_t ndim = coords_row.size();
 
@@ -698,230 +699,319 @@ namespace Hatrix {
   void H2::factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
                            RowMap& r, RowMap& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
+    std::vector<int64_t> fill_in_rows, fill_in_cols;
     for (int64_t block = 0; block < nblocks; ++block) {
+      // if (block > 0) {
+      // row fill-in recompression.
+      // {
+      //   int64_t block_size = D(block, block, level).rows;
+      //   int64_t nblocks = level_blocks[level];
+      //   Matrix row_concat(block_size, 0);
+      //   bool found_row_fill_in = false;
+      //   for (int64_t j = 0; j < nblocks; ++j) {
+      //     if (F.exists(block, j)) {
+      //       found_row_fill_in = true;
+      //       break;
+      //     }
+      //   }
+
+      //   if (found_row_fill_in) {
+      //     // step 1: recompress along the row of factorization and update U.
+      //     row_concat = concat(row_concat, matmul(U(block, level),
+      //                                            Scol(block, level)), 1);
+      //     for (int64_t j = 0; j < nblocks; ++j) {
+      //       if (F.exists(block, j)) {
+
+      //         // std::cout << "FILL IN CONCAT: block -> " <<  block << " j -> " << j
+      //         //           << " level: " << level << std::endl;
+      //         if (j < block) {
+      //           // Concat the fill-ins before the diagonal block. These fill-ins are all
+      //           // of size (co; oo) and should be multiplied with Vj before before being
+      //           // concatenated into the recompression.
+      //           Matrix Fp = matmul(F(block, j), V(j, level), false, true);
+      //           row_concat = concat(row_concat, Fp, 1);
+      //         }
+      //         else if (j > block) {
+      //           row_concat = concat(row_concat, F(block, j), 1);
+      //         }
+      //       }
+      //     }
+
+      //     Matrix UN_block, SN_block, _VN1T; double error;
+      //     std::tie(UN_block, SN_block, _VN1T, error) = truncated_svd(row_concat, rank);
+
+      //     Matrix r_block = matmul(UN_block, U(block, level), true, false);
+
+      //     U.erase(block, level);
+      //     U.insert(block, level, std::move(UN_block));
+
+      //     Scol.erase(block, level);
+      //     Scol.insert(block, level, std::move(SN_block));
+
+      //     // step 2: recompress along the column where the nb*nb fill-in exists and update V
+      //     // in those respective columns.
+      //     for (int64_t j = block + 1; j < nblocks; ++j) {
+      //       // scan where is the fill-in after the diagonal element on this row.
+      //       if (F.exists(block, j)) {
+      //         Matrix col_concat = concat(matmul(Srow(j, level), V(j, level), false, true),
+      //                                    F(block, j), 0);
+      //         Matrix _UN_j, SN_j, VN_j;
+      //         std::tie(_UN_j, SN_j, VN_j, error) = truncated_svd(col_concat, rank);
+
+      //         Matrix t_j = matmul(V(j, level), VN_j, true, true);
+
+      //         V.erase(j, level);
+      //         V.insert(j, level, transpose(VN_j));
+
+      //         Srow.erase(j, level);
+      //         Srow.insert(j, level, std::move(SN_j));
+
+      //         // step 2a: Once a fill-in is found, update S blocks in this column except
+      //         // the block where the fill-in exists since that requires both r and t.
+      //         for (int64_t i = 0; i < nblocks; ++i) {
+      //           if (i != block && is_admissible.exists(i, j, level) &&
+      //               is_admissible(i, j, level)) {
+      //             Matrix Sbar_i_j = matmul(S(i, j, level), t_j, false, true);
+
+      //             S.erase(i, j, level);
+      //             S.insert(i, j, level, std::move(Sbar_i_j));
+      //           }
+      //         }
+
+      //         t.insert(j, std::move(t_j));
+      //       }
+      //     }
+
+      //     // step 3: iterate over the row to udpate the S blocks.
+      //     for (int64_t j = 0; j < nblocks; ++j) {
+      //       if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
+      //         Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
+      //         if (F.exists(block, j)) {
+      //           if (j < block) {
+      //             Sbar_block_j =  Sbar_block_j + matmul(U(block, level), F(block, j), true, false);
+      //           }
+      //           else if (j > block) {
+      //             assert(F(block, j).rows == block_size &&
+      //                    F(block, j).cols == V(j, level).rows);
+      //             Sbar_block_j = matmul(matmul(r_block, S(block, j, level)), t(j))
+      //               + matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
+      //           }
+
+      //         }
+
+      //         // std::cout << "Change S blocks : block -> " << block << " j -> " << j <<  " level -> "<< level<<  std::endl;
+
+      //         S.erase(block, j, level);
+      //         S.insert(block, j, level, std::move(Sbar_block_j));
+      //       }
+
+      //       if (F.exists(block, j)) {
+      //         F.erase(block, j);
+      //       }
+      //     }
+
+      //     r.insert(block, std::move(r_block));
+      //   } // if (found_row_fill_in)
+      // }
+
+      // // col fill-in recompression
+      // {
+      //   int64_t block_size = D(block, block, level).cols;
+      //   int64_t nblocks = level_blocks[level];
+      //   Matrix col_concat(block_size, 0);
+      //   bool found_col_fill_in = false;
+      //   for (int64_t i = 0; i < nblocks; ++i) {
+      //     if (F.exists(i, block)) {
+      //       found_col_fill_in = true;
+      //       break;
+      //     }
+      //   }
+
+      //   if (found_col_fill_in) {
+      //     // step 1: recompress along the column of factorization.
+      //     col_concat = concat(col_concat,
+      //                         matmul(Srow(block, level), transpose(V(block, level))), 0);
+      //     for (int64_t i = 0; i < nblocks; ++i) {
+      //       if (F.exists(i, block)) {
+
+      //         // if (i == 5 && block == 4) {
+      //         //   Matrix _U, _S, _V;
+      //         //   Matrix fc(F(i, block));
+      //         //   std::tie(_U, _S, _V) = error_svd(fc, 1e-9);
+      //         //   std::cout << "FILL IN RANK -> i: " << i << " block: " << block << " rank: " << _S.rows << std::endl;
+      //         // }
+
+      //         if (i < block) {
+      //           col_concat = concat(col_concat,
+      //                               matmul(U(i, level), F(i, block)), 0);
+      //         }
+      //         else if (i > block) {
+      //           std::cout << "FILL IN: i -> " << i << " block -> " << block << std::endl;
+      //           col_concat = concat(col_concat, F(i, block), 0);
+
+      //           // col_concat = concat(col_concat, matmul(_S, _V), 0);
+      //         }
+      //       }
+      //     }
+      //     Matrix _UN2T, SN_block, VNT_block; double error;
+      //     std::tie(_UN2T, SN_block, VNT_block, error) = truncated_svd(col_concat, rank);
+
+      //     Matrix t_block = matmul(V(block, level), VNT_block, true, true);
+
+      //     V.erase(block, level);
+      //     V.insert(block, level, transpose(VNT_block));
+
+      //     Srow.erase(block, level);
+      //     Srow.insert(block, level, std::move(SN_block));
+
+      //     // step 2: recompress rows for larger fill-ins
+      //     for (int64_t i = block+1; i < nblocks; ++i) {
+      //       if (F.exists(i, block)) {
+      //         Matrix row_concat = concat(matmul(U(i, level), Scol(i, level)), F(i, block), 1);
+
+      //         Matrix UN_i, SN_i, _VNT_block; double error;
+      //         std::tie(UN_i, SN_i, VNT_block, error) = truncated_svd(row_concat, rank);
+
+      //         Matrix r_i = matmul(UN_i, U(i, level), true, false);
+
+      //         U.erase(i, level);
+      //         U.insert(i, level, std::move(UN_i));
+
+      //         Scol.erase(i, level);
+      //         Scol.insert(i, level, std::move(SN_i));
+
+      //         // step 2a: update S blocks in the row where this fill-in exists
+      //         // except the block within the fill-in because it is to be updated
+      //         // after
+      //         for (int64_t j = 0; j < nblocks; ++j) {
+      //           if (block != j && is_admissible.exists(i, j, level) &&
+      //               is_admissible(i, j, level)) {
+      //             Matrix Sbar_i_j = matmul(r_i, S(i, j, level));
+
+      //             S.erase(i, j, level);
+      //             S.insert(i, j, level, std::move(Sbar_i_j));
+      //           }
+      //         }
+
+      //         r.insert(i, std::move(r_i));
+      //       }
+      //     }
+
+      //     // step 3: iterate over the column to update the S blocks
+      //     for (int64_t i = 0; i < nblocks; ++i) {
+      //       if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
+      //         Matrix Sbar_i_block = matmul(S(i, block,level), t_block, false, true);
+      //         if (F.exists(i, block)) {
+      //           if (i < block) {
+      //             Sbar_i_block = Sbar_i_block + matmul(F(i, block), V(block, level));
+      //           }
+      //           else if (i > block) {
+      //             Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
+      //               matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
+      //           }
+      //         }
+
+      //         S.erase(i, block, level);
+      //         S.insert(i, block, level, std::move(Sbar_i_block));
+      //       }
+
+      //       if (F.exists(i, block)) {
+      //         F.erase(i, block);
+      //       }
+      //     }
+
+      //     t.insert(block, std::move(t_block));
+      //   } // if (found_col_fill_in)
+      // } // col fill-in recompress scope
+
+      // } // if (block > 0)
+
       if (block > 0) {
-        // row fill-in recompression.
-        // {
-        //   int64_t block_size = D(block, block, level).rows;
-        //   int64_t nblocks = level_blocks[level];
-        //   Matrix row_concat(block_size, 0);
-        //   bool found_row_fill_in = false;
-        //   for (int64_t j = 0; j < nblocks; ++j) {
-        //     if (F.exists(block, j)) {
-        //       found_row_fill_in = true;
-        //       break;
-        //     }
-        //   }
+        int64_t nblocks = level_blocks[level];
 
-        //   if (found_row_fill_in) {
-        //     // step 1: recompress along the row of factorization and update U.
-        //     row_concat = concat(row_concat, matmul(U(block, level),
-        //                                            Scol(block, level)), 1);
-        //     for (int64_t j = 0; j < nblocks; ++j) {
-        //       if (F.exists(block, j)) {
+        // Calculate row fill-ins
+        for (int64_t i = 0; i < nblocks; ++i) {
+          int64_t block_size = D(i, i, level).rows;
+          bool found_row_fill_in = false;
+          for (int64_t j = 0; j < nblocks; ++j) {
+            if (F.exists(i, j)) {
+              found_row_fill_in = true;
+              break;
+            }
+          }
 
-        //         // std::cout << "FILL IN CONCAT: block -> " <<  block << " j -> " << j
-        //         //           << " level: " << level << std::endl;
-        //         if (j < block) {
-        //           // Concat the fill-ins before the diagonal block. These fill-ins are all
-        //           // of size (co; oo) and should be multiplied with Vj before before being
-        //           // concatenated into the recompression.
-        //           Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-        //           row_concat = concat(row_concat, Fp, 1);
-        //         }
-        //         else if (j > block) {
-        //           row_concat = concat(row_concat, F(block, j), 1);
-        //         }
-        //       }
-        //     }
+          if (found_row_fill_in) {
+            Matrix row_i(block_size, 0);
 
-        //     Matrix UN_block, SN_block, _VN1T; double error;
-        //     std::tie(UN_block, SN_block, _VN1T, error) = truncated_svd(row_concat, rank);
+            row_i = concat(row_i, matmul(U(i, level), Scol(i, level)), 1);
+            for (int64_t j = 0; j < nblocks; ++j) {
+              if (F.exists(i, j)) {
+                if (j < block) {
+                  row_i = concat(row_i, matmul(F(i, j), V(j, level), false, true), 1);
+                }
+                else if (j > block) {
+                  row_i = concat(row_i, F(i, j), 1);
+                }
+              }
+            }
 
-        //     Matrix r_block = matmul(UN_block, U(block, level), true, false);
+            Matrix UN_i, SN_i, _VNT_i; double error;
+            std::tie(UN_i, SN_i, _VNT_i, error) = truncated_svd(row_i, rank);
 
-        //     U.erase(block, level);
-        //     U.insert(block, level, std::move(UN_block));
+            Matrix r_i = matmul(UN_i, U(i, level), true, false);
 
-        //     Scol.erase(block, level);
-        //     Scol.insert(block, level, std::move(SN_block));
+            U.erase(i, level);
+            U.insert(i, level, std::move(UN_i));
 
-        //     // step 2: recompress along the column where the nb*nb fill-in exists and update V
-        //     // in those respective columns.
-        //     for (int64_t j = block + 1; j < nblocks; ++j) {
-        //       // scan where is the fill-in after the diagonal element on this row.
-        //       if (F.exists(block, j)) {
-        //         Matrix col_concat = concat(matmul(Srow(j, level), V(j, level), false, true),
-        //                                    F(block, j), 0);
-        //         Matrix _UN_j, SN_j, VN_j;
-        //         std::tie(_UN_j, SN_j, VN_j, error) = truncated_svd(col_concat, rank);
+            Scol.erase(i, level);
+            Scol.insert(i, level, std::move(SN_i));
 
-        //         Matrix t_j = matmul(V(j, level), VN_j, true, true);
+            r.insert(i, std::move(r_i));
+          }
+        }
 
-        //         V.erase(j, level);
-        //         V.insert(j, level, transpose(VN_j));
+        // Calculate col fill-ins
+        for (int64_t j = 0; j < nblocks; ++j) {
+          int64_t block_size = D(j, j, level).cols;
+          bool found_col_fill_in = false;
+          for (int64_t i = 0; i < nblocks; ++i) {
+            if (F.exists(i, j)) {
+              found_col_fill_in = true;
+              break;
+            }
+          }
 
-        //         Srow.erase(j, level);
-        //         Srow.insert(j, level, std::move(SN_j));
+          if (found_col_fill_in) {
+            Matrix col_j(0, block_size);
+            col_j = concat(col_j,
+                           matmul(Srow(j, level), V(j, level), false, true), 0);
+            for (int64_t i = 0; i < nblocks; ++i) {
+              if (F.exists(i, j)) {
+                if (i < block) {
+                  col_j = concat(col_j, matmul(U(i, level), F(i, j)), 0);
+                }
+                else if (i > block) {
+                  col_j = concat(col_j, F(i, j), 0);
+                }
+              }
+            }
 
-        //         // step 2a: Once a fill-in is found, update S blocks in this column except
-        //         // the block where the fill-in exists since that requires both r and t.
-        //         for (int64_t i = 0; i < nblocks; ++i) {
-        //           if (i != block && is_admissible.exists(i, j, level) &&
-        //               is_admissible(i, j, level)) {
-        //             Matrix Sbar_i_j = matmul(S(i, j, level), t_j, false, true);
+            Matrix _UN_j, SN_j, VNT_j; double error;
+            std::tie(_UN_j, SN_j, VNT_j, error) = truncated_svd(col_j, rank);
 
-        //             S.erase(i, j, level);
-        //             S.insert(i, j, level, std::move(Sbar_i_j));
-        //           }
-        //         }
+            Matrix t_j = matmul(V(j, level), VNT_j, true, true);
 
-        //         t.insert(j, std::move(t_j));
-        //       }
-        //     }
+            V.erase(j, level);
+            V.insert(j, level, transpose(VNT_j));
 
-        //     // step 3: iterate over the row to udpate the S blocks.
-        //     for (int64_t j = 0; j < nblocks; ++j) {
-        //       if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-        //         Matrix Sbar_block_j = matmul(r_block, S(block, j, level));
-        //         if (F.exists(block, j)) {
-        //           if (j < block) {
-        //             Sbar_block_j =  Sbar_block_j + matmul(U(block, level), F(block, j), true, false);
-        //           }
-        //           else if (j > block) {
-        //             assert(F(block, j).rows == block_size &&
-        //                    F(block, j).cols == V(j, level).rows);
-        //             Sbar_block_j = matmul(matmul(r_block, S(block, j, level)), t(j))
-        //               + matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
-        //           }
+            Srow.erase(j, level);
+            Srow.insert(j, level, std::move(SN_j));
 
-        //         }
+            t.insert(j, std::move(t_j));
+          }
+        }
 
-        //         // std::cout << "Change S blocks : block -> " << block << " j -> " << j <<  " level -> "<< level<<  std::endl;
-
-        //         S.erase(block, j, level);
-        //         S.insert(block, j, level, std::move(Sbar_block_j));
-        //       }
-
-        //       if (F.exists(block, j)) {
-        //         F.erase(block, j);
-        //       }
-        //     }
-
-        //     r.insert(block, std::move(r_block));
-        //   } // if (found_row_fill_in)
-        // }
-
-        // // col fill-in recompression
-        // {
-        //   int64_t block_size = D(block, block, level).cols;
-        //   int64_t nblocks = level_blocks[level];
-        //   Matrix col_concat(block_size, 0);
-        //   bool found_col_fill_in = false;
-        //   for (int64_t i = 0; i < nblocks; ++i) {
-        //     if (F.exists(i, block)) {
-        //       found_col_fill_in = true;
-        //       break;
-        //     }
-        //   }
-
-        //   if (found_col_fill_in) {
-        //     // step 1: recompress along the column of factorization.
-        //     col_concat = concat(col_concat,
-        //                         matmul(Srow(block, level), transpose(V(block, level))), 0);
-        //     for (int64_t i = 0; i < nblocks; ++i) {
-        //       if (F.exists(i, block)) {
-
-        //         // if (i == 5 && block == 4) {
-        //         //   Matrix _U, _S, _V;
-        //         //   Matrix fc(F(i, block));
-        //         //   std::tie(_U, _S, _V) = error_svd(fc, 1e-9);
-        //         //   std::cout << "FILL IN RANK -> i: " << i << " block: " << block << " rank: " << _S.rows << std::endl;
-        //         // }
-
-        //         if (i < block) {
-        //           col_concat = concat(col_concat,
-        //                               matmul(U(i, level), F(i, block)), 0);
-        //         }
-        //         else if (i > block) {
-        //           std::cout << "FILL IN: i -> " << i << " block -> " << block << std::endl;
-        //           col_concat = concat(col_concat, F(i, block), 0);
-
-        //           // col_concat = concat(col_concat, matmul(_S, _V), 0);
-        //         }
-        //       }
-        //     }
-        //     Matrix _UN2T, SN_block, VNT_block; double error;
-        //     std::tie(_UN2T, SN_block, VNT_block, error) = truncated_svd(col_concat, rank);
-
-        //     Matrix t_block = matmul(V(block, level), VNT_block, true, true);
-
-        //     V.erase(block, level);
-        //     V.insert(block, level, transpose(VNT_block));
-
-        //     Srow.erase(block, level);
-        //     Srow.insert(block, level, std::move(SN_block));
-
-        //     // step 2: recompress rows for larger fill-ins
-        //     for (int64_t i = block+1; i < nblocks; ++i) {
-        //       if (F.exists(i, block)) {
-        //         Matrix row_concat = concat(matmul(U(i, level), Scol(i, level)), F(i, block), 1);
-
-        //         Matrix UN_i, SN_i, _VNT_block; double error;
-        //         std::tie(UN_i, SN_i, VNT_block, error) = truncated_svd(row_concat, rank);
-
-        //         Matrix r_i = matmul(UN_i, U(i, level), true, false);
-
-        //         U.erase(i, level);
-        //         U.insert(i, level, std::move(UN_i));
-
-        //         Scol.erase(i, level);
-        //         Scol.insert(i, level, std::move(SN_i));
-
-        //         // step 2a: update S blocks in the row where this fill-in exists
-        //         // except the block within the fill-in because it is to be updated
-        //         // after
-        //         for (int64_t j = 0; j < nblocks; ++j) {
-        //           if (block != j && is_admissible.exists(i, j, level) &&
-        //               is_admissible(i, j, level)) {
-        //             Matrix Sbar_i_j = matmul(r_i, S(i, j, level));
-
-        //             S.erase(i, j, level);
-        //             S.insert(i, j, level, std::move(Sbar_i_j));
-        //           }
-        //         }
-
-        //         r.insert(i, std::move(r_i));
-        //       }
-        //     }
-
-        //     // step 3: iterate over the column to update the S blocks
-        //     for (int64_t i = 0; i < nblocks; ++i) {
-        //       if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-        //         Matrix Sbar_i_block = matmul(S(i, block,level), t_block, false, true);
-        //         if (F.exists(i, block)) {
-        //           if (i < block) {
-        //             Sbar_i_block = Sbar_i_block + matmul(F(i, block), V(block, level));
-        //           }
-        //           else if (i > block) {
-        //             Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
-        //               matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
-        //           }
-        //         }
-
-        //         S.erase(i, block, level);
-        //         S.insert(i, block, level, std::move(Sbar_i_block));
-        //       }
-
-        //       if (F.exists(i, block)) {
-        //         F.erase(i, block);
-        //       }
-        //     }
-
-        //     t.insert(block, std::move(t_block));
-        //   } // if (found_col_fill_in)
-        // } // col fill-in recompress scope
-      } // if (block > 0)
+      }
 
       // if (level == 2) {
       //   auto A2_expected_splits = A2_expected.split(4, 4);
@@ -1021,6 +1111,8 @@ namespace Hatrix {
               int64_t rows = D(i, block, level).rows;
               int64_t cols = D(block, j, level).cols;
               if (F.exists(i, j)) {
+                fill_in_rows.push_back(i);
+                fill_in_cols.push_back(j);
                 Matrix& fill_in = F(i, j);
                 auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
                 matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
@@ -1087,6 +1179,8 @@ namespace Hatrix {
               // part of the permuted matrix in the co section.
               if (j <= block) {
                 if (!F.exists(i, j)) {
+                  fill_in_rows.push_back(i);
+                  fill_in_cols.push_back(j);
                   Matrix fill_in(D(i, block, level).rows, rank);
                   auto fill_splits =
                     fill_in.split(std::vector<int64_t>(1, D(i, block, level).rows - rank),
@@ -1168,6 +1262,8 @@ namespace Hatrix {
             else {
               if (i <= block) {
                 if (!F.exists(i, j)) {
+                  fill_in_rows.push_back(i);
+                  fill_in_cols.push_back(j);
                   Matrix fill_in(rank, D(block, j, level).cols);
                   auto fill_splits =
                     fill_in.split({},
@@ -2316,31 +2412,31 @@ namespace Hatrix {
     return std::sqrt(error / dense_norm);
   }
 
-    void
-    H2::actually_print_structure(int64_t level) {
-      if (level == 0) { return; }
-      int64_t nblocks = level_blocks[level];
-      std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
-      for (int64_t i = 0; i < nblocks; ++i) {
-        if (level == height && D.exists(i, i, height)) {
-          std::cout << D(i, i, height).rows << " ";
-        }
-        std::cout << "| ";
-        for (int64_t j = 0; j < nblocks; ++j) {
-          if (is_admissible.exists(i, j, level)) {
-            std::cout << is_admissible(i, j, level) << " | " ;
-          }
-          else {
-            std::cout << "  | ";
-          }
-        }
-        std::cout << std::endl;
+  void
+  H2::actually_print_structure(int64_t level) {
+    if (level == 0) { return; }
+    int64_t nblocks = level_blocks[level];
+    std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
+    for (int64_t i = 0; i < nblocks; ++i) {
+      if (level == height && D.exists(i, i, height)) {
+        std::cout << D(i, i, height).rows << " ";
       }
-
+      std::cout << "| ";
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, level)) {
+          std::cout << is_admissible(i, j, level) << " | " ;
+        }
+        else {
+          std::cout << "  | ";
+        }
+      }
       std::cout << std::endl;
-
-      actually_print_structure(level-1);
     }
+
+    std::cout << std::endl;
+
+    actually_print_structure(level-1);
+  }
 
   void H2::print_structure() {
     actually_print_structure(height);
@@ -2470,7 +2566,7 @@ Hatrix::Matrix generate_U1(Hatrix::H2& A) {
 void verify_A1_solve(Matrix& A1, H2& A, const Domain& domain) {
   Matrix b = generate_random_matrix(A.rank * 4, 1);
   auto A1_22 = Matrix(A1.split(2, 2)[3]);
-    // A1_22.print();              //
+  // A1_22.print();              //
   auto x1_solve = lu_solve(A1_22, b);
 
   auto x1_h2 = A.solve(b, 1);
@@ -2840,7 +2936,7 @@ Matrix generate_L2(const Hatrix::H2& A, int64_t block, int64_t nblocks) {
       int64_t row_split = A.D(i, block, A.height).rows - A.rank;
       int64_t col_split = A.D(i, block, A.height).cols - A.rank;
       auto D_splits = A.D(i, block, A.height).split(std::vector<int64_t>(1, row_split),
-                                                 std::vector<int64_t>(1, col_split));
+                                                    std::vector<int64_t>(1, col_split));
       L2_splits[(i + nblocks) * permuted_nblocks + block] = D_splits[2];
     }
   }
@@ -2925,7 +3021,7 @@ Matrix generate_U0_permuted(const Hatrix::H2& A, int64_t nblocks) {
         int64_t row_split = A.D(i, j,  A.height).rows - A.rank;
         int64_t col_split = A.D(i, j, A.height).cols - A.rank;
         auto D_splits = A.D(i, j, A.height).split(std::vector<int64_t>(1, row_split),
-                                               std::vector<int64_t>(1, col_split));
+                                                  std::vector<int64_t>(1, col_split));
 
         // Copy the oo parts
         if (i == j) {
@@ -3151,38 +3247,25 @@ int main(int argc, char ** argv) {
     }
 
     Matrix diff = (regenA - Adense);
-    auto d_splits = diff.split(M_row_offsets, M_col_offsets);
-    auto m_splits = Adense.split(M_row_offsets, M_col_offsets);
-    auto regen_splits = regenA.split(M_row_offsets, M_col_offsets);
+    // auto d_splits = diff.split(M_row_offsets, M_col_offsets);
+    // auto m_splits = Adense.split(M_row_offsets, M_col_offsets);
+    // auto regen_splits = regenA.split(M_row_offsets, M_col_offsets);
 
 
-    for (int i = 0; i < nblocks; ++i) {
-      for (int j = 0; j < nblocks; ++j) {
-        double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
+    // for (int i = 0; i < nblocks; ++i) {
+    //   for (int j = 0; j < nblocks; ++j) {
+    //     double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
 
-        std::cout << "<i, j>: " << i << ", " << j
-                  << " -- "
-                  << std::setprecision(5)
-                  << error
-                  << std::setw(5)
-                  << std::endl;
+    //     std::cout << "<i, j>: " << i << ", " << j
+    //               << " -- "
+    //               << std::setprecision(5)
+    //               << error
+    //               << std::setw(5)
+    //               << std::endl;
+    //   }
+    // }
 
-        if (i == 5 && j == 4) {
-          std::cout << "DIFF: \n";
-          d_splits[i * nblocks + j].print();
-
-          std::cout << "ACTUAL\n";
-          m_splits[i * nblocks + j].print();
-
-          std::cout << "EXPECTED\n";
-          regen_splits[i * nblocks + j].print();
-        }
-
-      }
-    }
-
-
-    std::cout << "factorization error = " << norm(regenA - Adense) / norm(Adense) << std::endl;
+    std::cout << "factorization error = " << norm(diff) / norm(Adense) << std::endl;
     regenA.block_ranks(domain.boxes.size(), 1e-9).print();
   }
 
