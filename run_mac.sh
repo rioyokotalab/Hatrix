@@ -14,16 +14,21 @@ echo "---- SQ EXP NDIM=2 ADMIS=1 KERNEL FUNC=1 ----"
 
 
 # ./bin/UMV_H2_far_dense 64 5 8 1 2 geometry_admis 0 0
+echo "LINE GEOMETRY"
+for rank in 6 7 8 10 14; do
+    ./bin/UMV_H2_far_dense 1024 $rank 64 0.7 1 geometry_admis 0 0
+done
 
-# echo "CIRCLE GEOMETRY"
-# for rank in 6 7 8 10 14; do
-#     ./bin/UMV_H2_far_dense 1024 $rank 64 0.7 2 geometry_admis 0 0
-# done
+
+echo "CIRCLE GEOMETRY"
+for rank in 6 7 8 10 14; do
+    ./bin/UMV_H2_far_dense 1024 $rank 64 0.7 2 geometry_admis 0 0
+done
 
 echo "SPHERE GEOMETRY"
-# for rank in 34 35 36 37 38 39 40; do
-#     ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
-# done
+for rank in 34 35 36 37 38 39 40; do
+    ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
+done
 
 # for rank in 34 35 36 37 38 39 40; do
 #     ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
