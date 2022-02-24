@@ -725,13 +725,17 @@ namespace Hatrix {
             row_i = concat(row_i, matmul(U(i, level), Scol(i, level)), 1);
             for (int64_t j = 0; j < nblocks; ++j) {
               if (F.exists(i, j)) {
-                // std::cout << "CONSUME ROW FILL: i -> " << i << " j -> " << j << " block_size -> " << block_size
-                //           << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols << std::endl;
-                // F(i, j).print_meta();
                 if (F(i, j).rows == block_size && F(i, j).cols == rank)  {
                   row_i = concat(row_i, matmul(F(i, j), V(j, level), false, true), 1);
                 }
                 else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
+                  Matrix Ui, Si, Vi; double error;
+                  std::tie(Ui, Si, Vi) = error_svd(F(i, j), 1e-9);
+                  std::cout << "CONSUME ROW FILL: i -> " << i << " j -> " << j << " block_size -> " << block_size
+                            << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
+                            << " rank= " << Si.rows <<  " norm = " << norm(F(i, j)) << std::endl;
+                  // F(i, j).print();
+
                   row_i = concat(row_i, F(i, j), 1);
                 }
               }
@@ -776,7 +780,8 @@ namespace Hatrix {
                   col_j = concat(col_j, matmul(U(i, level), F(i, j)), 0);
                 }
                 else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
-                  // std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j << std::endl;
+                  std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j
+                            << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols << std::endl;
                   col_j = concat(col_j, F(i, j), 0);
                 }
               }
@@ -807,7 +812,8 @@ namespace Hatrix {
                 int64_t block_size = D(j, j, level).cols;
                 Matrix Sbar_ij(rank, rank);
                 if (F.exists(i, j)) {
-                  // std::cout << "UPDATE S BLOCKS: i-> " << i << " j-> " << j << std::endl;
+
+                  std::cout << "UPDATE S BLOCKS: i-> " << i << " j-> " << j << std::endl;
                   // F(i, j).print_meta();
                   if (F(i, j).rows == block_size && F(i, j).cols == rank) {
                     Sbar_ij = matmul(r(i), S(i, j, level)) + matmul(U(i, level), F(i, j), true, false);
@@ -815,6 +821,17 @@ namespace Hatrix {
                   else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
                     Sbar_ij = matmul(r(i), S(i, j, level)) +
                       matmul(matmul(U(i, level), F(i, j), true, false), V(j, level));
+
+                    if (i == 2 && j == 5) {
+                      std::cout << "Sij\n";
+                      S(i, j, level).print();
+
+                      std::cout << "PROJECTION\n";
+                      matmul(r(i), S(i, j, level)).print();
+
+                      std::cout << "Sbarij\n";
+                      Sbar_ij.print();
+                    }
                   }
 
                   F.erase(i, j);
@@ -3098,8 +3115,15 @@ int main(int argc, char ** argv) {
                   << error
                   << std::setw(5)
                   << std::endl;
+
       }
     }
+
+    d_splits[2 * 8 + 5].print();
+    m_splits[2 * 8 + 5].print();
+
+    std::cout << " norm d: " <<  norm(d_splits[2 * 8 + 5]) << " norm m: " <<  norm(m_splits[2 * 8 + 5])
+                                      <<  "norm diff: " << norm(d_splits[2 * 8 + 5] - m_splits[2 * 8 + 5]) << std::endl;
 
     std::cout << "factorization error = " << norm(diff) / norm(Adense) << std::endl;
     regenA.block_ranks(domain.boxes.size(), 1e-9).print();
