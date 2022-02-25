@@ -20,23 +20,23 @@ echo "---- SQ EXP NDIM=2 ADMIS=1 KERNEL FUNC=1 ----"
 # done
 
 
-echo "2D GRID GEOMETRY"
-for rank in 25; do
-    ./bin/UMV_H2_far_dense 256 $rank 32 0.7 2 geometry_admis 1 0
-done
-
-# echo "SPHERE GEOMETRY"
-# for rank in 34 35 36 37 38 39 40; do
-#     ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 1 0
+# echo "2D GRID GEOMETRY"
+# for rank in 25; do
+#     ./bin/UMV_H2_far_dense 256 $rank 32 0.7 2 geometry_admis 1 0
 # done
+
+echo "SPHERE GEOMETRY"
+for rank in 34 35 36 37 38 39 40; do
+    ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
+done
 
 # for rank in 34 35 36 37 38 39 40; do
 #     ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
 # done
 
-# for rank in 14 15 16 20; do
-#     ./bin/UMV_H2_far_dense 512 $rank 32 1 3 geometry_admis 0 0
-# done
+for rank in 14 15 16 20; do
+    ./bin/UMV_H2_far_dense 1024 $rank 64 1 2 geometry_admis 0 0
+done
 
 # ./bin/UMV_H2_far_dense 256 12 32 1.3 3 geometry_admis 0 0
 # for rank in 12 15 18 22 25; do

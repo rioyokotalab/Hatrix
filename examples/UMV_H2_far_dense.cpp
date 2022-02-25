@@ -3133,72 +3133,71 @@ int main(int argc, char ** argv) {
   // verify_A2_factorization(A, domain);
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
 
-  // if (matrix_type == BLR2_MATRIX) {
-  //   Matrix regenA = regenerate_BLR2_matrix(A, domain);
+  if (matrix_type == BLR2_MATRIX) {
+    Matrix regenA = regenerate_BLR2_matrix(A, domain);
 
-  //   std::vector<int64_t> M_row_offsets, M_col_offsets;
-  //   int64_t rows = 0, cols = 0, level = 1;
+    std::vector<int64_t> M_row_offsets, M_col_offsets;
+    int64_t rows = 0, cols = 0, level = 1;
 
-  //   int64_t nblocks = domain.boxes.size();
+    int64_t nblocks = domain.boxes.size();
 
-  //   for (int i = 0; i < nblocks; ++i) {
-  //     M_row_offsets.push_back(rows + A.D(i, i, level).rows);
-  //     M_col_offsets.push_back(cols + A.D(i, i, level).rows);
+    for (int i = 0; i < nblocks; ++i) {
+      M_row_offsets.push_back(rows + A.D(i, i, level).rows);
+      M_col_offsets.push_back(cols + A.D(i, i, level).rows);
 
-  //     rows += A.D(i, i, level).rows;
-  //     cols += A.D(i, i, level).rows;
-  //   }
+      rows += A.D(i, i, level).rows;
+      cols += A.D(i, i, level).rows;
+    }
 
-  //   Matrix diff = (regenA - Adense);
-  //   auto d_splits = diff.split(M_row_offsets, M_col_offsets);
-  //   auto m_splits = Adense.split(M_row_offsets, M_col_offsets);
-  //   auto regen_splits = regenA.split(M_row_offsets, M_col_offsets);
+    Matrix diff = (regenA - Adense);
+    auto d_splits = diff.split(M_row_offsets, M_col_offsets);
+    auto m_splits = Adense.split(M_row_offsets, M_col_offsets);
+    auto regen_splits = regenA.split(M_row_offsets, M_col_offsets);
 
-  //   // std::cout <<  "BLOCK WISE NORM:\n";
-  //   // for (int64_t i = 0; i < nblocks; ++i) {
-  //   //   for (int64_t j = 0; j < nblocks; ++j) {
-  //   //     std::cout << "<i, j>: " << i << ", " << j
-  //   //               << " -- "
-  //   //               << std::setprecision(5)
-  //   //               << norm(m_splits[i * nblocks + j])
-  //   //               << std::setw(5)
-  //   //               << std::endl;
-  //   //   }
-  //   // }
+    // std::cout <<  "BLOCK WISE NORM:\n";
+    // for (int64_t i = 0; i < nblocks; ++i) {
+    //   for (int64_t j = 0; j < nblocks; ++j) {
+    //     std::cout << "<i, j>: " << i << ", " << j
+    //               << " -- "
+    //               << std::setprecision(5)
+    //               << norm(m_splits[i * nblocks + j])
+    //               << std::setw(5)
+    //               << std::endl;
+    //   }
+    // }
 
-  //   std::cout << "ERROR\n";
+    std::cout << "ERROR\n";
+
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
+
+        std::cout << "<i, j>: " << i << ", " << j
+                  << " -- norm -> "
+                  << std::setprecision(5)
+                  << error
+                  << std::setw(5)
+                  << " diff -> " << norm(d_splits[i * nblocks + j])
+                  << " m -> " << norm(m_splits[i * nblocks + j])
+                  << std::endl;
 
 
-  //   for (int i = 0; i < nblocks; ++i) {
-  //     for (int j = 0; j < nblocks; ++j) {
-  //       double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
+      }
+    }
 
-  //       std::cout << "<i, j>: " << i << ", " << j
-  //                 << " -- norm -> "
-  //                 << std::setprecision(5)
-  //                 << error
-  //                 << std::setw(5)
-  //                 << " diff -> " << norm(d_splits[i * nblocks + j])
-  //                 << " m -> " << norm(m_splits[i * nblocks + j])
-  //                 << std::endl;
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
+        if (error > 1e-4) {
+          std::cout << "i-> " << i << " j-> " << j << " large error: " << error << std::endl;;
+        }
 
+      }
+    }
 
-  //     }
-  //   }
-
-  //   for (int i = 0; i < nblocks; ++i) {
-  //     for (int j = 0; j < nblocks; ++j) {
-  //       double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
-  //       if (error > 1e-4) {
-  //         std::cout << "i-> " << i << " j-> " << j << " large error: " << error << std::endl;;
-  //       }
-
-  //     }
-  //   }
-
-  //   std::cout << "factorization error = " << norm(diff) / norm(Adense) << std::endl;
-  //   regenA.block_ranks(domain.boxes.size(), 1e-9).print();
-  // }
+    std::cout << "factorization error = " << norm(diff) / norm(Adense) << std::endl;
+    regenA.block_ranks(domain.boxes.size(), 1e-9).print();
+  }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix x = A.solve(b, A.height);
