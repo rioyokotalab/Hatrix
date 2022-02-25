@@ -213,7 +213,7 @@ namespace Hatrix {
       dist += pow(coords_row[k] - coords_col[k], 2);
     }
     dist = dist / local_beta;
-    if (dist == 0) {
+    if (std::abs(dist) < 1e-10) {
       return sigma + noise;
     }
     else {
@@ -720,23 +720,42 @@ namespace Hatrix {
           }
 
           if (found_row_fill_in) {
-            Matrix row_i(block_size, 0);
+            Matrix row_i(block_size, block_size);
 
             row_i = concat(row_i, matmul(U(i, level), Scol(i, level)), 1);
             for (int64_t j = 0; j < nblocks; ++j) {
               if (F.exists(i, j)) {
+                Matrix Ui, Si, Vi; double error;
+                Matrix cpy(F(i, j));
+                std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+
+                std::cout << "CONSUME ROW FILL IN i -> " << i << " j -> " << j
+                          << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
+                          << " rank=" << Si.rows << " norm=" << norm(F(i, j)) << std::endl;
+
+
                 if (F(i, j).rows == block_size && F(i, j).cols == rank)  {
                   row_i = concat(row_i, matmul(F(i, j), V(j, level), false, true), 1);
+                  // row_i = concat(row_i, matmul(F(i, j), F(i, j), false, true), 1);
+                  // row_i += matmul(F(i, j), V(j, level), false, true);
                 }
                 else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
-                  Matrix Ui, Si, Vi; double error;
-                  std::tie(Ui, Si, Vi) = error_svd(F(i, j), 1e-9);
-                  std::cout << "CONSUME ROW FILL: i -> " << i << " j -> " << j << " block_size -> " << block_size
-                            << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
-                            << " rank= " << Si.rows <<  " norm = " << norm(F(i, j)) << std::endl;
-                  // F(i, j).print();
 
+
+                  // F(i, j).print();
+                  // if (i == 1 && j == 2) {
+                  //   std::cout << "CONSUME ROW FILL: i -> " << i << " j -> " << j << " block_size -> " << block_size
+                  //             << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
+                  //             << " rank= " << Si.rows <<  " norm = " << norm(F(i, j)) << std::endl;
+                  //   std::cout << "DENSE:\n";
+                  //   matmul(matmul(U(i, level), S(i, j, level)), V(j, level), false, true).print();
+                  //   std::cout << "F\n";
+                  //   F(i, j).print();
+                  // }
+
+                  // row_i += F(i, j);
                   row_i = concat(row_i, F(i, j), 1);
+                  // row_i = concat(row_i, matmul(F(i, j), F(i, j), false, true), 1);
                 }
               }
             }
@@ -776,13 +795,20 @@ namespace Hatrix {
                            matmul(Srow(j, level), V(j, level), false, true), 0);
             for (int64_t i = 0; i < nblocks; ++i) {
               if (F.exists(i, j)) {
+                Matrix Ui, Si, Vi; double error;
+                Matrix cpy(F(i, j));
+                std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+
+                std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j
+                          << " F(i, j).rows: " << F(i, j).rows << " cols= "
+                          << F(i, j).cols << " rank=" << Si.rows << " norm=" << norm(F(i, j)) <<  std::endl;
+
                 if (F(i, j).rows == rank && F(i, j).cols == block_size) {
                   col_j = concat(col_j, matmul(U(i, level), F(i, j)), 0);
                 }
                 else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
-                  std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j
-                            << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols << std::endl;
-                  col_j = concat(col_j, F(i, j), 0);
+
+                  col_j = concat(col_j, matmul(F(i, j), F(i, j), false, true), 0);
                 }
               }
             }
@@ -813,28 +839,33 @@ namespace Hatrix {
                 Matrix Sbar_ij(rank, rank);
                 if (F.exists(i, j)) {
 
-                  std::cout << "UPDATE S BLOCKS: i-> " << i << " j-> " << j << std::endl;
                   // F(i, j).print_meta();
                   if (F(i, j).rows == block_size && F(i, j).cols == rank) {
                     Sbar_ij = matmul(r(i), S(i, j, level)) + matmul(U(i, level), F(i, j), true, false);
                   }
                   else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
-                    Sbar_ij = matmul(r(i), S(i, j, level)) +
+                    Sbar_ij = matmul(matmul(r(i), S(i, j, level)), t(j), false, true) +
                       matmul(matmul(U(i, level), F(i, j), true, false), V(j, level));
 
-                    if (i == 2 && j == 5) {
-                      std::cout << "Sij\n";
-                      S(i, j, level).print();
+                    // Sbar_ij = S(i, j, level) + matmul(matmul(U(i, level), F(i, j), true, false), V(j, level));
 
-                      std::cout << "PROJECTION\n";
-                      matmul(r(i), S(i, j, level)).print();
+                    // if (i == 1 && j == 2) {
+                    //   std::cout << "Sij\n";
+                    //   S(i, j, level).print();
 
-                      std::cout << "Sbarij\n";
-                      Sbar_ij.print();
-                    }
+                    //   std::cout << "PROJECTION\n";
+                    //   matmul(matmul(r(i), S(i, j, level)), t(j)).print();
+
+                    //   std::cout << "ADDITION\n";
+                    //   matmul(matmul(U(i, level), F(i, j), true, false), V(j, level)).print();
+
+                    //   std::cout << "ORIGINAL:\n";
+                    //   matmul(matmul(U(i, level), S(i, j, level)), V(j, level), false, true).print();
+
+                    //   std::cout << "REGENERATED:\n";
+                    //   matmul(matmul(U(i, level), Sbar_ij), V(j, level), false, true).print();
+                    // }
                   }
-
-                  F.erase(i, j);
                 }
                 else {
                   Sbar_ij = matmul(r(i), S(i, j, level));
@@ -855,12 +886,17 @@ namespace Hatrix {
           if (t.exists(j)) {
             for (int64_t i = 0; i < nblocks; ++i) {
               if (is_admissible(i, j, level)) {
+                std::cout << "COl update: i-> " << i <<  " j-> " << j << std::endl;
                 Matrix Sbar_ij = matmul(S(i, j, level), t(j), false, true);
                 if (F.exists(i, j)) {
+                  if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
+                    continue;
+                  }
+
                   if (F(i, j).rows == rank && F(i, j).cols == block_size) {
                     Sbar_ij += matmul(F(i, j), V(j, level));
                   }
-                  F.erase(i, j);
+                  //F.erase(i, j);
                 }
 
                 S.erase(i, j, level);
@@ -871,6 +907,7 @@ namespace Hatrix {
           }
         }
       }
+      F.erase_all();
 
       // if (level == 2) {
       //   auto A2_expected_splits = A2_expected.split(4, 4);
@@ -976,10 +1013,23 @@ namespace Hatrix {
                        false, false, -1.0, 1.0);
               }
               else {
+                // if (i == 1 && j == 2) {
+                //   std::cout << "FILL IN GEN\n";
+                //   std::cout << "LOWER SPLIT:\n";
+                //   // matmul(D(i, block, level), D(block, j, level)).print();
+                //   D(i, block, level).print();
+                //   lower_splits[0].print();
+                //   std::cout << "RIGHT SPLIT:\n";
+                //   D(block, j, level).print();
+                //   right_splits[0].print();
+                //   matmul(lower_splits[0], right_splits[0]).print();
+                // }
+
                 Matrix fill_in(rows, cols);
                 auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
                 matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
                        false, false, -1.0, 1.0);
+                // fill_in.print();
                 F.insert(i, j, std::move(fill_in));
               }
             }
@@ -1701,85 +1751,85 @@ namespace Hatrix {
     int64_t nblocks = domain.boxes.size();
     level_blocks.push_back(nblocks);
     int64_t level = 0;
-    // for (int64_t i = 0; i < nblocks; ++i) {
-    //   for (int64_t j = 0; j < nblocks; ++j) {
-    //     is_admissible.insert(i, j, level,
-    //                          std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
-    //                          admis * domain.boxes[i].distance_from(domain.boxes[j]));
-    //   }
-    // }
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        is_admissible.insert(i, j, level,
+                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
+                             admis * domain.boxes[i].distance_from(domain.boxes[j]));
+      }
+    }
 
-    is_admissible.insert(0, 0, level, false);
-    is_admissible.insert(0, 1, level, false);
-    is_admissible.insert(0, 2, level, false);
-    is_admissible.insert(0, 3, level, true);
-    is_admissible.insert(0, 4, level, false);
-    is_admissible.insert(0, 5, level, true);
-    is_admissible.insert(0, 6, level, true);
-    is_admissible.insert(0, 7, level, true);
+    // is_admissible.insert(0, 0, level, false);
+    // is_admissible.insert(0, 1, level, false);
+    // is_admissible.insert(0, 2, level, false);
+    // is_admissible.insert(0, 3, level, true);
+    // is_admissible.insert(0, 4, level, false);
+    // is_admissible.insert(0, 5, level, true);
+    // is_admissible.insert(0, 6, level, true);
+    // is_admissible.insert(0, 7, level, true);
 
-    is_admissible.insert(1, 0, level, false);
-    is_admissible.insert(1, 1, level, false);
-    is_admissible.insert(1, 2, level, true);
-    is_admissible.insert(1, 3, level, true);
-    is_admissible.insert(1, 4, level, false);
-    is_admissible.insert(1, 5, level, false);
-    is_admissible.insert(1, 6, level, true);
-    is_admissible.insert(1, 7, level, true);
+    // is_admissible.insert(1, 0, level, false);
+    // is_admissible.insert(1, 1, level, false);
+    // is_admissible.insert(1, 2, level, true);
+    // is_admissible.insert(1, 3, level, true);
+    // is_admissible.insert(1, 4, level, false);
+    // is_admissible.insert(1, 5, level, false);
+    // is_admissible.insert(1, 6, level, true);
+    // is_admissible.insert(1, 7, level, true);
 
-    is_admissible.insert(2, 0, level, false);
-    is_admissible.insert(2, 1, level, true);
-    is_admissible.insert(2, 2, level, false);
-    is_admissible.insert(2, 3, level, false);
-    is_admissible.insert(2, 4, level, true);
-    is_admissible.insert(2, 5, level, true);
-    is_admissible.insert(2, 6, level, false);
-    is_admissible.insert(2, 7, level, true);
+    // is_admissible.insert(2, 0, level, false);
+    // is_admissible.insert(2, 1, level, true);
+    // is_admissible.insert(2, 2, level, false);
+    // is_admissible.insert(2, 3, level, false);
+    // is_admissible.insert(2, 4, level, true);
+    // is_admissible.insert(2, 5, level, true);
+    // is_admissible.insert(2, 6, level, true);
+    // is_admissible.insert(2, 7, level, true);
 
-    is_admissible.insert(3, 0, level, true);
-    is_admissible.insert(3, 1, level, true);
-    is_admissible.insert(3, 2, level, false);
-    is_admissible.insert(3, 3, level, false);
-    is_admissible.insert(3, 4, level, true);
-    is_admissible.insert(3, 5, level, true);
-    is_admissible.insert(3, 6, level, false);
-    is_admissible.insert(3, 7, level, false);
+    // is_admissible.insert(3, 0, level, true);
+    // is_admissible.insert(3, 1, level, true);
+    // is_admissible.insert(3, 2, level, false);
+    // is_admissible.insert(3, 3, level, false);
+    // is_admissible.insert(3, 4, level, true);
+    // is_admissible.insert(3, 5, level, true);
+    // is_admissible.insert(3, 6, level, true);
+    // is_admissible.insert(3, 7, level, true);
 
-    is_admissible.insert(4, 0, level, false);
-    is_admissible.insert(4, 1, level, false);
-    is_admissible.insert(4, 2, level, true);
-    is_admissible.insert(4, 3, level, false);
-    is_admissible.insert(4, 4, level, false);
-    is_admissible.insert(4, 5, level, true);
-    is_admissible.insert(4, 6, level, true);
-    is_admissible.insert(4, 7, level, true);
+    // is_admissible.insert(4, 0, level, false);
+    // is_admissible.insert(4, 1, level, false);
+    // is_admissible.insert(4, 2, level, true);
+    // is_admissible.insert(4, 3, level, true);
+    // is_admissible.insert(4, 4, level, false);
+    // is_admissible.insert(4, 5, level, false);
+    // is_admissible.insert(4, 6, level, true);
+    // is_admissible.insert(4, 7, level, true);
 
-    is_admissible.insert(5, 0, level, true);
-    is_admissible.insert(5, 1, level, false);
-    is_admissible.insert(5, 2, level, true);
-    is_admissible.insert(5, 3, level, true);
-    is_admissible.insert(5, 4, level, false);
-    is_admissible.insert(5, 5, level, false);
-    is_admissible.insert(5, 6, level, true);
-    is_admissible.insert(5, 7, level, true);
+    // is_admissible.insert(5, 0, level, true);
+    // is_admissible.insert(5, 1, level, false);
+    // is_admissible.insert(5, 2, level, true);
+    // is_admissible.insert(5, 3, level, true);
+    // is_admissible.insert(5, 4, level, false);
+    // is_admissible.insert(5, 5, level, false);
+    // is_admissible.insert(5, 6, level, true);
+    // is_admissible.insert(5, 7, level, true);
 
-    is_admissible.insert(6, 0, level, true);
-    is_admissible.insert(6, 1, level, true);
-    is_admissible.insert(6, 2, level, false);
-    is_admissible.insert(6, 3, level, false);
-    is_admissible.insert(6, 4, level, true);
-    is_admissible.insert(6, 5, level, true);
-    is_admissible.insert(6, 6, level, false);
-    is_admissible.insert(6, 7, level, false);
+    // is_admissible.insert(6, 0, level, true);
+    // is_admissible.insert(6, 1, level, true);
+    // is_admissible.insert(6, 2, level, true);
+    // is_admissible.insert(6, 3, level, true);
+    // is_admissible.insert(6, 4, level, true);
+    // is_admissible.insert(6, 5, level, true);
+    // is_admissible.insert(6, 6, level, false);
+    // is_admissible.insert(6, 7, level, false);
 
-    is_admissible.insert(7, 0, level, true);
-    is_admissible.insert(7, 1, level, true);
-    is_admissible.insert(7, 2, level, true);
-    is_admissible.insert(7, 3, level, false);
-    is_admissible.insert(7, 4, level, true);
-    is_admissible.insert(7, 5, level, true);
-    is_admissible.insert(7, 6, level, false);
-    is_admissible.insert(7, 7, level, false);
+    // is_admissible.insert(7, 0, level, true);
+    // is_admissible.insert(7, 1, level, true);
+    // is_admissible.insert(7, 2, level, true);
+    // is_admissible.insert(7, 3, level, true);
+    // is_admissible.insert(7, 4, level, true);
+    // is_admissible.insert(7, 5, level, true);
+    // is_admissible.insert(7, 6, level, false);
+    // is_admissible.insert(7, 7, level, false);
 
     if (matrix_type == BLR2_MATRIX) {
       level_blocks.push_back(1);
@@ -3067,8 +3117,8 @@ int main(int argc, char ** argv) {
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
-  // Matrix rank_map = domain.generate_rank_heat_map();
-  // rank_map.print();
+  Matrix rank_map = domain.generate_rank_heat_map();
+  rank_map.print();
   // rank_map.out_csv("rank_map.csv");
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
@@ -3083,51 +3133,72 @@ int main(int argc, char ** argv) {
   // verify_A2_factorization(A, domain);
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
 
-  if (matrix_type == BLR2_MATRIX) {
-    Matrix regenA = regenerate_BLR2_matrix(A, domain);
+  // if (matrix_type == BLR2_MATRIX) {
+  //   Matrix regenA = regenerate_BLR2_matrix(A, domain);
 
-    std::vector<int64_t> M_row_offsets, M_col_offsets;
-    int64_t rows = 0, cols = 0, level = 1;
+  //   std::vector<int64_t> M_row_offsets, M_col_offsets;
+  //   int64_t rows = 0, cols = 0, level = 1;
 
-    int64_t nblocks = domain.boxes.size();
+  //   int64_t nblocks = domain.boxes.size();
 
-    for (int i = 0; i < nblocks; ++i) {
-      M_row_offsets.push_back(rows + A.D(i, i, level).rows);
-      M_col_offsets.push_back(cols + A.D(i, i, level).rows);
+  //   for (int i = 0; i < nblocks; ++i) {
+  //     M_row_offsets.push_back(rows + A.D(i, i, level).rows);
+  //     M_col_offsets.push_back(cols + A.D(i, i, level).rows);
 
-      rows += A.D(i, i, level).rows;
-      cols += A.D(i, i, level).rows;
-    }
+  //     rows += A.D(i, i, level).rows;
+  //     cols += A.D(i, i, level).rows;
+  //   }
 
-    Matrix diff = (regenA - Adense);
-    auto d_splits = diff.split(M_row_offsets, M_col_offsets);
-    auto m_splits = Adense.split(M_row_offsets, M_col_offsets);
-    auto regen_splits = regenA.split(M_row_offsets, M_col_offsets);
+  //   Matrix diff = (regenA - Adense);
+  //   auto d_splits = diff.split(M_row_offsets, M_col_offsets);
+  //   auto m_splits = Adense.split(M_row_offsets, M_col_offsets);
+  //   auto regen_splits = regenA.split(M_row_offsets, M_col_offsets);
+
+  //   // std::cout <<  "BLOCK WISE NORM:\n";
+  //   // for (int64_t i = 0; i < nblocks; ++i) {
+  //   //   for (int64_t j = 0; j < nblocks; ++j) {
+  //   //     std::cout << "<i, j>: " << i << ", " << j
+  //   //               << " -- "
+  //   //               << std::setprecision(5)
+  //   //               << norm(m_splits[i * nblocks + j])
+  //   //               << std::setw(5)
+  //   //               << std::endl;
+  //   //   }
+  //   // }
+
+  //   std::cout << "ERROR\n";
 
 
-    for (int i = 0; i < nblocks; ++i) {
-      for (int j = 0; j < nblocks; ++j) {
-        double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
+  //   for (int i = 0; i < nblocks; ++i) {
+  //     for (int j = 0; j < nblocks; ++j) {
+  //       double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
 
-        std::cout << "<i, j>: " << i << ", " << j
-                  << " -- "
-                  << std::setprecision(5)
-                  << error
-                  << std::setw(5)
-                  << std::endl;
+  //       std::cout << "<i, j>: " << i << ", " << j
+  //                 << " -- norm -> "
+  //                 << std::setprecision(5)
+  //                 << error
+  //                 << std::setw(5)
+  //                 << " diff -> " << norm(d_splits[i * nblocks + j])
+  //                 << " m -> " << norm(m_splits[i * nblocks + j])
+  //                 << std::endl;
 
-      }
-    }
 
-    d_splits[2 * 8 + 5].print();
-    m_splits[2 * 8 + 5].print();
+  //     }
+  //   }
 
-    std::cout << " norm d: " <<  norm(d_splits[2 * 8 + 5]) << " norm m: " <<  norm(m_splits[2 * 8 + 5])
-                                      <<  "norm diff: " << norm(d_splits[2 * 8 + 5] - m_splits[2 * 8 + 5]) << std::endl;
+  //   for (int i = 0; i < nblocks; ++i) {
+  //     for (int j = 0; j < nblocks; ++j) {
+  //       double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
+  //       if (error > 1e-4) {
+  //         std::cout << "i-> " << i << " j-> " << j << " large error: " << error << std::endl;;
+  //       }
 
-    std::cout << "factorization error = " << norm(diff) / norm(Adense) << std::endl;
-    regenA.block_ranks(domain.boxes.size(), 1e-9).print();
-  }
+  //     }
+  //   }
+
+  //   std::cout << "factorization error = " << norm(diff) / norm(Adense) << std::endl;
+  //   regenA.block_ranks(domain.boxes.size(), 1e-9).print();
+  // }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix x = A.solve(b, A.height);
