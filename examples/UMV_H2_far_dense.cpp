@@ -735,7 +735,9 @@ namespace Hatrix {
 
 
                 if (F(i, j).rows == block_size && F(i, j).cols == rank)  {
-                  row_i = concat(row_i, matmul(F(i, j), V(j, level), false, true), 1);
+                  // row_i = concat(row_i, matmul(F(i, j), V(j, level), false, true), 1);
+                  row_i = concat(row_i, matmul(Ui, Si), 1);
+
                   // row_i = concat(row_i, matmul(F(i, j), F(i, j), false, true), 1);
                   // row_i += matmul(F(i, j), V(j, level), false, true);
                 }
@@ -754,7 +756,8 @@ namespace Hatrix {
                   // }
 
                   // row_i += F(i, j);
-                  row_i = concat(row_i, F(i, j), 1);
+                  row_i = concat(row_i, matmul(Ui, Si), 1);
+                  // row_i = concat(row_i, F(i, j), 1);
                   // row_i = concat(row_i, matmul(F(i, j), F(i, j), false, true), 1);
                 }
               }
@@ -801,14 +804,18 @@ namespace Hatrix {
 
                 std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j
                           << " F(i, j).rows: " << F(i, j).rows << " cols= "
-                          << F(i, j).cols << " rank=" << Si.rows << " norm=" << norm(F(i, j)) <<  std::endl;
+                          << F(i, j).cols << " rank=" << Si.rows << " norm="
+                          << norm(F(i, j)) <<  std::endl;
 
                 if (F(i, j).rows == rank && F(i, j).cols == block_size) {
-                  col_j = concat(col_j, matmul(U(i, level), F(i, j)), 0);
+                  // col_j = concat(col_j, matmul(U(i, level), F(i, j)), 0);
+                  col_j = concat(col_j, matmul(Si, Vi), 0);
                 }
                 else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
+                  // col_j = concat(col_j, matmul(F(i, j), F(i, j), false, true), 0);
 
-                  col_j = concat(col_j, matmul(F(i, j), F(i, j), false, true), 0);
+                  // col_j = concat(col_j, F(i, j), 0);
+                  col_j = concat(col_j, matmul(Si, Vi), 0);
                 }
               }
             }
