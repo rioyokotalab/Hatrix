@@ -1777,38 +1777,38 @@ namespace Hatrix {
 
     // is_admissible.insert(1, 0, level, false);
     // is_admissible.insert(1, 1, level, false);
-    // is_admissible.insert(1, 2, level, true);
-    // is_admissible.insert(1, 3, level, true);
+    // is_admissible.insert(1, 2, level, false);
+    // is_admissible.insert(1, 3, level, false);
     // is_admissible.insert(1, 4, level, false);
     // is_admissible.insert(1, 5, level, false);
-    // is_admissible.insert(1, 6, level, true);
+    // is_admissible.insert(1, 6, level, false);
     // is_admissible.insert(1, 7, level, true);
 
     // is_admissible.insert(2, 0, level, false);
-    // is_admissible.insert(2, 1, level, true);
+    // is_admissible.insert(2, 1, level, false);
     // is_admissible.insert(2, 2, level, false);
     // is_admissible.insert(2, 3, level, false);
     // is_admissible.insert(2, 4, level, true);
     // is_admissible.insert(2, 5, level, true);
-    // is_admissible.insert(2, 6, level, true);
+    // is_admissible.insert(2, 6, level, false);
     // is_admissible.insert(2, 7, level, true);
 
     // is_admissible.insert(3, 0, level, true);
-    // is_admissible.insert(3, 1, level, true);
+    // is_admissible.insert(3, 1, level, false);
     // is_admissible.insert(3, 2, level, false);
     // is_admissible.insert(3, 3, level, false);
-    // is_admissible.insert(3, 4, level, true);
+    // is_admissible.insert(3, 4, level, false);
     // is_admissible.insert(3, 5, level, true);
-    // is_admissible.insert(3, 6, level, true);
-    // is_admissible.insert(3, 7, level, true);
+    // is_admissible.insert(3, 6, level, false);
+    // is_admissible.insert(3, 7, level, false);
 
     // is_admissible.insert(4, 0, level, false);
     // is_admissible.insert(4, 1, level, false);
     // is_admissible.insert(4, 2, level, true);
-    // is_admissible.insert(4, 3, level, true);
+    // is_admissible.insert(4, 3, level, false);
     // is_admissible.insert(4, 4, level, false);
     // is_admissible.insert(4, 5, level, false);
-    // is_admissible.insert(4, 6, level, true);
+    // is_admissible.insert(4, 6, level, false);
     // is_admissible.insert(4, 7, level, true);
 
     // is_admissible.insert(5, 0, level, true);
@@ -1817,24 +1817,24 @@ namespace Hatrix {
     // is_admissible.insert(5, 3, level, true);
     // is_admissible.insert(5, 4, level, false);
     // is_admissible.insert(5, 5, level, false);
-    // is_admissible.insert(5, 6, level, true);
-    // is_admissible.insert(5, 7, level, true);
+    // is_admissible.insert(5, 6, level, false);
+    // is_admissible.insert(5, 7, level, false);
 
     // is_admissible.insert(6, 0, level, true);
-    // is_admissible.insert(6, 1, level, true);
-    // is_admissible.insert(6, 2, level, true);
-    // is_admissible.insert(6, 3, level, true);
-    // is_admissible.insert(6, 4, level, true);
-    // is_admissible.insert(6, 5, level, true);
+    // is_admissible.insert(6, 1, level, false);
+    // is_admissible.insert(6, 2, level, false);
+    // is_admissible.insert(6, 3, level, false);
+    // is_admissible.insert(6, 4, level, false);
+    // is_admissible.insert(6, 5, level, false);
     // is_admissible.insert(6, 6, level, false);
     // is_admissible.insert(6, 7, level, false);
 
     // is_admissible.insert(7, 0, level, true);
     // is_admissible.insert(7, 1, level, true);
     // is_admissible.insert(7, 2, level, true);
-    // is_admissible.insert(7, 3, level, true);
+    // is_admissible.insert(7, 3, level, false);
     // is_admissible.insert(7, 4, level, true);
-    // is_admissible.insert(7, 5, level, true);
+    // is_admissible.insert(7, 5, level, false);
     // is_admissible.insert(7, 6, level, false);
     // is_admissible.insert(7, 7, level, false);
 
@@ -3105,7 +3105,7 @@ int main(int argc, char ** argv) {
     break;
   }
   case 1: {                     // sqrexp
-    beta = 0.1;
+    beta = 1;                   // supposed to be 0.1 in Cao's code.
     nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
     noise = 1.e-1;
     sigma = 1.0;
@@ -3140,7 +3140,7 @@ int main(int argc, char ** argv) {
   // verify_A2_factorization(A, domain);
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
 
-  if (matrix_type == BLR2_MATRIX) {
+  if (matrix_type != BLR2_MATRIX) {
     Matrix regenA = regenerate_BLR2_matrix(A, domain);
 
     std::vector<int64_t> M_row_offsets, M_col_offsets;
@@ -3175,9 +3175,14 @@ int main(int argc, char ** argv) {
 
     std::cout << "ERROR\n";
 
+    double tot_err = 0;
     for (int i = 0; i < nblocks; ++i) {
       for (int j = 0; j < nblocks; ++j) {
         double error = norm(d_splits[i * nblocks + j]) / norm(m_splits[i * nblocks + j]);
+
+        if ((i != 3 && j != 5) || (i != 5 && j != 3)) {
+          tot_err += norm(d_splits[i * nblocks + j]);
+        }
 
         std::cout << "<i, j>: " << i << ", " << j
                   << " -- norm -> "
@@ -3202,6 +3207,7 @@ int main(int argc, char ** argv) {
       }
     }
 
+    std::cout << "block error: " << tot_err / norm(Adense)  << std::endl;
     std::cout << "factorization error = " << norm(diff) / norm(Adense) << std::endl;
     regenA.block_ranks(domain.boxes.size(), 1e-9).print();
   }
