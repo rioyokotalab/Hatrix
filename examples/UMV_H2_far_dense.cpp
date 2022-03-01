@@ -729,9 +729,9 @@ namespace Hatrix {
                 Matrix cpy(F(i, j));
                 std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
 
-                std::cout << "CONSUME ROW FILL IN i -> " << i << " j -> " << j
-                          << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
-                          << " rank=" << Si.rows << " norm=" << norm(F(i, j)) << std::endl;
+                // std::cout << "CONSUME ROW FILL IN i -> " << i << " j -> " << j
+                //           << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
+                //           << " rank=" << Si.rows << " norm=" << norm(F(i, j)) << std::endl;
 
 
                 if (F(i, j).rows == block_size && F(i, j).cols == rank)  {
@@ -803,10 +803,10 @@ namespace Hatrix {
                 Matrix cpy(F(i, j));
                 std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
 
-                std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j
-                          << " F(i, j).rows: " << F(i, j).rows << " cols= "
-                          << F(i, j).cols << " rank=" << Si.rows << " norm="
-                          << norm(F(i, j)) <<  std::endl;
+                // std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j
+                //           << " F(i, j).rows: " << F(i, j).rows << " cols= "
+                //           << F(i, j).cols << " rank=" << Si.rows << " norm="
+                //           << norm(F(i, j)) <<  std::endl;
 
                 if (F(i, j).rows == rank && F(i, j).cols == block_size) {
                   // col_j = concat(col_j, matmul(U(i, level), F(i, j)), 0);
@@ -840,21 +840,28 @@ namespace Hatrix {
         }
 
         // Update S blocks in the rows.
-        for (int64_t i = 0; i < nblocks; ++i) {
-          if (r.exists(i)) {
+        // for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t i = 0; i < r_indices.size(); ++i) {
+
+          // std::cout << "USE R: i -> " << r_indices[i] << std::endl;
+          // if (r.exists(i)) {
+          int64_t r_index = r_indices[i];
+          Matrix& r_i = r(r_index);
+
+
             for (int64_t j = 0; j < nblocks; ++j) {
-              if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+              if (is_admissible.exists(r_index, j, level) && is_admissible(r_index, j, level)) {
                 int64_t block_size = D(j, j, level).cols;
                 Matrix Sbar_ij(rank, rank);
-                if (F.exists(i, j)) {
+                if (F.exists(r_index, j)) {
 
                   // F(i, j).print_meta();
-                  if (F(i, j).rows == block_size && F(i, j).cols == rank) {
-                    Sbar_ij = matmul(r(i), S(i, j, level)) + matmul(U(i, level), F(i, j), true, false);
+                  if (F(r_index, j).rows == block_size && F(r_index, j).cols == rank) {
+                    Sbar_ij = matmul(r_i, S(r_index, j, level)) + matmul(U(r_index, level), F(r_index, j), true, false);
                   }
-                  else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
-                    Sbar_ij = matmul(matmul(r(i), S(i, j, level)), t(j), false, true) +
-                      matmul(matmul(U(i, level), F(i, j), true, false), V(j, level));
+                  else if (F(r_index, j).rows == block_size && F(r_index, j).cols == block_size) {
+                    Sbar_ij = matmul(matmul(r_i, S(r_index, j, level)), t(j), false, true) +
+                      matmul(matmul(U(r_index, level), F(r_index, j), true, false), V(j, level));
 
                     // Sbar_ij = S(i, j, level) + matmul(matmul(U(i, level), F(i, j), true, false), V(j, level));
 
@@ -877,16 +884,16 @@ namespace Hatrix {
                   }
                 }
                 else {
-                  Sbar_ij = matmul(r(i), S(i, j, level));
+                  Sbar_ij = matmul(r_i, S(r_index, j, level));
                 }
 
                 // std::cout << "REMAKE S: i -> " << i << "j -> " << j << std::endl;
-                S.erase(i, j, level);
-                S.insert(i, j, level, std::move(Sbar_ij));
+                S.erase(r_index, j, level);
+                S.insert(r_index, j, level, std::move(Sbar_ij));
               }
             }
-            r.erase(i);
-          }
+          //   r.erase(i);
+          // }
         }
 
         // Update S blocks in the cols
@@ -895,7 +902,7 @@ namespace Hatrix {
           if (t.exists(j)) {
             for (int64_t i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-                std::cout << "COl update: i-> " << i <<  " j-> " << j << std::endl;
+                // std::cout << "COl update: i-> " << i <<  " j-> " << j << std::endl;
                 Matrix Sbar_ij = matmul(S(i, j, level), t(j), false, true);
                 if (F.exists(i, j)) {
                   if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
