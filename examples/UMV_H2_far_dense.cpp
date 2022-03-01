@@ -3153,7 +3153,7 @@ int main(int argc, char ** argv) {
   A.print_structure();
   A.factorize(domain);
 
-  if  (matrix_type == H2_MATRIX) {
+  if  (false) {
     std::cout << "-- H2 verification --\n";
     verify_A1_factorization(A, domain);
     verify_A2_factorization(A, domain);

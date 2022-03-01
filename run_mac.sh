@@ -2,27 +2,14 @@
 
 make -j all
 
-# ./bin/HSS_Nlevel_construct 800 20 3
-# ./bin/HSS_Nlevel_construct 1600 20 4
-# ./bin/HSS_Nlevel_construct 3200 20 5
-
-echo "---- SQ EXP NDIM=2 ADMIS=1 KERNEL FUNC=1 ----"
-
-# ./bin/UMV_H2_far_dense 2000 25 50 0.4 2 geometry_admis 2 0
-# ./bin/UMV_H2_far_dense 4000 25 50 0.4 2 geometry_admis 2 0
-# ./bin/UMV_H2_far_dense 1920 20 30 1.6 3 geometry_admis 0 0
-
-
-# ./bin/UMV_H2_far_dense 64 5 8 1 2 geometry_admis 0 0
-# echo "LINE GEOMETRY"
-
 rm result.txt
 
-./bin/UMV_H2_far_dense 1024 10 64 0.7 1 geometry_admis 1 0
-./bin/UMV_H2_far_dense 1024 15 64 0.5 2 geometry_admis 1 0
-./bin/UMV_H2_far_dense 1024 25 64 0.9 3 geometry_admis 1 0
+# ./bin/UMV_H2_far_dense 1024 10 64 0.7 1 geometry_admis 1 0
+# ./bin/UMV_H2_far_dense 1024 15 64 0.5 2 geometry_admis 1 0
+# ./bin/UMV_H2_far_dense 1024 25 64 0.9 3 geometry_admis 1 0
 
-./bin/UMV_H2_far_dense 1024 10 64 0.7 1 geometry_admis 1 1
+# ./bin/UMV_H2_far_dense 1024 10 64 0.7 1 geometry_admis 1 1
+lldb -o run -- ./bin/UMV_H2_far_dense 1024 10 64 0.5 2 geometry_admis 1 1
 
 cat result.txt
 
