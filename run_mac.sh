@@ -4,12 +4,13 @@ make -j all
 
 rm result.txt
 
-./bin/UMV_H2_far_dense 1024 10 64 0.7 1 geometry_admis 1 0
-./bin/UMV_H2_far_dense 1024 15 64 0.5 2 geometry_admis 1 0
-./bin/UMV_H2_far_dense 1024 25 64 0.9 3 geometry_admis 1 0
+./bin/UMV_H2_far_dense 1024 10 64 0.7 1 geometry_admis 0 0
+./bin/UMV_H2_far_dense 1024 15 64 0.5 2 geometry_admis 0 0
+./bin/UMV_H2_far_dense 1024 25 64 0.9 3 geometry_admis 0 0
 
 # ./bin/UMV_H2_far_dense 1024 10 64 0.7 1 geometry_admis 1
-./bin/UMV_H2_far_dense 1024 10 64 2 2 diagonal_admis 1 1
+./bin/UMV_H2_far_dense 1024 10 64 2 1 diagonal_admis 0 1
+./bin/UMV_H2_far_dense 1024 10 64 2 2 diagonal_admis 0 1
 # lldb -o run -- ./bin/UMV_H2_far_dense 1024 10 64 0.5 2 geometry_admis 1 1
 
 cat result.txt

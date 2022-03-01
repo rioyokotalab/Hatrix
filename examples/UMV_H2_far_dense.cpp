@@ -2243,8 +2243,6 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
     PV = 1e-3 * (1 / pow(10, height));
 
-    print_structure();
-
     int64_t all_dense_row = find_all_dense_row();
     if (all_dense_row != -1) {
       std::cout << "found all dense row at " << all_dense_row << ". Aborting.\n";
