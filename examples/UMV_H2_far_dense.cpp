@@ -678,11 +678,11 @@ namespace Hatrix {
   int64_t H2::find_all_dense_row() {
     int64_t nblocks = level_blocks[height];
 
-
     for (int64_t i = 0; i < nblocks; ++i) {
       bool all_dense_row = true;
       for (int64_t j = 0; j < nblocks; ++j) {
-        if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
+        if (!is_admissible.exists(i, j, height) ||
+            (is_admissible.exists(i, j, height) && is_admissible(i, j, height))) {
           all_dense_row = false;
         }
       }
@@ -1399,7 +1399,7 @@ namespace Hatrix {
 
     int64_t last_nodes = level_blocks[level];
 
-    // std::cout << "last nodes: " << last_nodes << " level: " << level << std::endl;
+    std::cout << "last nodes: " << last_nodes << " level: " << level << std::endl;
     // Capture unfactorized A1 block.
     // for (int64_t i = 0; i < last_nodes; ++i) {
     //   for (int64_t j = 0; j < last_nodes; ++j) {
@@ -2279,7 +2279,7 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
     PV = 1e-3 * (1 / pow(10, height));
 
-    // print_structure();
+    print_structure();
 
     int64_t all_dense_row = find_all_dense_row();
     if (all_dense_row != -1) {
