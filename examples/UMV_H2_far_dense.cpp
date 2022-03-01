@@ -838,6 +838,7 @@ namespace Hatrix {
             // std::cout << "t_j -> " << j << std::endl;
 
             t_indices.push_back(j);
+            if (t.exists(j)) { t.erase(j); }
             t.insert(j, std::move(t_j));
           }
         }
@@ -899,30 +900,33 @@ namespace Hatrix {
         }
 
         // Update S blocks in the cols
-        for (int64_t j = 0; j < nblocks; ++j) {
-          int64_t block_size = D(j, j, level).cols;
-          if (t.exists(j)) {
+        for (int64_t j = 0; j < t_indices.size(); ++j) {
+          int64_t t_index = t_indices[j];
+          Matrix& t_j = t(t_index);
+
+          // if (t.exists(j)) {
             for (int64_t i = 0; i < nblocks; ++i) {
-              if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-                // std::cout << "COl update: i-> " << i <<  " j-> " << j << std::endl;
-                Matrix Sbar_ij = matmul(S(i, j, level), t(j), false, true);
-                if (F.exists(i, j)) {
-                  if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
+              int64_t block_size = D(i, i, level).cols;
+              if (is_admissible.exists(i, t_index, level) && is_admissible(i, t_index, level)) {
+                // std::cout << "COl update: i-> " << i <<  " t_index-> " << t_index << std::endl;
+                Matrix Sbar_ij = matmul(S(i, t_index, level), t_j, false, true);
+                if (F.exists(i, t_index)) {
+                  if (F(i, t_index).rows == block_size && F(i, t_index).cols == block_size) {
                     continue;
                   }
 
-                  if (F(i, j).rows == rank && F(i, j).cols == block_size) {
-                    Sbar_ij += matmul(F(i, j), V(j, level));
+                  if (F(i, t_index).rows == rank && F(i, t_index).cols == block_size) {
+                    Sbar_ij += matmul(F(i, t_index), V(t_index, level));
                   }
                   //F.erase(i, j);
                 }
 
-                S.erase(i, j, level);
-                S.insert(i, j, level, std::move(Sbar_ij));
+                S.erase(i, t_index, level);
+                S.insert(i, t_index, level, std::move(Sbar_ij));
               }
             }
-            t.erase(j);
-          }
+          //   t.erase(t_index);
+          // }
         }
       }
 
