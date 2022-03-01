@@ -3236,4 +3236,16 @@ int main(int argc, char ** argv) {
             << " LR%= " << lr_ratio * 100 << "%"
             << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
 
+  std::ofstream file;
+
+  file.open("result.txt", std::ios::app | std::ios::out);
+  file << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
+       << " height= " << A.height << " rank=" << rank
+       << " construct error= " << construct_error
+       << " solve error= " << solve_error
+       << " kernel func= " << kernel_func
+       << " LR%= " << lr_ratio * 100 << "%"
+       << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
+  file.close();
+
 }
