@@ -841,7 +841,7 @@ namespace Hatrix {
         for (int64_t i = 0; i < nblocks; ++i) {
           if (r.exists(i)) {
             for (int64_t j = 0; j < nblocks; ++j) {
-              if (is_admissible(i, j, level)) {
+              if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
                 int64_t block_size = D(j, j, level).cols;
                 Matrix Sbar_ij(rank, rank);
                 if (F.exists(i, j)) {
@@ -892,7 +892,7 @@ namespace Hatrix {
           int64_t block_size = D(j, j, level).cols;
           if (t.exists(j)) {
             for (int64_t i = 0; i < nblocks; ++i) {
-              if (is_admissible(i, j, level)) {
+              if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
                 std::cout << "COl update: i-> " << i <<  " j-> " << j << std::endl;
                 Matrix Sbar_ij = matmul(S(i, j, level), t(j), false, true);
                 if (F.exists(i, j)) {
@@ -3135,12 +3135,15 @@ int main(int argc, char ** argv) {
   A.print_structure();
   A.factorize(domain);
 
-  // std::cout << "-- H2 verification --\n";
-  // verify_A1_factorization(A, domain);
-  // verify_A2_factorization(A, domain);
+  if  (matrix_type == H2_MATRIX) {
+    std::cout << "-- H2 verification --\n";
+    verify_A1_factorization(A, domain);
+    verify_A2_factorization(A, domain);
+  }
+
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
 
-  if (matrix_type != BLR2_MATRIX) {
+  if (false) {
     Matrix regenA = regenerate_BLR2_matrix(A, domain);
 
     std::vector<int64_t> M_row_offsets, M_col_offsets;
