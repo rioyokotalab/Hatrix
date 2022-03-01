@@ -713,19 +713,7 @@ namespace Hatrix {
         // for (int64_t i = 0; i < nblocks; ++i) {
 
           int64_t block_size = D(i, i, level).rows;
-          bool found_row_fill_in = false;
-          for (int64_t j = 0; j < nblocks; ++j) {
-            if (F.exists(i, j)) {
-              if ((F(i,j).rows == block_size && F(i, j).cols == rank) ||
-                  (F(i,j).rows == block_size && F(i, j).cols == block_size)) {
-                found_row_fill_in = true;
-              }
 
-              break;
-            }
-          }
-
-          if (true) {
             Matrix row_i(block_size, 0);
 
             row_i = concat(row_i, matmul(U(i, level), Scol(i, level)), 1);
@@ -738,34 +726,7 @@ namespace Hatrix {
                 // std::cout << "CONSUME ROW FILL IN i -> " << i << " j -> " << j
                 //           << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
                 //           << " rank=" << Si.rows << " norm=" << norm(F(i, j)) << std::endl;
-
-                if (F(i, j).rows == block_size && F(i, j).cols == rank)  {
-                  row_i = concat(row_i, matmul(F(i, j), V(j, level), false, true), 1);
-                  // row_i = concat(row_i, matmul(Ui, Si), 1);
-
-                  // row_i = concat(row_i, matmul(F(i, j), F(i, j), false, true), 1);
-                  // row_i += matmul(F(i, j), V(j, level), false, true);
-                }
-                else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
-
-
-                  // F(i, j).print();
-                  // if (i == 1 && j == 2) {
-                  //   std::cout << "CONSUME ROW FILL: i -> " << i << " j -> " << j << " block_size -> " << block_size
-                  //             << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
-                  //             << " rank= " << Si.rows <<  " norm = " << norm(F(i, j)) << std::endl;
-                  //   std::cout << "DENSE:\n";
-                  //   matmul(matmul(U(i, level), S(i, j, level)), V(j, level), false, true).print();
-                  //   std::cout << "F\n";
-                  //   F(i, j).print();
-                  // }
-
-                  // row_i += F(i, j);
-                  row_i = concat(row_i, matmul(Ui, Si), 1);
-                  // row_i = concat(row_i, F(i, j), 1);
-                  // row_i = concat(row_i, matmul(F(i, j), F(i, j), false, true), 1);
-                }
-                // row_i = concat(row_i, matmul(Ui, Si), 1);
+                row_i = concat(row_i, matmul(Ui, Si), 1);
               }
             }
 
@@ -785,7 +746,6 @@ namespace Hatrix {
             r_indices.push_back(i);
             if (r.exists(i)) { r.erase(i); }
             r.insert(i, std::move(r_i));
-          }
         }
 
         // Calculate col fill-ins
