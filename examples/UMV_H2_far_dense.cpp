@@ -703,6 +703,9 @@ namespace Hatrix {
 
     // row indices of row fill-ins, except (oc,oo) type (rank x block_size) sized fill-ins.
     std::set<int64_t> fill_in_rows;
+    // col indices of col fill-ins, except (co;oo) type (block_size x rank) sized fill-ins.
+    std::set<int64_t> fill_in_cols;
+
     for (int64_t block = 0; block < nblocks; ++block) {
       if (block > 0) {
         int64_t nblocks = level_blocks[level];
@@ -710,42 +713,38 @@ namespace Hatrix {
         // Calculate row fill-ins
         for (auto row_fill_itr = fill_in_rows.begin(); row_fill_itr != fill_in_rows.end(); ++row_fill_itr) {
           int64_t i = *row_fill_itr;
-        // for (int64_t i = 0; i < nblocks; ++i) {
-
           int64_t block_size = D(i, i, level).rows;
 
-            Matrix row_i(block_size, 0);
+          Matrix row_i(block_size, 0);
 
-            row_i = concat(row_i, matmul(U(i, level), Scol(i, level)), 1);
-            for (int64_t j = 0; j < nblocks; ++j) {
-              if (F.exists(i, j)) {
-                Matrix Ui, Si, Vi; double error;
-                Matrix cpy(F(i, j));
-                std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+          row_i = concat(row_i, matmul(U(i, level), Scol(i, level)), 1);
+          for (int64_t j = 0; j < nblocks; ++j) {
+            if (F.exists(i, j)) {
+              Matrix Ui, Si, Vi; double error;
+              Matrix cpy(F(i, j));
+              std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
 
-                // std::cout << "CONSUME ROW FILL IN i -> " << i << " j -> " << j
-                //           << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
-                //           << " rank=" << Si.rows << " norm=" << norm(F(i, j)) << std::endl;
-                row_i = concat(row_i, matmul(Ui, Si), 1);
-              }
+              // std::cout << "CONSUME ROW FILL IN i -> " << i << " j -> " << j
+              //           << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
+              //           << " rank=" << Si.rows << " norm=" << norm(F(i, j)) << std::endl;
+              row_i = concat(row_i, matmul(Ui, Si), 1);
             }
+          }
 
-            Matrix UN_i, SN_i, _VNT_i; double error;
-            std::tie(UN_i, SN_i, _VNT_i, error) = truncated_svd(row_i, rank);
+          Matrix UN_i, SN_i, _VNT_i; double error;
+          std::tie(UN_i, SN_i, _VNT_i, error) = truncated_svd(row_i, rank);
 
-            Matrix r_i = matmul(UN_i, U(i, level), true, false);
+          Matrix r_i = matmul(UN_i, U(i, level), true, false);
 
-            std::cout << "UPDATE U: i-> " << i << " level-> " << level << std::endl;
+          U.erase(i, level);
+          U.insert(i, level, std::move(UN_i));
 
-            U.erase(i, level);
-            U.insert(i, level, std::move(UN_i));
+          Scol.erase(i, level);
+          Scol.insert(i, level, std::move(SN_i));
 
-            Scol.erase(i, level);
-            Scol.insert(i, level, std::move(SN_i));
-
-            r_indices.push_back(i);
-            if (r.exists(i)) { r.erase(i); }
-            r.insert(i, std::move(r_i));
+          r_indices.push_back(i);
+          if (r.exists(i)) { r.erase(i); }
+          r.insert(i, std::move(r_i));
         }
 
         // Calculate col fill-ins
@@ -900,6 +899,7 @@ namespace Hatrix {
       r_indices.clear();
       t_indices.clear();
       fill_in_rows.clear();
+      fill_in_cols.clear();
       F.erase_all();
 
       // if (level == 2) {
@@ -1024,6 +1024,7 @@ namespace Hatrix {
                        false, false, -1.0, 1.0);
                 // fill_in.print();
                 fill_in_rows.insert(i);
+                fill_in_cols.insert(j);
                 F.insert(i, j, std::move(fill_in));
               }
             }
@@ -1172,7 +1173,7 @@ namespace Hatrix {
                   // Update the oo block within the fill-ins.
                   matmul(lower_splits[2], right_splits[1], fill_splits[1],
                          false, false, -1.0, 1.0);
-                  // fill_in_rows.insert(i);
+                  fill_in_cols.insert(j);
                   F.insert(i, j, std::move(fill_in));
                 }
                 else {
