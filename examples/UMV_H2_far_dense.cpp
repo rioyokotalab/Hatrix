@@ -700,12 +700,16 @@ namespace Hatrix {
                            RowMap& r, RowMap& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
     std::vector<int64_t> r_indices, t_indices;
+    std::set<int64_t> fill_in_rows;
     for (int64_t block = 0; block < nblocks; ++block) {
       if (block > 0) {
         int64_t nblocks = level_blocks[level];
 
         // Calculate row fill-ins
-        for (int64_t i = 0; i < nblocks; ++i) {
+        for (auto row_fill_itr = fill_in_rows.begin(); row_fill_itr != fill_in_rows.end(); ++row_fill_itr) {
+          int64_t i = *row_fill_itr;
+        // for (int64_t i = 0; i < nblocks; ++i) {
+
           int64_t block_size = D(i, i, level).rows;
           bool found_row_fill_in = false;
           for (int64_t j = 0; j < nblocks; ++j) {
@@ -720,7 +724,7 @@ namespace Hatrix {
           }
 
           if (found_row_fill_in) {
-            Matrix row_i(block_size, block_size);
+            Matrix row_i(block_size, 0);
 
             row_i = concat(row_i, matmul(U(i, level), Scol(i, level)), 1);
             for (int64_t j = 0; j < nblocks; ++j) {
@@ -742,6 +746,8 @@ namespace Hatrix {
 
             Matrix r_i = matmul(UN_i, U(i, level), true, false);
 
+            std::cout << "UPDATE U: i-> " << i << " level-> " << level << std::endl;
+
             U.erase(i, level);
             U.insert(i, level, std::move(UN_i));
 
@@ -749,9 +755,7 @@ namespace Hatrix {
             Scol.insert(i, level, std::move(SN_i));
 
             r_indices.push_back(i);
-            if (r.exists(i)) {
-              r.erase(i);
-            }
+            if (r.exists(i)) { r.erase(i); }
             r.insert(i, std::move(r_i));
           }
         }
@@ -858,6 +862,10 @@ namespace Hatrix {
                 S.erase(r_index, j, level);
                 S.insert(r_index, j, level, std::move(Sbar_ij));
               }
+
+              if (F.exists(r_index, j)) {
+                // F.erase(r_index, j)
+              }
             }
           //   r.erase(i);
           // }
@@ -888,14 +896,22 @@ namespace Hatrix {
                 S.erase(i, t_index, level);
                 S.insert(i, t_index, level, std::move(Sbar_ij));
               }
+              if (F.exists(i, t_index)) {
+                F.erase(i, t_index);
+              }
             }
           //   t.erase(t_index);
           // }
         }
       }
 
+      for (auto i = fill_in_rows.begin(); i != fill_in_rows.end(); ++i) {
+        std::cout << "fill in index i -> " << *i << std::endl;
+      }
+
       r_indices.clear();
       t_indices.clear();
+      fill_in_rows.clear();
       F.erase_all();
 
       // if (level == 2) {
@@ -1019,6 +1035,7 @@ namespace Hatrix {
                 matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
                        false, false, -1.0, 1.0);
                 // fill_in.print();
+                fill_in_rows.insert(i);
                 F.insert(i, j, std::move(fill_in));
               }
             }
@@ -1086,6 +1103,7 @@ namespace Hatrix {
                   // Update the oo block within the fill-in.
                   matmul(lower_splits[2], right_splits[1], fill_splits[1],
                          false, false, -1.0, 1.0);
+                  fill_in_rows.insert(i);
                   F.insert(i, j, std::move(fill_in));
                 }
 
@@ -1166,6 +1184,7 @@ namespace Hatrix {
                   // Update the oo block within the fill-ins.
                   matmul(lower_splits[2], right_splits[1], fill_splits[1],
                          false, false, -1.0, 1.0);
+                  fill_in_rows.insert(i);
                   F.insert(i, j, std::move(fill_in));
                 }
                 else {
