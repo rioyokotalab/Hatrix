@@ -4,7 +4,7 @@ make -j all
 
 rm result.txt
 
-./bin/UMV_H2_far_dense 1024 10 64 0.7 1 geometry_admis 0 0
+./bin/UMV_H2_far_dense 1024 10 64 0.2 1 geometry_admis 0 0
 ./bin/UMV_H2_far_dense 1024 15 64 0.5 2 geometry_admis 0 0
 ./bin/UMV_H2_far_dense 1024 25 64 0.9 3 geometry_admis 0 0
 
@@ -29,7 +29,7 @@ cat result.txt
 # done
 
 # ./bin/UMV_H2_far_dense 256 12 32 1.3 3 geometry_admis 0 0
-# for rank in 12 15 18 22 25; do
+# for rank in 12 15 18 22 25; d
 #     ./bin/UMV_H2_far_dense 256 $rank 32 1.3 3 geometry_admis 0 0
 # done
 
