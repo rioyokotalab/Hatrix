@@ -775,6 +775,9 @@ namespace Hatrix {
             Scol.insert(i, level, std::move(SN_i));
 
             r_indices.push_back(i);
+            if (r.exists(i)) {
+              r.erase(i);
+            }
             r.insert(i, std::move(r_i));
           }
         }
