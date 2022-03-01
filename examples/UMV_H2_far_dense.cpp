@@ -748,54 +748,41 @@ namespace Hatrix {
         }
 
         // Calculate col fill-ins
-        for (int64_t j = 0; j < nblocks; ++j) {
-          int64_t block_size = D(j, j, level).cols;
-          bool found_col_fill_in = false;
+        for (auto col_fill_itr = fill_in_cols.begin(); col_fill_itr != fill_in_cols.end(); ++col_fill_itr) {
+          int64_t j = *col_fill_itr;
+          Matrix col_j(0, block_size);
+          col_j = concat(col_j,
+                         matmul(Srow(j, level), V(j, level), false, true), 0);
           for (int64_t i = 0; i < nblocks; ++i) {
             if (F.exists(i, j)) {
-              if ((F(i, j).rows == rank && F(i, j).cols == block_size) ||
-                  (F(i, j).rows == block_size && F(i, j).cols == block_size)) {
-                found_col_fill_in = true;
-                break;
-              }
+              Matrix Ui, Si, Vi; double error;
+              Matrix cpy(F(i, j));
+              std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+
+              // std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j
+              //           << " F(i, j).rows: " << F(i, j).rows << " cols= "
+              //           << F(i, j).cols << " rank=" << Si.rows << " norm="
+              //           << norm(F(i, j)) <<  std::endl;
+              col_j = concat(col_j, matmul(Si, Vi), 0);
             }
           }
 
-          if (found_col_fill_in) {
-            Matrix col_j(0, block_size);
-            col_j = concat(col_j,
-                           matmul(Srow(j, level), V(j, level), false, true), 0);
-            for (int64_t i = 0; i < nblocks; ++i) {
-              if (F.exists(i, j)) {
-                Matrix Ui, Si, Vi; double error;
-                Matrix cpy(F(i, j));
-                std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+          Matrix _UN_j, SN_j, VNT_j; double error;
+          std::tie(_UN_j, SN_j, VNT_j, error) = truncated_svd(col_j, rank);
 
-                // std::cout << "CONSUME COL FILL IN i -> " << i << " j -> " << j
-                //           << " F(i, j).rows: " << F(i, j).rows << " cols= "
-                //           << F(i, j).cols << " rank=" << Si.rows << " norm="
-                //           << norm(F(i, j)) <<  std::endl;
-                col_j = concat(col_j, matmul(Si, Vi), 0);
-              }
-            }
+          Matrix t_j = matmul(VNT_j, V(j, level), false, false);
 
-            Matrix _UN_j, SN_j, VNT_j; double error;
-            std::tie(_UN_j, SN_j, VNT_j, error) = truncated_svd(col_j, rank);
+          V.erase(j, level);
+          V.insert(j, level, transpose(VNT_j));
 
-            Matrix t_j = matmul(VNT_j, V(j, level), false, false);
+          Srow.erase(j, level);
+          Srow.insert(j, level, std::move(SN_j));
 
-            V.erase(j, level);
-            V.insert(j, level, transpose(VNT_j));
+          // std::cout << "t_j -> " << j << std::endl;
 
-            Srow.erase(j, level);
-            Srow.insert(j, level, std::move(SN_j));
-
-            // std::cout << "t_j -> " << j << std::endl;
-
-            t_indices.push_back(j);
-            if (t.exists(j)) { t.erase(j); }
-            t.insert(j, std::move(t_j));
-          }
+          t_indices.push_back(j);
+          if (t.exists(j)) { t.erase(j); }
+          t.insert(j, std::move(t_j));
         }
 
         // Update S blocks in the rows.
@@ -890,10 +877,6 @@ namespace Hatrix {
           //   t.erase(t_index);
           // }
         }
-      }
-
-      for (auto i = fill_in_rows.begin(); i != fill_in_rows.end(); ++i) {
-        std::cout << "fill in index i -> " << *i << std::endl;
       }
 
       r_indices.clear();
