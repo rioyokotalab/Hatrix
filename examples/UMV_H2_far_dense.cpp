@@ -848,7 +848,6 @@ namespace Hatrix {
           int64_t r_index = r_indices[i];
           Matrix& r_i = r(r_index);
 
-
             for (int64_t j = 0; j < nblocks; ++j) {
               if (is_admissible.exists(r_index, j, level) && is_admissible(r_index, j, level)) {
                 int64_t block_size = D(j, j, level).cols;
