@@ -699,7 +699,7 @@ namespace Hatrix {
   void H2::factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
                            RowMap& r, RowMap& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
-    std::vector<int64_t> fill_in_rows, fill_in_cols;
+    std::vector<int64_t> r_indices, t_indices;
     for (int64_t block = 0; block < nblocks; ++block) {
       if (block > 0) {
         int64_t nblocks = level_blocks[level];
@@ -774,6 +774,7 @@ namespace Hatrix {
             Scol.erase(i, level);
             Scol.insert(i, level, std::move(SN_i));
 
+            r_indices.push_back(i);
             r.insert(i, std::move(r_i));
           }
         }
@@ -833,6 +834,7 @@ namespace Hatrix {
 
             // std::cout << "t_j -> " << j << std::endl;
 
+            t_indices.push_back(j);
             t.insert(j, std::move(t_j));
           }
         }
@@ -914,6 +916,9 @@ namespace Hatrix {
           }
         }
       }
+
+      r_indices.clear();
+      t_indices.clear();
       F.erase_all();
 
       // if (level == 2) {
