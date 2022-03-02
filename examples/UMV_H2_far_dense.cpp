@@ -1286,7 +1286,6 @@ namespace Hatrix {
 
       if (block > 0) {
         int64_t block_size = U(block, level).rows;
-        int64_t rank = U(block, level).cols;
         {
           // Scan for fill-ins in the same row as this diagonal block.
           Matrix row_concat(block_size, 0);
@@ -1299,23 +1298,38 @@ namespace Hatrix {
           }
 
           if (found_row_fill_in) {
-            row_concat = concat(row_concat, matmul(U(block, level),
-                                                   Scol(block, level)), 1);
-            for (int j = 0; j < nblocks; ++j) {
+            int64_t block_size = D(block, block, level).rows;
+
+            Matrix row_block(block_size, 0);
+            row_block = concat(row_block, matmul(U(block, level), Scol(block, level)), 1);
+            for (int64_t j = 0; j < nblocks; ++j) {
               if (F.exists(block, j)) {
-                Matrix Fp = matmul(F(block, j), V(j, level), false, true);
-                row_concat = concat(row_concat, Fp, 1);
+                // Matrix Ui, Si, Vi; double error;
+                // Matrix cpy(F(block, j));
+                // std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+
+                if (F(block, j).rows == block_size && F(block, j).cols == rank)  {
+                  row_block = concat(row_block, matmul(F(block, j), V(j, level), false, true), 1);
+                }
+                else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
+                  row_block = concat(row_block, F(block, j), 1);
+                }
               }
             }
 
-            Matrix UN1, _SN1, _VN1T; double error;
-            std::tie(UN1, _SN1, _VN1T, error) = truncated_svd(row_concat, rank);
-            Scol.erase(block, level);
-            Scol.insert(block, level, std::move(_SN1));
+            Matrix UN_block, SN_block, _VNT_block; double error;
+            std::tie(UN_block, SN_block, _VNT_block, error) = truncated_svd(row_block, rank);
 
-            Matrix r_block = matmul(UN1, U(block, level), true, false);
+            Matrix r_block = matmul(UN_block, U(block, level), true, false);
+
             U.erase(block, level);
-            U.insert(block, level, std::move(UN1));
+            U.insert(block, level, std::move(UN_block));
+
+            Scol.erase(block, level);
+            Scol.insert(block, level, std::move(SN_block));
+
+            r_indices.push_back(block);
+            if (r.exists(block)) { r.erase(block); }
             r.insert(block, std::move(r_block));
           } // if (found_row_fill_in)
 
@@ -1368,6 +1382,45 @@ namespace Hatrix {
             V.erase(block, level);
             V.insert(block, level, transpose(VN2T));
             t.insert(block, std::move(t_block));
+            // for (auto col_fill_itr = fill_in_cols.begin();
+            //      col_fill_itr != fill_in_cols.end(); ++col_fill_itr) {
+            //   int64_t j = *col_fill_itr;
+
+            //   std::cout << "FAR DENSE COL FILL IN : j-> " << j << std::endl;
+
+            //   int64_t block_size = D(j, j, level).rows;
+            //   Matrix col_j(0, block_size);
+            //   col_j = concat(col_j,
+            //                  matmul(Srow(j, level), V(j, level), false, true), 0);
+            //   for (int64_t i = 0; i < nblocks; ++i) {
+            //     if (F.exists(i, j)) {
+            //       Matrix Ui, Si, Vi; double error;
+            //       Matrix cpy(F(i, j));
+            //       std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+
+            //       if (F(i, j).rows == rank && F(i, j).cols == block_size) {
+            //         col_j = concat(col_j, matmul(U(i, level), F(i, j)), 0);
+            //       }
+            //       else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
+            //         col_j = concat(col_j, F(i, j), 0);
+            //       }
+            //     }
+            //   }
+
+            //   Matrix _UN_j, SN_j, VNT_j; double error;
+            //   std::tie(_UN_j, SN_j, VNT_j, error) = truncated_svd(col_j, rank);
+
+            //   Matrix t_j = matmul(V(j, level), VNT_j, true, true);
+            //   V.erase(j, level);
+            //   V.insert(j, level, transpose(VNT_j));
+
+            //   Srow.erase(j, level);
+            //   Srow.insert(j, level, std::move(SN_j));
+
+            //   t_indices.push_back(j);
+            //   if (t.exists(j)) { t.erase(j); }
+            //   t.insert(j, std::move(t_j));
+            // }
           }
 
           if (found_col_fill_in) {

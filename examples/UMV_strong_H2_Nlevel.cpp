@@ -684,6 +684,8 @@ namespace Hatrix {
           if (found_col_fill_in) {
             col_concat = concat(col_concat, matmul(Srow(block, level),
                                                    transpose(V(block, level))), 0);
+
+            std::cout << "COL FILL IN : block-> " << block << std::endl;
             for (int i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
                 Matrix Fp = matmul(U(i, level), F(i, block));
