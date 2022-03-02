@@ -1351,18 +1351,17 @@ namespace Hatrix {
     for (int block = 0; block < nblocks; ++block) {
 
       if (block > 0) {
-        int64_t block_size = U(block, level).rows;
+        int64_t block_size = D(block, block, level).rows;
         {
           // Scan for fill-ins in the same row as this diagonal block.
           bool found_row_fill_in = fill_in_row_indices.count(block) != 0;
           bool found_col_fill_in = fill_in_col_indices.count(block) != 0;
 
           if (found_row_fill_in) {
+            // std::cout << "ADDING R WITH ROW UPDATE: block -> " << block << std::endl;
             update_row_basis(block, level, F, r);
 
-            for (auto col_iter = fill_in_col_indices.begin(); col_iter != fill_in_col_indices.end(); ++col_iter) {
-              int64_t j = *col_iter;
-
+            for (int64_t j = 0; j < nblocks; ++j) {
               if (F.exists(block, j) && F(block,j).rows == block_size && F(block,j).cols == block_size) {
                 update_col_basis(j, level, F, t);
               }
@@ -1371,11 +1370,10 @@ namespace Hatrix {
 
 
           if (found_col_fill_in) {
+            // std::cout << "ADDING T WITH COL UPDATE: block -> " << block << std::endl;
             update_col_basis(block, level, F, t);
 
-            for (auto row_iter = fill_in_row_indices.begin(); row_iter != fill_in_row_indices.end(); ++row_iter) {
-              int64_t i = *row_iter;
-
+            for (int64_t i = 0; i < nblocks; ++i) {
               if (F.exists(i, block) && F(i, block).rows == block_size && F(i, block).cols == block_size) {
                 update_row_basis(i,level, F, r);
               }
@@ -1409,6 +1407,7 @@ namespace Hatrix {
                       }
                     }
                   }
+                  // t.erase(j);
                   F.erase(block, j);
                 }
                 else {
@@ -1699,7 +1698,6 @@ namespace Hatrix {
               matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
             }
             else {
-
               int64_t rows = D(i, block, level).rows;
               int64_t cols = D(block, j, level).cols;
               if (F.exists(i, j)) {
@@ -1714,6 +1712,9 @@ namespace Hatrix {
                 matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
                        false, false, -1.0, 1.0);
 
+                // if (block == 1) {
+                // std::cout << "ADDING ROW INDEX: " << i << " COL INDEX: " << j << " BLOCK: " << block << std::endl;
+                // }
                 fill_in_row_indices.insert(i);
                 fill_in_col_indices.insert(j);
                 F.insert(i, j, std::move(fill_in));
@@ -3812,13 +3813,13 @@ int main(int argc, char ** argv) {
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Matrix rank_map = domain.generate_rank_heat_map();
-  rank_map.print();
+  // rank_map.print();
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   double construct_error, lr_ratio, solve_error;
   construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
-  A.print_structure();
+  // A.print_structure();
   A.factorize(domain);
 
   if  (false) {
