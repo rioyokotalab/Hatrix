@@ -725,11 +725,6 @@ namespace Hatrix {
               Matrix cpy(F(i, j));
               std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
 
-              // std::cout << "CONSUME ROW FILL IN i -> " << i << " j -> " << j
-              //           << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
-              //           << " rank=" << Si.rows << " norm=" << norm(F(i, j)) << std::endl;
-              // row_i = concat(row_i, matmul(Ui, Si), 1);
-
               if (F(i, j).rows == block_size && F(i, j).cols == rank)  {
                 row_i = concat(row_i, matmul(F(i, j), V(j, level), false, true), 1);
               }
@@ -782,7 +777,7 @@ namespace Hatrix {
           Matrix _UN_j, SN_j, VNT_j; double error;
           std::tie(_UN_j, SN_j, VNT_j, error) = truncated_svd(col_j, rank);
 
-          Matrix t_j = matmul(VNT_j, V(j, level), false, false);
+          Matrix t_j = matmul(V(j, level), VNT_j, true, true);
           V.erase(j, level);
           V.insert(j, level, transpose(VNT_j));
 
@@ -804,14 +799,12 @@ namespace Hatrix {
               int64_t block_size = D(j, j, level).cols;
               Matrix Sbar_ij(rank, rank);
               if (F.exists(r_index, j)) {
-
-                // F(i, j).print_meta();
                 if (F(r_index, j).rows == block_size && F(r_index, j).cols == rank) {
                   Sbar_ij = matmul(r_i, S(r_index, j, level)) + matmul(U(r_index, level), F(r_index, j), true, false);
                 }
                 else if (F(r_index, j).rows == block_size && F(r_index, j).cols == block_size) {
-                  Sbar_ij = matmul(matmul(r_i, S(r_index, j, level)), t(j), false, true) +
-                    matmul(matmul(U(r_index, level), F(r_index, j), true, false), V(j, level));
+                  Sbar_ij = matmul(matmul(r_i, S(r_index, j, level)), t(j)) +
+                    matmul(matmul(U(r_index, level), F(r_index, j)), V(j, level));
                 }
               }
               else {
@@ -844,13 +837,13 @@ namespace Hatrix {
                 }
 
                 if (F(i, t_index).rows == rank && F(i, t_index).cols == block_size) {
-                  Sbar_ij = matmul(S(i, t_index, level), t_j, false, true) +
+                  Sbar_ij = matmul(S(i, t_index, level), t_j) +
                     matmul(F(i, t_index), V(t_index, level));
                 }
                 //F.erase(i, j);
               }
               else {
-                Sbar_ij = matmul(S(i, t_index, level), t_j, false, true);
+                Sbar_ij = matmul(S(i, t_index, level), t_j);
               }
 
               S.erase(i, t_index, level);
