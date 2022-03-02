@@ -1385,18 +1385,20 @@ namespace Hatrix {
           if (found_row_fill_in) {
             for (int j = 0; j < nblocks; ++j) {
               if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                Matrix Sbar_block_j = matmul(r(block), S(block, j, level));
+                Matrix Sbar_block_j(rank, rank);
 
                 if (F.exists(block, j)) {
-                  Matrix SpF(rank, rank);
                   if (F(block, j).rows == block_size && F(block, j).cols == rank) {
-                    SpF = matmul(U(block, level), F(block, j), true, false);
+                    Sbar_block_j = matmul(r(block), S(block, j, level)) +
+                      matmul(U(block, level), F(block, j), true, false);
                   }
                   else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
-                    SpF = matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
+                    Sbar_block_j = matmul(matmul(r(block), S(block, j, level)), t(j)) +
+                      matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
                   }
-
-                  Sbar_block_j = Sbar_block_j + SpF;
+                }
+                else {
+                  Sbar_block_j = matmul(r(block), S(block, j, level));
                 }
 
                 S.erase(block, j, level);
