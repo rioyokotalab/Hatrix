@@ -233,7 +233,7 @@ namespace Hatrix {
     int nblocks = pow(2, level);
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-      Hatrix::Matrix dense = Hatrix::generate_laplacend(randpts,
+      Hatrix::Matrix dense = Hatrix::kernel_function(randpts,
                                                                block_size, block_size,
                                                                block*block_size,
                                                                j*block_size);
@@ -260,7 +260,7 @@ namespace Hatrix {
     Hatrix::Matrix YtA(0, block_size);
     for (int64_t i = 0; i < pow(2, level); ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-      Hatrix::Matrix dense = Hatrix::generate_laplacend(randpts,
+      Hatrix::Matrix dense = Hatrix::kernel_function(randpts,
                                                         block_size, block_size,
                                                         i*block_size, block*block_size);
       YtA = concat(YtA, dense, 0);
@@ -290,7 +290,7 @@ namespace Hatrix {
       for (int j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
           D.insert(i, j, height,
-                   Hatrix::generate_laplacend(randpts,
+                   Hatrix::kernel_function(randpts,
                                               block_size, block_size,
                                               i*block_size, j*block_size));
         }
@@ -320,7 +320,7 @@ namespace Hatrix {
     for (int i = 0; i < nblocks; ++i) {
       for (int j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
-          Hatrix::Matrix dense = Hatrix::generate_laplacend(randpts,
+          Hatrix::Matrix dense = Hatrix::kernel_function(randpts,
                                                             block_size, block_size,
                                                             i*block_size, j*block_size);
 
@@ -438,7 +438,7 @@ namespace Hatrix {
     for (int row = 0; row < num_nodes; ++row) {
       for (int col = 0; col < num_nodes; ++col) {
         if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
-          Matrix D = generate_laplacend(randpts, block_size, block_size,
+          Matrix D = kernel_function(randpts, block_size, block_size,
                                         row * block_size, col * block_size);
           S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
                                            Vbig_parent(col, level)));
@@ -574,7 +574,7 @@ namespace Hatrix {
       for (int j = 0; j < num_nodes; ++j) {
         if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
           int slice = N / num_nodes;
-          Matrix actual = Hatrix::generate_laplacend(randvec, slice, slice,
+          Matrix actual = Hatrix::kernel_function(randvec, slice, slice,
                                                      slice * i, slice * j);
           Matrix expected = D(i, j, height);
           error += pow(norm(actual - expected), 2);
@@ -596,7 +596,7 @@ namespace Hatrix {
             int block_nrows = Ubig.rows;
             int block_ncols = Vbig.rows;
             Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-            Matrix actual_matrix = Hatrix::generate_laplacend(randvec, block_nrows,
+            Matrix actual_matrix = Hatrix::kernel_function(randvec, block_nrows,
                                                                      block_ncols,
                                                                      row * slice, col * slice);
 
@@ -1234,6 +1234,7 @@ int main(int argc, char *argv[]) {
   int64_t rank = atoi(argv[2]);
   int64_t height = atoi(argv[3]);
   int64_t admis = atoi(argv[4]);
+  int64_t kernel_func = atoi(argv[5]);
 
   if (rank > int(N / pow(2, height))) {
     std::cout << N << " % " << pow(2, height)
@@ -1241,14 +1242,24 @@ int main(int argc, char *argv[]) {
     abort();
   }
 
-  global_matrix.read_file("dense_matrix.data");
+  randvec_t randpts;
 
   Hatrix::Context::init();
-  randvec_t randpts;
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
-  randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
-  PV = 1e-3 * (1 / pow(10, height));
+  switch(kernel_func) {
+  case 0: {
+    global_matrix.read_file("dense_matrix.data");
+    Hatrix::kernel_function = Hatrix::generate_global;
+    break;
+  }
+  case 1: {
+    randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
+    randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
+    randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
+    PV = 1e-3 * (1 / pow(10, height));
+    Hatrix::kernel_function = Hatrix::generate_laplacend;
+    break;
+  }
+  }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
 
@@ -1258,7 +1269,7 @@ int main(int argc, char *argv[]) {
   auto construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
 
-  // A.print_structure();
+  A.print_structure();
 
   double construct_error = A.construction_relative_error(randpts);
 
@@ -1269,7 +1280,7 @@ int main(int argc, char *argv[]) {
     std::chrono::milliseconds>(stop_factor - start_factor).count();
 
   Hatrix::Matrix x = A.solve(b, A.height);
-  Hatrix::Matrix Adense = Hatrix::generate_laplacend(randpts, N, N, 0, 0);
+  Hatrix::Matrix Adense = Hatrix::kernel_function(randpts, N, N, 0, 0);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
 
   double solve_error =  Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);

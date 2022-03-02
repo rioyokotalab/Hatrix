@@ -238,7 +238,13 @@ void Matrix::read_file(std::string in_file) {
   data = std::make_shared<DataHandler>(rows * cols, 0);
   data_ptr = data->get_ptr();
 
-  std::cout << "r: " << rows << " c: " << cols << std::endl;
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      int64_t irow, jcol; double value;
+      file >> irow >> jcol >> value;
+      (*this)(irow, jcol) = value;
+    }
+  }
 
   file.close();
 }
@@ -248,7 +254,6 @@ void Matrix::out_file(std::string out_file) const {
   file.open(out_file, std::ios::out | std::ios::trunc);
 
   file << rows << " " << cols << std::endl;
-  file << "i j value" << std::endl;
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {
       file << i << " " << j << " " << (*this)(i, j) << std::endl;
