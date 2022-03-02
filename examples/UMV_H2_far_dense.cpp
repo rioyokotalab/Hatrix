@@ -1430,14 +1430,15 @@ namespace Hatrix {
                     Sbar_i_block = matmul(S(i, block,level), t(block)) + matmul(F(i, block), V(block, level));
                   }
                   else if (F(i, block).rows == block_size && F(i, block).cols == block_size) {
-                    Sbar_i_block = matmul(S(i, block,level), t(block)) +
+                    Sbar_i_block = matmul(r(i), matmul(S(i, block,level), t(block))) +
                       matmul(U(i, level), matmul(F(i, block), V(block, level)), true, false);
 
+                    // Update S blocks for the row of the block with nb * nb fill-in.
                     for (int64_t j = 0; j < nblocks; ++j) {
                       if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
                         Matrix Sbar_ij(rank, rank);
                         if (j != block) {
-                          Sbar_ij = matmul(r(i), Sbar_ij);
+                          Sbar_ij = matmul(r(i), S(i, j, level));
 
                           S.erase(i, j, level);
                           S.insert(i, j, level, std::move(Sbar_ij));
