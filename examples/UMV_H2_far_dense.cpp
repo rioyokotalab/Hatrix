@@ -1352,108 +1352,106 @@ namespace Hatrix {
 
       if (block > 0) {
         int64_t block_size = D(block, block, level).rows;
-        {
-          // Scan for fill-ins in the same row as this diagonal block.
-          bool found_row_fill_in = fill_in_row_indices.count(block) != 0;
-          bool found_col_fill_in = fill_in_col_indices.count(block) != 0;
+        // Scan for fill-ins in the same row as this diagonal block.
+        bool found_row_fill_in = fill_in_row_indices.count(block) != 0;
+        bool found_col_fill_in = fill_in_col_indices.count(block) != 0;
 
-          if (found_row_fill_in) {
-            // std::cout << "ADDING R WITH ROW UPDATE: block -> " << block << std::endl;
-            update_row_basis(block, level, F, r);
+        if (found_row_fill_in) {
+          // std::cout << "ADDING R WITH ROW UPDATE: block -> " << block << std::endl;
+          update_row_basis(block, level, F, r);
 
-            for (int64_t j = 0; j < nblocks; ++j) {
-              if (F.exists(block, j) && F(block,j).rows == block_size && F(block,j).cols == block_size) {
-                update_col_basis(j, level, F, t);
-              }
-            }
-          } // if (found_row_fill_in)
-
-
-          if (found_col_fill_in) {
-            // std::cout << "ADDING T WITH COL UPDATE: block -> " << block << std::endl;
-            update_col_basis(block, level, F, t);
-
-            for (int64_t i = 0; i < nblocks; ++i) {
-              if (F.exists(i, block) && F(i, block).rows == block_size && F(i, block).cols == block_size) {
-                update_row_basis(i,level, F, r);
-              }
+          for (int64_t j = 0; j < nblocks; ++j) {
+            if (F.exists(block, j) && F(block,j).rows == block_size && F(block,j).cols == block_size) {
+              update_col_basis(j, level, F, t);
             }
           }
+        } // if (found_row_fill_in)
 
-          if (found_row_fill_in) {
-            for (int j = 0; j < nblocks; ++j) {
-              if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-                Matrix Sbar_block_j(rank, rank);
 
-                if (F.exists(block, j)) {
-                  if (F(block, j).rows == block_size && F(block, j).cols == rank) {
-                    Sbar_block_j = matmul(r(block), S(block, j, level)) +
-                      matmul(U(block, level), F(block, j), true, false);
-                  }
-                  else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
-                    Sbar_block_j = matmul(matmul(r(block), S(block, j, level)), t(j)) +
-                      matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
+        if (found_col_fill_in) {
+          // std::cout << "ADDING T WITH COL UPDATE: block -> " << block << std::endl;
+          update_col_basis(block, level, F, t);
 
-                    // Update S blocks for the column of the block with nb * nb fill-in.
-                    for (int64_t i = 0; i < nblocks; ++i) {
-                      if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-                        Matrix Sbar_ij(rank, rank);
-                        if (i != block) {
-                          Sbar_ij = matmul(S(i, j, level), t(j));
+          for (int64_t i = 0; i < nblocks; ++i) {
+            if (F.exists(i, block) && F(i, block).rows == block_size && F(i, block).cols == block_size) {
+              update_row_basis(i,level, F, r);
+            }
+          }
+        }
 
-                          S.erase(i, j, level);
-                          S.insert(i, j, level, std::move(Sbar_ij));
-                        }
+        if (found_row_fill_in) {
+          for (int j = 0; j < nblocks; ++j) {
+            if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
+              Matrix Sbar_block_j(rank, rank);
+
+              if (F.exists(block, j)) {
+                if (F(block, j).rows == block_size && F(block, j).cols == rank) {
+                  Sbar_block_j = matmul(r(block), S(block, j, level)) +
+                    matmul(U(block, level), F(block, j), true, false);
+                }
+                else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
+                  Sbar_block_j = matmul(matmul(r(block), S(block, j, level)), t(j)) +
+                    matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
+
+                  // Update S blocks for the column of the block with nb * nb fill-in.
+                  for (int64_t i = 0; i < nblocks; ++i) {
+                    if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+                      Matrix Sbar_ij(rank, rank);
+                      if (i != block) {
+                        Sbar_ij = matmul(S(i, j, level), t(j));
+
+                        S.erase(i, j, level);
+                        S.insert(i, j, level, std::move(Sbar_ij));
                       }
                     }
                   }
-                  // t.erase(j);
-                  F.erase(block, j);
                 }
-                else {
-                  Sbar_block_j = matmul(r(block), S(block, j, level));
-                }
-
-                S.erase(block, j, level);
-                S.insert(block, j, level, std::move(Sbar_block_j));
+                // t.erase(j);
+                F.erase(block, j);
               }
+              else {
+                Sbar_block_j = matmul(r(block), S(block, j, level));
+              }
+
+              S.erase(block, j, level);
+              S.insert(block, j, level, std::move(Sbar_block_j));
             }
           }
+        }
 
-          if (found_col_fill_in) {
-            for (int i = 0; i < nblocks; ++i) {
-              if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                Matrix Sbar_i_block(rank, rank);
-                if (F.exists(i, block)) {
-                  if (F(i, block).rows == rank && F(i, block).cols == block_size) {
-                    Sbar_i_block = matmul(S(i, block,level), t(block)) + matmul(F(i, block), V(block, level));
-                  }
-                  else if (F(i, block).rows == block_size && F(i, block).cols == block_size) {
-                    Sbar_i_block = matmul(r(i), matmul(S(i, block,level), t(block))) +
-                      matmul(U(i, level), matmul(F(i, block), V(block, level)), true, false);
+        if (found_col_fill_in) {
+          for (int i = 0; i < nblocks; ++i) {
+            if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
+              Matrix Sbar_i_block(rank, rank);
+              if (F.exists(i, block)) {
+                if (F(i, block).rows == rank && F(i, block).cols == block_size) {
+                  Sbar_i_block = matmul(S(i, block,level), t(block)) + matmul(F(i, block), V(block, level));
+                }
+                else if (F(i, block).rows == block_size && F(i, block).cols == block_size) {
+                  Sbar_i_block = matmul(r(i), matmul(S(i, block,level), t(block))) +
+                    matmul(U(i, level), matmul(F(i, block), V(block, level)), true, false);
 
-                    // Update S blocks for the row of the block with nb * nb fill-in.
-                    for (int64_t j = 0; j < nblocks; ++j) {
-                      if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-                        Matrix Sbar_ij(rank, rank);
-                        if (j != block) {
-                          Sbar_ij = matmul(r(i), S(i, j, level));
+                  // Update S blocks for the row of the block with nb * nb fill-in.
+                  for (int64_t j = 0; j < nblocks; ++j) {
+                    if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+                      Matrix Sbar_ij(rank, rank);
+                      if (j != block) {
+                        Sbar_ij = matmul(r(i), S(i, j, level));
 
-                          S.erase(i, j, level);
-                          S.insert(i, j, level, std::move(Sbar_ij));
-                        }
+                        S.erase(i, j, level);
+                        S.insert(i, j, level, std::move(Sbar_ij));
                       }
                     }
                   }
-                  F.erase(i, block);
                 }
-                else {
-                  Sbar_i_block = matmul(S(i, block, level), t(block));
-                }
-
-                S.erase(i, block, level);
-                S.insert(i, block, level, std::move(Sbar_i_block));
+                F.erase(i, block);
               }
+              else {
+                Sbar_i_block = matmul(S(i, block, level), t(block));
+              }
+
+              S.erase(i, block, level);
+              S.insert(i, block, level, std::move(Sbar_i_block));
             }
           }
         }
@@ -1613,10 +1611,6 @@ namespace Hatrix {
       fill_in_row_indices.clear();
       fill_in_col_indices.clear();
       // F.erase_all();
-
-      if (level == 2) {
-        std::cout << "Norm<0,1>: " << norm(D(0,1,level)) << std::endl;
-      }
 
       Matrix U_F = make_complement(U(block, level));
       Matrix V_F = make_complement(V(block, level));
@@ -3815,7 +3809,7 @@ int main(int argc, char ** argv) {
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   Adense.out_file("dense_matrix.data");
 
-  if (false) {
+  if (matrix_type == BLR2_MATRIX) {
     // regenA = permute(U * L * L0 * U0 * U * VF)
     Matrix regenA = regenerate_BLR2_matrix(A, domain);
 
@@ -3836,18 +3830,6 @@ int main(int argc, char ** argv) {
     auto d_splits = diff.split(M_row_offsets, M_col_offsets);
     auto m_splits = Adense.split(M_row_offsets, M_col_offsets);
     auto regen_splits = regenA.split(M_row_offsets, M_col_offsets);
-
-    // std::cout <<  "BLOCK WISE NORM:\n";
-    // for (int64_t i = 0; i < nblocks; ++i) {
-    //   for (int64_t j = 0; j < nblocks; ++j) {
-    //     std::cout << "<i, j>: " << i << ", " << j
-    //               << " -- "
-    //               << std::setprecision(5)
-    //               << norm(m_splits[i * nblocks + j])
-    //               << std::setw(5)
-    //               << std::endl;
-    //   }
-    // }
 
     std::cout << "ERROR\n";
 

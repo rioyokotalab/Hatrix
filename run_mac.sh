@@ -4,25 +4,11 @@ make -j all
 
 rm result.txt
 
-# ./bin/UMV_H2_far_dense 512 10 64 0.7 2 geometry_admis 0 0
-# ./bin/UMV_H2_far_dense 1024 10 64 0.7 2 geometry_admis 0 0
-./bin/UMV_H2_far_dense 1024 10 64 0.5 2 geometry_admis 0 0
-# ./bin/UMV_H2_far_dense 1024 10 64 0.3 2 geometry_admis 0 0
-
-# ./bin/UMV_H2_far_dense 1024 15 64 0.7 2 geometry_admis 0 0
-./bin/UMV_H2_far_dense 1024 15 64 0.5 2 geometry_admis 0 0
-# ./bin/UMV_H2_far_dense 1024 15 64 0.3 2 geometry_admis 0 0
-
-# ./bin/UMV_H2_far_dense 1024 10 128 2 2 diagonal_admis 0 1
-# ./bin/UMV_H2_far_dense 2048 10 128 3 2 diagonal_admis 0 1
-
 echo "------ UMV H2 NLEVEL ------"
 
 # ./bin/UMV_strong_H2_Nlevel 1024 10 3 2 0
 # ./bin/UMV_strong_H2_Nlevel 1024 10 4 2 0
 # ./bin/UMV_strong_H2_Nlevel 2048 10 5 2
-
-
 
 # ./bin/UMV_H2_far_dense 1024 10 64 0.2 1 geometry_admis 0 0
 # ./bin/UMV_H2_far_dense 512 15 64 0.5 2 geometry_admis 0 0
@@ -35,9 +21,9 @@ echo "------ UMV H2 NLEVEL ------"
 
 
 # echo "SPHERE GEOMETRY"
-for rank in 34; do
-    lldb -o run -- ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
-done
+# for rank in 34; do
+#     lldb -o run -- ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
+# done
 
 cat result.txt
 
@@ -59,7 +45,9 @@ cat result.txt
 #     ./bin/UMV_H2_far_dense 1024 $rank 64 0.7 1 geometry_admis 1 0
 # done
 
-# echo "STARSH GRID GEOMETRY DIM=2"
+echo "STARSH GRID GEOMETRY DIM=2"
+./bin/UMV_H2_far_dense 1024 20 64 1.2 3 geometry_admis 0 0
+# ./bin/UMV_H2_far_dense 1024 30 64 0.5 2 geometry_admis 1 0
 # for rank in 20 24 30; do
 #     ./bin/UMV_H2_far_dense 1024 $rank 64 0.5 2 geometry_admis 1 0
 # done
