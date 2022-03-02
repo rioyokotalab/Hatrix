@@ -3,6 +3,8 @@
 make -j all
 
 ./bin/UMV_strong_H2_Nlevel 512 10 3 2
+./bin/UMV_strong_H2_Nlevel 1024 10 4 2
+# ./bin/UMV_strong_H2_Nlevel 2048 10 5 2
 
 rm result.txt
 
