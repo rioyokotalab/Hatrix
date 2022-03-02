@@ -1365,11 +1365,17 @@ namespace Hatrix {
 
             Matrix t_block = matmul(V(block, level), VN2T, true, true);
 
+            V.erase(block, level);
+            V.insert(block, level, transpose(VN2T));
+            t.insert(block, std::move(t_block));
+          }
+
+          if (found_col_fill_in) {
             for (int i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                Matrix Sbar_i_block = matmul(S(i, block,level), t_block);
+                Matrix Sbar_i_block = matmul(S(i, block,level), t(block));
                 if (F.exists(i, block)) {
-                  Matrix SpF = matmul(F(i, block), VN2T, false, true);
+                  Matrix SpF = matmul(F(i, block), V(block, level));
                   Sbar_i_block = Sbar_i_block + SpF;
                 }
 
@@ -1377,10 +1383,6 @@ namespace Hatrix {
                 S.insert(i, block, level, std::move(Sbar_i_block));
               }
             }
-
-            V.erase(block, level);
-            V.insert(block, level, transpose(VN2T));
-            t.insert(block, std::move(t_block));
           }
         }
       }
