@@ -710,11 +710,11 @@ namespace Hatrix {
       if (block > 0) {
         int64_t nblocks = level_blocks[level];
 
-        std::cout << "row itr: " << block << std::endl;
-        for (auto row_fill_itr = fill_in_rows.begin(); row_fill_itr != fill_in_rows.end(); ++row_fill_itr) {
-          std::cout << *row_fill_itr << " ";
-        }
-        std::cout << std::endl;
+        // std::cout << "row itr: " << block << std::endl;
+        // for (auto row_fill_itr = fill_in_rows.begin(); row_fill_itr != fill_in_rows.end(); ++row_fill_itr) {
+        //   std::cout << *row_fill_itr << " ";
+        // }
+        // std::cout << std::endl;
         // if (block ==1 && level == 2) {
         //   fill_in_rows.insert(1);
         //   fill_in_cols.insert(1);
@@ -774,11 +774,11 @@ namespace Hatrix {
           Matrix r_i = matmul(UN_i, U(i, level), true, false);
 
 
-          if (level == 2) {
-            std::cout << "U UPDATE i-> " << i << " level-> "
-                      << level << " r.exists: " << r.exists(i) << std::endl;
-            // r_i.print();
-          }
+          // if (level == 2) {
+          //   std::cout << "U UPDATE i-> " << i << " level-> "
+          //             << level << " r.exists: " << r.exists(i) << std::endl;
+          //   // r_i.print();
+          // }
 
           U.erase(i, level);
           U.insert(i, level, std::move(UN_i));
@@ -1318,13 +1318,13 @@ namespace Hatrix {
           auto temp_splits = temp.split(2, 1);
 
           if (r.exists(c1)) {
-            std::cout << "C1 update: " << c1 << std::endl;
+            // std::cout << "C1 update: " << c1 << std::endl;
             matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
             r.erase(c1);
           }
 
           if (r.exists(c2)) {
-            std::cout << "C2 update: " << c2 << std::endl;
+                        // std::cout << "C2 update: " << c2 << std::endl;
             matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
             r.erase(c2);
           }
@@ -1333,7 +1333,7 @@ namespace Hatrix {
           U.insert(parent_node, parent_level, std::move(temp));
 
           if (parent_level == 2) {
-            std::cout << "parent_node -> " << parent_node
+            std::cout << "FAR DENSE parent_node -> " << parent_node
                       << " parent_level -> " << parent_level
                       << norm(generate_identity_matrix(rank, rank) -
                               matmul(U(parent_node, parent_level),
@@ -1917,17 +1917,17 @@ namespace Hatrix {
         }
       }
 
-      is_admissible.erase(0, 2, level);
-      is_admissible.insert(0, 2, level, true);
+      // is_admissible.erase(0, 2, level);
+      // is_admissible.insert(0, 2, level, true);
 
-      is_admissible.erase(2, 0, level);
-      is_admissible.insert(2, 0, level, true);
+      // is_admissible.erase(2, 0, level);
+      // is_admissible.insert(2, 0, level, true);
 
-      is_admissible.erase(1, 3, level);
-      is_admissible.insert(1, 3, level, true);
+      // is_admissible.erase(1, 3, level);
+      // is_admissible.insert(1, 3, level, true);
 
-      is_admissible.erase(3, 1, level);
-      is_admissible.insert(3, 1, level, true);
+      // is_admissible.erase(3, 1, level);
+      // is_admissible.insert(3, 1, level, true);
 
     }
     else {
@@ -3184,7 +3184,7 @@ int main(int argc, char ** argv) {
   A.print_structure();
   A.factorize(domain);
 
-  if  (matrix_type == H2_MATRIX) {
+  if  (false) {
     std::cout << "-- H2 verification --\n";
     verify_A1_factorization(A, domain);
     verify_A2_factorization(A, domain);
@@ -3192,7 +3192,7 @@ int main(int argc, char ** argv) {
 
   // Adense = dense before the compression.
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-  Adense.out_file("dense_matrix.data");
+  // Adense.out_file("dense_matrix.data");
 
   if (false) {
     // regenA = permute(U * L * L0 * U0 * U * VF)
@@ -3275,9 +3275,10 @@ int main(int argc, char ** argv) {
   auto x_splits = x.split(8, 1);
   auto x_solve_splits = x_solve.split(8, 1);
 
-  for (int i = 0; i < 8; ++i) {
-    std::cout << "i -> " << i << " rel. err. -> " << norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
-  }
+  // for (int i = 0; i < 8; ++i) {
+  //   std::cout << "i -> " << i << " rel. err. -> "
+  //             << norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
+  // }
 
   // (x - x_solve).print();
 

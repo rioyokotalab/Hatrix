@@ -953,6 +953,15 @@ namespace Hatrix {
 
           U.erase(parent_node, parent_level);
           U.insert(parent_node, parent_level, std::move(temp));
+
+          if (parent_level == 2) {
+            std::cout << "NLEVEL parent_node -> " << parent_node
+                      << " parent_level -> " << parent_level
+                      << norm(generate_identity_matrix(rank, rank) -
+                              matmul(U(parent_node, parent_level),
+                                     U(parent_node, parent_level), true, false))
+                      << std::endl;
+          }
         }
 
         if (col_has_admissible_blocks(parent_node, parent_level)) {
