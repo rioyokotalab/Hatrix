@@ -1289,13 +1289,13 @@ namespace Hatrix {
         {
           // Scan for fill-ins in the same row as this diagonal block.
           Matrix row_concat(block_size, 0);
-          bool found_row_fill_in = false;
-          for (int j = 0; j < nblocks; ++j) {
-            if (F.exists(block, j)) {
-              found_row_fill_in = true;
-              break;
-            }
-          }
+          bool found_row_fill_in = fill_in_row_indices.count(block) != 0;
+          // for (int j = 0; j < nblocks; ++j) {
+          //   if (F.exists(block, j)) {
+          //     found_row_fill_in = true;
+          //     break;
+          //   }
+          // }
 
           if (found_row_fill_in) {
             int64_t block_size = D(block, block, level).rows;
@@ -1352,15 +1352,13 @@ namespace Hatrix {
 
         {
           // Scan for fill-ins in the same col as this diagonal block.
-          Matrix col_concat(0, block_size);
-          std::vector<int64_t> UN2_row_splits;
-          bool found_col_fill_in = false;
-          for (int i = 0; i < nblocks; ++i) {
-            if (F.exists(i, block)) {
-              found_col_fill_in = true;
-              break;
-            }
-          }
+          bool found_col_fill_in = fill_in_col_indices.count(block) != 0;
+          // for (int i = 0; i < nblocks; ++i) {
+          //   if (F.exists(i, block)) {
+          //     found_col_fill_in = true;
+          //     break;
+          //   }
+          // }
 
           if (found_col_fill_in) {
             int64_t block_size = D(block, block, level).rows;
@@ -1369,9 +1367,9 @@ namespace Hatrix {
                                matmul(Srow(block, level), V(block, level), false, true), 0);
             for (int64_t i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
-                Matrix Ui, Si, Vi; double error;
-                Matrix cpy(F(i, block));
-                std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+                // Matrix Ui, Si, Vi; double error;
+                // Matrix cpy(F(i, block));
+                // std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
 
                 if (F(i, block).rows == rank && F(i, block).cols == block_size) {
                   col_block = concat(col_block, matmul(U(i, level), F(i, block)), 0);
