@@ -1595,50 +1595,86 @@ namespace Hatrix {
         }
       }
 
-
-    // Schur's compliment between oc and cc blocks
-    for (int i = 0; i < nblocks; ++i) {
-      for (int j = block+1; j < nblocks; ++j) {
-        if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
-            (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
-          auto lower_splits = SPLIT_DENSE(D(i, block, level), block_size -
-                                          U(i, level).cols, col_split);
-          auto right_splits = SPLIT_DENSE(D(block, j, level),
-                                          row_split, block_size - V(j, level).cols);
-          // Schur's compliement between oc and cc blocks where product exists as dense.
-          if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
-            auto reduce_splits = SPLIT_DENSE(D(i, j, level),
-                                             block_size - U(i, level).cols,
-                                             block_size - V(j, level).cols);
-            matmul(lower_splits[2], right_splits[0], reduce_splits[2],
-                   false, false, -1.0, 1.0);
-          }
-          // Schur's compliement between co and cc blocks where a new fill-in is created.
-          // The product is a (co, oo)-sized block.
-          else {
-
-            if (!F.exists(i, j)) {
-              Matrix fill_in(rank, block_size);
-              auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
-              // Update the co block within the fill-ins.
-              matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
-              // Update the oo block within the fill-ins.
-              matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
-              F.insert(i, j, std::move(fill_in));
+      // Schur's compliment between oc and cc blocks where the result exists
+      // before the diagonal blocks.
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = block+1; j < nblocks; ++j) {
+          if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
+              (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+            auto lower_splits = SPLIT_DENSE(D(i, block, level),
+                                            D(i, block, level).rows - rank,
+                                            col_split);
+            auto right_splits = SPLIT_DENSE(D(block, j, level),
+                                            row_split,
+                                            D(block, j, level).cols - rank);
+            // Schur's compliement between oc and cc blocks where product exists as dense.
+            if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+              auto reduce_splits = SPLIT_DENSE(D(i, j, level),
+                                               D(i, j, level).rows - rank,
+                                               D(i, j, level).cols - rank);
+              matmul(lower_splits[2], right_splits[0], reduce_splits[2],
+                     false, false, -1.0, 1.0);
             }
+            // Schur's compliement between oc and cc blocks where a new fill-in is created.
+            // The product is a (oc, oo)-sized block.
             else {
-              Matrix& fill_in = F(i, j);
-              auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
-              // Update the co block within the fill-ins.
-              matmul(lower_splits[2], right_splits[0], fill_splits[0], false, false, -1.0, 1.0);
-              // Update the oo block within the fill-ins.
-              matmul(lower_splits[2], right_splits[1], fill_splits[1], false, false, -1.0, 1.0);
+              // if (i <= block) {
+              if (!F.exists(i, j)) {
+                Matrix fill_in(rank, D(block, j, level).cols);
+                auto fill_splits =
+                  fill_in.split({},
+                                std::vector<int64_t>(1, D(block, j, level).cols - rank));
+                // Update the oc block within the fill-ins.
+                matmul(lower_splits[2], right_splits[0], fill_splits[0],
+                       false, false, -1.0, 1.0);
+                // Update the oo block within the fill-ins.
+                matmul(lower_splits[2], right_splits[1], fill_splits[1],
+                       false, false, -1.0, 1.0);
+                fill_in_cols.insert(j);
+                F.insert(i, j, std::move(fill_in));
+              }
+              else {
+                Matrix& fill_in = F(i, j);
+                auto fill_splits =
+                  fill_in.split({},
+                                std::vector<int64_t>(1, D(block, j, level).cols - rank));
+                // Update the oc block within the fill-ins.
+                matmul(lower_splits[2], right_splits[0], fill_splits[0],
+                       false, false, -1.0, 1.0);
+                // Update the oo block within the fill-ins.
+                matmul(lower_splits[2], right_splits[1], fill_splits[1],
+                       false, false, -1.0, 1.0);
+              }
+              // }
             }
+            // Schur's compliment between oc and cc blocks where the result exists
+            // after the diagonal blocks. The fill-in generated here is always part
+            // of a nb*nb dense block.
+            // else {
+            //   if (F.exists(i, j)) {
+            //     Matrix& fill_in = F(i, j);
+            //     auto fill_splits = SPLIT_DENSE(fill_in,
+            //                                    D(i, block, level).rows - rank,
+            //                                    D(block, j, level).cols - rank);
+
+            //     // Update the oc block within the fill-ins.
+            //     matmul(lower_splits[2], right_splits[0], fill_splits[2],
+            //            false, false, -1.0, 1.0);
+            //     // Update the oo block within the fill-ins.
+            //     matmul(lower_splits[2], right_splits[1], fill_splits[3],
+            //            false, false, -1.0, 1.0);
+            //   }
+            //   else {
+            //     std::cout << "A fill-in block for (oc,oo) does not exist where "
+            //               << " it is supposed to at block-> "
+            //               << block << " i-> " << i << " j-> " << j << std::endl;
+            //     abort();
+            //   }
+            // }
           }
         }
       }
-    }
-  } // for (int block = 0; block < nblocks; ++block)
+    } // for (int block = 0; block < nblocks; ++block)
 
   F.erase_all();
 }
