@@ -715,12 +715,13 @@ namespace Hatrix {
           std::cout << *row_fill_itr << " ";
         }
         std::cout << std::endl;
-        if (block ==1 && level == 2) {
-          fill_in_rows.insert(1);
-          fill_in_cols.insert(1);
-        }
+        // if (block ==1 && level == 2) {
+        //   fill_in_rows.insert(1);
+        //   fill_in_cols.insert(1);
+        // }
         // Calculate row fill-ins
-        for (auto row_fill_itr = fill_in_rows.begin(); row_fill_itr != fill_in_rows.end(); ++row_fill_itr) {
+        for (auto row_fill_itr = fill_in_rows.begin();
+             row_fill_itr != fill_in_rows.end(); ++row_fill_itr) {
           int64_t i = *row_fill_itr;
           int64_t block_size = D(i, i, level).rows;
 
@@ -736,7 +737,34 @@ namespace Hatrix {
               // std::cout << "CONSUME ROW FILL IN i -> " << i << " j -> " << j
               //           << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
               //           << " rank=" << Si.rows << " norm=" << norm(F(i, j)) << std::endl;
-              row_i = concat(row_i, matmul(Ui, Si), 1);
+              // row_i = concat(row_i, matmul(Ui, Si), 1);
+
+              if (F(i, j).rows == block_size && F(i, j).cols == rank)  {
+                row_i = concat(row_i, matmul(F(i, j), V(j, level), false, true), 1);
+                // row_i = concat(row_i, matmul(Ui, Si), 1);
+
+                // row_i = concat(row_i, matmul(F(i, j), F(i, j), false, true), 1);
+                // row_i += matmul(F(i, j), V(j, level), false, true);
+              }
+              else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
+
+
+                // F(i, j).print();
+                // if (i == 1 && j == 2) {
+                //   std::cout << "CONSUME ROW FILL: i -> " << i << " j -> " << j << " block_size -> " << block_size
+                //             << " F(i, j).rows: " << F(i, j).rows << " cols= " << F(i, j).cols
+                //             << " rank= " << Si.rows <<  " norm = " << norm(F(i, j)) << std::endl;
+                //   std::cout << "DENSE:\n";
+                //   matmul(matmul(U(i, level), S(i, j, level)), V(j, level), false, true).print();
+                //   std::cout << "F\n";
+                //   F(i, j).print();
+                // }
+
+                // row_i += F(i, j);
+                // row_i = concat(row_i, matmul(Ui, Si), 1);
+                row_i = concat(row_i, F(i, j), 1);
+                // row_i = concat(row_i, matmul(F(i, j), F(i, j), false, true), 1);
+              }
             }
           }
 
@@ -746,12 +774,18 @@ namespace Hatrix {
           Matrix r_i = matmul(UN_i, U(i, level), true, false);
 
 
-          std::cout << "U UPDATE i-> " << i << " level-> " << level << std::endl;
+          if (level == 2) {
+            std::cout << "U UPDATE i-> " << i << " level-> "
+                      << level << " r.exists: " << r.exists(i) << std::endl;
+            // r_i.print();
+          }
+
           U.erase(i, level);
           U.insert(i, level, std::move(UN_i));
 
           Scol.erase(i, level);
           Scol.insert(i, level, std::move(SN_i));
+
 
           r_indices.push_back(i);
           if (r.exists(i)) { r.erase(i); }
@@ -759,7 +793,8 @@ namespace Hatrix {
         }
 
         // Calculate col fill-ins
-        for (auto col_fill_itr = fill_in_cols.begin(); col_fill_itr != fill_in_cols.end(); ++col_fill_itr) {
+        for (auto col_fill_itr = fill_in_cols.begin();
+             col_fill_itr != fill_in_cols.end(); ++col_fill_itr) {
           int64_t j = *col_fill_itr;
           int64_t block_size = D(j, j, level).rows;
           Matrix col_j(0, block_size);
@@ -775,7 +810,18 @@ namespace Hatrix {
               //           << " F(i, j).rows: " << F(i, j).rows << " cols= "
               //           << F(i, j).cols << " rank=" << Si.rows << " norm="
               //           << norm(F(i, j)) <<  std::endl;
-              col_j = concat(col_j, matmul(Si, Vi), 0);
+              // col_j = concat(col_j, matmul(Si, Vi), 0);
+
+              if (F(i, j).rows == rank && F(i, j).cols == block_size) {
+                col_j = concat(col_j, matmul(U(i, level), F(i, j)), 0);
+                // col_j = concat(col_j, matmul(Si, Vi), 0);
+              }
+              else if (F(i, j).rows == block_size && F(i, j).cols == block_size) {
+                // col_j = concat(col_j, matmul(F(i, j), F(i, j), false, true), 0);
+
+                col_j = concat(col_j, F(i, j), 0);
+                // col_j = concat(col_j, matmul(Si, Vi), 0);
+              }
             }
           }
 
@@ -784,7 +830,12 @@ namespace Hatrix {
 
           Matrix t_j = matmul(VNT_j, V(j, level), false, false);
 
-          std::cout << "V UPDATE i-> " << j << " level-> " << level << std::endl;
+                    // std::cout << "V UPDATE i-> " << j << " level-> " << level << std::endl;
+
+          if (level == 2) {
+            std::cout << "V UPDATE j-> " << j << " level-> "
+                      << level << " t.exists: " << t.exists(j) << std::endl;
+          }
           V.erase(j, level);
           V.insert(j, level, transpose(VNT_j));
 
@@ -845,7 +896,11 @@ namespace Hatrix {
                 Sbar_ij = matmul(r_i, S(r_index, j, level));
               }
 
-              // std::cout << "REMAKE S: i -> " << i << "j -> " << j << std::endl;
+
+
+              // if (level ==  2) {
+              //   std::cout << "REMAKE S: i -> " << r_index << "j -> " << j << std::endl;
+              // }
               S.erase(r_index, j, level);
               S.insert(r_index, j, level, std::move(Sbar_ij));
             }
@@ -868,16 +923,20 @@ namespace Hatrix {
               int64_t block_size = D(i, i, level).cols;
               if (is_admissible.exists(i, t_index, level) && is_admissible(i, t_index, level)) {
                 // std::cout << "COl update: i-> " << i <<  " t_index-> " << t_index << std::endl;
-                Matrix Sbar_ij = matmul(S(i, t_index, level), t_j, false, true);
+                Matrix Sbar_ij(rank, rank);
                 if (F.exists(i, t_index)) {
                   if (F(i, t_index).rows == block_size && F(i, t_index).cols == block_size) {
                     continue;
                   }
 
                   if (F(i, t_index).rows == rank && F(i, t_index).cols == block_size) {
-                    Sbar_ij += matmul(F(i, t_index), V(t_index, level));
+                    Sbar_ij = matmul(S(i, t_index, level), t_j, false, true) +
+                      matmul(F(i, t_index), V(t_index, level));
                   }
                   //F.erase(i, j);
+                }
+                else {
+                  Sbar_ij = matmul(S(i, t_index, level), t_j, false, true);
                 }
 
                 S.erase(i, t_index, level);
@@ -1259,11 +1318,13 @@ namespace Hatrix {
           auto temp_splits = temp.split(2, 1);
 
           if (r.exists(c1)) {
+            std::cout << "C1 update: " << c1 << std::endl;
             matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
             r.erase(c1);
           }
 
           if (r.exists(c2)) {
+            std::cout << "C2 update: " << c2 << std::endl;
             matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
             r.erase(c2);
           }
@@ -1271,12 +1332,15 @@ namespace Hatrix {
           U.erase(parent_node, parent_level);
           U.insert(parent_node, parent_level, std::move(temp));
 
-          std::cout << "parent_node -> " << parent_node
-                    << " parent_level -> " << parent_level
-                    << norm(generate_identity_matrix(rank, rank) -
-                            matmul(U(parent_node, parent_level),
-                                   U(parent_node, parent_level), true, false))
-                    << std::endl;
+          if (parent_level == 2) {
+            std::cout << "parent_node -> " << parent_node
+                      << " parent_level -> " << parent_level
+                      << norm(generate_identity_matrix(rank, rank) -
+                              matmul(U(parent_node, parent_level),
+                                     U(parent_node, parent_level), true, false))
+                      << std::endl;
+          }
+
         }
 
         if (col_has_admissible_blocks(parent_node, parent_level) && height != 1) {
@@ -1301,9 +1365,9 @@ namespace Hatrix {
         }
       } // for (block = 0; block < nblocks; block += 2)
 
-
         // Merge the unfactorized parts.
       int64_t parent_nblocks = level_blocks[parent_level];
+      std::cout << "START MERGE PARENT LEVEL: " << parent_level << " blocks: " << std::endl;
       for (int64_t i = 0; i < parent_nblocks; ++i) {
         for (int64_t j = 0; j < parent_nblocks; ++j) {
           if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
@@ -1334,11 +1398,14 @@ namespace Hatrix {
             for (int64_t ic1 = 0; ic1 < i_children.size(); ++ic1) {
               for (int64_t jc2 = 0; jc2 < j_children.size(); ++jc2) {
                 int64_t c1 = i_children[ic1], c2 = j_children[jc2];
-
-                // std::cout << "c1: " << c1 << " c2: " << c2 << " level: " << level << std::endl;
                 if (!U.exists(c1, level)) { continue; }
 
                 if (is_admissible.exists(c1, c2, level) && !is_admissible(c1, c2, level)) {
+                  // if (i == 1 && j == 3) {
+                  //   std::cout << "i -> " << i << " j -> " << j
+                  //             << " c1: " << c1 << " c2: " << c2 << " level: " << level << std::endl;
+                  // }
+
                   auto D_splits = SPLIT_DENSE(D(c1, c2, level),
                                               D(c1, c2, level).rows-rank,
                                               D(c1, c2, level).cols-rank);
@@ -1350,8 +1417,16 @@ namespace Hatrix {
               }
             }
 
-            // std::cout << "i -> " << i << " j -> " << j << " parent_level-> " << parent_level << std::endl;
-            // D_unelim.print();
+
+            // if (i == 1 && j == 3 && parent_level == 2) {
+            //   std::cout << "i -> " << i << " j -> " << j << " parent_level-> " << parent_level << std::endl;
+            //   D_unelim.print();
+            // }
+
+            // if (i == 3 && j == 1 && parent_level == 2) {
+            //   std::cout << "i -> " << i << " j -> " << j << " parent_level-> " << parent_level << std::endl;
+            //   D_unelim.print();
+            // }
 
             D.insert(i, j, parent_level, std::move(D_unelim));
           }
@@ -1841,6 +1916,19 @@ namespace Hatrix {
           is_admissible.insert(i, j, level, std::abs(i - j) > admis);
         }
       }
+
+      is_admissible.erase(0, 2, level);
+      is_admissible.insert(0, 2, level, true);
+
+      is_admissible.erase(2, 0, level);
+      is_admissible.insert(2, 0, level, true);
+
+      is_admissible.erase(1, 3, level);
+      is_admissible.insert(1, 3, level, true);
+
+      is_admissible.erase(3, 1, level);
+      is_admissible.insert(3, 1, level, true);
+
     }
     else {
       coarsen_blocks(level);
@@ -2702,6 +2790,7 @@ void verify_A2_factorization(Hatrix::H2& A, const Domain& domain) {
 
   auto diff_splits = diff.split(4, 4);
   auto A2_expected_splits = A2_expected.split(4, 4);
+  auto A2_act_splits = A2_actual.split(4,4);
 
   std::cout << "A2 factorization error: "
             <<  norm(A2_expected - A2_actual) / norm(A2_expected) << std::endl;
@@ -2720,25 +2809,6 @@ void verify_A2_factorization(Hatrix::H2& A, const Domain& domain) {
     }
     std::cout << std::endl;
   }
-
-
-  for (int64_t i = 0; i < 4; ++i) {
-    for (int64_t j = 0; j < 4; ++j) {
-      // if (i == 2 && j == 0) {
-      //   diff_splits[i * 4 + j].print();
-
-      // }
-      err += norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j]);
-      // std::cout << "<i, j>: " << i << ", " << j
-      //           << " -- "
-      //           << std::setprecision(8)
-      //           << norm(diff_splits[i * 4 + j]) / norm(A2_expected_splits[i * 4 + j])
-      //           << "   ";
-    }
-    // std::cout << std::endl;
-  }
-
-  std::cout << "fact error: " << err / 16 << std::endl;
 
   verify_A2_solve(A2_actual, A, domain);
 }
@@ -3121,9 +3191,11 @@ int main(int argc, char ** argv) {
     verify_A2_factorization(A, domain);
   }
 
+  // Adense = dense before the compression.
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
 
   if (false) {
+    // regenA = permute(U * L * L0 * U0 * U * VF)
     Matrix regenA = regenerate_BLR2_matrix(A, domain);
 
     std::vector<int64_t> M_row_offsets, M_col_offsets;
