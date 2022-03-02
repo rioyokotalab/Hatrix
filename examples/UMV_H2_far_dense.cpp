@@ -3193,6 +3193,7 @@ int main(int argc, char ** argv) {
 
   // Adense = dense before the compression.
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
+  Adense.out_csv("dense_matrix.csv");
 
   if (false) {
     // regenA = permute(U * L * L0 * U0 * U * VF)

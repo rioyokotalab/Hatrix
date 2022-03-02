@@ -5,6 +5,7 @@
 #include <chrono>
 #include <fstream>
 #include <numeric>
+#include <functional>
 
 #include "Hatrix/Hatrix.h"
 
@@ -13,6 +14,10 @@ using namespace Hatrix;
 double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
 namespace Hatrix {
+  std::function<Matrix(const std::vector<std::vector<double>>& x,
+                       int64_t rows, int64_t cols,
+                       int64_t row_start, int64_t col_start)> kernel_function;
+
   class H2 {
   public:
     int64_t N, rank, height, admis;
