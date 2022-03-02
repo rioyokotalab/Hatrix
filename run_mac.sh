@@ -6,11 +6,11 @@ rm result.txt
 
 # ./bin/UMV_H2_far_dense 512 10 64 0.7 2 geometry_admis 0 0
 # ./bin/UMV_H2_far_dense 1024 10 64 0.7 2 geometry_admis 0 0
-# ./bin/UMV_H2_far_dense 1024 10 64 0.5 2 geometry_admis 0 0
+./bin/UMV_H2_far_dense 1024 10 64 0.5 2 geometry_admis 0 0
 # ./bin/UMV_H2_far_dense 1024 10 64 0.3 2 geometry_admis 0 0
 
 # ./bin/UMV_H2_far_dense 1024 15 64 0.7 2 geometry_admis 0 0
-# ./bin/UMV_H2_far_dense 1024 15 64 0.5 2 geometry_admis 0 0
+./bin/UMV_H2_far_dense 1024 15 64 0.5 2 geometry_admis 0 0
 # ./bin/UMV_H2_far_dense 1024 15 64 0.3 2 geometry_admis 0 0
 
 # ./bin/UMV_H2_far_dense 1024 10 128 2 2 diagonal_admis 0 1
@@ -34,9 +34,9 @@ echo "------ UMV H2 NLEVEL ------"
 
 
 
-echo "SPHERE GEOMETRY"
-for rank in 34 35 36 37 38 39 40; do
-    ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
+# echo "SPHERE GEOMETRY"
+for rank in 34; do
+    lldb -o run -- ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
 done
 
 cat result.txt
