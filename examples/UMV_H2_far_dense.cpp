@@ -1618,34 +1618,34 @@ namespace Hatrix {
             // Schur's compliement between oc and cc blocks where a new fill-in is created.
             // The product is a (oc, oo)-sized block.
             else {
-              // if (i <= block) {
-              if (!F.exists(i, j)) {
-                Matrix fill_in(rank, D(block, j, level).cols);
-                auto fill_splits =
-                  fill_in.split({},
-                                std::vector<int64_t>(1, D(block, j, level).cols - rank));
-                // Update the oc block within the fill-ins.
-                matmul(lower_splits[2], right_splits[0], fill_splits[0],
-                       false, false, -1.0, 1.0);
-                // Update the oo block within the fill-ins.
-                matmul(lower_splits[2], right_splits[1], fill_splits[1],
-                       false, false, -1.0, 1.0);
-                fill_in_cols.insert(j);
-                F.insert(i, j, std::move(fill_in));
+              if (i <= block) {
+                if (!F.exists(i, j)) {
+                  Matrix fill_in(rank, D(block, j, level).cols);
+                  auto fill_splits =
+                    fill_in.split({},
+                                  std::vector<int64_t>(1, D(block, j, level).cols - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0],
+                         false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1],
+                         false, false, -1.0, 1.0);
+                  fill_in_cols.insert(j);
+                  F.insert(i, j, std::move(fill_in));
+                }
+                else {
+                  Matrix& fill_in = F(i, j);
+                  auto fill_splits =
+                    fill_in.split({},
+                                  std::vector<int64_t>(1, D(block, j, level).cols - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0],
+                         false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1],
+                         false, false, -1.0, 1.0);
+                }
               }
-              else {
-                Matrix& fill_in = F(i, j);
-                auto fill_splits =
-                  fill_in.split({},
-                                std::vector<int64_t>(1, D(block, j, level).cols - rank));
-                // Update the oc block within the fill-ins.
-                matmul(lower_splits[2], right_splits[0], fill_splits[0],
-                       false, false, -1.0, 1.0);
-                // Update the oo block within the fill-ins.
-                matmul(lower_splits[2], right_splits[1], fill_splits[1],
-                       false, false, -1.0, 1.0);
-              }
-              // }
             }
             // Schur's compliment between oc and cc blocks where the result exists
             // after the diagonal blocks. The fill-in generated here is always part
