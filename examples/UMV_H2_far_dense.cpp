@@ -1395,6 +1395,19 @@ namespace Hatrix {
                   else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
                     Sbar_block_j = matmul(matmul(r(block), S(block, j, level)), t(j)) +
                       matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
+
+                    // Update S blocks for the column of the block with nb * nb fill-in.
+                    for (int64_t i = 0; i < nblocks; ++i) {
+                      if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+                        Matrix Sbar_ij(rank, rank);
+                        if (i != block) {
+                          Sbar_ij = matmul(S(i, j, level), t(j));
+
+                          S.erase(i, j, level);
+                          S.insert(i, j, level, std::move(Sbar_ij));
+                        }
+                      }
+                    }
                   }
                 }
                 else {
@@ -1410,17 +1423,18 @@ namespace Hatrix {
           if (found_col_fill_in) {
             for (int i = 0; i < nblocks; ++i) {
               if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-                Matrix Sbar_i_block = matmul(S(i, block,level), t(block));
+                Matrix Sbar_i_block(rank, rank);
                 if (F.exists(i, block)) {
-                  Matrix SpF(rank, rank);
                   if (F(i, block).rows == rank && F(i, block).cols == block_size) {
-                    SpF = matmul(F(i, block), V(block, level));
+                    Sbar_i_block = matmul(S(i, block,level), t(block)) + matmul(F(i, block), V(block, level));
                   }
                   else if (F(i, block).rows == block_size && F(i, block).cols == block_size) {
-                    SpF = matmul(U(i, level), matmul(F(i, block), V(block, level)), true, false);
+                    Sbar_i_block = matmul(S(i, block,level), t(block)) +
+                      matmul(U(i, level), matmul(F(i, block), V(block, level)), true, false);
                   }
-
-                  Sbar_i_block = Sbar_i_block + SpF;
+                }
+                else {
+                  Sbar_i_block = matmul(S(i, block, level), t(block));
                 }
 
                 S.erase(i, block, level);
@@ -1680,7 +1694,6 @@ namespace Hatrix {
                        false, false, -1.0, 1.0);
               }
               else {
-
                 Matrix fill_in(rows, cols);
                 auto fill_in_splits = SPLIT_DENSE(fill_in, rows - rank, cols - rank);
                 matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
