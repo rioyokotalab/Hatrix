@@ -821,6 +821,7 @@ namespace Hatrix {
         }
       }
 
+      // Schur's compliment co and cc blocks.
       for (int i = block+1; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
