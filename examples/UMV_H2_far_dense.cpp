@@ -172,6 +172,7 @@ namespace Hatrix {
     void factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
                          RowMap& r, RowMap& t);
     int64_t find_all_dense_row();
+    void update_row_basis(int64_t row, RowColMap<Matrix>& F, RowMap& r);
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind, int64_t matrix_type);
@@ -1271,6 +1272,38 @@ namespace Hatrix {
   //   } // for (int64_t block = 0; block < nblocks; ++block)
   // }
 
+  void H2::update_row_basis(int64_t row, RowColMap<Matrix>& F, RowMap& r) {
+    int64_t block_size = D(block, block, level).rows;
+
+    Matrix row_block(block_size, 0);
+    row_block = concat(row_block, matmul(U(block, level), Scol(block, level)), 1);
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (F.exists(block, j)) {
+        if (F(block, j).rows == block_size && F(block, j).cols == rank)  {
+          row_block = concat(row_block, matmul(F(block, j), V(j, level), false, true), 1);
+        }
+        else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
+          row_block = concat(row_block, F(block, j), 1);
+        }
+      }
+    }
+
+    Matrix UN_block, SN_block, _VNT_block; double error;
+    std::tie(UN_block, SN_block, _VNT_block, error) = truncated_svd(row_block, rank);
+
+    Matrix r_block = matmul(UN_block, U(block, level), true, false);
+
+    U.erase(block, level);
+    U.insert(block, level, std::move(UN_block));
+
+    Scol.erase(block, level);
+    Scol.insert(block, level, std::move(SN_block));
+
+    r_indices.push_back(block);
+    if (r.exists(block)) { r.erase(block); }
+    r.insert(block, std::move(r_block));
+  }
+
   void H2::factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
                            RowMap& r, RowMap& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
@@ -1298,39 +1331,15 @@ namespace Hatrix {
           // }
 
           if (found_row_fill_in) {
-            int64_t block_size = D(block, block, level).rows;
+            update_row_basis(block, F, r);
 
-            Matrix row_block(block_size, 0);
-            row_block = concat(row_block, matmul(U(block, level), Scol(block, level)), 1);
-            for (int64_t j = 0; j < nblocks; ++j) {
-              if (F.exists(block, j)) {
-                // Matrix Ui, Si, Vi; double error;
-                // Matrix cpy(F(block, j));
-                // std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
+            for (auto col_iter = fill_in_col_indices.begin(); col_iter != fill_in_col_indices.end(); ++col_iter) {
+              int64_t j = *col_iter;
 
-                if (F(block, j).rows == block_size && F(block, j).cols == rank)  {
-                  row_block = concat(row_block, matmul(F(block, j), V(j, level), false, true), 1);
-                }
-                else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
-                  row_block = concat(row_block, F(block, j), 1);
-                }
+              if (F.exists(block, j) && F(block,j).rows == block_size && F(block,j).cols == block_size) {
+
               }
             }
-
-            Matrix UN_block, SN_block, _VNT_block; double error;
-            std::tie(UN_block, SN_block, _VNT_block, error) = truncated_svd(row_block, rank);
-
-            Matrix r_block = matmul(UN_block, U(block, level), true, false);
-
-            U.erase(block, level);
-            U.insert(block, level, std::move(UN_block));
-
-            Scol.erase(block, level);
-            Scol.insert(block, level, std::move(SN_block));
-
-            r_indices.push_back(block);
-            if (r.exists(block)) { r.erase(block); }
-            r.insert(block, std::move(r_block));
           } // if (found_row_fill_in)
 
           if (found_row_fill_in) {
