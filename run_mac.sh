@@ -4,12 +4,13 @@ make -j all
 
 rm result.txt
 
-# ./bin/UMV_H2_far_dense 512 10 64 2 2 diagonal_admis 0 1
+./bin/UMV_H2_far_dense 512 10 64 0.7 2 geometry_admis 0 0
 ./bin/UMV_H2_far_dense 1024 10 128 2 2 diagonal_admis 0 1
+# ./bin/UMV_H2_far_dense 2048 10 128 3 2 diagonal_admis 0 1
 
 echo "------ UMV H2 NLEVEL ------"
 
-./bin/UMV_strong_H2_Nlevel 1024 10 3 2 0
+# ./bin/UMV_strong_H2_Nlevel 1024 10 3 2 0
 # ./bin/UMV_strong_H2_Nlevel 1024 10 4 2 0
 # ./bin/UMV_strong_H2_Nlevel 2048 10 5 2
 

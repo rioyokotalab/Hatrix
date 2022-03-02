@@ -1445,6 +1445,7 @@ namespace Hatrix {
                       }
                     }
                   }
+                  F.erase(i, block);
                 }
                 else {
                   Sbar_i_block = matmul(S(i, block, level), t(block));
@@ -1611,7 +1612,7 @@ namespace Hatrix {
       t_indices.clear();
       fill_in_row_indices.clear();
       fill_in_col_indices.clear();
-      F.erase_all();
+      // F.erase_all();
 
       if (level == 2) {
         std::cout << "Norm<0,1>: " << norm(D(0,1,level)) << std::endl;
@@ -3819,7 +3820,7 @@ int main(int argc, char ** argv) {
   A.print_structure();
   A.factorize(domain);
 
-  if  (true) {
+  if  (false) {
     std::cout << "-- H2 verification --\n";
     verify_A1_factorization(A, domain);
     verify_A2_factorization(A, domain);
