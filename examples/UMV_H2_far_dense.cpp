@@ -1307,15 +1307,13 @@ namespace Hatrix {
 
   void H2::update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap& t) {
     int64_t block_size = D(col, col, level).rows;
+    int64_t nblocks = level_blocks[level];
     Matrix col_block(0, block_size);
+
     col_block = concat(col_block,
                        matmul(Srow(col, level), V(col, level), false, true), 0);
     for (int64_t i = 0; i < nblocks; ++i) {
       if (F.exists(i, col)) {
-        // Matrix Ui, Si, Vi; double error;
-        // Matrix cpy(F(i, block));
-        // std::tie(Ui, Si, Vi) = error_svd(cpy, 1e-9);
-
         if (F(i, col).rows == rank && F(i, col).cols == block_size) {
           col_block = concat(col_block, matmul(U(i, level), F(i, col)), 0);
         }
@@ -1326,7 +1324,7 @@ namespace Hatrix {
     }
 
     Matrix _UN_col, SN_col, VNT_col; double error;
-    std::tie(_UN_col, SN_col, VNT_col, error) = truncated_svd(col_col, rank);
+    std::tie(_UN_col, SN_col, VNT_col, error) = truncated_svd(col_block, rank);
 
     Matrix t_col = matmul(V(col, level), VNT_col, true, true);
     V.erase(col, level);
@@ -1356,8 +1354,8 @@ namespace Hatrix {
         int64_t block_size = U(block, level).rows;
         {
           // Scan for fill-ins in the same row as this diagonal block.
-          Matrix row_concat(block_size, 0);
           bool found_row_fill_in = fill_in_row_indices.count(block) != 0;
+          bool found_col_fill_in = fill_in_col_indices.count(block) != 0;
 
           if (found_row_fill_in) {
             update_row_basis(block, level, F, r);
@@ -1366,10 +1364,23 @@ namespace Hatrix {
               int64_t j = *col_iter;
 
               if (F.exists(block, j) && F(block,j).rows == block_size && F(block,j).cols == block_size) {
-
+                update_col_basis(j, level, F, t);
               }
             }
           } // if (found_row_fill_in)
+
+
+          if (found_col_fill_in) {
+            update_col_basis(block, level, F, t);
+
+            for (auto row_iter = fill_in_row_indices.begin(); row_iter != fill_in_row_indices.end(); ++row_iter) {
+              int64_t i = *row_iter;
+
+              if (F.exists(i, block) && F(i, block).rows == block_size && F(i, block).cols == block_size) {
+                update_row_basis(i,level, F, r);
+              }
+            }
+          }
 
           if (found_row_fill_in) {
             for (int j = 0; j < nblocks; ++j) {
@@ -1385,15 +1396,6 @@ namespace Hatrix {
                 S.insert(block, j, level, std::move(Sbar_block_j));
               }
             }
-          }
-        }
-
-        {
-          // Scan for fill-ins in the same col as this diagonal block.
-          bool found_col_fill_in = fill_in_col_indices.count(block) != 0;
-
-          if (found_col_fill_in) {
-            update_col_basis(block, level, F, t);
           }
 
           if (found_col_fill_in) {
@@ -1923,13 +1925,13 @@ namespace Hatrix {
           auto temp_splits = temp.split(2, 1);
 
           if (r.exists(c1)) {
-            std::cout << "C1 update: " << c1 << " norm: " << norm(r(c1)) << std::endl;
+            // std::cout << "C1 update: " << c1 << " norm: " << norm(r(c1)) << std::endl;
             matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
             r.erase(c1);
           }
 
           if (r.exists(c2)) {
-            std::cout << "C2 update: " << c2 <<  " norm: " << norm(r(c2)) << std::endl;
+            // std::cout << "C2 update: " << c2 <<  " norm: " << norm(r(c2)) << std::endl;
             matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
             r.erase(c2);
           }
@@ -1937,14 +1939,14 @@ namespace Hatrix {
           U.erase(parent_node, parent_level);
           U.insert(parent_node, parent_level, std::move(temp));
 
-          if (parent_level == 2) {
-            std::cout << "FAR DENSE parent_node -> " << parent_node
-                      << " parent_level -> " << parent_level
-                      << norm(generate_identity_matrix(rank, rank) -
-                              matmul(U(parent_node, parent_level),
-                                     U(parent_node, parent_level), true, false))
-                      << std::endl;
-          }
+          // if (parent_level == 2) {
+          //   std::cout << "FAR DENSE parent_node -> " << parent_node
+          //             << " parent_level -> " << parent_level
+          //             << norm(generate_identity_matrix(rank, rank) -
+          //                     matmul(U(parent_node, parent_level),
+          //                            U(parent_node, parent_level), true, false))
+          //             << std::endl;
+          // }
 
         }
 
