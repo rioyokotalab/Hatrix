@@ -1409,6 +1409,7 @@ namespace Hatrix {
                       }
                     }
                   }
+                  F.erase(block, j);
                 }
                 else {
                   Sbar_block_j = matmul(r(block), S(block, j, level));
@@ -1431,6 +1432,18 @@ namespace Hatrix {
                   else if (F(i, block).rows == block_size && F(i, block).cols == block_size) {
                     Sbar_i_block = matmul(S(i, block,level), t(block)) +
                       matmul(U(i, level), matmul(F(i, block), V(block, level)), true, false);
+
+                    for (int64_t j = 0; j < nblocks; ++j) {
+                      if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+                        Matrix Sbar_ij(rank, rank);
+                        if (j != block) {
+                          Sbar_ij = matmul(r(i), Sbar_ij);
+
+                          S.erase(i, j, level);
+                          S.insert(i, j, level, std::move(Sbar_ij));
+                        }
+                      }
+                    }
                   }
                 }
                 else {
