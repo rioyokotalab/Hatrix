@@ -13,6 +13,8 @@ using namespace Hatrix;
 
 double PV = 1e-3;
 using randvec_t = std::vector<std::vector<double> >;
+Hatrix::Matrix global_matrix;
+
 namespace Hatrix {
   std::function<Matrix(const std::vector<std::vector<double>>& x,
                        int64_t rows, int64_t cols,
@@ -23,6 +25,20 @@ namespace Hatrix {
                                int64_t row_start, int64_t col_start) {
     return generate_laplacend_matrix(x, rows, cols, row_start,
                                      col_start, PV);
+  };
+
+  auto generate_global = [](const std::vector<std::vector<double>>& x,
+                          int64_t rows, int64_t cols,
+                          int64_t row_start, int64_t col_start) {
+    Matrix out(rows, cols);
+
+    for (int64_t i = 0; i < rows; ++i) {
+      for (int64_t j = 0; j < cols; ++j) {
+        out(i, j) = global_matrix(i + row_start, j + col_start);
+      }
+    }
+
+    return out;
   };
 
   class H2 {

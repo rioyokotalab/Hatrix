@@ -230,10 +230,15 @@ void Matrix::print_meta() const {
   std::cout << "rows=" << rows << " cols=" << cols << " stride=" << stride << std::endl;
 }
 
-void Matrix::out_csv(std::string out_file) const {
+void Matrix::read_file(std::string in_file) {
+
+}
+
+void Matrix::out_file(std::string out_file) const {
   std::ofstream file;
   file.open(out_file, std::ios::out | std::ios::trunc);
 
+  file << rows << "," << cols << std::endl;
   file << "i,j,value" << std::endl;
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {

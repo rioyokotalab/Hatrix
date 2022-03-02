@@ -117,7 +117,9 @@ class Matrix {
 
   void print_meta() const;
 
-  void out_csv(std::string out_file) const;
+  void read_file(std::string in_file);
+
+  void out_file(std::string out_file) const;
 
   // Get the size of the memory used by this matrix. If this is a view,
   // this function returns only the memory consumed by the view.
