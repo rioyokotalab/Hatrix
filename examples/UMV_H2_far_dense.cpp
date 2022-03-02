@@ -3176,7 +3176,6 @@ int main(int argc, char ** argv) {
 
   Matrix rank_map = domain.generate_rank_heat_map();
   rank_map.print();
-  // rank_map.out_csv("rank_map.csv");
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   double construct_error, lr_ratio, solve_error;
@@ -3193,7 +3192,7 @@ int main(int argc, char ** argv) {
 
   // Adense = dense before the compression.
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-  Adense.out_csv("dense_matrix.csv");
+  Adense.out_file("dense_matrix.data");
 
   if (false) {
     // regenA = permute(U * L * L0 * U0 * U * VF)

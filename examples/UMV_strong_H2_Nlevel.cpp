@@ -1241,6 +1241,8 @@ int main(int argc, char *argv[]) {
     abort();
   }
 
+  global_matrix.read_file("dense_matrix.data");
+
   Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
