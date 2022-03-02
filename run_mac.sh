@@ -2,7 +2,9 @@
 
 make -j all
 
-./bin/UMV_H2_far_dense 512 15 64 2 2 diagonal_admis 0 1
+./bin/UMV_H2_far_dense 512 10 64 2 2 diagonal_admis 0 1
+
+echo "------ UMV H2 NLEVEL ------"
 
 ./bin/UMV_strong_H2_Nlevel 512 10 3 2 0
 # ./bin/UMV_strong_H2_Nlevel 1024 10 4 2 0

@@ -718,6 +718,10 @@ namespace Hatrix {
         }
       }
 
+      if (level == 2) {
+        std::cout << "Norm<0,1>: " << norm(D(0,1,level)) << std::endl;
+      }
+
       Matrix U_F = make_complement(U(block, level));
       Matrix V_F = make_complement(V(block, level));
 
@@ -942,11 +946,14 @@ namespace Hatrix {
           auto temp_splits = temp.split(2, 1);
 
           if (r.exists(c1)) {
+            std::cout << "C1 update: " << c1 << " norm: "  << norm(r(c1)) << std::endl;
             matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
             r.erase(c1);
           }
 
           if (r.exists(c2)) {
+            std::cout << "C2 update: " << c2 << " norm: " << norm(r(c2)) << std::endl;
+
             matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
             r.erase(c2);
           }
