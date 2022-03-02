@@ -1382,6 +1382,12 @@ namespace Hatrix {
         }
       }
 
+      r_indices.clear();
+      t_indices.clear();
+      fill_in_rows.clear();
+      fill_in_cols.clear();
+      F.erase_all();
+
       if (level == 2) {
         std::cout << "Norm<0,1>: " << norm(D(0,1,level)) << std::endl;
       }
@@ -1677,7 +1683,7 @@ namespace Hatrix {
       }
     } // for (int block = 0; block < nblocks; ++block)
 
-    F.erase_all();
+    // F.erase_all();
   }
 
 
