@@ -1846,40 +1846,25 @@ namespace Hatrix {
             // Schur's compliement between oc and cc blocks where a new fill-in is created.
             // The product is a (oc, oo)-sized block.
             else {
-              if (i <= block) {
-                if (!F.exists(i, j)) {
-                  Matrix fill_in(rank, D(block, j, level).cols);
-                  auto fill_splits =
-                    fill_in.split({},
-                                  std::vector<int64_t>(1, D(block, j, level).cols - rank));
-                  // Update the oc block within the fill-ins.
-                  matmul(lower_splits[2], right_splits[0], fill_splits[0],
-                         false, false, -1.0, 1.0);
-                  // Update the oo block within the fill-ins.
-                  matmul(lower_splits[2], right_splits[1], fill_splits[1],
-                         false, false, -1.0, 1.0);
-                  fill_in_col_indices.insert(j);
-                  F.insert(i, j, std::move(fill_in));
-                }
-                else {
-                  Matrix& fill_in = F(i, j);
-                  auto fill_splits =
-                    fill_in.split({},
-                                  std::vector<int64_t>(1, D(block, j, level).cols - rank));
-                  // Update the oc block within the fill-ins.
-                  matmul(lower_splits[2], right_splits[0], fill_splits[0],
-                         false, false, -1.0, 1.0);
-                  // Update the oo block within the fill-ins.
-                  matmul(lower_splits[2], right_splits[1], fill_splits[1],
-                         false, false, -1.0, 1.0);
-                }
+              if (!F.exists(i, j)) {
+                Matrix fill_in(rank, D(block, j, level).cols);
+                auto fill_splits =
+                  fill_in.split({},
+                                std::vector<int64_t>(1, D(block, j, level).cols - rank));
+                // Update the oc block within the fill-ins.
+                matmul(lower_splits[2], right_splits[0], fill_splits[0],
+                       false, false, -1.0, 1.0);
+                // Update the oo block within the fill-ins.
+                matmul(lower_splits[2], right_splits[1], fill_splits[1],
+                       false, false, -1.0, 1.0);
+                fill_in_col_indices.insert(j);
+                F.insert(i, j, std::move(fill_in));
               }
-
-              // Schur's compliment between oc and cc blocks where the result exists
-              // after the diagonal blocks. The fill-in generated here is always part
-              // of a nb*nb dense block.
               else {
-                if (F.exists(i, j)) {
+                // Schur's compliment between oc and cc blocks where the result exists
+                // after the diagonal blocks. The fill-in generated here is always part
+                // of a nb*nb dense block.
+                if (F(i, j).rows == D(i, block, level).rows && F(i, j).cols == D(block, j, level).cols) {
                   Matrix& fill_in = F(i, j);
                   auto fill_splits = SPLIT_DENSE(fill_in,
                                                  D(i, block, level).rows - rank,
@@ -1893,10 +1878,16 @@ namespace Hatrix {
                          false, false, -1.0, 1.0);
                 }
                 else {
-                  std::cout << "A fill-in block for (oc,oo) does not exist where "
-                            << " it is supposed to at block-> "
-                            << block << " i-> " << i << " j-> " << j << std::endl;
-                  abort();
+                  Matrix& fill_in = F(i, j);
+                  auto fill_splits =
+                    fill_in.split({},
+                                  std::vector<int64_t>(1, D(block, j, level).cols - rank));
+                  // Update the oc block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[0], fill_splits[0],
+                         false, false, -1.0, 1.0);
+                  // Update the oo block within the fill-ins.
+                  matmul(lower_splits[2], right_splits[1], fill_splits[1],
+                         false, false, -1.0, 1.0);
                 }
               }
             }

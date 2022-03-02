@@ -886,7 +886,6 @@ namespace Hatrix {
             // Schur's compliement between co and cc blocks where a new fill-in is created.
             // The product is a (co, oo)-sized block.
             else {
-
               if (!F.exists(i, j)) {
                 Matrix fill_in(rank, block_size);
                 auto fill_splits = fill_in.split({}, std::vector<int64_t>(1, block_size - rank));
