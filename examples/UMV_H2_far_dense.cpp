@@ -853,7 +853,6 @@ namespace Hatrix {
                     }
                   }
                 }
-                F.erase(block, j);
               }
               else {
                 Sbar_block_j = matmul(r(block), S(block, j, level));
@@ -862,6 +861,8 @@ namespace Hatrix {
               S.erase(block, j, level);
               S.insert(block, j, level, std::move(Sbar_block_j));
             }
+
+            if (F.exists(block, j)) { F.erase(block, j); }
           }
         }
 
@@ -890,7 +891,6 @@ namespace Hatrix {
                     }
                   }
                 }
-                F.erase(i, block);
               }
               else {
                 Sbar_i_block = matmul(S(i, block, level), t(block), false, true);
@@ -899,6 +899,8 @@ namespace Hatrix {
               S.erase(i, block, level);
               S.insert(i, block, level, std::move(Sbar_i_block));
             }
+
+            if (F.exists(i, block)) { F.erase(i, block); }
           }
         }
       }
@@ -1297,17 +1299,17 @@ namespace Hatrix {
       int64_t parent_nblocks = level_blocks[parent_level];
             // std::cout << "START MERGE PARENT LEVEL: " << parent_level << " blocks: " << std::endl;
 
-      if (level == 3) {
-        int64_t A2_nblocks = level_blocks[2];
-        for (int i = 0; i < A2_nblocks; ++i) {
-          for (int j = 0; j < A2_nblocks; ++j) {
-            if (is_admissible(i, j, 2)) {
-              A2_expected_splits[i * A2_nblocks + j] =
-                matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
-            }
-          }
-        }
-      }
+      // if (level == 3) {
+      //   int64_t A2_nblocks = level_blocks[2];
+      //   for (int i = 0; i < A2_nblocks; ++i) {
+      //     for (int j = 0; j < A2_nblocks; ++j) {
+      //       if (is_admissible(i, j, 2)) {
+      //         A2_expected_splits[i * A2_nblocks + j] =
+      //           matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
+      //       }
+      //     }
+      //   }
+      // }
 
       for (int64_t i = 0; i < parent_nblocks; ++i) {
         for (int64_t j = 0; j < parent_nblocks; ++j) {
@@ -1370,7 +1372,6 @@ namespace Hatrix {
         }
       }
     }
-
 
     for (int64_t d = 0; d < last_nodes; ++d) {
       lu(D(d, d, level));
@@ -1755,8 +1756,27 @@ namespace Hatrix {
       }
     }
 
+    // for (int i = 0; i < nblocks; ++i) {
+    //   for (int j = 13; j < nblocks; ++j) {
+    //     if (i != j) {
+    //       is_admissible.erase(i, j, level);
+    //       is_admissible.insert(i, j, level, true);
+    //     }
+    //   }
+    // }
+
+    // for (int i = 13; i < nblocks; ++i) {
+    //   for (int j = 0; j < nblocks; ++j) {
+    //     if (i != j) {
+    //       is_admissible.erase(i, j, level);
+    //       is_admissible.insert(i, j, level, true);
+    //     }
+    //   }
+    // }
+
     // is_admissible.insert(0, 0, level, false);
-    // is_admissible.insert(0, 1, level, false);
+    // is_admissible.erase(0, 1, level);
+    // is_admissible.insert(0, 1, level, true);
     // is_admissible.insert(0, 2, level, true);
     // is_admissible.insert(0, 3, level, true);
     // is_admissible.insert(0, 4, level, false);
@@ -1764,7 +1784,8 @@ namespace Hatrix {
     // is_admissible.insert(0, 6, level, true);
     // is_admissible.insert(0, 7, level, true);
 
-    // is_admissible.insert(1, 0, level, false);
+    // is_admissible.erase(1, 0, level);
+    // is_admissible.insert(1, 0, level, true);
     // is_admissible.insert(1, 1, level, false);
     // is_admissible.insert(1, 2, level, true);
     // is_admissible.insert(1, 3, level, false);
@@ -3116,7 +3137,7 @@ int main(int argc, char ** argv) {
   A.print_structure();
   A.factorize(domain);
 
-  if (matrix_type == H2_MATRIX) {
+  if (false) {
     std::cout << "-- H2 verification --\n";
     verify_A1_factorization(A, domain);
     verify_A2_factorization(A, domain);
