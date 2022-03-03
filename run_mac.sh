@@ -46,7 +46,7 @@ cat result.txt
 # done
 
 echo "STARSH GRID GEOMETRY DIM=2"
-./bin/UMV_H2_far_dense 1024 20 64 1.2 3 geometry_admis 0 0
+./bin/UMV_H2_far_dense 512 15 32 1.2 3 geometry_admis 0 0
 # ./bin/UMV_H2_far_dense 1024 30 64 0.5 2 geometry_admis 1 0
 # for rank in 20 24 30; do
 #     ./bin/UMV_H2_far_dense 1024 $rank 64 0.5 2 geometry_admis 1 0
