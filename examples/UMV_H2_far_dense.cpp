@@ -127,6 +127,7 @@ namespace Hatrix {
     int64_t matrix_type;
 
   private:
+    bool all_dense_blocks(int64_t level, int64_t nblocks);
     int64_t permute_forward(Matrix& x, const int64_t level, int64_t rank_offset);
     int64_t permute_backward(Matrix& x, const int64_t level, int64_t rank_offset);
     void solve_forward_level(Matrix& x_level, int64_t level);
@@ -675,6 +676,18 @@ namespace Hatrix {
     else if (ndim == 3) {
       orthogonal_recursive_bisection_3dim(0, N, std::string(""), nleaf, 0);
     }
+  }
+
+  bool H2::all_dense_blocks(int64_t level, int64_t nblocks) {
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (!is_admissible.exists(i, j, level) || is_admissible(i, j, level)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   int64_t H2::find_all_dense_row() {
@@ -1803,7 +1816,6 @@ namespace Hatrix {
   void
   H2::calc_diagonal_based_admissibility(int64_t level) {
     int64_t nblocks = pow(2, level); // pow since we are using diagonal based admis.
-    // std::cout << "nblocks: " << nblocks << " level: " << level << std::endl;
     level_blocks.push_back(nblocks);
     if (level == 0) { return; }
     if (level == height) {
@@ -1812,19 +1824,6 @@ namespace Hatrix {
           is_admissible.insert(i, j, level, std::abs(i - j) > admis);
         }
       }
-
-      // is_admissible.erase(0, 2, level);
-      // is_admissible.insert(0, 2, level, true);
-
-      // is_admissible.erase(2, 0, level);
-      // is_admissible.insert(2, 0, level, true);
-
-      // is_admissible.erase(1, 3, level);
-      // is_admissible.insert(1, 3, level, true);
-
-      // is_admissible.erase(3, 1, level);
-      // is_admissible.insert(3, 1, level, true);
-
     }
     else {
       coarsen_blocks(level);
@@ -3077,7 +3076,7 @@ int main(int argc, char ** argv) {
   double construct_error, lr_ratio, solve_error;
   construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
-  // A.print_structure();
+  A.print_structure();
   A.factorize(domain);
 
   if (false) {
