@@ -1297,6 +1297,18 @@ namespace Hatrix {
       int64_t parent_nblocks = level_blocks[parent_level];
             // std::cout << "START MERGE PARENT LEVEL: " << parent_level << " blocks: " << std::endl;
 
+      if (level == 3) {
+        int64_t A2_nblocks = level_blocks[2];
+        for (int i = 0; i < A2_nblocks; ++i) {
+          for (int j = 0; j < A2_nblocks; ++j) {
+            if (is_admissible(i, j, 2)) {
+              A2_expected_splits[i * A2_nblocks + j] =
+                matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
+            }
+          }
+        }
+      }
+
       for (int64_t i = 0; i < parent_nblocks; ++i) {
         for (int64_t j = 0; j < parent_nblocks; ++j) {
           if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
@@ -2668,15 +2680,12 @@ Matrix unpermute_matrix(Matrix PA, H2& A) {
 
 
 void verify_A2_solve(Matrix& A2, H2& A, const Domain& domain) {
-  Matrix b = generate_random_matrix(A.rank * 8, 1);
+  int64_t A2_nblocks = A.level_blocks[2];
+  int64_t permuted_nblocks = A2_nblocks * 2;
+  Matrix b = generate_random_matrix(A.rank * permuted_nblocks, 1);
 
   auto x2_dense = lu_solve(A2, b);
   auto x2_h2 = A.solve(b, 2);
-
-  // b.print();
-
-  // (x2_h2).print();
-  // x2_dense.print();
 
   std::cout << "A2 solve error: " << norm(x2_h2 - x2_dense) / norm(x2_dense) << std::endl;
 }
