@@ -2456,7 +2456,10 @@ Hatrix::Matrix generate_U1(Hatrix::H2& A) {
 }
 
 void verify_A1_solve(Matrix& A1, H2& A, const Domain& domain) {
-  Matrix b = generate_random_matrix(A.rank * 4, 1);
+  const int64_t level = 1;
+  int64_t A1_nblocks = A.level_blocks[level];
+  int64_t A1_total_nblocks = A1_nblocks * 2;
+  Matrix b = generate_random_matrix(A.rank * A1_total_nblocks, 1);
   auto A1_22 = Matrix(A1.split(2, 2)[3]);
   // A1_22.print();              //
   auto x1_solve = lu_solve(A1_22, b);
