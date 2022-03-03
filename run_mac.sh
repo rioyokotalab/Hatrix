@@ -10,16 +10,11 @@ echo "------ UMV H2 NLEVEL ------"
 # ./bin/UMV_strong_H2_Nlevel 1024 10 4 2 0
 # ./bin/UMV_strong_H2_Nlevel 2048 10 5 2
 
-./bin/UMV_H2_far_dense 1024 10 64 2 2 diagonal_admis 0 1
+# ./bin/UMV_H2_far_dense 1024 10 64 2 2 diagonal_admis 0 1
 
 # ./bin/UMV_H2_far_dense 1024 10 64 0.2 2 geometry_admis 0 1
-./bin/UMV_H2_far_dense 1024 10 64 0.2 2 geometry_admis 0 1
-# ./bin/UMV_H2_far_dense 512 15 64 0.5 2 geometry_admis 0 0
-# ./bin/UMV_H2_far_dense 512 15 64 2 2 diagonal_admis 0 0
-# ./bin/UMV_H2_far_dense 512 15 64 2 2 diagonal_admis 0 1
-# ./bin/UMV_H2_far_dense 512 15 64 1  2 diagonal_admis 1 0
-# ./bin/UMV_H2_far_dense 1024 25 64 0.9 3 geometry_admis 0 0
-# ./bin/UMV_H2_far_dense 2048 25 64 0.8 3 geometry_admis 0 0
+./bin/UMV_H2_far_dense 512 10 64 0.5 2 geometry_admis 0 1
+# ./bin/UMV_H2_far_dense 512 10 64 1 2 geometry_admis 0 1
 
 # echo "SPHERE GEOMETRY"
 # for rank in 34; do
