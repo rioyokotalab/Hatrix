@@ -848,19 +848,6 @@ namespace Hatrix {
                 else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
                   Sbar_block_j = matmul(matmul(r(block), S(block, j, level)), t(j)) +
                     matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
-
-                  // Update S blocks for the column of the block with nb * nb fill-in.
-                  for (int64_t i = 0; i < nblocks; ++i) {
-                    if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-                      Matrix Sbar_ij(rank, rank);
-                      if (i != block) {
-                        Sbar_ij = matmul(S(i, j, level), t(j), false, true);
-
-                        S.erase(i, j, level);
-                        S.insert(i, j, level, std::move(Sbar_ij));
-                      }
-                    }
-                  }
                 }
               }
               else {
@@ -871,7 +858,25 @@ namespace Hatrix {
               S.insert(block, j, level, std::move(Sbar_block_j));
             }
 
-            if (F.exists(block, j)) { F.erase(block, j); }
+            if (F.exists(block, j) && F(block, j).rows == block_size && F(block, j).cols == block_size) {
+              // Update S blocks for the column of the block with nb * nb fill-in.
+              for (int64_t i = 0; i < nblocks; ++i) {
+                if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+                  Matrix Sbar_ij(rank, rank);
+                  if (i != block) {
+                    Sbar_ij = matmul(S(i, j, level), t(j), false, true);
+
+                    S.erase(i, j, level);
+                    S.insert(i, j, level, std::move(Sbar_ij));
+                  }
+                }
+              }
+
+            }
+
+            if (F.exists(block, j)) {
+              F.erase(block, j);
+            }
           }
         }
 
@@ -880,29 +885,12 @@ namespace Hatrix {
             if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
               Matrix Sbar_i_block(rank, rank);
               if (F.exists(i, block)) {
-                if (i == 2 && block == 1) {
-                  std::cout << "FILL RECOMP: bl -> " << i << " block -> " << block << " level: " << level << std::endl;
-                  F(i, block).print_meta();
-                }
                 if (F(i, block).rows == rank && F(i, block).cols == block_size) {
                   Sbar_i_block = matmul(S(i, block,level), t(block)) + matmul(F(i, block), V(block, level));
                 }
                 else if (F(i, block).rows == block_size && F(i, block).cols == block_size) {
                   Sbar_i_block = matmul(r(i), matmul(S(i, block,level), t(block), false, true)) +
                     matmul(U(i, level), matmul(F(i, block), V(block, level)), true, false);
-
-                  // Update S blocks for the row of the block with nb * nb fill-in.
-                  for (int64_t j = 0; j < nblocks; ++j) {
-                    if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-                      Matrix Sbar_ij(rank, rank);
-                      if (j != block) {
-                        Sbar_ij = matmul(r(i), S(i, j, level));
-
-                        S.erase(i, j, level);
-                        S.insert(i, j, level, std::move(Sbar_ij));
-                      }
-                    }
-                  }
                 }
               }
               else {
@@ -913,7 +901,25 @@ namespace Hatrix {
               S.insert(i, block, level, std::move(Sbar_i_block));
             }
 
-            if (F.exists(i, block)) { F.erase(i, block); }
+            if (F.exists(i, block) && F(i, block).rows == block_size && F(i, block).cols == block_size) {
+              // Update S blocks for the row of the block with nb * nb fill-in.
+              for (int64_t j = 0; j < nblocks; ++j) {
+                if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+                  Matrix Sbar_ij(rank, rank);
+                  if (j != block) {
+                    Sbar_ij = matmul(r(i), S(i, j, level));
+
+                    S.erase(i, j, level);
+                    S.insert(i, j, level, std::move(Sbar_ij));
+                  }
+                }
+              }
+
+            }
+
+            if (F.exists(i, block)) {
+              F.erase(i, block);
+            }
           }
         }
       }
