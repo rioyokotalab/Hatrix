@@ -1687,6 +1687,8 @@ namespace Hatrix {
     int64_t child_level = level - 1;
     level_blocks.push_back(nblocks);
 
+    std::cout << "level: " << level << " nblocks: " << nblocks << std::endl;
+
     if (nblocks == 1) { return level; }
 
     for (int64_t i = 0; i < nblocks; ++i) {
@@ -1714,6 +1716,11 @@ namespace Hatrix {
 
         is_admissible.insert(i, j, level, std::move(admis_block));
       }
+    }
+
+    if (all_dense_blocks(level, nblocks)) {
+      level_blocks.push_back(nblocks/2);
+      return level+1;
     }
 
     return geometry_admis_non_leaf(nblocks/2, level+1);
@@ -2199,6 +2206,12 @@ namespace Hatrix {
 
       is_admissible = temp_is_admissible;
       std::reverse(std::begin(level_blocks), std::end(level_blocks));
+
+      std::cout << "height : " << height << std::endl;
+      for (int i = 0; i < level_blocks.size(); ++i) {
+        std::cout << level_blocks[i] << " ";
+      }
+      std::cout << std::endl;
     }
     else if (admis_kind == "diagonal_admis") {
       if (matrix_type == BLR2_MATRIX) {
@@ -2229,8 +2242,9 @@ namespace Hatrix {
     int64_t all_dense_row = find_all_dense_row();
     if (all_dense_row != -1) {
       std::cout << "found all dense row at " << all_dense_row << ". Aborting.\n";
-      abort();
-    }
+      abort();    }
+
+    print_structure();
 
     generate_leaf_nodes(domain);
     RowLevelMap Uchild = U;
