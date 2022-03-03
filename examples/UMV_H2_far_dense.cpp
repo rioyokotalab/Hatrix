@@ -914,7 +914,6 @@ namespace Hatrix {
                   }
                 }
               }
-
             }
 
             if (F.exists(i, block)) {
@@ -1219,12 +1218,15 @@ namespace Hatrix {
     int64_t A1_perm_nblocks = A1_nblocks * 2;
 
     int64_t A2_nblocks = level_blocks[2];
+    std::vector<Matrix> A2_expected_splits;
 
     A1_expected = generate_identity_matrix(rank * 2 * A1_perm_nblocks, rank * 2 * A1_perm_nblocks);
     auto A1_expected_splits = A1_expected.split(A1_perm_nblocks, A1_perm_nblocks);
 
-    A2_expected = generate_identity_matrix(rank * 2 * A2_nblocks, rank * 2 * A2_nblocks);
-    auto A2_expected_splits = A2_expected.split(A2_nblocks, A2_nblocks);
+    if (matrix_type == H2_MATRIX) {
+      A2_expected = generate_identity_matrix(rank * 2 * A2_nblocks, rank * 2 * A2_nblocks);
+      A2_expected_splits = A2_expected.split(A2_nblocks, A2_nblocks);
+    }
 
     for (; level > 0; --level) {
       int64_t nblocks = level_blocks[level];
@@ -1239,7 +1241,7 @@ namespace Hatrix {
         break;
       }
 
-      if (level == 2) {
+      if (matrix_type == H2_MATRIX && level == 2) {
         for (int64_t i = 0; i < A2_nblocks; ++i) {
           for (int64_t j = 0; j < A2_nblocks; ++j) {
             if (D.exists(i, j, level)) {
@@ -1318,17 +1320,17 @@ namespace Hatrix {
       int64_t parent_nblocks = level_blocks[parent_level];
             // std::cout << "START MERGE PARENT LEVEL: " << parent_level << " blocks: " << std::endl;
 
-      // if (level == 3) {
-      //   int64_t A2_nblocks = level_blocks[2];
-      //   for (int i = 0; i < A2_nblocks; ++i) {
-      //     for (int j = 0; j < A2_nblocks; ++j) {
-      //       if (is_admissible(i, j, 2)) {
-      //         A2_expected_splits[i * A2_nblocks + j] =
-      //           matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
-      //       }
-      //     }
-      //   }
-      // }
+      if (matrix_type == H2_MATRIX && level == 3) {
+        int64_t A2_nblocks = level_blocks[2];
+        for (int i = 0; i < A2_nblocks; ++i) {
+          for (int j = 0; j < A2_nblocks; ++j) {
+            if (is_admissible(i, j, 2)) {
+              A2_expected_splits[i * A2_nblocks + j] =
+                matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
+            }
+          }
+        }
+      }
 
       for (int64_t i = 0; i < parent_nblocks; ++i) {
         for (int64_t j = 0; j < parent_nblocks; ++j) {
@@ -2274,7 +2276,7 @@ namespace Hatrix {
     }
 
     is_admissible.insert(0, 0, 0, false);
-    PV = 1e-3 * (1 / pow(10, height));
+    PV = 1e-3;// * (1 / pow(10, height));
 
     int64_t all_dense_row = find_all_dense_row();
     if (all_dense_row != -1) {
