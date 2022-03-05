@@ -3252,4 +3252,15 @@ int main(int argc, char ** argv) {
        << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
   file.close();
 
+  file.open("results.csv", std::ios::app | std::ios::out);
+  file << N << "," << admis << "," << nleaf << "," << ndim
+       << "," << A.height << "," << rank
+       << "," << construct_error
+       << "," << solve_error
+       << "," << kernel_func
+       << "," << lr_ratio * 100
+       << "," << admis_kind
+       << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
+
+  file.close();
 }
