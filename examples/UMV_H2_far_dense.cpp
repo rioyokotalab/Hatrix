@@ -13,6 +13,7 @@
 #include <functional>
 #include <fstream>
 #include <set>
+#include <chrono>
 
 #include "Hatrix/Hatrix.h"
 
@@ -3161,12 +3162,20 @@ int main(int argc, char ** argv) {
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
+  auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
+  auto stop_construct = std::chrono::system_clock::now();
+  double construct_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_construct - start_construct).count();
+
   double construct_error, lr_ratio, solve_error;
   construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
   // A.print_structure();
+  auto start_factor = std::chrono::system_clock::now();
   A.factorize(domain);
+  auto stop_factor = std::chrono::system_clock::now();
+  double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_factor - start_factor).count();
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
 
@@ -3221,7 +3230,10 @@ int main(int argc, char ** argv) {
   }
 
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
+  auto solve_start = std::chrono::system_clock::now();
   Hatrix::Matrix x = A.solve(b, A.height);
+  auto solve_stop = std::chrono::system_clock::now();
+  double solve_time = std::chrono::duration_cast<std::chrono::milliseconds>(solve_stop - solve_start).count();
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
   solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
@@ -3249,7 +3261,11 @@ int main(int argc, char ** argv) {
        << " kernel func= " << kernel_func
        << " LR%= " << lr_ratio * 100 << "%"
        << " admis kind= " << admis_kind
-       << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
+       << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
+       << " factor time= " << factor_time
+       << " solve time= " << solve_time
+       << " construct time = " << construct_time
+       << std::endl;
   file.close();
 
   file.open("results.csv", std::ios::app | std::ios::out);
@@ -3260,7 +3276,11 @@ int main(int argc, char ** argv) {
        << "," << kernel_func
        << "," << lr_ratio * 100
        << "," << admis_kind
-       << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
+       << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
+       << "," << factor_time
+       << "," << solve_time
+       << "," << construct_time
+       << std::endl;
 
   file.close();
 }
