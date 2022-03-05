@@ -1158,16 +1158,6 @@ namespace Hatrix {
         break;
       }
 
-      if (matrix_type == H2_MATRIX && level == 2) {
-        for (int64_t i = 0; i < A2_nblocks; ++i) {
-          for (int64_t j = 0; j < A2_nblocks; ++j) {
-            if (D.exists(i, j, level)) {
-              A2_expected_splits[i * A2_nblocks + j] = D(i, j, level);
-            }
-          }
-        }
-      }
-
       factorize_level(level, nblocks, domain, r, t);
 
       int64_t parent_level = level - 1;
@@ -1186,29 +1176,17 @@ namespace Hatrix {
           auto temp_splits = temp.split(2, 1);
 
           if (r.exists(c1)) {
-            // std::cout << "C1 update: " << c1 << " norm: " << norm(r(c1)) << std::endl;
             matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
             r.erase(c1);
           }
 
           if (r.exists(c2)) {
-            // std::cout << "C2 update: " << c2 <<  " norm: " << norm(r(c2)) << std::endl;
             matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
             r.erase(c2);
           }
 
           U.erase(parent_node, parent_level);
           U.insert(parent_node, parent_level, std::move(temp));
-
-          if (parent_level == 2) {
-            std::cout << "FAR DENSE U parent_node -> " << parent_node
-                      << " parent_level -> " << parent_level
-                      << norm(generate_identity_matrix(rank, rank) -
-                              matmul(U(parent_node, parent_level),
-                                     U(parent_node, parent_level), true, false))
-                      << std::endl;
-          }
-
         }
 
         if (col_has_admissible_blocks(parent_node, parent_level) && height != 1) {
@@ -1230,15 +1208,6 @@ namespace Hatrix {
 
           V.erase(parent_node, parent_level);
           V.insert(parent_node, parent_level, std::move(temp));
-
-          if (parent_level == 2) {
-            std::cout << "FAR DENSE V parent_node -> " << parent_node
-                      << " parent_level -> " << parent_level
-                      << norm(generate_identity_matrix(rank, rank) -
-                              matmul(V(parent_node, parent_level),
-                                     V(parent_node, parent_level), true, false))
-                      << std::endl;
-          }
         }
       } // for (block = 0; block < nblocks; block += 2)
 
@@ -1651,8 +1620,6 @@ namespace Hatrix {
   H2::geometry_admis_non_leaf(int64_t nblocks, int64_t level) {
     int64_t child_level = level - 1;
     level_blocks.push_back(nblocks);
-
-    std::cout << "level: " << level << " nblocks: " << nblocks << std::endl;
 
     if (nblocks == 1) { return level; }
 
@@ -2972,9 +2939,6 @@ int main(int argc, char ** argv) {
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
-  Matrix rank_map = domain.generate_rank_heat_map();
-  rank_map.print();
-
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   double construct_error, lr_ratio, solve_error;
   construct_error = A.construction_relative_error(domain);
@@ -3037,16 +3001,6 @@ int main(int argc, char ** argv) {
   Hatrix::Matrix x = A.solve(b, A.height);
   Hatrix::Matrix x_solve = lu_solve(Adense, b);
   solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
-
-  auto x_splits = x.split(16, 1);
-  auto x_solve_splits = x_solve.split(16, 1);
-
-  for (int i = 0; i < 16; ++i) {
-    std::cout << "i -> " << i << " rel. err. -> "
-              << norm(x_splits[i] - x_solve_splits[i]) / norm(x_solve_splits[i]) << std::endl;
-  }
-
-  std::cout << "NORMAL DIFF: " << norm(x - x_solve) << " SOLVE NORM: " << norm(x_solve) << std::endl;;
 
   Hatrix::Context::finalize();
 

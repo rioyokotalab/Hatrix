@@ -22,10 +22,10 @@ echo "------ UMV H2 NLEVEL ------"
 # ./bin/UMV_H2_far_dense 512 10 64 0.5 2 geometry_admis 0 1
 ./bin/UMV_H2_far_dense 512 10 64 1 2 geometry_admis 0 1
 
-# echo "SPHERE GEOMETRY"
-# for rank in 34; do
-#     lldb -o run -- ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
-# done
+echo "SPHERE GEOMETRY"
+for rank in 34 40; do
+    ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 0 0
+done
 
 
 
@@ -54,14 +54,14 @@ echo "------ UMV H2 NLEVEL ------"
 
 
 echo "STARSH GRID GEOMETRY DIM=2"
-for rank in 20; do
-    lldb -o run -- ./bin/UMV_H2_far_dense 1024 $rank 64 0.7 2 geometry_admis 1 1
+for rank in 20 24 30; do
+    ./bin/UMV_H2_far_dense 1024 $rank 64 0.7 2 geometry_admis 1 1
 done
 
-# echo "STARSH GRID GEOMETRY DIM=3"
-# for rank in 40 50 60; do
-#     ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 1 0
-# done
+echo "STARSH GRID GEOMETRY DIM=3"
+for rank in 40 50 60; do
+    ./bin/UMV_H2_far_dense 1024 $rank 64 1 3 geometry_admis 1 0
+done
 
 # for rank in 40 50 60; do
 #     ./bin/UMV_H2_far_dense 1024 $rank 64 0.8 3 geometry_admis 1 0
