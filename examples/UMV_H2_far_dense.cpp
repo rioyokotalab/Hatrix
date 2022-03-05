@@ -1533,7 +1533,6 @@ namespace Hatrix {
     x_splits = x.split(std::vector<int64_t>(1, rhs_offset), {});
     Matrix x_last(x_splits[1]);
     int64_t last_nodes = level_blocks[level];
-    std::cout << "SOLVE last_nodes: " << last_nodes << " rhs_offset: " << rhs_offset << std::endl;
     auto x_last_splits = x_last.split(last_nodes, 1);
 
     for (int64_t i = 0; i < last_nodes; ++i) {
@@ -2943,6 +2942,7 @@ int main(int argc, char ** argv) {
   double construct_error, lr_ratio, solve_error;
   construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
+  A.print_structure();
   A.factorize(domain);
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
