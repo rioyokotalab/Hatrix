@@ -3227,12 +3227,15 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::finalize();
 
-  std::cout << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
+  std::cout << "N=" << N
+            << " admis=" << admis << std::setw(3)
+            << " nleaf=" << nleaf
+            << " ndim=" << ndim
             << " height= " << A.height << " rank=" << rank
-            << " construct error= " << construct_error
-            << " solve error= " << solve_error
+            << " construct error= " << std::setprecision(5) << construct_error << std::setw(3)
+            << " solve error= " << std::setprecision(5) << solve_error << std::setw(5)
             << " kernel func= " << kernel_func
-            << " LR%= " << lr_ratio * 100 << "%"
+            << " LR%= " << std::setprecision(5) << lr_ratio * 100 << "%" << std::setw(3)
             << " admis kind= " << admis_kind
             << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
 
