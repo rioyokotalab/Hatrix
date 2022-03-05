@@ -10,6 +10,8 @@
 #include <random>
 #include <string>
 #include <iomanip>
+#include <functional>
+#include <fstream>
 
 #include "Hatrix/Hatrix.h"
 
@@ -20,6 +22,8 @@ double PV = 1e-3;
   dense.split(std::vector<int64_t>(1, row_split),       \
               std::vector<int64_t>(1, col_split));
 
+
+double beta, nu, noise = 1.e-1, sigma;
 
 Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
   Hatrix::Matrix Q_F(Q.rows, Q.rows);
@@ -41,6 +45,8 @@ Hatrix::Matrix make_complement(const Hatrix::Matrix &Q) {
 }
 
 namespace Hatrix {
+  std::function<double(const std::vector<double>& coords_row, const std::vector<double>& coords_col)> kernel_function;
+
   class Particle {
   public:
     double value;
@@ -49,6 +55,7 @@ namespace Hatrix {
     Particle(double x, double _value);
     Particle(double x, double y, double _value);
     Particle(double x, double y, double z, double _value);
+    Particle(std::vector<double> coords, double _value);
   };
 
   class Box {
@@ -87,6 +94,8 @@ namespace Hatrix {
     Domain(int64_t N, int64_t ndim);
     void generate_particles(double min_val, double max_val);
     void divide_domain_and_create_particle_boxes(int64_t nleaf);
+    void generate_starsh_grid_particles();
+    void print_file(std::string file_name);
   };
 
   class H2 {
@@ -127,7 +136,7 @@ namespace Hatrix {
                                int64_t block_size, const Domain& domain, int64_t level);
     std::tuple<Matrix, Matrix>
     generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
-                               int64_t block_size, const Domain& domain, int level);
+                               int64_t block_size, const Domain& domain, int64_t level);
 
     void
     calc_geometry_based_admissibility(int64_t level, const Domain& domain);
@@ -142,10 +151,32 @@ namespace Hatrix {
        std::string& admis_kind);
     double construction_relative_error(const Domain& domain);
     void print_structure();
+    double low_rank_block_ratio();
+    void factorize(const Domain& domain);
   };
 }
 
 namespace Hatrix {
+  double sqrexp_kernel(const std::vector<double>& coords_row,
+                       const std::vector<double>& coords_col) {
+    int64_t ndim = coords_row.size();
+    double dist = 0, temp;
+
+    // Copied from kernel_sqrexp.c in stars-H.
+
+    for (int64_t k = 0; k < ndim; ++k) {
+      temp = coords_row[k] - coords_col[k];
+      dist += temp * temp;
+    }
+    dist = dist / beta;
+    if (dist == 0) {
+      return sigma + noise;
+    }
+    else {
+      return sigma * exp(dist);
+    }
+  }
+
   double laplace_kernel(const std::vector<double>& coords_row,
                         const std::vector<double>& coords_col) {
     int64_t ndim = coords_row.size();
@@ -155,19 +186,6 @@ namespace Hatrix {
     }
     double out = 1 / (std::sqrt(rij) + PV);
 
-    return out;
-  }
-
-  // Generate a full dense laplacian matrix assuming unit charges.
-  Matrix generate_laplacend_matrix(const std::vector<Hatrix::Particle>& particles,
-                                   int64_t nrows, int64_t ncols) {
-    Matrix out(nrows, ncols);
-
-    for (int64_t i = 0; i < nrows; ++i) {
-      for (int64_t j = 0; j < ncols; ++j) {
-        out(i, j) = laplace_kernel(particles[i].coords, particles[j].coords);
-      }
-    }
     return out;
   }
 
@@ -183,8 +201,67 @@ namespace Hatrix {
         int64_t source = domain.boxes[irow].start_index;
         int64_t target = domain.boxes[icol].start_index;
 
-        out(i, j) = laplace_kernel(domain.particles[source+i].coords,
+        out(i, j) = kernel_function(domain.particles[source+i].coords,
                                    domain.particles[target+j].coords);
+      }
+    }
+
+    return out;
+  }
+
+  std::vector<int64_t>
+  leaf_indices(int64_t node, int64_t level, int64_t height) {
+    std::vector<int64_t> indices;
+    if (level == height) {
+      std::vector<int64_t> leaf_index{node};
+      return leaf_index;
+    }
+
+    auto c1_indices = leaf_indices(node * 2, level + 1, height);
+    auto c2_indices = leaf_indices(node * 2 + 1, level + 1, height);
+
+    c1_indices.insert(c1_indices.end(), c2_indices.begin(), c2_indices.end());
+
+    return c1_indices;
+  }
+
+  Matrix generate_p2p_interactions(const Domain& domain,
+                                   int64_t irow, int64_t icol,
+                                   int64_t level, int64_t height) {
+    if (level == height) {
+      return generate_p2p_interactions(domain, irow, icol);
+    }
+
+    std::vector<int64_t> leaf_rows = leaf_indices(irow, level, height);
+    std::vector<int64_t> leaf_cols = leaf_indices(icol, level, height);
+
+    int64_t nrows = 0, ncols = 0;
+    for (int i = 0; i < leaf_rows.size(); ++i) { nrows += domain.boxes[leaf_rows[i]].num_particles; }
+    for (int i = 0; i < leaf_cols.size(); ++i) { ncols += domain.boxes[leaf_cols[i]].num_particles; }
+
+    Matrix out(nrows, ncols);
+
+    std::vector<Particle> source_particles, target_particles;
+    for (int i = 0; i < leaf_rows.size(); ++i) {
+      int64_t source_box = leaf_rows[i];
+      int64_t source = domain.boxes[source_box].start_index;
+      for (int n = 0; n < domain.boxes[source_box].num_particles; ++n) {
+        source_particles.push_back(domain.particles[source + n]);
+      }
+    }
+
+    for (int i = 0; i < leaf_cols.size(); ++i) {
+      int64_t target_box = leaf_cols[i];
+      int64_t target = domain.boxes[target_box].start_index;
+      for (int n = 0; n < domain.boxes[target_box].num_particles; ++n) {
+        target_particles.push_back(domain.particles[target + n]);
+      }
+    }
+
+    for (int64_t i = 0; i < nrows; ++i) {
+      for (int64_t j = 0; j < ncols; ++j) {
+        out(i, j) = kernel_function(source_particles[i].coords,
+                                    target_particles[j].coords);
       }
     }
 
@@ -206,6 +283,8 @@ namespace Hatrix {
     coords.push_back(z);
   }
 
+  Particle::Particle(std::vector<double> _coords, double _value) :
+    coords(_coords), value(_value) {}
 
   Box::Box() {}
 
@@ -254,6 +333,26 @@ namespace Hatrix {
     return std::sqrt(dist);
   }
 
+  void
+  Domain::print_file(std::string file_name) {
+    std::vector<char> coords{'x', 'y', 'z'};
+
+    std::ofstream file;
+    file.open(file_name, std::ios::app | std::ios::out);
+    for (int k = 0; k < ndim; ++k) {
+      file << coords[k] << ",";
+    }
+    file << std::endl;
+
+    for (int i = 0; i < N; ++i) {
+      for (int k = 0; k < ndim; ++k) {
+        file << particles[i].coords[k] << ",";
+      }
+      file << std::endl;
+    }
+
+    file.close();
+  }
 
   // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
   void
@@ -264,7 +363,7 @@ namespace Hatrix {
     // Sort the particles only by the X axis since that is the only axis that needs to be bisected.
     std::sort(particles.begin()+start,
               particles.begin()+end, [](const Particle& lhs, const Particle& rhs) {
-      return lhs.coords[0] <= rhs.coords[0];
+      return lhs.coords[0] < rhs.coords[0];
     });
 
     int64_t num_points = end - start;
@@ -381,6 +480,47 @@ namespace Hatrix {
 
   Domain::Domain(int64_t N, int64_t ndim) : N(N), ndim(ndim) {}
 
+  void Domain::generate_starsh_grid_particles() {
+    int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
+    int64_t total = side;
+    for (int i = 1; i < ndim; ++i) { total *= side; }
+
+    int64_t ncoords = ndim * side;
+    std::vector<double> coord(ncoords);
+
+    for (int i = 0; i < side; ++i) {
+      double val = double(i) / side;
+      for (int j = 0; j < ndim; ++j) {
+        coord[j * side + i] = val;
+      }
+    }
+
+    std::vector<int64_t> pivot(ndim, 0);
+
+    int64_t k = 0;
+    for (int64_t i = 0; i < N; ++i) {
+      std::vector<double> points(ndim);
+      for (k = 0; k < ndim; ++k) {
+
+        points[k] = coord[pivot[k] + k * side];
+        // std::cout << points[k] << " ";
+      }
+      // std::cout << std::endl;
+      particles.push_back(Hatrix::Particle(points, 0));
+
+      k = ndim - 1;
+      pivot[k]++;
+
+      while(pivot[k] == side) {
+        pivot[k] = 0;
+        if (k > 0) {
+          --k;
+          pivot[k]++;
+        }
+      }
+    }
+  }
+
   void Domain::generate_particles(double min_val, double max_val) {
     double range = max_val - min_val;
 
@@ -413,8 +553,12 @@ namespace Hatrix {
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
       for (int64_t i = 0; i < N; ++i) {
-        double phi = dis(gen);
+        // double phi = dis(gen);
+
+
+        double phi = (i * 2.0 * M_PI) / N;
         double theta = dis(gen);
+        // double theta = (i * 2.0 * M_PI) / N;
 
         double x = radius * sin(phi) * cos(theta);
         double y = radius * sin(phi) * sin(theta);
@@ -515,7 +659,7 @@ namespace Hatrix {
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
         is_admissible.insert(i, j, level,
-                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <
+                             std::min(domain.boxes[i].diameter, domain.boxes[j].diameter) <=
                              admis * domain.boxes[i].distance_from(domain.boxes[j]));
       }
     }
@@ -527,6 +671,7 @@ namespace Hatrix {
   H2::calc_diagonal_based_admissibility(int64_t level) {
     if (level == 0) { return; }
     int64_t nblocks = pow(2, level);
+    level_blocks.push_back(nblocks);
     if (level == height) {
       for (int64_t i = 0; i < nblocks; ++i) {
         for (int64_t j = 0; j < nblocks; ++j) {
@@ -574,8 +719,7 @@ namespace Hatrix {
     int64_t nblocks = level_blocks[level-1];
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-      int64_t col_block_size = get_block_size_col(domain, j, level);
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j, level, height);
       AY = concat(AY, dense, 1);
     }
 
@@ -598,8 +742,7 @@ namespace Hatrix {
     Hatrix::Matrix YtA(0, block_size);
     for (int64_t i = 0; i < pow(2, level); ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-      int64_t row_block_size = get_block_size_row(domain, i, level);
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block);
+      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block, level, height);
       YtA = concat(YtA, dense, 0);
     }
 
@@ -777,9 +920,36 @@ namespace Hatrix {
   H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
                                  int64_t block_size, const Domain& domain, int64_t level) {
     Matrix col_block = generate_column_block(node, block_size, domain, level);
+    auto col_block_splits = col_block.split(2, 1);
+
+    Matrix temp(Ubig_child1.cols + Ubig_child2.cols, col_block.cols);
+    auto temp_splits = temp.split(2, 1);
+
+    matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
+    matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
+
     Matrix Utransfer, Si, Vi; double error;
+    std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
 
     return {std::move(Utransfer), std::move(Si)};
+  }
+
+  std::tuple<Matrix, Matrix>
+  H2::generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
+                                 int64_t block_size, const Domain& domain, int64_t level) {
+    Matrix row_block = generate_row_block(node, block_size, domain, level);
+    auto row_block_splits = row_block.split(1, 2);
+
+    Matrix temp(row_block.rows, Vbig_child1.cols + Vbig_child2.cols);
+    auto temp_splits = temp.split(1, 2);
+
+    matmul(row_block_splits[0], Vbig_child1, temp_splits[0]);
+    matmul(row_block_splits[1], Vbig_child2, temp_splits[1]);
+
+    Matrix Ui, Si, Vtransfer; double error;
+    std::tie(Ui, Si, Vtransfer, error) = truncated_svd(temp, rank);
+
+    return {std::move(Si), transpose(Vtransfer)};
   }
 
   std::tuple<RowLevelMap, ColLevelMap>
@@ -805,7 +975,6 @@ namespace Hatrix {
       int64_t child_level = level + 1;
       int64_t block_size = get_block_size_row(domain, node, level);
 
-
       if (row_has_admissible_blocks(node, level)) {
         Matrix& Ubig_child1 = Uchild(child1, child_level);
         Matrix& Ubig_child2 = Uchild(child2, child_level);
@@ -817,17 +986,62 @@ namespace Hatrix {
                                                                 block_size,
                                                                 domain,
                                                                 level);
+
+        // std::cout << "level: " << level << " node: " << node
+        //           << " U : " << norm(generate_identity_matrix(rank, rank) - matmul(Utransfer, Utransfer, true, false))
+        //           << std::endl;
+
+        U.insert(node, level, std::move(Utransfer));
+        Scol.insert(node, level, std::move(Stemp));
+
+        // Generate the full bases to pass onto the parent.
+        auto Utransfer_splits = U(node, level).split(2, 1);
+        Matrix Ubig(block_size, rank);
+        auto Ubig_splits = Ubig.split(2, 1);
+
+        matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
+        matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
+
+        Ubig_parent.insert(node, level, std::move(Ubig));
       }
 
       if (col_has_admissible_blocks(node, level)) {
+        // Generate V transfer matrix.
+        Matrix& Vbig_child1 = Vchild(child1, child_level);
+        Matrix& Vbig_child2 = Vchild(child2, child_level);
 
+        Matrix Vtransfer, Stemp;
+        std::tie(Stemp, Vtransfer) = generate_V_transfer_matrix(Vbig_child1,
+                                                                Vbig_child2,
+                                                                node,
+                                                                block_size,
+                                                                domain,
+                                                                level);
+        V.insert(node, level, std::move(Vtransfer));
+        Srow.insert(node, level, std::move(Stemp));
+
+        // Generate the full bases for passing onto the upper level.
+        std::vector<Matrix> Vtransfer_splits = V(node, level).split(2, 1);
+        Matrix Vbig(rank, block_size);
+        std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
+
+        matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
+        matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
+
+        Vbig_parent.insert(node, level, transpose(Vbig));
       }
     }
 
     for (int row = 0; row < nblocks; ++row) {
       for (int col = 0; col < nblocks; ++col) {
         if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+          int64_t row_block_size = get_block_size_row(domain, row, level);
+          int64_t col_block_size = get_block_size_col(domain, col, level);
 
+          Matrix D = generate_p2p_interactions(domain, row, col, level, height);
+
+          S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
+                                           Vbig_parent(col, level)));
         }
       }
     }
@@ -865,8 +1079,10 @@ namespace Hatrix {
     else if (admis_kind == "diagonal_admis") {
       height = int64_t(log2(N / nleaf));
       calc_diagonal_based_admissibility(height);
+      std::reverse(std::begin(level_blocks), std::end(level_blocks));
     }
     is_admissible.insert(0, 0, 0, false);
+    PV = height;
 
     generate_leaf_nodes(domain);
     RowLevelMap Uchild = U;
@@ -894,7 +1110,7 @@ namespace Hatrix {
       }
     }
 
-    for (int level = height; level > height-1; --level) {
+    for (int level = height; level > 0; --level) {
       int64_t nblocks = level_blocks[level-1];
 
       for (int row = 0; row < nblocks; ++row) {
@@ -904,7 +1120,7 @@ namespace Hatrix {
             Matrix Vbig = get_Vbig(col, level);
 
             Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
-            Matrix actual_matrix = Hatrix::generate_p2p_interactions(domain, row, col);
+            Matrix actual_matrix = Hatrix::generate_p2p_interactions(domain, row, col, level, height);
 
             dense_norm += pow(norm(actual_matrix), 2);
             error += pow(norm(expected_matrix - actual_matrix), 2);
@@ -916,10 +1132,27 @@ namespace Hatrix {
     return std::sqrt(error / dense_norm);
   }
 
-
-
   void H2::print_structure() {
     actually_print_structure(height);
+  }
+
+  double
+  H2::low_rank_block_ratio() {
+    double total = 0, low_rank = 0;
+
+    int nblocks = level_blocks[height-1];
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        if ((is_admissible.exists(i, j, height) && is_admissible(i, j, height)) ||
+            !is_admissible.exists(i, j, height)) {
+          low_rank += 1;
+        }
+
+        total += 1;
+      }
+    }
+
+    return low_rank / total;
   }
 }
 
@@ -930,20 +1163,52 @@ int main(int argc, char ** argv) {
   double admis = atof(argv[4]);
   int64_t ndim = atoi(argv[5]);
   std::string admis_kind(argv[6]);
+  int64_t kernel_func = atoi(argv[7]);
+
+  beta = 0.1;
+  nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
+  noise = 1.e-1;
+  sigma = 1.0;
 
   Hatrix::Context::init();
 
   Hatrix::Domain domain(N, ndim);
-  domain.generate_particles(0.0, 1.0 * N);
+
+  switch(kernel_func) {
+  case 0: {                     // laplace kernel
+    domain.generate_particles(0.0, 1.0 * N);
+    Hatrix::kernel_function = Hatrix::laplace_kernel;
+    break;
+  }
+  case 1: {                     // sqrexp
+    domain.generate_starsh_grid_particles();
+    Hatrix::kernel_function = Hatrix::sqrexp_kernel;
+    break;
+  }
+  }
+
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind);
-  A.print_structure();
+  // A.print_structure();
   double construct_error = A.construction_relative_error(domain);
 
+  double lr_ratio = A.low_rank_block_ratio();
 
   Hatrix::Context::finalize();
 
-  std::cout << "construct error: " << construct_error << std::endl;
+  std::cout << "N=" << N << " admis=" << admis << " nleaf=" << nleaf << " ndim=" << ndim
+            << " height= " << A.height << " rank=" << rank
+            << " construct error= " << construct_error
+            << " LR%= " << lr_ratio * 100 << "%" << std::endl;
+
+  std::ofstream file;
+  file.open("h2_matrix_approximation.csv", std::ios::app | std::ios::out);
+  file << N << "," << admis << "," << nleaf << "," << ndim
+       << "," << A.height << "," << rank
+       << "," << kernel_func
+       << "," << construct_error
+       << "," << lr_ratio * 100 << std::endl;
+  file.close();
 
 }

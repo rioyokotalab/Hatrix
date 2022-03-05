@@ -9,6 +9,10 @@ Matrix& RowMap::operator()(int64_t key) { return (*this)[key]; }
 const Matrix& RowMap::operator()(int64_t key) const { return (*this)[key]; }
 
 void RowMap::insert(int64_t key, Matrix&& matrix) {
+  if ((*this).exists(key)) {
+    std::cout << "RowMap::insert() -> Element at <" << key << "> exists and cannot be inserted." << std::endl;
+    abort();
+  }
   map.insert({key, std::move(matrix)});
 }
 

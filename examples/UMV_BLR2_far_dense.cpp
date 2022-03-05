@@ -459,7 +459,6 @@ namespace Hatrix {
                     row_concat = concat(row_concat, F(block, j), 1);
                   }
                 }
-
               }
 
               Matrix UN_block, _SN1, _VN1T; double error;
@@ -540,7 +539,6 @@ namespace Hatrix {
             // Scan for fill-ins in the same col as this diagonal block.
             int64_t block_size = D(block, block, level).cols;
             Matrix col_concat(0, block_size);
-            std::vector<int64_t> UN2_row_splits;
             bool found_col_fill_in = false;
             for (int i = 0; i < nblocks; ++i) {
               if (F.exists(i, block)) {
@@ -566,8 +564,8 @@ namespace Hatrix {
                 }
               }
 
-              Matrix _UN2T, _SN2, VNT_block; double error;
-              std::tie(_UN2T, _SN2, VNT_block, error) = truncated_svd(col_concat, rank);
+              Matrix _UN2T, SN_block, VNT_block; double error;
+              std::tie(_UN2T, SN_block, VNT_block, error) = truncated_svd(col_concat, rank);
 
               Matrix t_block = matmul(V(block, level), VNT_block, true, true);
 
@@ -575,7 +573,7 @@ namespace Hatrix {
               V.insert(block, level, transpose(VNT_block));
 
               Srow.erase(block, level);
-              Srow.insert(block, level, std::move(_SN2));
+              Srow.insert(block, level, std::move(SN_block));
 
               // step 2: recompress rows for larger fill-ins
               RowMap r;
@@ -626,7 +624,6 @@ namespace Hatrix {
                       Sbar_i_block = matmul(matmul(r(i), S(i, block, level)), t_block) +
                         matmul(matmul(U(i, level), F(i,block), true, false), V(block, level));
                     }
-                    F.erase(i, block);
                   }
                   else {
                     Sbar_i_block = matmul(S(i, block, level), t_block);
@@ -634,6 +631,10 @@ namespace Hatrix {
 
                   S.erase(i, block, level);
                   S.insert(i, block, level, std::move(Sbar_i_block));
+                }
+
+                if (F.exists(i, block)) {
+                  F.erase(i, block);
                 }
               }
             }
@@ -1717,7 +1718,7 @@ int main(int argc, char** argv) {
   Hatrix::BLR2 A(domain, N, nleaf, rank, ndim, admis, admis_kind);
   double construct_error = A.construction_error(domain);
 
-  // A.print_structure();
+  A.print_structure();
   A.factorize(domain);
 
   // A_expected = Hatrix::generate_laplacend_matrix(domain.particles, N, N);

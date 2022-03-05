@@ -24,7 +24,7 @@ void lu(Matrix& A);
 std::vector<int> lup(Matrix& A);
 
 // Use getrs for solving dense matrix A w.r.t RHS b.
-Matrix lu_solve(Matrix& A, const Matrix& b);
+Matrix lu_solve(const Matrix& A, const Matrix& b);
 
 // Compute the in-place non-pivoted LDLT factorization of A.
 void ldl(Matrix& A);
@@ -46,7 +46,7 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
                                                          int64_t rank);
 
 // Compute truncated SVD for given accuracy threshold.
-std::tuple<Matrix, Matrix, Matrix> truncated_svd(Matrix& A, double error);
+std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error);
 
 double norm(const Matrix& A);
 

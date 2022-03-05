@@ -70,4 +70,35 @@ Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
   return out;
 }
 
+Matrix generate_sqrexpnd_matrix(const std::vector<std::vector<double>>& x,
+                                int64_t rows, int64_t cols,
+                                int64_t row_start, int64_t col_start,
+                                double beta, double nu, double noise,
+                                double sigma) {
+  Matrix out(rows, cols);
+  double value;
+
+  for(int64_t i = 0; i < rows; i++) {
+    for(int64_t j = 0; j < cols; j++) {
+      double dist = 0, temp;
+
+      for (int64_t k = 0; k < x.size(); ++k) {
+        temp = x[k][i + row_start] - x[k][j + col_start];
+        dist += temp * temp;
+      }
+      dist = dist / beta;
+      if (dist == 0) {
+        value = sigma + noise;
+      }
+      else {
+        value = sigma * exp(dist);
+      }
+
+      out(i, j) = value;
+    }
+  }
+
+  return out;
+
+}
 }  // namespace Hatrix

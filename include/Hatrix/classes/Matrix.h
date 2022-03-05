@@ -117,6 +117,10 @@ class Matrix {
 
   void print_meta() const;
 
+  void read_file(std::string in_file);
+
+  void out_file(std::string out_file) const;
+
   // Get the size of the memory used by this matrix. If this is a view,
   // this function returns only the memory consumed by the view.
   size_t memory_used() const;
@@ -125,6 +129,8 @@ class Matrix {
   // If this matrix is part of a view, it will return the memory used
   // by the whole matrix, not just the view.
   size_t shared_memory_used() const;
+
+  Matrix block_ranks(int64_t nblocks, double accuracy) const;
 };
 
 }  // namespace Hatrix

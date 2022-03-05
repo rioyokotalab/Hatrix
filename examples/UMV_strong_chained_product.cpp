@@ -147,20 +147,28 @@ namespace Hatrix {
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
-          is_admissible.insert(i, j, std::abs(i - j) > admis);
+          // Is_admissible.insert(i, j, std::abs(i - j) > admis);
+          is_admissible.insert(i, j, false);
         }
       }
 
-      // is_admissible.insert(0, 1, admis == 1 ? false : true);
-      // is_admissible.insert(1, 0, admis == 1 ? false : true);
-      // is_admissible.insert(1, 2, admis == 1 ? false : true);
-      // is_admissible.insert(2, 1, admis == 1 ? false : true);
-      // is_admissible.insert(3, 2, admis == 1 ? false : true);
-      // is_admissible.insert(2, 3, admis == 1 ? false : true);
-      // is_admissible.insert(4, 3, admis == 1 ? false : true);
-      // is_admissible.insert(3, 4, admis == 1 ? false : true);
+      is_admissible.erase(0, 1);
+      is_admissible.erase(1, 0);
+      is_admissible.erase(0, 3);
+      is_admissible.erase(3, 0);
+      is_admissible.erase(1, 2);
+      is_admissible.erase(2, 1);
+      is_admissible.erase(3, 2);
+      is_admissible.erase(2, 3);
 
-
+      is_admissible.insert(0, 1, true);
+      is_admissible.insert(1, 0, true);
+      is_admissible.insert(0, 3, true);
+      is_admissible.insert(3, 0, true);
+      is_admissible.insert(1, 2, true);
+      is_admissible.insert(2, 1, true);
+      is_admissible.insert(3, 2, true);
+      is_admissible.insert(2, 3, true);
 
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {

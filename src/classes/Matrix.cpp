@@ -1,4 +1,5 @@
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/functions/lapack.h"
 
 #include <algorithm>
 #include <cassert>
@@ -8,6 +9,7 @@
 #include <iomanip>
 #include <memory>
 #include <vector>
+#include <fstream>
 
 namespace Hatrix {
 
@@ -228,10 +230,58 @@ void Matrix::print_meta() const {
   std::cout << "rows=" << rows << " cols=" << cols << " stride=" << stride << std::endl;
 }
 
+void Matrix::read_file(std::string in_file) {
+  std::ifstream file(in_file, std::ios::in);
+
+  file >> rows >> cols;
+  stride = rows;
+  data = std::make_shared<DataHandler>(rows * cols, 0);
+  data_ptr = data->get_ptr();
+
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      int64_t irow, jcol; double value;
+      file >> irow >> jcol >> value;
+      (*this)(irow, jcol) = value;
+    }
+  }
+
+  file.close();
+}
+
+void Matrix::out_file(std::string out_file) const {
+  std::ofstream file;
+  file.open(out_file, std::ios::out | std::ios::trunc);
+
+  file << rows << " " << cols << std::endl;
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      file << i << " " << j << " " << (*this)(i, j) << std::endl;
+    }
+  }
+
+  file.close();
+}
+
 size_t Matrix::memory_used() const { return rows * cols * sizeof(double); }
 
 size_t Matrix::shared_memory_used() const {
   return data->size() * sizeof(double);
 }
+
+  Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
+    Matrix out(nblocks, nblocks);
+
+    auto this_splits = (*this).split(nblocks, nblocks);
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        Matrix Utemp, Stemp, Vtemp;
+        std::tie(Utemp, Stemp, Vtemp) = Hatrix::error_svd(this_splits[i * nblocks + j], accuracy);
+        out(i, j) = Stemp.rows;
+      }
+    }
+
+    return out;
+  }
 
 }  // namespace Hatrix
