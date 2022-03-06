@@ -26,21 +26,23 @@ for N in 1024 2048 4096 8192 16384 32768; do
             ./examples/UMV_H2_far_dense $N $rank 128 1.2 3 geometry_admis 0 $matrix_type
         done
 
-        echo "STARSH GRID DIAGO$NAL H2 DIM=2"
-        for rank in 10 20 24 30 80; do
-            ./examples/UMV_H2_far_dense $N $rank 128 2 2 diagonal_admis 1 $matrix_type
+        for dim in 2 3; do
+            echo "STARSH GRID DIAGO$NAL H2 DIM=$dim"
+            for beta in 0.3 0.5 1; do
+                for nu in 0.5 1; do
+                    for rank in 10 20 24 30 80; do
+                        ./examples/UMV_H2_far_dense $N $rank 128 2 $dim diagonal_admis 1 $matrix_type $beta $nu
+                    done
+
+                    for rank in 20 24 30 80; do
+                        for admis in 0.7 1; do
+                            ./examples/UMV_H2_far_dense $N $rank 128 $admis $dim geometry_admis 1 $matrix_type $beta $nu
+                        done
+                    done
+                done
+            done
         done
 
-
-        echo "STARSH GRID GEOMETRY DIM=2"
-        for rank in 20 24 30 80; do
-            ./examples/UMV_H2_far_dense $N $rank 128 0.7 2 geometry_admis 1 $matrix_type
-        done
-
-        echo "STARSH GRID GEOMETRY DIM=3"
-        for rank in 40 50 60 80; do
-            ./examples/UMV_H2_far_dense $N $rank 128 1 3 geometry_admis 1 $matrix_type
-        done
 
         echo "STARSH SIN KERNEL DIM=2"
         for rank in 20 24 30 50 80; do

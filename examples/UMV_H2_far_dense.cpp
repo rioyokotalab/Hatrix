@@ -3131,6 +3131,8 @@ int main(int argc, char ** argv) {
   // 0 - BLR2
   // 1 - H2 matrix
   int64_t matrix_type = atoi(argv[8]);
+  if (argc > 9) {beta = atof(argv[9]);}
+  if (argc > 10) {nu = atof(argv[10]);}
 
   Hatrix::Context::init();
 
@@ -3143,8 +3145,8 @@ int main(int argc, char ** argv) {
     break;
   }
   case 1: {                     // sqrexp
-    beta = 1;                   // supposed to be 0.1 in Cao's code.
-    nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
+    // beta = 1;                   // supposed to be 0.1 in Cao's code.
+    // nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
     noise = 1.e-1;
     sigma = 1.0;
     domain.generate_starsh_grid_particles();
@@ -3280,6 +3282,8 @@ int main(int argc, char ** argv) {
        << "," << factor_time
        << "," << solve_time
        << "," << construct_time
+       << "," << beta
+       << "," << nu
        << std::endl;
 
   file.close();
