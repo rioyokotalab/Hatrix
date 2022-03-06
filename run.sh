@@ -30,13 +30,15 @@ for N in 1024 2048 4096 8192 16384 32768; do
             echo "STARSH GRID DIAGO$NAL H2 DIM=$dim"
             for beta in 0.3 0.5 1; do
                 for nu in 0.5 1; do
-                    for rank in 10 20 24 30 80; do
-                        ./examples/UMV_H2_far_dense $N $rank 128 2 $dim diagonal_admis 1 $matrix_type $beta $nu
-                    done
+                    for sigma in 1.0 1.5; do
+                        for rank in 10 20 24 30 80; do
+                            ./examples/UMV_H2_far_dense $N $rank 128 2 $dim diagonal_admis 1 $matrix_type $beta $nu $sigma
+                        done
 
-                    for rank in 20 24 30 80; do
-                        for admis in 0.7 1; do
-                            ./examples/UMV_H2_far_dense $N $rank 128 $admis $dim geometry_admis 1 $matrix_type $beta $nu
+                        for rank in 20 24 30 80; do
+                            for admis in 0.7 1; do
+                                ./examples/UMV_H2_far_dense $N $rank 128 $admis $dim geometry_admis 1 $matrix_type $beta $nu $sigma
+                            done
                         done
                     done
                 done

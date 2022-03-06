@@ -3133,6 +3133,7 @@ int main(int argc, char ** argv) {
   int64_t matrix_type = atoi(argv[8]);
   if (argc > 9) {beta = atof(argv[9]);}
   if (argc > 10) {nu = atof(argv[10]);}
+  if (argc > 11) { sigma = atof(argv[11]); }
 
   Hatrix::Context::init();
 
@@ -3148,7 +3149,7 @@ int main(int argc, char ** argv) {
     // beta = 1;                   // supposed to be 0.1 in Cao's code.
     // nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
     noise = 1.e-1;
-    sigma = 1.0;
+    // sigma = 1.0;
     domain.generate_starsh_grid_particles();
     Hatrix::kernel_function = Hatrix::sqrexp_kernel;
     break;
@@ -3284,6 +3285,7 @@ int main(int argc, char ** argv) {
        << "," << construct_time
        << "," << beta
        << "," << nu
+       << "," << sigma
        << std::endl;
 
   file.close();
