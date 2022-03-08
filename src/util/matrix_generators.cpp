@@ -8,7 +8,7 @@ namespace Hatrix {
 
 Matrix generate_random_matrix(int64_t rows, int64_t cols) {
   std::random_device rd;
-  std::mt19937 gen(rd());
+  std::mt19937 gen(1);
   // gen.seed(0);
   std::uniform_real_distribution<double> dist(0.0, 1.0);
   Matrix out(rows, cols);

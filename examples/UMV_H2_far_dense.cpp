@@ -824,7 +824,8 @@ namespace Hatrix {
                 if (F(block, j).rows == block_size && F(block, j).cols == rank) {
                   Sbar_block_j += matmul(U(block, level), F(block, j), true, false);
                 }
-                else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
+                else if (F(block, j).rows == block_size && F(block, j).cols == block_size &&
+                         j > block) {
                   Sbar_block_j +=
                     matmul(matmul(U(block, level), F(block, j), true, false), V(j, level));
                 }
@@ -844,7 +845,8 @@ namespace Hatrix {
                 if (F(i, block).rows == rank && F(i, block).cols == block_size) {
                   Sbar_i_block += matmul(F(i, block), V(block, level));
                 }
-                else if (F(i, block).rows == block_size && F(i, block).cols == block_size) {
+                else if (F(i, block).rows == block_size && F(i, block).cols == block_size &&
+                         i > block) {
                   Sbar_i_block += matmul(U(i, level),
                                          matmul(F(i, block), V(block, level)), true, false);
                 }
@@ -3146,10 +3148,10 @@ int main(int argc, char ** argv) {
     break;
   }
   case 1: {                     // sqrexp
-    // beta = 1;                   // supposed to be 0.1 in Cao's code.
-    // nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
+    beta = 0.1;                   // supposed to be 0.1 in Cao's code.
+    nu = 0.5;     //in matern, nu=0.5 exp (half smooth), nu=inf sqexp (inifinetly smooth)
     noise = 1.e-1;
-    // sigma = 1.0;
+    sigma = 1.0;
     domain.generate_starsh_grid_particles();
     Hatrix::kernel_function = Hatrix::sqrexp_kernel;
     break;

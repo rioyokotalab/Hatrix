@@ -47,7 +47,7 @@ all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES)
 $(DIRS):
 	$(MAKE) -C $@
 
-LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
+LINK_EXECUTABLE = @$(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
@@ -68,6 +68,7 @@ test: $(TEST_EXECUTABLES)
 	done
 
 .PHONY: clean
+.SILENT: clean
 clean:
 	for dir in $(DIRS) $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
