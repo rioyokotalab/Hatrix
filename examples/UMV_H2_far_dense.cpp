@@ -2094,7 +2094,7 @@ namespace Hatrix {
     }
 
     is_admissible.insert(0, 0, 0, false);
-    PV = (1.0 / double(N)) * 1e-3;// * (1 / pow(10, height));
+    PV =  (1 / pow(10, height));
 
     int64_t all_dense_row = find_all_dense_row();
     if (all_dense_row != -1) {

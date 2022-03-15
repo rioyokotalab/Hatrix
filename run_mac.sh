@@ -9,17 +9,20 @@ make -j all
 
 rm result.txt
 
-# echo "------ UMV H2 NLEVEL ------"
-for matrix_type in 0 1; do
-    echo "CIRCLE GEOMETRY"
-    for rank in 20 34 40; do
-        ./bin/UMV_H2_far_dense 1024 $rank 64 1.2 3 geometry_admis 0 $matrix_type
-    done
+./bin/UMV_H2_far_dense 128 12 32 0 1 diagonal_admis 0 1
+# ./bin/UMV_H2_far_dense 512 12 64 1 3 diagonal_admis 0 1
 
-    echo "SPHERE GEOMETRY"
-    for rank in 34 40; do
-        ./bin/UMV_H2_far_dense 1024 $rank 64 1.2 3 geometry_admis 0 $matrix_type
-    done
+# echo "------ UMV H2 NLEVEL ------"
+# for matrix_type in 0 1; do
+#     echo "CIRCLE GEOMETRY"
+#     for rank in 20 34 40; do
+#         ./bin/UMV_H2_far_dense 1024 $rank 64 1.2 3 geometry_admis 0 $matrix_type
+#     done
+
+#     echo "SPHERE GEOMETRY"
+#     for rank in 34 40; do
+#         ./bin/UMV_H2_far_dense 1024 $rank 64 1.2 3 geometry_admis 0 $matrix_type
+#     done
 
 #     echo "STARSH GRID DIAGONAL H2 DIM=2"
 #     for rank in 20 24 30; do
@@ -41,7 +44,7 @@ for matrix_type in 0 1; do
 #     for rank in 20 24 30 50; do
 #         ./bin/UMV_H2_far_dense 1024 $rank 64 0.4 2 geometry_admis 2 $matrix_type
 #     done
-done
+# done
 
 
 
