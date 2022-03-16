@@ -2094,7 +2094,7 @@ namespace Hatrix {
     }
 
     is_admissible.insert(0, 0, 0, false);
-    PV =  (1 / pow(10, height));
+    PV =  (1 / pow(10, height)) * 1e-3;
 
     int64_t all_dense_row = find_all_dense_row();
     if (all_dense_row != -1) {
@@ -3031,7 +3031,11 @@ int main(int argc, char ** argv) {
             << " kernel func= " << kernel_func
             << " LR%= " << std::setprecision(5) << lr_ratio * 100 << "%" << std::setw(4)
             << " admis kind= " << admis_kind
-            << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2") << std::endl;
+            << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
+            << " factor time= " << factor_time
+            << " solve time= " << solve_time
+            << " construct time = " << construct_time
+            << std::endl;
 
   std::ofstream file;
 

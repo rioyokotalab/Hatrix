@@ -13,11 +13,12 @@ rm result.txt
 # ./bin/UMV_H2_far_dense 512 12 64 1 3 diagonal_admis 0 1
 
 # echo "------ UMV H2 NLEVEL ------"
-# for matrix_type in 0 1; do
-#     echo "CIRCLE GEOMETRY"
-#     for rank in 20 34 40; do
-#         ./bin/UMV_H2_far_dense 1024 $rank 64 1.2 3 geometry_admis 0 $matrix_type
-#     done
+for matrix_type in 1; do
+    echo "CIRCLE GEOMETRY"
+    for rank in 20 34 40; do
+        ./bin/UMV_H2_far_dense 2048 $rank 128 1 1 diagonal_admis 0 $matrix_type
+    done
+done
 
 #     echo "SPHERE GEOMETRY"
 #     for rank in 34 40; do
