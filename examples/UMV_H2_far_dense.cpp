@@ -237,13 +237,11 @@ namespace Hatrix {
     return out;
   }
 
-  // Generates p2p interactions between the particles of two boxes specified by irow
-  // and icol. ndim specifies the dimensionality of the particles present in domain.
-  // Uses a laplace kernel for generating the interaction.
-  Matrix generate_p2p_interactions(const Domain& domain,
-                                   int64_t irow, int64_t icol) {
-    Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
-
+  void generate_p2p_interactions(const Domain& domain,
+                                 int64_t irow, int64_t icol,
+                                 Matrix& out) {
+    assert(out.rows == domain.boxes[irow].num_particles);
+    assert(out.cols == domain.boxes[icol].num_particles);
     for (int64_t i = 0; i < domain.boxes[irow].num_particles; ++i) {
       for (int64_t j = 0; j < domain.boxes[icol].num_particles; ++j) {
         int64_t source = domain.boxes[irow].start_index;
@@ -253,7 +251,15 @@ namespace Hatrix {
                                     domain.particles[target+j].coords);
       }
     }
+  }
 
+  // Generates p2p interactions between the particles of two boxes specified by irow
+  // and icol. ndim specifies the dimensionality of the particles present in domain.
+  // Uses a laplace kernel for generating the interaction.
+  Matrix generate_p2p_interactions(const Domain& domain,
+                                   int64_t irow, int64_t icol) {
+    Matrix out(domain.boxes[irow].num_particles, domain.boxes[icol].num_particles);
+    generate_p2p_interactions(domain, irow, icol, out);
     return out;
   }
 
@@ -273,11 +279,12 @@ namespace Hatrix {
     return c1_indices;
   }
 
-  Matrix generate_p2p_interactions(const Domain& domain,
-                                   int64_t irow, int64_t icol,
-                                   int64_t level, int64_t height) {
+  void generate_p2p_interactions(const Domain& domain,
+                                 int64_t irow, int64_t icol,
+                                 int64_t level, int64_t height,
+                                 Matrix& out) {
     if (level == height) {
-      return generate_p2p_interactions(domain, irow, icol);
+      generate_p2p_interactions(domain, irow, icol, out);
     }
 
     std::vector<int64_t> leaf_rows = leaf_indices(irow, level, height);
@@ -289,7 +296,8 @@ namespace Hatrix {
     for (int64_t i = 0; i < leaf_cols.size(); ++i) {
       ncols += domain.boxes[leaf_cols[i]].num_particles; }
 
-    Matrix out(nrows, ncols);
+    assert(out.rows == nrows);
+    assert(out.cols == ncols);
 
     std::vector<Particle> source_particles, target_particles;
     for (int64_t i = 0; i < leaf_rows.size(); ++i) {
@@ -314,6 +322,26 @@ namespace Hatrix {
                                     target_particles[j].coords);
       }
     }
+  }
+
+  Matrix generate_p2p_interactions(const Domain& domain,
+                                   int64_t irow, int64_t icol,
+                                   int64_t level, int64_t height) {
+    if (level == height) {
+      return generate_p2p_interactions(domain, irow, icol);
+    }
+
+    std::vector<int64_t> leaf_rows = leaf_indices(irow, level, height);
+    std::vector<int64_t> leaf_cols = leaf_indices(icol, level, height);
+
+    int64_t nrows = 0, ncols = 0;
+    for (int64_t i = 0; i < leaf_rows.size(); ++i) {
+      nrows += domain.boxes[leaf_rows[i]].num_particles; }
+    for (int64_t i = 0; i < leaf_cols.size(); ++i) {
+      ncols += domain.boxes[leaf_cols[i]].num_particles; }
+
+    Matrix out(nrows, ncols);
+    generate_p2p_interactions(domain, irow, icol, level, height, out);
 
     return out;
   }
@@ -1709,12 +1737,28 @@ namespace Hatrix {
   Matrix
   H2::generate_column_block(int64_t block, int64_t block_size, const Domain& domain,
                             int64_t level) {
-    Matrix AY(block_size, 0);
+    int ncols = 0;
+    int num_blocks = 0;
     for (int64_t j = 0; j < level_blocks[level]; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j, level, height);
-      AY = concat(AY, dense, 1);
+      ncols += get_block_size_col(domain, j, level);
+      num_blocks++;
     }
+
+    Matrix AY(block_size, ncols);
+    auto AY_splits = AY.split(1, num_blocks);
+
+    int index = 0;
+    for (int64_t j = 0; j < level_blocks[level]; ++j) {
+      if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
+      Hatrix::generate_p2p_interactions(domain, block, j, level, height, AY_splits[index++]);
+    }
+
+    // for (int64_t j = 0; j < level_blocks[level]; ++j) {
+    //   if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
+    //   Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j, level, height);
+    //   AY = concat(AY, dense, 1);
+    // }
 
     return AY;
   }
@@ -3026,10 +3070,10 @@ int main(int argc, char ** argv) {
             << " nleaf=" << nleaf
             << " ndim=" << ndim
             << " height= " << A.height << " rank=" << rank
-            << " construct error= " << std::setprecision(5) << construct_error << std::setw(3)
-            << " solve error= " << std::setprecision(5) << solve_error << std::setw(5)
+            << " construct error= " << std::setprecision(5) << construct_error
+            << " solve error= " << std::setprecision(5) << solve_error
             << " kernel func= " << kernel_func
-            << " LR%= " << std::setprecision(5) << lr_ratio * 100 << "%" << std::setw(4)
+            << " LR%= " << std::setprecision(5) << lr_ratio * 100 << "%"
             << " admis kind= " << admis_kind
             << " matrix type= " << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << " factor time= " << factor_time

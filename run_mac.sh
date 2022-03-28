@@ -6,10 +6,9 @@ make -j all
 # ./bin/UMV_weak_Nlevel 640 15 5
 # ./bin/UMV_weak_Nlevel 1280 15 6
 
+# rm result.txt
 
-rm result.txt
-
-./bin/UMV_H2_far_dense 128 12 32 0 1 diagonal_admis 0 1
+# ./bin/UMV_H2_far_dense 128 12 32 0 1 diagonal_admis 0 1
 # ./bin/UMV_H2_far_dense 512 12 64 1 3 diagonal_admis 0 1
 
 # echo "------ UMV H2 NLEVEL ------"
