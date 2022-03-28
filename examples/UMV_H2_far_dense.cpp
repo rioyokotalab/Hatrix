@@ -1754,12 +1754,6 @@ namespace Hatrix {
       Hatrix::generate_p2p_interactions(domain, block, j, level, height, AY_splits[index++]);
     }
 
-    // for (int64_t j = 0; j < level_blocks[level]; ++j) {
-    //   if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-    //   Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, block, j, level, height);
-    //   AY = concat(AY, dense, 1);
-    // }
-
     return AY;
   }
 
@@ -1776,11 +1770,21 @@ namespace Hatrix {
 
   Matrix
   H2::generate_row_block(int64_t block, int64_t block_size, const Domain& domain, int64_t level) {
-    Hatrix::Matrix YtA(0, block_size);
+    int nrows = 0;
+    int num_blocks = 0;
     for (int64_t i = 0; i < level_blocks[level]; ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-      Hatrix::Matrix dense = Hatrix::generate_p2p_interactions(domain, i, block, level, height);
-      YtA = concat(YtA, dense, 0);
+      nrows += get_block_size_row(domain, i, level);
+      num_blocks++;
+    }
+
+    Hatrix::Matrix YtA(nrows, block_size);
+    auto YtA_splits = YtA.split(num_blocks, 1);
+
+    int index = 0;
+    for (int64_t i = 0; i < level_blocks[level]; ++i) {
+      if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
+      Hatrix::generate_p2p_interactions(domain, i, block, level, height, YtA_splits[index++]);
     }
 
     return YtA;
