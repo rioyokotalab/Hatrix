@@ -1,3 +1,4 @@
+#include <cassert>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -2142,7 +2143,7 @@ namespace Hatrix {
     }
 
     is_admissible.insert(0, 0, 0, false);
-    PV =  (1 / pow(10, height)) * 1e-3;
+    PV =  (1 / double(N)) * 1e-3;
 
     int64_t all_dense_row = find_all_dense_row();
     if (all_dense_row != -1) {
