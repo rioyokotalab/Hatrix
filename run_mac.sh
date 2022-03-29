@@ -15,7 +15,7 @@ make -j all
 for matrix_type in 1; do
     echo "CIRCLE GEOMETRY"
     for rank in 20 34 40; do
-        ./bin/UMV_H2_far_dense 2048 $rank 128 1 1 diagonal_admis 0 $matrix_type
+        ./bin/UMV_H2_far_dense 2048 $rank 128 0 1 diagonal_admis 0 $matrix_type
     done
 done
 
