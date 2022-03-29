@@ -1163,19 +1163,19 @@ namespace Hatrix {
     RowColLevelMap<Matrix> F;
     RowMap r, t;
 
-    int64_t A1_nblocks = level_blocks[1];
-    int64_t A1_perm_nblocks = A1_nblocks * 2;
+    // int64_t A1_nblocks = level_blocks[1];
+    // int64_t A1_perm_nblocks = A1_nblocks * 2;
 
-    int64_t A2_nblocks = level_blocks[2];
-    std::vector<Matrix> A2_expected_splits;
+    // int64_t A2_nblocks = level_blocks[2];
+    // std::vector<Matrix> A2_expected_splits;
 
-    A1_expected = generate_identity_matrix(rank * 2 * A1_perm_nblocks, rank * 2 * A1_perm_nblocks);
-    auto A1_expected_splits = A1_expected.split(A1_perm_nblocks, A1_perm_nblocks);
+    // A1_expected = generate_identity_matrix(rank * 2 * A1_perm_nblocks, rank * 2 * A1_perm_nblocks);
+    // auto A1_expected_splits = A1_expected.split(A1_perm_nblocks, A1_perm_nblocks);
 
-    if (matrix_type == H2_MATRIX) {
-      A2_expected = generate_identity_matrix(rank * 2 * A2_nblocks, rank * 2 * A2_nblocks);
-      A2_expected_splits = A2_expected.split(A2_nblocks, A2_nblocks);
-    }
+    // if (matrix_type == H2_MATRIX) {
+    //   A2_expected = generate_identity_matrix(rank * 2 * A2_nblocks, rank * 2 * A2_nblocks);
+    //   A2_expected_splits = A2_expected.split(A2_nblocks, A2_nblocks);
+    // }
 
     for (; level > 0; --level) {
       int64_t nblocks = level_blocks[level];
@@ -1250,17 +1250,17 @@ namespace Hatrix {
       // Merge the unfactorized parts.
       int64_t parent_nblocks = level_blocks[parent_level];
 
-      if (matrix_type == H2_MATRIX && level == 3) {
-        int64_t A2_nblocks = level_blocks[2];
-        for (int i = 0; i < A2_nblocks; ++i) {
-          for (int j = 0; j < A2_nblocks; ++j) {
-            if (is_admissible(i, j, 2)) {
-              A2_expected_splits[i * A2_nblocks + j] =
-                matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
-            }
-          }
-        }
-      }
+      // if (matrix_type == H2_MATRIX && level == 3) {
+      //   int64_t A2_nblocks = level_blocks[2];
+      //   for (int i = 0; i < A2_nblocks; ++i) {
+      //     for (int j = 0; j < A2_nblocks; ++j) {
+      //       if (is_admissible(i, j, 2)) {
+      //         A2_expected_splits[i * A2_nblocks + j] =
+      //           matmul(matmul(U(i, 2), S(i, j, 2)), V(j, 2), false, true);
+      //       }
+      //     }
+      //   }
+      // }
 
       for (int64_t i = 0; i < parent_nblocks; ++i) {
         for (int64_t j = 0; j < parent_nblocks; ++j) {
@@ -1316,13 +1316,13 @@ namespace Hatrix {
     int64_t last_nodes = level_blocks[level];
 
     // Capture unfactorized A1 block.
-    if (level == 1 && height != 1) {
-      for (int64_t i = 0; i < last_nodes; ++i) {
-        for (int64_t j = 0; j < last_nodes; ++j) {
-          A1_expected_splits[(i + A1_nblocks) * A1_perm_nblocks + j + A1_nblocks] = D(i, j, level);
-        }
-      }
-    }
+    // if (level == 1 && height != 1) {
+    //   for (int64_t i = 0; i < last_nodes; ++i) {
+    //     for (int64_t j = 0; j < last_nodes; ++j) {
+    //       A1_expected_splits[(i + A1_nblocks) * A1_perm_nblocks + j + A1_nblocks] = D(i, j, level);
+    //     }
+    //   }
+    // }
 
     for (int64_t d = 0; d < last_nodes; ++d) {
       lu(D(d, d, level));
@@ -2970,7 +2970,7 @@ int main(int argc, char ** argv) {
 
   switch(kernel_func) {
   case 0: {                     // laplace kernel
-    domain.generate_particles(0.0, 1.0 * N);
+    domain.generate_starsh_grid_particles();
     Hatrix::kernel_function = Hatrix::laplace_kernel;
     break;
   }
