@@ -1,7 +1,7 @@
 #!/bin/bash
 
 make -j all
-./bin/HSS_main --N 800 --nleaf 40
+./bin/HSS_main --N 800 --nleaf 40 --kernel-func laplace --add-diag 1e-4
 
 # ./bin/UMV_weak_Nlevel 320 15 4
 # ./bin/UMV_weak_Nlevel 640 15 5

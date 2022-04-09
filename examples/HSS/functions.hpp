@@ -27,4 +27,13 @@ namespace Hatrix {
                                  int64_t irow, int64_t icol,
                                  const kernel_function& kernel,
                                  Matrix& out);
+
+  double laplace_kernel(const std::vector<double>& coords_row,
+                        const std::vector<double>& coords_col,
+                        const double eta);
+  // double sqrexp_kernel(const std::vector<double>& coords_row,
+  //                      const std::vector<double>& coords_col);
+  // double block_sin(const std::vector<double>& coords_row,
+  //                  const std::vector<double>& coords_col);
+
 }

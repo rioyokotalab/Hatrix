@@ -144,4 +144,54 @@ namespace Hatrix {
       }
     }
   }
+
+  // double
+  // block_sin(const std::vector<double>& coords_row,
+  //           const std::vector<double>& coords_col) {
+  //   double dist = 0, temp;
+  //   int64_t ndim = coords_row.size();
+
+  //   for (int64_t k = 0; k < ndim; ++k) {
+  //     dist += pow(coords_row[k] - coords_col[k], 2);
+  //   }
+  //   if (dist == 0) {
+  //     return add_diag;
+  //   }
+  //   else {
+  //     dist = std::sqrt(dist);
+  //     return sin(wave_k * dist) / dist;
+  //   }
+  // }
+
+  // double
+  // sqrexp_kernel(const std::vector<double>& coords_row,
+  //               const std::vector<double>& coords_col) {
+  //   int64_t ndim = coords_row.size();
+  //   double dist = 0;
+  //   double local_beta = -2 * pow(beta, 2);
+  //   // Copied from kernel_sqrexp.c in stars-H.
+  //   for (int64_t k = 0; k < ndim; ++k) {
+  //     dist += pow(coords_row[k] - coords_col[k], 2);
+  //   }
+  //   dist = dist / local_beta;
+  //   if (std::abs(dist) < 1e-10) {
+  //     return sigma + noise;
+  //   }
+  //   else {
+  //     return sigma * exp(dist);
+  //   }
+  // }
+
+  double laplace_kernel(const std::vector<double>& coords_row,
+                        const std::vector<double>& coords_col,
+                        const double eta) {
+    int64_t ndim = coords_row.size();
+    double rij = 0;
+    for (int64_t k = 0; k < ndim; ++k) {
+      rij += pow(coords_row[k] - coords_col[k], 2);
+    }
+    double out = 1 / (std::sqrt(rij) + eta);
+
+    return out;
+  }
 }

@@ -12,8 +12,10 @@
 
 #include "Hatrix/Hatrix.h"
 
+#include "functions.hpp"
 #include "internal_types.hpp"
 #include "HSS.hpp"
+
 using namespace Hatrix;
 
 bool help_option_exists(std::vector<std::string>& cmd_options) {
@@ -53,6 +55,7 @@ int main(int argc, char* argv[]) {
               << " --construct-algorithm :: Specify the kind of construction algorithm." << std::endl
               << "    miro       -- From the miro board. Use SVD everywhere." << std::endl
               << "    id_random  -- From Martinsson2010. Use ID + randomized sampling."
+              << " --add-diag :: Specify the value to add to the diagonal."
               << std::endl;
   }
 
@@ -64,6 +67,7 @@ int main(int argc, char* argv[]) {
   int64_t rank = 10;
   double admis = 1;
   double acc = -1;
+  double add_diag = 0;
   ADMIS_KIND admis_kind = DIAGONAL;
   CONSTRUCT_ALGORITHM construct_algorithm = MIRO;
 
@@ -83,6 +87,7 @@ int main(int argc, char* argv[]) {
       }
       else if (value == "sqrexp") {
         kernel_func = SQR_EXP;
+
       }
       else if (value == "sin") {
         kernel_func = SINE;
@@ -143,7 +148,19 @@ int main(int argc, char* argv[]) {
         abort();
       }
     }
+    else if (option == "--add-diag") {
+      add_diag = std::stod(*(++iter));
+    }
   }
+
+  kernel_function kernel;
+  if (kernel_func == LAPLACE) {
+    kernel = [&](const std::vector<double>& c_row,
+                 const std::vector<double>& c_col) {
+      return laplace_kernel(c_row, c_col, add_diag);
+    };
+  }
+
 
   Hatrix::Context::finalize();
   return 0;
