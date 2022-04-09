@@ -49,7 +49,7 @@ all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES)
 $(DIRS):
 	$(MAKE) -C $@
 
-LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
+LINK_EXECUTABLE = @$(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
