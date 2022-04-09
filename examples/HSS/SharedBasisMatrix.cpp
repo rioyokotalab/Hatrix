@@ -8,17 +8,13 @@
 namespace Hatrix {
   ConstructAlgorithm::ConstructAlgorithm(SharedBasisMatrix* context) : context(context) {}
 
-  ConstructMiro::ConstructMiro(SharedBasisMatrix* context) : ConstructAlgorithm(context) {
-
-  }
+  ConstructMiro::ConstructMiro(SharedBasisMatrix* context) : ConstructAlgorithm(context) {}
 
   void
   ConstructMiro::construct() {
   }
 
-  ConstructID_Random::ConstructID_Random(SharedBasisMatrix* context) : ConstructAlgorithm(context) {
-
-  }
+  ConstructID_Random::ConstructID_Random(SharedBasisMatrix* context) : ConstructAlgorithm(context) {}
 
   void
   ConstructID_Random::construct() {
@@ -76,6 +72,11 @@ namespace Hatrix {
     calc_diagonal_based_admissibility(level-1);
   }
 
+  double
+  SharedBasisMatrix::construction_error() {
+
+  }
+
   SharedBasisMatrix::SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank, double accuracy,
                                        double admis, ADMIS_KIND admis_kind,
                                        CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
@@ -102,9 +103,13 @@ namespace Hatrix {
     is_admissible.insert(0, 0, 0, false);
 
     ConstructAlgorithm *construct_algo;
-
     if (construct_algorithm == MIRO) {
       construct_algo = new ConstructMiro(this);
     }
+    else if (construct_algorithm == ID_RANDOM) {
+      construct_algo = new ConstructID_Random(this);
+    }
+
+    contruct_algo->construct();
   };
 }

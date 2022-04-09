@@ -32,6 +32,9 @@ namespace Hatrix {
                       double admis, ADMIS_KIND admis_kind,
                       CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
                       const Domain& domain, const kernel_function& kernel);
+
+    // Obtain construction error w.r.t dense matrix with matvec.
+    double construction_error();
   };
 
   class ConstructAlgorithm {
