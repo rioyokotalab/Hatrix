@@ -14,7 +14,7 @@
 
 #include "functions.hpp"
 #include "internal_types.hpp"
-#include "HSS.hpp"
+#include "SharedBasisMatrix.hpp"
 
 using namespace Hatrix;
 
@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
               << "    miro       -- From the miro board. Use SVD everywhere." << std::endl
               << "    id_random  -- From Martinsson2010. Use ID + randomized sampling."
               << " --add-diag :: Specify the value to add to the diagonal."
+              << " --nested-basis :: Specify whether this matrix uses shared basis."
               << std::endl;
   }
 
@@ -70,6 +71,7 @@ int main(int argc, char* argv[]) {
   double add_diag = 0;
   ADMIS_KIND admis_kind = DIAGONAL;
   CONSTRUCT_ALGORITHM construct_algorithm = MIRO;
+  bool use_nested_basis = false;
 
   for (auto iter = cmd_options.begin(); iter != cmd_options.end(); ++iter) {
     auto option = *iter;
@@ -151,6 +153,9 @@ int main(int argc, char* argv[]) {
     else if (option == "--add-diag") {
       add_diag = std::stod(*(++iter));
     }
+    else if (option == "--nested-basis") {
+      use_nested_basis = bool(std::stoi(*(++iter)));
+    }
   }
 
   kernel_function kernel;
@@ -168,7 +173,9 @@ int main(int argc, char* argv[]) {
   else if (kind_of_geometry == CIRCULAR) {
     domain.generate_circular_particles(0, N);
   }
+  domain.divide_domain_and_create_particle_boxes(nleaf);
 
+  SharedBasisMatrix A(domain, N, nleaf, rank, acc, kernel, construct_algorithm, use_nested_basis);
 
   Hatrix::Context::finalize();
   return 0;
