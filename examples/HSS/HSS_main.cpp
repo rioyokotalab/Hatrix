@@ -12,17 +12,15 @@
 
 #include "Hatrix/Hatrix.h"
 
+#include "HSS.hpp"
+using namespace Hatrix;
+
 bool help_option_exists(std::vector<std::string>& cmd_options) {
   auto begin = cmd_options.begin();
   auto end = cmd_options.end();
   return (std::find(begin, end, "-h") != end) || (std::find(begin, end, "--help") != end);
 }
 
-constexpr int INIT_VALUE = -1;
-enum KIND_OF_PROBLEM {LAPLACE, SQR_EXP, SINE};
-enum KIND_OF_GEOMETRY {GRID, CIRCULAR};
-enum ADMIS_KIND {DIAGONAL, GEOMETRY};
-enum CONSTRUCT_ALGORITHM {MIRO, ID_RANDOM};
 
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
@@ -57,12 +55,12 @@ int main(int argc, char* argv[]) {
               << std::endl;
   }
 
-  long long N = 1000;
-  long long nleaf = 100;
+  int64_t N = 1000;
+  int64_t nleaf = 100;
   KIND_OF_PROBLEM kind_of_problem = LAPLACE;
   KIND_OF_GEOMETRY kind_of_geometry = GRID;
-  int ndim = 1;
-  int rank = 10;
+  int64_t ndim = 1;
+  int64_t rank = 10;
   double admis = 1;
   double acc = -1;
   ADMIS_KIND admis_kind = DIAGONAL;
@@ -107,10 +105,10 @@ int main(int argc, char* argv[]) {
       }
     }
     else if (option == "--ndim") {
-      ndim = std::stoi(*(++iter));
+      ndim = std::stol(*(++iter));
     }
     else if (option == "--rank") {
-      rank = std::stoi(*(++iter));
+      rank = std::stol(*(++iter));
     }
     else if (option == "--acc") {
       acc = std::stod(*(++iter));
@@ -145,8 +143,6 @@ int main(int argc, char* argv[]) {
       }
     }
   }
-
-  std::cout << "N: " << N << " leaf: " << nleaf << std::endl;
 
   Hatrix::Context::finalize();
   return 0;
