@@ -20,6 +20,8 @@ namespace Hatrix {
     ADMIS_KIND admis_kind;
     CONSTRUCT_ALGORITHM construct_algorithm;
     bool use_shared_basis;
+    const Domain domain;
+    const kernel_function kernel;
     int64_t height;
 
     ColLevelMap U;
@@ -45,6 +47,8 @@ namespace Hatrix {
   };
 
   class ConstructMiro : public ConstructAlgorithm {
+  private:
+    void generate_leaf_nodes(const Domain& domain);
   public:
     ConstructMiro(SharedBasisMatrix* context);
     void construct();

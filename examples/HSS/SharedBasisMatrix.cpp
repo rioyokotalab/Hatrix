@@ -4,6 +4,7 @@
 
 #include "Domain.hpp"
 #include "SharedBasisMatrix.hpp"
+#include "functions.hpp"
 
 namespace Hatrix {
   ConstructAlgorithm::ConstructAlgorithm(SharedBasisMatrix* context) : context(context) {}
@@ -11,7 +12,66 @@ namespace Hatrix {
   ConstructMiro::ConstructMiro(SharedBasisMatrix* context) : ConstructAlgorithm(context) {}
 
   void
+  ConstructMiro::generate_leaf_nodes(const Domain& domain) {
+    int64_t nblocks = context->level_blocks[context->height];
+    std::vector<Hatrix::Matrix> Y;
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (context->is_admissible.exists(i, j, context->height) &&
+            !context->is_admissible(i, j, context->height)) {
+          context->D.insert(i, j, context->height,
+                            generate_p2p_interactions(context->domain, i, j, context->kernel));
+        }
+      }
+    }
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      Y.push_back(generate_random_matrix(domain.boxes[i].num_particles, context->rank + oversampling));
+    }
+
+    // Generate U leaf blocks
+    for (int64_t i = 0; i < nblocks; ++i) {
+      Matrix Utemp, Stemp;
+      std::tie(Utemp, Stemp) =
+        generate_column_bases(i, domain.boxes[i].num_particles, context->domain, Y, context->height);
+      context->U.insert(i, context->height, std::move(Utemp));
+    }
+
+    // Generate V leaf blocks
+    for (int64_t j = 0; j < nblocks; ++j) {
+      Matrix Stemp, Vtemp;
+      std::tie(Stemp, Vtemp) =
+        generate_row_bases(j, domain.boxes[j].num_particles,
+                           context->domain, Y, context->height);
+      context->V.insert(j, context->height, std::move(Vtemp));
+    }
+
+    // Generate S coupling matrices
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (context->is_admissible.exists(i, j, context->height) &&
+            context->is_admissible(i, j, context->height)) {
+          Matrix dense = generate_p2p_interactions(context->domain, i, j, context->kernel);
+
+          context->S.insert(i, j, context->height,
+                            matmul(matmul(context->U(i, context->height), dense, true, false),
+                                   context->V(j, context->height)));
+        }
+      }
+    }
+  }
+
+
+  void
   ConstructMiro::construct() {
+    generate_leaf_nodes(context->domain);
+    RowLevelMap Uchild = context->U;
+    ColLevelMap Vchild = context->V;
+
+    for (int64_t level = context->height-1; level > 0; --level) {
+      std::tie(Uchild, Vchild) = generate_transfer_matrices(context->domain, level, Uchild, Vchild);
+    }
   }
 
   ConstructID_Random::ConstructID_Random(SharedBasisMatrix* context) : ConstructAlgorithm(context) {}
@@ -82,7 +142,8 @@ namespace Hatrix {
                                        CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
                                        const Domain& domain, const kernel_function& kernel) :
     N(N), nleaf(nleaf), rank(rank), accuracy(accuracy), admis(admis), admis_kind(admis_kind),
-    construct_algorithm(construct_algorithm), use_shared_basis(use_shared_basis)
+    construct_algorithm(construct_algorithm), use_shared_basis(use_shared_basis),
+    domain(domain), kernel(kernel)
   {
     if (use_shared_basis) {
       height = int64_t(log2(N / nleaf));
@@ -110,6 +171,6 @@ namespace Hatrix {
       construct_algo = new ConstructID_Random(this);
     }
 
-    contruct_algo->construct();
+    construct_algo->construct();
   };
 }

@@ -4,6 +4,7 @@
 
 namespace Hatrix {
   constexpr int INIT_VALUE = -1;
+  constexpr int oversampling = 5;
   enum KERNEL_FUNC {LAPLACE, SQR_EXP, SINE};
   enum KIND_OF_GEOMETRY {GRID, CIRCULAR};
   enum ADMIS_KIND {DIAGONAL, GEOMETRY};
