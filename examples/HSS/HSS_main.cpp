@@ -12,6 +12,7 @@
 
 #include "Hatrix/Hatrix.h"
 
+#include "internal_types.hpp"
 #include "HSS.hpp"
 using namespace Hatrix;
 
@@ -35,7 +36,7 @@ int main(int argc, char* argv[]) {
     std::cout << "FRANKLIN accepts the following options: " << std::endl;
     std::cout << " --N :: Specify problem size. Generates a NxN matrix. Must be integer." << std::endl
               << " --nleaf :: Specify leaf size. This is the maximum size of the tile in the lowest level of the tree. Alternatively maximum number of particles in the leaf node. Must be integer." << std::endl
-              << " --kind-of-problem :: Specify the kind of problem: " << std::endl
+              << " --kernel-func :: Specify the kernel function: " << std::endl
               << "    laplace -- Laplace kernel." << std::endl
               << "    sqrexp  -- Sqr. exp. kernel from stars-H." << std::endl
               << "    sin     -- Sine kernel from stars-H." << std::endl
@@ -57,7 +58,7 @@ int main(int argc, char* argv[]) {
 
   int64_t N = 1000;
   int64_t nleaf = 100;
-  KIND_OF_PROBLEM kind_of_problem = LAPLACE;
+  KERNEL_FUNC kernel_func = LAPLACE;
   KIND_OF_GEOMETRY kind_of_geometry = GRID;
   int64_t ndim = 1;
   int64_t rank = 10;
@@ -78,13 +79,13 @@ int main(int argc, char* argv[]) {
     else if (option == "--kind-of-problem") {
       auto value = *(++iter);
       if (value == "laplace") {
-        kind_of_problem = LAPLACE;
+        kernel_func = LAPLACE;
       }
       else if (value == "sqrexp") {
-        kind_of_problem = SQR_EXP;
+        kernel_func = SQR_EXP;
       }
       else if (value == "sin") {
-        kind_of_problem = SINE;
+        kernel_func = SINE;
       }
       else {
         std::cout << "wrong value for --kind-of-problem " << value << std::endl;
