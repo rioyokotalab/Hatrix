@@ -1,7 +1,8 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/common.mk
 
-DIRS := src/classes src/functions src/util
+DIRS := src/classes src/functions src/util examples/HSS
+EXAMPLE_OBJLIBS := libHSS_main.a
 OBJLIBS := libfunctions.a libclasses.a libutil.a
 TEST := test
 EXAMPLES := examples
@@ -38,16 +39,17 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_BLR2_far_dense \
 	H2_far_dense_construct \
 	UMV_H2_far_dense
+EXAMPLE_DIR_EXECUTABLES := HSS_main
 
-.PHONY: dirs $(DIRS)
-dirs: $(DIRS)
+.PHONY: dirs $(DIRS) $(EXAMPLE_DIRS)
+dirs: $(DIRS) $(EXAMPLE_DIRS)
 
-all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES)
+all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES)
 
 $(DIRS):
 	$(MAKE) -C $@
 
-LINK_EXECUTABLE = @$(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
+LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
@@ -57,6 +59,9 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
+	$(LINK_EXECUTABLE)
+
+$(EXAMPLE_DIR_EXECUTABLES) : % : lib%.a $(EXAMPLE_OBJ_LIBS) dirs
 	$(LINK_EXECUTABLE)
 
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
