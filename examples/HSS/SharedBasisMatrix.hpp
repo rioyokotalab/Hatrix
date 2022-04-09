@@ -9,8 +9,6 @@ namespace Hatrix {
 
   class SharedBasisMatrix {
   private:
-
-
     void coarsen_blocks(int64_t level);
     void calc_diagonal_based_admissibility(int64_t level);
   public:
@@ -30,6 +28,7 @@ namespace Hatrix {
     RowColLevelMap<bool> is_admissible;
     std::vector<int64_t> level_blocks;
 
+    int64_t get_block_size(int64_t parent, int64_t level);
     SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank, double accuracy,
                       double admis, ADMIS_KIND admis_kind,
                       CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
@@ -48,6 +47,12 @@ namespace Hatrix {
 
   class ConstructMiro : public ConstructAlgorithm {
   private:
+    Matrix generate_row_block(int64_t block, int64_t block_size, int64_t level);
+    std::tuple<Matrix, Matrix>
+    generate_row_bases(int64_t block, int64_t block_size, int64_t level);
+    std::tuple<Matrix, Matrix>
+    generate_column_bases(int64_t block, int64_t block_size, int64_t level);
+    Matrix generate_column_block(int64_t block, int64_t block_size, int64_t level);
     void generate_leaf_nodes(const Domain& domain);
   public:
     ConstructMiro(SharedBasisMatrix* context);
