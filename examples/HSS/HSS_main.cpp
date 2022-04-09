@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
   KIND_OF_GEOMETRY kind_of_geometry = GRID;
   int64_t ndim = 1;
   int64_t rank = 10;
-  double admis = 1;
+  double admis = 0;
   double acc = -1;
   double add_diag = 0;
   ADMIS_KIND admis_kind = DIAGONAL;
@@ -175,7 +175,8 @@ int main(int argc, char* argv[]) {
   }
   domain.divide_domain_and_create_particle_boxes(nleaf);
 
-  SharedBasisMatrix A(domain, N, nleaf, rank, acc, kernel, construct_algorithm, use_nested_basis);
+  SharedBasisMatrix A(N, nleaf, rank, acc, admis, admis_kind,
+                      construct_algorithm, use_nested_basis, domain, kernel);
 
   Hatrix::Context::finalize();
   return 0;
