@@ -6,6 +6,24 @@
 #include "SharedBasisMatrix.hpp"
 
 namespace Hatrix {
+  ConstructAlgorithm::ConstructAlgorithm(SharedBasisMatrix* context) : context(context) {}
+
+  ConstructMiro::ConstructMiro(SharedBasisMatrix* context) : ConstructAlgorithm(context) {
+
+  }
+
+  void
+  ConstructMiro::construct() {
+  }
+
+  ConstructID_Random::ConstructID_Random(SharedBasisMatrix* context) : ConstructAlgorithm(context) {
+
+  }
+
+  void
+  ConstructID_Random::construct() {
+
+  }
 
   void
   SharedBasisMatrix::coarsen_blocks(int64_t level) {
@@ -80,6 +98,13 @@ namespace Hatrix {
       }
       level_blocks.push_back(1);
       level_blocks.push_back(nblocks);
+    }
+    is_admissible.insert(0, 0, 0, false);
+
+    ConstructAlgorithm *construct_algo;
+
+    if (construct_algorithm == MIRO) {
+      construct_algo = new ConstructMiro(this);
     }
   };
 }

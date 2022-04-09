@@ -6,8 +6,14 @@
 #include "internal_types.hpp"
 
 namespace Hatrix {
+
   class SharedBasisMatrix {
   private:
+
+
+    void coarsen_blocks(int64_t level);
+    void calc_diagonal_based_admissibility(int64_t level);
+  public:
     int64_t N, nleaf, rank;
     double accuracy;
     double admis;
@@ -16,9 +22,6 @@ namespace Hatrix {
     bool use_shared_basis;
     int64_t height;
 
-    void coarsen_blocks(int64_t level);
-    void calc_diagonal_based_admissibility(int64_t level);
-  public:
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
@@ -29,5 +32,24 @@ namespace Hatrix {
                       double admis, ADMIS_KIND admis_kind,
                       CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
                       const Domain& domain, const kernel_function& kernel);
+  };
+
+  class ConstructAlgorithm {
+  public:
+    SharedBasisMatrix *context;
+    ConstructAlgorithm(SharedBasisMatrix* context);
+    virtual void construct() = 0;
+  };
+
+  class ConstructMiro : public ConstructAlgorithm {
+  public:
+    ConstructMiro(SharedBasisMatrix* context);
+    void construct();
+  };
+
+  class ConstructID_Random : public ConstructAlgorithm {
+  public:
+    ConstructID_Random(SharedBasisMatrix* context);
+    void construct();
   };
 }
