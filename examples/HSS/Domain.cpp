@@ -32,25 +32,6 @@ namespace Hatrix {
     file.close();
   }
 
-  Matrix Domain::generate_rank_heat_map() const {
-    int64_t nblocks = boxes.size();
-    Matrix out(nblocks, nblocks);
-
-    for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j < nblocks; ++j) {
-        Matrix block = Hatrix::generate_p2p_interactions(*this, i, j);
-
-        Matrix Utemp, Stemp, Vtemp;
-        std::tie(Utemp, Stemp, Vtemp) = error_svd(block, 1e-9);
-        int64_t rank = Stemp.rows;
-
-        out(i, j) = rank;
-      }
-    }
-
-    return out;
-  }
-
   // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
   void
   Domain::orthogonal_recursive_bisection_1dim(int64_t start,
@@ -183,7 +164,7 @@ namespace Hatrix {
 
   }
 
-  void Domain::generate_starsh_grid_particles() {
+  void Domain::generate_grid_particles() {
     int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
     int64_t total = side;
     for (int64_t i = 1; i < ndim; ++i) { total *= side; }
@@ -221,7 +202,7 @@ namespace Hatrix {
     }
   }
 
-  void Domain::generate_particles(double min_val, double max_val) {
+  void Domain::generate_circular_particles(double min_val, double max_val) {
     double range = max_val - min_val;
 
     if (ndim == 1) {

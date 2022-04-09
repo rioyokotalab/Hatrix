@@ -25,11 +25,9 @@ namespace Hatrix {
                                              int64_t nleaf, int64_t axis);
   public:
     Domain(int64_t N, int64_t ndim);
-    void generate_particles(double min_val, double max_val);
+    void generate_circular_particles(double min_val, double max_val);
     void divide_domain_and_create_particle_boxes(int64_t nleaf);
-    void generate_starsh_grid_particles();
-    void generate_starsh_electrodynamics_particles();
+    void generate_grid_particles();
     void print_file(std::string file_name);
-    Matrix generate_rank_heat_map() const;
   };
 }

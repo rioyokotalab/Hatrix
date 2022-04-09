@@ -161,6 +161,14 @@ int main(int argc, char* argv[]) {
     };
   }
 
+  Domain domain(N, ndim);
+  if (kind_of_geometry == GRID) {
+    domain.generate_grid_particles();
+  }
+  else if (kind_of_geometry == CIRCULAR) {
+    domain.generate_circular_particles(0, N);
+  }
+
 
   Hatrix::Context::finalize();
   return 0;
