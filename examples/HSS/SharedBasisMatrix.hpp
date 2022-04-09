@@ -54,6 +54,18 @@ namespace Hatrix {
     generate_column_bases(int64_t block, int64_t block_size, int64_t level);
     Matrix generate_column_block(int64_t block, int64_t block_size, int64_t level);
     void generate_leaf_nodes(const Domain& domain);
+
+    bool row_has_admissible_blocks(int64_t row, int64_t level);
+    bool col_has_admissible_blocks(int64_t col, int64_t level);
+    std::tuple<Matrix, Matrix>
+    generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
+                                              int64_t block_size, int64_t level);
+    std::tuple<Matrix, Matrix>
+    generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
+                                              int64_t block_size, int64_t level);
+    std::tuple<RowLevelMap, ColLevelMap>
+    generate_transfer_matrices(int64_t level, RowLevelMap& Uchild, ColLevelMap& Vchild);
+
   public:
     ConstructMiro(SharedBasisMatrix* context);
     void construct();

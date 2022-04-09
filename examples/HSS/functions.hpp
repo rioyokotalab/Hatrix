@@ -13,7 +13,8 @@ namespace Hatrix {
                                  Matrix& out);
   Matrix generate_p2p_interactions(const Domain& domain,
                                    int64_t irow, int64_t icol,
-                                   int64_t level, int64_t height);
+                                   int64_t level, int64_t height,
+                                   const kernel_function& kernel);
   Matrix generate_p2p_matrix(const Domain& domain,
                              const kernel_function& kernel);
 
