@@ -370,9 +370,99 @@ namespace Hatrix {
     calc_diagonal_based_admissibility(level-1);
   }
 
+  Matrix
+  SharedBasisMatrix::get_Ubig(int64_t node, int64_t level) {
+    if (level == height) {
+      return U(node, level);
+    }
+
+    int64_t child1 = node * 2;
+    int64_t child2 = node * 2 + 1;
+
+    Matrix Ubig_child1 = get_Ubig(child1, level+1);
+    Matrix Ubig_child2 = get_Ubig(child2, level+1);
+
+    int64_t block_size = Ubig_child1.rows + Ubig_child2.rows;
+
+    Matrix Ubig(block_size, rank);
+
+    std::vector<Matrix> Ubig_splits = Ubig.split(
+                                                 std::vector<int64_t>(1,
+                                                                      Ubig_child1.rows),
+                                                 {});
+
+    std::vector<Matrix> U_splits = U(node, level).split(2, 1);
+
+    matmul(Ubig_child1, U_splits[0], Ubig_splits[0]);
+    matmul(Ubig_child2, U_splits[1], Ubig_splits[1]);
+
+    return Ubig;
+  }
+
+  Matrix
+  SharedBasisMatrix::get_Vbig(int64_t node, int64_t level) {
+    if (level == height) {
+      return V(node, height);
+    }
+
+    int64_t child1 = node * 2;
+    int64_t child2 = node * 2 + 1;
+
+    Matrix Vbig_child1 = get_Vbig(child1, level+1);
+    Matrix Vbig_child2 = get_Vbig(child2, level+1);
+
+    int64_t block_size = Vbig_child1.rows + Vbig_child2.rows;
+
+    Matrix Vbig(block_size, rank);
+
+    std::vector<Matrix> Vbig_splits = Vbig.split(std::vector<int64_t>(1, Vbig_child1.rows), {});
+    std::vector<Matrix> V_splits = V(node, level).split(2, 1);
+
+    matmul(Vbig_child1, V_splits[0], Vbig_splits[0]);
+    matmul(Vbig_child2, V_splits[1], Vbig_splits[1]);
+
+    return Vbig;
+  }
+
+
   double
   SharedBasisMatrix::construction_error() {
+    double error = 0;
+    double dense_norm = 0;
+    int64_t nblocks = level_blocks[height];
 
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
+          Matrix actual = Hatrix::generate_p2p_interactions(domain, i, j, kernel);
+          Matrix expected = D(i, j, height);
+          error += pow(norm(actual - expected), 2);
+          dense_norm += pow(norm(actual), 2);
+        }
+      }
+    }
+
+    for (int64_t level = height; level > 0; --level) {
+      int64_t nblocks = level_blocks[level];
+
+      for (int64_t row = 0; row < nblocks; ++row) {
+        for (int64_t col = 0; col < nblocks; ++col) {
+          if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+            Matrix Ubig = get_Ubig(row, level);
+            Matrix Vbig = get_Vbig(col, level);
+
+            Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+            Matrix actual_matrix =
+              Hatrix::generate_p2p_interactions(domain, row, col, level, height, kernel);
+
+            dense_norm += pow(norm(actual_matrix), 2);
+            error += pow(norm(expected_matrix - actual_matrix), 2);
+          }
+        }
+      }
+    }
+
+    return std::sqrt(error / dense_norm);
   }
 
   SharedBasisMatrix::SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank, double accuracy,

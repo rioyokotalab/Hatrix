@@ -11,6 +11,8 @@ namespace Hatrix {
   private:
     void coarsen_blocks(int64_t level);
     void calc_diagonal_based_admissibility(int64_t level);
+    Matrix get_Ubig(int64_t node, int64_t level);
+    Matrix get_Vbig(int64_t node, int64_t level);
   public:
     int64_t N, nleaf, rank;
     double accuracy;

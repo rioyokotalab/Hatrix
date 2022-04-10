@@ -178,6 +178,8 @@ int main(int argc, char* argv[]) {
   SharedBasisMatrix A(N, nleaf, rank, acc, admis, admis_kind,
                       construct_algorithm, use_nested_basis, domain, kernel);
 
+  std::cout << "error= " << A.construction_error() << std::endl;
+
   Hatrix::Context::finalize();
   return 0;
 }
