@@ -55,4 +55,7 @@ void householder_qr_compact_wy(Matrix& A, Matrix& T);
 void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                            int side, bool trans);
 
+std::tuple<Matrix, Matrix> error_interpolate(Matrix& A, bool transpose, double error);
+std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, bool transpose, int64_t rank);
+
 }  // namespace Hatrix

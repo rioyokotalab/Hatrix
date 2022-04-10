@@ -250,4 +250,12 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                  'F', 'C', C.rows, C.cols, T.cols, &V, V.stride, &T, T.stride,
                  &C, C.stride);
 }
+
+std::tuple<Matrix, Matrix> error_interpolate(Matrix& A, bool transpose, double error) {
+
+}
+
+std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, bool transpose, int64_t rank) {
+}
+
 }  // namespace Hatrix

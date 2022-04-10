@@ -40,6 +40,7 @@ namespace Hatrix {
     double construction_error();
   };
 
+  // Strategy pattern class hierarchy for implementation of various construction schemes.
   class ConstructAlgorithm {
   public:
     SharedBasisMatrix *context;
@@ -47,6 +48,7 @@ namespace Hatrix {
     virtual void construct() = 0;
   };
 
+  // Construct HSS matrix using the algorithm written in the miro board.
   class ConstructMiro : public ConstructAlgorithm {
   private:
     Matrix generate_row_block(int64_t block, int64_t block_size, int64_t level);
