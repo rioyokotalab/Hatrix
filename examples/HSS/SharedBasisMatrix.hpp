@@ -38,9 +38,11 @@ namespace Hatrix {
 
     // Obtain construction error w.r.t dense matrix with matvec.
     double construction_error();
+    Matrix matvec(const Matrix& x);
   };
 
-  // Strategy pattern class hierarchy for implementation of various construction schemes.
+  // Strategy pattern class hierarchy for implementation of various
+  // construction schemes.
   class ConstructAlgorithm {
   public:
     SharedBasisMatrix *context;

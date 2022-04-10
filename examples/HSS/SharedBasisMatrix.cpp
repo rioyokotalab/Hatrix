@@ -451,9 +451,11 @@ namespace Hatrix {
             Matrix Ubig = get_Ubig(row, level);
             Matrix Vbig = get_Vbig(col, level);
 
-            Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+            Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)),
+                                            Vbig, false, true);
             Matrix actual_matrix =
-              Hatrix::generate_p2p_interactions(domain, row, col, level, height, kernel);
+              Hatrix::generate_p2p_interactions(domain, row, col, level,
+                                                height, kernel);
 
             dense_norm += pow(norm(actual_matrix), 2);
             error += pow(norm(expected_matrix - actual_matrix), 2);
@@ -465,13 +467,54 @@ namespace Hatrix {
     return std::sqrt(error / dense_norm);
   }
 
-  SharedBasisMatrix::SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank, double accuracy,
-                                       double admis, ADMIS_KIND admis_kind,
-                                       CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
-                                       const Domain& domain, const kernel_function& kernel) :
-    N(N), nleaf(nleaf), rank(rank), accuracy(accuracy), admis(admis), admis_kind(admis_kind),
-    construct_algorithm(construct_algorithm), use_shared_basis(use_shared_basis),
-    domain(domain), kernel(kernel)
+  Matrix
+  SharedBasisMatrix::matvec(const Matrix& x) {
+    Matrix b(x);
+    int nblocks = level_blocks[height];
+    std::vector<Matrix> x_hat;
+    auto x_splits = x.split(nblocks, 1);
+
+    for (int i = 0; i < nblocks; ++i) {
+      x_hat.push_back(matmul(V(i, height), x_splits[i], true, false, 1.0));
+    }
+
+    int offset = 0;
+
+    for (int level = height - 1; level > 0; --level) {
+      int nblocks = level_blocks[level];
+      int child_level = level + 1;
+      for (int i = 0; i < nblocks; ++i) {
+        int child1 = i * 2;
+        int child2 = i * 2 + 1;
+
+        Matrix xtemp = Matrix(V(i, level).rows, 1);
+        auto xtemp_splits =
+          xtemp.split(std::vector<int64_t>(1, V(child1, child_level).cols),
+                      {});
+        xtemp_splits[0] = x_hat[offset + child1];
+        xtemp_splits[1] = x_hat[offset + child2];
+
+        std::cout << "xhat: " << offset << " h: " << height << std::endl;
+
+        x_hat.push_back(matmul(V(i, level), xtemp, true, false, 1.0));
+      }
+
+      offset += level_blocks[level+1];
+    }
+
+    return b;
+  }
+
+  SharedBasisMatrix::SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank,
+                                       double accuracy, double admis,
+                                       ADMIS_KIND admis_kind,
+                                       CONSTRUCT_ALGORITHM construct_algorithm,
+                                       bool use_shared_basis,
+                                       const Domain& domain,
+                                       const kernel_function& kernel) :
+    N(N), nleaf(nleaf), rank(rank), accuracy(accuracy), admis(admis),
+    admis_kind(admis_kind), construct_algorithm(construct_algorithm),
+    use_shared_basis(use_shared_basis), domain(domain), kernel(kernel)
   {
     if (use_shared_basis) {
       height = int64_t(log2(N / nleaf));

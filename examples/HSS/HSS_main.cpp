@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
               << "    miro       -- From the miro board. Use SVD everywhere." << std::endl
               << "    id_random  -- From Martinsson2010. Use ID + randomized sampling."
               << " --add-diag :: Specify the value to add to the diagonal."
-              << " --nested-basis :: Specify whether this matrix uses shared basis."
+              << " --nested-basis :: Specify whether this matrix uses shared basis. 0 or 1."
               << std::endl;
   }
 
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
   double add_diag = 0;
   ADMIS_KIND admis_kind = DIAGONAL;
   CONSTRUCT_ALGORITHM construct_algorithm = MIRO;
-  bool use_nested_basis = false;
+  bool use_nested_basis = true;
 
   for (auto iter = cmd_options.begin(); iter != cmd_options.end(); ++iter) {
     auto option = *iter;
@@ -178,7 +178,9 @@ int main(int argc, char* argv[]) {
   SharedBasisMatrix A(N, nleaf, rank, acc, admis, admis_kind,
                       construct_algorithm, use_nested_basis, domain, kernel);
 
-  std::cout << "error= " << A.construction_error() << std::endl;
+  std::cout << "construct error= " << A.construction_error() << std::endl;
+  Matrix x = generate_random_matrix(N, 1);
+  Matrix b = A.matvec(x);
 
   Hatrix::Context::finalize();
   return 0;
