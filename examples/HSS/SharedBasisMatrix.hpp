@@ -20,8 +20,8 @@ namespace Hatrix {
     bool use_shared_basis;
     const Domain domain;
     const kernel_function kernel;
-    int64_t height;
 
+    int64_t height;
     ColLevelMap U;
     RowLevelMap V;
     RowColLevelMap<Matrix> D, S;

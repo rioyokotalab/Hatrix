@@ -410,5 +410,7 @@ namespace Hatrix {
     }
 
     construct_algo->construct();
+
+    delete construct_algo;
   };
 }

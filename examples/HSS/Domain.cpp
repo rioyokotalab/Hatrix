@@ -161,7 +161,6 @@ namespace Hatrix {
       std::cout << "invalid ndim : " << ndim << std::endl;
       abort();
     }
-
   }
 
   void Domain::generate_grid_particles() {
