@@ -19,6 +19,8 @@ TEST_P(InterpolateTests, interpolate_rank) {
   std::tie(U, S, V, error) = Hatrix::truncated_svd(A, rank);
 
   Matrix Arank = matmul(matmul(U, S), V);
+  Matrix Ainterp, Apivots;
+  std::tie(Ainterp, Apivots) = truncated_interpolate(Arank, false, rank);
 
   Hatrix::Context::finalize();
 }

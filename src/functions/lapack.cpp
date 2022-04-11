@@ -261,6 +261,7 @@ std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, bool transpose, int6
   std::vector<double> tau(std::min(A.rows, A.cols));
   std::vector<int> jpvt(A.cols);
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, A.rows, A.cols, rank, &A, A.stride, tau.data());
 }
 
 }  // namespace Hatrix
