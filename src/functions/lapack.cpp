@@ -252,10 +252,15 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
 }
 
 std::tuple<Matrix, Matrix> error_interpolate(Matrix& A, bool transpose, double error) {
-
+  std::vector<double> tau(std::min(A.rows, A.cols));
+  std::vector<int> jpvt(A.cols);
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
 }
 
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, bool transpose, int64_t rank) {
+  std::vector<double> tau(std::min(A.rows, A.cols));
+  std::vector<int> jpvt(A.cols);
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
 }
 
 }  // namespace Hatrix

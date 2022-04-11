@@ -23,6 +23,7 @@ else()
     svd
     norms
     scale
+    id
   )
 endif()
 
