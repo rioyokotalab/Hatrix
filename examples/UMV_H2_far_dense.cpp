@@ -2967,6 +2967,8 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::init();
 
+  auto start_particles = std::chrono::system_clock::now();
+
   Hatrix::Domain domain(N, ndim);
 
   switch(kernel_func) {
@@ -2994,6 +2996,9 @@ int main(int argc, char ** argv) {
   }
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
+  auto stop_particles = std::chrono::system_clock::now();
+  double particle_construct_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_particles - start_particles).count();
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
@@ -3085,6 +3090,7 @@ int main(int argc, char ** argv) {
             << " factor time= " << factor_time
             << " solve time= " << solve_time
             << " construct time = " << construct_time
+            << " particle time = " << particle_construct_time
             << std::endl;
 
   std::ofstream file;
@@ -3119,6 +3125,7 @@ int main(int argc, char ** argv) {
        << "," << beta
        << "," << nu
        << "," << sigma
+       << "," << particle_construct_time
        << std::endl;
 
   file.close();
