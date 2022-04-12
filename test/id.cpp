@@ -47,6 +47,11 @@ TEST_P(InterpolateTests, interpolate_rank) {
   Hatrix::Context::finalize();
 }
 
+TEST_P(InterpolateTests, interpolate_rank_transpose) {
+  Hatrix::Context::init();
+  Hatrix::Context::finalize();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     INTERPOLATE, InterpolateTests,
     testing::Combine(testing::Values(30), testing::Values(30), testing::Values(10)),
