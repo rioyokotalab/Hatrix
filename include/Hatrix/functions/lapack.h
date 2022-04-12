@@ -56,6 +56,22 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                            int side, bool trans);
 
 std::tuple<Matrix, Matrix> error_interpolate(Matrix& A, bool transpose, double error);
+
+// One-sided truncated interpolative decomposition. Refer to section 4 of
+// https://amath.colorado.edu/faculty/martinss/Pubs/2004_skeletonization.pdf for the
+// full algorithm.
+//
+// Inputs
+// ------
+//
+// Matrix A - Matrix to perform ID on. MODIFIED IN-PLACE.
+//
+// Returns
+// -------
+//
+// std::tuple<Matrix, Matrix> - The first Matrix is a (A.rows x rank) block with the interpolation
+// matrix obtained from the left-sided QR decomposition of A. The second Matrix is a (rankx1) vector
+// denoting the first rank pivot columns from A that are chosen as the basis vectors.
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, bool transpose, int64_t rank);
 
 }  // namespace Hatrix

@@ -1,8 +1,9 @@
 #!/bin/bash
 
-make -j
-./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-4 \
-               --rank 10 --use-nested-basis 1
+make test
+# make -j
+# ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-4 \
+#                --rank 10 --use-nested-basis 1
 # ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-4 --rank 20
 
 

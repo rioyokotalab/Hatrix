@@ -255,13 +255,51 @@ std::tuple<Matrix, Matrix> error_interpolate(Matrix& A, bool transpose, double e
   std::vector<double> tau(std::min(A.rows, A.cols));
   std::vector<int> jpvt(A.cols);
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
+
+  int rank = 10;
+  Matrix U(A.rows, rank), pivots(A.cols, 1);
+
+  return {std::move(U), std::move(pivots)};
 }
 
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, bool transpose, int64_t rank) {
+  Matrix interp(A.rows, rank), pivots(A.cols, 1);
   std::vector<double> tau(std::min(A.rows, A.cols));
   std::vector<int> jpvt(A.cols);
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
-  LAPACKE_dorgqr(LAPACK_COL_MAJOR, A.rows, A.cols, rank, &A, A.stride, tau.data());
+  // use the R11 and R12 pieces from the LAPACK representation of pivoted QR.
+  Matrix R11(rank, rank), R12(rank, A.cols - rank);
+  // TODO: optimize this by checking if trsm can be called directly with the proper transpose and stride.
+  // copy
+  for (int i = 0; i < rank; ++i) {
+    for (int j = i; j < rank; ++j) {
+      R11(i, j) = A(i, j);
+    }
+  }
+
+  for (int i = 0; i < R12.rows; ++i) {
+    for (int j = 0; j < R12.cols; ++j) {
+      R12(i, j) = A(i, j + rank);
+    }
+  }
+
+  solve_triangular(R11, R12, Left, Upper, false, false, 1.0);
+
+  // Copy the interpolation matrix from TRSM into the
+  for (int i = 0; i < rank; ++i) {
+    interp(i, i) = 1.0;
+  }
+  for (int i = 0; i < rank; ++i) {
+    for (int j = 0; j < R12.cols; ++j) {
+      interp(j + rank, i) = R12(i, j);
+    }
+  }
+
+  for (int i = 0; i < A.cols; ++i) {
+    pivots(i, 0) = jpvt[i];
+  }
+
+  return {std::move(interp), std::move(pivots)};
 }
 
 }  // namespace Hatrix
