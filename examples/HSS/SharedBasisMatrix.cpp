@@ -339,6 +339,8 @@ namespace Hatrix {
           }
 
           samples_loc -= Hatrix::matmul(context->D(node, node, level), OMEGA_loc);
+          Matrix interp, pivots;
+          // std::tie(interp, pivots) = truncated_interpolate(samples_loc, true, context->rank);
         }
         else {
 
