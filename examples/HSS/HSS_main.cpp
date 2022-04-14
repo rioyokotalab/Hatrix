@@ -182,6 +182,12 @@ int main(int argc, char* argv[]) {
   Matrix x = generate_random_matrix(N, 1);
   Matrix b = A.matvec(x);
 
+  Matrix Adense = Hatrix::generate_p2p_matrix(domain, kernel);
+  Matrix bdense = matmul(Adense, x);
+
+  std::cout << "matvec norm = "
+            << Hatrix::norm(b - bdense) / Hatrix::norm(bdense) << std::endl;
+
   Hatrix::Context::finalize();
   return 0;
 }

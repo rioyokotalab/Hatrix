@@ -472,7 +472,6 @@ namespace Hatrix {
 
   Matrix
   SharedBasisMatrix::matvec(const Matrix& x) {
-    Matrix b(x);
     int leaf_nblocks = level_blocks[height];
     std::vector<Matrix> x_hat;
     auto x_splits = x.split(leaf_nblocks, 1);
@@ -524,16 +523,17 @@ namespace Hatrix {
       for (int row = 0; row < nblocks; ++row) {
         int c_r1 = row * 2, c_r2 = row * 2 + 1;
 
-        Matrix U_b_row_level = matmul(U(row, level),
+        Matrix Ub = matmul(U(row, level),
                                       b_hat[b_hat_offset + row]);
+        auto Ub_splits = Ub.split(2, 1);
 
         Matrix b_r1_cl = matmul(S(c_r1, c_r2, child_level),
                                 x_hat[x_hat_offset + c_r2]);
-        b_hat.push_back(b_r1_cl);
+        b_hat.push_back(b_r1_cl + Ub_splits[0]);
 
         Matrix b_r2_cl = matmul(S(c_r2, c_r1, child_level),
                                 x_hat[x_hat_offset + c_r1]);
-        b_hat.push_back(b_r2_cl);
+        b_hat.push_back(b_r2_cl + Ub_splits[1]);
       }
 
       b_hat_offset += level_blocks[level];
@@ -541,11 +541,12 @@ namespace Hatrix {
 
     // multiply the leaf level U block with the generated b_hat vectors
     // and add the product with the corresponding x blocks.
+    Matrix b(x.rows, 1);
     auto b_splits = b.split(leaf_nblocks, 1);
-    int nblocks = level_blocks[height];
     for (int i = 0; i < leaf_nblocks; ++i) {
-      Matrix temp = matmul(U(i, height), x_hat[x_hat_offset + i]) +
-        matmul(D(i, i, height), b_splits[i]);
+      Matrix temp = matmul(U(i, height), b_hat[b_hat_offset + i]) +
+        matmul(D(i, i, height), x_splits[i]);
+      b_splits[i] = temp;
     }
 
     return b;

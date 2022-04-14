@@ -8,8 +8,15 @@
 # done
 
 make -j
-./bin/HSS_main --N 256 --nleaf 64 --kernel-func laplace --add-diag 1e-4 \
+./bin/HSS_main --N 128 --nleaf 32 --kernel-func laplace --add-diag 1e-4 \
                --rank 10 --use-nested-basis 1
+
+./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-4 \
+               --rank 10 --use-nested-basis 1
+
+./bin/HSS_main --N 8192 --nleaf 128 --kernel-func laplace --add-diag 1e-4 \
+               --rank 10 --use-nested-basis 1
+
 # ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-4 --rank 20
 
 
