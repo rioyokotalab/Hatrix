@@ -307,10 +307,47 @@ namespace Hatrix {
   void
   ConstructID_Random::construct() {
     Matrix dense = generate_p2p_matrix(context->domain, context->kernel);
-    Matrix random = generate_random_matrix(context->N, p);
-    Matrix samples = matmul(dense, random);
-  }
+    Matrix OMEGA = generate_random_matrix(context->N, p);
+    Matrix samples = Hatrix::matmul(dense, OMEGA);
 
+    std::vector<int64_t> c1_indices, c2_indices;
+
+    for (int64_t level = context->height; level > 0; --level) {
+      int64_t nblocks = context->level_blocks[level];
+      std::vector<int64_t> indices;
+
+      for (int node = 0; node < nblocks; ++node) {
+        std::vector<int64_t> row_indices;
+
+        if (level == context->height) {
+          for (int64_t row_index = node * nblocks;
+               row_index < (node + 1) * nblocks; ++row_index) {
+            row_indices.push_back(row_index);
+          }
+          Matrix OMEGA_loc(row_indices.size(), p);
+          Matrix samples_loc(row_indices.size(), p);
+
+          int64_t r = 0;
+          for (auto row_index : row_indices) {
+            for (int64_t c = 0; c < p; ++c) {
+              // choose the rows within row_indices and put them into OMEGA_loc
+              OMEGA_loc(r, c) = OMEGA(row_index, c);
+              // Obtain the row within the samples and put them into samples_loc
+              samples_loc(r, c) = samples(row_index, c);
+            }
+            r++;
+          }
+
+          samples_loc -= Hatrix::matmul(context->D(node, node, level), OMEGA_loc);
+        }
+        else {
+
+        }
+      }
+    }
+
+    int64_t leaf_nblocks = context->level_blocks[context->height];
+  }
 
   int64_t
   SharedBasisMatrix::get_block_size(int64_t parent, int64_t level) {
