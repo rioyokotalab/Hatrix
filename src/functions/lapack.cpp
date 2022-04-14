@@ -251,25 +251,38 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                  &C, C.stride);
 }
 
-std::tuple<Matrix, Matrix> error_interpolate(Matrix& A, bool transpose, double error) {
+std::tuple<Matrix, Matrix, int64_t> error_interpolate(Matrix& A, double error) {
   std::vector<double> tau(std::min(A.rows, A.cols));
   std::vector<int> jpvt(A.cols);
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
 
-  int rank = 10;
+  int64_t rank = 0;
+  // find the right rank for this.
+  for (int64_t i = 0; i < A.rows; ++i) {
+    if (std::abs(A(i, i)) < error) { break; }
+    rank += 1;
+  }
+
+  if (rank > A.cols) {
+    std::cout << "ID with tol " << error << " failed.\n";
+    abort();
+  }
+
   Matrix U(A.rows, rank), pivots(A.cols, 1);
 
-  return {std::move(U), std::move(pivots)};
+  return {std::move(U), std::move(pivots), rank};
 }
 
-std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, bool transpose, int64_t rank) {
+std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
   Matrix interp(A.rows, rank), pivots(A.cols, 1);
   std::vector<double> tau(std::min(A.rows, A.cols));
   std::vector<int> jpvt(A.cols);
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
   // use the R11 and R12 pieces from the LAPACK representation of pivoted QR.
   Matrix R11(rank, rank), R12(rank, A.cols - rank);
-  // TODO: optimize this by checking if trsm can be called directly with the proper transpose and stride.
+  // TODO: optimize this by checking if trsm can be called directly with the
+  // proper transpose and stride.
+
   // copy
   for (int i = 0; i < rank; ++i) {
     for (int j = i; j < rank; ++j) {
