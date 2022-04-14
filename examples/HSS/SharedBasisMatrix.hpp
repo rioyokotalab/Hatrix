@@ -78,6 +78,7 @@ namespace Hatrix {
   };
 
   class ConstructID_Random : public ConstructAlgorithm {
+    const int64_t p = 50;
   public:
     ConstructID_Random(SharedBasisMatrix* context);
     void construct();

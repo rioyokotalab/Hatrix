@@ -306,7 +306,9 @@ namespace Hatrix {
 
   void
   ConstructID_Random::construct() {
-
+    Matrix dense = generate_p2p_matrix(context->domain, context->kernel);
+    Matrix random = generate_random_matrix(context->N, p);
+    Matrix samples = matmul(dense, random);
   }
 
 
@@ -524,7 +526,7 @@ namespace Hatrix {
         int c_r1 = row * 2, c_r2 = row * 2 + 1;
 
         Matrix Ub = matmul(U(row, level),
-                                      b_hat[b_hat_offset + row]);
+                           b_hat[b_hat_offset + row]);
         auto Ub_splits = Ub.split(2, 1);
 
         Matrix b_r1_cl = matmul(S(c_r1, c_r2, child_level),
