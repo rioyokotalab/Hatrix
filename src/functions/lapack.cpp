@@ -251,38 +251,8 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                  &C, C.stride);
 }
 
-std::tuple<Matrix, Matrix, int64_t> error_interpolate(Matrix& A, double error) {
-  std::vector<double> tau(std::min(A.rows, A.cols));
-  std::vector<int> jpvt(A.cols);
-  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
-
-  int64_t rank = 0;
-  // find the right rank for this.
-  for (int64_t i = 0; i < A.rows; ++i) {
-    if (std::abs(A(i, i)) < error) { break; }
-    rank += 1;
-  }
-
-  if (rank > A.cols) {
-    std::cout << "ID with tol " << error << " failed.\n";
-    abort();
-  }
-
-  Matrix U(A.rows, rank), pivots(A.cols, 1);
-
-  return {std::move(U), std::move(pivots), rank};
-}
-
-std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
-  Matrix interp(A.rows, rank), pivots(A.cols, 1);
-  std::vector<double> tau(std::min(A.rows, A.cols));
-  std::vector<int> jpvt(A.cols);
-  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
-  // use the R11 and R12 pieces from the LAPACK representation of pivoted QR.
+void solve_r_block(Matrix& interp, Matrix& pivots, const Matrix& A, const int64_t rank) {
   Matrix R11(rank, rank), R12(rank, A.cols - rank);
-  // TODO: optimize this by checking if trsm can be called directly with the
-  // proper transpose and stride.
-
   // copy
   for (int i = 0; i < rank; ++i) {
     for (int j = i; j < rank; ++j) {
@@ -307,11 +277,46 @@ std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
       interp(j + rank, i) = R12(i, j);
     }
   }
+}
+
+std::tuple<Matrix, Matrix, int64_t> error_interpolate(Matrix& A, double error) {
+  std::vector<double> tau(std::min(A.rows, A.cols));
+  std::vector<int> jpvt(A.cols);
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
+
+  int64_t rank = 0;
+  // find the right rank for this.
+  for (int64_t i = 0; i < A.rows; ++i) {
+    if (std::abs(A(i, i)) < error) { break; }
+    rank += 1;
+  }
+
+  if (rank > A.cols) {
+    std::cout << "ID with tol " << error << " failed.\n";
+    abort();
+  }
+
+  Matrix interp(A.rows, rank), pivots(A.cols, 1);
+  solve_r_block(interp, pivots, A, rank);
 
   for (int i = 0; i < A.cols; ++i) {
     pivots(i, 0) = jpvt[i];
   }
+  return {std::move(interp), std::move(pivots), rank};
+}
 
+
+std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
+  Matrix interp(A.rows, rank), pivots(A.cols, 1);
+  std::vector<double> tau(std::min(A.rows, A.cols));
+  std::vector<int> jpvt(A.cols);
+  Matrix R11(rank, rank), R12(rank, A.cols - rank);
+
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
+  solve_r_block(interp, pivots, A, rank);
+  for (int i = 0; i < A.cols; ++i) {
+    pivots(i, 0) = jpvt[i];
+  }
   return {std::move(interp), std::move(pivots)};
 }
 
