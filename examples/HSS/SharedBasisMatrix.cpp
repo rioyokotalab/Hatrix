@@ -473,16 +473,16 @@ namespace Hatrix {
   Matrix
   SharedBasisMatrix::matvec(const Matrix& x) {
     Matrix b(x);
-    int nblocks = level_blocks[height];
+    int leaf_nblocks = level_blocks[height];
     std::vector<Matrix> x_hat;
-    auto x_splits = x.split(nblocks, 1);
+    auto x_splits = x.split(leaf_nblocks, 1);
 
     // V leaf nodes
-    for (int i = 0; i < nblocks; ++i) {
+    for (int i = 0; i < leaf_nblocks; ++i) {
       x_hat.push_back(matmul(V(i, height), x_splits[i], true, false, 1.0));
     }
 
-    int offset = 0;
+    int x_hat_offset = 0;
 
     // V non-leaf nodes
     for (int level = height-1; level > 0; --level) {
@@ -496,26 +496,57 @@ namespace Hatrix {
         auto xtemp_splits =
           xtemp.split(std::vector<int64_t>(1, V(child1, child_level).cols),
                       {});
-        xtemp_splits[0] = x_hat[offset + child1];
-        xtemp_splits[1] = x_hat[offset + child2];
+        xtemp_splits[0] = x_hat[x_hat_offset + child1];
+        xtemp_splits[1] = x_hat[x_hat_offset + child2];
 
         x_hat.push_back(matmul(V(i, level), xtemp, true, false, 1.0));
       }
 
-      offset += level_blocks[level+1];
+      x_hat_offset += level_blocks[level+1];
     }
     int level = 1;
 
     // b_hat does the product in reverse so matrices are pushed from the back.
     std::vector<Matrix> b_hat;
 
-    Matrix b0(rank * 2, 1);
-    auto b0_splits = b0.split(2, 1);
     // Multiply the S blocks at the top-most level with the corresponding xhat.
-    matmul(S(0, 1, level), x_hat[offset+1], b0_splits[1]);
-    matmul(S(1, 0, level), x_hat[offset], b0_splits[0]);
-    b_hat.insert(b_hat.begin(), b0);
+    Matrix b1_1 = matmul(S(0, 1, level), x_hat[x_hat_offset+1]);
+    Matrix b1_2 = matmul(S(1, 0, level), x_hat[x_hat_offset]);
+    b_hat.push_back(b1_1);
+    b_hat.push_back(b1_2);
+    int b_hat_offset = 0;
 
+    for (int level = 1; level < height; ++level) {
+      int nblocks = level_blocks[level];
+      int child_level = level + 1;
+      x_hat_offset -= level_blocks[child_level];
+
+      for (int row = 0; row < nblocks; ++row) {
+        int c_r1 = row * 2, c_r2 = row * 2 + 1;
+
+        Matrix U_b_row_level = matmul(U(row, level),
+                                      b_hat[b_hat_offset + row]);
+
+        Matrix b_r1_cl = matmul(S(c_r1, c_r2, child_level),
+                                x_hat[x_hat_offset + c_r2]);
+        b_hat.push_back(b_r1_cl);
+
+        Matrix b_r2_cl = matmul(S(c_r2, c_r1, child_level),
+                                x_hat[x_hat_offset + c_r1]);
+        b_hat.push_back(b_r2_cl);
+      }
+
+      b_hat_offset += level_blocks[level];
+    }
+
+    // multiply the leaf level U block with the generated b_hat vectors
+    // and add the product with the corresponding x blocks.
+    auto b_splits = b.split(leaf_nblocks, 1);
+    int nblocks = level_blocks[height];
+    for (int i = 0; i < leaf_nblocks; ++i) {
+      Matrix temp = matmul(U(i, height), x_hat[x_hat_offset + i]) +
+        matmul(D(i, i, height), b_splits[i]);
+    }
 
     return b;
   }
