@@ -28,7 +28,8 @@ namespace Hatrix {
 
     int index = 0;
     for (int64_t j = 0; j < context->level_blocks[level]; ++j) {
-      if (context->is_admissible.exists(block, j, level) && !context->is_admissible(block, j, level)) { continue; }
+      if (context->is_admissible.exists(block, j, level) &&
+          !context->is_admissible(block, j, level)) { continue; }
       Hatrix::generate_p2p_interactions(context->domain, block, j, level, context->height,
                                         context->kernel, AY_splits[index++]);
     }
@@ -99,7 +100,8 @@ namespace Hatrix {
     }
 
     for (int64_t i = 0; i < nblocks; ++i) {
-      Y.push_back(generate_random_matrix(domain.boxes[i].num_particles, context->rank + oversampling));
+      Y.push_back(generate_random_matrix(domain.boxes[i].num_particles,
+                                         context->rank + oversampling));
     }
 
     // Generate U leaf blocks
@@ -278,7 +280,8 @@ namespace Hatrix {
           Matrix dense = generate_p2p_interactions(context->domain, row, col, level,
                                                    context->height, context->kernel);
 
-          context->S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), dense, true, false),
+          context->S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level),
+                                                           dense, true, false),
                                                     Vbig_parent(col, level)));
         }
       }
@@ -474,13 +477,15 @@ namespace Hatrix {
     std::vector<Matrix> x_hat;
     auto x_splits = x.split(nblocks, 1);
 
+    // V leaf nodes
     for (int i = 0; i < nblocks; ++i) {
       x_hat.push_back(matmul(V(i, height), x_splits[i], true, false, 1.0));
     }
 
     int offset = 0;
 
-    for (int level = height - 1; level > 0; --level) {
+    // V non-leaf nodes
+    for (int level = height-1; level > 0; --level) {
       int nblocks = level_blocks[level];
       int child_level = level + 1;
       for (int i = 0; i < nblocks; ++i) {
@@ -494,13 +499,23 @@ namespace Hatrix {
         xtemp_splits[0] = x_hat[offset + child1];
         xtemp_splits[1] = x_hat[offset + child2];
 
-        std::cout << "xhat: " << offset << " h: " << height << std::endl;
-
         x_hat.push_back(matmul(V(i, level), xtemp, true, false, 1.0));
       }
 
       offset += level_blocks[level+1];
     }
+    int level = 1;
+
+    // b_hat does the product in reverse so matrices are pushed from the back.
+    std::vector<Matrix> b_hat;
+
+    Matrix b0(rank * 2, 1);
+    auto b0_splits = b0.split(2, 1);
+    // Multiply the S blocks at the top-most level with the corresponding xhat.
+    matmul(S(0, 1, level), x_hat[offset+1], b0_splits[1]);
+    matmul(S(1, 0, level), x_hat[offset], b0_splits[0]);
+    b_hat.insert(b_hat.begin(), b0);
+
 
     return b;
   }

@@ -1,15 +1,15 @@
 #!/bin/bash
 
-make -j all
-for N in 100 200 300 400 500 600 1000 2000 3000 4000; do
-    for rank in 10 20 40 50 100; do
-        ./bin/svd_vs_id $N $rank
-    done
-done
+# make -j all
+# for N in 100 200 300 400 500 600 1000 2000 3000 4000; do
+#     for rank in 10 20 40 50 100; do
+#         ./bin/svd_vs_id $N $rank
+#     done
+# done
 
-# make -j
-# ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-4 \
-#                --rank 10 --use-nested-basis 1
+make -j
+./bin/HSS_main --N 256 --nleaf 64 --kernel-func laplace --add-diag 1e-4 \
+               --rank 10 --use-nested-basis 1
 # ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-4 --rank 20
 
 

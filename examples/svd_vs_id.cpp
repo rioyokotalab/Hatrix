@@ -6,6 +6,27 @@
 
 #include "Hatrix/Hatrix.h"
 
+// Results on a 2021 macbook pro with M1.
+// N= 1000 rank= 10 svd= 2421 id= 497
+// N= 1000 rank= 20 svd= 2422 id= 531
+// N= 1000 rank= 40 svd= 2420 id= 499
+// N= 1000 rank= 50 svd= 2421 id= 499
+// N= 1000 rank= 100 svd= 2424 id= 500
+// N= 2000 rank= 10 svd= 23111 id= 4101
+// N= 2000 rank= 20 svd= 23172 id= 4102
+// N= 2000 rank= 40 svd= 23109 id= 4103
+// N= 2000 rank= 50 svd= 23118 id= 4102
+// N= 2000 rank= 100 svd= 23115 id= 4109
+// N= 3000 rank= 10 svd= 83671 id= 13970
+// N= 3000 rank= 20 svd= 84293 id= 13991
+// N= 3000 rank= 40 svd= 84303 id= 14010
+// N= 3000 rank= 50 svd= 84455 id= 14015
+// N= 3000 rank= 100 svd= 84505 id= 14027
+// N= 4000 rank= 10 svd= 523282 id= 80411
+// N= 4000 rank= 20 svd= 294784 id= 33707
+// N= 4000 rank= 40 svd= 276772 id= 33750
+// N= 4000 rank= 50 svd= 274316 id= 33666
+
 using namespace Hatrix;
 
 int main(int argc, char **argv) {
