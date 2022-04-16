@@ -79,6 +79,8 @@ namespace Hatrix {
 
   class ConstructID_Random : public ConstructAlgorithm {
     const int64_t p = 50;
+    std::tuple<std::vector<std::vector<int64_t>>, std::vector<Matrix>, std::vector<Matrix>>
+    generate_leaf_blocks(const Matrix& samplesT, const Matrix& OMEGA);
   public:
     ConstructID_Random(SharedBasisMatrix* context);
     void construct();

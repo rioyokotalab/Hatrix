@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 
   Matrix interp, pivots;
   auto id_start = std::chrono::system_clock::now();
-  std::tie(interp, pivots) = Hatrix::truncated_interpolate(Arank, false, rank);
+  std::tie(interp, pivots) = Hatrix::truncated_interpolate(Arank, rank);
   auto id_stop = std::chrono::system_clock::now();
   double id_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(id_stop - id_start).count();

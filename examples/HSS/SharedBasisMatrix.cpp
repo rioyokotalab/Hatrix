@@ -302,53 +302,34 @@ namespace Hatrix {
     }
   }
 
-  ConstructID_Random::ConstructID_Random(SharedBasisMatrix* context) : ConstructAlgorithm(context) {}
+  ConstructID_Random::ConstructID_Random(SharedBasisMatrix* context) :
+    ConstructAlgorithm(context) {}
+
+  std::tuple<std::vector<std::vector<int64_t>>, std::vector<Matrix>, std::vector<Matrix>>
+  ConstructID_Random::generate_leaf_blocks(const Matrix& samplesT, const Matrix& OMEGA) {
+    std::vector<std::vector<int64_t>> row_indices;
+    std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
+
+    return {std::move(row_indices), std::move(S_loc_blocks), std::move(OMEGA_blocks)};
+  }
 
   void
   ConstructID_Random::construct() {
     Matrix dense = generate_p2p_matrix(context->domain, context->kernel);
-    Matrix OMEGA = generate_random_matrix(context->N, p);
-    Matrix samples = Hatrix::matmul(dense, OMEGA);
+    Matrix OMEGA = generate_random_matrix(p, context->N);
+    // obtain the transposed samples so that we dont need to transpose for the ID.
+    Matrix samplesT = Hatrix::matmul(OMEGA, dense, false, true);
 
-    std::vector<int64_t> c1_indices, c2_indices;
+    // begin construction procedure using randomized samples.
+    std::vector<std::vector<int64_t>> row_indices;
+    std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
 
     for (int64_t level = context->height; level > 0; --level) {
-      int64_t nblocks = context->level_blocks[level];
-      std::vector<int64_t> indices;
-
-      for (int node = 0; node < nblocks; ++node) {
-        std::vector<int64_t> row_indices;
-
-        if (level == context->height) {
-          for (int64_t row_index = node * nblocks;
-               row_index < (node + 1) * nblocks; ++row_index) {
-            row_indices.push_back(row_index);
-          }
-          Matrix OMEGA_loc(row_indices.size(), p);
-          Matrix samples_loc(row_indices.size(), p);
-
-          int64_t r = 0;
-          for (auto row_index : row_indices) {
-            for (int64_t c = 0; c < p; ++c) {
-              // choose the rows within row_indices and put them into OMEGA_loc
-              OMEGA_loc(r, c) = OMEGA(row_index, c);
-              // Obtain the row within the samples and put them into samples_loc
-              samples_loc(r, c) = samples(row_index, c);
-            }
-            r++;
-          }
-
-          samples_loc -= Hatrix::matmul(context->D(node, node, level), OMEGA_loc);
-          Matrix interp, pivots;
-          // std::tie(interp, pivots) = truncated_interpolate(samples_loc, true, context->rank);
-        }
-        else {
-
-        }
+      if (level == context->height) {
+        std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
+          generate_leaf_blocks(samplesT, OMEGA);
       }
     }
-
-    int64_t leaf_nblocks = context->level_blocks[context->height];
   }
 
   int64_t
