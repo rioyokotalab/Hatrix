@@ -313,6 +313,18 @@ namespace Hatrix {
     return {std::move(row_indices), std::move(S_loc_blocks), std::move(OMEGA_blocks)};
   }
 
+  std::tuple<std::vector<std::vector<int64_t>>, std::vector<Matrix>, std::vector<Matrix>>
+  ConstructID_Random::generate_transfer_blocks(const std::vector<std::vector<int64_t>>& child_row_indices,
+                                               const std::vector<Matrix>& child_S_loc_blocks,
+                                               const std::vector<Matrix>& child_OMEGA_blocks,
+                                               int level) {
+    std::vector<std::vector<int64_t>> row_indices;
+    std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
+
+    return {std::move(row_indices), std::move(S_loc_blocks), std::move(OMEGA_blocks)};
+  }
+
+
   void
   ConstructID_Random::construct() {
     Matrix dense = generate_p2p_matrix(context->domain, context->kernel);
@@ -328,6 +340,10 @@ namespace Hatrix {
       if (level == context->height) {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
           generate_leaf_blocks(samplesT, OMEGA);
+      }
+      else {
+        std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
+          generate_transfer_blocks(row_indices, S_loc_blocks, OMEGA_blocks, level);
       }
     }
   }
