@@ -309,6 +309,23 @@ namespace Hatrix {
   ConstructID_Random::generate_leaf_blocks(const Matrix& samplesT, const Matrix& OMEGA) {
     std::vector<std::vector<int64_t>> row_indices;
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
+    int64_t nblocks = context->level_blocks[context->height];
+
+    for (int64_t node = 0; node < nblocks; ++node) {
+      // gather indices for leaf nodes. line 1.
+      std::vector<int64_t> indices;
+      for (int64_t i = node * nblocks; i < (node + 1) * nblocks; ++i) { indices.push_back(i); }
+      row_indices.push_back(indices);
+
+      // obtain a slice of the random matrix. line 2.
+      Matrix OMEGA_loc(p, context->nleaf);
+      for (int64_t i = 0; i < p; ++i) {
+        for (int64_t j = 0; j < indices.size(); ++j) {
+          int64_t col = indices[j];
+          OMEGA_loc(i, col) = OMEGA(i, j);
+        }
+      }
+    }
 
     return {std::move(row_indices), std::move(S_loc_blocks), std::move(OMEGA_blocks)};
   }
