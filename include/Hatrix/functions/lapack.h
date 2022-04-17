@@ -51,7 +51,6 @@ std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error);
 double norm(const Matrix& A);
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T);
-
 void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                            int side, bool trans);
 

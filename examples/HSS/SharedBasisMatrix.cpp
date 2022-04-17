@@ -338,12 +338,11 @@ namespace Hatrix {
 
       OMEGA_blocks.push_back(OMEGA_loc);
 
-      Matrix S_loc(context->nleaf, p);
+      Matrix S_loc(indices.size(), p);
       // Copy the samples into its own matrix
       for (int64_t i = 0; i < indices.size(); ++i) {
         int64_t row = indices[i];
         for (int64_t j = 0; j < p; ++j) {
-
           S_loc(i, j) = samples(row, j);
         }
       }
@@ -374,7 +373,8 @@ namespace Hatrix {
   ConstructID_Random::construct() {
     Matrix dense = generate_p2p_matrix(context->domain, context->kernel);
     Matrix OMEGA = generate_random_matrix(context->N, p);
-    // obtain the transposed samples so that we dont need to transpose for the ID.
+    // TODO: perform this multiplication with a transpose so that it is possible
+    // to perform the interpolation without neeeded to transpose the samples.
     Matrix samples = Hatrix::matmul(dense, OMEGA);
 
     // begin construction procedure using randomized samples.
@@ -396,9 +396,15 @@ namespace Hatrix {
         Matrix interp, pivots;
         int64_t rank;
 
-        std::cout << "interp: " << node << std::endl;
-        std::tie(interp, pivots, rank) = error_interpolate(S_loc_blocks[node],
-                                                           context->accuracy);
+        // TODO: use rvalues with transpose.
+        Matrix sT(transpose(S_loc_blocks[node]));
+        std::tie(interp, pivots, rank) = error_interpolate(sT, context->accuracy);
+        context->U.insert(node, level, transpose(interp));
+        context->V.insert(node, level, transpose(interp));
+
+        OMEGA_blocks[node].print_meta();
+        interp.print_meta();
+        OMEGA_blocks[node] = matmul(interp, OMEGA_blocks[node]);
       }
     }
   }

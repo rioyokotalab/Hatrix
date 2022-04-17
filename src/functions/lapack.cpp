@@ -296,7 +296,7 @@ std::tuple<Matrix, Matrix, int64_t> error_interpolate(Matrix& A, double error) {
     abort();
   }
 
-  Matrix interp(A.rows, rank), pivots(A.cols, 1);
+  Matrix interp(A.cols, rank), pivots(A.cols, 1);
   solve_r_block(interp, pivots, A, rank);
 
   for (int i = 0; i < A.cols; ++i) {
