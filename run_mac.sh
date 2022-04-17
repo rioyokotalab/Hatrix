@@ -10,10 +10,10 @@
 make -j
 
 ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
-               --rank 20 --use-nested-basis 1 --construct_algorithm miro
+               --acc 1e-9 --nested-basis 1 --construct-algorithm id_random
 
-./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
-               --rank 20 --use-nested-basis 1 --construct-algorithm id_random
+# ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
+#                --rank 20 --use-nested-basis 1 --construct-algorithm id_random
 
 
 # ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-4 --rank 20

@@ -370,7 +370,7 @@ namespace Hatrix {
     std::vector<std::vector<int64_t>> row_indices;
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
 
-    for (int64_t level = context->height; level > 0; --level) {
+    for (int64_t level = context->height; level > context->height -1; --level) {
       if (level == context->height) {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
           generate_leaf_blocks(samplesT, OMEGA);
@@ -384,6 +384,8 @@ namespace Hatrix {
       for (int64_t node = 0; node < nblocks; ++node) {
         Matrix interp, pivots;
         int64_t rank;
+
+        std::cout << "interp: " << node << std::endl;
         std::tie(interp, pivots, rank) = error_interpolate(S_loc_blocks[node],
                                                            context->accuracy);
       }
