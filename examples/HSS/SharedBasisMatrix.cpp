@@ -325,13 +325,30 @@ namespace Hatrix {
           OMEGA_loc(i, col) = OMEGA(i, j);
         }
       }
+
+      OMEGA_blocks.push_back(OMEGA_loc);
+
+      Matrix S_loc(p, context->nleaf);
+      // Copy the samples into its own matrix
+      for (int64_t i = 0; i < p; ++i) {
+        for (int64_t j = 0; j < indices.size(); ++j) {
+          int64_t col = indices[j];
+          S_loc(i, j) = samplesT(i, col);
+        }
+      }
+
+      // Remove the dense part from the LR block
+      S_loc -= matmul(context->D(node, node, context->height), OMEGA_loc);
+
+      S_loc_blocks.push_back(S_loc);
     }
 
     return {std::move(row_indices), std::move(S_loc_blocks), std::move(OMEGA_blocks)};
   }
 
   std::tuple<std::vector<std::vector<int64_t>>, std::vector<Matrix>, std::vector<Matrix>>
-  ConstructID_Random::generate_transfer_blocks(const std::vector<std::vector<int64_t>>& child_row_indices,
+  ConstructID_Random::generate_transfer_blocks(const std::vector<std::vector<int64_t>>&
+                                               child_row_indices,
                                                const std::vector<Matrix>& child_S_loc_blocks,
                                                const std::vector<Matrix>& child_OMEGA_blocks,
                                                int level) {
@@ -361,6 +378,14 @@ namespace Hatrix {
       else {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
           generate_transfer_blocks(row_indices, S_loc_blocks, OMEGA_blocks, level);
+      }
+      int64_t nblocks = context->level_blocks[level];
+
+      for (int64_t node = 0; node < nblocks; ++node) {
+        Matrix interp, pivots;
+        int64_t rank;
+        std::tie(interp, pivots, rank) = error_interpolate(S_loc_blocks[node],
+                                                           context->accuracy);
       }
     }
   }
