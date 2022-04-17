@@ -9,8 +9,8 @@
 
 make -j
 
-./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
-               --acc 1e-9 --nested-basis 1 --construct-algorithm id_random
+lldb -o run -- ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
+     --acc 1e-9 --nested-basis 1 --construct-algorithm id_random
 
 # ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
 #                --rank 20 --use-nested-basis 1 --construct-algorithm id_random

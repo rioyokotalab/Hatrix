@@ -19,17 +19,18 @@
 using namespace Hatrix;
 
 const std::vector<std::string> valid_opts = {
-  "--N",
-  "--nleaf",
-  "--kernel-func",
-  "--kind-of-geometry",
-  "--ndim",
-  "--rank",
-  "--acc",
-  "--admis_kind",
-  "--construct-algorithm",
-  "--add-diag",
-  "--nested-basis"
+  "--N",                        // 0
+  "--nleaf",                    // 1
+  "--kernel-func",              // 2
+  "--kind-of-geometry",         // 3
+  "--ndim",                     // 4
+  "--rank",                     // 5
+  "--acc",                      // 6
+  "--admis",                    // 7
+  "--admis_kind",               // 8
+  "--construct-algorithm",      // 9
+  "--add-diag",                 // 10
+  "--nested-basis"              // 11
 };
 
 bool help_option_exists(std::vector<std::string>& cmd_options) {
@@ -109,7 +110,7 @@ int main(int argc, char* argv[]) {
     else if (option == valid_opts[1]) {
       nleaf = std::stol(*(++iter));
     }
-    else if (option == "--kind-of-problem") {
+    else if (option == valid_opts[2]) {
       auto value = *(++iter);
       if (value == "laplace") {
         kernel_func = LAPLACE;
@@ -126,7 +127,7 @@ int main(int argc, char* argv[]) {
         abort();
       }
     }
-    else if (option == "--kind-of-geometry") {
+    else if (option == valid_opts[3]) {
       auto value = *(++iter);
       if (value == "grid") {
         kind_of_geometry = GRID;
@@ -139,19 +140,19 @@ int main(int argc, char* argv[]) {
         abort();
       }
     }
-    else if (option == "--ndim") {
+    else if (option == valid_opts[4]) {
       ndim = std::stol(*(++iter));
     }
-    else if (option == "--rank") {
+    else if (option == valid_opts[5]) {
       rank = std::stol(*(++iter));
     }
-    else if (option == "--acc") {
+    else if (option == valid_opts[6]) {
       acc = std::stod(*(++iter));
     }
-    else if (option == "--admis") {
+    else if (option == valid_opts[7]) {
       admis = std::stod(*(++iter));
     }
-    else if (option == "--admis-kind") {
+    else if (option == valid_opts[8]) {
       auto value = *(++iter);
       if (value == "geometry") {
         admis_kind = GEOMETRY;
@@ -164,7 +165,7 @@ int main(int argc, char* argv[]) {
         abort();
       }
     }
-    else if (option == "--construct-algorithm") {
+    else if (option == valid_opts[9]) {
       auto value = *(++iter);
       std::cout << "algo: " << construct_algorithm << std::endl;
       if (value == "miro") {
@@ -178,10 +179,10 @@ int main(int argc, char* argv[]) {
         abort();
       }
     }
-    else if (option == "--add-diag") {
+    else if (option == valid_opts[10]) {
       add_diag = std::stod(*(++iter));
     }
-    else if (option == "--nested-basis") {
+    else if (option == valid_opts[11]) {
       use_nested_basis = bool(std::stoi(*(++iter)));
     }
   }

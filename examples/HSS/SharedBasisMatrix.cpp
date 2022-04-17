@@ -306,10 +306,20 @@ namespace Hatrix {
     ConstructAlgorithm(context) {}
 
   std::tuple<std::vector<std::vector<int64_t>>, std::vector<Matrix>, std::vector<Matrix>>
-  ConstructID_Random::generate_leaf_blocks(const Matrix& samplesT, const Matrix& OMEGA) {
+  ConstructID_Random::generate_leaf_blocks(const Matrix& samples, const Matrix& OMEGA) {
     std::vector<std::vector<int64_t>> row_indices;
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
     int64_t nblocks = context->level_blocks[context->height];
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (context->is_admissible.exists(i, j, context->height) &&
+            !context->is_admissible(i, j, context->height)) {
+          context->D.insert(i, j, context->height,
+                            generate_p2p_interactions(context->domain, i, j, context->kernel));
+        }
+      }
+    }
 
     for (int64_t node = 0; node < nblocks; ++node) {
       // gather indices for leaf nodes. line 1.
@@ -318,22 +328,23 @@ namespace Hatrix {
       row_indices.push_back(indices);
 
       // obtain a slice of the random matrix. line 2.
-      Matrix OMEGA_loc(p, context->nleaf);
-      for (int64_t i = 0; i < p; ++i) {
-        for (int64_t j = 0; j < indices.size(); ++j) {
-          int64_t col = indices[j];
-          OMEGA_loc(i, col) = OMEGA(i, j);
+      Matrix OMEGA_loc(context->nleaf, p);
+      for (int64_t i = 0; i < indices.size(); ++i) {
+        int64_t row = indices[i];
+        for (int64_t j = 0; j < p; ++j) {
+          OMEGA_loc(i, j) = OMEGA(row, j);
         }
       }
 
       OMEGA_blocks.push_back(OMEGA_loc);
 
-      Matrix S_loc(p, context->nleaf);
+      Matrix S_loc(context->nleaf, p);
       // Copy the samples into its own matrix
-      for (int64_t i = 0; i < p; ++i) {
-        for (int64_t j = 0; j < indices.size(); ++j) {
-          int64_t col = indices[j];
-          S_loc(i, j) = samplesT(i, col);
+      for (int64_t i = 0; i < indices.size(); ++i) {
+        int64_t row = indices[i];
+        for (int64_t j = 0; j < p; ++j) {
+
+          S_loc(i, j) = samples(row, j);
         }
       }
 
@@ -362,9 +373,9 @@ namespace Hatrix {
   void
   ConstructID_Random::construct() {
     Matrix dense = generate_p2p_matrix(context->domain, context->kernel);
-    Matrix OMEGA = generate_random_matrix(p, context->N);
+    Matrix OMEGA = generate_random_matrix(context->N, p);
     // obtain the transposed samples so that we dont need to transpose for the ID.
-    Matrix samplesT = Hatrix::matmul(OMEGA, dense, false, true);
+    Matrix samples = Hatrix::matmul(dense, OMEGA);
 
     // begin construction procedure using randomized samples.
     std::vector<std::vector<int64_t>> row_indices;
@@ -373,7 +384,7 @@ namespace Hatrix {
     for (int64_t level = context->height; level > context->height -1; --level) {
       if (level == context->height) {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
-          generate_leaf_blocks(samplesT, OMEGA);
+          generate_leaf_blocks(samples, OMEGA);
       }
       else {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
