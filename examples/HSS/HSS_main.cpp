@@ -214,8 +214,6 @@ int main(int argc, char* argv[]) {
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
 
-  // std::cout << "construct error= " << A.construction_error() << std::endl;
-
   double construct_error;
   auto start_check = std::chrono::system_clock::now();
   // Matrix x = generate_random_matrix(N, 1);
@@ -232,8 +230,6 @@ int main(int argc, char* argv[]) {
             << domain_time << " - "
             << construct_time << " - "
             << construct_error << std::endl;
-  // std::cout << "matvec norm = "
-  //           <<  << std::endl;
 
   Hatrix::Context::finalize();
   return 0;
