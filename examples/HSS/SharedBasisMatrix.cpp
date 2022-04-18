@@ -366,6 +366,28 @@ namespace Hatrix {
                                                int level) {
     std::vector<std::vector<int64_t>> row_indices;
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
+    int64_t nblocks = context->level_blocks[level];
+
+    for (int64_t node = 0; node < nblocks; ++node) {
+      int64_t c1 = node * 2, c2 = node * 2 + 1;
+
+      // line 5. Combine the indices of the child nodes.
+      std::vector<int64_t> indices;
+      for (int64_t i : child_row_indices[c1]) { indices.push_back(i); }
+      for (int64_t i : child_row_indices[c2]) { indices.push_back(i); }
+      int64_t c1_size = child_row_indices[c1].size();
+      int64_t c2_size = child_row_indices[c2].size();
+
+      // line 6. Concat the random matrices.
+      Matrix OMEGA_loc(c1_size + c2_size, p);
+      auto OMEGA_loc_splits = OMEGA_loc.split(std::vector<int64_t>(1, c1_size), {});
+      OMEGA_loc_splits[0] = child_OMEGA_blocks[c1];
+      OMEGA_loc_splits[1] = child_OMEGA_blocks[c2];
+      OMEGA_blocks.push_back(OMEGA_loc);
+
+      // line 7.Combine samples from the children.
+
+    }
 
     return {std::move(row_indices), std::move(S_loc_blocks), std::move(OMEGA_blocks)};
   }
@@ -383,7 +405,7 @@ namespace Hatrix {
     std::vector<std::vector<int64_t>> row_indices;
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
 
-    for (int64_t level = context->height; level > context->height - 1; --level) {
+    for (int64_t level = context->height; level > 0; --level) {
       if (level == context->height) {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
           generate_leaf_blocks(samples, OMEGA);
