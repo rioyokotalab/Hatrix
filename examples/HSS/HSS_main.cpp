@@ -167,7 +167,6 @@ int main(int argc, char* argv[]) {
     }
     else if (option == valid_opts[9]) {
       auto value = *(++iter);
-      std::cout << "algo: " << construct_algorithm << std::endl;
       if (value == "miro") {
         construct_algorithm = MIRO;
       }
@@ -195,6 +194,7 @@ int main(int argc, char* argv[]) {
     };
   }
 
+  auto start_domain = std::chrono::system_clock::now();
   Domain domain(N, ndim);
   if (kind_of_geometry == GRID) {
     domain.generate_grid_particles();
@@ -203,19 +203,37 @@ int main(int argc, char* argv[]) {
     domain.generate_circular_particles(0, N);
   }
   domain.divide_domain_and_create_particle_boxes(nleaf);
+  auto stop_domain = std::chrono::system_clock::now();
+  double domain_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_domain - start_domain).count();
 
+  auto start_construct = std::chrono::system_clock::now();
   SharedBasisMatrix A(N, nleaf, rank, acc, admis, admis_kind,
                       construct_algorithm, use_nested_basis, domain, kernel);
+  auto stop_construct = std::chrono::system_clock::now();
+  double construct_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_construct - start_construct).count();
 
   // std::cout << "construct error= " << A.construction_error() << std::endl;
+
+  double construct_error;
+  auto start_check = std::chrono::system_clock::now();
   // Matrix x = generate_random_matrix(N, 1);
   // Matrix b = A.matvec(x);
-
   // Matrix Adense = Hatrix::generate_p2p_matrix(domain, kernel);
   // Matrix bdense = matmul(Adense, x);
+  // construct_error = Hatrix::norm(b - bdense) / Hatrix::norm(bdense);
+  auto stop_check = std::chrono::system_clock::now();
+  double check_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_check - start_check).count();
 
+
+  std::cout << N << " - "
+            << domain_time << " - "
+            << construct_time << " - "
+            << construct_error << std::endl;
   // std::cout << "matvec norm = "
-  //           << Hatrix::norm(b - bdense) / Hatrix::norm(bdense) << std::endl;
+  //           <<  << std::endl;
 
   Hatrix::Context::finalize();
   return 0;

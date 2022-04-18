@@ -9,8 +9,17 @@
 
 make -j
 
-./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
-               --acc 1e-8 --nested-basis 1 --construct-algorithm id_random
+# for N in 1024 2048 4096; do
+#     ./bin/HSS_main --N $N --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
+#                    --acc 1e-8 --nested-basis 1 --construct-algorithm miro
+# done
+
+for N in 1024 2048 4096; do
+    ./bin/HSS_main --N $N --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
+                   --acc 1e-8 --nested-basis 1 --construct-algorithm id_random
+done
+
+
 
 # ./bin/HSS_main --N 1024 --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
 #                --rank 20 --use-nested-basis 1 --construct-algorithm id_random
