@@ -324,11 +324,13 @@ namespace Hatrix {
     for (int64_t node = 0; node < nblocks; ++node) {
       // gather indices for leaf nodes. line 1.
       std::vector<int64_t> indices;
-      for (int64_t i = node * nblocks; i < (node + 1) * nblocks; ++i) { indices.push_back(i); }
+      for (int64_t i = node * context->nleaf; i < (node + 1) * context->nleaf; ++i) {
+        indices.push_back(i);
+      }
       row_indices.push_back(indices);
 
       // obtain a slice of the random matrix. line 2.
-      Matrix OMEGA_loc(context->nleaf, p);
+      Matrix OMEGA_loc(indices.size(), p);
       for (int64_t i = 0; i < indices.size(); ++i) {
         int64_t row = indices[i];
         for (int64_t j = 0; j < p; ++j) {
@@ -399,12 +401,12 @@ namespace Hatrix {
         // TODO: use rvalues with transpose.
         Matrix sT(transpose(S_loc_blocks[node]));
         std::tie(interp, pivots, rank) = error_interpolate(sT, context->accuracy);
-        context->U.insert(node, level, transpose(interp));
-        context->V.insert(node, level, transpose(interp));
+        // TODO: avoid storing both the U and V.
+        Matrix Vinterp(interp);
+        context->U.insert(node, level, std::move(interp));
+        context->V.insert(node, level, std::move(Vinterp));
 
-        OMEGA_blocks[node].print_meta();
-        interp.print_meta();
-        OMEGA_blocks[node] = matmul(interp, OMEGA_blocks[node]);
+        OMEGA_blocks[node] = matmul(interp, OMEGA_blocks[node], true, false);
       }
     }
   }
