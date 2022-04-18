@@ -109,13 +109,13 @@ double* Matrix::operator&() { return data_ptr; }
 const double* Matrix::operator&() const { return data_ptr; }
 
 double& Matrix::operator()(int64_t i, int64_t j) {
-  assert(i < rows);
-  assert(j < cols);
+  assert(i < rows && i >= 0);
+  assert(j < cols && j >= 0);
   return data_ptr[j * stride + i];
 }
 const double& Matrix::operator()(int64_t i, int64_t j) const {
-  assert(i < rows);
-  assert(j < cols);
+  assert(i < rows && i >= 0);
+  assert(j < cols && j >= 0);
   return data_ptr[j * stride + i];
 }
 

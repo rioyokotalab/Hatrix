@@ -324,7 +324,7 @@ namespace Hatrix {
     for (int64_t node = 0; node < nblocks; ++node) {
       // gather indices for leaf nodes. line 1.
       std::vector<int64_t> indices;
-      for (int64_t i = node * context->nleaf; i < (node + 1) * context->nleaf; ++i) {
+      for (int64_t i = 0; i < context->nleaf; ++i) {
         indices.push_back(i);
       }
       row_indices.push_back(indices);
@@ -332,7 +332,7 @@ namespace Hatrix {
       // obtain a slice of the random matrix. line 2.
       Matrix OMEGA_loc(indices.size(), p);
       for (int64_t i = 0; i < indices.size(); ++i) {
-        int64_t row = indices[i];
+        int64_t row = i + node * context->nleaf;
         for (int64_t j = 0; j < p; ++j) {
           OMEGA_loc(i, j) = OMEGA(row, j);
         }
@@ -343,7 +343,7 @@ namespace Hatrix {
       Matrix S_loc(indices.size(), p);
       // Copy the samples into its own matrix
       for (int64_t i = 0; i < indices.size(); ++i) {
-        int64_t row = indices[i];
+        int64_t row = i + node * context->nleaf;
         for (int64_t j = 0; j < p; ++j) {
           S_loc(i, j) = samples(row, j);
         }
@@ -406,7 +406,17 @@ namespace Hatrix {
         context->U.insert(node, level, std::move(interp));
         context->V.insert(node, level, std::move(Vinterp));
 
+        // apply the interpolation matrix on the previous random vectors
         OMEGA_blocks[node] = matmul(interp, OMEGA_blocks[node], true, false);
+
+        // choose the rows of the samples that correspond to the interpolation.
+        Matrix S_loc(rank, p);
+        for (int64_t i = 0; i < rank; ++i) {
+          int64_t row = row_indices[node][i];
+          for (int64_t j = 0; j < p; ++j) {
+            S_loc(i, j) = S_loc_blocks[node](row, j);
+          }
+        }
       }
     }
   }
