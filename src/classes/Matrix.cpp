@@ -269,19 +269,19 @@ size_t Matrix::shared_memory_used() const {
   return data->size() * sizeof(double);
 }
 
-  Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
-    Matrix out(nblocks, nblocks);
+Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
+  Matrix out(nblocks, nblocks);
 
-    auto this_splits = (*this).split(nblocks, nblocks);
-    for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j < nblocks; ++j) {
-        Matrix Utemp, Stemp, Vtemp;
-        std::tie(Utemp, Stemp, Vtemp) = Hatrix::error_svd(this_splits[i * nblocks + j], accuracy);
-        out(i, j) = Stemp.rows;
-      }
+  auto this_splits = (*this).split(nblocks, nblocks);
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      Matrix Utemp, Stemp, Vtemp;
+      std::tie(Utemp, Stemp, Vtemp) = Hatrix::error_svd(this_splits[i * nblocks + j], accuracy);
+      out(i, j) = Stemp.rows;
     }
-
-    return out;
   }
+
+  return out;
+}
 
 }  // namespace Hatrix

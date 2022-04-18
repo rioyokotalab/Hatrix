@@ -417,6 +417,14 @@ namespace Hatrix {
             S_loc(i, j) = S_loc_blocks[node](row, j);
           }
         }
+        S_loc_blocks[node] = std::move(S_loc);
+
+        // keep the rows that span the row of this index set
+        std::vector<int64_t> indices;
+        for (int64_t i = 0; i < rank; ++i) {
+          indices.push_back(row_indices[node][pivots(i, 0)-1]);
+        }
+        row_indices[node] = std::move(indices);
       }
     }
   }
