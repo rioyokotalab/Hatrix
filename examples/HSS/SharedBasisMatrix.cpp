@@ -137,10 +137,6 @@ namespace Hatrix {
         context->U.insert(node, level, std::move(interp));
         context->V.insert(node, level, std::move(Vinterp));
 
-        Matrix pivot_rank(rank, 1);
-        for (int64_t i = 0; i < rank; ++i) { pivot_rank(i, 0) = pivots(i, 0); }
-        pivot_store[node] = std::move(pivot_rank);
-
         // apply the interpolation matrix on the previous random vectors
         OMEGA_blocks[node] = matmul(interp, OMEGA_blocks[node], true, false);
 
@@ -163,14 +159,24 @@ namespace Hatrix {
         row_indices[node] = std::move(indices);
       }
 
-      for (int64_t i = 0; i < nblocks; ++i) {
-        Matrix pivot_actual_row(pivot_store[i].rows, 1);
-        for (int64_t j = 0; j < nblocks; ++j) {
-          Matrix pivot_actual_col(pivot_store[j].rows, 1);
+      // generate S blocks for the lower triangular region only since this
+      // is a symmetric matrix.
+      for (int64_t brow = 0; brow < nblocks; ++brow) {
+        for (int64_t bcol = 0; bcol < brow; ++bcol) {
+          if (context->is_admissible.exists(brow, bcol, level) &&
+              context->is_admissible(brow, bcol, level)) {
+            int64_t row_size = row_indices[brow].size();
+            int64_t col_size = row_indices[bcol].size();
 
-          if (context->is_admissible.exists(i, j, level) &&
-              context->is_admissible(i, j, level)) {
+            Matrix Stemp(row_size, col_size);
+            for (int64_t i = 0; i < row_size; ++i) {
+              for (int64_t j = 0; j < col_size; ++j) {
+                Stemp(i, j) = context->kernel(context->domain.particles[brow].coords,
+                                               context->domain.particles[bcol].coords);
+              }
+            }
 
+            context->S.insert(brow, bcol, level, std::move(Stemp));
           }
         }
       }

@@ -15,8 +15,8 @@ make -j
 # done
 
 for N in 1024; do
-    lldb -o run -- ./bin/HSS_main --N $N --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
-         --acc 1e-8 --nested-basis 1 --construct-algorithm id_random
+    ./bin/HSS_main --N $N --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
+                   --acc 1e-8 --nested-basis 1 --construct-algorithm id_random
 done
 
 
