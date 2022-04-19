@@ -216,11 +216,11 @@ int main(int argc, char* argv[]) {
 
   double construct_error;
   auto start_check = std::chrono::system_clock::now();
-  // Matrix x = generate_random_matrix(N, 1);
-  // Matrix b = A.matvec(x);
-  // Matrix Adense = Hatrix::generate_p2p_matrix(domain, kernel);
-  // Matrix bdense = matmul(Adense, x);
-  // construct_error = Hatrix::norm(b - bdense) / Hatrix::norm(bdense);
+  Matrix x = generate_random_matrix(N, 1);
+  Matrix b = A.matvec(x);
+  Matrix Adense = Hatrix::generate_p2p_matrix(domain, kernel);
+  Matrix bdense = matmul(Adense, x);
+  construct_error = Hatrix::norm(b - bdense) / Hatrix::norm(bdense);
   auto stop_check = std::chrono::system_clock::now();
   double check_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_check - start_check).count();

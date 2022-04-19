@@ -75,6 +75,7 @@ namespace Hatrix {
     std::vector<std::vector<int64_t>> row_indices;
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
     int64_t nblocks = context->level_blocks[level];
+    int64_t child_level = level + 1;
 
     for (int64_t node = 0; node < nblocks; ++node) {
       int64_t c1 = node * 2, c2 = node * 2 + 1;
@@ -83,6 +84,8 @@ namespace Hatrix {
       std::vector<int64_t> indices;
       for (int64_t i : child_row_indices[c1]) { indices.push_back(i); }
       for (int64_t i : child_row_indices[c2]) { indices.push_back(i); }
+      row_indices.push_back(indices);
+
       int64_t c1_size = child_row_indices[c1].size();
       int64_t c2_size = child_row_indices[c2].size();
 
@@ -98,8 +101,9 @@ namespace Hatrix {
       Matrix Sloc(c1_size + c2_size, p);
       auto Sloc_splits = Sloc.split(std::vector<int64_t>(1, c1_size), {});
 
-      Sv1 -= matmul(context->S(c1, c2, level), child_OMEGA_blocks[c2]);
-      Sv2 -= matmul(context->S(c2, c1, level), child_OMEGA_blocks[c1]);
+      Sv2 -= matmul(context->S(c2, c1, child_level), child_OMEGA_blocks[c1]);
+      Sv1 -= matmul(context->S(c2, c1, child_level), child_OMEGA_blocks[c2], true, false);
+
       Sloc_splits[0] = Sv1;
       Sloc_splits[1] = Sv2;
 
@@ -119,7 +123,7 @@ namespace Hatrix {
     Matrix samples = Hatrix::matmul(dense, OMEGA);
 
     // begin construction procedure using randomized samples.
-    std::vector<std::vector<int64_t>> row_indices;
+    std::vector<std::vector<int64_t>> row_indices(context->level_blocks[context->height]);
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
     std::vector<Matrix> pivot_store(context->level_blocks[context->height]);
 
@@ -391,8 +395,8 @@ namespace Hatrix {
     std::vector<Matrix> b_hat;
 
     // Multiply the S blocks at the top-most level with the corresponding xhat.
-    Matrix b1_1 = matmul(S(0, 1, level), x_hat[x_hat_offset+1]);
     Matrix b1_2 = matmul(S(1, 0, level), x_hat[x_hat_offset]);
+    Matrix b1_1 = matmul(S(1, 0, level), x_hat[x_hat_offset+1], true, false);
     b_hat.push_back(b1_1);
     b_hat.push_back(b1_2);
     int b_hat_offset = 0;
@@ -407,10 +411,12 @@ namespace Hatrix {
 
         Matrix Ub = matmul(U(row, level),
                            b_hat[b_hat_offset + row]);
-        auto Ub_splits = Ub.split(2, 1);
+        auto Ub_splits = Ub.split(std::vector<int64_t>(1, U(c_r1, child_level).cols),
+                                  {});
 
-        Matrix b_r1_cl = matmul(S(c_r1, c_r2, child_level),
-                                x_hat[x_hat_offset + c_r2]);
+        Matrix b_r1_cl = matmul(S(c_r2, c_r1, child_level),
+                                x_hat[x_hat_offset + c_r2],
+                                true, false);
         b_hat.push_back(b_r1_cl + Ub_splits[0]);
 
         Matrix b_r2_cl = matmul(S(c_r2, c_r1, child_level),
