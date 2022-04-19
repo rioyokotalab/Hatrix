@@ -112,8 +112,9 @@ namespace Hatrix {
     // begin construction procedure using randomized samples.
     std::vector<std::vector<int64_t>> row_indices;
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
+    std::vector<Matrix> pivot_store(context->level_blocks[context->height]);
 
-    for (int64_t level = context->height; level > 0; --level) {
+    for (int64_t level = context->height; level > context->height - 1; --level) {
       if (level == context->height) {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
           generate_leaf_blocks(samples, OMEGA);
@@ -136,6 +137,10 @@ namespace Hatrix {
         context->U.insert(node, level, std::move(interp));
         context->V.insert(node, level, std::move(Vinterp));
 
+        Matrix pivot_rank(rank, 1);
+        for (int64_t i = 0; i < rank; ++i) { pivot_rank(i, 0) = pivots(i, 0); }
+        pivot_store[node] = std::move(pivot_rank);
+
         // apply the interpolation matrix on the previous random vectors
         OMEGA_blocks[node] = matmul(interp, OMEGA_blocks[node], true, false);
 
@@ -155,6 +160,15 @@ namespace Hatrix {
           indices.push_back(row_indices[node][pivots(i, 0)-1]);
         }
         row_indices[node] = std::move(indices);
+      }
+
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if (context->is_admissible.exists(i, j, level) &&
+              context->is_admissible(i, j, level)) {
+
+          }
+        }
       }
     }
   }
