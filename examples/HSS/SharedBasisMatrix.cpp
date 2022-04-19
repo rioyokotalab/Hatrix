@@ -79,7 +79,7 @@ namespace Hatrix {
     for (int64_t node = 0; node < nblocks; ++node) {
       int64_t c1 = node * 2, c2 = node * 2 + 1;
 
-      // line 5. Combine the indices of the child nodes.
+      // line 5. Store absolute row indices from the child nodes.
       std::vector<int64_t> indices;
       for (int64_t i : child_row_indices[c1]) { indices.push_back(i); }
       for (int64_t i : child_row_indices[c2]) { indices.push_back(i); }
@@ -94,7 +94,16 @@ namespace Hatrix {
       OMEGA_blocks.push_back(OMEGA_loc);
 
       // line 7.Combine samples from the children.
+      Matrix Sv1(child_S_loc_blocks[c1]), Sv2(child_S_loc_blocks[c2]);
+      Matrix Sloc(c1_size + c2_size, p);
+      auto Sloc_splits = Sloc.split(std::vector<int64_t>(1, c1_size), {});
 
+      Sv1 -= matmul(context->S(c1, c2, level), child_OMEGA_blocks[c2]);
+      Sv2 -= matmul(context->S(c2, c1, level), child_OMEGA_blocks[c1]);
+      Sloc_splits[0] = Sv1;
+      Sloc_splits[1] = Sv2;
+
+      S_loc_blocks.push_back(Sloc);
     }
 
     return {std::move(row_indices), std::move(S_loc_blocks), std::move(OMEGA_blocks)};
@@ -114,7 +123,7 @@ namespace Hatrix {
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
     std::vector<Matrix> pivot_store(context->level_blocks[context->height]);
 
-    for (int64_t level = context->height; level > context->height - 1; --level) {
+    for (int64_t level = context->height; level > 0; --level) {
       if (level == context->height) {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
           generate_leaf_blocks(samples, OMEGA);
@@ -172,7 +181,7 @@ namespace Hatrix {
             for (int64_t i = 0; i < row_size; ++i) {
               for (int64_t j = 0; j < col_size; ++j) {
                 Stemp(i, j) = context->kernel(context->domain.particles[brow].coords,
-                                               context->domain.particles[bcol].coords);
+                                              context->domain.particles[bcol].coords);
               }
             }
 
