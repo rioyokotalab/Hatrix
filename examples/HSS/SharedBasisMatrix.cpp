@@ -32,7 +32,7 @@ namespace Hatrix {
     for (int64_t node = 0; node < nblocks; ++node) {
       // gather indices for leaf nodes. line 1.
       std::vector<int64_t> indices;
-      for (int64_t i = 0; i < context->nleaf; ++i) {
+      for (int64_t i = node * context->nleaf; i < (node + 1) * context->nleaf; ++i) {
         indices.push_back(i);
       }
       row_indices.push_back(indices);
@@ -40,7 +40,7 @@ namespace Hatrix {
       // obtain a slice of the random matrix. line 2.
       Matrix OMEGA_loc(indices.size(), p);
       for (int64_t i = 0; i < indices.size(); ++i) {
-        int64_t row = i + node * context->nleaf;
+        int64_t row = row_indices[node][i];
         for (int64_t j = 0; j < p; ++j) {
           OMEGA_loc(i, j) = OMEGA(row, j);
         }
@@ -51,7 +51,7 @@ namespace Hatrix {
       Matrix S_loc(indices.size(), p);
       // Copy the samples into its own matrix
       for (int64_t i = 0; i < indices.size(); ++i) {
-        int64_t row = i + node * context->nleaf;
+        int64_t row = row_indices[node][i];
         for (int64_t j = 0; j < p; ++j) {
           S_loc(i, j) = samples(row, j);
         }
@@ -147,14 +147,15 @@ namespace Hatrix {
         // choose the rows of the samples that correspond to the interpolation.
         Matrix S_loc(rank, p);
         for (int64_t i = 0; i < rank; ++i) {
-          int64_t row = row_indices[node][i];
+          int64_t row = pivots(i, 0)-1;
           for (int64_t j = 0; j < p; ++j) {
             S_loc(i, j) = S_loc_blocks[node](row, j);
           }
         }
         S_loc_blocks[node] = std::move(S_loc);
 
-        // keep the rows that span the row of this index set
+        // keep the absolute indicies of the rows that span the row of
+        // this index set.
         std::vector<int64_t> indices;
         for (int64_t i = 0; i < rank; ++i) {
           indices.push_back(row_indices[node][pivots(i, 0)-1]);
@@ -163,7 +164,10 @@ namespace Hatrix {
       }
 
       for (int64_t i = 0; i < nblocks; ++i) {
+        Matrix pivot_actual_row(pivot_store[i].rows, 1);
         for (int64_t j = 0; j < nblocks; ++j) {
+          Matrix pivot_actual_col(pivot_store[j].rows, 1);
+
           if (context->is_admissible.exists(i, j, level) &&
               context->is_admissible(i, j, level)) {
 
