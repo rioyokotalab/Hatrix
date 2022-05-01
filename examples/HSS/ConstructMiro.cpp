@@ -97,19 +97,32 @@ namespace Hatrix {
       }
     }
 
-    // Generate U leaf blocks
-    for (int64_t i = 0; i < nblocks; ++i) {
-      Matrix Utemp, Stemp;
-      std::tie(Utemp, Stemp) =
-        generate_column_bases(i, domain.boxes[i].num_particles, context->height);
-      context->U.insert(i, context->height, std::move(Utemp));
-    }
+    if (context->is_symmetric) {
+      // Generate U leaf blocks
+      for (int64_t i = 0; i < nblocks; ++i) {
+        Matrix Utemp, Stemp;
+        std::tie(Utemp, Stemp) =
+          generate_column_bases(i, domain.boxes[i].num_particles, context->height);
+        Matrix Vtemp(Utemp);
 
-    // Generate V leaf blocks
-    for (int64_t j = 0; j < nblocks; ++j) {
-      Matrix Stemp, Vtemp;
-      std::tie(Stemp, Vtemp) = generate_row_bases(j, domain.boxes[j].num_particles, context->height);
-      context->V.insert(j, context->height, std::move(Vtemp));
+        context->U.insert(i, context->height, std::move(Utemp));
+        context->V.insert(i, context->height, std::move(Vtemp));
+      }
+    }
+    else {
+      for (int64_t i = 0; i < nblocks; ++i) {
+        Matrix Utemp, Stemp;
+        std::tie(Utemp, Stemp) =
+          generate_column_bases(i, domain.boxes[i].num_particles, context->height);
+        context->U.insert(i, context->height, std::move(Utemp));
+      }
+      // Generate V leaf blocks
+      for (int64_t j = 0; j < nblocks; ++j) {
+        Matrix Stemp, Vtemp;
+        std::tie(Stemp, Vtemp) =
+          generate_row_bases(j, domain.boxes[j].num_particles, context->height);
+        context->V.insert(j, context->height, std::move(Vtemp));
+      }
     }
 
     // Generate S coupling matrices
