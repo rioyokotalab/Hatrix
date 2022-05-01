@@ -108,6 +108,22 @@ namespace Hatrix {
         context->U.insert(i, context->height, std::move(Utemp));
         context->V.insert(i, context->height, std::move(Vtemp));
       }
+
+      // Generate S coupling matrices
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < i; ++j) {
+          if (context->is_admissible.exists(i, j, context->height) &&
+              context->is_admissible(i, j, context->height)) {
+            Matrix dense = generate_p2p_interactions(context->domain, i, j, context->kernel);
+            Matrix Sblock = matmul(matmul(context->U(i, context->height), dense, true, false),
+                                   context->V(j, context->height));
+            Matrix SblockT(transpose(Sblock));
+
+            context->S.insert(i, j, context->height, std::move(Sblock));
+            context->S.insert(j, i, context->height, std::move(SblockT));
+          }
+        }
+      }
     }
     else {
       for (int64_t i = 0; i < nblocks; ++i) {
@@ -123,18 +139,18 @@ namespace Hatrix {
           generate_row_bases(j, domain.boxes[j].num_particles, context->height);
         context->V.insert(j, context->height, std::move(Vtemp));
       }
-    }
 
-    // Generate S coupling matrices
-    for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j < nblocks; ++j) {
-        if (context->is_admissible.exists(i, j, context->height) &&
-            context->is_admissible(i, j, context->height)) {
-          Matrix dense = generate_p2p_interactions(context->domain, i, j, context->kernel);
+      // Generate S coupling matrices
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if (context->is_admissible.exists(i, j, context->height) &&
+              context->is_admissible(i, j, context->height)) {
+            Matrix dense = generate_p2p_interactions(context->domain, i, j, context->kernel);
 
-          context->S.insert(i, j, context->height,
-                            matmul(matmul(context->U(i, context->height), dense, true, false),
-                                   context->V(j, context->height)));
+            context->S.insert(i, j, context->height,
+                              matmul(matmul(context->U(i, context->height), dense, true, false),
+                                     context->V(j, context->height)));
+          }
         }
       }
     }
