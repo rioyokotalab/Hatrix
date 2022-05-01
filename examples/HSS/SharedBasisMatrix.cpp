@@ -395,8 +395,8 @@ namespace Hatrix {
     std::vector<Matrix> b_hat;
 
     // Multiply the S blocks at the top-most level with the corresponding xhat.
-    Matrix b1_2 = matmul(S(1, 0, level), x_hat[x_hat_offset]);
-    Matrix b1_1 = matmul(S(1, 0, level), x_hat[x_hat_offset+1], true, false);
+    Matrix b1_2 = matmul(S(1, 0, level), x_hat[x_hat_offset], true, false);
+    Matrix b1_1 = matmul(S(1, 0, level), x_hat[x_hat_offset]);
     b_hat.push_back(b1_1);
     b_hat.push_back(b1_2);
     int b_hat_offset = 0;
