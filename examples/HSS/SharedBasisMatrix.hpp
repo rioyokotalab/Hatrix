@@ -22,6 +22,7 @@ namespace Hatrix {
     bool use_shared_basis;
     const Domain domain;
     const kernel_function kernel;
+    const bool is_symmetric;
 
     int64_t height;
     ColLevelMap U;
@@ -34,7 +35,8 @@ namespace Hatrix {
     SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank, double accuracy,
                       double admis, ADMIS_KIND admis_kind,
                       CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
-                      const Domain& domain, const kernel_function& kernel);
+                      const Domain& domain, const kernel_function& kernel,
+                      const bool is_symmetric);
 
     // Obtain construction error w.r.t dense matrix with matvec.
     double construction_error();

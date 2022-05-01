@@ -86,7 +86,6 @@ namespace Hatrix {
   void
   ConstructMiro::generate_leaf_nodes(const Domain& domain) {
     int64_t nblocks = context->level_blocks[context->height];
-    std::vector<Hatrix::Matrix> Y;
 
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
@@ -96,11 +95,6 @@ namespace Hatrix {
                             generate_p2p_interactions(context->domain, i, j, context->kernel));
         }
       }
-    }
-
-    for (int64_t i = 0; i < nblocks; ++i) {
-      Y.push_back(generate_random_matrix(domain.boxes[i].num_particles,
-                                         context->rank + oversampling));
     }
 
     // Generate U leaf blocks
@@ -202,16 +196,10 @@ namespace Hatrix {
                                             ColLevelMap& Vchild) {
     int64_t nblocks = context->level_blocks[level];
 
-    std::vector<Matrix> Y;
     // Generate the actual bases for the upper level and pass it to this
     // function again for generating transfer matrices at successive levels.
     RowLevelMap Ubig_parent;
     ColLevelMap Vbig_parent;
-
-    for (int64_t i = 0; i < nblocks; ++i) {
-      int64_t block_size = context->get_block_size(i, level);
-      Y.push_back(generate_random_matrix(block_size, context->rank + oversampling));
-    }
 
     for (int64_t node = 0; node < nblocks; ++node) {
       int64_t child1 = node * 2;

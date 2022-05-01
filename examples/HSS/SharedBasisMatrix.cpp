@@ -446,10 +446,12 @@ namespace Hatrix {
                                        CONSTRUCT_ALGORITHM construct_algorithm,
                                        bool use_shared_basis,
                                        const Domain& domain,
-                                       const kernel_function& kernel) :
+                                       const kernel_function& kernel,
+                                       const bool is_symmetrix) :
     N(N), nleaf(nleaf), rank(rank), accuracy(accuracy), admis(admis),
     admis_kind(admis_kind), construct_algorithm(construct_algorithm),
-    use_shared_basis(use_shared_basis), domain(domain), kernel(kernel)
+    use_shared_basis(use_shared_basis), domain(domain), kernel(kernel),
+    is_symmetric(is_symmetric)
   {
     if (use_shared_basis) {
       height = int64_t(log2(N / nleaf));

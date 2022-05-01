@@ -174,7 +174,8 @@ int main(int argc, char* argv[]) {
         construct_algorithm = ID_RANDOM;
       }
       else {
-        std::cout << "wrong value for --construct-algorithm " << value << std::endl;
+        std::cout << "wrong value for --construct-algorithm "
+                  << value << std::endl;
         abort();
       }
     }
@@ -194,6 +195,11 @@ int main(int argc, char* argv[]) {
     };
   }
 
+  bool is_symmetric = false;
+  if (kernel_func == LAPLACE) {
+    is_symmetric = true;
+  }
+
   auto start_domain = std::chrono::system_clock::now();
   Domain domain(N, ndim);
   if (kind_of_geometry == GRID) {
@@ -209,7 +215,8 @@ int main(int argc, char* argv[]) {
 
   auto start_construct = std::chrono::system_clock::now();
   SharedBasisMatrix A(N, nleaf, rank, acc, admis, admis_kind,
-                      construct_algorithm, use_nested_basis, domain, kernel);
+                      construct_algorithm, use_nested_basis,
+                      domain, kernel, is_symmetric);
   auto stop_construct = std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
