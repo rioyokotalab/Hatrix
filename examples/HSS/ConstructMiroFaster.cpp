@@ -92,8 +92,16 @@ namespace Hatrix {
     }
   }
 
+  void ConstructMiroFaster::generate_transfer_matrices(int64_t level) {
+
+  }
+
   void
   ConstructMiroFaster::construct() {
     generate_leaf_nodes(context->domain);
+
+    for (int64_t level = context->height-1; level > 0; --level) {
+      generate_transfer_matrices(level);
+    }
   }
 }

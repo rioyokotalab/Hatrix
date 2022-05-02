@@ -15,6 +15,7 @@ namespace Hatrix {
                                                      int64_t level);
     Matrix generate_column_block(int64_t block, int64_t block_size,
                                  int64_t level);
+    void generate_transfer_matrices(int64_t level);
   public:
     ConstructMiroFaster(SharedBasisMatrix* context);
     void construct();
