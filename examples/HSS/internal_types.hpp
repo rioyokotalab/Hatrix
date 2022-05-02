@@ -8,7 +8,7 @@ namespace Hatrix {
   enum KERNEL_FUNC {LAPLACE, SQR_EXP, SINE};
   enum KIND_OF_GEOMETRY {GRID, CIRCULAR};
   enum ADMIS_KIND {DIAGONAL, GEOMETRY};
-  enum CONSTRUCT_ALGORITHM {MIRO, ID_RANDOM};
+  enum CONSTRUCT_ALGORITHM {MIRO, MIRO_FASTER, ID_RANDOM};
 
   using kernel_function =
     std::function<double(const std::vector<double>& coords_row,

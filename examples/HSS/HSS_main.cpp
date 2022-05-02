@@ -80,6 +80,7 @@ int main(int argc, char* argv[]) {
               << "    diagonal :: Admissibility condition based on the distance from the diagonal."
               << " --construct-algorithm :: Specify the kind of construction algorithm." << std::endl
               << "    miro       -- From the miro board. Use SVD everywhere." << std::endl
+              << "    miro_fast  -- Imporovised miro board with SVD." << std::endl
               << "    id_random  -- From Martinsson2010. Use ID + randomized sampling."
               << " --add-diag :: Specify the value to add to the diagonal."
               << " --nested-basis :: Specify whether this matrix uses shared basis. 0 or 1."
@@ -169,6 +170,9 @@ int main(int argc, char* argv[]) {
       auto value = *(++iter);
       if (value == "miro") {
         construct_algorithm = MIRO;
+      }
+      else if (value == "miro_fast") {
+        construct_algorithm = MIRO_FASTER;
       }
       else if (value == "id_random") {
         construct_algorithm = ID_RANDOM;

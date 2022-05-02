@@ -5,6 +5,7 @@
 #include "Domain.hpp"
 #include "SharedBasisMatrix.hpp"
 #include "ConstructMiro.hpp"
+#include "ConstructMiroFaster.hpp"
 #include "ConstructID_Random.hpp"
 #include "functions.hpp"
 
@@ -291,6 +292,9 @@ namespace Hatrix {
     }
     else if (construct_algorithm == ID_RANDOM) {
       construct_algo = new ConstructID_Random(this);
+    }
+    else if (construct_algorithm == MIRO_FASTER) {
+      construct_algo = new ConstructMiroFaster(this);
     }
 
     construct_algo->construct();
