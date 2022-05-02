@@ -25,8 +25,8 @@ namespace Hatrix {
     const bool is_symmetric;
 
     int64_t height;
-    ColLevelMap U;
-    RowLevelMap V;
+    ColLevelMap U, Srow;
+    RowLevelMap V, Scol;
     RowColLevelMap<Matrix> D, S;
     RowColLevelMap<bool> is_admissible;
     std::vector<int64_t> level_blocks;

@@ -107,6 +107,10 @@ namespace Hatrix {
 
         context->U.insert(i, context->height, std::move(Utemp));
         context->V.insert(i, context->height, std::move(Vtemp));
+
+        Matrix Stempcol(Stemp);
+        context->Srow.insert(i, context->height, std::move(Stemp));
+        context->Scol.insert(i, context->height, std::move(Stempcol));
       }
 
       // Generate S coupling matrices

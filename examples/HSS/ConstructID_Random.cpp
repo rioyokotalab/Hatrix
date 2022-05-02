@@ -5,6 +5,7 @@
 #include "Domain.hpp"
 #include "SharedBasisMatrix.hpp"
 #include "ConstructMiro.hpp"
+#include "ConstructID_Random.hpp"
 #include "functions.hpp"
 
 namespace Hatrix {
