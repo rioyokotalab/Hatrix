@@ -93,7 +93,55 @@ namespace Hatrix {
   }
 
   void ConstructMiroFaster::generate_transfer_matrices(int64_t level) {
+    int64_t nblocks = context->level_blocks[level];
+    int64_t child_level = level + 1;
 
+    for (int64_t node = 0; node < nblocks; ++node) {
+      int64_t child1 = node * 2;
+      int64_t child2 = node * 2 + 1;
+
+      const Matrix& Uc1 = context->U(child1, child_level);
+      const Matrix& Uc2 = context->U(child2, child_level);
+
+      Matrix temp(Uc1.cols + Uc2.cols, context->rank);
+      auto temp_splits = temp.split(std::vector<int64_t>(1, Uc1.cols),
+                                    {});
+
+      matmul(Uc1, matmul(Uc1, context->Srow(child1, child_level)),
+             temp_splits[0], true, false);
+
+      matmul(Uc2, matmul(Uc2, context->Srow(child2, child_level)),
+             temp_splits[1], true, false);
+
+      Matrix Utemp, Stemp, Vtemp; double error;
+      std::tie(Utemp, Stemp, Vtemp, error) = truncated_svd(temp, context->rank);
+
+      Matrix Utemp_c(Utemp), Stemp_c(transpose(Stemp));
+
+      context->U.insert(node, level, std::move(Utemp));
+      context->Srow.insert(node, level, std::move(Stemp));
+
+      context->V.insert(node, level, std::move(Utemp_c));
+      context->Scol.insert(node, level, std::move(Stemp_c));
+    }
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < i; ++j) {
+        if (context->is_admissible.exists(i, j, level) &&
+            context->is_admissible(i, j, level)) {
+          Matrix dense = generate_p2p_interactions(context->domain, i, j, level,
+                                                   context->height, context->kernel);
+          Matrix Ub_c1 = context->get_Ubig(i, level);
+          Matrix Vb_c2 = context->get_Vbig(j, level);
+
+          Matrix S1 = matmul(matmul(Ub_c1, dense, true, false), Vb_c2);
+          Matrix S1T(transpose(S1));
+
+          context->S.insert(i, j, level, std::move(S1));
+          context->S.insert(j, i, level, std::move(S1T));
+        }
+      }
+    }
   }
 
   void

@@ -295,9 +295,6 @@ namespace Hatrix {
       for (int64_t col = 0; col < nblocks; ++col) {
         if (context->is_admissible.exists(row, col, level) &&
             context->is_admissible(row, col, level)) {
-          int64_t row_block_size = context->get_block_size(row, level);
-          int64_t col_block_size = context->get_block_size(col, level);
-
           Matrix dense = generate_p2p_interactions(context->domain, row, col, level,
                                                    context->height, context->kernel);
 
