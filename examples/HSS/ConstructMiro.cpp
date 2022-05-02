@@ -251,8 +251,8 @@ namespace Hatrix {
                                                                 block_size,
                                                                 level);
 
-
         context->U.insert(node, level, std::move(Utransfer));
+        context->Srow.insert(node, level, std::move(Stemp));
 
         // Generate the full bases to pass onto the parent.
         auto Utransfer_splits = context->U(node, level).split(2, 1);
@@ -277,6 +277,7 @@ namespace Hatrix {
                                                                 block_size,
                                                                 level);
         context->V.insert(node, level, std::move(Vtransfer));
+        context->Scol.insert(node, level, std::move(Stemp));
 
         // Generate the full bases for passing onto the upper level.
         std::vector<Matrix> Vtransfer_splits = context->V(node, level).split(2, 1);
