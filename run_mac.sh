@@ -14,7 +14,7 @@ make -j
 #                    --acc 1e-8 --nested-basis 1 --construct-algorithm miro
 # done
 
-for N in 512; do
+for N in 1024; do
     ./bin/HSS_main --N $N --nleaf 64 --kernel-func laplace --add-diag 1e-6 \
                    --rank 30 --nested-basis 1 --construct-algorithm miro_fast \
                    --kind-of-geometry circular

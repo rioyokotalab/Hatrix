@@ -8,9 +8,10 @@
 #include "functions.hpp"
 
 namespace Hatrix {
-  ConstructMiroFaster::ConstructMiroFaster(SharedBasisMatrix* context) : ConstructAlgorithm(context) {}
+  ConstructMiroFaster::ConstructMiroFaster(SharedBasisMatrix* context) :
+    ConstructAlgorithm(context) {}
 
-    Matrix
+  Matrix
   ConstructMiroFaster::generate_column_block(int64_t block, int64_t block_size,
                                        int64_t level) {
     int ncols = 0;
