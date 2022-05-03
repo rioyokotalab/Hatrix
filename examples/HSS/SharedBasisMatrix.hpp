@@ -20,7 +20,7 @@ namespace Hatrix {
     bool use_shared_basis;
     const Domain domain;
     const kernel_function kernel;
-    const bool is_symmetric;
+    bool is_symmetric = true;
 
     int64_t height;
     ColLevelMap U, Srow;
@@ -36,7 +36,7 @@ namespace Hatrix {
                       double admis, ADMIS_KIND admis_kind,
                       CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
                       const Domain& domain, const kernel_function& kernel,
-                      const bool is_symmetric);
+                      bool is_symmetric);
 
     Matrix get_Ubig(int64_t node, int64_t level);
     Matrix get_Vbig(int64_t node, int64_t level);

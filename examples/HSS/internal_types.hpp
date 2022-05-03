@@ -2,6 +2,8 @@
 
 #include "Hatrix/Hatrix.h"
 
+#include <functional>
+
 namespace Hatrix {
   constexpr int INIT_VALUE = -1;
   constexpr int oversampling = 5;

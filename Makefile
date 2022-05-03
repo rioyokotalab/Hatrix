@@ -3,7 +3,7 @@ include $(TOPSRCDIR)/common.mk
 
 DIRS := src/classes src/functions src/util examples/HSS
 EXAMPLE_OBJLIBS := libHSS_main.a
-OBJLIBS := libfunctions.a libclasses.a libutil.a
+OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
 TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \
