@@ -234,73 +234,129 @@ namespace Hatrix {
     RowLevelMap Ubig_parent;
     ColLevelMap Vbig_parent;
 
-    for (int64_t node = 0; node < nblocks; ++node) {
-      int64_t child1 = node * 2;
-      int64_t child2 = node * 2 + 1;
-      int64_t child_level = level + 1;
-      int64_t block_size = context->get_block_size(node, level);
+    if (context->is_symmetric && 1) {
+      for (int64_t node = 0; node < nblocks; ++node) {
+        int64_t child1 = node * 2;
+        int64_t child2 = node * 2 + 1;
+        int64_t child_level = level + 1;
+        int64_t block_size = context->get_block_size(node, level);
 
-      if (row_has_admissible_blocks(node, level) && context->height != 1) {
-        Matrix& Ubig_child1 = Uchild(child1, child_level);
-        Matrix& Ubig_child2 = Uchild(child2, child_level);
+        if (row_has_admissible_blocks(node, level) && context->height != 1) {
+          Matrix& Ubig_child1 = Uchild(child1, child_level);
+          Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-        Matrix Utransfer, Stemp;
-        std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
-                                                                Ubig_child2,
-                                                                node,
-                                                                block_size,
-                                                                level);
+          Matrix Utransfer, Stemp;
+          std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
+                                                                  Ubig_child2,
+                                                                  node,
+                                                                  block_size,
+                                                                  level);
+          Matrix Vtransfer(Utransfer), Scoltemp(Stemp);
+          context->U.insert(node, level, std::move(Utransfer));
+          context->Srow.insert(node, level, std::move(Stemp));
 
-        context->U.insert(node, level, std::move(Utransfer));
-        context->Srow.insert(node, level, std::move(Stemp));
+          context->V.insert(node, level, std::move(Vtransfer));
+          context->Scol.insert(node, level, std::move(Scoltemp));
 
-        // Generate the full bases to pass onto the parent.
-        auto Utransfer_splits = context->U(node, level).split(2, 1);
-        Matrix Ubig(block_size, context->rank);
-        auto Ubig_splits = Ubig.split(2, 1);
+          auto Utransfer_splits = context->U(node, level).split(2, 1);
+          Matrix Ubig(block_size, context->rank);
+          auto Ubig_splits = Ubig.split(2, 1);
 
-        matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
-        matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
+          matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
+          matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
 
-        Ubig_parent.insert(node, level, std::move(Ubig));
+          Matrix Vbig(Ubig);
+
+          Ubig_parent.insert(node, level, std::move(Ubig));
+          Vbig_parent.insert(node, level, std::move(Vbig));
+        }
       }
 
-      if (col_has_admissible_blocks(node, level) && context->height != 1) {
-        // Generate V transfer matrix.
-        Matrix& Vbig_child1 = Vchild(child1, child_level);
-        Matrix& Vbig_child2 = Vchild(child2, child_level);
+      for (int64_t row = 0; row < nblocks; ++row) {
+        for (int64_t col = 0; col < nblocks; ++col) {
+          if (context->is_admissible.exists(row, col, level) &&
+              context->is_admissible(row, col, level)) {
+            Matrix dense = generate_p2p_interactions(context->domain, row, col, level,
+                                                     context->height, context->kernel);
 
-        Matrix Vtransfer, Stemp;
-        std::tie(Stemp, Vtransfer) = generate_V_transfer_matrix(Vbig_child1,
-                                                                Vbig_child2,
-                                                                node,
-                                                                block_size,
-                                                                level);
-        context->V.insert(node, level, std::move(Vtransfer));
-        context->Scol.insert(node, level, std::move(Stemp));
+            Matrix Sdense = matmul(matmul(Ubig_parent(row, level),
+                                          dense, true, false),
+                                   Vbig_parent(col, level));
 
-        // Generate the full bases for passing onto the upper level.
-        std::vector<Matrix> Vtransfer_splits = context->V(node, level).split(2, 1);
-        Matrix Vbig(context->rank, block_size);
-        std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
-
-        matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
-        matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
-
-        Vbig_parent.insert(node, level, transpose(Vbig));
+            context->S.insert(row, col, level, std::move(Sdense));
+          }
+        }
       }
     }
+    else {
+      for (int64_t node = 0; node < nblocks; ++node) {
+        int64_t child1 = node * 2;
+        int64_t child2 = node * 2 + 1;
+        int64_t child_level = level + 1;
+        int64_t block_size = context->get_block_size(node, level);
 
-    for (int64_t row = 0; row < nblocks; ++row) {
-      for (int64_t col = 0; col < nblocks; ++col) {
-        if (context->is_admissible.exists(row, col, level) &&
-            context->is_admissible(row, col, level)) {
-          Matrix dense = generate_p2p_interactions(context->domain, row, col, level,
-                                                   context->height, context->kernel);
+        if (row_has_admissible_blocks(node, level) && context->height != 1) {
+          Matrix& Ubig_child1 = Uchild(child1, child_level);
+          Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-          context->S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level),
-                                                           dense, true, false),
-                                                    Vbig_parent(col, level)));
+          Matrix Utransfer, Stemp;
+          std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
+                                                                  Ubig_child2,
+                                                                  node,
+                                                                  block_size,
+                                                                  level);
+
+          context->U.insert(node, level, std::move(Utransfer));
+          context->Srow.insert(node, level, std::move(Stemp));
+
+          // Generate the full bases to pass onto the parent.
+          auto Utransfer_splits = context->U(node, level).split(2, 1);
+          Matrix Ubig(block_size, context->rank);
+          auto Ubig_splits = Ubig.split(2, 1);
+
+          matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0], false, false, 1, 0);
+          matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1], false, false, 1, 0);
+
+          Ubig_parent.insert(node, level, std::move(Ubig));
+        }
+
+        if (col_has_admissible_blocks(node, level) && context->height != 1) {
+          // Generate V transfer matrix.
+          Matrix& Vbig_child1 = Vchild(child1, child_level);
+          Matrix& Vbig_child2 = Vchild(child2, child_level);
+
+          Matrix Vtransfer, Stemp;
+          std::tie(Stemp, Vtransfer) = generate_V_transfer_matrix(Vbig_child1,
+                                                                  Vbig_child2,
+                                                                  node,
+                                                                  block_size,
+                                                                  level);
+          context->V.insert(node, level, std::move(Vtransfer));
+          context->Scol.insert(node, level, std::move(Stemp));
+
+          // Generate the full bases for passing onto the upper level.
+          std::vector<Matrix> Vtransfer_splits = context->V(node, level).split(2, 1);
+          Matrix Vbig(context->rank, block_size);
+          std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
+
+          matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
+          matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
+
+          Vbig_parent.insert(node, level, transpose(Vbig));
+        }
+      }
+
+      for (int64_t row = 0; row < nblocks; ++row) {
+        for (int64_t col = 0; col < nblocks; ++col) {
+          if (context->is_admissible.exists(row, col, level) &&
+              context->is_admissible(row, col, level)) {
+            Matrix dense = generate_p2p_interactions(context->domain, row, col, level,
+                                                     context->height, context->kernel);
+
+            context->S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level),
+                                                             dense, true, false),
+                                                      Vbig_parent(col, level)));
+          }
         }
       }
     }
