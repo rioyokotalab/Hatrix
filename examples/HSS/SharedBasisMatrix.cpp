@@ -212,7 +212,7 @@ namespace Hatrix {
 
     // Multiply the S blocks at the top-most level with the corresponding xhat.
     Matrix b1_2 = matmul(S(1, 0, level), x_hat[x_hat_offset]);
-    Matrix b1_1 = matmul(S(0, 1, level), x_hat[x_hat_offset+1]);
+    Matrix b1_1 = matmul(S(1, 0, level), x_hat[x_hat_offset+1], true, false);
     b_hat.push_back(b1_1);
     b_hat.push_back(b1_2);
     int b_hat_offset = 0;
@@ -230,8 +230,9 @@ namespace Hatrix {
         auto Ub_splits = Ub.split(std::vector<int64_t>(1, U(c_r1, child_level).cols),
                                   {});
 
-        Matrix b_r1_cl = matmul(S(c_r1, c_r2, child_level),
-                                x_hat[x_hat_offset + c_r2]);
+        Matrix b_r1_cl = matmul(S(c_r2, c_r1, child_level),
+                                x_hat[x_hat_offset + c_r2],
+                                true, false);
         b_hat.push_back(b_r1_cl + Ub_splits[0]);
 
         Matrix b_r2_cl = matmul(S(c_r2, c_r1, child_level),
