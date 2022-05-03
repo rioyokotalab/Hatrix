@@ -12,7 +12,7 @@ namespace Hatrix {
 
   Matrix
   ConstructMiro::generate_column_block(int64_t block, int64_t block_size,
-                                       int64_t level) {
+                                       int64_t level, const std::vector<Matrix>& A_splits) {
     int ncols = 0;
     int num_blocks = 0;
     for (int64_t j = 0; j < context->level_blocks[level]; ++j) {
@@ -29,17 +29,17 @@ namespace Hatrix {
     for (int64_t j = 0; j < context->level_blocks[level]; ++j) {
       if (context->is_admissible.exists(block, j, level) &&
           !context->is_admissible(block, j, level)) { continue; }
-      Hatrix::generate_p2p_interactions(context->domain, block, j, level, context->height,
-                                        context->kernel, AY_splits[index++]);
+      AY_splits[index++] = A_splits[block * context->level_blocks[level] + j];
     }
 
     return AY;
   }
 
   std::tuple<Matrix, Matrix>
-  ConstructMiro::generate_column_bases(int64_t block, int64_t block_size, int64_t level) {
+  ConstructMiro::generate_column_bases(int64_t block, int64_t block_size, int64_t level,
+                                       const std::vector<Matrix>& A_splits) {
     // Row slice since column bases should be cutting across the columns.
-    Matrix AY = generate_column_block(block, block_size, level);
+    Matrix AY = generate_column_block(block, block_size, level, A_splits);
     Matrix Ui, Si, Vi; double error;
     std::tie(Ui, Si, Vi, error) = truncated_svd(AY, context->rank);
 
@@ -84,15 +84,16 @@ namespace Hatrix {
   }
 
   void
-  ConstructMiro::generate_leaf_nodes(const Domain& domain) {
+  ConstructMiro::generate_leaf_nodes(const Domain& domain, const Matrix& A) {
     int64_t nblocks = context->level_blocks[context->height];
+    auto A_splits = A.split(nblocks, nblocks);
 
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
         if (context->is_admissible.exists(i, j, context->height) &&
             !context->is_admissible(i, j, context->height)) {
-          context->D.insert(i, j, context->height,
-                            generate_p2p_interactions(context->domain, i, j, context->kernel));
+          Matrix Aij(A_splits[i + j * nblocks]);
+          context->D.insert(i, j, context->height, std::move(Aij));
         }
       }
     }
@@ -102,7 +103,8 @@ namespace Hatrix {
       for (int64_t i = 0; i < nblocks; ++i) {
         Matrix Utemp, Stemp;
         std::tie(Utemp, Stemp) =
-          generate_column_bases(i, domain.boxes[i].num_particles, context->height);
+          generate_column_bases(i, domain.boxes[i].num_particles, context->height,
+                                A_splits);
         Matrix Vtemp(Utemp);
 
         context->U.insert(i, context->height, std::move(Utemp));
@@ -115,49 +117,46 @@ namespace Hatrix {
 
       // Generate S coupling matrices
       for (int64_t i = 0; i < nblocks; ++i) {
-        for (int64_t j = 0; j < i; ++j) {
-          if (context->is_admissible.exists(i, j, context->height) &&
-              context->is_admissible(i, j, context->height)) {
-            Matrix dense = generate_p2p_interactions(context->domain, i, j, context->kernel);
-            Matrix Sblock = matmul(matmul(context->U(i, context->height), dense, true, false),
-                                   context->V(j, context->height));
-            Matrix SblockT(transpose(Sblock));
-
-            context->S.insert(i, j, context->height, std::move(Sblock));
-            context->S.insert(j, i, context->height, std::move(SblockT));
-          }
-        }
-      }
-    }
-    else {
-      for (int64_t i = 0; i < nblocks; ++i) {
-        Matrix Utemp, Stemp;
-        std::tie(Utemp, Stemp) =
-          generate_column_bases(i, domain.boxes[i].num_particles, context->height);
-        context->U.insert(i, context->height, std::move(Utemp));
-      }
-      // Generate V leaf blocks
-      for (int64_t j = 0; j < nblocks; ++j) {
-        Matrix Stemp, Vtemp;
-        std::tie(Stemp, Vtemp) =
-          generate_row_bases(j, domain.boxes[j].num_particles, context->height);
-        context->V.insert(j, context->height, std::move(Vtemp));
-      }
-
-      // Generate S coupling matrices
-      for (int64_t i = 0; i < nblocks; ++i) {
         for (int64_t j = 0; j < nblocks; ++j) {
           if (context->is_admissible.exists(i, j, context->height) &&
               context->is_admissible(i, j, context->height)) {
-            Matrix dense = generate_p2p_interactions(context->domain, i, j, context->kernel);
-
-            context->S.insert(i, j, context->height,
-                              matmul(matmul(context->U(i, context->height), dense, true, false),
-                                     context->V(j, context->height)));
+            Matrix Sblock = matmul(matmul(context->U(i, context->height),
+                                          A_splits[i * nblocks + j], true, false),
+                                   context->V(j, context->height));
+            context->S.insert(i, j, context->height, std::move(Sblock));
           }
         }
       }
     }
+    // else {
+    //   for (int64_t i = 0; i < nblocks; ++i) {
+    //     Matrix Utemp, Stemp;
+    //     std::tie(Utemp, Stemp) =
+    //       generate_column_bases(i, domain.boxes[i].num_particles, context->height);
+    //     context->U.insert(i, context->height, std::move(Utemp));
+    //   }
+    //   // Generate V leaf blocks
+    //   for (int64_t j = 0; j < nblocks; ++j) {
+    //     Matrix Stemp, Vtemp;
+    //     std::tie(Stemp, Vtemp) =
+    //       generate_row_bases(j, domain.boxes[j].num_particles, context->height);
+    //     context->V.insert(j, context->height, std::move(Vtemp));
+    //   }
+
+    //   // Generate S coupling matrices
+    //   for (int64_t i = 0; i < nblocks; ++i) {
+    //     for (int64_t j = 0; j < nblocks; ++j) {
+    //       if (context->is_admissible.exists(i, j, context->height) &&
+    //           context->is_admissible(i, j, context->height)) {
+    //         Matrix dense = generate_p2p_interactions(context->domain, i, j, context->kernel);
+
+    //         context->S.insert(i, j, context->height,
+    //                           matmul(matmul(context->U(i, context->height), dense, true, false),
+    //                                  context->V(j, context->height)));
+    //       }
+    //     }
+    //   }
+    // }
   }
 
   bool
@@ -190,8 +189,9 @@ namespace Hatrix {
 
   std::tuple<Matrix, Matrix>
   ConstructMiro::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
-                                            int64_t block_size, int64_t level) {
-    Matrix col_block = generate_column_block(node, block_size, level);
+                                            int64_t block_size, int64_t level,
+                                            const std::vector<Matrix>& A_splits) {
+    Matrix col_block = generate_column_block(node, block_size, level, A_splits);
     auto col_block_splits = col_block.split(2, 1);
 
     Matrix temp(Ubig_child1.cols + Ubig_child2.cols, col_block.cols);
@@ -226,15 +226,16 @@ namespace Hatrix {
 
   std::tuple<RowLevelMap, ColLevelMap>
   ConstructMiro::generate_transfer_matrices(int64_t level, RowLevelMap& Uchild,
-                                            ColLevelMap& Vchild) {
+                                            ColLevelMap& Vchild, const Matrix& A) {
     int64_t nblocks = context->level_blocks[level];
+    auto A_splits = A.split(nblocks, nblocks);
 
     // Generate the actual bases for the upper level and pass it to this
     // function again for generating transfer matrices at successive levels.
     RowLevelMap Ubig_parent;
     ColLevelMap Vbig_parent;
 
-    if (context->is_symmetric && 1) {
+    if (context->is_symmetric) {
       for (int64_t node = 0; node < nblocks; ++node) {
         int64_t child1 = node * 2;
         int64_t child2 = node * 2 + 1;
@@ -250,7 +251,8 @@ namespace Hatrix {
                                                                   Ubig_child2,
                                                                   node,
                                                                   block_size,
-                                                                  level);
+                                                                  level,
+                                                                  A_splits);
           Matrix Vtransfer(Utransfer), Scoltemp(Stemp);
           context->U.insert(node, level, std::move(Utransfer));
           context->Srow.insert(node, level, std::move(Stemp));
@@ -276,11 +278,8 @@ namespace Hatrix {
         for (int64_t col = 0; col < nblocks; ++col) {
           if (context->is_admissible.exists(row, col, level) &&
               context->is_admissible(row, col, level)) {
-            Matrix dense = generate_p2p_interactions(context->domain, row, col, level,
-                                                     context->height, context->kernel);
-
             Matrix Sdense = matmul(matmul(Ubig_parent(row, level),
-                                          dense, true, false),
+                                          A_splits[row * nblocks + col], true, false),
                                    Vbig_parent(col, level));
 
             context->S.insert(row, col, level, std::move(Sdense));
@@ -288,78 +287,78 @@ namespace Hatrix {
         }
       }
     }
-    else {
-      for (int64_t node = 0; node < nblocks; ++node) {
-        int64_t child1 = node * 2;
-        int64_t child2 = node * 2 + 1;
-        int64_t child_level = level + 1;
-        int64_t block_size = context->get_block_size(node, level);
+    // else {
+    //   for (int64_t node = 0; node < nblocks; ++node) {
+    //     int64_t child1 = node * 2;
+    //     int64_t child2 = node * 2 + 1;
+    //     int64_t child_level = level + 1;
+    //     int64_t block_size = context->get_block_size(node, level);
 
-        if (row_has_admissible_blocks(node, level) && context->height != 1) {
-          Matrix& Ubig_child1 = Uchild(child1, child_level);
-          Matrix& Ubig_child2 = Uchild(child2, child_level);
+    //     if (row_has_admissible_blocks(node, level) && context->height != 1) {
+    //       Matrix& Ubig_child1 = Uchild(child1, child_level);
+    //       Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-          Matrix Utransfer, Stemp;
-          std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
-                                                                  Ubig_child2,
-                                                                  node,
-                                                                  block_size,
-                                                                  level);
+    //       Matrix Utransfer, Stemp;
+    //       std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
+    //                                                               Ubig_child2,
+    //                                                               node,
+    //                                                               block_size,
+    //                                                               level);
 
-          context->U.insert(node, level, std::move(Utransfer));
-          context->Srow.insert(node, level, std::move(Stemp));
+    //       context->U.insert(node, level, std::move(Utransfer));
+    //       context->Srow.insert(node, level, std::move(Stemp));
 
-          // Generate the full bases to pass onto the parent.
-          auto Utransfer_splits = context->U(node, level).split(2, 1);
-          Matrix Ubig(block_size, context->rank);
-          auto Ubig_splits = Ubig.split(2, 1);
+    //       // Generate the full bases to pass onto the parent.
+    //       auto Utransfer_splits = context->U(node, level).split(2, 1);
+    //       Matrix Ubig(block_size, context->rank);
+    //       auto Ubig_splits = Ubig.split(2, 1);
 
-          matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0], false, false, 1, 0);
-          matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1], false, false, 1, 0);
+    //       matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0], false, false, 1, 0);
+    //       matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1], false, false, 1, 0);
 
-          Ubig_parent.insert(node, level, std::move(Ubig));
-        }
+    //       Ubig_parent.insert(node, level, std::move(Ubig));
+    //     }
 
-        if (col_has_admissible_blocks(node, level) && context->height != 1) {
-          // Generate V transfer matrix.
-          Matrix& Vbig_child1 = Vchild(child1, child_level);
-          Matrix& Vbig_child2 = Vchild(child2, child_level);
+    //     if (col_has_admissible_blocks(node, level) && context->height != 1) {
+    //       // Generate V transfer matrix.
+    //       Matrix& Vbig_child1 = Vchild(child1, child_level);
+    //       Matrix& Vbig_child2 = Vchild(child2, child_level);
 
-          Matrix Vtransfer, Stemp;
-          std::tie(Stemp, Vtransfer) = generate_V_transfer_matrix(Vbig_child1,
-                                                                  Vbig_child2,
-                                                                  node,
-                                                                  block_size,
-                                                                  level);
-          context->V.insert(node, level, std::move(Vtransfer));
-          context->Scol.insert(node, level, std::move(Stemp));
+    //       Matrix Vtransfer, Stemp;
+    //       std::tie(Stemp, Vtransfer) = generate_V_transfer_matrix(Vbig_child1,
+    //                                                               Vbig_child2,
+    //                                                               node,
+    //                                                               block_size,
+    //                                                               level);
+    //       context->V.insert(node, level, std::move(Vtransfer));
+    //       context->Scol.insert(node, level, std::move(Stemp));
 
-          // Generate the full bases for passing onto the upper level.
-          std::vector<Matrix> Vtransfer_splits = context->V(node, level).split(2, 1);
-          Matrix Vbig(context->rank, block_size);
-          std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
+    //       // Generate the full bases for passing onto the upper level.
+    //       std::vector<Matrix> Vtransfer_splits = context->V(node, level).split(2, 1);
+    //       Matrix Vbig(context->rank, block_size);
+    //       std::vector<Matrix> Vbig_splits = Vbig.split(1, 2);
 
-          matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
-          matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
+    //       matmul(Vtransfer_splits[0], Vbig_child1, Vbig_splits[0], true, true, 1, 0);
+    //       matmul(Vtransfer_splits[1], Vbig_child2, Vbig_splits[1], true, true, 1, 0);
 
-          Vbig_parent.insert(node, level, transpose(Vbig));
-        }
-      }
+    //       Vbig_parent.insert(node, level, transpose(Vbig));
+    //     }
+    //   }
 
-      for (int64_t row = 0; row < nblocks; ++row) {
-        for (int64_t col = 0; col < nblocks; ++col) {
-          if (context->is_admissible.exists(row, col, level) &&
-              context->is_admissible(row, col, level)) {
-            Matrix dense = generate_p2p_interactions(context->domain, row, col, level,
-                                                     context->height, context->kernel);
+    //   for (int64_t row = 0; row < nblocks; ++row) {
+    //     for (int64_t col = 0; col < nblocks; ++col) {
+    //       if (context->is_admissible.exists(row, col, level) &&
+    //           context->is_admissible(row, col, level)) {
+    //         Matrix dense = generate_p2p_interactions(context->domain, row, col, level,
+    //                                                  context->height, context->kernel);
 
-            context->S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level),
-                                                             dense, true, false),
-                                                      Vbig_parent(col, level)));
-          }
-        }
-      }
-    }
+    //         context->S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level),
+    //                                                          dense, true, false),
+    //                                                   Vbig_parent(col, level)));
+    //       }
+    //     }
+    //   }
+    // }
 
     return {Ubig_parent, Vbig_parent};
   }
@@ -367,12 +366,13 @@ namespace Hatrix {
 
   void
   ConstructMiro::construct() {
-    generate_leaf_nodes(context->domain);
+    Matrix A = generate_p2p_matrix(context->domain, context->kernel);
+    generate_leaf_nodes(context->domain, A);
     RowLevelMap Uchild = context->U;
     ColLevelMap Vchild = context->V;
 
     for (int64_t level = context->height-1; level > 0; --level) {
-      std::tie(Uchild, Vchild) = generate_transfer_matrices(level, Uchild, Vchild);
+      std::tie(Uchild, Vchild) = generate_transfer_matrices(level, Uchild, Vchild, A);
     }
   }
 }
