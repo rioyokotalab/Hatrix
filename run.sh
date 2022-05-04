@@ -15,8 +15,10 @@ module load cmake lapack/3.9.0 openmpi/4.0.5 gcc/7.5
 # export MKL_NUM_THREADS=1
 make -j
 
-for N in 1024 2048 4096 8192 16384 32768 65536; do
-    ./bin/HSS_main --N $N --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
+for data in "1024 1e-5" "2048 1e-5" "4096 1e-6" "8192 1e-6" "16384 1e-7" "32768 1e-7" "65536 1e-8" "131072 1e-8" "262144 1e-9" "524288 1e-9" "1048576 1e-10"; do
+    set -- $data
+
+    ./bin/HSS_main --N $1 --nleaf 128 --kernel-func laplace --add-diag $2 \
                    --rank 15 --nested-basis 1 --construct-algorithm miro \
                    --kind-of-geometry circular
 done
