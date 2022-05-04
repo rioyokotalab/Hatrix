@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #include "Hatrix/Hatrix.h"
 #include "gtest/gtest.h"
@@ -73,8 +74,11 @@ TEST(MatrixTests, ViewMoveAssigment) {
   Hatrix::Matrix A_copy(block_size, block_size);
 
   auto A_copy_splits = A_copy.split(4, 4);
+  std::cout << "HELLO\n";
   // Assign an rvalue into a slice of a matrix.
   A_copy_splits[1] = Hatrix::generate_identity_matrix(sub_block, sub_block);
+
+  std::cout << "HELLO 1\n";
 
   for (int64_t i = 0; i < sub_block; ++i) {
     for (int64_t j = 0; j < sub_block; ++j) {

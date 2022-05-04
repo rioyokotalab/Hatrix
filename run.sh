@@ -11,8 +11,8 @@ module load cmake lapack/3.9.0 openmpi/4.0.5 gcc/7.5
 make clean
 make -j
 
-for N in 1024 2048 4096 8192 16384; do
+for N in 2048; do
     ./bin/HSS_main --N $N --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
-        --rank 15 --nested-basis 1 --construct-algorithm miro \
-        --kind-of-geometry circular
+                   --rank 15 --nested-basis 1 --construct-algorithm miro \
+                   --kind-of-geometry circular
 done

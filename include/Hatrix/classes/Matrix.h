@@ -16,16 +16,19 @@ class Matrix {
 
  private:
   class DataHandler;
-  std::shared_ptr<DataHandler> data;
+  // Not using a shared_ptr here since it is not capable of handling a
+  // dynamic heap-allocated array.
+  // https://stackoverflow.com/questions/13061979/shared-ptr-to-an-array-should-it-be-used
+  double *data = nullptr;
   // data_ptr is a pointer to the memory within data. This is done
   // for easily tracking the location to an offset of data if this Matrix
   // is a view of another matrix.
   double* data_ptr = nullptr;
 
  public:
-  Matrix() = default;
+  Matrix();
 
-  ~Matrix() = default;
+  ~Matrix();
 
   Matrix(const Matrix& A);
 
@@ -45,6 +48,7 @@ class Matrix {
   double& operator()(int64_t i, int64_t j);
   const double& operator()(int64_t i, int64_t j) const;
 
+  // WARNING: does not deallocate the extra data!
   void shrink(int64_t rows, int64_t cols);
 
   // Split the matrix into n_row_splits * n_col_splits blocks.

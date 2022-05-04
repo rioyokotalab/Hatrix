@@ -4,7 +4,7 @@ BLAS_LIB     = -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 \
                $(shell pkg-config --cflags gtest)
 CXXFLAGS     = -std=c++11 -O3 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
                $(shell pkg-config --cflags gtest) $(shell pkg-config --cflags gtest_main)
-CXX          = g++
+CXX          = g++ -g
 LDFLAGS      = $(shell pkg-config --libs gtest_main) $(shell pkg-config --libs gtest)  $(BLAS_LIB)
 RM           = rm -rf
 AR           = ar
