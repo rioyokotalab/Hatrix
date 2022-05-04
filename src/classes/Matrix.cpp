@@ -1,5 +1,6 @@
 #include "Hatrix/classes/Matrix.h"
 #include "Hatrix/functions/lapack.h"
+#include "Hatrix/functions/blas.h"
 
 #include <algorithm>
 #include <cassert>
@@ -12,53 +13,6 @@
 #include <fstream>
 
 namespace Hatrix {
-
-class Matrix::DataHandler {
- private:
-  int64_t data_size;
-  double *data_;
-
- public:
-  DataHandler() {
-    data_ = nullptr;
-  };
-
-  ~DataHandler() {
-    if (data_) {
-      delete[] data_;
-    }
-  };
-
-  DataHandler(int64_t size, double init_value) : data_size(size) {
-    try {
-      data_ = new double[size];
-      for (int64_t i = 0; i < size; ++i) {
-        data_[i] = init_value;
-      }
-    }
-    catch (std::bad_alloc& e) {
-      std::cout << "DataHandler(size, init_value) -> Cannot allocate data." << std::endl;
-      exit(2);
-    }
-  }
-
-  double* get_ptr() { return data_; }
-
-  const double* get_ptr() const { return data_; }
-
-  size_t size() const { return data_size; }
-
-  void resize(int64_t new_size) {
-    data_size = new_size;
-    try {
-      data_ = new double[data_size];
-    }
-    catch (std::bad_alloc& e) {
-      std::cout << "DataHandler#resize(size) -> Cannot allocate data." << std::endl;
-      exit(2);
-    }
-  }
-};
 
 Matrix::Matrix() {
   rows = -1;
@@ -79,29 +33,53 @@ Matrix::~Matrix() {
 }
 
 // Copy constructor.
-Matrix::Matrix(const Matrix& A)
+Matrix::Matrix(const Matrix& A, bool copy)
     : rows(A.rows),
-      cols(A.cols),
-      stride(A.rows) {
-  try {
-    data_ptr = new double[rows * cols];
+      cols(A.cols) {
+  if (A.is_view && !copy) {
+    is_view = true;
+    stride = A.stride;
+    data_ptr = A.data_ptr;
   }
-  catch (std::bad_alloc& e) {
-    std::cout << "Matrix(const Matrix& A) -> "
-              << e.what()
-              << " rows= " << rows
-              << " cols= " << cols
-              << std::endl;
-  }
-  // Reinitilize the stride to number of rows if its a view.
-  // stride = A.rows;
-  // Need the for loop and cannot init directly in the initializer list because
-  // the object might be a view and therefore will not get copied properly.
-  for (int i = 0; i < A.rows; ++i) {
-    for (int j = 0; j < A.cols; ++j) {
-      (*this)(i, j) = A(i, j);
+  else {
+    try {
+      data_ptr = new double[rows * cols]();
+    }
+    catch (std::bad_alloc& e) {
+      std::cout << "Matrix(const Matrix& A, bool copy) -> "
+                << e.what()
+                << " rows= " << rows
+                << " cols= " << cols
+                << std::endl;
+    }
+    is_view = false;
+    stride = A.rows;
+    // array_copy(A.data_ptr, data_ptr, rows * cols);
+    // // Reinitilize the stride to number of rows if its a view.
+    // // stride = A.rows;
+    // // Need the for loop and cannot init directly in the initializer list because
+    // // the object might be a view and therefore will not get copied properly.
+    for (int i = 0; i < A.rows; ++i) {
+      for (int j = 0; j < A.cols; ++j) {
+        (*this)(i, j) = A(i, j);
+      }
     }
   }
+}
+
+  // TODO: Is the behaviour of the move constructor and move assigment
+  // divergent wrt views? In the move constructor we are assigning
+  // A.data_ptr = nullptr unconditionally, which makes A an empty
+  // object in the calling code. In the assignment we are performing
+  // a copy of the view and keeping the A still valid. Ideally both
+  // should do the same thing(?)
+Matrix::Matrix(Matrix&& A) {
+  std::swap(rows, A.rows);
+  std::swap(cols, A.cols);
+  std::swap(stride, A.stride);
+  std::swap(data_ptr, A.data_ptr);
+  std::swap(is_view, A.is_view);
+  A.data_ptr = nullptr;
 }
 
 // Move assignment constructor.
@@ -150,7 +128,7 @@ Matrix::Matrix(int64_t rows, int64_t cols)
       cols(cols),
       stride(rows) {
   try {
-    data_ptr = new double[rows * cols];
+    data_ptr = new double[rows * cols]();
   }
   catch (std::bad_alloc& e) {
     std::cout << "Matrix(rows, cols) -> " << e.what() << std::endl;
@@ -169,12 +147,12 @@ const double* Matrix::operator&() const { return data_ptr; }
 double& Matrix::operator()(int64_t i, int64_t j) {
   assert(i < rows && i >= 0);
   assert(j < cols && j >= 0);
-  return data_ptr[j * stride + i];
+  return data_ptr[i + j * stride];
 }
 const double& Matrix::operator()(int64_t i, int64_t j) const {
   assert(i < rows && i >= 0);
   assert(j < cols && j >= 0);
-  return data_ptr[j * stride + i];
+  return data_ptr[i + j * stride];
 }
 
 void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
@@ -184,7 +162,7 @@ void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
   if (new_rows < rows) {
     for (int64_t j = 0; j < new_cols; ++j) {
       for (int64_t i = 0; i < new_rows; ++i) {
-        data_ptr[j * new_rows + i] = (*this)(i, j);
+        data_ptr[i + j * new_rows] = (*this)(i, j);
       }
     }
   }
@@ -250,13 +228,14 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
         part_of_this.cols = n_cols;
         part_of_this.stride = stride;
         part_of_this.is_view = true;
-        part_of_this.data_ptr = &data_ptr[col_start * stride + row_start];
+        part_of_this.data_ptr = &data_ptr[row_start + col_start * stride];
       }
       parts.emplace_back(std::move(part_of_this));
       col_start = col_end;
     }
     row_start = row_end;
   }
+
   return parts;
 }
 
@@ -326,10 +305,6 @@ void Matrix::out_file(std::string out_file) const {
 }
 
 size_t Matrix::memory_used() const { return rows * cols * sizeof(double); }
-
-size_t Matrix::shared_memory_used() const {
-  return rows * cols * sizeof(double);
-}
 
 Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
   Matrix out(nblocks, nblocks);

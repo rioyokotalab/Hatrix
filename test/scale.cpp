@@ -33,7 +33,7 @@ TEST_P(ScaleTests, ScalingPart) {
   Hatrix::Context::init();
   Hatrix::Matrix A_big = Hatrix::generate_random_matrix(2*m, 2*n);
   std::vector<Hatrix::Matrix> A_split = A_big.split(2, 2);
-  Hatrix::Matrix A_copy(A_split[0]);
+  Hatrix::Matrix A_copy(A_split[0], true);
 
   Hatrix::scale(A_split[0], alpha);
   for (int64_t j = 0; j < A_split[0].cols; ++j) {
@@ -51,7 +51,7 @@ TEST_P(ScaleTests, RowScaling) {
   Hatrix::Context::init();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
   Hatrix::Matrix A_copy(A);
-  Hatrix::Matrix D = Hatrix::generate_random_matrix(m, m);  
+  Hatrix::Matrix D = Hatrix::generate_random_matrix(m, m);
 
   Hatrix::row_scale(A, D);
   for (int64_t j = 0; j < A.cols; ++j) {
@@ -69,7 +69,7 @@ TEST_P(ScaleTests, ColumnScaling) {
   Hatrix::Context::init();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
   Hatrix::Matrix A_copy(A);
-  Hatrix::Matrix D = Hatrix::generate_random_matrix(n, n);  
+  Hatrix::Matrix D = Hatrix::generate_random_matrix(n, n);
 
   Hatrix::column_scale(A, D);
   for (int64_t j = 0; j < A.cols; ++j) {
@@ -82,9 +82,12 @@ TEST_P(ScaleTests, ColumnScaling) {
 
 INSTANTIATE_TEST_SUITE_P(
     BLAS, ScaleTests,
-    testing::Values(std::make_tuple(10, 10, 4.32), std::make_tuple(1, 7, 2),
-                    std::make_tuple(15, 3, 99.9), std::make_tuple(4, 1, 0.5),
-                    std::make_tuple(8, 21, -3.4)),
+    testing::Values(std::make_tuple(10, 10, 4.32),
+                    std::make_tuple(1, 7, 2),
+                    std::make_tuple(15, 3, 99.9),
+                    std::make_tuple(4, 1, 0.5),
+                    std::make_tuple(8, 21, -3.4)
+                    ),
     [](const testing::TestParamInfo<ScaleTests::ParamType>& info) {
       std::string name = ("m" + std::to_string(std::get<0>(info.param)) + "n" +
                           std::to_string(std::get<1>(info.param)));

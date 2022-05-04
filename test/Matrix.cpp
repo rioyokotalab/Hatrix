@@ -68,25 +68,39 @@ TEST(MatrixTests, MoveAssignment) {
   }
 }
 
-TEST(MatrixTests, ViewMoveAssigment) {
-  int64_t block_size = 100, sub_block = 25;
+TEST(MatrixTests, ViewAssignment) {
+  int64_t block_size = 40, sub_block = 10;
   Hatrix::Matrix A = Hatrix::generate_random_matrix(block_size, block_size);
-  Hatrix::Matrix A_copy(block_size, block_size);
+  auto A_splits = A.split(4, 4);
 
-  auto A_copy_splits = A_copy.split(4, 4);
-  std::cout << "HELLO\n";
-  // Assign an rvalue into a slice of a matrix.
-  A_copy_splits[1] = Hatrix::generate_identity_matrix(sub_block, sub_block);
+  Hatrix::Matrix& A1 = A_splits[1];
 
-  std::cout << "HELLO 1\n";
+  for (int64_t i = 0; i < sub_block; ++i) {
+    for (int64_t j = 0; j < sub_block; ++j) {
+      A1(i, j) = 0;
+    }
+  }
+
+  for (int64_t i = 0; i < sub_block; ++i) {
+    for (int64_t j = 0; j < sub_block; ++j) {
+      EXPECT_EQ(A_splits[1](i, j), 0.0);
+    }
+  }
+}
+
+TEST(MatrixTests, ViewMoveAssignment) {
+  int64_t block_size = 40, sub_block = 10;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(block_size, block_size);
+  auto A_splits = A.split(4, 4);
+  A_splits[1] = Hatrix::generate_identity_matrix(sub_block, sub_block);
 
   for (int64_t i = 0; i < sub_block; ++i) {
     for (int64_t j = 0; j < sub_block; ++j) {
       if (i == j)  {
-        EXPECT_EQ(A_copy(i, j + sub_block), 1);
+        EXPECT_EQ(A(i, j + sub_block), 1);
       }
       else {
-        EXPECT_EQ(A_copy(i, j + sub_block), 0);
+        EXPECT_EQ(A(i, j + sub_block), 0);
       }
     }
   }
@@ -132,11 +146,6 @@ TEST_P(MatrixTests, split) {
           EXPECT_EQ(A(m_start + i, n_start + j), block(i, j));
         }
       }
-      if (copy) {
-        EXPECT_EQ(block.memory_used(), block.shared_memory_used());
-      } else {
-        EXPECT_EQ(block.shared_memory_used(), A.shared_memory_used());
-      }
       n_start += block.cols;
     }
     m_start += split[i_c * n_splits].rows;
@@ -171,7 +180,6 @@ TEST(MatrixTests, shrinktest) {
           EXPECT_EQ(A(m_start + i, n_start + j), block(i, j));
         }
       }
-      EXPECT_EQ(block.shared_memory_used(), A.shared_memory_used());
       n_start += block.cols;
     }
     m_start += split[i_c * (col_split_indices.size()+1)].rows;

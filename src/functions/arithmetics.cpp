@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 
 #include "Hatrix/classes/Matrix.h"
 #include "Hatrix/functions/blas.h"
@@ -83,6 +84,7 @@ Matrix lower_tri(const Matrix& A, bool diag) {
       A_lower(i, j) = (i == j && diag ? 1. : A(i, j));
     }
   }
+
   return A_lower;
 }
 
@@ -95,6 +97,6 @@ Matrix upper_tri(const Matrix& A, bool diag) {
   }
   return A_upper;
 }
-   
+
 
 }  // namespace Hatrix

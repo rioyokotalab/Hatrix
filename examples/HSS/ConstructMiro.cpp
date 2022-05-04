@@ -94,7 +94,7 @@ namespace Hatrix {
       for (int64_t j = 0; j < nblocks; ++j) {
         if (context->is_admissible.exists(i, j, context->height) &&
             !context->is_admissible(i, j, context->height)) {
-          Matrix Aij(A_splits[i * nblocks + j]);
+          Matrix Aij(A_splits[i * nblocks + j], true);
           context->D.insert(i, j, context->height, std::move(Aij));
         }
       }

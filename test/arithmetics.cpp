@@ -192,9 +192,9 @@ TEST_P(ArithmeticTests, Transpose) {
 }
 
 TEST_P(ArithmeticTests, LowerTriangularPart) {
-  int64_t m, n;
+  int64_t m = 10, n = 10;
   Hatrix::Context::init();
-  std::tie(m, n) = GetParam();
+  // std::tie(m, n) = GetParam();
 
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
   Hatrix::Matrix A_nounit_lower = lower_tri(A);
@@ -204,19 +204,20 @@ TEST_P(ArithmeticTests, LowerTriangularPart) {
   EXPECT_EQ(A_nounit_lower.cols, n);
   EXPECT_EQ(A_unit_lower.rows, m);
   EXPECT_EQ(A_unit_lower.cols, n);
+
   for (int64_t i = 0; i < m; ++i) {
     for (int64_t j = 0; j < n; ++j) {
       if(i == j) {
-	EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
-	EXPECT_EQ(1., A_unit_lower(i, j));
+        EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
+        EXPECT_EQ(1., A_unit_lower(i, j));
       }
       else if(i > j) {
-	EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
-	EXPECT_EQ(A(i, j), A_unit_lower(i, j));
+        EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
+        EXPECT_EQ(A(i, j), A_unit_lower(i, j));
       }
       else {
-	EXPECT_EQ(0., A_nounit_lower(i, j));
-	EXPECT_EQ(0., A_unit_lower(i, j));
+        EXPECT_EQ(0., A_nounit_lower(i, j));
+        EXPECT_EQ(0., A_unit_lower(i, j));
       }
     }
   }

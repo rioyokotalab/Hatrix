@@ -80,6 +80,34 @@ TEST_P(MatMulTests, matmulReturn) {
   Hatrix::Context::finalize();
 }
 
+TEST(MatMulViewTests, matmulView) {
+  Hatrix::Context::init();
+  int64_t block = 100, sub_block = 25;
+  int64_t splits = block / sub_block;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(block, block);
+  Hatrix::Matrix x = Hatrix::generate_random_matrix(block, 1);
+  Hatrix::Matrix b(block, 1);
+
+  auto A_splits = A.split(splits, splits);
+  auto x_splits = x.split(splits, 1);
+  auto b_splits = b.split(splits, 1);
+
+  for (int64_t m = 0; m < splits; ++m) {
+    for (int64_t n = 0; n < 1; ++n) {
+      for (int64_t k = 0; k < splits; ++k) {
+        matmul(A_splits[m * splits + k], x_splits[k], b_splits[m], false, false, 1, 1);
+      }
+    }
+  }
+
+  Hatrix::Matrix b_result = matmul(A, x);
+  for (int64_t i = 0; i < block; ++i) {
+    EXPECT_NEAR(b_result(i, 0), b(i, 0), 1e-13);
+  }
+
+  Hatrix::Context::finalize();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     Params, MatMulTests,
     testing::Combine(testing::Values(13), testing::Values(47),
