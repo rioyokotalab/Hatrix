@@ -20,23 +20,21 @@ namespace Hatrix {
     bool use_shared_basis;
     const Domain domain;
     const kernel_function kernel;
-    const bool is_symmetric;
+    bool is_symmetric = true;
 
     int64_t height;
-    ColLevelMap U, Srow;
-    RowLevelMap V, Scol;
+    ColLevelMap U;
+    RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
     RowColLevelMap<bool> is_admissible;
     std::vector<int64_t> level_blocks;
-
-
 
     int64_t get_block_size(int64_t parent, int64_t level);
     SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank, double accuracy,
                       double admis, ADMIS_KIND admis_kind,
                       CONSTRUCT_ALGORITHM construct_algorithm, bool use_shared_basis,
                       const Domain& domain, const kernel_function& kernel,
-                      const bool is_symmetric);
+                      bool is_symmetric);
 
     Matrix get_Ubig(int64_t node, int64_t level);
     Matrix get_Vbig(int64_t node, int64_t level);

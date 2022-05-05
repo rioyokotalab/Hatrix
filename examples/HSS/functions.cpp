@@ -1,4 +1,6 @@
 #include <vector>
+#include <cassert>
+#include <cmath>
 
 #include "Domain.hpp"
 #include "functions.hpp"
@@ -106,8 +108,9 @@ namespace Hatrix {
       }
     }
 
-
+    #pragma omp parallel for
     for (int64_t i = 0; i < rows; ++i) {
+      #pragma omp parallel for
       for (int64_t j = 0; j < cols; ++j) {
         out(i, j) = kernel(particles[i].coords,
                            particles[j].coords);

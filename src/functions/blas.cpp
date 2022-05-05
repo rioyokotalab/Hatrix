@@ -1,6 +1,7 @@
 #include "Hatrix/functions/blas.h"
 
 #include <cassert>
+#include <iostream>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -11,6 +12,10 @@
 #include "Hatrix/classes/Matrix.h"
 
 namespace Hatrix {
+
+void array_copy(const double* from, double* to, int64_t size) {
+  cblas_dcopy(size, from, 1, to, 1);
+}
 
 void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
             bool transB, double alpha, double beta) {

@@ -12,38 +12,40 @@ namespace Hatrix {
 
   Matrix
   ConstructMiro::generate_column_block(int64_t block, int64_t block_size,
-                                       int64_t level, const std::vector<Matrix>& A_splits) {
+                                       int64_t level, const Matrix& A, const Matrix& rand) {
     int ncols = 0;
     int num_blocks = 0;
-    for (int64_t j = 0; j < context->level_blocks[level]; ++j) {
+    int nblocks = context->level_blocks[level];
+    for (int64_t j = 0; j < nblocks; ++j) {
       if (context->is_admissible.exists(block, j, level) &&
           !context->is_admissible(block, j, level)) { continue; }
       ncols += context->get_block_size(j, level);
       num_blocks++;
     }
 
-    Matrix AY(block_size, ncols);
-    auto AY_splits = AY.split(1, num_blocks);
+    auto A_splits = A.split(nblocks, nblocks);
+    auto rand_splits = rand.split(nblocks, 1);
+    Matrix AY(block_size, rand.cols);
 
     int index = 0;
-    for (int64_t j = 0; j < context->level_blocks[level]; ++j) {
+    for (int64_t j = 0; j < nblocks; ++j) {
       if (context->is_admissible.exists(block, j, level) &&
           !context->is_admissible(block, j, level)) { continue; }
-      AY_splits[index++] = A_splits[block * context->level_blocks[level] + j];
+      matmul(A_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1, 1);
     }
 
     return AY;
   }
 
-  std::tuple<Matrix, Matrix>
+  Matrix
   ConstructMiro::generate_column_bases(int64_t block, int64_t block_size, int64_t level,
-                                       const std::vector<Matrix>& A_splits) {
+                                       const Matrix& A, const Matrix& rand) {
     // Row slice since column bases should be cutting across the columns.
-    Matrix AY = generate_column_block(block, block_size, level, A_splits);
-    Matrix Ui, Si, Vi; double error;
-    std::tie(Ui, Si, Vi, error) = truncated_svd(AY, context->rank);
+    Matrix AY = generate_column_block(block, block_size, level, A, rand);
+    Matrix Ui; std::vector<int> pivots;
+    std::tie(Ui, pivots) = pivoted_qr(AY, context->rank);
 
-    return {std::move(Ui), std::move(Si)};
+    return {std::move(Ui)};
   }
 
   Matrix
@@ -84,7 +86,7 @@ namespace Hatrix {
   }
 
   void
-  ConstructMiro::generate_leaf_nodes(const Domain& domain, const Matrix& A) {
+  ConstructMiro::generate_leaf_nodes(const Domain& domain, const Matrix& A, const Matrix& rand) {
     int64_t nblocks = context->level_blocks[context->height];
     auto A_splits = A.split(nblocks, nblocks);
 
@@ -92,7 +94,7 @@ namespace Hatrix {
       for (int64_t j = 0; j < nblocks; ++j) {
         if (context->is_admissible.exists(i, j, context->height) &&
             !context->is_admissible(i, j, context->height)) {
-          Matrix Aij(A_splits[i + j * nblocks]);
+          Matrix Aij(A_splits[i * nblocks + j], true);
           context->D.insert(i, j, context->height, std::move(Aij));
         }
       }
@@ -101,18 +103,12 @@ namespace Hatrix {
     if (context->is_symmetric) {
       // Generate U leaf blocks
       for (int64_t i = 0; i < nblocks; ++i) {
-        Matrix Utemp, Stemp;
-        std::tie(Utemp, Stemp) =
-          generate_column_bases(i, domain.boxes[i].num_particles, context->height,
-                                A_splits);
+        Matrix Utemp = generate_column_bases(i, domain.boxes[i].num_particles, context->height,
+                                             A, rand);
         Matrix Vtemp(Utemp);
 
         context->U.insert(i, context->height, std::move(Utemp));
         context->V.insert(i, context->height, std::move(Vtemp));
-
-        Matrix Stempcol(Stemp);
-        context->Srow.insert(i, context->height, std::move(Stemp));
-        context->Scol.insert(i, context->height, std::move(Stempcol));
       }
 
       // Generate S coupling matrices
@@ -187,11 +183,11 @@ namespace Hatrix {
     return has_admis;
   }
 
-  std::tuple<Matrix, Matrix>
+  Matrix
   ConstructMiro::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
                                             int64_t block_size, int64_t level,
-                                            const std::vector<Matrix>& A_splits) {
-    Matrix col_block = generate_column_block(node, block_size, level, A_splits);
+                                            const Matrix& A, const Matrix& rand) {
+    Matrix col_block = generate_column_block(node, block_size, level, A, rand);
     auto col_block_splits = col_block.split(2, 1);
 
     Matrix temp(Ubig_child1.cols + Ubig_child2.cols, col_block.cols);
@@ -200,10 +196,10 @@ namespace Hatrix {
     matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
     matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
 
-    Matrix Utransfer, Si, Vi; double error;
-    std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, context->rank);
+    Matrix Utransfer; std::vector<int> pivots;
+    std::tie(Utransfer, pivots) = pivoted_qr(temp, context->rank);
 
-    return {std::move(Utransfer), std::move(Si)};
+    return std::move(Utransfer);
   }
 
   std::tuple<Matrix, Matrix>
@@ -226,7 +222,8 @@ namespace Hatrix {
 
   std::tuple<RowLevelMap, ColLevelMap>
   ConstructMiro::generate_transfer_matrices(int64_t level, RowLevelMap& Uchild,
-                                            ColLevelMap& Vchild, const Matrix& A) {
+                                            ColLevelMap& Vchild, const Matrix& A,
+                                            const Matrix& rand) {
     int64_t nblocks = context->level_blocks[level];
     auto A_splits = A.split(nblocks, nblocks);
 
@@ -246,19 +243,16 @@ namespace Hatrix {
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-          Matrix Utransfer, Stemp;
-          std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
-                                                                  Ubig_child2,
-                                                                  node,
-                                                                  block_size,
-                                                                  level,
-                                                                  A_splits);
-          Matrix Vtransfer(Utransfer), Scoltemp(Stemp);
+          Matrix Utransfer  = generate_U_transfer_matrix(Ubig_child1,
+                                                         Ubig_child2,
+                                                         node,
+                                                         block_size,
+                                                         level,
+                                                         A,
+                                                         rand);
+          Matrix Vtransfer(Utransfer);
           context->U.insert(node, level, std::move(Utransfer));
-          context->Srow.insert(node, level, std::move(Stemp));
-
           context->V.insert(node, level, std::move(Vtransfer));
-          context->Scol.insert(node, level, std::move(Scoltemp));
 
           auto Utransfer_splits = context->U(node, level).split(2, 1);
           Matrix Ubig(block_size, context->rank);
@@ -366,13 +360,15 @@ namespace Hatrix {
 
   void
   ConstructMiro::construct() {
+    int64_t p = 50;
     Matrix A = generate_p2p_matrix(context->domain, context->kernel);
-    generate_leaf_nodes(context->domain, A);
+    Matrix rand = generate_random_matrix(context->N, p);
+    generate_leaf_nodes(context->domain, A, rand);
     RowLevelMap Uchild = context->U;
     ColLevelMap Vchild = context->V;
 
     for (int64_t level = context->height-1; level > 0; --level) {
-      std::tie(Uchild, Vchild) = generate_transfer_matrices(level, Uchild, Vchild, A);
+      std::tie(Uchild, Vchild) = generate_transfer_matrices(level, Uchild, Vchild, A, rand);
     }
   }
 }

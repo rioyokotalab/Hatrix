@@ -1,23 +1,32 @@
 #!/bin/bash
 #YBATCH -r epyc-7502_8
 #SBATCH -N 1
-#SBATCH -J ATAT
+#SBATCH -J HSS
 #SBATCH --time=72:00:00
 
-source ~/.bashrc
+source /etc/profile.d/modules.sh
+module load cmake lapack/3.9.0 openmpi/4.0.5 gcc/7.5
 
-rm -rf build
-mkdir build
-cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=$PWD -DCMAKE_BUILD_TYPE=Release
-make -j all
+# valgrind warnings https://stackoverflow.com/questions/36197527/insight-as-to-why-valgrind-shows-memory-leak-for-intels-mkl-lapacke
+# export MKL_DISABLE_FAST_MM=1
+# source ~/.bashrc
+# make clean#
+# export OMP_NUM_THREADS=1
+# export MKL_NUM_THREADS=1
+make -j
 
-for N in 1024 2048 4096 8192 16384 32768 65536 131072; do
-    for matrix_type in 1 0; do
-        for admis in 0 1.2 1.5 2; do
-            for rank in 5 10 20 40 70 80; do
-                ./examples/UMV_H2_far_dense $N $rank 128 $admis 3 geometry_admis 0 $matrix_type
-            done
-        done
-    done
+for data in "1024 1e-5" "2048 1e-5" "4096 1e-6" "8192 1e-6" "16384 1e-7" "32768 1e-7" "65536 1e-8" "131072 1e-8" "262144 1e-9" "524288 1e-9" "1048576 1e-10"; do
+    set -- $data
+
+    ./bin/HSS_main --N $1 --nleaf 128 --kernel-func laplace --add-diag $2 \
+                   --rank 15 --nested-basis 1 --construct-algorithm miro \
+                   --kind-of-geometry circular
 done
+
+# for data in "1024 1e-5"; do
+#     set -- $data
+
+#     ./bin/HSS_main --N $1 --nleaf 128 --kernel-func laplace --add-diag $2 \
+#                    --rank 15 --nested-basis 1 --construct-algorithm miro \
+#                    --kind-of-geometry circular
+# done

@@ -6,6 +6,8 @@ namespace Hatrix {
 enum Side { Left, Right };
 enum Mode { Upper, Lower };
 
+void array_copy(const double* from, double* to, int64_t size);
+
 // Perform a matrix multiplication C = beta * C + alpha * A * B.
 // Optionally transpose A and B.
 void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA = false,

@@ -12,6 +12,7 @@ Matrix generate_random_matrix(int64_t rows, int64_t cols) {
   // gen.seed(0);
   std::uniform_real_distribution<double> dist(0.0, 1.0);
   Matrix out(rows, cols);
+  #pragma omp parallel for
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {
       out(i, j) = dist(gen);

@@ -145,7 +145,7 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
 }
 
 // TODO: complete this function  get rid of return warnings. Also return empty R. Needs dummy alloc now.
-std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret) {
+std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret, bool pivoted) {
   Matrix R(1, 1);
 
   if (mode == Lapack::Full) {
@@ -157,7 +157,14 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_
           Q(i, j) = A(i, j);
         }
       }
-      LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
+      if (pivoted) {
+        std::vector<int> jpvt(A.cols);
+        LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, jpvt.data(), tau.data());
+      }
+      else {
+        LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
+      }
+
       LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
                      Q.stride, tau.data());
 
@@ -165,6 +172,19 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_
     }
   }
   abort();
+}
+
+std::tuple<Matrix, std::vector<int>> pivoted_qr(Matrix& A, int64_t rank) {
+  Matrix Q(A, true);
+  std::vector<double> tau(Q.rows);
+  std::vector<int> jpvt(Q.cols);
+
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.min_dim(), Q.min_dim(), &Q, Q.stride, tau.data());
+
+  Q.shrink(Q.rows, rank);
+
+  return {Q, jpvt};
 }
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {

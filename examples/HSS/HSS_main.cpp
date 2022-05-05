@@ -171,9 +171,6 @@ int main(int argc, char* argv[]) {
       if (value == "miro") {
         construct_algorithm = MIRO;
       }
-      else if (value == "miro_fast") {
-        construct_algorithm = MIRO_FASTER;
-      }
       else if (value == "id_random") {
         construct_algorithm = ID_RANDOM;
       }

@@ -5,9 +5,10 @@
 #include "Domain.hpp"
 #include "SharedBasisMatrix.hpp"
 #include "ConstructMiro.hpp"
-#include "ConstructMiroFaster.hpp"
 #include "ConstructID_Random.hpp"
 #include "functions.hpp"
+
+#include <algorithm>
 
 namespace Hatrix {
   ConstructAlgorithm::ConstructAlgorithm(SharedBasisMatrix* context) : context(context) {}
@@ -263,12 +264,12 @@ namespace Hatrix {
                                        bool use_shared_basis,
                                        const Domain& domain,
                                        const kernel_function& kernel,
-                                       const bool is_symmetrix) :
+                                       bool _is_symmetric) :
     N(N), nleaf(nleaf), rank(rank), accuracy(accuracy), admis(admis),
     admis_kind(admis_kind), construct_algorithm(construct_algorithm),
-    use_shared_basis(use_shared_basis), domain(domain), kernel(kernel),
-    is_symmetric(is_symmetric)
+    use_shared_basis(use_shared_basis), domain(domain), kernel(kernel)
   {
+    is_symmetric = _is_symmetric;
     if (use_shared_basis) {
       height = int64_t(log2(N / nleaf));
       calc_diagonal_based_admissibility(height);
@@ -294,10 +295,6 @@ namespace Hatrix {
     else if (construct_algorithm == ID_RANDOM) {
       construct_algo = new ConstructID_Random(this);
     }
-    else if (construct_algorithm == MIRO_FASTER) {
-      construct_algo = new ConstructMiroFaster(this);
-    }
-
     construct_algo->construct();
 
     delete construct_algo;
