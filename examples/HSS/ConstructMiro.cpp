@@ -42,8 +42,9 @@ namespace Hatrix {
                                        const Matrix& A, const Matrix& rand) {
     // Row slice since column bases should be cutting across the columns.
     Matrix AY = generate_column_block(block, block_size, level, A, rand);
-    Matrix Ui, Si, Vi; double error;
-    std::tie(Ui, Si, Vi, error) = truncated_svd(AY, context->rank);
+
+    Matrix Ui; std::vector<int> pivots;
+    std::tie(Ui, pivots) = pivoted_qr(AY, context->rank);
 
     return {std::move(Ui)};
   }
@@ -183,7 +184,7 @@ namespace Hatrix {
     return has_admis;
   }
 
-  std::tuple<Matrix, Matrix>
+  Matrix
   ConstructMiro::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
                                             int64_t block_size, int64_t level,
                                             const Matrix& A, const Matrix& rand) {
@@ -196,10 +197,10 @@ namespace Hatrix {
     matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
     matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
 
-    Matrix Utransfer, Si, Vi; double error;
-    std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, context->rank);
+    Matrix Utransfer; std::vector<int> pivots;
+    std::tie(Utransfer, pivots) = pivoted_qr(temp, context->rank);
 
-    return {std::move(Utransfer), std::move(Si)};
+    return std::move(Utransfer);
   }
 
   std::tuple<Matrix, Matrix>
@@ -243,17 +244,15 @@ namespace Hatrix {
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
 
-          Matrix Utransfer, Stemp;
-          std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
-                                                                  Ubig_child2,
-                                                                  node,
-                                                                  block_size,
-                                                                  level,
-                                                                  A,
-                                                                  rand);
-          Matrix Vtransfer(Utransfer), Scoltemp(Stemp);
+          Matrix Utransfer  = generate_U_transfer_matrix(Ubig_child1,
+                                                         Ubig_child2,
+                                                         node,
+                                                         block_size,
+                                                         level,
+                                                         A,
+                                                         rand);
+          Matrix Vtransfer(Utransfer);
           context->U.insert(node, level, std::move(Utransfer));
-
           context->V.insert(node, level, std::move(Vtransfer));
 
           auto Utransfer_splits = context->U(node, level).split(2, 1);

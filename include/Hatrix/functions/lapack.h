@@ -31,6 +31,8 @@ void ldl(Matrix& A);
 
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
+std::tuple<Matrix, std::vector<int>> pivoted_qr(Matrix& A, int64_t rank);
+
 // Compute the storage for Q and R automatically from mode and qr_ret values
 // and return Q and R matrices.
 std::tuple<Matrix, Matrix> qr(const Matrix& A,
