@@ -23,13 +23,11 @@ namespace Hatrix {
     bool is_symmetric = true;
 
     int64_t height;
-    ColLevelMap U, Srow;
-    RowLevelMap V, Scol;
+    ColLevelMap U;
+    RowLevelMap V;
     RowColLevelMap<Matrix> D, S;
     RowColLevelMap<bool> is_admissible;
     std::vector<int64_t> level_blocks;
-
-
 
     int64_t get_block_size(int64_t parent, int64_t level);
     SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank, double accuracy,

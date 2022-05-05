@@ -7,7 +7,9 @@
 #include "internal_types.hpp"
 
 namespace Hatrix {
-// Construct HSS matrix using the algorithm written in the miro board.
+  // Construct HSS matrix using the algorithm written in the miro board.
+  // The only change in this one is that we multiply a random matrix with
+  // blocks of the dense matrix before using the SVD.
   class ConstructMiro : public ConstructAlgorithm {
   private:
     Matrix generate_row_block(int64_t block, int64_t block_size, int64_t level);

@@ -111,10 +111,6 @@ namespace Hatrix {
 
         context->U.insert(i, context->height, std::move(Utemp));
         context->V.insert(i, context->height, std::move(Vtemp));
-
-        Matrix Stempcol(Stemp);
-        context->Srow.insert(i, context->height, std::move(Stemp));
-        context->Scol.insert(i, context->height, std::move(Stempcol));
       }
 
       // Generate S coupling matrices
@@ -259,10 +255,8 @@ namespace Hatrix {
                                                                   rand);
           Matrix Vtransfer(Utransfer), Scoltemp(Stemp);
           context->U.insert(node, level, std::move(Utransfer));
-          context->Srow.insert(node, level, std::move(Stemp));
 
           context->V.insert(node, level, std::move(Vtransfer));
-          context->Scol.insert(node, level, std::move(Scoltemp));
 
           auto Utransfer_splits = context->U(node, level).split(2, 1);
           Matrix Ubig(block_size, context->rank);
