@@ -15,7 +15,7 @@ namespace Hatrix {
     Matrix generate_row_block(int64_t block, int64_t block_size, int64_t level);
     std::tuple<Matrix, Matrix>
     generate_row_bases(int64_t block, int64_t block_size, int64_t level);
-    std::tuple<Matrix, Matrix>
+    Matrix
     generate_column_bases(int64_t block, int64_t block_size, int64_t level,
                           const Matrix& A, const Matrix& rand);
     Matrix generate_column_block(int64_t block, int64_t block_size, int64_t level,

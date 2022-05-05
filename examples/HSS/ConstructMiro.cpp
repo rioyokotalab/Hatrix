@@ -37,7 +37,7 @@ namespace Hatrix {
     return AY;
   }
 
-  std::tuple<Matrix, Matrix>
+  Matrix
   ConstructMiro::generate_column_bases(int64_t block, int64_t block_size, int64_t level,
                                        const Matrix& A, const Matrix& rand) {
     // Row slice since column bases should be cutting across the columns.
@@ -45,7 +45,7 @@ namespace Hatrix {
     Matrix Ui, Si, Vi; double error;
     std::tie(Ui, Si, Vi, error) = truncated_svd(AY, context->rank);
 
-    return {std::move(Ui), std::move(Si)};
+    return {std::move(Ui)};
   }
 
   Matrix
@@ -103,10 +103,8 @@ namespace Hatrix {
     if (context->is_symmetric) {
       // Generate U leaf blocks
       for (int64_t i = 0; i < nblocks; ++i) {
-        Matrix Utemp, Stemp;
-        std::tie(Utemp, Stemp) =
-          generate_column_bases(i, domain.boxes[i].num_particles, context->height,
-                                A, rand);
+        Matrix Utemp = generate_column_bases(i, domain.boxes[i].num_particles, context->height,
+                                             A, rand);
         Matrix Vtemp(Utemp);
 
         context->U.insert(i, context->height, std::move(Utemp));
