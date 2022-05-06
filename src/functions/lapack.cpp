@@ -174,7 +174,7 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_
   abort();
 }
 
-std::tuple<Matrix, std::vector<int>> pivoted_qr(Matrix& A, int64_t rank) {
+std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t rank) {
   Matrix Q(A, true);
   std::vector<double> tau(Q.rows);
   std::vector<int> jpvt(Q.cols);
@@ -184,7 +184,34 @@ std::tuple<Matrix, std::vector<int>> pivoted_qr(Matrix& A, int64_t rank) {
 
   Q.shrink(Q.rows, rank);
 
-  return {Q, jpvt};
+  // c-style pivots
+  std::vector<int64_t> pivots(Q.cols);
+  for (int64_t i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
+
+  return {std::move(Q), std::move(pivots)};
+}
+
+std::tuple<Matrix, std::vector<int64_t>, int64_t> error_pivoted_qr(const Matrix& A, double error) {
+  Matrix Q(A, true);
+  std::vector<double> tau(Q.rows);
+  std::vector<int> jpvt(Q.cols);
+  int64_t rank = 0;
+
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.min_dim(), Q.min_dim(), &Q, Q.stride, tau.data());
+
+  for (int64_t i = 0; i < Q.min_dim(); ++i) {
+    if (Q(i,i) < error) { break; }
+    rank++;
+  }
+
+  Q.shrink(Q.rows, rank);
+
+  // c-style pivots
+  std::vector<int64_t> pivots(Q.cols);
+  for (int64_t i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
+
+  return {std::move(Q), std::move(pivots), rank};
 }
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {

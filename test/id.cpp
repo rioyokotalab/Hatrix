@@ -59,14 +59,15 @@ TEST_P(InterpolateTests, interpolate_error) {
   Matrix A_error = matmul(matmul(U, S), V);
   double tol = 1e-9;
 
-  Matrix A_interp, A_pivots, A_error_copy(A_error);
+  Matrix A_interp, A_error_copy(A_error);
+  std::vector<int64_t> A_pivots;
   int64_t rank;
   std::tie(A_interp, A_pivots, rank) = error_interpolate(A_error, tol);
 
     // Generate A_CS
   Matrix A_CS(m, rank);
   for (int j = 0; j < rank; ++j) {
-    int pivot_col = A_pivots(j, 0) - 1;
+    int pivot_col = A_pivots[j];
     for (int i = 0; i < m; ++i) {
       A_CS(i, j) = A_error_copy(i, pivot_col);
     }
@@ -77,7 +78,7 @@ TEST_P(InterpolateTests, interpolate_error) {
 
   // Bring the original matrix into the pivoted form
   for (int j = 0; j < result.cols; ++j) {
-    int pcol = A_pivots(j, 0) - 1;
+    int pcol = A_pivots[j];
     for (int i = 0; i < result.rows; ++i) {
       result(i, j) = A_error_copy(i, pcol);
     }

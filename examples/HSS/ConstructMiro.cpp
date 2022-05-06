@@ -42,7 +42,7 @@ namespace Hatrix {
                                        const Matrix& A, const Matrix& rand) {
     // Row slice since column bases should be cutting across the columns.
     Matrix AY = generate_column_block(block, block_size, level, A, rand);
-    Matrix Ui; std::vector<int> pivots;
+    Matrix Ui; std::vector<int64_t> pivots;
     std::tie(Ui, pivots) = pivoted_qr(AY, context->rank);
 
     return {std::move(Ui)};
@@ -196,7 +196,7 @@ namespace Hatrix {
     matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
     matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
 
-    Matrix Utransfer; std::vector<int> pivots;
+    Matrix Utransfer; std::vector<int64_t> pivots;
     std::tie(Utransfer, pivots) = pivoted_qr(temp, context->rank);
 
     return std::move(Utransfer);
