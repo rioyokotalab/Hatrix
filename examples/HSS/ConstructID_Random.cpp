@@ -143,14 +143,16 @@ namespace Hatrix {
 
         // TODO: use rvalues with transpose.
         Matrix sT(transpose(S_loc_blocks[node]));
+
         std::tie(interp, pivots, rank) = error_interpolate(sT, context->accuracy);
         // TODO: avoid storing both the U and V.
-        Matrix Vinterp(interp);
+        Matrix Vinterp(interp, true);
         context->U.insert(node, level, std::move(interp));
         context->V.insert(node, level, std::move(Vinterp));
 
         // apply the interpolation matrix on the previous random vectors
-        OMEGA_blocks[node] = matmul(interp, OMEGA_blocks[node], true, false);
+        OMEGA_blocks[node] = matmul(context->U(node, level),
+                                    OMEGA_blocks[node], true, false);
 
         // choose the rows of the samples that correspond to the interpolation.
         Matrix S_loc(rank, p);
@@ -168,29 +170,50 @@ namespace Hatrix {
         for (int64_t i = 0; i < rank; ++i) {
           indices.push_back(row_indices[node][pivots(i, 0)-1]);
         }
+        // std::cout << "indicies for node: " << node << ", level -> " << level << " \n";
+        // for (int i = 0; i < indices.size(); ++i) {
+        //   std::cout << indices[i] << " ";
+        // }
+        // std::cout << std::endl;
         row_indices[node] = std::move(indices);
       }
+
+
+
 
       // generate S blocks for the lower triangular region only since this
       // is a symmetric matrix.
       for (int64_t brow = 0; brow < nblocks; ++brow) {
-        for (int64_t bcol = 0; bcol < brow; ++bcol) {
+        for (int64_t bcol = 0; bcol < nblocks; ++bcol) {
           if (context->is_admissible.exists(brow, bcol, level) &&
               context->is_admissible(brow, bcol, level)) {
-            int64_t row_size = row_indices[brow].size();
-            int64_t col_size = row_indices[bcol].size();
+            std::vector<int64_t>& row_index_set = row_indices[brow];
+            std::vector<int64_t>& col_index_set = row_indices[bcol];
+            int64_t row_size = row_index_set.size();
+            int64_t col_size = col_index_set.size();
 
             Matrix Stemp(row_size, col_size);
             for (int64_t i = 0; i < row_size; ++i) {
               for (int64_t j = 0; j < col_size; ++j) {
-                Stemp(i, j) = context->kernel(context->domain.particles[brow].coords,
-                                              context->domain.particles[bcol].coords);
+                Stemp(i, j) = context->kernel(context->domain.particles[row_index_set[i]].coords,
+                                              context->domain.particles[col_index_set[j]].coords);
               }
             }
 
             context->S.insert(brow, bcol, level, std::move(Stemp));
           }
         }
+      }
+
+      if (level == context->height) {
+        // context->S(1, 0, level).print();
+        std::cout << "REGEN D(1, 0)\n";
+        context->U(1, level).print_meta();
+        matmul(matmul(context->U(1, level), context->S(1, 0, level)),
+               context->V(0, level), false, true).print();
+
+        std::cout << "REAL D(1,0)\n";
+        generate_p2p_interactions(context->domain, 1, 0, context->kernel).print();;
       }
     }
   }

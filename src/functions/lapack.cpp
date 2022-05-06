@@ -306,7 +306,7 @@ std::tuple<Matrix, Matrix, int64_t> error_interpolate(Matrix& A, double error) {
 
   int64_t rank = 0;
   // find the right rank for this.
-  for (int64_t i = 0; i < A.rows; ++i) {
+  for (int64_t i = 0; i < A.min_dim(); ++i) {
     if (std::abs(A(i, i)) < error) { break; }
     rank += 1;
   }

@@ -234,6 +234,10 @@ int main(int argc, char* argv[]) {
   double check_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_check - start_check).count();
 
+  // b.print();
+  // bdense.print();
+  // (b - bdense).print();
+
   std::cout << "-------------------------------\n";
   std::cout << "N               : " << N << "\n"
             << "RANK            : " << rank << "\n"
