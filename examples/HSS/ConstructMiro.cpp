@@ -42,8 +42,16 @@ namespace Hatrix {
                                        const Matrix& A, const Matrix& rand) {
     // Row slice since column bases should be cutting across the columns.
     Matrix AY = generate_column_block(block, block_size, level, A, rand);
-    Matrix Ui; std::vector<int64_t> pivots;
-    std::tie(Ui, pivots) = pivoted_qr(AY, context->rank);
+    Matrix Ui;
+    if (context->rank > 0) {             // constant rank compression
+      std::vector<int64_t> pivots;
+      std::tie(Ui, pivots) = pivoted_qr(AY, context->rank);
+    }
+    else {                      // constant accuracy compression
+      std::vector<int64_t> pivots; int64_t rank;
+      std::tie(Ui, pivots, rank) = error_pivoted_qr(AY, context->accuracy);
+      std::cout << "PQR leaf rank = " << rank << std::endl;
+    }
 
     return {std::move(Ui)};
   }
@@ -196,8 +204,16 @@ namespace Hatrix {
     matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
     matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
 
-    Matrix Utransfer; std::vector<int64_t> pivots;
-    std::tie(Utransfer, pivots) = pivoted_qr(temp, context->rank);
+    Matrix Utransfer;
+    std::vector<int64_t> pivots;
+    if (context->rank > 0) {    // constant rank
+      std::tie(Utransfer, pivots) = pivoted_qr(temp, context->rank);
+    }
+    else {
+      int64_t rank;
+      std::tie(Utransfer, pivots, rank) = error_pivoted_qr(temp, context->accuracy);
+      std::cout << "PQR non-leaf rank = " << rank << std::endl;
+    }
 
     return std::move(Utransfer);
   }
@@ -237,11 +253,11 @@ namespace Hatrix {
         int64_t child1 = node * 2;
         int64_t child2 = node * 2 + 1;
         int64_t child_level = level + 1;
-        int64_t block_size = context->get_block_size(node, level);
 
         if (row_has_admissible_blocks(node, level) && context->height != 1) {
           Matrix& Ubig_child1 = Uchild(child1, child_level);
           Matrix& Ubig_child2 = Uchild(child2, child_level);
+          int64_t block_size = Ubig_child1.rows + Ubig_child2.rows;
 
           Matrix Utransfer  = generate_U_transfer_matrix(Ubig_child1,
                                                          Ubig_child2,
@@ -250,19 +266,23 @@ namespace Hatrix {
                                                          level,
                                                          A,
                                                          rand);
-          Matrix Vtransfer(Utransfer);
-          context->U.insert(node, level, std::move(Utransfer));
-          context->V.insert(node, level, std::move(Vtransfer));
 
-          auto Utransfer_splits = context->U(node, level).split(2, 1);
-          Matrix Ubig(block_size, context->rank);
+
+          auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, Ubig_child1.cols),
+                                                  {});
+          Matrix Ubig(block_size, Utransfer.cols);
+
           auto Ubig_splits = Ubig.split(2, 1);
 
           matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
           matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
 
-          Matrix Vbig(Ubig);
+          // add to context
+          Matrix Vtransfer(Utransfer);
+          context->U.insert(node, level, std::move(Utransfer));
+          context->V.insert(node, level, std::move(Vtransfer));
 
+          Matrix Vbig(Ubig);
           Ubig_parent.insert(node, level, std::move(Ubig));
           Vbig_parent.insert(node, level, std::move(Vbig));
         }

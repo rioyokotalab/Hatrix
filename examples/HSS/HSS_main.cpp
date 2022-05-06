@@ -257,9 +257,14 @@ int main(int argc, char* argv[]) {
     std::chrono::milliseconds>(stop_check - start_check).count();
 
   std::cout << "-------------------------------\n";
-  std::cout << "N               : " << N << "\n"
-            << "RANK            : " << rank << "\n"
-            << "NLEAF           : " << nleaf << "\n"
+  std::cout << "N               : " << N << std::endl;
+  if (rank < 0) {
+    std::cout << "ACCURACY      : " << acc << std::endl;
+  }
+  else {
+    std::cout << "RANK            : " << rank << std::endl;
+  }
+  std::cout << "NLEAF           : " << nleaf << "\n"
             << "Domain(ms)      : " << domain_time << "\n"
             << "Contruct(ms)    : " << construct_time << "\n"
             << "Construct error : " << construct_error << std::endl;
