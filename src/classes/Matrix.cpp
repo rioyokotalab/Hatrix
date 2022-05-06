@@ -321,4 +321,31 @@ Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
   return out;
 }
 
+Matrix Matrix::swap_rows(const std::vector<int>& row_indices) {
+  Matrix out(rows, cols);
+
+  out.print_meta();
+  std::cout << "s: " << row_indices.size() << std::endl;
+
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      out(row_indices[i], j) = (*this)(i, j);
+    }
+  }
+
+  return out;
+}
+
+Matrix Matrix::swap_cols(const std::vector<int>& col_indices) {
+  Matrix out(rows, cols);
+
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      out(i, col_indices[j]) = (*this)(i, j);
+    }
+  }
+
+  return out;
+}
+
 }  // namespace Hatrix

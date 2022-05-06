@@ -271,7 +271,7 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                  &C, C.stride);
 }
 
-void solve_r_block(Matrix& interp, Matrix& pivots, const Matrix& A, const int64_t rank) {
+void solve_r_block(Matrix& interp, const Matrix& A, const int64_t rank) {
   Matrix R11(rank, rank), R12(rank, A.cols - rank);
   // copy
   for (int i = 0; i < rank; ++i) {
@@ -299,7 +299,7 @@ void solve_r_block(Matrix& interp, Matrix& pivots, const Matrix& A, const int64_
   }
 }
 
-std::tuple<Matrix, Matrix, int64_t> error_interpolate(Matrix& A, double error) {
+std::tuple<Matrix, std::vector<int>, int64_t> error_interpolate(Matrix& A, double error) {
   std::vector<double> tau(std::min(A.rows, A.cols));
   std::vector<int> jpvt(A.cols);
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
@@ -316,13 +316,14 @@ std::tuple<Matrix, Matrix, int64_t> error_interpolate(Matrix& A, double error) {
     abort();
   }
 
-  Matrix interp(A.cols, rank), pivots(A.cols, 1);
-  solve_r_block(interp, pivots, A, rank);
-
-  for (int i = 0; i < A.cols; ++i) {
-    pivots(i, 0) = jpvt[i];
+  Matrix interp(A.cols, rank);
+  solve_r_block(interp, A, rank);
+  // Bring pivots in C-style.
+  for (int64_t i = 0; i < jpvt.size(); ++i) {
+    jpvt[i] -= 1;
   }
-  return {std::move(interp), std::move(pivots), rank};
+
+  return {std::move(interp), std::move(jpvt), rank};
 }
 
 
@@ -333,7 +334,7 @@ std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
   Matrix R11(rank, rank), R12(rank, A.cols - rank);
 
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
-  solve_r_block(interp, pivots, A, rank);
+  solve_r_block(interp, A, rank);
   for (int i = 0; i < A.cols; ++i) {
     pivots(i, 0) = jpvt[i];
   }

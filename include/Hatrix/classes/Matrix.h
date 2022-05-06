@@ -128,6 +128,9 @@ class Matrix {
   size_t memory_used() const;
 
   Matrix block_ranks(int64_t nblocks, double accuracy) const;
+
+  Matrix swap_rows(const std::vector<int>& row_indices);
+  Matrix swap_cols(const std::vector<int>& col_indices);
 };
 
 }  // namespace Hatrix

@@ -126,6 +126,8 @@ namespace Hatrix {
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
     std::vector<Matrix> pivot_store(context->level_blocks[context->height]);
 
+    std::vector<std::vector<int>> temp;
+
     for (int64_t level = context->height; level > 0; --level) {
       if (level == context->height) {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
@@ -138,7 +140,8 @@ namespace Hatrix {
       int64_t nblocks = context->level_blocks[level];
 
       for (int64_t node = 0; node < nblocks; ++node) {
-        Matrix interp, pivots;
+        Matrix interp;
+        std::vector<int> pivots;
         int64_t rank;
 
         // TODO: use rvalues with transpose.
@@ -146,6 +149,7 @@ namespace Hatrix {
 
         std::tie(interp, pivots, rank) = error_interpolate(sT, context->accuracy);
         // TODO: avoid storing both the U and V.
+        temp.push_back(pivots);
         Matrix Vinterp(interp, true);
         context->U.insert(node, level, std::move(interp));
         context->V.insert(node, level, std::move(Vinterp));
@@ -157,7 +161,7 @@ namespace Hatrix {
         // choose the rows of the samples that correspond to the interpolation.
         Matrix S_loc(rank, p);
         for (int64_t i = 0; i < rank; ++i) {
-          int64_t row = pivots(i, 0)-1;
+          int64_t row = pivots[i];
           for (int64_t j = 0; j < p; ++j) {
             S_loc(i, j) = S_loc_blocks[node](row, j);
           }
@@ -168,24 +172,16 @@ namespace Hatrix {
         // this index set.
         std::vector<int64_t> indices;
         for (int64_t i = 0; i < rank; ++i) {
-          indices.push_back(row_indices[node][pivots(i, 0)-1]);
+          indices.push_back(row_indices[node][pivots[i]]);
         }
-        // std::cout << "indicies for node: " << node << ", level -> " << level << " \n";
-        // for (int i = 0; i < indices.size(); ++i) {
-        //   std::cout << indices[i] << " ";
-        // }
-        // std::cout << std::endl;
         row_indices[node] = std::move(indices);
       }
-
-
-
 
       // generate S blocks for the lower triangular region only since this
       // is a symmetric matrix.
       for (int64_t brow = 0; brow < nblocks; ++brow) {
         for (int64_t bcol = 0; bcol < nblocks; ++bcol) {
-          if (context->is_admissible.exists(brow, bcol, level) &&
+          if (context-y>is_admissible.exists(brow, bcol, level) &&
               context->is_admissible(brow, bcol, level)) {
             std::vector<int64_t>& row_index_set = row_indices[brow];
             std::vector<int64_t>& col_index_set = row_indices[bcol];
@@ -209,11 +205,13 @@ namespace Hatrix {
         // context->S(1, 0, level).print();
         std::cout << "REGEN D(1, 0)\n";
         context->U(1, level).print_meta();
-        matmul(matmul(context->U(1, level), context->S(1, 0, level)),
-               context->V(0, level), false, true).print();
+        auto regen = matmul(matmul(context->U(1, level), context->S(1, 0, level)),
+               context->V(0, level), false, true).swap_rows(temp[1]).swap_cols(temp[0]);
+
 
         std::cout << "REAL D(1,0)\n";
-        generate_p2p_interactions(context->domain, 1, 0, context->kernel).print();;
+        auto a = generate_p2p_interactions(context->domain, 1, 0, context->kernel);
+        (regen - a).print();
       }
     }
   }

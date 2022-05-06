@@ -15,7 +15,7 @@ make -j
 # done
 
 for N in 128; do
-    ./bin/HSS_main --N $N --nleaf 32 --kernel-func laplace --add-diag 1e-6 \
+    lldb -o run -- ./bin/HSS_main --N $N --nleaf 32 --kernel-func laplace --add-diag 1e-6 \
                    --acc 1e-5 --nested-basis 1 --construct-algorithm id_random \
                    --kind-of-geometry circular
     # ./bin/H2_far_dense_construct $N 30 64 0 1 diagonal_admis 0

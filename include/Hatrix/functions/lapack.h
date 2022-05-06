@@ -59,7 +59,7 @@ void householder_qr_compact_wy(Matrix& A, Matrix& T);
 void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                            int side, bool trans);
 
-std::tuple<Matrix, Matrix, int64_t> error_interpolate(Matrix& A, double error);
+std::tuple<Matrix, std::vector<int>, int64_t> error_interpolate(Matrix& A, double error);
 
 // One-sided truncated interpolative decomposition. Refer to section 4 of
 // https://amath.colorado.edu/faculty/martinss/Pubs/2004_skeletonization.pdf for the
