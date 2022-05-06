@@ -40,13 +40,25 @@ bool help_option_exists(std::vector<std::string>& cmd_options) {
 }
 
 void validate_cmd(std::vector<std::string>& cmd_options) {
+  bool found_rank = false, found_acc = false;
   for (std::string option : cmd_options) {
     if (option.find("--", 0) != std::string::npos) {
       if (std::find(valid_opts.begin(), valid_opts.end(), option) == valid_opts.end()) {
         std::cout << "Found unknown option " << option << std::endl;
         abort();
       }
+
+      if (option == valid_opts[5]) {
+        found_rank = true;
+      }
+      if (option == valid_opts[6]) {
+        found_acc = true;
+      }
     }
+  }
+
+  if (found_rank && found_acc) {
+    throw std::invalid_argument("validate_cmd()-> --rank and --acc are mutually exclusive.");
   }
 }
 
@@ -92,9 +104,9 @@ int main(int argc, char* argv[]) {
   KERNEL_FUNC kernel_func = LAPLACE;
   KIND_OF_GEOMETRY kind_of_geometry = GRID;
   int64_t ndim = 1;
-  int64_t rank = 10;
+  int64_t rank = -1;
   double admis = 0;
-  double acc = -1;
+  double acc = 1;
   double add_diag = 0;
   ADMIS_KIND admis_kind = DIAGONAL;
   CONSTRUCT_ALGORITHM construct_algorithm = MIRO;
@@ -146,9 +158,11 @@ int main(int argc, char* argv[]) {
     }
     else if (option == valid_opts[5]) {
       rank = std::stol(*(++iter));
+      acc = 1;
     }
     else if (option == valid_opts[6]) {
       acc = std::stod(*(++iter));
+      rank = -1;
     }
     else if (option == valid_opts[7]) {
       admis = std::stod(*(++iter));
@@ -215,9 +229,17 @@ int main(int argc, char* argv[]) {
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
   auto start_construct = std::chrono::system_clock::now();
-  SharedBasisMatrix A(N, nleaf, rank, acc, admis, admis_kind,
-                      construct_algorithm, use_nested_basis,
-                      domain, kernel, is_symmetric);
+  SharedBasisMatrix A(N,
+                      nleaf,
+                      rank,
+                      acc,
+                      admis,
+                      admis_kind,
+                      construct_algorithm,
+                      use_nested_basis,
+                      domain,
+                      kernel,
+                      is_symmetric);
   auto stop_construct = std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
@@ -233,10 +255,6 @@ int main(int argc, char* argv[]) {
   auto stop_check = std::chrono::system_clock::now();
   double check_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_check - start_check).count();
-
-  // b.print();
-  // bdense.print();
-  // (b - bdense).print();
 
   std::cout << "-------------------------------\n";
   std::cout << "N               : " << N << "\n"

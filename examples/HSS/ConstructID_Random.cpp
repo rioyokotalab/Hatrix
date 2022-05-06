@@ -112,7 +112,6 @@ namespace Hatrix {
     return {std::move(row_indices), std::move(S_loc_blocks), std::move(OMEGA_blocks)};
   }
 
-
   void
   ConstructID_Random::construct() {
     Matrix dense = generate_p2p_matrix(context->domain, context->kernel);
@@ -124,8 +123,6 @@ namespace Hatrix {
     // begin construction procedure using randomized samples.
     std::vector<std::vector<int64_t>> row_indices(context->level_blocks[context->height]);
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
-
-    std::vector<std::vector<int64_t>> temp;
 
     for (int64_t level = context->height; level > 0; --level) {
       if (level == context->height) {
@@ -172,14 +169,6 @@ namespace Hatrix {
         for (int64_t i = 0; i < rank; ++i) {
           indices.push_back(row_indices[node][pivots[i]]);
         }
-
-        std::cout << "node: " << node << " pivs: " << pivots.size() << " rank : "
-                  << rank << std::endl;
-
-
-        // std::vector<int64_t> temp_indices;
-        // for (int64_t i = 0; i < )
-        temp.push_back(pivots);
         row_indices[node] = std::move(indices);
       }
 
@@ -207,88 +196,5 @@ namespace Hatrix {
         }
       }
     }
-
-    std::cout << "n0 lvl 1\n";
-    for (int i = 0; i < temp[4].size(); ++i) {
-      std::cout << temp[4][i] << " ";
-    }
-    std::cout << std::endl;
-
-    std::cout << "S(1, 0)\n";
-    auto t = matmul(matmul(context->U(1, 1), context->S(1, 0, 1)),
-                    context->V(0, 1), false, true).swap_rows(temp[5]).swap_cols(temp[4]);
-
-    Matrix& U2 = context->U(2, 2);
-    Matrix& U3 = context->U(3, 2);
-    Matrix l(U2.rows + U3.rows,
-             context->U(2, 2).cols + context->U(3, 2).cols);
-    for (int i = 0; i < U2.rows; ++i) {
-      for (int j = 0; j < U2.cols; ++j) {
-        l(i, j) = U2(i, j);
-      }
-    }
-
-    for (int i = 0; i < U3.rows; ++i) {
-      for (int j = 0;j < U3.cols; ++j) {
-        l(i + U2.rows, j + U2.cols) = U3(i, j);
-      }
-    }
-
-    Matrix& V0 = context->V(0, 2);
-    Matrix& V1 = context->V(1, 2);
-    Matrix r(V0.rows + V1.rows, V0.cols + V1.cols);
-
-    for (int i = 0; i < V0.rows; ++i) {
-      for (int j = 0; j < V0.cols; ++j) {
-        r(i, j)= V0(i, j);
-      }
-    }
-
-    for (int i = 0; i < V1.rows; ++i) {
-      for (int j = 0; j < V1.cols; ++j) {
-        r(i + V0.rows, j + V0.cols) = V1(i, j);
-      }
-    }
-
-    auto pp = matmul(matmul(l, t), r, false, true);
-
-    std::vector<int64_t> pl, pr;
-    for (int i = 0; i < temp[2].size(); ++i) {
-      pl.push_back(temp[2][i]);
-    }
-    for (int i = 0; i < temp[3].size(); ++i) {
-      pl.push_back(temp[3][i] + context->nleaf);
-    }
-    std::cout << "pl\n";
-    for (int i = 0; i < pl.size(); ++i) {
-      std::cout << pl[i] << " ";
-    }
-    std::cout << std::endl;
-
-    for (int i = 0; i < temp[0].size(); ++i) {
-      pr.push_back(temp[0][i]);
-    }
-    for (int i = 0; i < temp[1].size(); ++i) {
-      pr.push_back(temp[1][i] + context->nleaf);
-    }
-
-
-    Matrix d = generate_p2p_interactions(context->domain, 1, 0, 1,
-                                         context->height, context->kernel);
-    std::cout << "norm: " << Hatrix::norm(pp.swap_rows(pl).swap_cols(pr) - d) << std::endl;;
-
-    // matmul(matmul(l, t), r, false, true).print();
-    // d.print();
-
-    // int level = 2;
-    // std::cout << "REGEN D(3, 0) U->x\n";
-    // context->U(1, level).print_meta();
-    // auto regen = matmul(matmul(context->U(3, level), context->S(3, 2, level)),
-    //                     context->V(2, level), false, true).swap_rows(temp[3]).swap_cols(temp[2]);
-
-
-    // std::cout << "REAL D(3,0)\n";
-    // auto a = generate_p2p_interactions(context->domain, 3, 2, context->kernel);
-    // (regen - a).print();
   }
 }
