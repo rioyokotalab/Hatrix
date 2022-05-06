@@ -11,6 +11,7 @@
 #include <memory>
 #include <vector>
 #include <fstream>
+#include <stdexcept>
 
 namespace Hatrix {
 
@@ -145,13 +146,25 @@ double* Matrix::operator&() { return data_ptr; }
 const double* Matrix::operator&() const { return data_ptr; }
 
 double& Matrix::operator()(int64_t i, int64_t j) {
-  assert(i < rows && i >= 0);
-  assert(j < cols && j >= 0);
+  if (i > rows || i < 0) {
+    throw std::invalid_argument("Matrix#operator() -> expected i < rows && i > 0, but got i= " +
+                                std::to_string(i) + " rows= " + std::to_string(rows));
+  }
+  if (j > cols || j < 0) {
+    throw std::invalid_argument("Matrix#operator() -> expected j > cols && j > 0, but got j=" +
+                                std::to_string(j) + " cols= " + std::to_string(cols));
+  }
   return data_ptr[i + j * stride];
 }
 const double& Matrix::operator()(int64_t i, int64_t j) const {
-  assert(i < rows && i >= 0);
-  assert(j < cols && j >= 0);
+  if (i > rows || i < 0) {
+    throw std::invalid_argument("Matrix#operator() -> expected i < rows && i > 0, but got i= " +
+                                std::to_string(i) + " rows= " + std::to_string(rows));
+  }
+  if (j > cols || j < 0) {
+    throw std::invalid_argument("Matrix#operator() -> expected j > cols && j > 0, but got j=" +
+                                std::to_string(j) + " cols= " + std::to_string(cols));
+  }
   return data_ptr[i + j * stride];
 }
 
@@ -321,11 +334,8 @@ Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
   return out;
 }
 
-Matrix Matrix::swap_rows(const std::vector<int>& row_indices) {
+Matrix Matrix::swap_rows(const std::vector<int64_t>& row_indices) {
   Matrix out(rows, cols);
-
-  out.print_meta();
-  std::cout << "s: " << row_indices.size() << std::endl;
 
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {
@@ -336,7 +346,7 @@ Matrix Matrix::swap_rows(const std::vector<int>& row_indices) {
   return out;
 }
 
-Matrix Matrix::swap_cols(const std::vector<int>& col_indices) {
+Matrix Matrix::swap_cols(const std::vector<int64_t>& col_indices) {
   Matrix out(rows, cols);
 
   for (int64_t i = 0; i < rows; ++i) {

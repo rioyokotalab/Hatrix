@@ -299,7 +299,7 @@ void solve_r_block(Matrix& interp, const Matrix& A, const int64_t rank) {
   }
 }
 
-std::tuple<Matrix, std::vector<int>, int64_t> error_interpolate(Matrix& A, double error) {
+std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, double error) {
   std::vector<double> tau(std::min(A.rows, A.cols));
   std::vector<int> jpvt(A.cols);
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
@@ -319,11 +319,12 @@ std::tuple<Matrix, std::vector<int>, int64_t> error_interpolate(Matrix& A, doubl
   Matrix interp(A.cols, rank);
   solve_r_block(interp, A, rank);
   // Bring pivots in C-style.
+  std::vector<int64_t> c_pivots(jpvt.size());
   for (int64_t i = 0; i < jpvt.size(); ++i) {
-    jpvt[i] -= 1;
+    c_pivots[i] = jpvt[i] - 1;
   }
 
-  return {std::move(interp), std::move(jpvt), rank};
+  return {std::move(interp), std::move(c_pivots), rank};
 }
 
 

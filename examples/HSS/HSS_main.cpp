@@ -225,7 +225,7 @@ int main(int argc, char* argv[]) {
   double construct_error;
 
   auto start_check = std::chrono::system_clock::now();
-  Matrix x = generate_random_matrix(N, 1);
+  Matrix x = generate_range_matrix(N, 1, 0);
   Matrix b = A.matvec(x);
   Matrix Adense = Hatrix::generate_p2p_matrix(domain, kernel);
   Matrix bdense = matmul(Adense, x);
