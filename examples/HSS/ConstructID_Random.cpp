@@ -144,6 +144,9 @@ namespace Hatrix {
         Matrix sT(transpose(S_loc_blocks[node]));
 
         std::tie(interp, pivots, rank) = error_interpolate(sT, context->accuracy);
+
+        std::cout << "node = " << node << " level = " << level
+                  << " rank = " << rank << std::endl;
         // TODO: avoid storing both the U and V.
         Matrix Vinterp(interp, true);
         context->U.insert(node, level, std::move(interp));

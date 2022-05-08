@@ -336,17 +336,20 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
   std::vector<int> jpvt(A.cols);
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
 
-  int64_t rank = 0;
-  // find the right rank for this.
-  for (int64_t i = 0; i < A.min_dim(); ++i) {
-    if (std::abs(A(i, i)) < error) { break; }
-    rank += 1;
+  int64_t min_dim = A.min_dim();
+  if (std::abs(A(min_dim-1, min_dim-1)) > error) {
+    throw std::runtime_error("ID failed since the requested error cannot be reached. Min. error= " +
+                             std::to_string(std::abs(A(min_dim, min_dim))) + ", requested error= " +
+                             std::to_string(error));
   }
 
-  if (rank > A.cols) {
-    std::cout << "ID with tol " << error << " failed.\n";
-    abort();
+  int64_t rank = 1;
+  // find the right rank for this.
+  for (int64_t i = 1; i < min_dim; ++i) {
+    if (std::abs(A(i, i)) < error) { break; }
+    rank++;
   }
+  std::cout << "resulting rank = " << rank <<  " last value= " << std::abs(A(min_dim-1, min_dim-1))<< std::endl;
 
   Matrix interp(A.cols, rank);
   solve_r_block(interp, A, rank);

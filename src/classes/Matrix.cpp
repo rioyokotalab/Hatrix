@@ -146,22 +146,22 @@ double* Matrix::operator&() { return data_ptr; }
 const double* Matrix::operator&() const { return data_ptr; }
 
 double& Matrix::operator()(int64_t i, int64_t j) {
-  if (i > rows || i < 0) {
+  if (i >= rows || i < 0) {
     throw std::invalid_argument("Matrix#operator() -> expected i < rows && i > 0, but got i= " +
                                 std::to_string(i) + " rows= " + std::to_string(rows));
   }
-  if (j > cols || j < 0) {
+  if (j >= cols || j < 0) {
     throw std::invalid_argument("Matrix#operator() -> expected j > cols && j > 0, but got j=" +
                                 std::to_string(j) + " cols= " + std::to_string(cols));
   }
   return data_ptr[i + j * stride];
 }
 const double& Matrix::operator()(int64_t i, int64_t j) const {
-  if (i > rows || i < 0) {
+  if (i >= rows || i < 0) {
     throw std::invalid_argument("Matrix#operator() -> expected i < rows && i > 0, but got i= " +
                                 std::to_string(i) + " rows= " + std::to_string(rows));
   }
-  if (j > cols || j < 0) {
+  if (j >= cols || j < 0) {
     throw std::invalid_argument("Matrix#operator() -> expected j > cols && j > 0, but got j=" +
                                 std::to_string(j) + " cols= " + std::to_string(cols));
   }

@@ -8,7 +8,7 @@
 
 namespace Hatrix {
   class ConstructID_Random : public ConstructAlgorithm {
-    const int64_t p = 50;
+    const int64_t p = 100;
     std::tuple<std::vector<std::vector<int64_t>>, std::vector<Matrix>, std::vector<Matrix>>
     generate_leaf_blocks(const Matrix& samples, const Matrix& OMEGA);
     std::tuple<std::vector<std::vector<int64_t>>, std::vector<Matrix>, std::vector<Matrix>>
