@@ -349,7 +349,6 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
     if (std::abs(A(i, i)) < error) { break; }
     rank++;
   }
-  std::cout << "resulting rank = " << rank <<  " last value= " << std::abs(A(min_dim-1, min_dim-1))<< std::endl;
 
   Matrix interp(A.cols, rank);
   solve_r_block(interp, A, rank);
