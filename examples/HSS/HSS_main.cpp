@@ -259,8 +259,8 @@ int main(int argc, char* argv[]) {
   std::cout << "-------------------------------\n";
   std::cout << "N               : " << N << std::endl;
   if (rank < 0) {
-    std::cout << "ACCURACY      : " << acc << std::endl;
-    std::cout << "MAX RANK      : " << A.max_rank() << std::endl;
+    std::cout << "ACCURACY        : " << acc << std::endl;
+    std::cout << "MAX RANK        : " << A.max_rank() << std::endl;
   }
   else {
     std::cout << "RANK            : " << rank << std::endl;

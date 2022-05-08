@@ -339,7 +339,7 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
   int64_t min_dim = A.min_dim();
   if (std::abs(A(min_dim-1, min_dim-1)) > error) {
     throw std::runtime_error("ID failed since the requested error cannot be reached. Min. error= " +
-                             std::to_string(std::abs(A(min_dim, min_dim))) + ", requested error= " +
+                             std::to_string(std::abs(A(min_dim-1, min_dim-1))) + ", requested error= " +
                              std::to_string(error));
   }
 
