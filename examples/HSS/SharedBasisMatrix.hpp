@@ -44,6 +44,8 @@ namespace Hatrix {
 
     // Perform matrix-vector multiplication.
     Matrix matvec(const Matrix& x);
+
+    int64_t max_rank();
   };
 
   // Strategy pattern class hierarchy for implementation of various

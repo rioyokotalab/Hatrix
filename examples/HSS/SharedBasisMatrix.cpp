@@ -265,6 +265,20 @@ namespace Hatrix {
     return b;
   }
 
+  int64_t SharedBasisMatrix::max_rank() {
+    int64_t max = 0;
+    for (int64_t level = height; level > 0; --level) {
+      for (int64_t i = 0; i < level_blocks[level]; ++i) {
+        if (max < U(i, level).cols) {
+          max = U(i, level).cols;
+        }
+      }
+    }
+
+    return max;
+  }
+
+
   SharedBasisMatrix::SharedBasisMatrix(int64_t N, int64_t nleaf, int64_t rank,
                                        double accuracy, double admis,
                                        ADMIS_KIND admis_kind,

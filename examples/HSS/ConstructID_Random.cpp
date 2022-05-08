@@ -124,6 +124,8 @@ namespace Hatrix {
     std::vector<std::vector<int64_t>> row_indices(context->level_blocks[context->height]);
     std::vector<Matrix> S_loc_blocks, OMEGA_blocks;
 
+    std::vector<std::vector<int64_t>> temp;
+
     for (int64_t level = context->height; level > 0; --level) {
       if (level == context->height) {
         std::tie(row_indices, S_loc_blocks, OMEGA_blocks) =
@@ -144,7 +146,7 @@ namespace Hatrix {
         Matrix sT(transpose(S_loc_blocks[node]));
 
         std::tie(interp, pivots, rank) = error_interpolate(sT, context->accuracy);
-
+        temp.push_back(pivots);
         // TODO: avoid storing both the U and V.
         Matrix Vinterp(interp, true);
         context->U.insert(node, level, std::move(interp));
@@ -197,5 +199,16 @@ namespace Hatrix {
         }
       }
     }
+    // context->S(1, 0, level).print();
+    int level = 2;
+    std::cout << "REGEN D(1, 0)\n";
+    context->U(1, level).print_meta();
+    auto regen = matmul(matmul(context->U(1, level), context->S(1, 0, level)),
+                        context->V(0, level), false, true).swap_rows(temp[1]).swap_cols(temp[0]);
+
+
+    std::cout << "REAL D(1,0)\n";
+    auto a = generate_p2p_interactions(context->domain, 1, 0, context->kernel);
+    std::cout << "error norm -> " << Hatrix::norm(regen - a) << std::endl;
   }
 }
