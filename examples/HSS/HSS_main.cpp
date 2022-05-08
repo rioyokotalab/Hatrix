@@ -256,6 +256,7 @@ int main(int argc, char* argv[]) {
   double check_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_check - start_check).count();
 
+  std::cout << "err = " << A.construction_error() << std::endl;
   std::cout << "-------------------------------\n";
   std::cout << "N               : " << N << std::endl;
   if (rank < 0) {
