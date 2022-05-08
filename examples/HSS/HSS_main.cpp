@@ -158,6 +158,10 @@ int main(int argc, char* argv[]) {
     }
     else if (option == valid_opts[5]) {
       rank = std::stol(*(++iter));
+      if (rank <= 0) {
+        throw std::invalid_argument("rank >=0 is required, but got rank=" +
+                                    std::to_string(rank));
+      }
       acc = 1;
     }
     else if (option == valid_opts[6]) {
