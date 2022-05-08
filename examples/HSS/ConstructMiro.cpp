@@ -50,7 +50,6 @@ namespace Hatrix {
     else {                      // constant accuracy compression
       std::vector<int64_t> pivots; int64_t rank;
       std::tie(Ui, pivots, rank) = error_pivoted_qr(AY, context->accuracy);
-      std::cout << "PQR leaf rank = " << rank << std::endl;
     }
 
     return {std::move(Ui)};
@@ -199,7 +198,8 @@ namespace Hatrix {
     auto col_block_splits = col_block.split(2, 1);
 
     Matrix temp(Ubig_child1.cols + Ubig_child2.cols, col_block.cols);
-    auto temp_splits = temp.split(2, 1);
+    auto temp_splits = temp.split(std::vector<int64_t>(1, Ubig_child1.cols),
+                                  {});
 
     matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
     matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
@@ -212,7 +212,6 @@ namespace Hatrix {
     else {
       int64_t rank;
       std::tie(Utransfer, pivots, rank) = error_pivoted_qr(temp, context->accuracy);
-      std::cout << "PQR non-leaf rank = " << rank << std::endl;
     }
 
     return std::move(Utransfer);
@@ -380,7 +379,7 @@ namespace Hatrix {
 
   void
   ConstructMiro::construct() {
-    int64_t p = 50;
+    int64_t p = 100;
     Matrix A = generate_p2p_matrix(context->domain, context->kernel);
     Matrix rand = generate_random_matrix(context->N, p);
     generate_leaf_nodes(context->domain, A, rand);
