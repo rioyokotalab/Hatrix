@@ -40,6 +40,7 @@ else()
     UMV_BLR2_far_dense
     H2_far_dense_construct
     UMV_H2_far_dense
+    LDL_strong_1level
   )
 endif()
 
