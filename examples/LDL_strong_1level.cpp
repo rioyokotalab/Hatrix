@@ -1729,7 +1729,7 @@ int main(int argc, char ** argv) {
   Hatrix::Context::init();
 
   const auto start_particles = std::chrono::system_clock::now();
-  constexpr int64_t ndim = 2;
+  constexpr int64_t ndim = 3;
   Hatrix::Domain domain(N, ndim);
   // Laplace kernel
   domain.generate_particles(0, 1);
