@@ -13,15 +13,7 @@ namespace Hatrix {
   Matrix
   ConstructMiro::generate_column_block(int64_t block, int64_t block_size,
                                        int64_t level, const Matrix& A, const Matrix& rand) {
-    int ncols = 0;
-    int num_blocks = 0;
     int nblocks = context->level_blocks[level];
-    for (int64_t j = 0; j < nblocks; ++j) {
-      if (context->is_admissible.exists(block, j, level) &&
-          !context->is_admissible(block, j, level)) { continue; }
-      ncols += context->get_block_size(j, level);
-      num_blocks++;
-    }
 
     auto A_splits = A.split(nblocks, nblocks);
     auto rand_splits = rand.split(nblocks, 1);
