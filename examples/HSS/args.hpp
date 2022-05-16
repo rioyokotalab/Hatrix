@@ -1,6 +1,7 @@
-#include "internal_types.hpp"
-
+#pragma once
 #include <string>
+
+#include "internal_types.hpp"
 
 namespace Hatrix {
   class Args {
