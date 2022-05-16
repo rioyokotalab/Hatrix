@@ -68,6 +68,36 @@ void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {
   throw std::exception();
 }
 
+static Matrix
+generate_column_block(int64_t block, int64_t block_size,
+                      int64_t level,
+                      const SymmetricSharedBasisMatrix& A,
+                      const Matrix& dense,
+                      const Matrix& rand) {
+  int64_t nblocks = A.level_blocks[level];
+  auto dense_splits = dense.split(nblocks, nblocks);
+  auto rand_splits = rand.split(nblocks, 1);
+  Matrix AY(block_size, rand.cols);
+
+  int64_t index = 0;
+  for (int64_t j = 0; j < nblocks; ++j) {
+    if (A.is_admissible.exists(block, j, level) &&
+        !A.is_admissible(block, j, level)) { continue; }
+    matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
+  }
+
+  return AY;
+}
+
+static Matrix
+generate_column_bases(int64_t block, int64_t block_size, int64_t level,
+                      const SymmetricSharedBasisMatrix& A,
+                      const Matrix& dense, const Matrix&rand) {
+  Matrix AY = generate_column_block(block, block_size, level, A, dense, rand);
+
+  return AY;
+}
+
 static void
 generate_leaf_nodes(const Domain& domain,
                     SymmetricSharedBasisMatrix& A,
@@ -80,10 +110,22 @@ generate_leaf_nodes(const Domain& domain,
     for (int64_t j = 0; j < nblocks; ++j) {
       if (A.is_admissible.exists(i, j, A.height) &&
           !A.is_admissible(i, j, A.height)) {
+        // TODO: Make this only a lower triangular matrix with the diagonal.
         Matrix Aij(dense_splits[i * nblocks + j], true);
         A.D.insert(i, j, A.height, std::move(Aij));
       }
     }
+  }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    A.U.insert(i,
+               A.height,
+               generate_column_bases(i,
+                                     domain.boxes[i].num_particles,
+                                     A.height,
+                                     A,
+                                     dense,
+                                     rand));
   }
 }
 
