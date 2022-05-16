@@ -196,15 +196,18 @@ std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t ran
   return {std::move(Q), std::move(pivots)};
 }
 
-std::tuple<Matrix, std::vector<int64_t>, int64_t> error_pivoted_qr(const Matrix& A, double error) {
+std::tuple<Matrix, std::vector<int64_t>, int64_t>
+error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
   Matrix Q(A, true);
   std::vector<double> tau(Q.rows);
   std::vector<int> jpvt(Q.cols);
   int64_t rank = 1;
 
+  assert(max_rank <= Q.min_dim());
+
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
   for (int64_t i = 1; i < Q.min_dim(); ++i) {
-    if (std::abs(Q(i,i)) < error) { break; }
+    if ((rank >= max_rank && max_rank > 0) || std::abs(Q(i,i)) < error) { break; }
     rank++;
   }
 

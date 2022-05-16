@@ -100,15 +100,18 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
   Matrix AY = generate_column_block(block, block_size, level, A, dense, rand);
   Matrix Ui;
   std::vector<int64_t> pivots;
+  int64_t rank;
 
-  if (opts.accuracy > 1) {        // constant rank compression
-    std::tie(Ui, pivots) = pivoted_qr(AY, opts.max_rank);
+  if (opts.accuracy == -1) {        // constant rank compression
+    rank = opts.max_rank;
+    std::tie(Ui, pivots) = pivoted_qr(AY, rank);
   }
   else {
-    int64_t rank;
-    std::tie(Ui, pivots, rank) = error_pivoted_qr(AY, opts.accuracy);
-    A.ranks.insert(block, level, std::move(rank));
+    std::tie(Ui, pivots, rank) = error_pivoted_qr(AY, opts.accuracy, opts.max_rank);
+
   }
+
+  A.ranks.insert(block, level, std::move(rank));
 
   return std::move(Ui);
 }
@@ -185,14 +188,16 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
 
   Matrix Utransfer;
   std::vector<int64_t> pivots;
-  if (opts.accuracy > 1) {      // constant rank factorization
-    std::tie(Utransfer, pivots) = pivoted_qr(temp, opts.max_rank);
+  int64_t rank;
+  if (opts.accuracy == -1) {      // constant rank factorization
+    rank = opts.max_rank;
+    std::tie(Utransfer, pivots) = pivoted_qr(temp, rank);
   }
   else {
-    int64_t rank;
     std::tie(Utransfer, pivots, rank) = error_pivoted_qr(temp, opts.accuracy);
-    A.ranks.insert(node, level, std::move(rank));
   }
+
+  A.ranks.insert(node, level, std::move(rank));
 
   return std::move(Utransfer);
 }
@@ -261,7 +266,8 @@ generate_transfer_matrices(const int64_t level,
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) &&
           A.is_admissible(i, j, level)) {
-        Matrix Sdense = matmul(matmul(Ubig_parent(i, level), dense_splits[i * nblocks + j], true, false),
+        Matrix Sdense = matmul(matmul(Ubig_parent(i, level),
+                                      dense_splits[i * nblocks + j], true, false),
                                Ubig_parent(j, level));
 
         A.S.insert(i, j, level, std::move(Sdense));
@@ -354,10 +360,12 @@ reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
 
           dense_norm += pow(norm(actual_matrix), 2);
           error += pow(norm(expected_matrix - actual_matrix), 2);
+
+          std::cout << "r: " << row << " c: " << col << " l: "
+                    << level << std::sqrt(error / dense_norm) << std::endl;
         }
       }
     }
-
   }
 
   return std::sqrt(error / dense_norm);

@@ -47,13 +47,11 @@ int main(int argc, char* argv[]) {
   int64_t max_rank;
   double construct_time;
 
-  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
 
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
     SymmetricSharedBasisMatrix A;
     if (opts.admis_kind == DIAGONAL) {
-      std::cout << "=====\n";
       init_diagonal_admis(A, opts);
     }
     else {
@@ -64,15 +62,10 @@ int main(int argc, char* argv[]) {
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
 
-    print_h2_structure(A);
-
-    std::cout << "acc: " << reconstruct_accuracy(A, domain, Adense, opts) << std::endl;
-
-    max_rank = A.max_rank();
     b = matmul(A, x);
   }
 
-
+  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
 
   double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
