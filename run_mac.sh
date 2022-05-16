@@ -14,13 +14,14 @@ make -j
 #                    --acc 1e-8 --nested-basis 1 --construct-algorithm miro
 # done
 
-for N in 2048; do
+for N in 1024;
+do
     ./bin/HSS_main --N $N \
                    --nleaf 128 \
                    --kernel_func laplace \
                    --kind_of_geometry circular \
                    --ndim 1 \
-                   --max_rank 20 \
+                   --max_rank 50 \
                    --accuracy 1 \
                    --admis 0 \
                    --admis_kind diagonal \

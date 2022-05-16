@@ -2,4 +2,4 @@
 
 using namespace Hatrix;
 
-Matrix matmul(SymmetricSharedBasisMatrix& A, const Matrix& x);
+Matrix matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x);

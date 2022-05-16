@@ -260,9 +260,10 @@ generate_transfer_matrices(const int64_t level,
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) &&
-          !A.is_admissible(i, j, level)) {
+          A.is_admissible(i, j, level)) {
         Matrix Sdense = matmul(matmul(Ubig_parent(i, level), dense_splits[i * nblocks + j], true, false),
                                Ubig_parent(j, level));
+
         A.S.insert(i, j, level, std::move(Sdense));
       }
     }
@@ -284,4 +285,80 @@ void construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A,
   for (int64_t level = A.height-1; level > 0; --level) {
     Uchild = generate_transfer_matrices(level, Uchild, A, dense, rand, opts);
   }
+}
+
+static void
+actually_print_h2_structure(const SymmetricSharedBasisMatrix& A, const int64_t level) {
+  if (level == 0) { return; }
+  int64_t nblocks = A.level_blocks[level];
+  std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
+  for (int64_t i = 0; i < nblocks; ++i) {
+    if (level == A.height) {
+      std::cout << A.U(i, A.height).rows << " ";
+    }
+    std::cout << "| " ;
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, level)) {
+        std::cout << A.is_admissible(i, j, level) << " | " ;
+      }
+      else {
+        std::cout << "  | ";
+      }
+    }
+    std::cout << std::endl;
+  }
+
+  std::cout << std::endl;
+
+  actually_print_h2_structure(A, level-1);
+}
+
+void print_h2_structure(const SymmetricSharedBasisMatrix& A) {
+  actually_print_h2_structure(A, A.height);
+}
+
+double
+reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
+                     const Domain& domain,
+                     const Matrix& dense,
+                     const Args& opts) {
+  double error = 0;
+  double dense_norm = 0;
+  int64_t nblocks = A.level_blocks[A.height];
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.height) && !A.is_admissible(i, j, A.height)) {
+        Matrix actual = generate_p2p_interactions(domain, i, j, opts.kernel);
+        Matrix expected = A.D(i, j, A.height);
+        error += pow(norm(actual - expected), 2);
+        dense_norm += pow(norm(actual), 2);
+      }
+    }
+  }
+
+  for (int64_t level = A.height; level > 0; --level) {
+    int64_t nblocks = A.level_blocks[level];
+
+    for (int64_t row = 0; row < nblocks; ++row) {
+      for (int64_t col = 0; col < row; ++col) {
+        if (A.is_admissible.exists(row, col, level) && A.is_admissible(row, col, level)) {
+          Matrix Ubig = A.Ubig(row, level);
+          Matrix Vbig = A.Ubig(col, level);
+
+          Matrix expected_matrix = matmul(matmul(Ubig, A.S(row, col, level)),
+                                          Vbig, false, true);
+          Matrix actual_matrix =
+            Hatrix::generate_p2p_interactions(domain, row, col, level,
+                                              A.height, opts.kernel);
+
+          dense_norm += pow(norm(actual_matrix), 2);
+          error += pow(norm(expected_matrix - actual_matrix), 2);
+        }
+      }
+    }
+
+  }
+
+  return std::sqrt(error / dense_norm);
 }
