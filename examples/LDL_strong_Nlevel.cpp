@@ -2008,7 +2008,6 @@ int main(int argc, char ** argv) {
   construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
 
-  A.print_structure();
   const auto start_factor = std::chrono::system_clock::now();
   A.factorize(domain);
   const auto stop_factor = std::chrono::system_clock::now();
