@@ -108,7 +108,6 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
   }
   else {
     std::tie(Ui, pivots, rank) = error_pivoted_qr(AY, opts.accuracy, opts.max_rank);
-
   }
 
   A.ranks.insert(block, level, std::move(rank));
@@ -194,7 +193,7 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
     std::tie(Utransfer, pivots) = pivoted_qr(temp, rank);
   }
   else {
-    std::tie(Utransfer, pivots, rank) = error_pivoted_qr(temp, opts.accuracy);
+    std::tie(Utransfer, pivots, rank) = error_pivoted_qr(temp, opts.accuracy, opts.max_rank);
   }
 
   A.ranks.insert(node, level, std::move(rank));
