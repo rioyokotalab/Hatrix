@@ -15,6 +15,7 @@
 #include "functions.hpp"
 #include "internal_types.hpp"
 #include "SharedBasisMatrix.hpp"
+#include "Args.hpp"
 
 using namespace Hatrix;
 

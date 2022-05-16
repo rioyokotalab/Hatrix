@@ -4,6 +4,22 @@
 #include <getopt.h>
 
 namespace Hatrix {
+  static struct option long_options[] = {
+    {"N", required_argument, 0, 'n'},
+    {"nleaf", required_argument, 0, 'l'},
+    {"kernel_func", required_argument, 0, 'k'},
+    {"kind_of_geometry", required_argument, 0, 'g'},
+    {"ndim", required_argument, 0, 'd' },
+    {"max_rank", required_argument, 0, 'r'},
+    {"accuracy", required_argument, 0, 'e'},
+    {"admis", required_argument, 0, 'a'},
+    {"admis_kind", required_argument, 0, 'm'},
+    {"construct_algorithm", required_argument, 0, 'c'},
+    {"add_diag", required_argument, 0, 'z'},
+    {"nested_basis", required_argument, 0, 'b'},
+    {"verbose", required_argument, 0, 'v'}
+  };
+
   std::string
   Args::kernel_func_to_string(KERNEL_FUNC kernel_func) {
     switch(kernel_func) {
@@ -56,7 +72,43 @@ namespace Hatrix {
       construct_algorithm(MIRO),
       use_nested_basis(true)
   {
+    while(1) {
+      int option_index;
+      int c = getopt_long(argc, argv, "n:l:k:g:d:r:e:a:m:c:z:b:v:");
 
+      if (c == -1) break;
+      switch(c) {
+      case 'n':
+        break;
+      case 'l':
+        break;
+      case 'k':
+        break;
+      case 'g':
+        break;
+      case 'd':
+        break;
+      case 'r':
+        break;
+      case 'e':
+        break;
+      case 'a':
+        break;
+      case 'm':
+        break;
+      case 'c':
+        break;
+      case 'z':
+        break;
+      case 'b':
+        break;
+      case 'v':
+        break;
+      default:
+        usage(argv[0]);
+        abort();
+      }
+    }
   }
 
   void
