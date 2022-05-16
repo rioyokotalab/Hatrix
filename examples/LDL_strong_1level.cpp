@@ -1632,7 +1632,7 @@ int main(int argc, char ** argv) {
   constexpr int64_t ndim = 3;
   Hatrix::Domain domain(N, ndim);
   // Laplace kernel
-  domain.generate_particles(0, 1);
+  domain.generate_starsh_grid_particles();
   Hatrix::kernel_function = Hatrix::laplace_kernel;
   domain.divide_domain_and_create_particle_boxes(nleaf);
   const auto stop_particles = std::chrono::system_clock::now();
