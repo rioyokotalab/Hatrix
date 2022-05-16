@@ -74,7 +74,8 @@ namespace Hatrix {
   {
     while(1) {
       int option_index;
-      int c = getopt_long(argc, argv, "n:l:k:g:d:r:e:a:m:c:z:b:v:");
+      int c = getopt_long(argc, argv, "n:l:k:g:d:r:e:a:m:c:z:b:v:",
+                          long_options, &option_index);
 
       if (c == -1) break;
       switch(c) {
