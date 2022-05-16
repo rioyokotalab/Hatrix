@@ -1559,12 +1559,6 @@ Matrix BLR2_SPD::solve(const Matrix& b) {
   int64_t nblocks = level_blocks[level];
   // Forward
   {
-    bool lr_exists = false;
-    // for (int64_t block = 0; block < nblocks; ++block) {
-    //   if (U.exists(block, level)) { lr_exists = true; }
-    // }
-    // if (!lr_exists) { break; }
-
     int64_t n = 0;
     for (int64_t i = 0; i < nblocks; ++i) { n += D(i, i, level).rows; }
     Matrix x_level(n, 1);
@@ -1588,12 +1582,6 @@ Matrix BLR2_SPD::solve(const Matrix& b) {
 
   // Backward
   {
-    // bool lr_exists = false;
-    // for (int64_t block = 0; block < nblocks; ++block) {
-    //   if (U.exists(block, level)) { lr_exists = true; }
-    // }
-    // if (!lr_exists) { break; }
-
     int64_t n = 0;
     for (int64_t i = 0; i < nblocks; ++i) { n += D(i, i, level).cols; }
     Matrix x_level(n, 1);
