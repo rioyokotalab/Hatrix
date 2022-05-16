@@ -741,11 +741,6 @@ int64_t H2_SPD::geometry_admis_non_leaf(int64_t nblocks, int64_t level) {
     }
   }
 
-  if (all_dense_blocks(level, nblocks)) {
-    level_blocks.push_back(nblocks/2);
-    return level+1;
-  }
-
   return geometry_admis_non_leaf(nblocks/2, level+1);
 }
 
@@ -1575,6 +1570,30 @@ void H2_SPD::factorize(const Domain& domain) {
         U.erase(parent_node, parent_level);
         U.insert(parent_node, parent_level, std::move(temp));
       }
+      else {
+        // Use identity matrix as U bases whenever all dense row is encountered during merge
+        Matrix I = generate_identity_matrix(rank, rank);
+        Matrix Utransfer(2 * rank, rank);
+        auto Utransfer_splits = Utransfer.split(2, 1);
+
+        if (r.exists(c1)) {
+          Utransfer_splits[0] = r(c1);
+          r.erase(c1);
+        }
+        else {
+          Utransfer_splits[0] = I;
+        }
+
+        if (r.exists(c2)) {
+          Utransfer_splits[1] = r(c2);
+          r.erase(c2);
+        }
+        else {
+          Utransfer_splits[1] = I;
+        }
+
+        U.insert(parent_node, parent_level, std::move(Utransfer));
+      }
     } // for (block = 0; block < nblocks; block += 2)
 
     // Merge the unfactorized parts.
@@ -1632,7 +1651,6 @@ void H2_SPD::factorize(const Domain& domain) {
 
   // Factorize remaining part
   int64_t last_nodes = level_blocks[level];
-  
   for (int64_t d = 0; d < last_nodes; ++d) {
     ldl(D(d, d, level));
     for (int64_t j = d+1; j < last_nodes; ++j) {
