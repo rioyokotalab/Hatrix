@@ -1,4 +1,4 @@
-#include "args.hpp"
+#include "Args.hpp"
 
 #include <string>
 #include <getopt.h>
@@ -80,30 +80,85 @@ namespace Hatrix {
       if (c == -1) break;
       switch(c) {
       case 'n':
+        N = std::stol(optarg);
         break;
       case 'l':
+        nleaf = std::stol(optarg);
         break;
       case 'k':
+        if (!strcmp(optarg, "laplace")) {
+          kernel_func = LAPLACE;
+        }
+        else {
+          throw std::invalid_argument("Cannot support "
+                                      + std::string(optarg)
+                                      + " for --kind_of_kernel (-k).");
+        }
         break;
       case 'g':
+        if (!strcmp(optarg, "grid")) {
+          kind_of_geometry = GRID;
+        }
+        else if (!strcmp(optarg, "circular")) {
+          kind_of_geometry = CIRCULAR;
+        }
+        else {
+          throw std::invalid_argument("Cannot support " +
+                                      std::string(optarg) +
+                                      " for --kind_of_geometry (-g)");
+        }
         break;
       case 'd':
+        ndim = std::stol(optarg);
         break;
       case 'r':
+        max_rank = std::stol(optarg);
         break;
       case 'e':
+        accuracy = std::stod(optarg);
         break;
       case 'a':
+        admis = std::stod(optarg);
         break;
       case 'm':
+        if (!strcmp(optarg, "geometry")) {
+          admis_kind = GEOMETRY;
+        }
+        else if (!strcmp(optarg, "diagonal")) {
+          admis_kind = DIAGONAL;
+        }
+        else {
+          throw std::invalid_argument("Cannot support " +
+                                      std::string(optarg) +
+                                      " for --admis_kind (-m).");
+        }
         break;
       case 'c':
+        if (!strcmp(optarg, "miro")) {
+          construct_algorithm = MIRO;
+        }
+        else if (!strcmp(optarg, "id_random")) {
+          construct_algorithm = ID_RANDOM;
+        }
+        else {
+          throw std::invalid_argument("Cannot support " +
+                                      std::string(optarg) +
+                                      " for --construct-algorithm (-c).");
+        }
         break;
       case 'z':
+        add_diag = std::stod(optarg);
         break;
       case 'b':
+        if (!strcmp("false", optarg) || std::stoi(optarg) == 0) {
+          use_nested_basis = false;
+        }
+        else {
+          use_nested_basis = true;
+        }
         break;
       case 'v':
+        verbose = bool(std::stoi(optarg));
         break;
       default:
         usage(argv[0]);
