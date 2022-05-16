@@ -8,18 +8,19 @@ namespace Hatrix {
   static struct option long_options[] = {
     {"N",                required_argument, 0, 'n'},
     {"nleaf",            required_argument, 0, 'l'},
-    {"kernel_func",      required_argument, 0, 'k'},
-    {"kind_of_geometry", required_argument, 0, 'g'},
-    {"ndim",             required_argument, 0, 'd' },
-    {"max_rank",         required_argument, 0, 'r'},
-    {"accuracy",         required_argument, 0, 'e'},
-    {"admis",            required_argument, 0, 'a'},
-    {"admis_kind",       required_argument, 0, 'm'},
+    {"kernel_func",         required_argument, 0, 'k'},
+    {"kind_of_geometry",    required_argument, 0, 'g'},
+    {"ndim",                required_argument, 0, 'd'},
+    {"max_rank",            required_argument, 0, 'r'},
+    {"accuracy",            required_argument, 0, 'e'},
+    {"admis",               required_argument, 0, 'a'},
+    {"admis_kind",          required_argument, 0, 'm'},
     {"construct_algorithm", required_argument, 0, 'c'},
-    {"add_diag", required_argument, 0, 'z'},
-    {"use_nested_basis", no_argument, 0, 'b'},
-    {"verbose", no_argument, 0, 'v'},
-    {0, 0, 0, 0},
+    {"add_diag",            required_argument, 0, 'z'},
+    {"use_nested_basis",    no_argument,       0, 'b'},
+    {"verbose",             no_argument,       0, 'v'},
+    {"help",                no_argument,       0, 'h'},
+    {0,                     0,                 0,  0},
   };
 
   std::string
@@ -70,7 +71,7 @@ namespace Hatrix {
     KERNEL_FUNC kfunc;
     while(1) {
       int option_index;
-      int c = getopt_long(argc, argv, "n:l:k:g:d:r:e:a:m:c:z:bv",
+      int c = getopt_long(argc, argv, "n:l:k:g:d:r:e:a:m:c:z:bvh",
                           long_options, &option_index);
 
       if (c == -1) break;
@@ -153,6 +154,9 @@ namespace Hatrix {
       case 'v':
         verbose = true;
         break;
+      case 'h':
+        usage(argv[0]);
+        exit(0);
       default:
         usage(argv[0]);
         abort();
@@ -185,7 +189,8 @@ namespace Hatrix {
               "--construct_algorithm (-c) [miro|id_random] : Construction algorithm to use (%s).\n"
               "--add_diag (-z)                             : Value to add to the diagonal (%lf).\n"
               "--nested_basis (-b)                         : Whether to use nested basis (%d).\n"
-              "--verbose (-v)                              : Verbose mode (%d).\n",
+              "--verbose (-v)                              : Verbose mode (%d).\n"
+              "--help (-h)                                 : Show this help message.\n",
               name,
               N,
               nleaf,
