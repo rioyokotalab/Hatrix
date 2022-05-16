@@ -15,9 +15,20 @@ make -j
 # done
 
 for N in 512; do
-    ./bin/HSS_main --N $N --nleaf 128 --kernel-func laplace --add-diag 1e-6 \
-                   --acc 1e-8 --nested-basis 1 --construct-algorithm miro \
-                   --kind-of-geometry circular
+    ./bin/HSS_main --N $N \
+                   --nleaf 128 \
+                   --kernel_func laplace \
+                   --kind_of_geometry circular \
+                   --ndim 1 \
+                   --max_rank 10 \
+                   --accuracy 1 \
+                   --admis 0 \
+                   --admis_kind diagonal \
+                   --construct_algorithm miro \
+                   --add_diag 1e-3 \
+                   --use_nested_basis \
+                   -v
+
     # ./bin/H2_far_dense_construct $N 30 64 0 1 diagonal_admis 0
 done
 

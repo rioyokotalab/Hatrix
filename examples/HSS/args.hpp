@@ -5,14 +5,14 @@
 namespace Hatrix {
   class Args {
   private:
-    std::string kernel_func_to_string(KERNEL_FUNC k);
     std::string geometry_to_string(KIND_OF_GEOMETRY geometry);
     std::string admis_kind_to_string(ADMIS_KIND admis_kind);
     std::string construct_algorithm_to_string(CONSTRUCT_ALGORITHM construct_algorithm);
   public:
     int64_t N;                  // problem size
     int64_t nleaf;              // leaf size
-    KERNEL_FUNC kernel_func;    // kernel function for matrix generation
+    kernel_function kernel;    // kernel function for matrix generation
+    std::string kernel_verbose; // name of the kernel function
     KIND_OF_GEOMETRY kind_of_geometry;
     int64_t ndim;
     int64_t max_rank;
@@ -23,6 +23,7 @@ namespace Hatrix {
     CONSTRUCT_ALGORITHM construct_algorithm;
     bool use_nested_basis;      // whether to use nested basis in construction
     bool verbose;             // whether execution is verbose.
+    bool is_symmetric;
 
     Args(int argc=0, char **argv=NULL);
     void usage(const char *name);
