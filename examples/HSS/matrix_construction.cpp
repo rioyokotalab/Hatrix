@@ -1,5 +1,7 @@
 #include <exception>
 
+#include "Hatrix/Hatrix.h"
+
 #include "functions.hpp"
 #include "matrix_construction.hpp"
 #include "SymmetricSharedBasisMatrix.hpp"
@@ -91,18 +93,32 @@ generate_column_block(int64_t block, int64_t block_size,
 
 static Matrix
 generate_column_bases(int64_t block, int64_t block_size, int64_t level,
-                      const SymmetricSharedBasisMatrix& A,
-                      const Matrix& dense, const Matrix&rand) {
+                      SymmetricSharedBasisMatrix& A,
+                      const Matrix& dense,
+                      const Matrix&rand,
+                      const Args& opts) {
   Matrix AY = generate_column_block(block, block_size, level, A, dense, rand);
+  Matrix Ui;
+  std::vector<int64_t> pivots;
 
-  return AY;
+  if (opts.accuracy > 1) {        // constant rank compression
+    std::tie(Ui, pivots) = pivoted_qr(AY, opts.max_rank);
+  }
+  else {
+    int64_t rank;
+    std::tie(Ui, pivots, rank) = error_pivoted_qr(AY, opts.accuracy);
+    A.ranks.insert(block, level, std::move(rank));
+  }
+
+  return std::move(Ui);
 }
 
 static void
 generate_leaf_nodes(const Domain& domain,
                     SymmetricSharedBasisMatrix& A,
                     const Matrix& dense,
-                    const Matrix& rand) {
+                    const Matrix& rand,
+                    const Args& opts) {
   int64_t nblocks = A.level_blocks[A.height];
   auto dense_splits = dense.split(nblocks, nblocks);
 
@@ -125,8 +141,134 @@ generate_leaf_nodes(const Domain& domain,
                                      A.height,
                                      A,
                                      dense,
-                                     rand));
+                                     rand,
+                                     opts));
   }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (A.is_admissible.exists(i, j, A.height) &&
+          A.is_admissible(i, j, A.height)) {
+        Matrix Sblock = matmul(matmul(A.U(i, A.height),
+                                      dense_splits[i * nblocks + j], true, false),
+                               A.U(j, A.height));
+        A.S.insert(i, j, A.height, std::move(Sblock));
+      }
+    }
+  }
+}
+
+static Matrix
+generate_U_transfer_matrix(const Matrix& Ubig_c1,
+                           const Matrix& Ubig_c2,
+                           const int64_t node,
+                           const int64_t block_size,
+                           const int64_t level,
+                           SymmetricSharedBasisMatrix& A,
+                           const Matrix& dense,
+                           const Matrix& rand,
+                           const Args& opts) {
+  Matrix col_block = generate_column_block(node, block_size, level, A, dense, rand);
+  auto col_block_splits = col_block.split(2, 1);
+
+  int64_t c1 = node * 2;
+  int64_t c2 = node * 2 + 1;
+  int64_t child_level = level + 1;
+  int64_t r_c1 = A.ranks(c1, child_level);
+  int64_t r_c2 = A.ranks(c2, child_level);
+
+  Matrix temp(r_c1 + r_c2, col_block.cols);
+  auto temp_splits = temp.split(std::vector<int64_t>(1, r_c1), {});
+
+  matmul(Ubig_c1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
+  matmul(Ubig_c2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
+
+  Matrix Utransfer;
+  std::vector<int64_t> pivots;
+  if (opts.accuracy > 1) {      // constant rank factorization
+    std::tie(Utransfer, pivots) = pivoted_qr(temp, opts.max_rank);
+  }
+  else {
+    int64_t rank;
+    std::tie(Utransfer, pivots, rank) = error_pivoted_qr(temp, opts.accuracy);
+    A.ranks.insert(node, level, std::move(rank));
+  }
+
+  return std::move(Utransfer);
+}
+
+static bool
+row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row, int64_t level) {
+  bool has_admis = false;
+  for (int64_t i = 0; i < A.level_blocks[level]; ++i) {
+    if (!A.is_admissible.exists(row, i, level) ||
+        (A.is_admissible.exists(row, i, level) && A.is_admissible(row, i, level))) {
+      has_admis = true;
+      break;
+    }
+  }
+
+  return has_admis;
+}
+
+
+static RowLevelMap
+generate_transfer_matrices(const int64_t level,
+                           const RowLevelMap& Uchild,
+                           SymmetricSharedBasisMatrix& A,
+                           const Matrix& dense,
+                           const Matrix& rand,
+                           const Args& opts) {
+  int64_t nblocks = A.level_blocks[level];
+  auto dense_splits = dense.split(nblocks, nblocks);
+
+  RowLevelMap Ubig_parent;
+  for (int64_t node = 0; node < nblocks; ++node) {
+    int64_t c1 = node * 2;
+    int64_t c2 = node * 2 + 1;
+    int64_t child_level = level + 1;
+
+    if (row_has_admissible_blocks(A, node, level) && A.height != 1) {
+      const Matrix& Ubig_c1 = Uchild(c1, child_level);
+      const Matrix& Ubig_c2 = Uchild(c2, child_level);
+      int64_t block_size = Ubig_c1.rows + Ubig_c2.rows;
+
+      Matrix Utransfer = generate_U_transfer_matrix(Ubig_c1,
+                                                    Ubig_c2,
+                                                    node,
+                                                    block_size,
+                                                    level,
+                                                    A,
+                                                    dense,
+                                                    rand,
+                                                    opts);
+
+      auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, A.ranks(c1, child_level)),
+                                              {});
+
+      Matrix Ubig(block_size, A.ranks(node, level));
+      auto Ubig_splits = Ubig.split(2, 1);
+
+      matmul(Ubig_c1, Utransfer_splits[0], Ubig_splits[0]);
+      matmul(Ubig_c2, Utransfer_splits[1], Ubig_splits[1]);
+
+      A.U.insert(node, level, std::move(Utransfer));
+      Ubig_parent.insert(node, level, std::move(Ubig));
+    }
+  }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (A.is_admissible.exists(i, j, level) &&
+          !A.is_admissible(i, j, level)) {
+        Matrix Sdense = matmul(matmul(Ubig_parent(i, level), dense_splits[i * nblocks + j], true, false),
+                               Ubig_parent(j, level));
+        A.S.insert(i, j, level, std::move(Sdense));
+      }
+    }
+  }
+
+  return Ubig_parent;
 }
 
 void construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A,
@@ -135,6 +277,11 @@ void construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A,
   int64_t P = 100;
   Matrix dense = generate_p2p_matrix(domain, opts.kernel);
   Matrix rand = generate_random_matrix(opts.N, P);
-  generate_leaf_nodes(domain, A, dense, rand);
+  generate_leaf_nodes(domain, A, dense, rand, opts);
 
+  RowLevelMap Uchild = A.U;
+
+  for (int64_t level = A.height-1; level > 0; --level) {
+    Uchild = generate_transfer_matrices(level, Uchild, A, dense, rand, opts);
+  }
 }
