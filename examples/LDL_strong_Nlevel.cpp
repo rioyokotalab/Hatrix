@@ -111,7 +111,7 @@ class Domain {
   Matrix generate_rank_heat_map();
 };
 
-class BLR2_SPD {
+class H2_SPD {
  public:
   int64_t N, nleaf, n_blocks, rank;
   double admis;
@@ -121,8 +121,8 @@ class BLR2_SPD {
   RowColLevelMap<bool> is_admissible;
   std::string admis_kind;
   std::vector<int64_t> level_blocks;
-  const int64_t height = 1;
-  const int64_t matrix_type = BLR2_MATRIX;
+  int64_t height;
+  int64_t matrix_type;
 
  private:
   bool all_dense_blocks(int64_t level, int64_t nblocks);
@@ -135,29 +135,37 @@ class BLR2_SPD {
   void generate_leaf_nodes(const Domain& domain);
   void actually_print_structure(int64_t level);
   bool row_has_admissible_blocks(int64_t row, int64_t level);
-  bool col_has_admissible_blocks(int64_t col, int64_t level);
   Matrix generate_column_block(int64_t block, int64_t block_size,
                                const Domain& domain, int64_t level);
   std::tuple<Matrix, Matrix>
   generate_column_bases(int64_t block, int64_t block_size, const Domain& domain,
                         std::vector<Matrix>& Y, int64_t level);
-
+  std::tuple<Matrix, Matrix>
+  generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
+                             int64_t block_size, const Domain& domain, int64_t level);
+  RowLevelMap generate_transfer_matrices(const Domain& domain, int64_t level,
+                                         RowLevelMap& Uchild);
   Matrix get_Ubig(int64_t node, int64_t level);
 
-  void calc_geometry_based_admissibility(const Domain& domain);
+  int64_t calc_geometry_based_admissibility(const Domain& domain);
+  void calc_diagonal_based_admissibility(int64_t level);
+  void coarsen_blocks(int64_t level);
+  int64_t geometry_admis_non_leaf(int64_t nblocks, int64_t level);
+  int64_t get_block_size_row(const Domain& domain, int64_t parent, int64_t level);
   int64_t get_block_size_col(const Domain& domain, int64_t parent, int64_t level);
   void factorize_level(int64_t level, int64_t nblocks, const Domain& domain, RowMap& r);
   int64_t find_all_dense_row();
   void update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r);
 
  public:
-  BLR2_SPD(const Domain& domain, const int64_t N, const int64_t rank,
-           const int64_t nleaf, const double admis, const std::string& admis_kind);
+  H2_SPD(const Domain& domain, const int64_t N, const int64_t rank,
+         const int64_t nleaf, const double admis,
+         const std::string& admis_kind, const int64_t matrix_type);
   double construction_relative_error(const Domain& domain);
   void print_structure();
   double low_rank_block_ratio();
   void factorize(const Domain& domain);
-  Matrix solve(const Matrix& b);
+  Matrix solve(const Matrix& b, int64_t _level);
 };
 
 double laplace_kernel(const std::vector<double>& coords_row,
@@ -638,7 +646,7 @@ void Domain::divide_domain_and_create_particle_boxes(int64_t nleaf) {
   }
 }
 
-bool BLR2_SPD::all_dense_blocks(int64_t level, int64_t nblocks) {
+bool H2_SPD::all_dense_blocks(int64_t level, int64_t nblocks) {
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
       if (!is_admissible.exists(i, j, level) || is_admissible(i, j, level)) {
@@ -649,7 +657,7 @@ bool BLR2_SPD::all_dense_blocks(int64_t level, int64_t nblocks) {
   return true;
 }
 
-int64_t BLR2_SPD::find_all_dense_row() {
+int64_t H2_SPD::find_all_dense_row() {
   int64_t nblocks = level_blocks[height];
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -669,7 +677,74 @@ int64_t BLR2_SPD::find_all_dense_row() {
   return -1;
 }
 
-void BLR2_SPD::calc_geometry_based_admissibility(const Domain& domain) {
+void H2_SPD::coarsen_blocks(int64_t level) {
+  int64_t child_level = level + 1;
+  int64_t nblocks = pow(2, level);
+  for (int64_t i = 0; i < nblocks; ++i) {
+    std::vector<int64_t> row_children({i * 2, i * 2 + 1});
+    for (int64_t j = 0; j < nblocks; ++j) {
+      std::vector<int64_t> col_children({j * 2, j * 2 + 1});
+
+      bool admis_block = true;
+      for (int64_t c1 = 0; c1 < 2; ++c1) {
+        for (int64_t c2 = 0; c2 < 2; ++c2) {
+          if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
+              !is_admissible(row_children[c1], col_children[c2], child_level)) {
+            admis_block = false;
+          }
+        }
+      }
+
+      if (admis_block) {
+        for (int64_t c1 = 0; c1 < 2; ++c1) {
+          for (int64_t c2 = 0; c2 < 2; ++c2) {
+            is_admissible.erase(row_children[c1], col_children[c2], child_level);
+          }
+        }
+      }
+
+      is_admissible.insert(i, j, level, std::move(admis_block));
+    }
+  }
+}
+
+int64_t H2_SPD::geometry_admis_non_leaf(int64_t nblocks, int64_t level) {
+  int64_t child_level = level - 1;
+  level_blocks.push_back(nblocks);
+
+  if (nblocks == 1) { return level; }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    std::vector<int64_t> row_children({i * 2, i * 2 + 1});
+    for (int64_t j = 0; j < nblocks; ++j) {
+      std::vector<int64_t> col_children({j * 2, j * 2 + 1});
+
+      bool admis_block = true;
+      for (int64_t c1 = 0; c1 < 2; ++c1) {
+        for (int64_t c2 = 0; c2 < 2; ++c2) {
+          if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
+              !is_admissible(row_children[c1], col_children[c2], child_level)) {
+            admis_block = false;
+          }
+        }
+      }
+
+      if (admis_block) {
+        for (int64_t c1 = 0; c1 < 2; ++c1) {
+          for (int64_t c2 = 0; c2 < 2; ++c2) {
+            is_admissible.erase(row_children[c1], col_children[c2], child_level);
+          }
+        }
+      }
+
+      is_admissible.insert(i, j, level, std::move(admis_block));
+    }
+  }
+
+  return geometry_admis_non_leaf(nblocks/2, level+1);
+}
+
+int64_t H2_SPD::calc_geometry_based_admissibility(const Domain& domain) {
   int64_t nblocks = domain.boxes.size();
   level_blocks.push_back(nblocks);
   int64_t level = 0;
@@ -680,11 +755,36 @@ void BLR2_SPD::calc_geometry_based_admissibility(const Domain& domain) {
                            admis * domain.boxes[i].distance_from(domain.boxes[j]));
     }
   }
-  level_blocks.push_back(1);
+
+  if (matrix_type == BLR2_MATRIX) {
+    level_blocks.push_back(1);
+    return 1;
+  }
+  else {
+    return geometry_admis_non_leaf(nblocks / 2, level+1);
+  }
 }
 
-Matrix BLR2_SPD::generate_column_block(int64_t block, int64_t block_size,
-                                       const Domain& domain, int64_t level) {
+void H2_SPD::calc_diagonal_based_admissibility(int64_t level) {
+  int64_t nblocks = pow(2, level); // pow since we are using diagonal based admis.
+  level_blocks.push_back(nblocks);
+  if (level == 0) { return; }
+  if (level == height) {
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        is_admissible.insert(i, j, level, std::abs(i - j) > admis);
+      }
+    }
+  }
+  else {
+    coarsen_blocks(level);
+  }
+
+  calc_diagonal_based_admissibility(level-1);
+}
+
+Matrix H2_SPD::generate_column_block(int64_t block, int64_t block_size,
+                                     const Domain& domain, int64_t level) {
   int ncols = 0;
   int num_blocks = 0;
   for (int64_t j = 0; j < level_blocks[level]; ++j) {
@@ -705,9 +805,9 @@ Matrix BLR2_SPD::generate_column_block(int64_t block, int64_t block_size,
   return AY;
 }
 
-std::tuple<Matrix, Matrix> BLR2_SPD::generate_column_bases(int64_t block, int64_t block_size,
-                                                           const Domain& domain,
-                                                           std::vector<Matrix>& Y, int64_t level) {
+std::tuple<Matrix, Matrix> H2_SPD::generate_column_bases(int64_t block, int64_t block_size,
+                                                         const Domain& domain,
+                                                         std::vector<Matrix>& Y, int64_t level) {
   // Row slice since column bases should be cutting across the columns.
   Matrix AY = generate_column_block(block, block_size, domain, level);
   Matrix Ui, Si, Vi; double error;
@@ -716,7 +816,7 @@ std::tuple<Matrix, Matrix> BLR2_SPD::generate_column_bases(int64_t block, int64_
   return {std::move(Ui), std::move(Si)};
 }
 
-void BLR2_SPD::generate_leaf_nodes(const Domain& domain) {
+void H2_SPD::generate_leaf_nodes(const Domain& domain) {
   int64_t nblocks = level_blocks[height];
   std::vector<Hatrix::Matrix> Y;
 
@@ -756,7 +856,7 @@ void BLR2_SPD::generate_leaf_nodes(const Domain& domain) {
   }
 }
 
-Matrix BLR2_SPD::get_Ubig(int64_t node, int64_t level) {
+Matrix H2_SPD::get_Ubig(int64_t node, int64_t level) {
   if (level == height) {
     return U(node, level);
   }
@@ -782,7 +882,19 @@ Matrix BLR2_SPD::get_Ubig(int64_t node, int64_t level) {
 
 }
 
-int64_t BLR2_SPD::get_block_size_col(const Domain& domain, int64_t parent, int64_t level) {
+int64_t H2_SPD::get_block_size_row(const Domain& domain, int64_t parent, int64_t level) {
+  if (level == height) {
+    return domain.boxes[parent].num_particles;
+  }
+  int64_t child_level = level + 1;
+  int64_t child1 = parent * 2;
+  int64_t child2 = parent * 2 + 1;
+
+  return get_block_size_row(domain, child1, child_level) +
+      get_block_size_row(domain, child2, child_level);
+}
+
+int64_t H2_SPD::get_block_size_col(const Domain& domain, int64_t parent, int64_t level) {
   if (level == height) {
     return domain.boxes[parent].num_particles;
   }
@@ -794,7 +906,7 @@ int64_t BLR2_SPD::get_block_size_col(const Domain& domain, int64_t parent, int64
       get_block_size_col(domain, child2, child_level);
 }
 
-bool BLR2_SPD::row_has_admissible_blocks(int64_t row, int64_t level) {
+bool H2_SPD::row_has_admissible_blocks(int64_t row, int64_t level) {
   bool has_admis = false;
   for (int64_t i = 0; i < level_blocks[level]; ++i) {
     if (!is_admissible.exists(row, i, level) ||
@@ -806,35 +918,106 @@ bool BLR2_SPD::row_has_admissible_blocks(int64_t row, int64_t level) {
   return has_admis;
 }
 
-bool BLR2_SPD::col_has_admissible_blocks(int64_t col, int64_t level) {
-  bool has_admis = false;
-  for (int64_t j = 0; j < level_blocks[level]; ++j) {
-    if (!is_admissible.exists(j, col, level) ||
-        (is_admissible.exists(j, col, level) && is_admissible(j, col, level))) {
-      has_admis = true;
-      break;
-    }
-  }
-  return has_admis;
+std::tuple<Matrix, Matrix>
+H2_SPD::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
+                                   int64_t block_size, const Domain& domain, int64_t level) {
+  Matrix col_block = generate_column_block(node, block_size, domain, level);
+  auto col_block_splits = col_block.split(2, 1);
+
+  Matrix temp(Ubig_child1.cols + Ubig_child2.cols, col_block.cols);
+  auto temp_splits = temp.split(2, 1);
+
+  matmul(Ubig_child1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
+  matmul(Ubig_child2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
+
+  Matrix Utransfer, Si, Vi; double error;
+  std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
+
+  return {std::move(Utransfer), std::move(Si)};
 }
 
-BLR2_SPD::BLR2_SPD(const Domain& domain, const int64_t N, const int64_t rank,
-                   const int64_t nleaf, const double admis, const std::string& admis_kind)
-    : N(N), rank(rank), nleaf(nleaf), admis(admis), admis_kind(admis_kind) {
+RowLevelMap H2_SPD::generate_transfer_matrices(const Domain& domain, int64_t level,
+                                               RowLevelMap& Uchild) {
+  int64_t nblocks = level_blocks[level];
+
+  std::vector<Matrix> Y;
+  // Generate the actual bases for the upper level and pass it to this
+  // function again for generating transfer matrices at successive levels.
+  RowLevelMap Ubig_parent;
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    int64_t block_size = get_block_size_row(domain, i, level);
+    Y.push_back(generate_random_matrix(block_size, rank + oversampling));
+  }
+
+  for (int64_t node = 0; node < nblocks; ++node) {
+    int64_t child1 = node * 2;
+    int64_t child2 = node * 2 + 1;
+    int64_t child_level = level + 1;
+    int64_t block_size = get_block_size_row(domain, node, level);
+
+    if (row_has_admissible_blocks(node, level) && height != 1) {
+      Matrix& Ubig_child1 = Uchild(child1, child_level);
+      Matrix& Ubig_child2 = Uchild(child2, child_level);
+
+      Matrix Utransfer, Stemp;
+      std::tie(Utransfer, Stemp) = generate_U_transfer_matrix(Ubig_child1,
+                                                              Ubig_child2,
+                                                              node,
+                                                              block_size,
+                                                              domain,
+                                                              level);
+
+      U.insert(node, level, std::move(Utransfer));
+      Scol.insert(node, level, std::move(Stemp));
+
+      // Generate the full bases to pass onto the parent.
+      auto Utransfer_splits = U(node, level).split(2, 1);
+      Matrix Ubig(block_size, rank);
+      auto Ubig_splits = Ubig.split(2, 1);
+
+      matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
+      matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
+
+      Ubig_parent.insert(node, level, std::move(Ubig));
+    }
+  }
+
+  for (int64_t row = 0; row < nblocks; ++row) {
+    for (int64_t col = 0; col < nblocks; ++col) {
+      if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+        Matrix D = generate_p2p_interactions(domain, row, col, level, height);
+
+        S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
+                                         Ubig_parent(col, level)));
+      }
+    }
+  }
+
+  return Ubig_parent;
+}
+
+H2_SPD::H2_SPD(const Domain& domain, const int64_t N, const int64_t rank,
+               const int64_t nleaf, const double admis,
+               const std::string& admis_kind, const int64_t matrix_type)
+    : N(N), rank(rank), nleaf(nleaf), admis(admis),
+      admis_kind(admis_kind), matrix_type(matrix_type) {
   if (admis_kind == "geometry_admis") {
     // TODO: use dual tree traversal for this.
-    calc_geometry_based_admissibility(domain);
+    height = calc_geometry_based_admissibility(domain);
     // reverse the levels stored in the admis blocks.
     RowColLevelMap<bool> temp_is_admissible;
 
-    int64_t level = 0;
-    int64_t nblocks = level_blocks[level];
-    for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j < nblocks; ++j) {
-        if (is_admissible.exists(i, j, level)) {
-          bool value = is_admissible(i, j, level);
-          temp_is_admissible.insert(i, j, height - level,
-                                    std::move(value));
+    for (int64_t level = 0; level < height; ++level) {
+      int64_t nblocks = level_blocks[level];
+
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if (is_admissible.exists(i, j, level)) {
+            bool value = is_admissible(i, j, level);
+            temp_is_admissible.insert(i, j, height - level,
+                                      std::move(value));
+          }
         }
       }
     }
@@ -843,14 +1026,22 @@ BLR2_SPD::BLR2_SPD(const Domain& domain, const int64_t N, const int64_t rank,
     std::reverse(std::begin(level_blocks), std::end(level_blocks));
   }
   else if (admis_kind == "diagonal_admis") {
-    int64_t nblocks = domain.boxes.size();
-    for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j < nblocks; ++j) {
-        is_admissible.insert(i, j, height, std::abs(i - j) > admis);
+    if (matrix_type == BLR2_MATRIX) {
+      height = 1;
+      int64_t nblocks = domain.boxes.size();
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          is_admissible.insert(i, j, height, std::abs(i - j) > admis);
+        }
       }
+      level_blocks.push_back(1);
+      level_blocks.push_back(nblocks);
     }
-    level_blocks.push_back(1);
-    level_blocks.push_back(nblocks);
+    else if (matrix_type == H2_MATRIX) {
+      height = int64_t(log2(N / nleaf));
+      calc_diagonal_based_admissibility(height);
+      std::reverse(std::begin(level_blocks), std::end(level_blocks));
+    }
   }
   else {
     std::cout << "wrong admis condition: " << admis_kind << std::endl;
@@ -867,9 +1058,14 @@ BLR2_SPD::BLR2_SPD(const Domain& domain, const int64_t N, const int64_t rank,
   }
 
   generate_leaf_nodes(domain);
+  RowLevelMap Uchild = U;
+
+  for (int64_t level = height-1; level > 0; --level) {
+    Uchild  = generate_transfer_matrices(domain, level, Uchild);
+  }
 }
 
-double BLR2_SPD::construction_relative_error(const Domain& domain) {
+double H2_SPD::construction_relative_error(const Domain& domain) {
   double error = 0;
   double dense_norm = 0;
   int64_t nblocks = level_blocks[height];
@@ -882,23 +1078,33 @@ double BLR2_SPD::construction_relative_error(const Domain& domain) {
         error += pow(norm(actual - expected), 2);
         dense_norm += pow(norm(actual), 2);
       }
-      if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
-        Matrix Ubig = get_Ubig(i, height);
-        Matrix Vbig = get_Ubig(j, height);
+    }
+  }
 
-        Matrix expected_matrix = matmul(matmul(Ubig, S(i, j, height)), Vbig, false, true);
-        Matrix actual_matrix =
-	  Hatrix::generate_p2p_interactions(domain, i, j, height, height);
+  for (int64_t level = height; level > 0; --level) {
+    int64_t nblocks = level_blocks[level];
 
-        dense_norm += pow(norm(actual_matrix), 2);
-        error += pow(norm(expected_matrix - actual_matrix), 2);
+    for (int64_t row = 0; row < nblocks; ++row) {
+      for (int64_t col = 0; col < nblocks; ++col) {
+        if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
+          Matrix Ubig = get_Ubig(row, level);
+          Matrix Vbig = get_Ubig(col, level);
+
+          Matrix expected_matrix = matmul(matmul(Ubig, S(row, col, level)), Vbig, false, true);
+          Matrix actual_matrix =
+              Hatrix::generate_p2p_interactions(domain, row, col, level, height);
+
+          dense_norm += pow(norm(actual_matrix), 2);
+          error += pow(norm(expected_matrix - actual_matrix), 2);
+        }
       }
     }
   }
+
   return std::sqrt(error / dense_norm);
 }
 
-void BLR2_SPD::actually_print_structure(int64_t level) {
+void H2_SPD::actually_print_structure(int64_t level) {
   if (level == 0) { return; }
   int64_t nblocks = level_blocks[level];
   std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
@@ -923,11 +1129,11 @@ void BLR2_SPD::actually_print_structure(int64_t level) {
   actually_print_structure(level-1);
 }
 
-void BLR2_SPD::print_structure() {
+void H2_SPD::print_structure() {
   actually_print_structure(height);
 }
 
-double BLR2_SPD::low_rank_block_ratio() {
+double H2_SPD::low_rank_block_ratio() {
   double total = 0, low_rank = 0;
 
   int64_t nblocks = level_blocks[height];
@@ -945,7 +1151,7 @@ double BLR2_SPD::low_rank_block_ratio() {
   return low_rank / total;
 }
 
-void BLR2_SPD::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r) {
+void H2_SPD::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r) {
   int64_t nblocks = level_blocks[level];
   int64_t block_size = D(row, row, level).rows;
   Matrix row_block(block_size, 0);
@@ -977,9 +1183,9 @@ void BLR2_SPD::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F
   r.insert(row, std::move(r_row));
 }
 
-void BLR2_SPD::factorize_level(int64_t level, int64_t nblocks,
-                               const Domain& domain,
-                               RowMap& r) {
+void H2_SPD::factorize_level(int64_t level, int64_t nblocks,
+                             const Domain& domain,
+                             RowMap& r) {
   RowColMap<Matrix> F;      // fill-in blocks.
 
   for (int64_t block = 0; block < nblocks; ++block) {
@@ -1312,35 +1518,162 @@ void BLR2_SPD::factorize_level(int64_t level, int64_t nblocks,
   F.erase_all();
 }
 
-void BLR2_SPD::factorize(const Domain& domain) {
+void H2_SPD::factorize(const Domain& domain) {
   int64_t level = height;
-  int64_t nblocks = level_blocks[level];
+  RowColLevelMap<Matrix> F;
   RowMap r;
-  factorize_level(level, nblocks, domain, r);
 
-  // Merge the unfactorized parts into root level
-  Matrix D_unelim(nblocks * rank, nblocks * rank);
-  auto D_unelim_splits = D_unelim.split(nblocks, nblocks);
-  for(int64_t i = 0; i < nblocks; ++i) {
-    for(int64_t j = 0; j < nblocks; ++j) {
-      if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
-        auto D_splits = D(i, j, level).split(vec{D(i, j, level).rows - rank},
-                                             vec{D(i, j, level).cols - rank});
-        D_unelim_splits[i * nblocks + j] = D_splits[3]; //oo part
+  for (; level > 0; --level) {
+    int64_t nblocks = level_blocks[level];
+    bool is_all_dense_level = false;
+    for (int64_t i = 0; i < nblocks; ++i) {
+      if (!U.exists(i, level)) {
+        is_all_dense_level = true;
+      }
+    }
+
+    if (is_all_dense_level) {
+      if (level != 1) {
+        std::cout << "found an all dense block on level " << level << ". Aborting.\n";
+        abort();
+      }
+      break;
+    }
+
+    factorize_level(level, nblocks, domain, r);
+
+    int64_t parent_level = level - 1;
+
+    // Update transfer matrices on one level higher.
+    for (int64_t block = 0; block < nblocks; block += 2) {
+      int64_t parent_node = block / 2;
+      int64_t c1 = block;
+      int64_t c2 = block+1;
+
+      if (row_has_admissible_blocks(parent_node, parent_level) && height != 1) {
+        Matrix& Utransfer = U(parent_node, parent_level);
+        auto Utransfer_splits = Utransfer.split(2, 1);
+
+        Matrix temp(Utransfer);
+        auto temp_splits = temp.split(2, 1);
+
+        if (r.exists(c1)) {
+          matmul(r(c1), Utransfer_splits[0], temp_splits[0], false, false, 1, 0);
+          r.erase(c1);
+        }
+
+        if (r.exists(c2)) {
+          matmul(r(c2), Utransfer_splits[1], temp_splits[1], false, false, 1, 0);
+          r.erase(c2);
+        }
+
+        U.erase(parent_node, parent_level);
+        U.insert(parent_node, parent_level, std::move(temp));
       }
       else {
-        D_unelim_splits[i * nblocks + j] = S(i, j, level);
+        // Use identity matrix as U bases whenever all dense row is encountered during merge
+        Matrix I = generate_identity_matrix(rank, rank);
+        Matrix Utransfer(2 * rank, rank);
+        auto Utransfer_splits = Utransfer.split(2, 1);
+
+        if (r.exists(c1)) {
+          Utransfer_splits[0] = r(c1);
+          r.erase(c1);
+        }
+        else {
+          Utransfer_splits[0] = I;
+        }
+
+        if (r.exists(c2)) {
+          Utransfer_splits[1] = r(c2);
+          r.erase(c2);
+        }
+        else {
+          Utransfer_splits[1] = I;
+        }
+
+        U.insert(parent_node, parent_level, std::move(Utransfer));
+      }
+    } // for (block = 0; block < nblocks; block += 2)
+
+    // Merge the unfactorized parts.
+    int64_t parent_nblocks = level_blocks[parent_level];
+
+    for (int64_t i = 0; i < parent_nblocks; ++i) {
+      for (int64_t j = 0; j < parent_nblocks; ++j) {
+        if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
+          // TODO: need to switch to morton indexing so finding the parent is straightforward.
+          std::vector<int64_t> i_children, j_children;
+          int64_t nrows=0, ncols=0;
+          if (matrix_type == BLR2_MATRIX) {
+            for (int n = 0; n < level_blocks[level]; ++n) {
+              i_children.push_back(n);
+              j_children.push_back(n);
+
+              nrows += rank;
+              ncols += rank;
+            }
+          }
+          else if (matrix_type == H2_MATRIX) {
+            for (int n = 0; n < 2; ++n) {
+              i_children.push_back(i * 2 + n);
+              j_children.push_back(j * 2 + n);
+
+              nrows += rank;
+              ncols += rank;
+            }
+          }
+          Matrix D_unelim(nrows, ncols);
+          auto D_unelim_splits = D_unelim.split(i_children.size(), j_children.size());
+
+          for (int64_t ic1 = 0; ic1 < i_children.size(); ++ic1) {
+            for (int64_t jc2 = 0; jc2 < j_children.size(); ++jc2) {
+              int64_t c1 = i_children[ic1], c2 = j_children[jc2];
+              if (!U.exists(c1, level)) { continue; }
+
+              if (is_admissible.exists(c1, c2, level) && !is_admissible(c1, c2, level)) {
+
+                auto D_splits = D(c1, c2, level).split(vec{D(c1, c2, level).rows - rank},
+                                                       vec{D(c1, c2, level).cols - rank});
+                D_unelim_splits[ic1 * j_children.size() + jc2] = D_splits[3];
+              }
+              else {
+                D_unelim_splits[ic1 * j_children.size() + jc2] = S(c1, c2, level);
+              }
+            }
+          }
+
+          D.insert(i, j, parent_level, std::move(D_unelim));
+        }
+      }
+    }
+  } // for (; level > 0; --level)
+
+  // Factorize remaining part
+  int64_t last_nodes = level_blocks[level];
+  for (int64_t d = 0; d < last_nodes; ++d) {
+    ldl(D(d, d, level));
+    for (int64_t j = d+1; j < last_nodes; ++j) {
+      solve_triangular(D(d, d, level), D(d, j, level), Hatrix::Left, Hatrix::Lower, true, false);
+      solve_diagonal(D(d, d, level), D(d, j, level), Hatrix::Left);
+    }
+    for (int64_t i = d+1; i < last_nodes; ++i) {
+      solve_triangular(D(d, d, level), D(i, d, level), Hatrix::Right, Hatrix::Lower, true, true);
+      solve_diagonal(D(d, d, level), D(i, d, level), Hatrix::Right);
+    }
+
+    for (int64_t i = d+1; i < last_nodes; ++i) {
+      Matrix lower_scaled(D(i, d, level));
+      column_scale(lower_scaled, D(d, d, level));
+      for (int64_t j = d+1; j < last_nodes; ++j) {
+        matmul(lower_scaled, D(d, j, level), D(i, j, level), false, false, -1.0, 1.0);
       }
     }
   }
-  D.insert(0, 0, 0, std::move(D_unelim));
-
-  // Factorize remaining part (root level)
-  ldl(D(0, 0, 0));
 }
 
 // permute the vector forward and return the offset at which the new vector begins.
-int64_t BLR2_SPD::permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) {
+int64_t H2_SPD::permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) {
   Matrix copy(x);
   int64_t num_nodes = level_blocks[level];
   int64_t c_offset = rank_offset;
@@ -1372,7 +1705,7 @@ int64_t BLR2_SPD::permute_forward(Matrix& x, const int64_t level, int64_t rank_o
   return rank_offset;
 }
 
-int64_t BLR2_SPD::permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) {
+int64_t H2_SPD::permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) {
   Matrix copy(x);
   int64_t num_nodes = level_blocks[level];
   int64_t c_offset = rank_offset;
@@ -1403,7 +1736,7 @@ int64_t BLR2_SPD::permute_backward(Matrix& x, const int64_t level, int64_t rank_
   return c_offset;
 }
 
-void BLR2_SPD::solve_forward_level(Matrix& x_level, int64_t level) {
+void H2_SPD::solve_forward_level(Matrix& x_level, int64_t level) {
   int64_t nblocks = level_blocks[level];
   std::vector<int64_t> row_offsets;
   int64_t nrows = 0;
@@ -1466,7 +1799,7 @@ void BLR2_SPD::solve_forward_level(Matrix& x_level, int64_t level) {
   }
 }
 
-void BLR2_SPD::solve_backward_level(Matrix& x_level, int64_t level) {
+void H2_SPD::solve_backward_level(Matrix& x_level, int64_t level) {
   int64_t nblocks = level_blocks[level];
   std::vector<int64_t> col_offsets;
   int64_t nrows = 0;
@@ -1527,7 +1860,7 @@ void BLR2_SPD::solve_backward_level(Matrix& x_level, int64_t level) {
   }
 }
 
-void BLR2_SPD::solve_diagonal_level(Matrix& x_level, int64_t level) {
+void H2_SPD::solve_diagonal_level(Matrix& x_level, int64_t level) {
   int64_t nblocks = level_blocks[level];
   std::vector<int64_t> col_offsets;
   int64_t nrows = 0;
@@ -1550,15 +1883,21 @@ void BLR2_SPD::solve_diagonal_level(Matrix& x_level, int64_t level) {
   }
 }
 
-Matrix BLR2_SPD::solve(const Matrix& b) {
+Matrix H2_SPD::solve(const Matrix& b, int64_t _level) {
   Matrix x(b);
+  int64_t level = _level;
   int64_t rhs_offset = 0;
   std::vector<Matrix> x_splits;
 
-  int64_t level = height;
-  int64_t nblocks = level_blocks[level];
   // Forward
-  {
+  for (; level > 0; --level) {
+    int64_t nblocks = level_blocks[level];
+    bool lr_exists = false;
+    for (int64_t block = 0; block < nblocks; ++block) {
+      if (U.exists(block, level)) { lr_exists = true; }
+    }
+    if (!lr_exists) { break; }
+
     int64_t n = 0;
     for (int64_t i = 0; i < nblocks; ++i) { n += D(i, i, level).rows; }
     Matrix x_level(n, 1);
@@ -1571,17 +1910,48 @@ Matrix BLR2_SPD::solve(const Matrix& b) {
     for (int64_t i = 0; i < x_level.rows; ++i) {
       x(rhs_offset + i, 0) = x_level(i, 0);
     }
+
     rhs_offset = permute_forward(x, level, rhs_offset);
   }
 
-  // Solve with root level LDL^T
+  // Solve with root level L
   x_splits = x.split(vec{rhs_offset}, {});
-  solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true, false);
-  solve_diagonal(D(0, 0, 0), x_splits[1], Hatrix::Left);
-  solve_triangular(D(0, 0, 0), x_splits[1], Hatrix::Left, Hatrix::Lower, true, true);
+  Matrix x_last(x_splits[1]);
+  int64_t last_nodes = level_blocks[level];
+  auto x_last_splits = x_last.split(last_nodes, 1);
+  for (int64_t i = 0; i < last_nodes; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
+    }
+    solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Lower, true, false);
+  }
 
+  // Solve Diagonal
+  // Root level D
+  for (int64_t i = 0; i < last_nodes; ++i) {
+    solve_diagonal(D(i, i, level), x_last_splits[i], Hatrix::Left);
+  }
+  
+  // Solve with root level L^T
+  for (int64_t i = last_nodes-1; i >= 0; --i) {
+    for (int64_t j = last_nodes-1; j > i; --j) {
+      matmul(D(i, j, level), x_last_splits[j], x_last_splits[i], false, false, -1.0, 1.0);
+    }
+    solve_triangular(D(i, i, level), x_last_splits[i], Hatrix::Left, Hatrix::Lower, true, true);
+  }
+  x_splits[1] = x_last;
+
+  level++;
   // Backward
-  {
+  for (; level <= _level; ++level) {
+    int64_t nblocks = level_blocks[level];
+
+    bool lr_exists = false;
+    for (int64_t block = 0; block < nblocks; ++block) {
+      if (U.exists(block, level)) { lr_exists = true; }
+    }
+    if (!lr_exists) { break; }
+
     int64_t n = 0;
     for (int64_t i = 0; i < nblocks; ++i) { n += D(i, i, level).cols; }
     Matrix x_level(n, 1);
@@ -1599,6 +1969,7 @@ Matrix BLR2_SPD::solve(const Matrix& b) {
       x(rhs_offset + i, 0) = x_level(i, 0);
     }
   }
+
   return x;
 }
 
@@ -1612,7 +1983,8 @@ int main(int argc, char ** argv) {
   // diagonal_admis or geometry_admis
   const std::string admis_kind = argc > 5 ? std::string(argv[5]) : "diagonal_admis";
   // 0: BLR2
-  constexpr int64_t matrix_type = 0;
+  // 1: H2
+  const int64_t matrix_type = argc > 6 ? atoi(argv[6]) : 1;
 
   Hatrix::Context::init();
 
@@ -1628,7 +2000,7 @@ int main(int argc, char ** argv) {
                                          (stop_particles - start_particles).count();
 
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::BLR2_SPD A(domain, N, rank, nleaf, admis, admis_kind);
+  Hatrix::H2_SPD A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
@@ -1644,7 +2016,7 @@ int main(int argc, char ** argv) {
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   Hatrix::Matrix b = Hatrix::generate_random_matrix(N, 1);
   const auto solve_start = std::chrono::system_clock::now();
-  Hatrix::Matrix x = A.solve(b);
+  Hatrix::Matrix x = A.solve(b, A.height);
   const auto solve_stop = std::chrono::system_clock::now();
   const double solve_time = std::chrono::duration_cast<std::chrono::milliseconds>
                             (solve_stop - solve_start).count();
