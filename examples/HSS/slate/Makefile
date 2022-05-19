@@ -1,9 +1,5 @@
 TOPSRCDIR = ../../..
 SOURCES :=  $(wildcard *.cpp)
-# sublib := libHSS_slate.a
-
-libHSS_slate.a:  $(OBJECTS)
-	$(AR) $(ARFLAGS) $@ $^
-	$(MV) $@ $(TOPSRCDIR)/$@
+sublib := libHSS_slate.a
 
 include $(TOPSRCDIR)/common.mk

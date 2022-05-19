@@ -65,10 +65,10 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-$(EXAMPLE_DIR_EXECUTABLES) : % : libHSS_main.a dirs
+$(EXAMPLE_DIR_EXECUTABLES) : % : lib%.a dirs
 	$(LINK_EXECUTABLE)
 
-$(EXAMPLE_SLATE_EXECS) : % : libHSS_slate.a dirs
+$(EXAMPLE_SLATE_EXECS) : % : lib%.a dirs
 	$(LINK_EXECUTABLE)
 
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
