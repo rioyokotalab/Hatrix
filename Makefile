@@ -40,8 +40,7 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_H2_far_dense \
 	svd_vs_id
 
-EXAMPLE_DIR_EXECUTABLES := HSS_main
-EXAMPLE_SLATE_EXECS := HSS_slate
+EXAMPLE_DIR_EXECUTABLES := HSS_main HSS_slate
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)

@@ -20,5 +20,5 @@ for N in 1024; do
     done
 done
 
-# make -j HSS_slate
-# ./bin/HSS_slate
+make -j HSS_slate
+./bin/HSS_slate
