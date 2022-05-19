@@ -12,6 +12,8 @@
 
 #include "Hatrix/Hatrix.h"
 
+#include <slate/slate.hh>
+
 int main(int argc, char* argv[]) {
   return 0;
 }

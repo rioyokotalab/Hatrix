@@ -21,4 +21,5 @@
 #     done
 # done
 
-make HSS_slate
+make -j HSS_slate
+./bin/HSS_slate
