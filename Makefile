@@ -65,7 +65,9 @@ $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 $(EXAMPLE_DIR_EXECUTABLES) : % : lib%.a dirs
-	$(LINK_EXECUTABLE)
+	$(CXX) $< $(OBJLIBS) libfranklin.a $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
 
 # $(EXAMPLE_SLATE_EXECS) : % : lib%.a dirs
 # 	$(LINK_EXECUTABLE)
