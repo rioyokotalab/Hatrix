@@ -1,8 +1,7 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/common.mk
 
-DIRS := src/classes src/functions src/util examples/HSS examples/HSS/slate
-EXAMPLE_OBJ_LIBS := libHSS_main.a
+DIRS := src/classes src/functions src/util examples/franklin examples/franklin/HSS examples/franklin/HSS_slate
 OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
@@ -68,8 +67,8 @@ $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 $(EXAMPLE_DIR_EXECUTABLES) : % : lib%.a dirs
 	$(LINK_EXECUTABLE)
 
-$(EXAMPLE_SLATE_EXECS) : % : lib%.a dirs
-	$(LINK_EXECUTABLE)
+# $(EXAMPLE_SLATE_EXECS) : % : lib%.a dirs
+# 	$(LINK_EXECUTABLE)
 
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
