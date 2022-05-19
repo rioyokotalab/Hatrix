@@ -1,9 +1,10 @@
 #!/bin/bash
 
-make -j
+make HSS_main
 
 for N in 1024; do
     for r in 30; do
+        ./bin/HSS_main -v -h
         ./bin/HSS_main --N $N \
              --nleaf 128 \
              --kernel_func laplace \
@@ -19,3 +20,5 @@ for N in 1024; do
              -v
     done
 done
+
+make HSS_slate

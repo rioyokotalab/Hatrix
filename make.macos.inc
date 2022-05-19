@@ -13,4 +13,5 @@ AR           = ar
 ARFLAGS      = -rv
 MV           = mv -f
 
-.SUFFIXES: .cpp
+%.o : %.cpp
+	$(CXX) $(CXXFLAGS) $< -c -o $@

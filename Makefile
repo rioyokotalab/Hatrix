@@ -1,7 +1,7 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/common.mk
 
-DIRS := src/classes src/functions src/util examples/HSS
+DIRS := src/classes src/functions src/util examples/HSS examples/HSS/slate
 EXAMPLE_OBJ_LIBS := libHSS_main.a
 OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
@@ -42,18 +42,20 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	svd_vs_id
 
 EXAMPLE_DIR_EXECUTABLES := HSS_main
+EXAMPLE_SLATE_EXECS := HSS_slate
 
-.PHONY: dirs $(DIRS) $(EXAMPLE_DIRS)
-dirs: $(DIRS) $(EXAMPLE_DIRS)
+.PHONY: dirs $(DIRS)
+dirs: $(DIRS)
 
 all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES)
 
 $(DIRS):
 	$(MAKE) -C $@
 
-LINK_EXECUTABLE = @$(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
+LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
+
 
 # The extra colon is needed for correct expansion in the dependency list
 # https://stackoverflow.com/questions/16262344/pass-a-target-name-to-dependency-list-in-makefile
@@ -63,7 +65,10 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-$(EXAMPLE_DIR_EXECUTABLES) : % : $(EXAMPLE_OBJ_LIBS) dirs
+$(EXAMPLE_DIR_EXECUTABLES) : % : libHSS_main.a dirs
+	$(LINK_EXECUTABLE)
+
+$(EXAMPLE_SLATE_EXECS) : % : libHSS_slate.a dirs
 	$(LINK_EXECUTABLE)
 
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
