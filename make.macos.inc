@@ -2,10 +2,11 @@ LAPACK_INCLUDE = -I/opt/homebrew/opt/lapack/include
 LAPACK_LIB = -L/opt/homebrew/opt/lapack/lib -llapacke -llapack
 BLAS_INCLUDE = -I${VEC_LIB_INCLUDE}
 BLAS_LIB     = -framework Accelerate
-CXX          = mpicxx --std=c++11 -Xpreprocessor -fopenmp \
-             -I"$(shell brew --prefix libomp)/include"
-CXXFLAGS     = -O0 -g -I. -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) $(LAPACK_INCLUDE) \
-             $(shell pkg-config --cflags gtest gtest_main)
+CXX          = clang++
+CXXFLAGS     = -O3 --std=c++11 -Xpreprocessor -fopenmp \
+               -I"$(shell brew --prefix libomp)/include" \
+               -I. -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) $(LAPACK_INCLUDE) \
+               $(shell pkg-config --cflags gtest gtest_main)
 LDFLAGS      = $(shell pkg-config --libs gtest_main) $(shell pkg-config --libs gtest) \
              $(LAPACK_LIB) $(BLAS_LIB) -L"$(shell brew --prefix libomp)/lib" -lomp \
              -L/Users/sameer/gitrepos/slate/build/lib -lslate -llapackpp -lblaspp \
