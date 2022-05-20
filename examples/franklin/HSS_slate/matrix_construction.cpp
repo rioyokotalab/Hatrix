@@ -1,10 +1,11 @@
 #include <exception>
 
 #include "Hatrix/Hatrix.h"
-
 #include "franklin/franklin.hpp"
-
 #include "matrix_construction.hpp"
+#include "MPIWrapper.hpp"
+
+#include "slate/slate.hh"
 
 static void coarsen_blocks(MPISymmSharedBasisMatrix& A, int64_t level) {
   int64_t child_level = level + 1;
@@ -59,4 +60,10 @@ void init_diagonal_admis(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts) 
   A.max_level = int64_t(log2(opts.N / opts.nleaf));
   A.min_level = diagonal_admis_init(A, opts, A.max_level);
   A.is_admissible.insert(0, 0, 0, false);
+}
+
+void construct_h2_mpi_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
+                           const Hatrix::Args& opts) {
+  const int64_t P = 100;
+  slate::Matrix<double> dense(opts.N, opts.N, opts.nleaf, opts.nleaf, mpi_world.MPISIZE, mpi_world.COMM);
 }

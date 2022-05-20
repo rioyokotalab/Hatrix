@@ -15,15 +15,17 @@
 
 #include "MPISymmSharedBasisMatrix.hpp"
 #include "matrix_construction.hpp"
+#include "MPIWrapper.hpp"
 
 #include "mpi.h"
 #include <slate/slate.hh>
 
+MPIWrapper mpi_world;
+
 int main(int argc, char* argv[]) {
   Hatrix::Args opts(argc, argv);
 
-  int provided;
-  assert(MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided) == 0);
+  mpi_world.init(argc, argv);
 
   // generate the points on all the processes.
   auto start_domain = std::chrono::system_clock::now();
@@ -47,12 +49,12 @@ int main(int argc, char* argv[]) {
     if (opts.admis_kind == Hatrix::DIAGONAL) {
       init_diagonal_admis(A, opts);
     }
+    construct_h2_mpi_miro(A, domain, opts);
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
   }
 
-  assert(MPI_Finalize() == 0);
-
+  mpi_world.finish();
   return 0;
 }
