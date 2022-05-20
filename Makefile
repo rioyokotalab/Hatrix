@@ -40,7 +40,7 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_H2_far_dense \
 	svd_vs_id
 
-EXAMPLE_DIR_EXECUTABLES := HSS_main HSS_slate
+EXAMPLE_DIR_EXECUTABLES := HSS_main
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -68,8 +68,10 @@ $(EXAMPLE_DIR_EXECUTABLES) : % : lib%.a dirs
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-# $(EXAMPLE_SLATE_EXECS) : % : lib%.a dirs
-# 	$(LINK_EXECUTABLE)
+HSS_slate : % : libHSS_slate.a dirs
+	$(MPICXX) $< $(OBJLIBS) libfranklin.a $(LDFLAGS) $(SLATE_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
 
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
