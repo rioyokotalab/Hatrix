@@ -73,6 +73,7 @@ namespace Hatrix {
       int c = getopt_long(argc, argv, "n:l:k:g:d:r:e:a:m:c:z:bvh",
                           long_options, &option_index);
 
+      if (c == -1) break;
       switch(c) {
       case 'n':
         N = std::stol(optarg);
@@ -156,7 +157,8 @@ namespace Hatrix {
         usage(argv[0]);
         exit(0);
       default:
-        fprintf(stderr, "Please supply appropriate cmd options as below.\n");
+        fprintf(stderr, "Please supply appropriate cmd options as below. %s is not supported\n",
+                optarg);
         usage(argv[0]);
         exit(2);
       }

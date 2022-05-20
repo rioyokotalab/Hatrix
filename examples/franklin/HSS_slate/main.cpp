@@ -10,21 +10,14 @@
 #include <iterator>
 #include <iomanip>
 
-
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
 
+#include "MPISymmSharedBasisMatrix.hpp"
+#include "matrix_construction.hpp"
+
 #include "mpi.h"
 #include <slate/slate.hh>
-
-
-typedef struct MPISymmSharedBasisMatrix {
-  int64_t min_level, max_level;
-  Hatrix::ColLevelMap U;
-  Hatrix::RowColLevelMap<Hatrix::Matrix> D, S;
-  Hatrix::RowColLevelMap<bool> is_admissible;
-  Hatrix::RankMap rank_map;
-} MPISymmSharedBasisMatrix;
 
 int main(int argc, char* argv[]) {
   Hatrix::Args opts(argc, argv);
@@ -50,7 +43,10 @@ int main(int argc, char* argv[]) {
 
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
-
+    MPISymmSharedBasisMatrix A;
+    if (opts.admis_kind == Hatrix::DIAGONAL) {
+      init_diagonal_admis(A, opts);
+    }
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
