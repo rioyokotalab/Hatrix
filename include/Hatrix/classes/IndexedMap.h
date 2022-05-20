@@ -94,6 +94,7 @@ class RowColMap {
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol
 using RowLevelMap = RowColMap<Matrix>;
 using ColLevelMap = RowColMap<Matrix>;
+using RankMap = RowColMap<std::vector<int64_t>>;
 
 template <class T>
 class RowColLevelMap {

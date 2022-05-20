@@ -100,7 +100,6 @@ void RowColMap<T>::erase_all() {
 // explicit instatiation
 template class RowColMap<bool>;
 template class RowColMap<Matrix>;
-template class RowColMap<int64_t>;
 
 template<class T>
 T& RowColLevelMap<T>::operator[](const std::tuple<int64_t, int64_t, int64_t>& key) {
