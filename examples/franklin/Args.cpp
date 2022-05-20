@@ -26,9 +26,9 @@ namespace Hatrix {
   Args::geometry_to_string(KIND_OF_GEOMETRY geometry) {
     switch(geometry) {
     case CIRCULAR:
-      return std::string("CIRCULAR");
+      return std::string("circular");
     default:
-      return std::string("GRID");
+      return std::string("grid");
     }
   }
 
@@ -36,9 +36,9 @@ namespace Hatrix {
   Args::admis_kind_to_string(ADMIS_KIND admis_kind) {
     switch(admis_kind) {
     case GEOMETRY:
-      return std::string("GEOMETRY");
+      return std::string("geometry");
     default:
-      return std::string("DIAGONAL");
+      return std::string("diagonal");
     }
   }
 
@@ -73,7 +73,6 @@ namespace Hatrix {
       int c = getopt_long(argc, argv, "n:l:k:g:d:r:e:a:m:c:z:bvh",
                           long_options, &option_index);
 
-      if (c == -1) break;
       switch(c) {
       case 'n':
         N = std::stol(optarg);
@@ -157,8 +156,9 @@ namespace Hatrix {
         usage(argv[0]);
         exit(0);
       default:
+        fprintf(stderr, "Please supply appropriate cmd options as below.\n");
         usage(argv[0]);
-        abort();
+        exit(2);
       }
     }
 
@@ -172,39 +172,37 @@ namespace Hatrix {
 
   void
   Args::usage(const char *name) {
-    if (verbose) {
-      fprintf(stderr,
-              "Usage: %s [options]\n"
-              "Long option (short option)                  : Description (Default value)\n"
-              "--N (-n)                                    : Number of points to consider (%lld).\n"
-              "--nleaf (-l)                                : Max. number of points in a leaf node (%lld).\n"
-              "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
-              "--kind_of_geometry (-g) [sphere|grid]       : Kind of geometry of the points  (%s).\n"
-              "--ndim (-d)                                 : Number of dimensions of the geometry (%lld).\n"
-              "--max_rank (-r)                             : Maximum rank (%lld).\n"
-              "--accuracy (-e)                             : Desired accuracy for construction. > 0 for constant rank construction. (%lf).\n"
-              "--admis (-a)                                : Admissibility constant (%lf).\n"
-              "--admis_kind (-m) [diagonal|geometry]       : Whether geometry-based or diagonal-based admis (%s).\n"
-              "--construct_algorithm (-c) [miro|id_random] : Construction algorithm to use (%s).\n"
-              "--add_diag (-z)                             : Value to add to the diagonal (%lf).\n"
-              "--nested_basis (-b)                         : Whether to use nested basis (%d).\n"
-              "--verbose (-v)                              : Verbose mode (%d).\n"
-              "--help (-h)                                 : Show this help message.\n",
-              name,
-              N,
-              nleaf,
-              kernel_verbose.c_str(),
-              geometry_to_string(kind_of_geometry).c_str(),
-              ndim,
-              max_rank,
-              accuracy,
-              admis,
-              admis_kind_to_string(admis_kind).c_str(),
-              construct_algorithm_to_string(construct_algorithm).c_str(),
-              add_diag,
-              use_nested_basis,
-              verbose);
-    }
+    fprintf(stderr,
+            "Usage: %s [options]\n"
+            "Long option (short option)                  : Description (Default value)\n"
+            "--N (-n)                                    : Number of points to consider (%lld).\n"
+            "--nleaf (-l)                                : Max. number of points in a leaf node (%lld).\n"
+            "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
+            "--kind_of_geometry (-g) [sphere|grid]       : Kind of geometry of the points  (%s).\n"
+            "--ndim (-d)                                 : Number of dimensions of the geometry (%lld).\n"
+            "--max_rank (-r)                             : Maximum rank (%lld).\n"
+            "--accuracy (-e)                             : Desired accuracy for construction. > 0 for constant rank construction. (%lf).\n"
+            "--admis (-a)                                : Admissibility constant (%lf).\n"
+            "--admis_kind (-m) [diagonal|geometry]       : Whether geometry-based or diagonal-based admis (%s).\n"
+            "--construct_algorithm (-c) [miro|id_random] : Construction algorithm to use (%s).\n"
+            "--add_diag (-z)                             : Value to add to the diagonal (%lf).\n"
+            "--nested_basis (-b)                         : Whether to use nested basis (%d).\n"
+            "--verbose (-v)                              : Verbose mode (%d).\n"
+            "--help (-h)                                 : Show this help message.\n",
+            name,
+            N,
+            nleaf,
+            kernel_verbose.c_str(),
+            geometry_to_string(kind_of_geometry).c_str(),
+            ndim,
+            max_rank,
+            accuracy,
+            admis,
+            admis_kind_to_string(admis_kind).c_str(),
+            construct_algorithm_to_string(construct_algorithm).c_str(),
+            add_diag,
+            use_nested_basis,
+            verbose);
   }
 
   void
