@@ -8,6 +8,12 @@
 namespace Hatrix {
   void generate_p2p_interactions(const Domain& domain,
                                  int64_t irow, int64_t icol,
+                                 const kernel_function& kernel,
+                                 const int64_t rows, const int64_t cols,
+                                 double* out,
+                                 const int64_t ld);
+  void generate_p2p_interactions(const Domain& domain,
+                                 int64_t irow, int64_t icol,
                                  int64_t level, int64_t height,
                                  const kernel_function& kernel,
                                  Matrix& out);

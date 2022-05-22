@@ -134,18 +134,28 @@ namespace Hatrix {
   void generate_p2p_interactions(const Domain& domain,
                                  int64_t irow, int64_t icol,
                                  const kernel_function& kernel,
-                                 Matrix& out) {
-    assert(out.rows == domain.boxes[irow].num_particles);
-    assert(out.cols == domain.boxes[icol].num_particles);
-    for (int64_t i = 0; i < domain.boxes[irow].num_particles; ++i) {
-      for (int64_t j = 0; j < domain.boxes[icol].num_particles; ++j) {
+                                 const int64_t rows, const int64_t cols,
+                                 double* out,
+                                 const int64_t ld) {
+    for (int64_t i = 0; i < rows; ++i) {
+      for (int64_t j = 0; j < cols; ++j) {
         int64_t source = domain.boxes[irow].start_index;
         int64_t target = domain.boxes[icol].start_index;
 
-        out(i, j) = kernel(domain.particles[source+i].coords,
-                           domain.particles[target+j].coords);
+        out[i + j * ld] = kernel(domain.particles[source+i].coords,
+                                 domain.particles[target+j].coords);
       }
     }
+  }
+
+  void generate_p2p_interactions(const Domain& domain,
+                                 int64_t irow, int64_t icol,
+                                 const kernel_function& kernel,
+                                 Matrix& out) {
+    assert(out.rows == domain.boxes[irow].num_particles);
+    assert(out.cols == domain.boxes[icol].num_particles);
+    generate_p2p_interactions(domain, irow, icol, kernel,
+                              out.rows, out.cols, &out, out.stride);
   }
 
   // double

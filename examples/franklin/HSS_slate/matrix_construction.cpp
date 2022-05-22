@@ -79,6 +79,13 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A, s
       }
     }
   }
+
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    if (A.rank_1d(i) == mpi_world.MPIRANK) {
+
+    }
+  }
 }
 
 void random_matrix(int64_t nrows, int64_t ncols, double* data, int64_t lda) {
@@ -90,12 +97,31 @@ void random_matrix(int64_t nrows, int64_t ncols, double* data, int64_t lda) {
 }
 
 void random_matrix(slate::Matrix<double>& rand) {
-  rand.insertLocalTiles();
+  #pragma omp parallel for
   for (int64_t i = 0; i < rand.mt(); ++i) {
     for (int64_t j = 0; j < rand.nt(); ++j) {
       if (rand.tileIsLocal(i, j)) {
         slate::Tile<double> tile = rand(i, j);
         random_matrix(tile.mb(), tile.nb(), tile.data(), tile.stride());
+      }
+    }
+  }
+}
+
+void randomize_dense_matrix(const Hatrix::Domain& domain, slate::Matrix<double>& dense,
+                            const slate::Matrix<double>& rand,
+                            slate::Matrix<double>& product, const MPISymmSharedBasisMatrix& A,
+                            const Hatrix::Args& opts) {
+  for (int64_t i = 0; i < dense.mt(); ++i) {
+    for (int64_t j = 0; j < dense.nt(); ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) { continue; }
+
+      if (dense.tileIsLocal(i, j)) {
+        slate::Tile<double>* tile = dense.tileInsert(i, j);
+
+        generate_p2p_interactions(domain, i, j, opts.kernel,
+                                  tile->mb(), tile->nb(), tile->data(), tile->stride());
       }
     }
   }
@@ -108,7 +134,11 @@ void construct_h2_mpi_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& do
   slate::Matrix<double> rand(opts.N, P, opts.nleaf, P, mpi_world.MPISIZE, 1, mpi_world.COMM);
   slate::Matrix<double> product(opts.N, P, opts.nleaf, P, mpi_world.MPISIZE, 1, mpi_world.COMM);
 
+  rand.insertLocalTiles();
+  product.insertLocalTiles();
+
   random_matrix(rand);
+  randomize_dense_matrix(domain, dense, rand, product, A, opts);
 
   generate_leaf_nodes(domain, A, dense, rand, product, opts);
 }
