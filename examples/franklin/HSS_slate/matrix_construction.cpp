@@ -62,8 +62,45 @@ void init_diagonal_admis(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts) 
   A.is_admissible.insert(0, 0, 0, false);
 }
 
+static void
+generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A, slate::Matrix<double>& dense,
+                    const slate::Matrix<double>& rand, slate::Matrix<double>& product, const Hatrix::Args& opts) {
+  int64_t nblocks = pow(2, A.max_level);
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level) && A.rank_1d(i) == mpi_world.MPIRANK) {
+        A.D.insert(i, j, A.max_level,
+                   generate_p2p_interactions(domain, i, j, opts.kernel));
+      }
+    }
+  }
+}
+
+void random_matrix(int64_t nrows, int64_t ncols, double* data, int64_t lda) {
+
+}
+
+void random_matrix(slate::Matrix<double>& rand) {
+  rand.insertLocalTiles();
+  for (int64_t i = 0; i < rand.mt(); ++i) {
+    for (int64_t j = 0; j < rand.nt(); ++j) {
+      if (rand.tileIsLocal(i, j)) {
+        slate::Tile<double> tile = rand(i, j);
+        random_matrix(tile.mb(), tile.nb(), tile.data(), tile.stride());
+      }
+    }
+  }
+}
+
 void construct_h2_mpi_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
                            const Hatrix::Args& opts) {
   const int64_t P = 100;
-  slate::Matrix<double> dense(opts.N, opts.N, opts.nleaf, opts.nleaf, mpi_world.MPISIZE, mpi_world.COMM);
+  slate::Matrix<double> dense(opts.N, opts.N, opts.nleaf, opts.nleaf, mpi_world.MPISIZE, 1, mpi_world.COMM);
+  slate::Matrix<double> rand(opts.N, P, opts.nleaf, P, mpi_world.MPISIZE, 1, mpi_world.COMM);
+  slate::Matrix<double> product(opts.N, P, opts.nleaf, P, mpi_world.MPISIZE, 1, mpi_world.COMM);
+
+  random_matrix(rand);
+
+  generate_leaf_nodes(domain, A, dense, rand, product, opts);
 }
