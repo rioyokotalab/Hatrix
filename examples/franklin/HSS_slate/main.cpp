@@ -51,11 +51,17 @@ int main(int argc, char* argv[]) {
       init_diagonal_admis(A, opts);
     }
     construct_h2_mpi_miro(A, domain, opts);
+    MPI_Barrier(MPI_COMM_WORLD);
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
   }
 
+  if (mpi_world.MPIRANK == 0) {
+    std::cout << "construct time: " << construct_time << std::endl;
+  }
+
   mpi_world.finish();
+
   return 0;
 }

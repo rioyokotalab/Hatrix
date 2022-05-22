@@ -21,7 +21,7 @@
 # done
 
 make -j HSS_slate
-./bin/HSS_slate --N 1024 \
+mpirun -n 1 ./bin/HSS_slate --N 1024 \
                 --nleaf 128 \
                 --kernel_func laplace \
                 --kind_of_geometry circular \
