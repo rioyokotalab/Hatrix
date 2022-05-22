@@ -26,6 +26,7 @@ int main(int argc, char* argv[]) {
   Hatrix::Args opts(argc, argv);
 
   mpi_world.init(argc, argv);
+  random_generator.seed(mpi_world.MPIRANK);
 
   // generate the points on all the processes.
   auto start_domain = std::chrono::system_clock::now();

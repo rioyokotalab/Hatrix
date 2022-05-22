@@ -1,4 +1,5 @@
 #include <exception>
+#include <random>
 
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
@@ -6,6 +7,9 @@
 #include "MPIWrapper.hpp"
 
 #include "slate/slate.hh"
+
+std::mt19937 random_generator;
+std::uniform_real_distribution<double> uniform_distribution(0, 1.0);
 
 static void coarsen_blocks(MPISymmSharedBasisMatrix& A, int64_t level) {
   int64_t child_level = level + 1;
@@ -78,7 +82,11 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A, s
 }
 
 void random_matrix(int64_t nrows, int64_t ncols, double* data, int64_t lda) {
-
+  for (int64_t i = 0; i < nrows; ++i) {
+    for (int64_t j = 0; j < ncols; ++j) {
+      data[i + j * lda] = uniform_distribution(random_generator);
+    }
+  }
 }
 
 void random_matrix(slate::Matrix<double>& rand) {
