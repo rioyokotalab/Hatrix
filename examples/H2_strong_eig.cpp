@@ -21,6 +21,7 @@ using vec = std::vector<int64_t>;
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 constexpr int64_t oversampling = 5;
+constexpr double EPS_EV = 1e-5;
 double PV = 1e-3;
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 
@@ -65,18 +66,6 @@ void shift_diag(Hatrix::Matrix& A, const double shift) {
   for(int64_t i = 0; i < A.min_dim(); i++) {
     A(i, i) += shift;
   }
-}
-
-int64_t inertia(const Hatrix::Matrix& A, const double lambda) {
-  Hatrix::Matrix Ac(A);
-  shift_diag(Ac, -lambda);
-  Hatrix::ldl(Ac);
-  // std::cout << "D\n"; (diag(Ac)).print();
-  int64_t negative_elements_count = 0;
-  for(int64_t i = 0; i < Ac.min_dim(); i++) {
-    negative_elements_count += (Ac(i, i) < 0 ? 1 : 0);
-  }
-  return negative_elements_count;
 }
 
 double norm_2(const Hatrix::Matrix& A) {
@@ -202,6 +191,8 @@ class H2_SPD {
   void factorize(const Domain& domain);
   Matrix solve(const Matrix& b, int64_t _level);
   int64_t inertia(const Domain& domain, const double lambda);
+  double get_mth_eigenvalue(const Domain& domain, const int64_t m,
+                            double left, double right);
 };
 
 double laplace_kernel(const std::vector<double>& coords_row,
@@ -1085,7 +1076,7 @@ H2_SPD::H2_SPD(const Domain& domain, const int64_t N, const int64_t rank,
   }
 
   is_admissible.insert(0, 0, 0, false);
-  PV =  (1 / double(N)) * 1e-3;
+  // PV = (1 / (double)N) * 1e-3;
 
   int64_t all_dense_row = find_all_dense_row();
   if (all_dense_row != -1) {
@@ -2024,14 +2015,14 @@ int64_t H2_SPD::inertia(const Domain& domain, const double lambda) {
     int64_t nblocks = level_blocks[level];
     for(int64_t block = 0; block < nblocks; block++) {
       if(level == 0) {
-	D_lambda = concat(D_lambda, diag(A_shifted.D(block, block, level)), 0);
+        D_lambda = concat(D_lambda, diag(A_shifted.D(block, block, level)), 0);
       }
       else {
-	int64_t row_split = A_shifted.D(block, block, level).rows - rank;
-	int64_t col_split = A_shifted.D(block, block, level).cols - rank;
-	auto D_splits = A_shifted.D(block, block, level).split(vec{row_split},
-							       vec{col_split});
-	D_lambda = concat(D_lambda, diag(D_splits[0]), 0);
+        int64_t row_split = A_shifted.D(block, block, level).rows - rank;
+        int64_t col_split = A_shifted.D(block, block, level).cols - rank;
+        auto D_splits = A_shifted.D(block, block, level).split(vec{row_split},
+                                                               vec{col_split});
+        D_lambda = concat(D_lambda, diag(D_splits[0]), 0);
       }
     }
   }
@@ -2042,19 +2033,53 @@ int64_t H2_SPD::inertia(const Domain& domain, const double lambda) {
   }
   return negative_elements_count;
 }
-			  
+
+double H2_SPD::get_mth_eigenvalue(const Domain& domain, const int64_t m,
+                                  double left, double right) {
+  while((right - left) >= EPS_EV) {
+    const auto mid = (left + right) / 2;
+    const auto value = (*this).inertia(domain, mid);
+    if(value >= m) right = mid;
+    else left = mid;
+  }
+  return (left + right) / 2;
+}
+
 } // namespace Hatrix
+
+int64_t inertia(const Hatrix::Matrix& A, const double lambda) {
+  Hatrix::Matrix Ac(A);
+  shift_diag(Ac, -lambda);
+  Hatrix::ldl(Ac);
+  int64_t negative_elements_count = 0;
+  bool zero_found = false;
+  for(int64_t i = 0; i < Ac.min_dim(); i++) {
+    negative_elements_count += (Ac(i, i) < 0 ? 1 : 0);
+  }
+  return negative_elements_count;
+}
+
+double get_mth_eigenvalue_dense(const Hatrix::Matrix& A, const int64_t m,
+                                double left, double right) {
+  while((right - left) >= EPS_EV) {
+    const auto mid = (left + right) / 2;
+    const auto value = inertia(A, mid);
+    if(value >= m) right = mid;
+    else left = mid;
+  }
+  return (left + right) / 2;
+}
 
 int main(int argc, char ** argv) {
   const int64_t N = argc > 1 ? atoi(argv[1]) : 256;
   const int64_t nleaf = argc > 2 ? atoi(argv[2]) : 64;
-  const int64_t rank = argc > 3 ? atoi(argv[3]) : 8;
-  const double admis = argc > 4 ? atof(argv[4]) : 1.0;
+  const int64_t rank = argc > 3 ? atoi(argv[3]) : 16;
+  const double admis = argc > 4 ? atof(argv[4]) : 1;
   // diagonal_admis or geometry_admis
   const std::string admis_kind = argc > 5 ? std::string(argv[5]) : "diagonal_admis";
-  // 0: BLR2
-  // 1: H2
-  const int64_t matrix_type = argc > 6 ? atoi(argv[6]) : 1;
+  const int64_t m  = argc > 6 ? atoi(argv[6]) : 1;
+  const int64_t print_header = argc > 7 ? atoi(argv[7]) : 0;
+  const int64_t matrix_type = H2_MATRIX;
 
   Hatrix::Context::init();
 
@@ -2062,7 +2087,7 @@ int main(int argc, char ** argv) {
   constexpr int64_t ndim = 3;
   Hatrix::Domain domain(N, ndim);
   // Laplace kernel
-  domain.generate_starsh_grid_particles();
+  domain.generate_particles(0, N); //Unit sphere
   Hatrix::kernel_function = Hatrix::laplace_kernel;
   domain.divide_domain_and_create_particle_boxes(nleaf);
   const auto stop_particles = std::chrono::system_clock::now();
@@ -2079,27 +2104,36 @@ int main(int argc, char ** argv) {
   lr_ratio = A.low_rank_block_ratio();
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-  const double shift = norm_2(Adense) + 10;
-  const auto a_h2 = A.inertia(domain, -shift);
-  const auto b_h2 = A.inertia(domain, shift);
-  const auto a_dense = inertia(Adense, -shift);
-  const auto b_dense = inertia(Adense, shift);
+  auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
+  
+  const auto b = norm_2(Adense) + 1.0;
+  const auto a = -b;
+  const auto v_a = A.inertia(domain, a);
+  const auto v_b = A.inertia(domain, b);
+  if(v_a != 0 || v_b != N) {
+    std::cout << "Warning: starting interval does not contain the whole spectrum\n";
+  }
+  const auto h2_mth_eigv = A.get_mth_eigenvalue(domain, m, a, b);
+  const auto dense_mth_eigv = get_mth_eigenvalue_dense(Adense, m, a, b);
 
   Hatrix::Context::finalize();
 
-  std::cout << "N=" << N
-            << " admis=" << admis << std::setw(3)
-            << " nleaf=" << nleaf
-            << " ndim=" << ndim
-            << " height=" << A.height << " rank=" << rank
-            << " construct_error=" << std::setprecision(5) << construct_error
-            << " LR%= " << std::setprecision(5) << lr_ratio * 100 << "%"
-            << " admis_kind=" << admis_kind
-            << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
-            << " construct_time=" << construct_time
-	    << " shift=" << shift
-	    << " a_dense=" << a_dense << " b_dense=" << b_dense
-	    << " a_h2=" << a_h2 << " b_h2=" << b_h2
+  if(print_header == 1) {
+    std::cout << "N,nleaf,rank,admis,admis_kind,height,construct_time,construct_error,lr_ratio"
+              << ",m,lapack_eigv,dense_eigv,h2_eigv,dense_eigv_error,h2_eigv_error"
+              << std::endl;
+  }
+  std::cout << N << "," << nleaf << "," << rank << "," << admis << "," << admis_kind
+            << "," << A.height
+            << "," << construct_time
+            << "," << std::setprecision(5) << construct_error
+            << "," << lr_ratio * 100
+            << "," << m
+            << "," << std::setprecision(10) << lapack_eigv[m - 1] 
+            << "," << std::setprecision(10) << dense_mth_eigv
+            << "," << std::setprecision(10) << h2_mth_eigv
+            << "," << std::scientific << std::abs(dense_mth_eigv - lapack_eigv[m - 1])
+            << "," << std::scientific << std::abs(h2_mth_eigv - lapack_eigv[m - 1])
             << std::endl;
 
   return 0;
