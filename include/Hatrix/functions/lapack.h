@@ -94,4 +94,6 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
 // denoting the first rank pivot columns from A that are chosen as the basis vectors.
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank);
 
+std::vector<double> get_eigenvalues(const Matrix& A);
+
 }  // namespace Hatrix

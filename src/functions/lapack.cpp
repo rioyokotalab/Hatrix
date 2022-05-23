@@ -530,7 +530,6 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
   return {std::move(interp), std::move(c_pivots), rank};
 }
 
-
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
   Matrix interp(A.rows, rank), pivots(A.cols, 1);
   std::vector<double> tau(std::min(A.rows, A.cols));
@@ -543,6 +542,14 @@ std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
     pivots(i, 0) = jpvt[i];
   }
   return {std::move(interp), std::move(pivots)};
+}
+
+std::vector<double> get_eigenvalues(const Matrix& A) {
+  assert(A.rows == A.cols);
+  Matrix Ac(A);
+  std::vector<double> eigv(Ac.rows, 0);
+  LAPACKE_dsyev(LAPACK_COL_MAJOR, 'N', 'L', Ac.rows, &Ac, Ac.stride, eigv.data());
+  return eigv;
 }
 
 }  // namespace Hatrix
