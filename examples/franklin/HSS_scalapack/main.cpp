@@ -1,32 +1,46 @@
 #include "franklin/franklin.hpp"
 #include "MPIWrapper.hpp"
+#include "library_decls.hpp"
+#include "matrix_construction.hpp"
 
 #include "mpi.h"
 
-extern "C" {
-  /* Cblacs declarations */
-  void Cblacs_pinfo(int*, int*);
-  void Cblacs_get(int, int, int*);
-  void Cblacs_gridinit(int*, const char*, int, int);
-  void Cblacs_gridinfo(int, int*, int*, int*, int*);
-  void Cblacs_pcoord(int, int, int*, int*);
-  void Cblacs_gridexit(int);
-  void Cblacs_barrier(int, const char*);
-
-  int numroc_(int*, int*, int*, int*, int*);
-
-  void descinit_(int *desc, const int *m,  const int *n, const int *mb,
-    const int *nb, const int *irsrc, const int *icsrc, const int *ictxt,
-    const int *lld, int *info);
-  void pdgetrf_(
-                int *m, int *n, double *a, int *ia, int *ja, int *desca,
-                int *ipiv,int *info);
-  int indxg2l_(int* , int*, int*, int*, int*);
-  int indxg2p_(int*, int*, int*, int*, int*);
-}
-
 int main(int argc, char* argv[]) {
+  Hatrix::Args opts(argc, argv);
   mpi_world.init(argc, argv);
+  random_generator.seed(mpi_world.MPIRANK);
+
+  // generate the points on all the processes.
+  auto start_domain = std::chrono::system_clock::now();
+  Hatrix::Domain domain(opts.N, opts.ndim);
+  if (opts.kind_of_geometry == Hatrix::GRID) {
+    domain.generate_grid_particles();
+  }
+  else if (opts.kind_of_geometry == Hatrix::CIRCULAR) {
+    domain.generate_circular_particles(0, opts.N);
+  }
+  domain.divide_domain_and_create_particle_boxes(opts.nleaf);
+  auto stop_domain = std::chrono::system_clock::now();
+  double domain_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_domain - start_domain).count();
+  double construct_time;
+
+  if (opts.is_symmetric) {
+    auto begin_construct = std::chrono::system_clock::now();
+    MPISymmSharedBasisMatrix A;
+    if (opts.admis_kind == Hatrix::DIAGONAL) {
+      init_diagonal_admis(A, opts);
+    }
+    construct_h2_miro(A, domain, opts);
+    Cblacs_barrier(mpi_world.CBLACS_CONTEXT, "All");
+    auto stop_construct = std::chrono::system_clock::now();
+    construct_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_construct - begin_construct).count();
+  }
+
+  if (mpi_world.MPIRANK == 0) {
+    std::cout << "construct time: " << construct_time << std::endl;
+  }
 
   mpi_world.finish();
 }

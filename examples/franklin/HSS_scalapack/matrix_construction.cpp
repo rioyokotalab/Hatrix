@@ -64,3 +64,8 @@ void init_diagonal_admis(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts) 
   A.min_level = diagonal_admis_init(A, opts, A.max_level);
   A.is_admissible.insert(0, 0, 0, false);
 }
+
+void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
+                       const Hatrix::Args& opts) {
+
+}

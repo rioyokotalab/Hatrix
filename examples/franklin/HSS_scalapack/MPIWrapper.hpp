@@ -8,7 +8,7 @@ public:
   int MPIRANK;
   MPI_Comm COMM;
   int MPIGRID[2] = {0, 0};
-  int BLACS_CONTEXT;
+  int CBLACS_CONTEXT;
 
   int ROWRANK, COLRANK;
 

@@ -16,10 +16,10 @@ MPIWrapper::init(int argc, char* argv[]) {
 
   MPI_Dims_create(MPISIZE, 2, MPIGRID);
 
-  Cblacs_get( -1, 0, &BLACS_CONTEXT );
-  Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0],
+  Cblacs_get( -1, 0, &CBLACS_CONTEXT );
+  Cblacs_gridinit(&CBLACS_CONTEXT, "Row", MPIGRID[0],
                    MPIGRID[1]);
-  Cblacs_pcoord(BLACS_CONTEXT,
+  Cblacs_pcoord(CBLACS_CONTEXT,
                 MPIRANK,
                 &ROWRANK, &COLRANK);
 }
