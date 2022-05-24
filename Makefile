@@ -75,8 +75,8 @@ $(EXAMPLE_DIR_EXECUTABLES) : % : lib%.a dirs
 examples/franklin/HSS_slate:
 	$(MAKE) -C $@
 
-HSS_slate : % : libHSS_slate.a dirs examples/franklin/HSS_slate
-	$(MPICXX) $< $(OBJLIBS) libfranklin.a $(LDFLAGS) $(SLATE_LIB) -o $@; \
+HSS_slate : % : dirs examples/franklin/HSS_slate
+	$(MPICXX) $(OBJLIBS) libfranklin.a libHSS_slate.a $(LDFLAGS) $(SLATE_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
@@ -85,8 +85,8 @@ HSS_slate : % : libHSS_slate.a dirs examples/franklin/HSS_slate
 examples/franklin/HSS_scalapack:
 	$(MAKE) -C $@
 
-HSS_scalapack : % : libHSS_scalapack.a dirs examples/franklin/HSS_scalapack
-	$(MPICXX) $< $(OBJLIBS) libfranklin.a $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
+HSS_scalapack : % : dirs examples/franklin/HSS_scalapack
+	$(MPICXX) $(OBJLIBS) libfranklin.a libHSS_scalapack.a $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
