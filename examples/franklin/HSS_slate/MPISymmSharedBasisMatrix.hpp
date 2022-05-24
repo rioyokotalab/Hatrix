@@ -17,6 +17,7 @@ typedef struct MPISymmSharedBasisMatrix {
   }
 
   int rank_2d(const int row, const int col) {
-    return (row % mpi_world.MPIGRID[0]) + (col % mpi_world.MPIGRID[1]) * mpi_world.MPIGRID[0];
+    return (row % mpi_world.MPIGRID[0]) +
+      (col % mpi_world.MPIGRID[1]) * mpi_world.MPIGRID[0];
   }
 } MPISymmSharedBasisMatrix;

@@ -1,10 +1,12 @@
 #pragma once
 
+#include "mpi.h"
+
 class MPIWrapper {
 public:
   int MPISIZE;
   int MPIRANK;
-  int COMM;
+  MPI_Comm COMM;
   int MPIGRID[2];
 
   void init(int argc, char* argv[]);

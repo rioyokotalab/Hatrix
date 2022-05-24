@@ -108,9 +108,11 @@ void random_matrix(slate::Matrix<double>& rand) {
   }
 }
 
-void randomize_dense_matrix(const Hatrix::Domain& domain, slate::Matrix<double>& dense,
-                            const slate::Matrix<double>& rand,
-                            slate::Matrix<double>& product, const MPISymmSharedBasisMatrix& A,
+void randomize_dense_matrix(const Hatrix::Domain& domain,
+                            slate::Matrix<double>& dense,
+                            slate::Matrix<double>& rand,
+                            slate::Matrix<double>& product,
+                            const MPISymmSharedBasisMatrix& A,
                             const Hatrix::Args& opts) {
   for (int64_t i = 0; i < dense.mt(); ++i) {
     for (int64_t j = 0; j < dense.nt(); ++j) {
@@ -122,6 +124,13 @@ void randomize_dense_matrix(const Hatrix::Domain& domain, slate::Matrix<double>&
 
         generate_p2p_interactions(domain, i, j, opts.kernel,
                                   tile->mb(), tile->nb(), tile->data(), tile->stride());
+        auto sub_matrix = dense.sub(i, i, j, j);
+        auto rand_sub_matrix = rand.sub(i, i, 0, 0);
+        auto product_sub_matrix = product.sub(i, i, 0, 0);
+
+        // TODO: this segfault on mac. Why is that?
+        slate::gemm(1.0, sub_matrix, rand_sub_matrix, 1.0, product_sub_matrix);
+        // gemm(1.0, dense, )
       }
     }
   }
