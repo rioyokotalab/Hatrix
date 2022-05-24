@@ -1,3 +1,6 @@
+#include "franklin/franklin.hpp"
+#include "MPIWrapper.hpp"
+
 #include "mpi.h"
 
 extern "C" {
@@ -23,7 +26,7 @@ extern "C" {
 }
 
 int main(int argc, char* argv[]) {
-  MPI_Init(NULL, NULL);
+  mpi_world.init(argc, argv);
 
-  MPI_Finalize();
+  mpi_world.finish();
 }
