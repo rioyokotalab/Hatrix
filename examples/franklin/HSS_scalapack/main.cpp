@@ -34,7 +34,8 @@ int main(int argc, char* argv[]) {
       init_diagonal_admis(A, opts);
     }
     construct_h2_miro(A, domain, opts);
-    Cblacs_barrier(mpi_world.CBLACS_CONTEXT, "All");
+    MPI_Barrier(MPI_COMM_WORLD);
+    // Cblacs_barrier(mpi_world.CBLACS_CONTEXT, "All");
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();

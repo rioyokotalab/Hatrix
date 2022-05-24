@@ -86,7 +86,7 @@ examples/franklin/HSS_scalapack:
 	$(MAKE) -C $@
 
 HSS_scalapack : % : dirs examples/franklin/HSS_scalapack
-	$(MPICXX) $(OBJLIBS) libfranklin.a libHSS_scalapack.a $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
+	$(MPICXX) libHSS_scalapack.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
