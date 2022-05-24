@@ -1,8 +1,8 @@
 #!/bin/bash
-#PJM -L "node=2"
-#PJM -L "rscgrp=cx-"
+#PJM -L "node=1"
+#PJM -L "rscgrp=cx-small"
 #PJM -L "elapse=86400"
-#PJM --mpi "proc=2"
+#PJM --mpi "proc=1"
 #PJM -j
 
 module purge
@@ -14,7 +14,7 @@ export I_MPI_CXX=g++
 make clean
 make -j HSS_scalapack
 
-for nprocs in 1 4; do
+for nprocs in 1; do
     mpirun -n $nprocs ./bin/HSS_scalapack --N 16384 \
            --nleaf 1024 \
            --kernel_func laplace \
