@@ -2,7 +2,7 @@ TOPSRCDIR = .
 include $(TOPSRCDIR)/common.mk
 
 DIRS := src/classes src/functions src/util examples/franklin \
-	examples/franklin/HSS examples/franklin/HSS_slate
+	examples/franklin/HSS
 OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
@@ -46,7 +46,8 @@ EXAMPLE_DIR_EXECUTABLES := HSS_main
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
 
-all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES)
+all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES) \
+	HSS_slate HSS_scalapack
 
 $(DIRS):
 	$(MAKE) -C $@
@@ -69,21 +70,25 @@ $(EXAMPLE_DIR_EXECUTABLES) : % : lib%.a dirs
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-HSS_slate : % : libHSS_slate.a dirs
+# slate rules
+.PHONY: examples/franklin/HSS_slate
+examples/franklin/HSS_slate:
+	$(MAKE) -C $@
+
+HSS_slate : % : libHSS_slate.a dirs examples/franklin/HSS_slate
 	$(MPICXX) $< $(OBJLIBS) libfranklin.a $(LDFLAGS) $(SLATE_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-# Scalapack rules
+# scalapack rules
+.PHONY: examples/franklin/HSS_scalapack
 examples/franklin/HSS_scalapack:
 	$(MAKE) -C $@
 
-HSS_scalapack : % : libHSS_scalapack.a dirs
+HSS_scalapack : % : libHSS_scalapack.a dirs examples/franklin/HSS_scalapack
 	$(MPICXX) $< $(OBJLIBS) libfranklin.a $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
-
-
 
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
