@@ -1,4 +1,5 @@
 #include "MPIWrapper.hpp"
+#include "library_decls.hpp"
 
 #include "mpi.h"
 #include <cassert>
@@ -14,6 +15,13 @@ MPIWrapper::init(int argc, char* argv[]) {
   COMM = MPI_COMM_WORLD;
 
   MPI_Dims_create(MPISIZE, 2, MPIGRID);
+
+  Cblacs_get( -1, 0, &BLACS_CONTEXT );
+  Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0],
+                   MPIGRID[1]);
+  Cblacs_pcoord(BLACS_CONTEXT,
+                MPIRANK,
+                &ROWRANK, &COLRANK);
 }
 
 void
