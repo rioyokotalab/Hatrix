@@ -108,18 +108,28 @@ randomize_block_leaf_row(int64_t block,
   }
   else {
     // communicate the random blocks.
+    MPI_Request send_requests[nblocks];
     for (int64_t j = 0; j < nblocks; ++j) {
+      send_requests[j] = NULL;
       if (A.is_admissible.exists(block, j, A.max_level) &&
           !A.is_admissible(block, j, A.max_level)) { continue; }
 
       // send random blocks where the compute should happen.
       if (A.rank_1d(j) == mpi_world.MPIRANK) {
-        MPI_Send(&rand(j),
-                 domain.boxes[block].num_particles * P,
-                 MPI_DOUBLE,
-                 A.rank_1d(block),
-                 j,
-                 MPI_COMM_WORLD);
+        MPI_Isend(&rand(j),
+                  domain.boxes[block].num_particles * P,
+                  MPI_DOUBLE,
+                  A.rank_1d(block),
+                  j,
+                  MPI_COMM_WORLD,
+                  &send_requests[j]);
+      }
+    }
+
+    for (int64_t j = 0; j < nblocks; ++j) {
+      MPI_Status status;
+      if (send_requests[j]) {
+        MPI_Wait(&send_requests[j], &status);
       }
     }
   }
