@@ -21,7 +21,7 @@
 # done
 
 make -j HSS_scalapack
-mpirun -n 1 ./bin/HSS_scalapack --N 1024 \
+mpirun -n 2 ./bin/HSS_scalapack --N 1024 \
      --nleaf 128 \
      --kernel_func laplace \
      --kind_of_geometry circular \

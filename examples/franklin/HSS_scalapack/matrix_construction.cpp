@@ -10,6 +10,8 @@
 std::mt19937 random_generator;
 std::uniform_real_distribution<double> uniform_distribution(0, 1.0);
 
+static const int64_t P = 100;
+
 static void coarsen_blocks(MPISymmSharedBasisMatrix& A, int64_t level) {
   int64_t child_level = level + 1;
   int64_t nblocks = pow(2, level);
@@ -65,6 +67,13 @@ void init_diagonal_admis(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts) 
   A.is_admissible.insert(0, 0, 0, false);
 }
 
+static Hatrix::Matrix
+generate_column_bases(int64_t i, int64_t block_size, int64_t level,
+                      const Hatrix::RowMap& rand, MPISymmSharedBasisMatrix& A,
+                      const Hatrix::Args& opts) {
+
+}
+
 static void
 generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
                     const Hatrix::RowMap& rand, Hatrix::RowMap& product,
@@ -80,30 +89,68 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
     }
   }
 
-  for (int64_t i = 0; i < nblocks; ++i) {
-    if (A.rank_1d(i) == mpi_world.MPIRANK) {
+  for (int64_t block = 0; block < nblocks; ++block) {
+    // Matrix Utemp = generate_column_bases(i, domain.boxes[i].num_particles, A.max_level,
+    //                                      A, rand);
 
+    // the basis is supposed to be stored on this process. so receive random blocks from
+    // other procs and perform multiplication with the generated matrix block.
+    if (A.rank_1d(block) == mpi_world.MPIRANK) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (A.is_admissible.exists(block, j, A.max_level) &&
+            !A.is_admissible(block, j, A.max_level)) { continue; }
+        Hatrix::Matrix mat_rand(domain.boxes[block].num_particles, P);
+        MPI_Status stat;
+
+        if (A.rank_1d(j) != mpi_world.MPIRANK) {
+          MPI_Recv(&mat_rand,
+                   mat_rand.rows * mat_rand.cols,
+                   MPI_DOUBLE,
+                   A.rank_1d(j),
+                   j,
+                   MPI_COMM_WORLD,
+                   &stat);
+        }
+      }
+    }
+    else {
+      // communicate the random blocks.
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (A.is_admissible.exists(block, j, A.max_level) &&
+            !A.is_admissible(block, j, A.max_level)) { continue; }
+
+        // send random blocks where the compute should happen.
+        if (A.rank_1d(j) == mpi_world.MPIRANK) {
+          MPI_Send(&rand(j),
+                   domain.boxes[block].num_particles * P,
+                   MPI_DOUBLE,
+                   A.rank_1d(block),
+                   j,
+                   MPI_COMM_WORLD);
+        }
+      }
     }
   }
 }
 
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
                        const Hatrix::Args& opts) {
-  const int64_t P = 100;
   // init random matrix
   Hatrix::RowMap rand, product;
   int64_t nblocks = pow(2, A.max_level);
 
   for (int64_t block = 0; block < nblocks; ++block) {
     if (A.rank_1d(block) == mpi_world.MPIRANK) {
-      Hatrix::Matrix random_block(opts.nleaf, P);
+      Hatrix::Matrix random_block(domain.boxes[block].num_particles, P);
+
       for (int64_t i = 0; i < opts.nleaf; ++i) {
         for (int64_t j = 0; j < P; ++j) {
           random_block(i, j) = uniform_distribution(random_generator);
         }
       }
       rand.insert(block, std::move(random_block));
-      product.insert(block, Hatrix::Matrix(opts.nleaf, P));
+      product.insert(block, Hatrix::Matrix(domain.boxes[block].num_particles,
+                                           P));
     }
   }
   generate_leaf_nodes(domain, A, rand, product, opts);
