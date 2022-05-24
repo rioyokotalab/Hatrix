@@ -65,7 +65,46 @@ void init_diagonal_admis(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts) 
   A.is_admissible.insert(0, 0, 0, false);
 }
 
+static void
+generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
+                    const Hatrix::RowMap& rand, Hatrix::RowMap& product,
+                    const Hatrix::Args& opts) {
+  int64_t nblocks = pow(2, A.max_level);
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level) && A.rank_1d(i) == mpi_world.MPIRANK) {
+        A.D.insert(i, j, A.max_level,
+                   generate_p2p_interactions(domain, i, j, opts.kernel));
+      }
+    }
+  }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    if (A.rank_1d(i) == mpi_world.MPIRANK) {
+
+    }
+  }
+}
+
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
                        const Hatrix::Args& opts) {
+  const int64_t P = 100;
+  // init random matrix
+  Hatrix::RowMap rand, product;
+  int64_t nblocks = pow(2, A.max_level);
 
+  for (int64_t block = 0; block < nblocks; ++block) {
+    if (A.rank_1d(block) == mpi_world.MPIRANK) {
+      Hatrix::Matrix random_block(opts.nleaf, P);
+      for (int64_t i = 0; i < opts.nleaf; ++i) {
+        for (int64_t j = 0; j < P; ++j) {
+          random_block(i, j) = uniform_distribution(random_generator);
+        }
+      }
+      rand.insert(block, std::move(random_block));
+      product.insert(block, Hatrix::Matrix(opts.nleaf, P));
+    }
+  }
+  generate_leaf_nodes(domain, A, rand, product, opts);
 }
