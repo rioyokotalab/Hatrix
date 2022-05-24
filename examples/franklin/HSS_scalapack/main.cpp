@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "franklin/franklin.hpp"
 #include "MPIWrapper.hpp"
 #include "library_decls.hpp"

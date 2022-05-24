@@ -1,5 +1,6 @@
 #include "franklin/franklin.hpp"
 
+#include <cstring>
 #include <string>
 #include <getopt.h>
 
@@ -177,7 +178,7 @@ namespace Hatrix {
     fprintf(stderr,
             "Usage: %s [options]\n"
             "Long option (short option)                  : Description (Default value)\n"
-            "--N (-n)                                    : Number of points to consider (%lld).\n"
+            "--N (-n)                                    : Number of points to consider (%ld).\n"
             "--nleaf (-l)                                : Max. number of points in a leaf node (%lld).\n"
             "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
             "--kind_of_geometry (-g) [sphere|grid]       : Kind of geometry of the points  (%s).\n"

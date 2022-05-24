@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <exception>
+#include <cmath>
 
 #include "Hatrix/Hatrix.h"
 
