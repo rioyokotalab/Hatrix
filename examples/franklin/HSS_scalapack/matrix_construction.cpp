@@ -91,11 +91,9 @@ generate_random_blocks(const Hatrix::Domain& domain,
 
     MPI_Bcast(&random_block, block_size * P, MPI_DOUBLE, A.rank_1d(block), MPI_COMM_WORLD);
 
-    for (int64_t i = 0; i < nblocks; ++i) {
-      if (A.rank_1d(i) == mpi_world.MPIRANK) {
-        Hatrix::Matrix Ai_block = generate_p2p_interactions(domain, i, block, opts.kernel);
-        matmul(Ai_block, random_block, product(i), false, false, 1.0, 1.0);
-      }
+    for (int64_t i = mpi_world.MPIRANK; i < nblocks; i += mpi_world.MPISIZE) {
+      Hatrix::Matrix Ai_block = generate_p2p_interactions(domain, i, block, opts.kernel);
+      matmul(Ai_block, random_block, product(i), false, false, 1.0, 1.0);
     }
   }
 }
@@ -116,6 +114,23 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
   }
 
   generate_random_blocks(domain, A, rand, product, opts);
+
+  for (int64_t i = mpi_world.MPIRANK; i < nblocks; i += mpi_world.MPISIZE) {
+    Hatrix::Matrix Ui;
+    std::vector<int64_t> pivots;
+    int64_t rank;
+
+    if (opts.accuracy == -1) {
+      rank = opts.max_rank;
+      std::tie(Ui, pivots) = pivoted_qr(product(i), rank);
+    }
+    else {
+      std::tie(Ui, pivots, rank) = error_pivoted_qr(product(i), opts.accuracy);
+    }
+    A.U.insert(i,
+               A.max_level,
+               std::move(Ui));
+  }
 }
 
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
