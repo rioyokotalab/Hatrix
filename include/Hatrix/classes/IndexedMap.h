@@ -39,26 +39,28 @@ struct hash<std::tuple<int64_t, int64_t, int64_t>> {
 
 namespace Hatrix {
 
+template <class T>
 class RowMap {
  private:
-  std::unordered_map<int64_t, Matrix> map;
+  std::unordered_map<int64_t, T> map;
 
 public:
-  Matrix& operator[](int64_t key);
-  const Matrix& operator[](int64_t key) const;
+  T& operator[](int64_t key);
+  const T& operator[](int64_t key) const;
 
-  Matrix& operator()(int64_t key);
-  const Matrix& operator()(int64_t key) const;
+  T& operator()(int64_t key);
+  const T& operator()(int64_t key) const;
 
-  void insert(int64_t key, Matrix&& matrix);
+  void insert(int64_t key, T&& matrix);
 
-  Matrix extract(int64_t key);
+  T extract(int64_t key);
 
   bool exists(int64_t key) const;
 
   void erase(int64_t key);
 };
-typedef RowMap ColMap;
+template<typename T> using ColMap  = RowMap<T>;
+using RankMap = RowMap<std::vector<int64_t>>;
 
 template <class T>
 class RowColMap {
@@ -94,7 +96,6 @@ class RowColMap {
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol
 using RowLevelMap = RowColMap<Matrix>;
 using ColLevelMap = RowColMap<Matrix>;
-using RankMap = RowColMap<std::vector<int64_t>>;
 
 template <class T>
 class RowColLevelMap {
