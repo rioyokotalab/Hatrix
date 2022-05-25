@@ -14,7 +14,7 @@ export I_MPI_CXX=g++
 make clean
 make -j HSS_scalapack
 
-for nprocs in 1; do
+for nprocs in 2; do
     mpirun -n $nprocs  ./bin/HSS_scalapack --N 2048 \
            --nleaf 256 \
            --kernel_func laplace \
