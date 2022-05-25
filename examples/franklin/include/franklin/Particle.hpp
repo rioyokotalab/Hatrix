@@ -5,8 +5,8 @@
 namespace Hatrix {
   class Particle {
   public:
-    double value;
     std::vector<double> coords;
+    double value;
 
     Particle(double x, double _value);
     Particle(double x, double y, double _value);

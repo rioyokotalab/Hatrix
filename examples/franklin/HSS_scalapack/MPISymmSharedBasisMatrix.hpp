@@ -10,7 +10,7 @@ typedef struct MPISymmSharedBasisMatrix {
   Hatrix::ColLevelMap U;
   Hatrix::RowColLevelMap<Hatrix::Matrix> D, S;
   Hatrix::RowColLevelMap<bool> is_admissible;
-  Hatrix::RankMap rank_map;     // rank of each level
+  Hatrix::RowMap<std::vector<int64_t>> rank_map;     // rank of each level
 
   int rank_1d(const int row) {
     return row % mpi_world.MPISIZE;

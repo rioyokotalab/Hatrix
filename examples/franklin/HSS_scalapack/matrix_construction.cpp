@@ -113,7 +113,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
     }
   }
 
-  // A.rank_map.insert(A.max_level, std::vector<int64_t>(nblocks));
+  std::vector<int64_t> leaf_ranks(nblocks);
 
   generate_random_blocks(domain, A, rand, product, opts);
 
@@ -133,22 +133,40 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
     A.U.insert(i,
                A.max_level,
                std::move(Ui));
-    // A.rank_map(A.max_level)[i] = rank;
+
+    leaf_ranks[i] = rank;
   }
 
-  // generate the S blocks
-  for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, A.max_level) &&
-          A.is_admissible(i, j, A.max_level)) {
-        if (A.rank_1d(i) == mpi_world.MPIRANK) {
-          Hatrix::Matrix Aij = generate_p2p_interactions(domain, i, j, opts.kernel);
-          // A.S.insert(i, j, A.max_level,
-          //            )
-        }
-      }
-    }
+  // int64_t num_count = nblocks / mpi_world.MPISIZE;
+  // int recvcounts[mpi_world.MPISIZE], displs[mpi_world.MPISIZE];
+  // for (int i = 0; i < mpi_world.MPISIZE; ++i) {
+  //   recvcounts[i] = num_count;
+  //   displs[i] = i * mpi_world.MPISIZE;
+  // }
+
+  // MPI_Allgatherv(&leaf_ranks[mpi_world.MPIRANK], num_count, MPI_INT64_T,
+  //                &leaf_ranks[mpi_world.MPIRANK], recvcounts, displs, MPI_INT64_T,
+  //                MPI_COMM_WORLD);
+  std::cout << "leaf: " << leaf_ranks.size() <<  std::endl;
+  for (int i = 0; i < leaf_ranks.size(); ++i) {
+    std::cout << leaf_ranks[i] << " ";
   }
+  std::cout << std::endl;
+
+  // A.rank_map.insert(A.max_level, std::move(leaf_ranks));
+  // generate the S blocks
+  // for (int64_t i = 0; i < nblocks; ++i) {
+  //   for (int64_t j = 0; j < i; ++j) {
+  //     if (A.is_admissible.exists(i, j, A.max_level) &&
+  //         A.is_admissible(i, j, A.max_level)) {
+  //       if (A.rank_1d(i) == mpi_world.MPIRANK) {
+  //         Hatrix::Matrix Aij = generate_p2p_interactions(domain, i, j, opts.kernel);
+  //         // A.S.insert(i, j, A.max_level,
+  //         //            )
+  //       }
+  //     }
+  //   }
+  // }
 }
 
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,

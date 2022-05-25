@@ -183,7 +183,7 @@ namespace Hatrix {
             "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
             "--kind_of_geometry (-g) [sphere|grid]       : Kind of geometry of the points  (%s).\n"
             "--ndim (-d)                                 : Number of dimensions of the geometry (%ld).\n"
-            "--max_rank (-r)                             : Maximum rank (%lld).\n"
+            "--max_rank (-r)                             : Maximum rank (%ld).\n"
             "--accuracy (-e)                             : Desired accuracy for construction. > 0 for constant rank construction. (%lf).\n"
             "--admis (-a)                                : Admissibility constant (%lf).\n"
             "--admis_kind (-m) [diagonal|geometry]       : Whether geometry-based or diagonal-based admis (%s).\n"
