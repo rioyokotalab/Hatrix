@@ -6,8 +6,8 @@
 
 namespace Hatrix {
   static struct option long_options[] = {
-    {"N",                required_argument, 0, 'n'},
-    {"nleaf",            required_argument, 0, 'l'},
+    {"N",                   required_argument, 0, 'n'},
+    {"nleaf",               required_argument, 0, 'l'},
     {"kernel_func",         required_argument, 0, 'k'},
     {"kind_of_geometry",    required_argument, 0, 'g'},
     {"ndim",                required_argument, 0, 'd'},

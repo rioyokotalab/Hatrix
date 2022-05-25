@@ -75,61 +75,26 @@ generate_column_bases(int64_t i, int64_t block_size, int64_t level,
 }
 
 static void
-randomize_block_leaf_row(int64_t block,
+generate_random_blocks(const Hatrix::Domain& domain,
                          MPISymmSharedBasisMatrix& A,
-                         const Hatrix::Domain& domain,
                          const Hatrix::RowMap& rand,
                          Hatrix::RowMap& product,
                          const Hatrix::Args& opts) {
   int64_t nblocks = pow(2, A.max_level);
-  if (A.rank_1d(block) == mpi_world.MPIRANK) {
-    for (int64_t j = 0; j < nblocks; ++j) {
-      if (A.is_admissible.exists(block, j, A.max_level) &&
-          !A.is_admissible(block, j, A.max_level)) { continue; }
-      Hatrix::Matrix mat_rand(domain.boxes[block].num_particles, P);
-      MPI_Status stat;
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t block_size = domain.boxes[block].num_particles;
+    Hatrix::Matrix random_block(block_size, P);
 
-      if (A.rank_1d(j) != mpi_world.MPIRANK) {
-        MPI_Recv(&mat_rand,
-                 mat_rand.rows * mat_rand.cols,
-                 MPI_DOUBLE,
-                 A.rank_1d(j),
-                 j,
-                 MPI_COMM_WORLD,
-                 &stat);
-      }
-      else {
-        mat_rand = rand(j);   // random block on the same process so copy it out.
-      }
-
-      Hatrix::Matrix Aij_height = generate_p2p_interactions(domain, block, j, opts.kernel);
-      matmul(Aij_height, mat_rand, product(block), false, false, 1.0, 1.0);
-    }
-  }
-  else {
-    // communicate the random blocks.
-    MPI_Request send_requests[nblocks];
-    for (int64_t j = 0; j < nblocks; ++j) {
-      send_requests[j] = NULL;
-      if (A.is_admissible.exists(block, j, A.max_level) &&
-          !A.is_admissible(block, j, A.max_level)) { continue; }
-
-      // send random blocks where the compute should happen.
-      if (A.rank_1d(j) == mpi_world.MPIRANK) {
-        MPI_Isend(&rand(j),
-                  domain.boxes[block].num_particles * P,
-                  MPI_DOUBLE,
-                  A.rank_1d(block),
-                  j,
-                  MPI_COMM_WORLD,
-                  &send_requests[j]);
-      }
+    if (A.rank_1d(block) == mpi_world.MPIRANK) {
+      random_block = rand(block);
     }
 
-    for (int64_t j = 0; j < nblocks; ++j) {
-      MPI_Status status;
-      if (send_requests[j]) {
-        MPI_Wait(&send_requests[j], &status);
+    MPI_Bcast(&random_block, block_size * P, MPI_DOUBLE, A.rank_1d(block), MPI_COMM_WORLD);
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      if (A.rank_1d(i) == mpi_world.MPIRANK) {
+        Hatrix::Matrix Ai_block = generate_p2p_interactions(domain, i, block, opts.kernel);
+        matmul(Ai_block, random_block, product(i), false, false, 1.0, 1.0);
       }
     }
   }
@@ -150,15 +115,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
     }
   }
 
-  for (int64_t block = 0; block < nblocks; ++block) {
-    // the basis is supposed to be stored on this process. so receive random blocks from
-    // other procs and perform multiplication with the generated matrix block.
-    randomize_block_leaf_row(block, A, domain, rand, product, opts);
-
-    if (A.rank_1d(block == mpi_world.MPIRANK)) {
-
-    }
-  }
+  generate_random_blocks(domain, A, rand, product, opts);
 }
 
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
