@@ -1,5 +1,6 @@
 #include <exception>
 #include <random>
+#include <cassert>
 
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
@@ -43,7 +44,8 @@ static void coarsen_blocks(MPISymmSharedBasisMatrix& A, int64_t level) {
   }
 }
 
-static int64_t diagonal_admis_init(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts, int64_t level) {
+static int64_t diagonal_admis_init(MPISymmSharedBasisMatrix& A,
+                                   const Hatrix::Args& opts, int64_t level) {
   int64_t nblocks = pow(2, level); // pow since we are using diagonal based admis.
   if (level == 0) { return 0; }
   if (level == A.max_level) {
@@ -65,13 +67,6 @@ void init_diagonal_admis(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts) 
   A.max_level = int64_t(log2(opts.N / opts.nleaf));
   A.min_level = diagonal_admis_init(A, opts, A.max_level);
   A.is_admissible.insert(0, 0, 0, false);
-}
-
-static Hatrix::Matrix
-generate_column_bases(int64_t i, int64_t block_size, int64_t level,
-                      const Hatrix::RowMap<Hatrix::Matrix>& rand, MPISymmSharedBasisMatrix& A,
-                      const Hatrix::Args& opts) {
-
 }
 
 static void
@@ -137,21 +132,12 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
     leaf_ranks[i] = rank;
   }
 
-  int64_t num_count = nblocks / mpi_world.MPISIZE;
-  int recvcounts[mpi_world.MPISIZE], displs[mpi_world.MPISIZE];
-  for (int i = 0; i < mpi_world.MPISIZE; ++i) {
-    recvcounts[i] = num_count;
-    displs[i] = i * mpi_world.MPISIZE;
+  // TODO: this is really clumsy. Find a way to all gather a distributed strided array.
+  for (int64_t i = mpi_world.MPIRANK; i < nblocks; i += mpi_world.MPISIZE) {
+    MPI_Allgather(&leaf_ranks[i], 1, MPI_INT64_T,
+                  &leaf_ranks[i], 1, MPI_INT64_T,
+                  MPI_COMM_WORLD);
   }
-
-  MPI_Allgatherv(&leaf_ranks[mpi_world.MPIRANK], num_count, MPI_INT64_T,
-                 &leaf_ranks[mpi_world.MPIRANK], recvcounts, displs, MPI_INT64_T,
-                 MPI_COMM_WORLD);
-  std::cout << "leaf: " << leaf_ranks.size() <<  std::endl;
-  for (int i = 0; i < leaf_ranks.size(); ++i) {
-    std::cout << leaf_ranks[i] << " ";
-  }
-  std::cout << std::endl;
 
   A.rank_map.insert(A.max_level, std::move(leaf_ranks));
   // generate the S blocks

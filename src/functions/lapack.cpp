@@ -191,7 +191,7 @@ std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t ran
 
   // c-style pivots
   std::vector<int64_t> pivots(Q.cols);
-  for (int64_t i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
+  for (unsigned i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
 
   return {std::move(Q), std::move(pivots)};
 }
@@ -217,7 +217,7 @@ error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
 
   // c-style pivots
   std::vector<int64_t> pivots(jpvt.size());
-  for (int64_t i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
+  for (unsigned i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
 
   return {std::move(Q), std::move(pivots), rank};
 }
@@ -357,7 +357,7 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
   solve_r_block(interp, A, rank);
   // Bring pivots in C-style.
   std::vector<int64_t> c_pivots(jpvt.size());
-  for (int64_t i = 0; i < jpvt.size(); ++i) {
+  for (unsigned i = 0; i < jpvt.size(); ++i) {
     c_pivots[i] = jpvt[i] - 1;
   }
 

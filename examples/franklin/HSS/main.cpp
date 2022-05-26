@@ -42,7 +42,6 @@ int main(int argc, char* argv[]) {
   Matrix x = generate_random_matrix(opts.N, 1);
   Matrix b;
 
-  int64_t max_rank;
   double construct_time;
 
 

@@ -34,24 +34,24 @@ namespace Hatrix {
     std::vector<int64_t> leaf_cols = leaf_indices(icol, level, height);
 
     int64_t nrows = 0, ncols = 0;
-    for (int64_t i = 0; i < leaf_rows.size(); ++i) {
+    for (unsigned i = 0; i < leaf_rows.size(); ++i) {
       nrows += domain.boxes[leaf_rows[i]].num_particles; }
-    for (int64_t i = 0; i < leaf_cols.size(); ++i) {
+    for (unsigned i = 0; i < leaf_cols.size(); ++i) {
       ncols += domain.boxes[leaf_cols[i]].num_particles; }
 
     assert(out.rows == nrows);
     assert(out.cols == ncols);
 
     std::vector<Particle> source_particles, target_particles;
-    for (int64_t i = 0; i < leaf_rows.size(); ++i) {
+    for (unsigned i = 0; i < leaf_rows.size(); ++i) {
       int64_t source_box = leaf_rows[i];
       int64_t source = domain.boxes[source_box].start_index;
-      for (int64_t n = 0; n < domain.boxes[source_box].num_particles; ++n) {
+      for (unsigned n = 0; n < domain.boxes[source_box].num_particles; ++n) {
         source_particles.push_back(domain.particles[source + n]);
       }
     }
 
-    for (int64_t i = 0; i < leaf_cols.size(); ++i) {
+    for (unsigned i = 0; i < leaf_cols.size(); ++i) {
       int64_t target_box = leaf_cols[i];
       int64_t target = domain.boxes[target_box].start_index;
       for (int64_t n = 0; n < domain.boxes[target_box].num_particles; ++n) {
@@ -79,9 +79,9 @@ namespace Hatrix {
     std::vector<int64_t> leaf_cols = leaf_indices(icol, level, height);
 
     int64_t nrows = 0, ncols = 0;
-    for (int64_t i = 0; i < leaf_rows.size(); ++i) {
+    for (unsigned i = 0; i < leaf_rows.size(); ++i) {
       nrows += domain.boxes[leaf_rows[i]].num_particles; }
-    for (int64_t i = 0; i < leaf_cols.size(); ++i) {
+    for (unsigned i = 0; i < leaf_cols.size(); ++i) {
       ncols += domain.boxes[leaf_cols[i]].num_particles; }
 
     Matrix out(nrows, ncols);
@@ -99,7 +99,7 @@ namespace Hatrix {
 
     std::vector<Particle> particles;
 
-    for (int64_t irow = 0; irow < domain.boxes.size(); ++irow) {
+    for (unsigned irow = 0; irow < domain.boxes.size(); ++irow) {
       int64_t source = domain.boxes[irow].start_index;
       for (int64_t n = 0; n < domain.boxes[irow].num_particles; ++n) {
         particles.push_back(domain.particles[source + n]);
