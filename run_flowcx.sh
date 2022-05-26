@@ -1,8 +1,8 @@
 #!/bin/bash
-#PJM -L "node=16"
-#PJM -L "rscgrp=cx-large"
+#PJM -L "node=4"
+#PJM -L "rscgrp=cx-small"
 #PJM -L "elapse=2:00:00"
-#PJM --mpi "proc=32"
+#PJM --mpi "proc=8"
 #PJM -e error.log
 #PJM -j
 
@@ -20,9 +20,10 @@ export MKL_NUM_THREADS=1
 
 
 # for nprocs in 4; do
-mpirun -n $PJM_MPI_PROC -machinefile $PJM_O_NODEINF -npernode 2  \
-       ./bin/HSS_scalapack --N 262144 \
-       --nleaf 2048 \
+mpirun -n $PJM_MPI_PROC -machinefile $PJM_O_NODEINF -npernode 2 \
+       --report-bindings --bind-to socket \
+       ./bin/HSS_scalapack --N 65536 \
+       --nleaf 1024 \
        --kernel_func laplace \
        --kind_of_geometry grid \
        --ndim 1 \
