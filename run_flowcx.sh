@@ -1,8 +1,9 @@
 #!/bin/bash
-#PJM -L "node=4"
-#PJM -L "rscgrp=cx-small"
+#PJM -L "node=16"
+#PJM -L "rscgrp=cx-large"
 #PJM -L "elapse=2:00:00"
-#PJM --mpi "proc=8"
+#PJM --mpi "proc=32"
+#PJM -e error.log
 #PJM -j
 
 module purge

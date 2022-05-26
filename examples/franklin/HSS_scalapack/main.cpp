@@ -44,7 +44,11 @@ int main(int argc, char* argv[]) {
   }
 
   if (mpi_world.MPIRANK == 0) {
-    std::cout << "construct time: " << construct_time << std::endl;
+    std::cout << "RESULT: "
+              << "N-> " << opts.N
+              << " ctime-> " << construct_time
+              << " nprocs -> " << mpi_world.MPISIZE
+              << std::endl;
   }
 
   mpi_world.finish();
