@@ -203,7 +203,10 @@ error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
   std::vector<int> jpvt(Q.cols);
   int64_t rank = 1;
 
-  assert(max_rank <= Q.min_dim());
+  if (max_rank > Q.min_dim()) {
+    throw std::invalid_argument("error_pivoted_qr() -> max_rank <= Q.min_dim() is necessary, but got "
+                                "max_rank= " + std::to_string(max_rank) + " Q.min_dim= " + std::to_string(Q.min_dim()));
+  }
 
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
   for (int64_t i = 1; i < Q.min_dim(); ++i) {

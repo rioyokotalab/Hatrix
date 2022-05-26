@@ -11,7 +11,7 @@
 std::mt19937 random_generator;
 std::uniform_real_distribution<double> uniform_distribution(0, 1.0);
 
-static const int64_t P = 100;
+static int64_t P;
 
 static void coarsen_blocks(MPISymmSharedBasisMatrix& A, int64_t level) {
   int64_t child_level = level + 1;
@@ -140,22 +140,32 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
   }
 
   // generate the S blocks
-  for (int64_t i = 0; i < nblocks; ++i) {
-    int64_t block_size = domain.boxes[i].num_particles;
-    for (int64_t j = 0; j < i; ++j) {
-      MPI_Comm MPI_COMM_ROW;
+  for (int64_t j = 0; j < nblocks; ++j) {
+    int64_t block_size = domain.boxes[j].num_particles;
+    Hatrix::Matrix Uj(block_size, leaf_ranks[j]);
+
+    MPI_Comm MPI_COMM_COL;
+    for (int64_t i = 0; i < nblocks; ++i) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
-        MPI_Comm_split(MPI_COMM_WORLD, i, j, &MPI_COMM_ROW);
+        MPI_Comm_split(MPI_COMM_WORLD, j, i, &MPI_COMM_COL);
       }
+    }
 
-      Hatrix::Matrix Ui(block_size, leaf_ranks[i]);
-      if (A.rank_1d(i) == mpi_world.MPIRANK) {
-        Ui = A.U(i, A.max_level);
+    if (A.rank_1d(j) == mpi_world.MPIRANK) {
+      Uj = A.U(j, A.max_level);
+    }
+    MPI_Bcast(&Uj, block_size * leaf_ranks[j], MPI_DOUBLE,
+              A.rank_1d(j), MPI_COMM_COL);
+
+    for (int64_t i = mpi_world.MPIRANK; i < nblocks; i += mpi_world.MPISIZE) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          A.is_admissible(i, j, A.max_level)) {
+        Hatrix::Matrix Aij = generate_p2p_interactions(domain, i, j, opts.kernel);
+        A.S.insert(i, j, A.max_level,
+                   matmul(matmul(A.U(i, A.max_level), Aij, true, false),
+                          Uj));
       }
-      MPI_Bcast(&Ui, block_size * leaf_ranks[i], MPI_DOUBLE,
-                A.rank_1d(i), MPI_COMM_WORLD);
-
     }
   }
 
@@ -164,6 +174,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
 
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
                        const Hatrix::Args& opts) {
+  P = opts.nleaf / 2;
   // init random matrix
   Hatrix::RowMap<Hatrix::Matrix> rand, product;
   int64_t nblocks = pow(2, A.max_level);
