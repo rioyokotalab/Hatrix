@@ -123,6 +123,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
       std::tie(Ui, pivots) = pivoted_qr(product(i), rank);
     }
     else {
+      std::cout << "error qr\n";
       std::tie(Ui, pivots, rank) = error_pivoted_qr(product(i), opts.accuracy);
     }
     A.U.insert(i,
