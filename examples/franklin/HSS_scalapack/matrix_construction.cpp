@@ -1,6 +1,8 @@
 #include <exception>
 #include <random>
 #include <cassert>
+#include <string>
+#include <chrono>
 
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
@@ -10,6 +12,12 @@
 
 std::mt19937 random_generator;
 std::uniform_real_distribution<double> uniform_distribution(0, 1.0);
+
+inline std::string timestamp() {
+  auto now = std::chrono::system_clock::now();
+  return std::to_string(mpi_world.MPIRANK) + ":" +
+    std::to_string(std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count());
+}
 
 static int64_t P;
 
@@ -100,6 +108,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
                     const Hatrix::RowMap<Hatrix::Matrix>& rand, Hatrix::RowMap<Hatrix::Matrix>& product,
                     const Hatrix::Args& opts) {
   int64_t nblocks = pow(2, A.max_level);
+  std::cerr << "generate_leaf_nodes()<" << timestamp() << "> :: begin dense matrix generation.\n";
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
@@ -178,9 +187,21 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
   A.rank_map.insert(A.max_level, std::move(leaf_ranks));
 }
 
+static Hatrix::RowLevelMap
+generate_transfer_matrices(const int64_t level,
+                          const Hatrix::RowLevelMap& Uchild,
+                          MPISymmSharedBasisMatrix& A,
+                          const Hatrix::RowMap<Hatrix::Matrix>& rand,
+                          const Hatrix::RowMap<Hatrix::Matrix>& product,
+                          const Hatrix::Args& opts) {
+  Hatrix::RowLevelMap Ubig_parent;
+
+  return Ubig_parent;
+}
+
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
                        const Hatrix::Args& opts) {
-  P = opts.nleaf / 2;
+  P = opts.nleaf;
   // init random matrix
   Hatrix::RowMap<Hatrix::Matrix> rand, product;
   int64_t nblocks = pow(2, A.max_level);
@@ -200,4 +221,17 @@ void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain
     }
   }
   generate_leaf_nodes(domain, A, rand, product, opts);
+
+  Hatrix::RowLevelMap Uchild = A.U;
+
+  for (int64_t level = A.max_level-1; level > A.min_level; --level) {
+    Uchild = generate_transfer_matrices(level, Uchild, A, rand, product, opts);
+  }
+}
+
+double construct_error_mpi(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
+                           const Hatrix::Args& opts) {
+  double error = 0;
+
+  return error;
 }

@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
-  double construct_time;
+  double construct_time, construct_error, matvec_error;
 
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
-
+    construct_error = construct_error_mpi(A, domain, opts);
 
   }
 
