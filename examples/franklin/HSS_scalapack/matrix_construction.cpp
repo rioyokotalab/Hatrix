@@ -141,18 +141,15 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
   A.rank_map.insert(A.max_level, std::move(leaf_ranks));
 
   // generate the S blocks
-  // for (int64_t i = 0; i < nblocks; ++i) {
-  //   for (int64_t j = 0; j < i; ++j) {
-  //     if (A.is_admissible.exists(i, j, A.max_level) &&
-  //         A.is_admissible(i, j, A.max_level)) {
-  //       if (A.rank_1d(i) == mpi_world.MPIRANK) {
-  //         Hatrix::Matrix Aij = generate_p2p_interactions(domain, i, j, opts.kernel);
-  //         // A.S.insert(i, j, A.max_level,
-  //         //            )
-  //       }
-  //     }
-  //   }
-  // }
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      MPI_Comm MPI_COMM_ROW;
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          A.is_admissible(i, j, A.max_level)) {
+        MPI_Comm_split(MPI_COMM_WORLD, i, j, &MPI_COMM_ROW);
+      }
+    }
+  }
 }
 
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,

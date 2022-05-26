@@ -82,7 +82,6 @@ generate_column_block(int64_t block, int64_t block_size,
   auto rand_splits = rand.split(nblocks, 1);
   Matrix AY(block_size, rand.cols);
 
-  int64_t index = 0;
   for (int64_t j = 0; j < nblocks; ++j) {
     if (A.is_admissible.exists(block, j, level) &&
         !A.is_admissible(block, j, level)) { continue; }
