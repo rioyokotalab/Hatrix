@@ -15,8 +15,9 @@ std::uniform_real_distribution<double> uniform_distribution(0, 1.0);
 
 inline std::string timestamp() {
   auto now = std::chrono::system_clock::now();
-  return std::to_string(mpi_world.MPIRANK) + ":" +
-    std::to_string(std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count());
+  return ":" + std::to_string(mpi_world.MPIRANK) + ":" +
+    std::to_string(std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count()) +
+    ":";
 }
 
 static int64_t P;
@@ -121,14 +122,18 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
 
   std::vector<int64_t> leaf_ranks(nblocks);
 
-  generate_random_blocks(domain, A, rand, product, opts);
 
+  std::cerr << "generate_leaf_nodes() -> " << timestamp() << "begin random block generation.\n";
+  generate_random_blocks(domain, A, rand, product, opts);
+  std::cerr << "generate_leaf_nodes() -> " << timestamp() << "finish random block generation.\n";
   // generate the leaf basis.
 #pragma omp parallel for
   for (int64_t i = mpi_world.MPIRANK; i < nblocks; i += mpi_world.MPISIZE) {
     Hatrix::Matrix Ui;
     std::vector<int64_t> pivots;
     int64_t rank;
+
+    std::cerr << "generate_leaf_nodes() -> " << timestamp() << "begin generate basis " + std::to_string(i) << std::endl;
 
     if (opts.accuracy == -1) {
       rank = opts.max_rank;
@@ -145,6 +150,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
 
       leaf_ranks[i] = rank;
     }
+    std::cerr << "generate_leaf_nodes() -> " << timestamp() << "finish generate basis " + std::to_string(i) << std::endl;
   }
 
   // TODO: this is really clumsy. Find a way to all gather a distributed strided array.
@@ -154,6 +160,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
 
   // generate the S blocks
   for (int64_t j = 0; j < nblocks; ++j) {
+    std::cerr << "generate_leaf_nodes() -> " << timestamp() << "begin S row " + std::to_string(j) << std::endl;
     int64_t block_size = domain.boxes[j].num_particles;
     Hatrix::Matrix Uj(block_size, leaf_ranks[j]);
 
@@ -182,6 +189,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
         A.S.insert(i, j, A.max_level, std::move(Sij));
       }
     }
+    std::cerr << "generate_leaf_nodes() -> " << timestamp() << "finish S row " + std::to_string(j) << std::endl;
   }
 
   A.rank_map.insert(A.max_level, std::move(leaf_ranks));
@@ -201,6 +209,7 @@ generate_transfer_matrices(const int64_t level,
 
 void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
                        const Hatrix::Args& opts) {
+  std::cerr << "construct_h2_miro() ->" << timestamp() << ": begin construct_h2_miro.\n";
   P = opts.nleaf;
   // init random matrix
   Hatrix::RowMap<Hatrix::Matrix> rand, product;
@@ -227,6 +236,8 @@ void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain
   for (int64_t level = A.max_level-1; level > A.min_level; --level) {
     Uchild = generate_transfer_matrices(level, Uchild, A, rand, product, opts);
   }
+
+  std::cerr << "construct_h2_miro() ->" << timestamp() << ": finish construct_h2_miro.\n";
 }
 
 double construct_error_mpi(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain,
