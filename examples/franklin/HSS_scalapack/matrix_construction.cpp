@@ -87,6 +87,8 @@ generate_random_blocks(const Hatrix::Domain& domain,
     MPI_Bcast(&random_block, block_size * P, MPI_DOUBLE, A.rank_1d(block), MPI_COMM_WORLD);
 
     for (int64_t i = mpi_world.MPIRANK; i < nblocks; i += mpi_world.MPISIZE) {
+      if (A.is_admissible.exists(i, block, A.max_level) &&
+          !A.is_admissible(i, block, A.max_level)) { continue; }
       Hatrix::Matrix Ai_block = generate_p2p_interactions(domain, i, block, opts.kernel);
       matmul(Ai_block, random_block, product(i), false, false, 1.0, 1.0);
     }
@@ -123,8 +125,7 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
       std::tie(Ui, pivots) = pivoted_qr(product(i), rank);
     }
     else {
-      std::cout << "error qr\n";
-      std::tie(Ui, pivots, rank) = error_pivoted_qr(product(i), opts.accuracy);
+      std::tie(Ui, pivots, rank) = error_pivoted_qr(product(i), opts.accuracy, opts.max_rank);
     }
     A.U.insert(i,
                A.max_level,
@@ -134,13 +135,11 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
   }
 
   // TODO: this is really clumsy. Find a way to all gather a distributed strided array.
-  for (int64_t i = mpi_world.MPIRANK; i < nblocks; i += mpi_world.MPISIZE) {
-    MPI_Allgather(&leaf_ranks[i], 1, MPI_INT64_T,
-                  &leaf_ranks[i], 1, MPI_INT64_T,
-                  MPI_COMM_WORLD);
+  for (int64_t i = 0; i < nblocks; ++i) {
+    MPI_Bcast(&leaf_ranks[i], 1, MPI_INT64_T, i % mpi_world.MPISIZE, MPI_COMM_WORLD);
   }
-
   A.rank_map.insert(A.max_level, std::move(leaf_ranks));
+
   // generate the S blocks
   // for (int64_t i = 0; i < nblocks; ++i) {
   //   for (int64_t j = 0; j < i; ++j) {

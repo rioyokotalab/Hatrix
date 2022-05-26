@@ -15,10 +15,10 @@ make clean
 make -j HSS_scalapack
 
 for nprocs in 2; do
-    mpirun -n $nprocs  ./bin/HSS_scalapack --N 2048 \
-           --nleaf 256 \
+    mpirun -n $nprocs  ./bin/HSS_scalapack --N 1024 \
+           --nleaf 128 \
            --kernel_func laplace \
-           --kind_of_geometry circular \
+           --kind_of_geometry grid \
            --ndim 1 \
            --max_rank 100 \
            --accuracy 1e-11 \
