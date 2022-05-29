@@ -21,6 +21,7 @@ using vec = std::vector<int64_t>;
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 constexpr int64_t oversampling = 5;
+constexpr double EPS = 1e-14;
 constexpr double EPS_EV = 1e-5;
 double PV = 1e-3;
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
@@ -190,7 +191,7 @@ class H2_SPD {
   double low_rank_block_ratio();
   void factorize(const Domain& domain);
   Matrix solve(const Matrix& b, int64_t _level);
-  int64_t inertia(const Domain& domain, const double lambda);
+  int64_t inertia(const Domain& domain, const double lambda, bool &singular);
   double get_mth_eigenvalue(const Domain& domain, const int64_t m,
                             double left, double right);
 };
@@ -2000,7 +2001,7 @@ Matrix H2_SPD::solve(const Matrix& b, int64_t _level) {
   return x;
 }
 
-int64_t H2_SPD::inertia(const Domain& domain, const double lambda) {
+int64_t H2_SPD::inertia(const Domain& domain, const double lambda, bool &singular) {
   H2_SPD A_shifted(*this);
   // Shift leaf level diagonal blocks
   int64_t leaf_nblocks = level_blocks[height];
@@ -2008,6 +2009,8 @@ int64_t H2_SPD::inertia(const Domain& domain, const double lambda) {
     shift_diag(A_shifted.D(block, block, height), -lambda);
   }
   // LDL Factorize
+  // TODO measure shifted LDLT solve error
+  // Large error may lead to wrong decision during bisection
   A_shifted.factorize(domain);
   // // Gather values in D
   Matrix D_lambda(0, 0);
@@ -2030,15 +2033,21 @@ int64_t H2_SPD::inertia(const Domain& domain, const double lambda) {
   int64_t negative_elements_count = 0;
   for(int64_t i = 0; i < D_lambda.rows; i++) {
     negative_elements_count += (D_lambda(i, 0) < 0 ? 1 : 0);
+    if(std::isnan(D_lambda(i, 0)) || std::abs(D_lambda(i, 0)) < EPS) singular = true;
   }
   return negative_elements_count;
 }
 
 double H2_SPD::get_mth_eigenvalue(const Domain& domain, const int64_t m,
                                   double left, double right) {
+  bool singular = false;
   while((right - left) >= EPS_EV) {
     const auto mid = (left + right) / 2;
-    const auto value = (*this).inertia(domain, mid);
+    const auto value = (*this).inertia(domain, mid, singular);
+    if(singular) {
+      std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
+      break;
+    }
     if(value >= m) right = mid;
     else left = mid;
   }
@@ -2047,7 +2056,7 @@ double H2_SPD::get_mth_eigenvalue(const Domain& domain, const int64_t m,
 
 } // namespace Hatrix
 
-int64_t inertia(const Hatrix::Matrix& A, const double lambda) {
+int64_t inertia(const Hatrix::Matrix& A, const double lambda, bool& singular) {
   Hatrix::Matrix Ac(A);
   shift_diag(Ac, -lambda);
   Hatrix::ldl(Ac);
@@ -2055,15 +2064,21 @@ int64_t inertia(const Hatrix::Matrix& A, const double lambda) {
   bool zero_found = false;
   for(int64_t i = 0; i < Ac.min_dim(); i++) {
     negative_elements_count += (Ac(i, i) < 0 ? 1 : 0);
+    if(std::isnan(Ac(i, i)) || std::abs(Ac(i, i)) < EPS) singular = true;
   }
   return negative_elements_count;
 }
 
 double get_mth_eigenvalue_dense(const Hatrix::Matrix& A, const int64_t m,
                                 double left, double right) {
+  bool singular = false;
   while((right - left) >= EPS_EV) {
     const auto mid = (left + right) / 2;
-    const auto value = inertia(A, mid);
+    const auto value = inertia(A, mid, singular);
+    if(singular) {
+      std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
+      break;
+    }
     if(value >= m) right = mid;
     else left = mid;
   }
@@ -2084,10 +2099,10 @@ int main(int argc, char ** argv) {
   Hatrix::Context::init();
 
   const auto start_particles = std::chrono::system_clock::now();
-  constexpr int64_t ndim = 3;
+  constexpr int64_t ndim = 2;
   Hatrix::Domain domain(N, ndim);
   // Laplace kernel
-  domain.generate_particles(0, N); //Unit sphere
+  domain.generate_particles(0, N); //Unit circle
   Hatrix::kernel_function = Hatrix::laplace_kernel;
   domain.divide_domain_and_create_particle_boxes(nleaf);
   const auto stop_particles = std::chrono::system_clock::now();
@@ -2105,16 +2120,19 @@ int main(int argc, char ** argv) {
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
-  
-  const auto b = norm_2(Adense) + 1.0;
+
+  bool s = false;
+  const auto b = 10 * (1 / PV);
   const auto a = -b;
-  const auto v_a = A.inertia(domain, a);
-  const auto v_b = A.inertia(domain, b);
+  const auto v_a = A.inertia(domain, a, s);
+  const auto v_b = A.inertia(domain, b, s);
   if(v_a != 0 || v_b != N) {
-    std::cout << "Warning: starting interval does not contain the whole spectrum\n";
+    std::cerr << "Warning: starting interval does not contain the whole spectrum" << std::endl
+              << "at N=" << N << ",nleaf=" << nleaf << ",rank=" << rank
+              << ",admis=" << admis << ",m=" << m << ",b=" << b << std::endl;
   }
   const auto h2_mth_eigv = A.get_mth_eigenvalue(domain, m, a, b);
-  const auto dense_mth_eigv = get_mth_eigenvalue_dense(Adense, m, a, b);
+  const auto dense_mth_eigv = -1;
 
   Hatrix::Context::finalize();
 
@@ -2132,7 +2150,7 @@ int main(int argc, char ** argv) {
             << "," << std::setprecision(10) << lapack_eigv[m - 1] 
             << "," << std::setprecision(10) << dense_mth_eigv
             << "," << std::setprecision(10) << h2_mth_eigv
-            << "," << std::scientific << std::abs(dense_mth_eigv - lapack_eigv[m - 1])
+            << "," << std::scientific << -1
             << "," << std::scientific << std::abs(h2_mth_eigv - lapack_eigv[m - 1])
             << std::endl;
 

@@ -2084,10 +2084,10 @@ int main(int argc, char ** argv) {
   Hatrix::Context::init();
 
   const auto start_particles = std::chrono::system_clock::now();
-  constexpr int64_t ndim = 3;
+  constexpr int64_t ndim = 2;
   Hatrix::Domain domain(N, ndim);
   // Laplace kernel
-  domain.generate_particles(0, N); //Unit sphere
+  domain.generate_particles(0, N); //Unit circle
   Hatrix::kernel_function = Hatrix::laplace_kernel;
   domain.divide_domain_and_create_particle_boxes(nleaf);
   const auto stop_particles = std::chrono::system_clock::now();
@@ -2104,7 +2104,7 @@ int main(int argc, char ** argv) {
   lr_ratio = A.low_rank_block_ratio();
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-  const auto b = norm_2(Adense) + 1.0;
+  const auto b = 10 * (1 / PV);
   const auto a = -b;
   // const auto v_a = A.inertia(domain, a);
   // const auto v_b = A.inertia(domain, b);
