@@ -1128,7 +1128,8 @@ double H2_SPD::construction_relative_error(const Domain& domain) {
     }
   }
 
-  return std::sqrt(error / dense_norm);
+  // return std::sqrt(error / dense_norm); //Relative error
+  return std::sqrt(error); //Absolute error
 }
 
 void H2_SPD::actually_print_structure(int64_t level) {
@@ -2103,7 +2104,6 @@ int main(int argc, char ** argv) {
   construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
 
-  Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   const auto b = 10 * (1 / PV);
   const auto a = -b;
   // const auto v_a = A.inertia(domain, a);

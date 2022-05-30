@@ -1128,8 +1128,8 @@ double H2_SPD::construction_relative_error(const Domain& domain) {
       }
     }
   }
-
-  return std::sqrt(error / dense_norm);
+  // return std::sqrt(error / dense_norm); //Relative error
+  return std::sqrt(error); //Absolute error
 }
 
 void H2_SPD::actually_print_structure(int64_t level) {
