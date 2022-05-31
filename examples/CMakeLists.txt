@@ -48,7 +48,8 @@ else()
     H2_fixed_acc_UMV_qr
     H2_fixed_acc_LDL
     H2_strong_eig
-	H2_strong_eig_time
+    H2_strong_eig_time
+    H2_strong_ldl_time
   )
 endif()
 
