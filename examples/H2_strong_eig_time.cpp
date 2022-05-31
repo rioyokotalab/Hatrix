@@ -21,7 +21,7 @@ using vec = std::vector<int64_t>;
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 constexpr int64_t oversampling = 5;
-constexpr double EPS_EV = 1e-5;
+double EPS_EV = 1e-5;
 double PV = 1e-3;
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 
@@ -2080,6 +2080,8 @@ int main(int argc, char ** argv) {
   const std::string admis_kind = argc > 5 ? std::string(argv[5]) : "diagonal_admis";
   const int64_t m  = argc > 6 ? atoi(argv[6]) : 1;
   const int64_t print_header = argc > 7 ? atoi(argv[7]) : 0;
+  const double eps_ev = argc > 8 ? atof(argv[8]) : 1e-5;
+  EPS_EV = eps_ev;
   const int64_t matrix_type = H2_MATRIX;
 
   Hatrix::Context::init();
