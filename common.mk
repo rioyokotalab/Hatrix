@@ -1,4 +1,4 @@
-include $(TOPSRCDIR)/make.flowcx.inc
+include $(TOPSRCDIR)/make.lab.inc
 
 OBJECTS := $(subst .cpp,.o,$(SOURCES))
 

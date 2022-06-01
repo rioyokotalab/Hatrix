@@ -41,7 +41,6 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_H2_far_dense \
 	svd_vs_id
 
-EXAMPLE_DIR_EXECUTABLES := HSS_main
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
@@ -65,8 +64,13 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-$(EXAMPLE_DIR_EXECUTABLES) : % : lib%.a dirs
-	$(CXX) $< $(OBJLIBS) libfranklin.a $(LDFLAGS) -o $@; \
+# non-distributed code.
+.PHONY: examples/franklin/HSS
+examples/franklin/HSS:
+	$(MAKE) -C $@
+
+HSS_main : % : dirs examples/franklin/HSS
+	$(CXX) libHSS_main.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
@@ -76,7 +80,7 @@ examples/franklin/HSS_slate:
 	$(MAKE) -C $@
 
 HSS_slate : % : dirs examples/franklin/HSS_slate
-	$(MPICXX) $(OBJLIBS) libfranklin.a libHSS_slate.a $(LDFLAGS) $(SLATE_LIB) -o $@; \
+	$(MPICXX) libHSS_slate.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(SLATE_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 

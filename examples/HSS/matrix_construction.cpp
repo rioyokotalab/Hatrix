@@ -216,17 +216,17 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row, int6
 }
 
 
-static RowLevelMap
+static Hatrix::RowLevelMap
 generate_transfer_matrices(const int64_t level,
-                           const RowLevelMap& Uchild,
+                           const Hatrix::RowLevelMap& Uchild,
                            SymmetricSharedBasisMatrix& A,
-                           const Matrix& dense,
+                           const Hatrix::Matrix& dense,
                            const Matrix& rand,
                            const Args& opts) {
   int64_t nblocks = A.level_blocks[level];
   auto dense_splits = dense.split(nblocks, nblocks);
 
-  RowLevelMap Ubig_parent;
+  Hatrix::RowLevelMap Ubig_parent;
   for (int64_t node = 0; node < nblocks; ++node) {
     int64_t c1 = node * 2;
     int64_t c2 = node * 2 + 1;
@@ -285,7 +285,7 @@ void construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A,
   Matrix rand = generate_random_matrix(opts.N, P);
   generate_leaf_nodes(domain, A, dense, rand, opts);
 
-  RowLevelMap Uchild = A.U;
+  Hatrix::RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.height-1; level > 0; --level) {
     Uchild = generate_transfer_matrices(level, Uchild, A, dense, rand, opts);

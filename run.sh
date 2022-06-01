@@ -13,16 +13,16 @@ module load cmake lapack/3.9.0 openmpi/4.0.5 gcc/7.5
 # make clean#
 # export OMP_NUM_THREADS=1
 # export MKL_NUM_THREADS=1
-make -j
+make -j HSS_main
 
 echo "CONSTANT ACCURACY CONSTRUCTION"
-for data in "1024 1e-5" "2048 1e-5" "4096 1e-6" "8192 1e-6" "16384 1e-7" "32768 1e-7" "65536 1e-8" "131072 1e-8" "262144 1e-9" "524288 1e-9" "1048576 1e-10"; do
+for data in "1024 1e-5"; do
     set -- $data
     ./bin/HSS_main --N $1 --nleaf 128 --kernel-func laplace --add-diag $2 \
                    --acc 1e-9 --nested-basis 1 --construct-algorithm id_random \
                    --kind-of-geometry circular
 
-    ./bin/HSS_main --N $1 --nleaf 128 --kernel-func laplace --add-diag $2 \
-                   --acc 1e-9 --nested-basis 1 --construct-algorithm miro \
-                   --kind-of-geometry circular
+    # ./bin/HSS_main --N $1 --nleaf 128 --kernel-func laplace --add-diag $2 \
+    #                --acc 1e-9 --nested-basis 1 --construct-algorithm miro \
+    #                --kind-of-geometry circular
 done
