@@ -806,13 +806,12 @@ Matrix H2::generate_block_row(int64_t block, int64_t block_size,
   int64_t nblocks = level_blocks[level];
   auto rand_splits = rand.split(nblocks, 1);
 
-  Matrix block_row(block_size, 0);
+  Matrix block_row(block_size, rand.cols);
   for (int64_t j = 0; j < nblocks; ++j) {
     if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-    // Append random sample of each block
-    block_row =
-        concat(block_row, matmul(generate_p2p_interactions(domain, block, j, level, height),
-                                 rand_splits[j]), 1);
+    // Accumulate sample of each block
+    matmul(generate_p2p_interactions(domain, block, j, level, height), rand_splits[j],
+           block_row, false, false, 1.0, 1.0);
   }
   return block_row;
 }
@@ -836,13 +835,12 @@ Matrix H2::generate_block_column(int64_t block, int64_t block_size,
   int64_t nblocks = level_blocks[level];
   auto rand_splits = rand.split(nblocks, 1);
 
-  Matrix block_column(0, block_size);
+  Matrix block_column(rand.cols, block_size);
   for (int64_t i = 0; i < nblocks; ++i) {
     if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-    // Append random sample of each block
-    block_column =
-        concat(block_column, matmul(rand_splits[i], generate_p2p_interactions(domain, i, block, level, height),
-                                    true, false), 0);
+    // Accumulate sample of each block
+    matmul(rand_splits[i], generate_p2p_interactions(domain, i, block, level, height),
+           block_column, true, false, 1.0, 1.0);
   }
   return block_column;
 }
