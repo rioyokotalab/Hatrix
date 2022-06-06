@@ -102,7 +102,7 @@ class Domain {
 
 class H2 {
  public:
-  int64_t N, nleaf, n_blocks, lr_max_rank;
+  int64_t N, nleaf, n_blocks;
   double accuracy, admis;
   std::string admis_kind;
   int64_t matrix_type;
@@ -129,14 +129,14 @@ class H2 {
   bool col_has_admissible_blocks(int64_t col, int64_t level);
   Matrix generate_block_row(int64_t block, int64_t block_size,
                             const Domain& domain, int64_t level,
-                            const Matrix& rand);
+                            const Matrix& rand, bool sample=true);
   std::tuple<Matrix, Matrix>
   generate_row_cluster_bases(int64_t block, int64_t block_size,
                              const Domain& domain, int64_t level,
                              const Matrix& rand);
   Matrix generate_block_column(int64_t block, int64_t block_size,
                                const Domain& domain, int64_t level,
-                               const Matrix& rand);
+                               const Matrix& rand, bool sample=true);
   std::tuple<Matrix, Matrix>
   generate_column_cluster_bases(int64_t block, int64_t block_size,
                                 const Domain& domain, int64_t level,
@@ -171,9 +171,10 @@ class H2 {
 
  public:
   H2(const Domain& domain, const int64_t N, const int64_t nleaf,
-     const int64_t lr_max_rank, const double accuracy, const double admis,
-     const std::string& admis_kind, const int64_t matrix_type);
-  double construction_absolute_error(const Domain& domain);
+     const double accuracy, const double admis,
+     const std::string& admis_kind, const int64_t matrix_type,
+     const Matrix& rand);
+  double construction_relative_error(const Domain& domain);
   void print_structure();
   double low_rank_block_ratio();
   void factorize(const Domain& domain);
@@ -835,16 +836,21 @@ bool H2::col_has_admissible_blocks(int64_t col, int64_t level) {
 
 Matrix H2::generate_block_row(int64_t block, int64_t block_size,
                               const Domain& domain, int64_t level,
-                              const Matrix& rand) {
+                              const Matrix& rand, bool sample) {
   int64_t nblocks = level_blocks[level];
   auto rand_splits = rand.split(nblocks, 1);
 
-  Matrix block_row(block_size, rand.cols);
+  Matrix block_row(block_size, sample ? rand.cols : 0);
   for (int64_t j = 0; j < nblocks; ++j) {
     if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-    // Accumulate sample of each block
-    matmul(generate_p2p_interactions(domain, block, j, level, height), rand_splits[j],
-           block_row, false, false, 1.0, 1.0);
+    if (sample) {
+      matmul(generate_p2p_interactions(domain, block, j, level, height), rand_splits[j],
+             block_row, false, false, 1.0, 1.0);
+    }
+    else {
+      block_row =
+          concat(block_row, generate_p2p_interactions(domain, block, j, level, height), 1);
+    }
   }
   return block_row;
 }
@@ -865,16 +871,22 @@ H2::generate_row_cluster_bases(int64_t block, int64_t block_size,
 
 Matrix H2::generate_block_column(int64_t block, int64_t block_size,
                                  const Domain& domain, int64_t level,
-                                 const Matrix& rand) {
+                                 const Matrix& rand, bool sample) {
   int64_t nblocks = level_blocks[level];
   auto rand_splits = rand.split(nblocks, 1);
 
-  Matrix block_column(rand.cols, block_size);
+  Matrix block_column(sample ? rand.cols : 0, block_size);
   for (int64_t i = 0; i < nblocks; ++i) {
     if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-    // Accumulate sample of each block
-    matmul(rand_splits[i], generate_p2p_interactions(domain, i, block, level, height),
-           block_column, true, false, 1.0, 1.0);
+    if (sample) {
+      matmul(rand_splits[i],
+             generate_p2p_interactions(domain, i, block, level, height),
+             block_column, true, false, 1.0, 1.0);
+    }
+    else {
+      block_column =
+          concat(block_column, generate_p2p_interactions(domain, i, block, level, height), 0);
+    }
   }
   return block_column;
 }
@@ -1087,11 +1099,12 @@ Matrix H2::get_Vbig(int64_t node, int64_t level) {
 }
 
 H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
-       const int64_t lr_max_rank, const double accuracy, const double admis,
-       const std::string& admis_kind, const int64_t matrix_type)
-    : N(N), nleaf(nleaf), lr_max_rank(lr_max_rank), accuracy(accuracy),
+       const double accuracy, const double admis,
+       const std::string& admis_kind, const int64_t matrix_type,
+       const Matrix& rand)
+    : N(N), nleaf(nleaf), accuracy(accuracy),
       admis(admis), admis_kind(admis_kind), matrix_type(matrix_type),
-      min_rank(lr_max_rank), max_rank(-lr_max_rank) {
+      min_rank(N), max_rank(-N) {
   if (admis_kind == "geometry_admis") {
     // TODO: use dual tree traversal for this.
     height = calc_geometry_based_admissibility(domain);
@@ -1147,7 +1160,6 @@ H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
     abort();
   }
 
-  Matrix rand = generate_random_matrix(N, lr_max_rank);
   generate_leaf_nodes(domain, rand);
   RowLevelMap Uchild = U;
   ColLevelMap Vchild = V;
@@ -1157,7 +1169,7 @@ H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
   }
 }
 
-double H2::construction_absolute_error(const Domain& domain) {
+double H2::construction_relative_error(const Domain& domain) {
   double error = 0;
   double dense_norm = 0;
   int64_t nblocks = level_blocks[height];
@@ -1409,7 +1421,8 @@ void H2::factorize_level(const Domain& domain,
     // TRSM with CC blocks on the row
     for (int64_t j = block + 1; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
-        int64_t col_split = D(block, j, level).cols - V(j, level).cols;
+        int64_t col_split = D(block, j, level).cols -
+                            (level == height ? V(j, level).cols : V(j * 2, level + 1).cols);
         auto D_splits = D(block, j, level).split(vec{row_split}, vec{col_split});
         solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true);
       }
@@ -1417,7 +1430,10 @@ void H2::factorize_level(const Domain& domain,
     // TRSM with co blocks on this row
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
-        int64_t col_split = D(block, j, level).cols - V(j, level).cols;
+        int64_t col_split = D(block, j, level).cols -
+                            (j <= block || level == height ?
+                             V(j, level).cols :
+                             V(j * 2, level + 1).cols);
         auto D_splits = D(block, j, level).split(vec{row_split}, vec{col_split});
         solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true);
       }
@@ -1425,7 +1441,8 @@ void H2::factorize_level(const Domain& domain,
     // TRSM with cc blocks on the column
     for (int64_t i = block + 1; i < nblocks; ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
-        int64_t row_split = D(i, block, level).rows - U(i, level).cols;
+        int64_t row_split = D(i, block, level).rows -
+                            (level == height ? U(i, level).cols : U(i * 2, level + 1).cols);
         auto D_splits = D(i, block, level).split(vec{row_split}, vec{col_split});
         solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Upper, false);
       }
@@ -1433,7 +1450,10 @@ void H2::factorize_level(const Domain& domain,
     // TRSM with oc blocks on the column
     for (int64_t i = 0; i < nblocks; ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
-        int64_t row_split = D(i, block, level).rows - U(i, level).cols;
+        int64_t row_split = D(i, block, level).rows -
+                            (i <= block || level == height ?
+                             U(i, level).cols :
+                             U(i * 2, level + 1).cols);
         auto D_splits = D(i, block, level).split(vec{row_split}, vec{col_split});
         solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Upper, false);
       }
@@ -1444,33 +1464,37 @@ void H2::factorize_level(const Domain& domain,
       for (int64_t j = block+1; j < nblocks; ++j) {
         if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+          int64_t lower_row_rank =
+              level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
+          int64_t right_col_rank =
+              level == height ? V(j, level).cols : V(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - U(i, level).cols},
+              vec{D(i, block, level).rows - lower_row_rank},
               vec{D(i, block, level).cols - V(block, level).cols});
           auto right_splits = D(block, j, level).split(
               vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - V(j, level).cols});
+              vec{D(block, j, level).cols - right_col_rank});
 
           if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
             auto reduce_splits = D(i, j, level).split(
-                vec{D(i, j, level).rows - U(i, level).cols},
-                vec{D(i, j, level).cols - V(j, level).cols});
+                vec{D(i, j, level).rows - lower_row_rank},
+                vec{D(i, j, level).cols - right_col_rank});
             matmul(lower_splits[0], right_splits[0], reduce_splits[0], false, false, -1.0, 1.0);
           }
           else {
             int64_t rows = D(i, block, level).rows;
             int64_t cols = D(block, j, level).cols;
-            int64_t row_split = rows - U(i, level).cols;
-            int64_t col_split = cols - V(j, level).cols;
             if (F.exists(i, j)) {
               Matrix& fill_in = F(i, j);
-              auto fill_in_splits = fill_in.split(vec{row_split}, vec{col_split});
+              auto fill_in_splits = fill_in.split(vec{rows - lower_row_rank},
+                                                  vec{cols - right_col_rank});
               matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
                      false, false, -1.0, 1.0);
             }
             else {
               Matrix fill_in(rows, cols);
-              auto fill_in_splits = fill_in.split(vec{row_split}, vec{col_split});
+              auto fill_in_splits = fill_in.split(vec{rows - lower_row_rank},
+                                                  vec{cols - right_col_rank});
               matmul(lower_splits[0], right_splits[0], fill_in_splits[0],
                      false, false, -1.0, 1.0);
               F.insert(i, j, std::move(fill_in));
@@ -1484,18 +1508,22 @@ void H2::factorize_level(const Domain& domain,
       for (int64_t j = 0; j < nblocks; ++j) {
         if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+          int64_t lower_row_rank =
+              i <= block || level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
+          int64_t right_col_rank =
+              j <= block || level == height ? V(j, level).cols : V(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - U(i, level).cols},
+              vec{D(i, block, level).rows - lower_row_rank},
               vec{D(i, block, level).cols - V(block, level).cols});
           auto right_splits = D(block, j, level).split(
               vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - V(j, level).cols});
+              vec{D(block, j, level).cols - right_col_rank});
 
           if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
             // no fill-in in the oo portion. SC into another dense block.
             auto reduce_splits = D(i, j, level).split(
-                vec{D(i, j, level).rows - U(i, level).cols},
-                vec{D(i, j, level).cols - V(j, level).cols});
+                vec{D(i, j, level).rows - lower_row_rank},
+                vec{D(i, j, level).cols - right_col_rank});
             matmul(lower_splits[2], right_splits[1], reduce_splits[3], false, false, -1.0, 1.0);
           }
         }
@@ -1507,17 +1535,22 @@ void H2::factorize_level(const Domain& domain,
       for (int64_t j = 0; j < nblocks; ++j) {
         if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+          int64_t lower_row_rank =
+              level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
+          int64_t right_col_rank =
+              j <= block || level == height ? V(j, level).cols : V(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - U(i, level).cols},
+              vec{D(i, block, level).rows - lower_row_rank},
               vec{D(i, block, level).cols - V(block, level).cols});
           auto right_splits = D(block, j, level).split(
               vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - V(j, level).cols});
+              vec{D(block, j, level).cols - right_col_rank});
+
           // Schur's complement between cc and co blocks where product exists as dense.
           if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
             auto reduce_splits = D(i, j, level).split(
-                vec{D(i, j, level).rows - U(i, level).cols},
-                vec{D(i, j, level).cols - V(j, level).cols});
+                vec{D(i, j, level).rows - lower_row_rank},
+                vec{D(i, j, level).cols - right_col_rank});
             matmul(lower_splits[0], right_splits[1], reduce_splits[1], false, false, -1.0, 1.0);
           }
           // Schur's complement between cc and co blocks where a new fill-in is created.
@@ -1527,9 +1560,9 @@ void H2::factorize_level(const Domain& domain,
             // a narrow strip of size nb * rank. These blocks are formed only on the right
             // part of the permuted matrix in the co section.
             if (!F.exists(i, j)) {
-              Matrix fill_in(D(i, block, level).rows, V(j, level).cols);
+              Matrix fill_in(D(i, block, level).rows, right_col_rank);
               auto fill_in_splits =
-                  fill_in.split(vec{D(i, block, level).rows - U(i, level).cols}, vec{});
+                  fill_in.split(vec{D(i, block, level).rows - lower_row_rank}, vec{});
               // Update the co block within the fill-in.
               matmul(lower_splits[0], right_splits[1], fill_in_splits[0],
                      false, false, -1.0, 1.0);
@@ -1548,8 +1581,8 @@ void H2::factorize_level(const Domain& domain,
                   F(i, j).cols == D(block, j, level).cols) {
                 Matrix& fill_in = F(i, j);
                 auto fill_in_splits =
-                    fill_in.split(vec{D(i, block, level).rows - U(i, level).cols},
-                                  vec{D(block, j, level).cols - V(j, level).cols});
+                    fill_in.split(vec{D(i, block, level).rows - lower_row_rank},
+                                  vec{D(block, j, level).cols - right_col_rank});
                 // Update the co block within the fill-in.
                 matmul(lower_splits[0], right_splits[1], fill_in_splits[1],
                        false, false, -1.0, 1.0);
@@ -1560,7 +1593,7 @@ void H2::factorize_level(const Domain& domain,
               else {
                 Matrix &fill_in = F(i, j);
                 auto fill_in_splits =
-                    fill_in.split(vec{D(i, block, level).rows - U(i, level).cols}, vec{});
+                    fill_in.split(vec{D(i, block, level).rows - lower_row_rank}, vec{});
                 // Update the co block within the fill-in.
                 matmul(lower_splits[0], right_splits[1], fill_in_splits[0],
                        false, false, -1.0, 1.0);
@@ -1579,17 +1612,22 @@ void H2::factorize_level(const Domain& domain,
       for (int64_t j = block+1; j < nblocks; ++j) {
         if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, block, level) && !is_admissible(i, block, level))) {
+          int64_t lower_row_rank =
+              i <= block || level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
+          int64_t right_col_rank =
+              level == height ? V(j, level).cols : V(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - U(i, level).cols},
+              vec{D(i, block, level).rows - lower_row_rank},
               vec{D(i, block, level).cols - V(block, level).cols});
           auto right_splits = D(block, j, level).split(
               vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - V(j, level).cols});
+              vec{D(block, j, level).cols - right_col_rank});
+
           // Schur's complement between oc and cc blocks where product exists as dense.
           if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
             auto reduce_splits = D(i, j, level).split(
-                vec{D(i, j, level).rows - U(i, level).cols},
-                vec{D(i, j, level).cols - V(j, level).cols});
+                vec{D(i, j, level).rows - lower_row_rank},
+                vec{D(i, j, level).cols - right_col_rank});
             matmul(lower_splits[2], right_splits[0], reduce_splits[2],
                    false, false, -1.0, 1.0);
           }
@@ -1597,9 +1635,9 @@ void H2::factorize_level(const Domain& domain,
           // The product is a (oc, oo)-sized block.
           else {
             if (!F.exists(i, j)) {
-              Matrix fill_in(U(i, level).cols, D(block, j, level).cols);
+              Matrix fill_in(lower_row_rank, D(block, j, level).cols);
               auto fill_in_splits =
-                  fill_in.split(vec{}, vec{D(block, j, level).cols - V(j, level).cols});
+                  fill_in.split(vec{}, vec{D(block, j, level).cols - right_col_rank});
               // Update the oc block within the fill-ins.
               matmul(lower_splits[2], right_splits[0], fill_in_splits[0],
                      false, false, -1.0, 1.0);
@@ -1616,8 +1654,8 @@ void H2::factorize_level(const Domain& domain,
                   F(i, j).cols == D(block, j, level).cols) {
                 Matrix& fill_in = F(i, j);
                 auto fill_in_splits =
-                    fill_in.split(vec{D(i, block, level).rows - U(i, level).cols},
-                                  vec{D(block, j, level).cols - V(j, level).cols});
+                    fill_in.split(vec{D(i, block, level).rows - lower_row_rank},
+                                  vec{D(block, j, level).cols - right_col_rank});
                 // Update the oc block within the fill-ins.
                 matmul(lower_splits[2], right_splits[0], fill_in_splits[2],
                        false, false, -1.0, 1.0);
@@ -1628,7 +1666,7 @@ void H2::factorize_level(const Domain& domain,
               else {
                 Matrix& fill_in = F(i, j);
                 auto fill_in_splits =
-                    fill_in.split(vec{}, vec{D(block, j, level).cols - V(j, level).cols});
+                    fill_in.split(vec{}, vec{D(block, j, level).cols - right_col_rank});
                 // Update the oc block within the fill-ins.
                 matmul(lower_splits[2], right_splits[0], fill_in_splits[0],
                        false, false, -1.0, 1.0);
@@ -1695,6 +1733,22 @@ void H2::factorize(const Domain& domain) {
         U.erase(parent_node, parent_level);
         U.insert(parent_node, parent_level, std::move(temp));
       }
+      else {
+        // Use identity matrix as U bases whenever all dense row is encountered during merge
+        int64_t rank_c1 = U(c1, level).cols;
+        int64_t rank_c2 = U(c2, level).cols;
+        Matrix Utransfer =
+            generate_identity_matrix(rank_c1 + rank_c2, std::max(rank_c1, rank_c2));
+
+        if (r.exists(c1)) {
+          r.erase(c1);
+        }
+        if (r.exists(c2)) {
+          r.erase(c2);
+        }
+        U.insert(parent_node, parent_level, std::move(Utransfer));
+      }
+      
       if (col_has_admissible_blocks(parent_node, parent_level) && height != 1) {
         Matrix& Vtransfer = V(parent_node, parent_level);
         // Split based on original rank
@@ -1714,6 +1768,21 @@ void H2::factorize(const Domain& domain) {
         }
         V.erase(parent_node, parent_level);
         V.insert(parent_node, parent_level, std::move(temp));
+      }
+      else {
+        // Use identity matrix as V bases whenever all dense row is encountered during merge
+        int64_t rank_c1 = V(c1, level).cols;
+        int64_t rank_c2 = V(c2, level).cols;
+        Matrix Vtransfer =
+            generate_identity_matrix(rank_c1 + rank_c2, std::max(rank_c1, rank_c2));
+
+        if (t.exists(c1)) {
+          t.erase(c1);
+        }
+        if (t.exists(c2)) {
+          t.erase(c2);
+        }
+        V.insert(parent_node, parent_level, std::move(Vtransfer));
       }
     } // for (block = 0; block < nblocks; block += 2)
 
@@ -1803,14 +1872,13 @@ void H2::factorize(const Domain& domain) {
 int main(int argc, char ** argv) {
   const int64_t N = argc > 1 ? atoi(argv[1]) : 256;
   const int64_t nleaf = argc > 2 ? atoi(argv[2]) : 32;
-  const int64_t lr_max_rank = argc > 3 ? atoi(argv[3]) : nleaf/2;
-  const double accuracy = argc > 4 ? atof(argv[4]) : 1e-5;
-  const double admis = argc > 5 ? atof(argv[5]) : 1.0;
+  const double accuracy = argc > 3 ? atof(argv[3]) : 1e-5;
+  const double admis = argc > 4 ? atof(argv[4]) : 1.0;
   // diagonal_admis or geometry_admis
-  const std::string admis_kind = argc > 6 ? std::string(argv[6]) : "diagonal_admis";
+  const std::string admis_kind = argc > 5 ? std::string(argv[5]) : "diagonal_admis";
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = argc > 7 ? atoi(argv[7]) : 1;
+  const int64_t matrix_type = argc > 6 ? atoi(argv[6]) : 1;
 
   Hatrix::Context::init();
 
@@ -1826,27 +1894,19 @@ int main(int argc, char ** argv) {
   const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                          (stop_particles - start_particles).count();
 
+  const int64_t sample_size = std::min(int64_t{100}, nleaf);
+  Hatrix::Matrix rand = Hatrix::generate_random_matrix(N, sample_size);
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::H2 A(domain, N, nleaf, lr_max_rank, accuracy, admis, admis_kind, matrix_type);
+  Hatrix::H2 A(domain, N, nleaf, accuracy, admis, admis_kind, matrix_type, rand);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
   double construct_error, lr_ratio, solve_error;
-  construct_error = A.construction_absolute_error(domain);
+  construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
-  A.print_structure();
-
-  const auto start_factor = std::chrono::system_clock::now();
-  A.factorize(domain);
-  const auto stop_factor = std::chrono::system_clock::now();
-  const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                             (stop_factor - start_factor).count();
-
-  Hatrix::Context::finalize();
 
   std::cout << "N=" << N
             << " nleaf=" << nleaf
-            << " lr_max_rank=" << lr_max_rank
             << " accuracy=" << accuracy
             << " admis=" << admis << std::setw(3)
             << " ndim=" << ndim
@@ -1854,12 +1914,22 @@ int main(int argc, char ** argv) {
             << " admis_kind=" << admis_kind
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << " LR%=" << std::setprecision(5) << lr_ratio * 100 << "%"
-            << " min_rank=" << A.min_rank
-            << " max_rank=" << A.max_rank
+            << " construct_min_rank=" << A.min_rank
+            << " construct_max_rank=" << A.max_rank
             << " construct_time=" << construct_time
             << " construct_error=" << std::setprecision(5) << construct_error
-            << " factor_time=" << factor_time
             << std::endl;
 
+  const auto start_factor = std::chrono::system_clock::now();
+  A.factorize(domain);
+  const auto stop_factor = std::chrono::system_clock::now();
+  const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                             (stop_factor - start_factor).count();
+  std::cout << "factor_time=" << factor_time
+            << " factor_min_rank=" << A.min_rank
+            << " factor_max_rank=" << A.max_rank
+            << std::endl;
+
+  Hatrix::Context::finalize();
   return 0;
 }
