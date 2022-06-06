@@ -83,7 +83,7 @@ class Domain {
 
 class H2 {
  public:
-  int64_t N, nleaf, n_blocks, lr_max_rank;
+  int64_t N, nleaf, n_blocks;
   double accuracy, admis;
   std::string admis_kind;
   int64_t matrix_type;
@@ -140,9 +140,10 @@ class H2 {
 
  public:
   H2(const Domain& domain, const int64_t N, const int64_t nleaf,
-     const int64_t lr_max_rank, const double accuracy, const double admis,
-     const std::string& admis_kind, const int64_t matrix_type);
-  double construction_absolute_error(const Domain& domain);
+     const double accuracy, const double admis,
+     const std::string& admis_kind, const int64_t matrix_type,
+     const Matrix& rand);
+  double construction_relative_error(const Domain& domain);
   void print_structure();
   double low_rank_block_ratio();
 };
@@ -806,12 +807,11 @@ Matrix H2::generate_block_row(int64_t block, int64_t block_size,
   int64_t nblocks = level_blocks[level];
   auto rand_splits = rand.split(nblocks, 1);
 
-  Matrix block_row(block_size, rand.cols);
+  Matrix block_row(block_size, 0);
   for (int64_t j = 0; j < nblocks; ++j) {
     if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-    // Accumulate sample of each block
-    matmul(generate_p2p_interactions(domain, block, j, level, height), rand_splits[j],
-           block_row, false, false, 1.0, 1.0);
+    block_row =
+        concat(block_row, generate_p2p_interactions(domain, block, j, level, height), 1);
   }
   return block_row;
 }
@@ -836,12 +836,11 @@ Matrix H2::generate_block_column(int64_t block, int64_t block_size,
   int64_t nblocks = level_blocks[level];
   auto rand_splits = rand.split(nblocks, 1);
 
-  Matrix block_column(rand.cols, block_size);
+  Matrix block_column(0, block_size);
   for (int64_t i = 0; i < nblocks; ++i) {
     if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-    // Accumulate sample of each block
-    matmul(rand_splits[i], generate_p2p_interactions(domain, i, block, level, height),
-           block_column, true, false, 1.0, 1.0);
+    block_column =
+        concat(block_column, generate_p2p_interactions(domain, i, block, level, height), 0);
   }
   return block_column;
 }
@@ -1049,11 +1048,12 @@ Matrix H2::get_Vbig(int64_t node, int64_t level) {
 }
 
 H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
-       const int64_t lr_max_rank, const double accuracy, const double admis,
-       const std::string& admis_kind, const int64_t matrix_type)
-    : N(N), nleaf(nleaf), lr_max_rank(lr_max_rank), accuracy(accuracy),
+       const double accuracy, const double admis,
+       const std::string& admis_kind, const int64_t matrix_type,
+       const Matrix& rand)
+    : N(N), nleaf(nleaf), accuracy(accuracy),
       admis(admis), admis_kind(admis_kind), matrix_type(matrix_type),
-      min_rank(lr_max_rank), max_rank(-lr_max_rank) {
+      min_rank(N), max_rank(-N) {
   if (admis_kind == "geometry_admis") {
     // TODO: use dual tree traversal for this.
     height = calc_geometry_based_admissibility(domain);
@@ -1109,7 +1109,6 @@ H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
     abort();
   }
 
-  Matrix rand = generate_random_matrix(N, lr_max_rank);
   generate_leaf_nodes(domain, rand);
   RowLevelMap Uchild = U;
   ColLevelMap Vchild = V;
@@ -1119,7 +1118,7 @@ H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
   }
 }
 
-double H2::construction_absolute_error(const Domain& domain) {
+double H2::construction_relative_error(const Domain& domain) {
   double error = 0;
   double dense_norm = 0;
   int64_t nblocks = level_blocks[height];
@@ -1155,7 +1154,7 @@ double H2::construction_absolute_error(const Domain& domain) {
     }
   }
 
-  return std::sqrt(error);
+  return std::sqrt(error / dense_norm);
 }
 
 void H2::actually_print_structure(int64_t level) {
@@ -1210,42 +1209,43 @@ double H2::low_rank_block_ratio() {
 int main(int argc, char ** argv) {
   const int64_t N = argc > 1 ? atoi(argv[1]) : 256;
   const int64_t nleaf = argc > 2 ? atoi(argv[2]) : 32;
-  const int64_t lr_max_rank = argc > 3 ? atoi(argv[3]) : nleaf/2;
-  const double accuracy = argc > 4 ? atof(argv[4]) : 1e-5;
-  const double admis = argc > 5 ? atof(argv[5]) : 1.0;
+  const double accuracy = argc > 3 ? atof(argv[3]) : 1e-5;
+  const double admis = argc > 4 ? atof(argv[4]) : 1.0;
   // diagonal_admis or geometry_admis
-  const std::string admis_kind = argc > 6 ? std::string(argv[6]) : "diagonal_admis";
+  const std::string admis_kind = argc > 5 ? std::string(argv[5]) : "diagonal_admis";
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = argc > 7 ? atoi(argv[7]) : 1;
+  const int64_t matrix_type = argc > 6 ? atoi(argv[6]) : 1;
 
   Hatrix::Context::init();
 
   const auto start_particles = std::chrono::system_clock::now();
-  constexpr int64_t ndim = 2;
+  constexpr int64_t ndim = 3;
   Hatrix::Domain domain(N, ndim);
   // Laplace kernel
-  domain.generate_particles(0, N);
+  // domain.generate_particles(0, N);
+  domain.generate_starsh_grid_particles();
   Hatrix::kernel_function = Hatrix::laplace_kernel;
   domain.divide_domain_and_create_particle_boxes(nleaf);
   const auto stop_particles = std::chrono::system_clock::now();
   const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                          (stop_particles - start_particles).count();
 
+  const int64_t sample_size = 100;
+  Hatrix::Matrix rand = Hatrix::generate_random_matrix(N, sample_size);
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::H2 A(domain, N, nleaf, lr_max_rank, accuracy, admis, admis_kind, matrix_type);
+  Hatrix::H2 A(domain, N, nleaf, accuracy, admis, admis_kind, matrix_type, rand);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
   double construct_error, lr_ratio, solve_error;
-  construct_error = A.construction_absolute_error(domain);
+  construct_error = A.construction_relative_error(domain);
   lr_ratio = A.low_rank_block_ratio();
 
   Hatrix::Context::finalize();
 
   std::cout << "N=" << N
             << " nleaf=" << nleaf
-            << " lr_max_rank=" << lr_max_rank
             << " accuracy=" << accuracy
             << " admis=" << admis << std::setw(3)
             << " ndim=" << ndim
