@@ -46,11 +46,11 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
                                                          int64_t rank);
 
 // Compute truncated SVD for given accuracy threshold.
-std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error);
+std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative=true);
 
 // Pivoted QR that stops as soon as the desired accuracy is reached
 // Modification of LAPACK's dgeqp3 routine
-std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double error);
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative=true);
 
 double norm(const Matrix& A);
 

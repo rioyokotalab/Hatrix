@@ -210,12 +210,15 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t ran
   return truncated_svd(Ac, rank);
 }
 
-std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error) {
+std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative) {
   Matrix U(A.rows, A.min_dim());
   Matrix S(A.min_dim(), A.min_dim());
   Matrix V(A.min_dim(), A.cols);
 
   svd(A, U, S, V);
+
+  double error = eps;
+  if(relative) error *= S(0, 0);
 
   int rank = 1;
   int irow = 1;
@@ -231,7 +234,7 @@ std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error) {
   return {std::move(U), std::move(S), std::move(V)};
 }
 
-std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double error) {
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative) {
   // Pointer aliases
   double* a = &A;
   const int m = A.rows;
@@ -239,6 +242,8 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double error) {
   const int lda = A.stride;
 
   // Initialize variables for pivoted QR
+  double error = eps;
+  if(relative) error *= norm(A);
   const double tol = LAPACKE_dlamch('e');
   const double tol3z = std::sqrt(tol);
   const int min_dim = A.min_dim();
