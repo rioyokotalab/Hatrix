@@ -109,14 +109,14 @@ class H2 {
   bool col_has_admissible_blocks(int64_t col, int64_t level);
   Matrix generate_block_row(int64_t block, int64_t block_size,
                             const Domain& domain, int64_t level,
-                            const Matrix& rand);
+                            const Matrix& rand, bool sample=true);
   std::tuple<Matrix, Matrix>
   generate_row_cluster_bases(int64_t block, int64_t block_size,
                              const Domain& domain, int64_t level,
                              const Matrix& rand);
   Matrix generate_block_column(int64_t block, int64_t block_size,
                                const Domain& domain, int64_t level,
-                               const Matrix& rand);
+                               const Matrix& rand, bool sample=true);
   std::tuple<Matrix, Matrix>
   generate_column_cluster_bases(int64_t block, int64_t block_size,
                                 const Domain& domain, int64_t level,
@@ -803,15 +803,21 @@ bool H2::col_has_admissible_blocks(int64_t col, int64_t level) {
 
 Matrix H2::generate_block_row(int64_t block, int64_t block_size,
                               const Domain& domain, int64_t level,
-                              const Matrix& rand) {
+                              const Matrix& rand, bool sample) {
   int64_t nblocks = level_blocks[level];
   auto rand_splits = rand.split(nblocks, 1);
 
-  Matrix block_row(block_size, 0);
+  Matrix block_row(block_size, sample ? rand.cols : 0);
   for (int64_t j = 0; j < nblocks; ++j) {
     if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-    block_row =
-        concat(block_row, generate_p2p_interactions(domain, block, j, level, height), 1);
+    if (sample) {
+      matmul(generate_p2p_interactions(domain, block, j, level, height), rand_splits[j],
+             block_row, false, false, 1.0, 1.0);
+    }
+    else {
+      block_row =
+          concat(block_row, generate_p2p_interactions(domain, block, j, level, height), 1);
+    }
   }
   return block_row;
 }
@@ -831,15 +837,22 @@ H2::generate_row_cluster_bases(int64_t block, int64_t block_size,
 
 Matrix H2::generate_block_column(int64_t block, int64_t block_size,
                                  const Domain& domain, int64_t level,
-                                 const Matrix& rand) {
+                                 const Matrix& rand, bool sample) {
   int64_t nblocks = level_blocks[level];
   auto rand_splits = rand.split(nblocks, 1);
 
-  Matrix block_column(0, block_size);
+  Matrix block_column(sample ? rand.cols : 0, block_size);
   for (int64_t i = 0; i < nblocks; ++i) {
     if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-    block_column =
-        concat(block_column, generate_p2p_interactions(domain, i, block, level, height), 0);
+    if (sample) {
+      matmul(rand_splits[i],
+             generate_p2p_interactions(domain, i, block, level, height),
+             block_column, true, false, 1.0, 1.0);
+    }
+    else {
+      block_column =
+          concat(block_column, generate_p2p_interactions(domain, i, block, level, height), 0);
+    }
   }
   return block_column;
 }
