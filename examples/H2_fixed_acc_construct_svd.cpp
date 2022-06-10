@@ -146,6 +146,7 @@ class H2 {
   double construction_relative_error(const Domain& domain);
   void print_structure();
   double low_rank_block_ratio();
+  void print_ranks();
 };
 
 double laplace_kernel(const std::vector<double>& coords_row,
@@ -1217,6 +1218,27 @@ double H2::low_rank_block_ratio() {
   return low_rank / total;
 }
 
+void H2::print_ranks() {
+  for(int64_t level = height; level > 0; level--) {
+    int64_t nblocks = level_blocks[level];
+    for(int64_t block = 0; block < nblocks; block++) {
+      std::cout << "block=" << block << "," << "level=" << level << ":\t"
+                << "diag= ";
+      if(D.exists(block, block, level)) {
+        std::cout << D(block, block, level).rows << "x" << D(block, block, level).cols;
+      }
+      else {
+        std::cout << "empty";
+      }
+      std::cout << ", row_rank=" << (U.exists(block, level) ?
+                                   U(block, level).cols : -1)
+                << ", col_rank=" << (V.exists(block, level) ?
+                                     V(block, level).cols : -1)
+                << std::endl;
+    }
+  }
+}
+
 } // namespace Hatrix
 
 int main(int argc, char ** argv) {
@@ -1236,8 +1258,8 @@ int main(int argc, char ** argv) {
   constexpr int64_t ndim = 3;
   Hatrix::Domain domain(N, ndim);
   // Laplace kernel
-  // domain.generate_particles(0, N);
-  domain.generate_starsh_grid_particles();
+  domain.generate_particles(0, N); // Unit sphere
+  // domain.generate_starsh_grid_particles();
   Hatrix::kernel_function = Hatrix::laplace_kernel;
   domain.divide_domain_and_create_particle_boxes(nleaf);
   const auto stop_particles = std::chrono::system_clock::now();
