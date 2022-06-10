@@ -1959,12 +1959,11 @@ void H2::solve_forward_level(Matrix& x_level, int64_t level) {
   for (int64_t block = 0; block < nblocks; ++block) {
     int64_t row_split = D(block, block, level).rows - U(block, level).cols;
     int64_t col_split = D(block, block, level).cols - V(block, level).cols;
-    assert(row_split == col_split); // Assume row bases rank = column bases rank
     auto block_splits = D(block, block, level).split(vec{row_split}, vec{col_split});
 
     Matrix x_block(x_level_split[block]);
+    assert(row_split == col_split); // Assume row bases rank = column bases rank
     auto x_block_splits = x_block.split(vec{row_split}, vec{});
-
     solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
     matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
     x_level_split[block] = x_block;
@@ -2016,7 +2015,6 @@ void H2::solve_backward_level(Matrix& x_level, int64_t level) {
   for (int64_t block = nblocks-1; block >= 0; --block) {
     int64_t row_split = D(block, block, level).rows - U(block, level).cols;
     int64_t col_split = D(block, block, level).cols - V(block, level).cols;
-    assert(row_split == col_split); // Assume row bases rank = column bases rank
 
     auto block_splits = D(block, block, level).split(vec{row_split}, vec{col_split});
     // Apply co block.
@@ -2050,6 +2048,7 @@ void H2::solve_backward_level(Matrix& x_level, int64_t level) {
     }
 
     Matrix x_block(x_level_split[block]);
+    assert(row_split == col_split); // Assume row bases rank = column bases rank
     auto x_block_splits = x_block.split(vec{col_split}, vec{});
     matmul(block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
     solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
