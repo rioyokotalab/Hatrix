@@ -129,19 +129,45 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
   assert(Q.rows == A.rows);
   assert(Q.cols == R.rows);
   assert(R.cols == A.cols);
+  assert(Q.cols <= A.rows); // Q is orthogonal bases of columns of A
 
   int64_t k = A.min_dim();
   std::vector<double> tau(k);
   LAPACKE_dgeqrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, tau.data());
-  // Copy upper triangular (or trapezoidal) part of A to R
+  // Copy upper triangular (or trapezoidal) part of A into R
   for (int64_t j = 0; j < R.cols; j++) {
     cblas_dcopy(std::min(j + 1, R.rows), &A(0, j), 1, &R(0, j), 1);
   }
-  // Copy lower triangular of A to Q
+  // Copy strictly lower triangular (or trapezoidal) part of A into Q
   for (int64_t j = 0; j < std::min(A.cols, Q.cols); j++) {
     cblas_dcopy(Q.rows - j, &A(j, j), 1, &Q(j, j), 1);
   }
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
+}
+
+void rq(Matrix& A, Matrix& R, Matrix& Q) {
+  // check dimensions
+  assert(R.rows == A.rows);
+  assert(R.cols == Q.rows);
+  assert(Q.cols == A.cols);
+  assert(Q.rows <= A.cols); // Q is orthogonal bases of rows of A
+
+  int64_t k = A.min_dim();
+  std::vector<double> tau(k);
+  LAPACKE_dgerqf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, tau.data());
+  // Copy upper triangular (or trapezoidal) part of A into R
+  for (int64_t i = 0; i < R.rows; i++) {
+    for (int64_t j = std::max(i + A.cols - A.rows, int64_t{0}); j < A.cols; j++) {
+      R(i, j + R.cols - A.cols) = A(i, j);
+    }
+  }
+  // Copy strictly lower triangular (or trapezoidal) part of A into Q
+  for (int64_t i = std::max(A.rows - A.cols, int64_t{0}); i < A.rows; i++) {
+    for (int64_t j = 0; j < (i + A.cols - A.rows); j++) {
+      Q(i + Q.rows - A.rows, j) = A(i, j);
+    }
+  }
+  LAPACKE_dorgrq(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
 }
 
 // TODO: complete this function  get rid of return warnings. Also return empty R. Needs dummy alloc now.
