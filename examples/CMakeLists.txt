@@ -42,6 +42,8 @@ else()
     UMV_H2_far_dense
     LDL_strong_1level
     LDL_strong_Nlevel
+    H2_fixed_acc_construct_svd
+    H2_fixed_acc_construct_qr
   )
 endif()
 

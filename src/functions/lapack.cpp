@@ -129,19 +129,45 @@ void qr(Matrix& A, Matrix& Q, Matrix& R) {
   assert(Q.rows == A.rows);
   assert(Q.cols == R.rows);
   assert(R.cols == A.cols);
+  assert(Q.cols <= A.rows); // Q is orthogonal bases of columns of A
 
   int64_t k = A.min_dim();
   std::vector<double> tau(k);
   LAPACKE_dgeqrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, tau.data());
-  // Copy upper triangular (or trapezoidal) part of A to R
+  // Copy upper triangular (or trapezoidal) part of A into R
   for (int64_t j = 0; j < R.cols; j++) {
     cblas_dcopy(std::min(j + 1, R.rows), &A(0, j), 1, &R(0, j), 1);
   }
-  // Copy lower triangular of A to Q
+  // Copy strictly lower triangular (or trapezoidal) part of A into Q
   for (int64_t j = 0; j < std::min(A.cols, Q.cols); j++) {
     cblas_dcopy(Q.rows - j, &A(j, j), 1, &Q(j, j), 1);
   }
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
+}
+
+void rq(Matrix& A, Matrix& R, Matrix& Q) {
+  // check dimensions
+  assert(R.rows == A.rows);
+  assert(R.cols == Q.rows);
+  assert(Q.cols == A.cols);
+  assert(Q.rows <= A.cols); // Q is orthogonal bases of rows of A
+
+  int64_t k = A.min_dim();
+  std::vector<double> tau(k);
+  LAPACKE_dgerqf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, tau.data());
+  // Copy upper triangular (or trapezoidal) part of A into R
+  for (int64_t i = 0; i < R.rows; i++) {
+    for (int64_t j = std::max(i + A.cols - A.rows, int64_t{0}); j < A.cols; j++) {
+      R(i, j + R.cols - A.cols) = A(i, j);
+    }
+  }
+  // Copy strictly lower triangular (or trapezoidal) part of A into Q
+  for (int64_t i = std::max(A.rows - A.cols, int64_t{0}); i < A.rows; i++) {
+    for (int64_t j = 0; j < (i + A.cols - A.rows); j++) {
+      Q(i + Q.rows - A.rows, j) = A(i, j);
+    }
+  }
+  LAPACKE_dorgrq(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
 }
 
 // TODO: complete this function  get rid of return warnings. Also return empty R. Needs dummy alloc now.
@@ -210,12 +236,15 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t ran
   return truncated_svd(Ac, rank);
 }
 
-std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error) {
+std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative) {
   Matrix U(A.rows, A.min_dim());
   Matrix S(A.min_dim(), A.min_dim());
   Matrix V(A.min_dim(), A.cols);
 
   svd(A, U, S, V);
+
+  double error = eps;
+  if(relative) error *= S(0, 0);
 
   int rank = 1;
   int irow = 1;
@@ -229,6 +258,124 @@ std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error) {
   V.shrink(rank, V.cols);
 
   return {std::move(U), std::move(S), std::move(V)};
+}
+
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative) {
+  // Pointer aliases
+  double* a = &A;
+  const int m = A.rows;
+  const int n = A.cols;
+  const int lda = A.stride;
+
+  // Initialize variables for pivoted QR
+  double error = eps;
+  if(relative) error *= norm(A);
+  const double tol = LAPACKE_dlamch('e');
+  const double tol3z = std::sqrt(tol);
+  const int min_dim = A.min_dim();
+  std::vector<double> tau(min_dim, 0);
+  std::vector<double> ipiv(n, 0);
+  std::vector<double> cnorm(n, 0);
+  std::vector<double> partial_cnorm(n, 0);
+  for(int j=0; j<n; j++) {
+    ipiv[j] = j;
+    cnorm[j] = cblas_dnrm2(m, a + j * lda, 1);
+    partial_cnorm[j] = cnorm[j];
+  }
+
+  // Begin pivoted QR
+  int r = 0;
+  double max_cnorm = *std::max_element(cnorm.begin(), cnorm.end());
+  //Handle zero matrix case
+  if(max_cnorm <= tol) {
+    Matrix Q(m, 1); Q(0,0) = 1.0;
+    Matrix R(1, n);
+    return {Q, R};
+  }
+  while((r < min_dim) && (max_cnorm > error)) {
+    // Select pivot column and swap
+    const int k = std::max_element(cnorm.begin() + r, cnorm.end()) - cnorm.begin();
+    cblas_dswap(m, a + r * lda, 1, a + k * lda, 1);
+    std::swap(cnorm[r], cnorm[k]);
+    std::swap(partial_cnorm[r], partial_cnorm[k]);
+    std::swap(ipiv[r], ipiv[k]);
+
+    // Generate householder reflector to annihilate A(r+1:m, r)
+    double *arr = a + r + (r * lda);
+    if(r < (m-1)) {
+      LAPACKE_dlarfg(m-r, arr, arr+1, 1, &tau[r]);
+    }
+    else {
+      LAPACKE_dlarfg(1, arr, arr, 1, &tau[r]);
+    }
+    
+    if(r < (min_dim-1)) {
+      // Apply reflector to A(r:m,r+1:n) from left
+      const double _arr = *arr;
+      *arr = 1.0;
+      // w = A(r:m, r+1:n)^T * v
+      std::vector<double> w(n-r-1, 0);
+      double *arj = a + r + (r+1) * lda;
+      cblas_dgemv(CblasColMajor, CblasTrans,
+                  m-r, n-r-1, 1, arj, lda, arr, 1, 0, &w[0], 1);
+      // A(r:m,r+1:n) = A(r:m,r+1:n) - tau * v * w^T
+      cblas_dger(CblasColMajor, m-r, n-r-1, -tau[r], arr, 1, &w[0], 1, arj, lda);
+      *arr = _arr;
+    }
+    // Update partial column norm
+    for(int j=r+1; j<n; j++) {
+      //See LAPACK Working Note 176 (Section 3.2.1) for detail
+      if(cnorm[j] != 0.0) {
+        double temp = std::fabs(A(r, j)/cnorm[j]);
+        temp = std::fmax(0.0, (1-temp)*(1+temp));
+        const double temp2 =
+            temp * (cnorm[j]/partial_cnorm[j]) * (cnorm[j]/partial_cnorm[j]);
+        if(temp2 > tol3z) {
+          cnorm[j] = cnorm[j] * std::sqrt(temp);
+        }
+        else {
+          if(r < (m-1)) {
+            cnorm[j] = cblas_dnrm2(m-r-1, a+(r+1)+j*lda, 1);
+            partial_cnorm[j] = cnorm[j];
+          }
+          else {
+            cnorm[j] = 0.0;
+            partial_cnorm[j] = 0.0;
+          }
+        }
+      }
+    }
+    r++;
+    max_cnorm = *std::max_element(cnorm.begin() + r, cnorm.end());
+  }
+  // Construct truncated Q
+  Matrix Q(m, r);
+  // Copy strictly lower triangular (or trapezoidal) part of A into Q
+  for(int i=0; i<Q.rows; i++) {
+    for(int j=0; j<std::min(i, r); j++) {
+      Q(i, j) = A(i, j);
+    }
+  }
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, r, &Q, Q.stride, &tau[0]);
+  // Construct truncated R
+  Matrix R(r, n);
+  // Copy first r rows of upper triangular part of A into R
+  for(int i=0; i<r; i++) {
+    for(int j=i; j<n; j++) {
+      R(i, j) = A(i, j);
+    }
+  }
+  // Permute columns of R
+  std::vector<int> ipivT(ipiv.size(), 0);
+  for(size_t i=0; i<ipiv.size(); i++) ipivT[ipiv[i]] = i;
+  Matrix RP(R);
+  for(int i=0; i<R.rows; i++) {
+    for(int j=0; j<R.cols; j++) {
+      RP(i, j) = R(i, ipivT[j]);
+    }
+  }
+  // Return truncated Q and permuted R
+  return {Q, RP};
 }
 
 double norm(const Matrix& A) {

@@ -31,6 +31,8 @@ void ldl(Matrix& A);
 
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
+void rq(Matrix& A, Matrix& R, Matrix& Q);
+
 // Compute the storage for Q and R automatically from mode and qr_ret values
 // and return Q and R matrices.
 std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret);
@@ -46,7 +48,11 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
                                                          int64_t rank);
 
 // Compute truncated SVD for given accuracy threshold.
-std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error);
+std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative=true);
+
+// Pivoted QR that stops as soon as the desired accuracy is reached
+// Modification of LAPACK's dgeqp3 routine
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative=true);
 
 double norm(const Matrix& A);
 
