@@ -46,6 +46,7 @@ else()
     H2_fixed_acc_construct_qr
     H2_fixed_acc_UMV_svd
     H2_fixed_acc_UMV_qr
+    H2_fixed_acc_LDL
   )
 endif()
 
