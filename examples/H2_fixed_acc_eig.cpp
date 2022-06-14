@@ -2190,7 +2190,8 @@ int main(int argc, char ** argv) {
   double eig_abs_err = std::abs(h2_mth_eigv - lapack_eigv[m - 1]);
   double eig_rel_err = eig_abs_err / lapack_eigv[m - 1];
 
-  std::cout << "ev_tol=" << ev_tol
+  std::cout << "m=" << m
+            << " ev_tol=" << ev_tol
             << " eig_time=" << eig_time
             << " factor_max_rank=" << factor_max_rank
             << std::setprecision(10)
