@@ -107,7 +107,8 @@ generate_random_blocks(const Hatrix::Domain& domain,
 
 static void
 generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
-                    const Hatrix::RowMap<Hatrix::Matrix>& rand, Hatrix::RowMap<Hatrix::Matrix>& product,
+                    const Hatrix::RowMap<Hatrix::Matrix>& rand,
+                    Hatrix::RowMap<Hatrix::Matrix>& product,
                     const Hatrix::Args& opts) {
   int64_t nblocks = pow(2, A.max_level);
 #ifdef ENABLE_DEBUG
@@ -207,6 +208,44 @@ generate_leaf_nodes(const Hatrix::Domain& domain, MPISymmSharedBasisMatrix& A,
   A.rank_map.insert(A.max_level, std::move(leaf_ranks));
 }
 
+static bool
+row_has_admissible_blocks(const MPISymmSharedBasisMatrix& A, int64_t row, int64_t level) {
+  bool has_admis = false;
+  for (int64_t i = 0; i < pow(2, level); ++i) {
+    if (!A.is_admissible.exists(row, i, level) ||
+        (A.is_admissible.exists(row, i, level) && A.is_admissible(row, i, level))) {
+      has_admis = true;
+      break;
+    }
+  }
+
+  return has_admis;
+}
+
+static std::vector<int64_t>
+get_leaves(const int64_t block,
+           const int64_t level,
+           const MPISymmSharedBasisMatrix& A) {
+  std::vector<int64_t> leaves;
+  if (level == A.max_level) {
+    leaves.push_back(block * 2);
+    leaves.push_back(block * 2 + 1);
+    return leaves;
+  }
+
+  auto c1 = get_leaves(block*2, level+1, A);
+  auto c2 = get_leaves(block*2 + 1, level+1, A);
+
+  c1.insert(c1.end(), c2.begin(), c2.end());
+
+  return c1;
+}
+
+static void
+reduce_randomized_matrices() {
+
+}
+
 static Hatrix::RowLevelMap
 generate_transfer_matrices(const int64_t level,
                           const Hatrix::RowLevelMap& Uchild,
@@ -218,9 +257,15 @@ generate_transfer_matrices(const int64_t level,
   Hatrix::RowLevelMap Ubig_parent;
 
   for (int64_t block = mpi_world.MPIRANK; block < nblocks; block += mpi_world.MPISIZE) {
-    int64_t c1 = block * 2;
-    int64_t c2 = block * 2 + 1;
     int64_t child_level = level + 1;
+    auto children = get_leaves(block, child_level, A);
+
+    if (row_has_admissible_blocks(A, block, level) && A.max_level != 1) {
+      // generate randomized blocks corresponding to the transfer matrices.
+      reduce_randomized_matrices();
+      // generate a sampling matrix from the leaf blocks
+      // perform distributed pivoted QR
+    }
   }
 
   return Ubig_parent;
