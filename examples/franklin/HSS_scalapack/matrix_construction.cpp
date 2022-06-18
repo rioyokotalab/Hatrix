@@ -68,8 +68,7 @@ static int64_t diagonal_admis_init(MPISymmSharedBasisMatrix& A,
     coarsen_blocks(A, level);
   }
 
-  diagonal_admis_init(A, opts, level-1);
-  return level;
+  return diagonal_admis_init(A, opts, level-1);
 }
 
 void init_diagonal_admis(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts) {
@@ -228,8 +227,8 @@ get_leaves(const int64_t block,
            const MPISymmSharedBasisMatrix& A) {
   std::vector<int64_t> leaves;
   if (level == A.max_level) {
-    leaves.push_back(block * 2);
-    leaves.push_back(block * 2 + 1);
+    leaves.push_back(block);
+    // leaves.push_back(block * 2 + 1);
     return leaves;
   }
 
@@ -242,8 +241,11 @@ get_leaves(const int64_t block,
 }
 
 static void
-reduce_randomized_matrices() {
-
+reduce_randomized_matrices(const std::vector<int64_t>& c1, const std::vector<int64_t>& c2) {
+  for (auto i : c1) {
+    std::cout << " " <<  i  << std::endl;
+  }
+  std::cout << std::endl;
 }
 
 static Hatrix::RowLevelMap
@@ -256,13 +258,17 @@ generate_transfer_matrices(const int64_t level,
   int64_t nblocks = pow(2, level);
   Hatrix::RowLevelMap Ubig_parent;
 
+  // std::cout << "B: " << level << std::endl;
+
   for (int64_t block = mpi_world.MPIRANK; block < nblocks; block += mpi_world.MPISIZE) {
     int64_t child_level = level + 1;
-    auto children = get_leaves(block, child_level, A);
+    auto c1 = get_leaves(block*2, child_level, A);
+    auto c2 = get_leaves(block*2+1, child_level, A);
+    std::cout << "B: " << block << std::endl;
 
     if (row_has_admissible_blocks(A, block, level) && A.max_level != 1) {
       // generate randomized blocks corresponding to the transfer matrices.
-      reduce_randomized_matrices();
+      reduce_randomized_matrices(c1, c2);
       // generate a sampling matrix from the leaf blocks
       // perform distributed pivoted QR
     }
@@ -299,7 +305,10 @@ void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain
 
   Hatrix::RowLevelMap Uchild = A.U;
 
+  std::cout << "startn " << A.max_level << " min: " << A.min_level << std::endl;;
+
   for (int64_t level = A.max_level-1; level > A.min_level; --level) {
+    std::cout << "startn\n";
     Uchild = generate_transfer_matrices(level, Uchild, A, rand, product, opts);
   }
 #ifdef ENABLE_DEBUG
