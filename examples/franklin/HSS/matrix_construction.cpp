@@ -63,8 +63,6 @@ void init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {
   A.max_level = int64_t(log2(opts.N / opts.nleaf));
   A.min_level = diagonal_admis_init(A, opts, A.max_level);
   A.is_admissible.insert(0, 0, 0, false);
-
-  std::cout << "max: " << A.max_level << " min: " << A.min_level << std::endl;
 }
 
 void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {

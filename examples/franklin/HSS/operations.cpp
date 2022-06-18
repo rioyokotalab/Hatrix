@@ -3,9 +3,57 @@
 #include "SymmetricSharedBasisMatrix.hpp"
 #include "operations.hpp"
 
+#define SPLIT_DENSE(dense, row_split, col_split)        \
+  dense.split(std::vector<int64_t>(1, row_split),       \
+              std::vector<int64_t>(1, col_split));
+
 using namespace Hatrix;
 
+static Matrix
+make_complement(const Matrix& Q) {
+  Hatrix::Matrix Q_F(Q.rows, Q.rows);
+  Hatrix::Matrix Q_full, R;
+  std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+
+  for (int64_t i = 0; i < Q_F.rows; ++i) {
+    for (int64_t j = 0; j < Q_F.cols - Q.cols; ++j) {
+      Q_F(i, j) = Q_full(i, j + Q.cols);
+    }
+  }
+
+  for (int64_t i = 0; i < Q_F.rows; ++i) {
+    for (int64_t j = 0; j < Q.cols; ++j) {
+      Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+    }
+  }
+  return Q_F;
+}
+
+static void
+factorize_level(const int64_t level,
+                const int64_t nblocks,
+                SymmetricSharedBasisMatrix& A) {
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t block_rank = A.ranks(block, level);
+    int64_t block_size = A.D(block, block, level).rows;
+    Matrix U_F = make_complement(A.U(block, level));
+
+    A.D(block, block, level) = matmul((matmul(U_F, A.D(block, block, level), true, false)),
+                                    U_F);
+    int64_t split_size = block_size - block_rank;
+
+    auto D_splits = SPLIT_DENSE(A.D(block, block, level), split_size, split_size);
+    Matrix& Dcc = D_splits[0];
+    lu(Dcc);
+  }
+}
+
 void factorize(SymmetricSharedBasisMatrix& A) {
+  for (int64_t level = A.max_level; level > A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
+
+    factorize_level(level, nblocks, A);
+  }
 }
 
 Matrix
