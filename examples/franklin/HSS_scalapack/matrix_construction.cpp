@@ -268,8 +268,6 @@ generate_transfer_matrices(const Hatrix::Domain& domain,
   int64_t nblocks = pow(2, level);
   Hatrix::RowLevelMap Ubig_parent;
 
-  // std::cout << "B: " << level << std::endl;
-
   for (int64_t block = mpi_world.MPIRANK; block < nblocks; block += mpi_world.MPISIZE) {
     int64_t child_level = level + 1;
     auto c1 = get_leaves(block*2, child_level, A);

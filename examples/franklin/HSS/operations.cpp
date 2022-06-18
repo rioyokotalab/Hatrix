@@ -6,7 +6,6 @@
 using namespace Hatrix;
 
 void factorize(SymmetricSharedBasisMatrix& A) {
-
 }
 
 Matrix
@@ -18,18 +17,18 @@ solve(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
 Matrix
 matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
-  int leaf_nblocks = A.level_blocks[A.height];
+  int leaf_nblocks = pow(2, A.max_level);
   std::vector<Matrix> x_hat;
   auto x_splits = x.split(leaf_nblocks, 1);
 
   // V leaf nodes
   for (int i = 0; i < leaf_nblocks; ++i) {
-    x_hat.push_back(matmul(A.U(i, A.height), x_splits[i], true, false, 1.0));
+    x_hat.push_back(matmul(A.U(i, A.max_level), x_splits[i], true, false, 1.0));
   }
 
   int x_hat_offset = 0;
-  for (int64_t level = A.height - 1; level > 0; --level) {
-    int64_t nblocks = A.level_blocks[level];
+  for (int64_t level = A.max_level - 1; level > 0; --level) {
+    int64_t nblocks = pow(2, level);
     int64_t child_level = level + 1;
     for (int64_t i = 0; i < nblocks; ++i) {
       int64_t c1 = i * 2;
@@ -44,7 +43,7 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
       x_hat.push_back(matmul(A.U(i, level), xtemp, true, false, 1.0));
     }
 
-    x_hat_offset += A.level_blocks[level+1];
+    x_hat_offset += pow(2, child_level);
   }
   int64_t level = 1;
 
@@ -58,10 +57,10 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   b_hat.push_back(b1_2);
   int b_hat_offset = 0;
 
-  for (int64_t level = 1; level < A.height; ++level) {
-    int64_t nblocks = A.level_blocks[level];
+  for (int64_t level = 1; level < A.max_level; ++level) {
+    int64_t nblocks = pow(2, level);
     int64_t child_level = level + 1;
-    x_hat_offset -= A.level_blocks[child_level];
+    x_hat_offset -= pow(2, child_level);
 
     for (int64_t row = 0; row < nblocks; ++row) {
       int c_r1 = row * 2, c_r2 = row * 2 + 1;
@@ -81,15 +80,15 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
                               x_hat[x_hat_offset + c_r1]);
       b_hat.push_back(b_r2_cl + Ub_splits[1]);
     }
-    b_hat_offset += A.level_blocks[level];
+    b_hat_offset += nblocks;
   }
 
 
   Matrix b(x.rows, 1);
   auto b_splits = b.split(leaf_nblocks, 1);
   for (int i = 0; i < leaf_nblocks; ++i) {
-    Matrix temp = matmul(A.U(i, A.height), b_hat[b_hat_offset + i]) +
-      matmul(A.D(i, i, A.height), x_splits[i]);
+    Matrix temp = matmul(A.U(i, A.max_level), b_hat[b_hat_offset + i]) +
+      matmul(A.D(i, i, A.max_level), x_splits[i]);
     b_splits[i] = temp;
   }
 

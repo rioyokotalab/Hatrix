@@ -42,11 +42,10 @@ static void coarsen_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
   }
 }
 
-static void diagonal_admis_init(SymmetricSharedBasisMatrix& A, const Args& opts, int64_t level) {
+static int64_t diagonal_admis_init(SymmetricSharedBasisMatrix& A, const Args& opts, int64_t level) {
   int64_t nblocks = pow(2, level); // pow since we are using diagonal based admis.
-  A.level_blocks.push_back(nblocks);
-  if (level == 0) { return; }
-  if (level == A.height) {
+  if (level == 0) { return 0; }
+  if (level == A.max_level) {
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j <= i; ++j) {
         A.is_admissible.insert(i, j, level, std::abs(i - j) > opts.admis);
@@ -57,14 +56,15 @@ static void diagonal_admis_init(SymmetricSharedBasisMatrix& A, const Args& opts,
     coarsen_blocks(A, level);
   }
 
-  diagonal_admis_init(A, opts, level-1);
+  return diagonal_admis_init(A, opts, level-1);
 }
 
 void init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {
-  A.height = int64_t(log2(opts.N / opts.nleaf));
-  diagonal_admis_init(A, opts, A.height);
-  std::reverse(std::begin(A.level_blocks), std::end(A.level_blocks));
+  A.max_level = int64_t(log2(opts.N / opts.nleaf));
+  A.min_level = diagonal_admis_init(A, opts, A.max_level);
   A.is_admissible.insert(0, 0, 0, false);
+
+  std::cout << "max: " << A.max_level << " min: " << A.min_level << std::endl;
 }
 
 void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {
@@ -77,7 +77,7 @@ generate_column_block(int64_t block, int64_t block_size,
                       const SymmetricSharedBasisMatrix& A,
                       const Matrix& dense,
                       const Matrix& rand) {
-  int64_t nblocks = A.level_blocks[level];
+  int64_t nblocks = pow(2, level);
   auto dense_splits = dense.split(nblocks, nblocks);
   auto rand_splits = rand.split(nblocks, 1);
   Matrix AY(block_size, rand.cols);
@@ -121,26 +121,26 @@ generate_leaf_nodes(const Domain& domain,
                     const Matrix& dense,
                     const Matrix& rand,
                     const Args& opts) {
-  int64_t nblocks = A.level_blocks[A.height];
+  int64_t nblocks = pow(2, A.max_level);
   auto dense_splits = dense.split(nblocks, nblocks);
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
-      if (A.is_admissible.exists(i, j, A.height) &&
-          !A.is_admissible(i, j, A.height)) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
         // TODO: Make this only a lower triangular matrix with the diagonal.
         Matrix Aij(dense_splits[i * nblocks + j], true);
-        A.D.insert(i, j, A.height, std::move(Aij));
+        A.D.insert(i, j, A.max_level, std::move(Aij));
       }
     }
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
     A.U.insert(i,
-               A.height,
+               A.max_level,
                generate_column_bases(i,
                                      domain.boxes[i].num_particles,
-                                     A.height,
+                                     A.max_level,
                                      A,
                                      dense,
                                      rand,
@@ -149,12 +149,12 @@ generate_leaf_nodes(const Domain& domain,
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, A.height) &&
-          A.is_admissible(i, j, A.height)) {
-        Matrix Sblock = matmul(matmul(A.U(i, A.height),
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          A.is_admissible(i, j, A.max_level)) {
+        Matrix Sblock = matmul(matmul(A.U(i, A.max_level),
                                       dense_splits[i * nblocks + j], true, false),
-                               A.U(j, A.height));
-        A.S.insert(i, j, A.height, std::move(Sblock));
+                               A.U(j, A.max_level));
+        A.S.insert(i, j, A.max_level, std::move(Sblock));
       }
     }
   }
@@ -204,7 +204,8 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
 static bool
 row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row, int64_t level) {
   bool has_admis = false;
-  for (int64_t i = 0; i < A.level_blocks[level]; ++i) {
+
+  for (int64_t i = 0; i < pow(2, level); ++i) {
     if (!A.is_admissible.exists(row, i, level) ||
         (A.is_admissible.exists(row, i, level) && A.is_admissible(row, i, level))) {
       has_admis = true;
@@ -223,7 +224,7 @@ generate_transfer_matrices(const int64_t level,
                            const Matrix& dense,
                            const Matrix& rand,
                            const Args& opts) {
-  int64_t nblocks = A.level_blocks[level];
+  int64_t nblocks = pow(2, level);
   auto dense_splits = dense.split(nblocks, nblocks);
 
   RowLevelMap Ubig_parent;
@@ -232,7 +233,7 @@ generate_transfer_matrices(const int64_t level,
     int64_t c2 = node * 2 + 1;
     int64_t child_level = level + 1;
 
-    if (row_has_admissible_blocks(A, node, level) && A.height != 1) {
+    if (row_has_admissible_blocks(A, node, level) && A.max_level != 1) {
       const Matrix& Ubig_c1 = Uchild(c1, child_level);
       const Matrix& Ubig_c2 = Uchild(c2, child_level);
       int64_t block_size = Ubig_c1.rows + Ubig_c2.rows;
@@ -287,7 +288,7 @@ void construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A,
 
   RowLevelMap Uchild = A.U;
 
-  for (int64_t level = A.height-1; level > 0; --level) {
+  for (int64_t level = A.max_level-1; level > 0; --level) {
     Uchild = generate_transfer_matrices(level, Uchild, A, dense, rand, opts);
   }
 }
@@ -295,11 +296,11 @@ void construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A,
 static void
 actually_print_h2_structure(const SymmetricSharedBasisMatrix& A, const int64_t level) {
   if (level == 0) { return; }
-  int64_t nblocks = A.level_blocks[level];
+  int64_t nblocks = pow(2, level);
   std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
   for (int64_t i = 0; i < nblocks; ++i) {
-    if (level == A.height) {
-      std::cout << A.U(i, A.height).rows << " ";
+    if (level == A.max_level) {
+      std::cout << A.U(i, A.max_level).rows << " ";
     }
     std::cout << "| " ;
     for (int64_t j = 0; j < nblocks; ++j) {
@@ -319,7 +320,7 @@ actually_print_h2_structure(const SymmetricSharedBasisMatrix& A, const int64_t l
 }
 
 void print_h2_structure(const SymmetricSharedBasisMatrix& A) {
-  actually_print_h2_structure(A, A.height);
+  actually_print_h2_structure(A, A.max_level);
 }
 
 double
@@ -329,21 +330,21 @@ reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
                      const Args& opts) {
   double error = 0;
   double dense_norm = 0;
-  int64_t nblocks = A.level_blocks[A.height];
+  int64_t nblocks = pow(2, A.max_level);
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
-      if (A.is_admissible.exists(i, j, A.height) && !A.is_admissible(i, j, A.height)) {
+      if (A.is_admissible.exists(i, j, A.max_level) && !A.is_admissible(i, j, A.max_level)) {
         Matrix actual = generate_p2p_interactions(domain, i, j, opts.kernel);
-        Matrix expected = A.D(i, j, A.height);
+        Matrix expected = A.D(i, j, A.max_level);
         error += pow(norm(actual - expected), 2);
         dense_norm += pow(norm(actual), 2);
       }
     }
   }
 
-  for (int64_t level = A.height; level > 0; --level) {
-    int64_t nblocks = A.level_blocks[level];
+  for (int64_t level = A.max_level; level > A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
 
     for (int64_t row = 0; row < nblocks; ++row) {
       for (int64_t col = 0; col < row; ++col) {
@@ -355,7 +356,7 @@ reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
                                           Vbig, false, true);
           Matrix actual_matrix =
             Hatrix::generate_p2p_interactions(domain, row, col, level,
-                                              A.height, opts.kernel);
+                                              A.max_level, opts.kernel);
 
           dense_norm += pow(norm(actual_matrix), 2);
           error += pow(norm(expected_matrix - actual_matrix), 2);

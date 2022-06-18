@@ -6,7 +6,7 @@ using namespace Hatrix;
 
 Matrix
 SymmetricSharedBasisMatrix::Ubig(int64_t node, int64_t level) const {
-  if (level == height) {
+  if (level == max_level) {
     return U(node, level);
   }
 
