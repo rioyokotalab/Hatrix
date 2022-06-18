@@ -5,7 +5,19 @@
 
 using namespace Hatrix;
 
-Matrix matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
+void factorize(SymmetricSharedBasisMatrix& A) {
+
+}
+
+Matrix
+solve(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
+  Matrix b(x);
+
+  return b;
+}
+
+Matrix
+matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   int leaf_nblocks = A.level_blocks[A.height];
   std::vector<Matrix> x_hat;
   auto x_splits = x.split(leaf_nblocks, 1);
