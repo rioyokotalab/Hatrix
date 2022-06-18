@@ -31,8 +31,8 @@ make_complement(const Matrix& Q) {
 
 static void
 factorize_level(const int64_t level,
-                const int64_t nblocks,
                 SymmetricSharedBasisMatrix& A) {
+  int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
     int64_t block_rank = A.ranks(block, level);
     int64_t block_size = A.D(block, block, level).rows;
@@ -44,15 +44,20 @@ factorize_level(const int64_t level,
 
     auto D_splits = SPLIT_DENSE(A.D(block, block, level), split_size, split_size);
     Matrix& Dcc = D_splits[0];
+    Matrix& Dco = D_splits[1];
+    Matrix& Doc = D_splits[2];
+    Matrix& Doo = D_splits[3];
+
     lu(Dcc);
+    solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true);
+    solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false);
+    matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
   }
 }
 
 void factorize(SymmetricSharedBasisMatrix& A) {
   for (int64_t level = A.max_level; level > A.min_level; --level) {
-    int64_t nblocks = pow(2, level);
-
-    factorize_level(level, nblocks, A);
+    factorize_level(level, A);
   }
 }
 
