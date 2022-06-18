@@ -241,15 +241,25 @@ get_leaves(const int64_t block,
 }
 
 static void
-reduce_randomized_matrices(const std::vector<int64_t>& c1, const std::vector<int64_t>& c2) {
-  for (auto i : c1) {
-    std::cout << " " <<  i  << std::endl;
+reduce_randomized_matrices(const std::vector<int64_t>& c1,
+                           const std::vector<int64_t>& c2,
+                           const Hatrix::Domain& domain,
+                           const MPISymmSharedBasisMatrix& A,
+                           const Hatrix::RowMap<Hatrix::Matrix>& rand,
+                           const Hatrix::RowMap<Hatrix::Matrix>& product,
+                           const Hatrix::Args& opts) {
+  for (auto c1_i : c1) {
+    for (auto c2_j : c2) {
+      if (A.rank_1d(c1_i) == mpi_world.MPIRANK) {
+        Hatrix::Matrix A_c1c2 = generate_p2p_interactions(domain, c1_i, c2_j, opts.kernel);
+      }
+    }
   }
-  std::cout << std::endl;
 }
 
 static Hatrix::RowLevelMap
-generate_transfer_matrices(const int64_t level,
+generate_transfer_matrices(const Hatrix::Domain& domain,
+                           const int64_t level,
                           const Hatrix::RowLevelMap& Uchild,
                           MPISymmSharedBasisMatrix& A,
                           const Hatrix::RowMap<Hatrix::Matrix>& rand,
@@ -268,7 +278,7 @@ generate_transfer_matrices(const int64_t level,
 
     if (row_has_admissible_blocks(A, block, level) && A.max_level != 1) {
       // generate randomized blocks corresponding to the transfer matrices.
-      reduce_randomized_matrices(c1, c2);
+      reduce_randomized_matrices(c1, c2, domain, A, rand, product, opts);
       // generate a sampling matrix from the leaf blocks
       // perform distributed pivoted QR
     }
@@ -309,7 +319,7 @@ void construct_h2_miro(MPISymmSharedBasisMatrix& A, const Hatrix::Domain& domain
 
   for (int64_t level = A.max_level-1; level > A.min_level; --level) {
     std::cout << "startn\n";
-    Uchild = generate_transfer_matrices(level, Uchild, A, rand, product, opts);
+    Uchild = generate_transfer_matrices(domain, level, Uchild, A, rand, product, opts);
   }
 #ifdef ENABLE_DEBUG
   std::cerr << "construct_h2_miro() ->" << timestamp() << ": finish construct_h2_miro.\n";
