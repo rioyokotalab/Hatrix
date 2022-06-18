@@ -58,6 +58,42 @@ factorize_level(const int64_t level,
 void factorize(SymmetricSharedBasisMatrix& A) {
   for (int64_t level = A.max_level; level > A.min_level; --level) {
     factorize_level(level, A);
+
+    int64_t parent_level = level-1;
+    int64_t parent_nblocks = pow(2, parent_level);
+    for (int64_t i = 0; i < parent_nblocks; ++i) {
+      int64_t nrows = 0, row_split = A.ranks(i * 2, level);
+      for (int64_t ic1 = 0; ic1 < 2; ++ic1) { nrows += A.ranks(i * 2 + ic1, level); }
+
+      for (int64_t j = 0; j < parent_nblocks; ++j) {
+        int64_t ncols = 0, col_split = A.ranks(j * 2, level);
+        for (int64_t jc2 = 0; jc2 < 2; ++jc2) { ncols += A.ranks(j * 2 + jc2, level); }
+
+        if (A.is_admissible.exists(i, j, parent_level) &&
+            !A.is_admissible(i, j, parent_level)) {
+          Matrix D_unelim(nrows, ncols);
+          auto D_unelim_splits = SPLIT_DENSE(D_unelim, row_split, col_split);
+
+          std::cout << "nr: " << nrows << " nc: " << ncols << std::endl;
+          for (int64_t ic1 = 0; ic1 < 2; ++ic1) {
+            for (int64_t jc2 = 0; jc2 < 2; ++jc2) {
+              int64_t c1 = i * 2 + ic1, c2 = j * 2 + jc2;
+              if (!A.U.exists(c1, level)) { continue; }
+
+              if (A.is_admissible.exists(c1, c2, level) && !A.is_admissible(c1, c2, level)) {
+                auto D_splits = SPLIT_DENSE(A.D(c1, c2, level),
+                                            A.D(c1, c2, level).rows - A.ranks(c1, level),
+                                            A.D(c1, c2, level).cols - A.ranks(c2, level));
+                D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
+              }
+              else {
+                D_unelim_splits[ic1 * 2 + jc2] = A.S(c1, c2, level);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 

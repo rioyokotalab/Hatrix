@@ -20,7 +20,7 @@ export TMPDIR=/tmp
                --kind_of_geometry circular \
                --ndim 1 \
                --max_rank 100 \
-               --accuracy 1e-11 \
+               --accuracy 1e-5 \
                --admis 0 \
                --admis_kind diagonal \
                --construct_algorithm miro \
