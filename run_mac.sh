@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make HSS_scalapack
+make HSS_main
 export TMPDIR=/tmp
 
 # for N in 8192; do
@@ -13,17 +13,17 @@ export TMPDIR=/tmp
 #     done
 # done
 
-for nprocs in 1; do
-    mpirun -n $nprocs ./bin/HSS_scalapack --N 8192 \
-           --nleaf 512 \
-           --kernel_func laplace \
-           --kind_of_geometry circular \
-           --ndim 1 \
-           --max_rank 100 \
-           --accuracy 1e-11 \
-           --admis 0 \
-           --admis_kind diagonal \
-           --construct_algorithm miro \
-           --add_diag 1e-5 \
-           --use_nested_basis
-done
+# for nprocs in 1; do
+./bin/HSS_main --N 8192 \
+               --nleaf 512 \
+               --kernel_func laplace \
+               --kind_of_geometry circular \
+               --ndim 1 \
+               --max_rank 200 \
+               --accuracy 1e-11 \
+               --admis 0 \
+               --admis_kind diagonal \
+               --construct_algorithm miro \
+               --add_diag 1e-5 \
+               --use_nested_basis
+# done

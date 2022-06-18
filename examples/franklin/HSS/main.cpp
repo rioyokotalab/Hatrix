@@ -44,7 +44,6 @@ int main(int argc, char* argv[]) {
 
   double construct_time;
 
-
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
     SymmetricSharedBasisMatrix A;
@@ -70,7 +69,8 @@ int main(int argc, char* argv[]) {
   std::cout << "-------------------------------\n";
   std::cout << "N               : " << opts.N << std::endl;
   std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-  std::cout << "MAX RANK        : " << opts.max_rank << std::endl;
+  std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+  std::cout << "REAL MAX RANK   : " << A.max_rank() << std::endl;
   std::cout << "NLEAF           : " << opts.nleaf << "\n"
             << "Domain(ms)      : " << domain_time << "\n"
             << "Contruct(ms)    : " << construct_time << "\n"

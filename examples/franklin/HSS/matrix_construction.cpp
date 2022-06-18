@@ -280,7 +280,7 @@ generate_transfer_matrices(const int64_t level,
 void construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A,
                               const Domain& domain,
                               const Args& opts) {
-  int64_t P = 100;
+  int64_t P = opts.max_rank;
   Matrix dense = generate_p2p_matrix(domain, opts.kernel);
   Matrix rand = generate_random_matrix(opts.N, P);
   generate_leaf_nodes(domain, A, dense, rand, opts);
