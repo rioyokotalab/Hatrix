@@ -36,6 +36,8 @@ std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t ran
 std::tuple<Matrix, std::vector<int64_t>, int64_t> error_pivoted_qr(const Matrix& A,
                                                                    double error,
                                                                    int64_t max_rank=-1);
+void rq(Matrix& A, Matrix& R, Matrix& Q);
+
 // Compute the storage for Q and R automatically from mode and qr_ret values
 // and return Q and R matrices.
 std::tuple<Matrix, Matrix> qr(const Matrix& A,
@@ -54,7 +56,11 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
                                                          int64_t rank);
 
 // Compute truncated SVD for given accuracy threshold.
-std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double error);
+std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative=true);
+
+// Pivoted QR that stops as soon as the desired accuracy is reached
+// Modification of LAPACK's dgeqp3 routine
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative=true);
 
 double norm(const Matrix& A);
 

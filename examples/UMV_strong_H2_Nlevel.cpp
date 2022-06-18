@@ -81,7 +81,7 @@ namespace Hatrix {
     generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int node,
                                int block_size, const randvec_t& randpts, int level);
     void factorize_level(int level, int nblocks, const randvec_t& randpts,
-                         RowMap& r, RowMap& t);
+                         RowMap<Hatrix::Matrix>& r, RowMap<Hatrix::Matrix>& t);
 
   public:
     H2(const randvec_t& randpts, int64_t _N, int64_t _rank, int64_t _height,
@@ -615,7 +615,7 @@ namespace Hatrix {
   }
 
   void H2::factorize_level(int level, int nblocks, const randvec_t& randpts,
-                           RowMap& r, RowMap& t) {
+                           RowMap<Hatrix::Matrix>& r, RowMap<Hatrix::Matrix>& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
 
     for (int block = 0; block < nblocks; ++block) {
@@ -916,7 +916,7 @@ namespace Hatrix {
     // For verification of A1 matrix.
     int64_t level = height;
     RowColLevelMap<Matrix> F;
-    RowMap r, t;
+    RowMap<Hatrix::Matrix> r, t;
 
     for (; level > 0; --level) {
       int num_nodes = pow(2, level);

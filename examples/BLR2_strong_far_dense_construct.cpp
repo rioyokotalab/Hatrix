@@ -303,8 +303,8 @@ namespace Hatrix {
     std::vector<std::vector<int64_t> > inadmissible_row_indices, admissible_row_indices;
     std::vector<std::vector<int64_t> > inadmissible_col_indices, admissible_col_indices;
 
-    RowMap U;
-    ColMap V;
+    RowMap<Hatrix::Matrix> U;
+    ColMap<Hatrix::Matrix> V;
     RowColMap<Matrix> S;
 
     int64_t N, nleaf, rank, ndim, nblocks;

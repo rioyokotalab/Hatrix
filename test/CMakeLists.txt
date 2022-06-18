@@ -20,6 +20,7 @@ else()
     lu
     ldl
     qr
+    rq
     svd
     norms
     scale

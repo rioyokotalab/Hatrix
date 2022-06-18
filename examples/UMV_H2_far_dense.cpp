@@ -173,10 +173,10 @@ namespace Hatrix {
     int64_t get_block_size_row(const Domain& domain, int64_t i, int64_t level);
     int64_t get_block_size_col(const Domain& domain, int64_t parent, int64_t level);
     void factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
-                         RowMap& r, RowMap& t);
+                         RowMap<Hatrix::Matrix>& r, RowMap<Hatrix::Matrix>& t);
     int64_t find_all_dense_row();
-    void update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r);
-    void update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap& t);
+    void update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& r);
+    void update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& t);
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind, int64_t matrix_type);
@@ -739,7 +739,7 @@ namespace Hatrix {
   }
 
 
-  void H2::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r) {
+  void H2::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& r) {
     int64_t nblocks = level_blocks[level];
     int64_t block_size = D(row, row, level).rows;
     Matrix row_block(block_size, 0);
@@ -771,7 +771,7 @@ namespace Hatrix {
     r.insert(row, std::move(r_row));
   }
 
-  void H2::update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap& t) {
+  void H2::update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& t) {
     int64_t block_size = D(col, col, level).rows;
     int64_t nblocks = level_blocks[level];
     Matrix col_block(0, block_size);
@@ -804,7 +804,7 @@ namespace Hatrix {
   }
 
   void H2::factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
-                           RowMap& r, RowMap& t) {
+                           RowMap<Hatrix::Matrix>& r, RowMap<Hatrix::Matrix>& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
 
     #pragma omp parallel for
@@ -1162,7 +1162,7 @@ namespace Hatrix {
   H2::factorize(const Domain& domain) {
     int64_t level = height;
     RowColLevelMap<Matrix> F;
-    RowMap r, t;
+    RowMap<Hatrix::Matrix> r, t;
 
     // int64_t A1_nblocks = level_blocks[1];
     // int64_t A1_perm_nblocks = A1_nblocks * 2;
@@ -2967,6 +2967,8 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::init();
 
+  auto start_particles = std::chrono::system_clock::now();
+
   Hatrix::Domain domain(N, ndim);
 
   switch(kernel_func) {
@@ -2994,6 +2996,9 @@ int main(int argc, char ** argv) {
   }
 
   domain.divide_domain_and_create_particle_boxes(nleaf);
+  auto stop_particles = std::chrono::system_clock::now();
+  double particle_construct_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_particles - start_particles).count();
 
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(domain, N, rank, nleaf, admis, admis_kind, matrix_type);
@@ -3085,6 +3090,7 @@ int main(int argc, char ** argv) {
             << " factor time= " << factor_time
             << " solve time= " << solve_time
             << " construct time = " << construct_time
+            << " particle time = " << particle_construct_time
             << std::endl;
 
   std::ofstream file;
@@ -3119,6 +3125,7 @@ int main(int argc, char ** argv) {
        << "," << beta
        << "," << nu
        << "," << sigma
+       << "," << particle_construct_time
        << std::endl;
 
   file.close();

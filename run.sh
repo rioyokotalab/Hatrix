@@ -1,28 +1,26 @@
 #!/bin/bash
 #YBATCH -r epyc-7502_8
 #SBATCH -N 1
-#SBATCH -J HSS
+#SBATCH -J GPROF
 #SBATCH --time=72:00:00
 
 source /etc/profile.d/modules.sh
 module load cmake lapack/3.9.0 openmpi/4.0.5 gcc/7.5
 
-# valgrind warnings https://stackoverflow.com/questions/36197527/insight-as-to-why-valgrind-shows-memory-leak-for-intels-mkl-lapacke
-# export MKL_DISABLE_FAST_MM=1
-# source ~/.bashrc
-# make clean#
-# export OMP_NUM_THREADS=1
-# export MKL_NUM_THREADS=1
-make -j HSS_main
+rm -rf build
+mkdir build
+cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=$PWD -DCMAKE_BUILD_TYPE=Debug \
+      -DCMAKE_CXX_FLAGS=-pg -DCMAKE_EXE_LINKER_FLAGS=-pg -DCMAKE_SHARED_LINKER_FLAGS=-pg
+make -j all
 
-echo "CONSTANT ACCURACY CONSTRUCTION"
-for data in "1024 1e-5"; do
-    set -- $data
-    ./bin/HSS_main --N $1 --nleaf 128 --kernel-func laplace --add-diag $2 \
-                   --acc 1e-9 --nested-basis 1 --construct-algorithm id_random \
-                   --kind-of-geometry circular
-
-    # ./bin/HSS_main --N $1 --nleaf 128 --kernel-func laplace --add-diag $2 \
-    #                --acc 1e-9 --nested-basis 1 --construct-algorithm miro \
-    #                --kind-of-geometry circular
+# 32768
+for N in 16384; do
+    for matrix_type in 1; do
+        for admis in 1000; do
+            for rank in 20; do
+                ./examples/UMV_H2_far_dense $N $rank 128 $admis 3 geometry_admis 0 $matrix_type
+            done
+        done
+    done
 done

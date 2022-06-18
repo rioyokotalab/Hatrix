@@ -7,6 +7,8 @@
 
 class QRTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>> {};
+class TruncatedPivotedQRTests
+    : public testing::TestWithParam<std::tuple<int64_t, int64_t, double>> {};
 class HouseholderQRCompactWYTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {};
 class ApplyBlockReflectorTests
@@ -41,6 +43,62 @@ TEST_P(QRTests, qr) {
     }
   }
 
+  Hatrix::Context::finalize();
+}
+
+TEST_P(TruncatedPivotedQRTests, ThresholdBasedTruncation) {
+  Hatrix::Context::init();
+  int64_t m, n;
+  double eps;
+  std::tie(m, n, eps) = GetParam();
+  
+  // Construct rank deficient matrix
+  const Hatrix::Matrix D = Hatrix::generate_low_rank_matrix(m, n);
+  Hatrix::Matrix A(D);
+  Hatrix::Matrix Q, RP;
+  std::tie(Q, RP) = truncated_pivoted_qr(A, eps);
+
+  // Check dimensions
+  EXPECT_EQ(Q.rows, D.rows);
+  EXPECT_EQ(Q.cols, RP.rows);
+  EXPECT_EQ(RP.cols, D.cols);
+  
+  // Check compression error
+  const double error = Hatrix::norm(D - Hatrix::matmul(Q, RP));
+  EXPECT_NEAR(error, eps, 10*eps);
+  Hatrix::Context::finalize();
+}
+
+TEST_P(TruncatedPivotedQRTests, ZeroMatrixHandler) {
+  Hatrix::Context::init();
+  int64_t m, n;
+  double eps;
+  std::tie(m, n, eps) = GetParam();
+  
+  // Construct m x n zero matrix
+  const Hatrix::Matrix D(m, n);
+  Hatrix::Matrix A(D);
+  Hatrix::Matrix Q, RP;
+  std::tie(Q, RP) = truncated_pivoted_qr(A, eps);
+  
+  // Check dimensions
+  EXPECT_EQ(Q.rows, D.rows);
+  EXPECT_EQ(Q.cols, RP.rows);
+  EXPECT_EQ(RP.cols, D.cols);
+  // Ensure rank 1 zero matrix
+  constexpr double EPS = std::numeric_limits<double>::epsilon();
+  EXPECT_EQ(Q.cols, 1);
+  for(int64_t i = 0; i < Q.rows; i++) {
+    if(i == 0) {
+      EXPECT_NEAR(Q(i, 0), 1.0, EPS);
+    }
+    else {
+      EXPECT_NEAR(Q(i, 0), 0.0, EPS);
+    }
+  }
+  for(int64_t j = 0; j < RP.cols; j++) {
+    EXPECT_NEAR(RP(0, j), 0.0, EPS);
+  }
   Hatrix::Context::finalize();
 }
 
@@ -138,6 +196,17 @@ INSTANTIATE_TEST_SUITE_P(LAPACK, QRTests,
                                          std::make_tuple(16, 8, 16),
                                          std::make_tuple(16, 8, 8),
                                          std::make_tuple(8, 16, 8)));
+
+INSTANTIATE_TEST_SUITE_P(LAPACK, TruncatedPivotedQRTests,
+                         testing::Values(std::make_tuple(32, 32, 1e-6),
+                                         std::make_tuple(32, 24, 1e-6),
+                                         std::make_tuple(24, 32, 1e-6),
+                                         std::make_tuple(32, 32, 1e-8),
+                                         std::make_tuple(32, 24, 1e-8),
+                                         std::make_tuple(24, 32, 1e-8),
+                                         std::make_tuple(32, 32, 1e-10),
+                                         std::make_tuple(32, 24, 1e-10),
+                                         std::make_tuple(24, 32, 1e-10)));
 
 INSTANTIATE_TEST_SUITE_P(LAPACK, HouseholderQRCompactWYTests,
                          testing::Values(std::make_tuple(16, 16),

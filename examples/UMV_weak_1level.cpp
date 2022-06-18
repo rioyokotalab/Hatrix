@@ -44,7 +44,7 @@ namespace Hatrix { namespace UMV {
     // Maps of the vector blocks. bc for upper part of the vector
     // and bo for lower part.
     int N, block_size, nblocks, rank;
-    RowMap c, o;
+    RowMap<Hatrix::Matrix> c, o;
 
     Vector(const Hatrix::Matrix& v, int _N, int _block_size, int _nblocks, int _rank) :
       N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
@@ -56,7 +56,8 @@ namespace Hatrix { namespace UMV {
                         nblocks(V.nblocks), rank(V.rank),
                         c(V.c), o(V.o) {}
 
-    Vector(std::function<Matrix(int64_t, int64_t)> gen_fn, int _N, int _block_size, int _nblocks, int _rank) :
+    Vector(std::function<Matrix(int64_t, int64_t)> gen_fn,
+           int _N, int _block_size, int _nblocks, int _rank) :
       N(_N), block_size(_block_size), nblocks(_nblocks), rank(_rank) {
       Hatrix::Matrix vector = gen_fn(N, 1);
       copy_from_vector(vector);
@@ -89,8 +90,8 @@ namespace Hatrix { namespace UMV {
   public:
     RowColMap<Matrix> Dcc, Dco, Doc, Doo;
     RowColMap<Matrix> S;
-    RowMap U, Uc;
-    ColMap V, Vc;
+    RowMap<Matrix> U, Uc;
+    ColMap<Matrix> V, Vc;
     int64_t N, block_size, n_blocks, rank, admis;
     double construct_error;
 
