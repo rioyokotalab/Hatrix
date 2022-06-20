@@ -14,8 +14,8 @@ export TMPDIR=/tmp
 # done
 
 # for nprocs in 1; do
-lldb -o run -- ./bin/HSS_main --N 8192 \
-               --nleaf 512 \
+lldb -o run -- ./bin/HSS_main --N 1024 \
+               --nleaf 128 \
                --kernel_func laplace \
                --kind_of_geometry circular \
                --ndim 1 \

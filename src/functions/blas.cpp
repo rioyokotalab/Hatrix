@@ -44,7 +44,7 @@ Matrix matmul(const Matrix& A, const Matrix& B, bool transA, bool transB,
   return C;
 }
 
-Matrix
+void
 syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
      double beta) {
   assert(C.rows == C.cols);
@@ -52,7 +52,7 @@ syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
               uplo == Lower ? CblasLower : CblasUpper,
               transA ? CblasTrans : CblasNoTrans,
               C.rows,
-              transA ? A.cols : A.rows,
+              transA ? A.rows : A.cols,
               alpha,
               &A,
               A.stride,

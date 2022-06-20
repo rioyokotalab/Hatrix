@@ -3,6 +3,7 @@
 #include <tuple>
 
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/functions/math_common.h"
 
 namespace Hatrix {
 
@@ -19,6 +20,9 @@ void lu(Matrix& A, Matrix& L, Matrix& U);
 
 // Compute the in-place LU factorization of A. Non-pivoted CBLAS version.
 void lu(Matrix& A);
+
+// Compute in-place Cholesky factorization fo A with LAPACK DPOTRF.
+void cholesky(Matrix& A, Mode uplo);
 
 // Compute pivoted LU factorization using LAPACK.
 std::vector<int> lup(Matrix& A);

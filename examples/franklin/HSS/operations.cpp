@@ -48,10 +48,9 @@ factorize_level(const int64_t level,
     Matrix& Doc = D_splits[2];
     Matrix& Doo = D_splits[3];
 
-    lu(Dcc);
-    solve_triangular(Dcc, Dco, Hatrix::Left, Hatrix::Lower, true);
-    solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Upper, false);
-    matmul(Doc, Dco, Doo, false, false, -1.0, 1.0);
+    cholesky(Dcc, Hatrix::Lower);
+    solve_triangular(Dcc, Doc, Hatrix::Right, Hatrix::Lower, false, true, 1.0);
+    syrk(Doc, Doo, Hatrix::Lower, false, -1.0, 1.0);
   }
 }
 

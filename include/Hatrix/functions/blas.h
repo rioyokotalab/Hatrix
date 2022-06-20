@@ -1,11 +1,8 @@
 #pragma once
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/functions/math_common.h"
 
 namespace Hatrix {
-
-enum Side { Left, Right };
-enum Mode { Upper, Lower };
-
 void array_copy(const double* from, double* to, int64_t size);
 
 // Perform a matrix multiplication C = beta * C + alpha * A * B.
@@ -16,7 +13,10 @@ void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA = false,
 Matrix matmul(const Matrix& A, const Matrix& B, bool transA = false,
               bool transB = false, double alpha = 1.0);
 
-Matrix syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
+// If transA is false:
+//   C = alpha * A * A' + beta * C
+// A has to be symmetric.
+void syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
             double beta);
 
 void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,

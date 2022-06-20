@@ -1,3 +1,4 @@
+#include "Hatrix/functions/math_common.h"
 #include "Hatrix/functions/lapack.h"
 
 #include <algorithm>
@@ -81,6 +82,10 @@ void lu(Matrix& A) {
     cblas_dscal(mi, p, ax, 1);
     cblas_dger(CblasColMajor, mi, ni, -1., ax, 1, ay, lda, an, lda);
   }
+}
+
+void cholesky(Matrix& A, Mode uplo) {
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, uplo == Lower ? 'L' : 'U', A.rows, &A, A.stride);
 }
 
 std::vector<int> lup(Matrix& A) {
