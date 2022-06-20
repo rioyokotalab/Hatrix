@@ -16,6 +16,9 @@ void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA = false,
 Matrix matmul(const Matrix& A, const Matrix& B, bool transA = false,
               bool transB = false, double alpha = 1.0);
 
+Matrix syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
+            double beta);
+
 void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
                        bool transA, bool diag, double alpha = 1.0);
 

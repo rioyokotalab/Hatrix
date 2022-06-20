@@ -44,6 +44,23 @@ Matrix matmul(const Matrix& A, const Matrix& B, bool transA, bool transB,
   return C;
 }
 
+Matrix
+syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
+     double beta) {
+  assert(C.rows == C.cols);
+  cblas_dsyrk(CblasColMajor,
+              uplo == Lower ? CblasLower : CblasUpper,
+              transA ? CblasTrans : CblasNoTrans,
+              C.rows,
+              transA ? A.cols : A.rows,
+              alpha,
+              &A,
+              A.stride,
+              beta,
+              &C,
+              C.stride);
+}
+
 void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
                        bool transA, bool diag, double alpha) {
   assert(side == Left ? (transA ? A.rows == B.rows : A.cols == B.rows)

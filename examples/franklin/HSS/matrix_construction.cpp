@@ -192,7 +192,6 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
   }
   else {
     std::tie(Utransfer, pivots, rank) = error_pivoted_qr(temp, opts.accuracy, opts.max_rank);
-    std::cout << "r: " << rank << std::endl;
   }
 
   A.ranks.insert(node, level, std::move(rank));

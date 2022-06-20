@@ -59,13 +59,19 @@ void factorize(SymmetricSharedBasisMatrix& A) {
   for (int64_t level = A.max_level; level > A.min_level; --level) {
     factorize_level(level, A);
 
+    std::cout << "ranks: " ;
+    for (int i = 0; i < pow(2, level); ++i) {
+      std::cout << "i -> " << i << " l -> " << level <<  " " <<  A.ranks(i, level) << "\n";
+    }
+    std::cout << std::endl;
+
     int64_t parent_level = level-1;
     int64_t parent_nblocks = pow(2, parent_level);
     for (int64_t i = 0; i < parent_nblocks; ++i) {
       int64_t nrows = 0, row_split = A.ranks(i * 2, level);
       for (int64_t ic1 = 0; ic1 < 2; ++ic1) { nrows += A.ranks(i * 2 + ic1, level); }
 
-      for (int64_t j = 0; j < parent_nblocks; ++j) {
+      for (int64_t j = 0; j <= i; ++j) {
         int64_t ncols = 0, col_split = A.ranks(j * 2, level);
         for (int64_t jc2 = 0; jc2 < 2; ++jc2) { ncols += A.ranks(j * 2 + jc2, level); }
 
@@ -74,9 +80,8 @@ void factorize(SymmetricSharedBasisMatrix& A) {
           Matrix D_unelim(nrows, ncols);
           auto D_unelim_splits = SPLIT_DENSE(D_unelim, row_split, col_split);
 
-          std::cout << "nr: " << nrows << " nc: " << ncols << std::endl;
           for (int64_t ic1 = 0; ic1 < 2; ++ic1) {
-            for (int64_t jc2 = 0; jc2 < 2; ++jc2) {
+            for (int64_t jc2 = 0; jc2 <= ic1; ++jc2) {
               int64_t c1 = i * 2 + ic1, c2 = j * 2 + jc2;
               if (!A.U.exists(c1, level)) { continue; }
 
@@ -91,6 +96,8 @@ void factorize(SymmetricSharedBasisMatrix& A) {
               }
             }
           }
+
+          A.D.insert(i, j, parent_level, std::move(D_unelim));
         }
       }
     }
