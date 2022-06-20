@@ -106,6 +106,19 @@ Matrix lu_solve(const Matrix& A, const Matrix& b) {
   return x;
 }
 
+Matrix cholesky_solve(const Matrix&A, const Matrix& b, const Mode uplo) {
+  Matrix x(b);
+  Matrix Ac(A);
+  LAPACKE_dppsv(LAPACK_COL_MAJOR,
+                uplo == Lower ? 'L' : 'U',
+                Ac.rows, x.cols,
+                &Ac,
+                &x,
+                x.stride);
+
+  return x;
+}
+
 void ldl(Matrix& A) {
   assert(A.rows == A.cols);
 

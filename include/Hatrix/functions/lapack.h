@@ -30,6 +30,9 @@ std::vector<int> lup(Matrix& A);
 // Use getrs for solving dense matrix A w.r.t RHS b.
 Matrix lu_solve(const Matrix& A, const Matrix& b);
 
+// Use potrf for solving dense matrix A w.r.t RHS b.
+Matrix cholesky_solve(const Matrix& A, const Matrix& b, const Mode uplo);
+
 // Compute the in-place non-pivoted LDLT factorization of A.
 void ldl(Matrix& A);
 

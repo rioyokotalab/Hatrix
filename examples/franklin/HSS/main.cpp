@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
-  Matrix dense_solution = lu_solve(Adense, x);
+  Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
   double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
   double solve_error = Hatrix::norm(dense_solution - HSS_solution) / Hatrix::norm(dense_solution);

@@ -58,12 +58,6 @@ void factorize(SymmetricSharedBasisMatrix& A) {
   for (int64_t level = A.max_level; level > A.min_level; --level) {
     factorize_level(level, A);
 
-    std::cout << "ranks: " ;
-    for (int i = 0; i < pow(2, level); ++i) {
-      std::cout << "i -> " << i << " l -> " << level <<  " " <<  A.ranks(i, level) << "\n";
-    }
-    std::cout << std::endl;
-
     int64_t parent_level = level-1;
     int64_t parent_nblocks = pow(2, parent_level);
     for (int64_t i = 0; i < parent_nblocks; ++i) {
@@ -101,6 +95,8 @@ void factorize(SymmetricSharedBasisMatrix& A) {
       }
     }
   }
+
+  cholesky(A.D(0, 0, 0), Hatrix::Lower);
 }
 
 Matrix
