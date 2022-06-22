@@ -807,7 +807,6 @@ namespace Hatrix {
                            RowMap<Hatrix::Matrix>& r, RowMap<Hatrix::Matrix>& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
 
-    #pragma omp parallel for
     for (int64_t block = 0; block < nblocks; ++block) {
       if (block > 0) {
         int64_t block_size = D(block, block, level).rows;
