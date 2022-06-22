@@ -28,7 +28,14 @@ class Matrix {
 
   ~Matrix();
 
-  Matrix(const Matrix& A, bool copy=false);
+  Matrix(const Matrix& A);
+
+  // Copy constructor for Matrix. Create a view object by default. The reason
+  // why this is done is mainly to accomodate std::vector#push_back or #emplace_back
+  // style functions which call the default copy constructor after they call the
+  // move constructor.
+  // https://stackoverflow.com/questions/40457302/c-vector-emplace-back-calls-copy-constructor
+  Matrix(const Matrix& A, bool copy);
 
   Matrix& operator=(const Matrix& A);
 

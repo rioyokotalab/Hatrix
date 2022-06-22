@@ -108,4 +108,4 @@ clean:
 	for dir in $(DIRS) $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
-	$(RM) $(OBJLIBS) bin/
+	$(RM) $(OBJLIBS) bin/ *.a

@@ -33,7 +33,34 @@ Matrix::~Matrix() {
   }
 }
 
-// Copy constructor.
+Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
+  if (A.is_view) {
+    is_view = true;
+    stride = A.stride;
+    data_ptr = A.data_ptr;
+  }
+  else {
+    try {
+      data_ptr = new double[rows * cols]();
+    }
+    catch (std::bad_alloc& e) {
+      std::cout << "Matrix(const Matrix& A, bool copy) -> "
+                << e.what()
+                << " rows= " << rows
+                << " cols= " << cols
+                << std::endl;
+    }
+    is_view = false;
+    stride = A.rows;
+    for (int i = 0; i < A.rows; ++i) {
+      for (int j = 0; j < A.cols; ++j) {
+        (*this)(i, j) = A(i, j);
+      }
+    }
+  }
+}
+
+// Copy constructor if you want to explicitly make a copy.
 Matrix::Matrix(const Matrix& A, bool copy)
     : rows(A.rows),
       cols(A.cols) {
