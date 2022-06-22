@@ -38,6 +38,7 @@ factorize_level(const int64_t level,
     int64_t block_size = A.D(block, block, level).rows;
     Matrix U_F = make_complement(A.U(block, level));
 
+    // TODO: use triangular matrix and use a trinangular matrix multiplication.
     A.D(block, block, level) = matmul((matmul(U_F, A.D(block, block, level), true, false)),
                                     U_F);
     int64_t split_size = block_size - block_rank;
@@ -100,10 +101,28 @@ void factorize(SymmetricSharedBasisMatrix& A) {
 }
 
 Matrix
-solve(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
-  Matrix b(x);
+solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
+  Matrix x(b);
+  int64_t level_offset = 0;
+  int64_t level = A.max_level;
 
-  return b;
+  // forward substitution.
+  // std::vector<Hatrix::Matrix> x_offset_views = x.split(std::vector<int64_t>(1, 0),
+  //                                                      {});
+  for (int64_t level = A.max_level; level > A.min_level; --level) {
+    int nblocks = pow(2, level);
+    // solve_forward_level(A, x_offset_views[1], level);
+    // level_offset = permute_forward(x, level, rhs_offset);
+  }
+
+  // last block forward
+  // last block backward
+
+  // backward substitution.
+  for (int64_t level = A.min_level+1; level <= A.max_level; ++level) {
+
+  }
+  return x;
 }
 
 Matrix

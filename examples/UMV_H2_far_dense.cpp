@@ -1550,6 +1550,8 @@ namespace Hatrix {
 
       int64_t n = 0;
       for (int64_t i = 0; i < nblocks; ++i) { n += D(i, i, level).rows; }
+      // use an n-sized vector so that the solve_forward_level() function can
+      // be reused for successive levels of the H2-matrix.
       Matrix x_level(n, 1);
       for (int64_t i = 0; i < x_level.rows; ++i) {
         x_level(i, 0) = x(rhs_offset + i, 0);
