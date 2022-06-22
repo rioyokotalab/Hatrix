@@ -208,6 +208,7 @@ void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
   }
   rows = new_rows;
   cols = new_cols;
+  stride = rows;
 }
 
 std::vector<Matrix> Matrix::split(int64_t n_row_splits, int64_t n_col_splits,
