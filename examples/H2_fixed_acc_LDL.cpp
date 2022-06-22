@@ -1235,7 +1235,7 @@ void SymmetricH2::factorize_level(const Domain& domain,
         // Update S along the column
         for (int i = 0; i < nblocks; ++i) {
           if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-            Matrix Sbar_i_block = matmul(S(i, block, level), r(block));
+            Matrix Sbar_i_block = matmul(S(i, block, level), r(block), false, true);
             if (F.exists(i, block)) {
               if (F(i, block).rows == U(i, level).cols && F(i, block).cols == block_size) {
                 Sbar_i_block += matmul(F(i, block), U(block, level));
