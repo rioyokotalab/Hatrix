@@ -14,9 +14,9 @@ namespace Hatrix {
 
 void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
             bool transB, double alpha, double beta) {
-  assert(transA ? A.cols : A.rows == C.rows);
-  assert(transB ? B.rows : B.cols == C.cols);
-  assert(transA ? A.rows : A.cols == transB ? B.cols : B.rows);
+  assert((transA ? A.cols : A.rows) == C.rows);
+  assert((transB ? B.rows : B.cols) == C.cols);
+  assert((transA ? A.rows : A.cols) == (transB ? B.cols : B.rows));
   cblas_dgemm(CblasColMajor, transA ? CblasTrans : CblasNoTrans,
               transB ? CblasTrans : CblasNoTrans, C.rows, C.cols,
               transA ? A.rows : A.cols, alpha, &A, A.stride, &B, B.stride, beta,
