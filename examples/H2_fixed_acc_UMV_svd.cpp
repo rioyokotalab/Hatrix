@@ -159,11 +159,11 @@ class H2 {
   void actually_print_structure(int64_t level);
 
   void update_row_cluster_bases(int64_t row, int64_t level,
-                                RowColMap<Matrix>& F, RowMap& r);
+                                RowColMap<Matrix>& F, RowMap<Matrix>& r);
   void update_column_cluster_bases(int64_t col, int64_t level,
-                                   RowColMap<Matrix>& F, RowMap& t);
+                                   RowColMap<Matrix>& F, RowMap<Matrix>& t);
   void factorize_level(const Domain& domain, int64_t level, int64_t nblocks,
-                       RowMap& r, RowMap& t);
+                       RowMap<Matrix>& r, RowMap<Matrix>& t);
   int64_t permute_forward(Matrix& x, int64_t level, int64_t rank_offset);
   int64_t permute_backward(Matrix& x, int64_t level, int64_t rank_offset);
   void solve_forward_level(Matrix& x_level, int64_t level);
@@ -1257,7 +1257,7 @@ double H2::low_rank_block_ratio() {
 }
 
 void H2::update_row_cluster_bases(int64_t row, int64_t level,
-                              RowColMap<Matrix>& F, RowMap& r) {
+                              RowColMap<Matrix>& F, RowMap<Matrix>& r) {
   int64_t nblocks = level_blocks[level];
   int64_t block_size = D(row, row, level).rows;
   Matrix block_row(block_size, 0);
@@ -1296,7 +1296,7 @@ void H2::update_row_cluster_bases(int64_t row, int64_t level,
 }
 
 void H2::update_column_cluster_bases(int64_t col, int64_t level,
-                                 RowColMap<Matrix>& F, RowMap& t) {
+                                 RowColMap<Matrix>& F, RowMap<Matrix>& t) {
   int64_t block_size = D(col, col, level).cols;
   int64_t nblocks = level_blocks[level];
   Matrix block_column(0, block_size);
@@ -1337,7 +1337,7 @@ void H2::update_column_cluster_bases(int64_t col, int64_t level,
 
 void H2::factorize_level(const Domain& domain,
                          int64_t level, int64_t nblocks,
-                         RowMap& r, RowMap& t) {
+                         RowMap<Matrix>& r, RowMap<Matrix>& t) {
   RowColMap<Matrix> F;      // fill-in blocks.
   for (int64_t block = 0; block < nblocks; ++block) {
     if (block > 0) {
@@ -1690,7 +1690,7 @@ void H2::factorize_level(const Domain& domain,
 
 void H2::factorize(const Domain& domain) {
   int64_t level = height;
-  RowMap r, t;
+  RowMap<Matrix> r, t;
 
   for (; level > 0; --level) {
     int64_t nblocks = level_blocks[level];

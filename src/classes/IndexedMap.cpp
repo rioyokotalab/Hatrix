@@ -2,33 +2,45 @@
 
 namespace Hatrix {
 
-Matrix& RowMap::operator[](int64_t key) { return map.at(key); }
-const Matrix& RowMap::operator[](int64_t key) const { return map.at(key); }
+template <class T>
+T& RowMap<T>::operator[](int64_t key) { return map.at(key); }
 
-Matrix& RowMap::operator()(int64_t key) { return (*this)[key]; }
-const Matrix& RowMap::operator()(int64_t key) const { return (*this)[key]; }
+template <class T>
+const T& RowMap<T>::operator[](int64_t key) const { return map.at(key); }
 
-void RowMap::insert(int64_t key, Matrix&& matrix) {
+template <class T>
+T& RowMap<T>::operator()(int64_t key) { return (*this)[key]; }
+template <class T>
+const T& RowMap<T>::operator()(int64_t key) const { return (*this)[key]; }
+
+template <class T>
+void RowMap<T>::insert(int64_t key, T&& matrix) {
   if ((*this).exists(key)) {
-    std::cout << "RowMap::insert() -> Element at <" << key << "> exists and cannot be inserted." << std::endl;
+    std::cout << "RowMap<T>::insert() -> Element at <" << key << "> exists and cannot be inserted." << std::endl;
     abort();
   }
   map.insert({key, std::move(matrix)});
 }
 
-Matrix RowMap::extract(int64_t key) {
-  Matrix out = std::move(map[key]);
+template <class T>
+T RowMap<T>::extract(int64_t key) {
+  T out = std::move(map[key]);
   map.erase(key);
   return out;
 }
 
-bool RowMap::exists(int64_t key) const {
+template <class T>
+bool RowMap<T>::exists(int64_t key) const {
   return map.count(key) == 0 ? false : true;
 }
 
-void RowMap::erase(int64_t key) {
+template <class T>
+void RowMap<T>::erase(int64_t key) {
   map.erase({key});
 }
+
+template class RowMap<Matrix>;
+template class RowMap<std::vector<int64_t>>;
 
 template<class T>
 T& RowColMap<T>::operator()(int64_t row, int64_t col) {
@@ -99,7 +111,8 @@ void RowColMap<T>::erase_all() {
 
 // explicit instatiation
 template class RowColMap<bool>;
-template class RowColMap<Matrix>;
+template class RowColMap<Hatrix::Matrix>;
+template class RowColMap<int64_t>;
 
 template<class T>
 T& RowColLevelMap<T>::operator[](const std::tuple<int64_t, int64_t, int64_t>& key) {

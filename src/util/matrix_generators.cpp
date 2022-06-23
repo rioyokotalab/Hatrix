@@ -12,6 +12,7 @@ Matrix generate_random_matrix(int64_t rows, int64_t cols) {
   // gen.seed(0);
   std::uniform_real_distribution<double> dist(0.0, 1.0);
   Matrix out(rows, cols);
+  #pragma omp parallel for
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {
       out(i, j) = dist(gen);
@@ -60,7 +61,7 @@ Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
   for(int64_t i = 0; i < rows; i++) {
     for(int64_t j = 0; j < cols; j++) {
       double rij = 0.0;
-      for(int64_t k = 0; k < x.size(); k++) {
+      for(unsigned k = 0; k < x.size(); k++) {
 	rij += ((x[k][i+row_start] - x[k][j+col_start]) *
 		(x[k][i+row_start] - x[k][j+col_start]));
       }
@@ -82,7 +83,7 @@ Matrix generate_sqrexpnd_matrix(const std::vector<std::vector<double>>& x,
     for(int64_t j = 0; j < cols; j++) {
       double dist = 0, temp;
 
-      for (int64_t k = 0; k < x.size(); ++k) {
+      for (unsigned k = 0; k < x.size(); ++k) {
         temp = x[k][i + row_start] - x[k][j + col_start];
         dist += temp * temp;
       }

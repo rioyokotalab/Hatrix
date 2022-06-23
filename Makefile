@@ -1,12 +1,13 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/common.mk
 
-DIRS := src/classes src/functions src/util
-OBJLIBS := libfunctions.a libclasses.a libutil.a
+DIRS := src/classes src/functions src/util examples/franklin \
+	examples/franklin/HSS
+OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
 TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \
-	qr Matrix norms
+	qr Matrix norms id
 EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	2x2_BlockDense_QR \
 	2x2_BLR_LU \
@@ -37,19 +38,23 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_strong_1level_better_index \
 	UMV_BLR2_far_dense \
 	H2_far_dense_construct \
-	UMV_H2_far_dense
+	UMV_H2_far_dense \
+	svd_vs_id
+
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
 
-all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES)
+all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES) \
+	HSS_slate HSS_scalapack
 
 $(DIRS):
 	$(MAKE) -C $@
 
-LINK_EXECUTABLE = @$(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
+LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
+
 
 # The extra colon is needed for correct expansion in the dependency list
 # https://stackoverflow.com/questions/16262344/pass-a-target-name-to-dependency-list-in-makefile
@@ -58,6 +63,36 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
+
+# non-distributed code.
+.PHONY: examples/franklin/HSS
+examples/franklin/HSS:
+	$(MAKE) -C $@
+
+HSS_main : % : dirs examples/franklin/HSS
+	$(CXX) libHSS_main.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+# slate rules
+.PHONY: examples/franklin/HSS_slate
+examples/franklin/HSS_slate:
+	$(MAKE) -C $@
+
+HSS_slate : % : dirs examples/franklin/HSS_slate
+	$(MPICXX) libHSS_slate.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(SLATE_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+# scalapack rules
+.PHONY: examples/franklin/HSS_scalapack
+examples/franklin/HSS_scalapack:
+	$(MAKE) -C $@
+
+HSS_scalapack : % : dirs examples/franklin/HSS_scalapack
+	$(MPICXX) libHSS_scalapack.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
 
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
@@ -73,4 +108,4 @@ clean:
 	for dir in $(DIRS) $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
-	$(RM) $(OBJLIBS) bin/
+	$(RM) $(OBJLIBS) bin/ *.a

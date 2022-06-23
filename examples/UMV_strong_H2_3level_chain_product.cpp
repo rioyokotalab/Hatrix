@@ -990,7 +990,7 @@ namespace Hatrix {
     // For verification of A1 matrix.
     int64_t level = height;
     RowColLevelMap<Matrix> F;
-    RowMap r, t;     // matrices for storing the updates for coupling blocks at each level.
+    RowMap<Hatrix::Matrix> r, t;     // matrices for storing the updates for coupling blocks at each level.
     A2_expected = generate_identity_matrix(rank * 8, rank * 8);
     auto A2_expected_splits = A2_expected.split(4, 4);
 

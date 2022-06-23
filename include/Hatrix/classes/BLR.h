@@ -7,8 +7,8 @@ class BLR {
  public:
   RowColMap<bool> is_admissible;
   RowColMap<Matrix> D, S;
-  RowMap U;
-  ColMap V;
+  RowMap<Matrix> U;
+  ColMap<Matrix> V;
 };
 
 }  // namespace Hatrix

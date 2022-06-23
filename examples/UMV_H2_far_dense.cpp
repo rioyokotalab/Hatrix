@@ -173,10 +173,10 @@ namespace Hatrix {
     int64_t get_block_size_row(const Domain& domain, int64_t i, int64_t level);
     int64_t get_block_size_col(const Domain& domain, int64_t parent, int64_t level);
     void factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
-                         RowMap& r, RowMap& t);
+                         RowMap<Hatrix::Matrix>& r, RowMap<Hatrix::Matrix>& t);
     int64_t find_all_dense_row();
-    void update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r);
-    void update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap& t);
+    void update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& r);
+    void update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& t);
   public:
     H2(const Domain& domain, int64_t _N, int64_t _rank, int64_t _nleaf, double _admis,
        std::string& admis_kind, int64_t matrix_type);
@@ -739,7 +739,7 @@ namespace Hatrix {
   }
 
 
-  void H2::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r) {
+  void H2::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& r) {
     int64_t nblocks = level_blocks[level];
     int64_t block_size = D(row, row, level).rows;
     Matrix row_block(block_size, 0);
@@ -771,7 +771,7 @@ namespace Hatrix {
     r.insert(row, std::move(r_row));
   }
 
-  void H2::update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap& t) {
+  void H2::update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& t) {
     int64_t block_size = D(col, col, level).rows;
     int64_t nblocks = level_blocks[level];
     Matrix col_block(0, block_size);
@@ -804,10 +804,9 @@ namespace Hatrix {
   }
 
   void H2::factorize_level(int64_t level, int64_t nblocks, const Domain& domain,
-                           RowMap& r, RowMap& t) {
+                           RowMap<Hatrix::Matrix>& r, RowMap<Hatrix::Matrix>& t) {
     RowColMap<Matrix> F;      // fill-in blocks.
 
-    #pragma omp parallel for
     for (int64_t block = 0; block < nblocks; ++block) {
       if (block > 0) {
         int64_t block_size = D(block, block, level).rows;
@@ -1162,7 +1161,7 @@ namespace Hatrix {
   H2::factorize(const Domain& domain) {
     int64_t level = height;
     RowColLevelMap<Matrix> F;
-    RowMap r, t;
+    RowMap<Hatrix::Matrix> r, t;
 
     // int64_t A1_nblocks = level_blocks[1];
     // int64_t A1_perm_nblocks = A1_nblocks * 2;
@@ -1551,6 +1550,8 @@ namespace Hatrix {
 
       int64_t n = 0;
       for (int64_t i = 0; i < nblocks; ++i) { n += D(i, i, level).rows; }
+      // use an n-sized vector so that the solve_forward_level() function can
+      // be reused for successive levels of the H2-matrix.
       Matrix x_level(n, 1);
       for (int64_t i = 0; i < x_level.rows; ++i) {
         x_level(i, 0) = x(rhs_offset + i, 0);

@@ -80,8 +80,8 @@ Hatrix::Matrix upper(Hatrix::Matrix A) {
 namespace Hatrix {
   class BLR2 {
   public:
-    RowMap U;
-    ColMap V;
+    RowMap<Hatrix::Matrix> U;
+    ColMap<Hatrix::Matrix> V;
     RowColMap<bool> is_admissible;
     RowColMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;

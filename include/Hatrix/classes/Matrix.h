@@ -15,25 +15,33 @@ class Matrix {
   bool is_view = false;
 
  private:
-  class DataHandler;
-  std::shared_ptr<DataHandler> data;
+  // Not using a shared_ptr here since it is not capable of handling a
+  // dynamic heap-allocated array.
+  // https://stackoverflow.com/questions/13061979/shared-ptr-to-an-array-should-it-be-used
   // data_ptr is a pointer to the memory within data. This is done
   // for easily tracking the location to an offset of data if this Matrix
   // is a view of another matrix.
   double* data_ptr = nullptr;
 
  public:
-  Matrix() = default;
+  Matrix();
 
-  ~Matrix() = default;
+  ~Matrix();
 
   Matrix(const Matrix& A);
+
+  // Copy constructor for Matrix. Create a view object by default. The reason
+  // why this is done is mainly to accomodate std::vector#push_back or #emplace_back
+  // style functions which call the default copy constructor after they call the
+  // move constructor.
+  // https://stackoverflow.com/questions/40457302/c-vector-emplace-back-calls-copy-constructor
+  Matrix(const Matrix& A, bool copy);
 
   Matrix& operator=(const Matrix& A);
 
   Matrix& operator=(Matrix&& A);
 
-  Matrix(Matrix&& A) = default;
+  Matrix(Matrix&& A);
 
   Matrix(int64_t rows, int64_t cols);
 
@@ -45,6 +53,7 @@ class Matrix {
   double& operator()(int64_t i, int64_t j);
   const double& operator()(int64_t i, int64_t j) const;
 
+  // WARNING: does not deallocate the extra data!
   void shrink(int64_t rows, int64_t cols);
 
   // Split the matrix into n_row_splits * n_col_splits blocks.
@@ -125,12 +134,10 @@ class Matrix {
   // this function returns only the memory consumed by the view.
   size_t memory_used() const;
 
-  // Get the size of the memory that is occupied by the whole matrix.
-  // If this matrix is part of a view, it will return the memory used
-  // by the whole matrix, not just the view.
-  size_t shared_memory_used() const;
-
   Matrix block_ranks(int64_t nblocks, double accuracy) const;
+
+  Matrix swap_rows(const std::vector<int64_t>& row_indices);
+  Matrix swap_cols(const std::vector<int64_t>& col_indices);
 };
 
 }  // namespace Hatrix

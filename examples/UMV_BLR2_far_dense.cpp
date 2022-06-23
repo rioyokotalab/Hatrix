@@ -472,7 +472,7 @@ namespace Hatrix {
               Scol.erase(block, level);
               Scol.insert(block, level, std::move(_SN1));
 
-              RowMap t;
+              RowMap<Hatrix::Matrix> t;
 
               // step 2: recompress along the column of nb*nb fill-in and update V.
               for (int j = block + 1; j < nblocks; ++j) {
@@ -576,7 +576,7 @@ namespace Hatrix {
               Srow.insert(block, level, std::move(SN_block));
 
               // step 2: recompress rows for larger fill-ins
-              RowMap r;
+              RowMap<Hatrix::Matrix> r;
 
               for (int64_t i = block+1; i < nblocks; ++i) {
                 if (F.exists(i, block)) {

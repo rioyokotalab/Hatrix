@@ -1,6 +1,7 @@
 #include "Hatrix/functions/blas.h"
 
 #include <cassert>
+#include <iostream>
 
 #ifdef USE_MKL
 #include "mkl_cblas.h"
@@ -12,8 +13,14 @@
 
 namespace Hatrix {
 
-void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
-            bool transB, double alpha, double beta) {
+void
+array_copy(const double* from, double* to, int64_t size) {
+  cblas_dcopy(size, from, 1, to, 1);
+}
+
+void
+matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
+       bool transB, double alpha, double beta) {
   assert((transA ? A.cols : A.rows) == C.rows);
   assert((transB ? B.rows : B.cols) == C.cols);
   assert((transA ? A.rows : A.cols) == (transB ? B.cols : B.rows));
@@ -23,8 +30,9 @@ void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA,
               &C, C.stride);
 };
 
-Matrix matmul(const Matrix& A, const Matrix& B, bool transA, bool transB,
-              double alpha) {
+Matrix
+matmul(const Matrix& A, const Matrix& B, bool transA, bool transB,
+       double alpha) {
   if (transA) {
     if (transB) { assert(A.rows == B.cols); }
     else        { assert(A.rows == B.rows); }
@@ -39,8 +47,26 @@ Matrix matmul(const Matrix& A, const Matrix& B, bool transA, bool transB,
   return C;
 }
 
-void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
-                       bool transA, bool diag, double alpha) {
+void
+syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
+     double beta) {
+  assert(C.rows == C.cols);
+  cblas_dsyrk(CblasColMajor,
+              uplo == Lower ? CblasLower : CblasUpper,
+              transA ? CblasTrans : CblasNoTrans,
+              C.rows,
+              transA ? A.rows : A.cols,
+              alpha,
+              &A,
+              A.stride,
+              beta,
+              &C,
+              C.stride);
+}
+
+void
+triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
+                  bool transA, bool diag, double alpha) {
   assert(side == Left ? (transA ? A.rows == B.rows : A.cols == B.rows)
                       : (transA ? B.cols == A.cols : B.cols == A.rows));
   cblas_dtrmm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
@@ -50,14 +76,16 @@ void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
               A.stride, &B, B.stride);
 }
 
-Matrix triangular_matmul_out(const Matrix& A, const Matrix& B, Side side, Mode uplo,
-                       bool transA, bool diag, double alpha) {
+Matrix
+triangular_matmul_out(const Matrix& A, const Matrix& B, Side side, Mode uplo,
+                      bool transA, bool diag, double alpha) {
   Matrix C(B);
   triangular_matmul(A, C, side, uplo, transA, diag, alpha);
   return C;
 }
 
-void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
+void
+solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
                       bool diag, bool transA, double alpha) {
   cblas_dtrsm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
               uplo == Upper ? CblasUpper : CblasLower,

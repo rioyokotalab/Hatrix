@@ -1,3 +1,4 @@
+#include "Hatrix/functions/math_common.h"
 #include "Hatrix/functions/lapack.h"
 
 #include <algorithm>
@@ -83,6 +84,10 @@ void lu(Matrix& A) {
   }
 }
 
+void cholesky(Matrix& A, Mode uplo) {
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, uplo == Lower ? 'L' : 'U', A.rows, &A, A.stride);
+}
+
 std::vector<int> lup(Matrix& A) {
   std::vector<int> ipiv(A.rows);
   LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());
@@ -97,6 +102,19 @@ Matrix lu_solve(const Matrix& A, const Matrix& b) {
   LAPACKE_dgetrf(LAPACK_COL_MAJOR, Ac.rows, Ac.cols, &Ac, A.stride, ipiv.data());
   LAPACKE_dgetrs(LAPACK_COL_MAJOR, 'N', Ac.rows, b.cols, &Ac, Ac.stride, ipiv.data(),
     &x, x.stride);
+
+  return x;
+}
+
+Matrix cholesky_solve(const Matrix&A, const Matrix& b, const Mode uplo) {
+  Matrix x(b);
+  Matrix Ac(A);
+  LAPACKE_dppsv(LAPACK_COL_MAJOR,
+                uplo == Lower ? 'L' : 'U',
+                Ac.rows, x.cols,
+                &Ac,
+                &x,
+                x.stride);
 
   return x;
 }
@@ -171,7 +189,7 @@ void rq(Matrix& A, Matrix& R, Matrix& Q) {
 }
 
 // TODO: complete this function  get rid of return warnings. Also return empty R. Needs dummy alloc now.
-std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret) {
+std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret, bool pivoted) {
   Matrix R(1, 1);
 
   if (mode == Lapack::Full) {
@@ -183,7 +201,14 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_
           Q(i, j) = A(i, j);
         }
       }
-      LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
+      if (pivoted) {
+        std::vector<int> jpvt(A.cols);
+        LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, jpvt.data(), tau.data());
+      }
+      else {
+        LAPACKE_dgeqrf(LAPACK_COL_MAJOR, Q.rows, A.cols, &Q, Q.stride, tau.data());
+      }
+
       LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.rows, Q.cols, &Q,
                      Q.stride, tau.data());
 
@@ -191,6 +216,57 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_
     }
   }
   abort();
+}
+
+std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t rank) {
+  if (rank < 0) {
+    std::invalid_argument("pivoted_qr()-> expected rank > 0, but got rank=" +
+                          std::to_string(rank));
+  }
+
+  Matrix Q(A, true);
+  std::vector<double> tau(Q.rows);
+  std::vector<int> jpvt(Q.cols);
+
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.min_dim(), Q.min_dim(), &Q, Q.stride, tau.data());
+
+  Q.shrink(Q.rows, rank);
+
+  // c-style pivots
+  std::vector<int64_t> pivots(Q.cols);
+  for (unsigned i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
+
+  return {std::move(Q), std::move(pivots)};
+}
+
+std::tuple<Matrix, std::vector<int64_t>, int64_t>
+error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
+  Matrix Q(A, true);
+  std::vector<double> tau(Q.rows);
+  std::vector<int> jpvt(Q.cols);
+  int64_t rank = 1;
+
+  // if (max_rank > Q.min_dim()) {
+  //   throw std::invalid_argument("error_pivoted_qr() -> max_rank <= Q.min_dim() is necessary, but got "
+  //                               "max_rank= " + std::to_string(max_rank) + " Q.min_dim= " + std::to_string(Q.min_dim()));
+  // }
+
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
+  for (int64_t i = 1; i < Q.min_dim(); ++i) {
+    if ((rank >= max_rank && max_rank > 0) || std::abs(Q(i,i)) < error) { break; }
+    rank++;
+  }
+
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.min_dim(), Q.min_dim(), &Q, Q.stride, tau.data());
+
+  Q.shrink(Q.rows, rank);
+
+  // c-style pivots
+  std::vector<int64_t> pivots(jpvt.size());
+  for (unsigned i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
+
+  return {std::move(Q), std::move(pivots), rank};
 }
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
@@ -308,7 +384,7 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
     else {
       LAPACKE_dlarfg(1, arr, arr, 1, &tau[r]);
     }
-    
+
     if(r < (min_dim-1)) {
       // Apply reflector to A(r:m,r+1:n) from left
       const double _arr = *arr;
@@ -397,4 +473,78 @@ void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
                  'F', 'C', C.rows, C.cols, T.cols, &V, V.stride, &T, T.stride,
                  &C, C.stride);
 }
+
+void solve_r_block(Matrix& interp, const Matrix& A, const int64_t rank) {
+  Matrix R11(rank, rank), R12(rank, A.cols - rank);
+  // copy
+  for (int i = 0; i < rank; ++i) {
+    for (int j = i; j < rank; ++j) {
+      R11(i, j) = A(i, j);
+    }
+  }
+
+  for (int i = 0; i < R12.rows; ++i) {
+    for (int j = 0; j < R12.cols; ++j) {
+      R12(i, j) = A(i, j + rank);
+    }
+  }
+
+  solve_triangular(R11, R12, Left, Upper, false, false, 1.0);
+
+  // Copy the interpolation matrix from TRSM into the
+  for (int i = 0; i < rank; ++i) {
+    interp(i, i) = 1.0;
+  }
+  for (int i = 0; i < rank; ++i) {
+    for (int j = 0; j < R12.cols; ++j) {
+      interp(j + rank, i) = R12(i, j);
+    }
+  }
+}
+
+std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, double error) {
+  std::vector<double> tau(std::min(A.rows, A.cols));
+  std::vector<int> jpvt(A.cols);
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
+
+  int64_t min_dim = A.min_dim();
+  if (std::abs(A(min_dim-1, min_dim-1)) > error) {
+    throw std::runtime_error("ID failed since the requested error cannot be reached. Min. error= " +
+                             std::to_string(std::abs(A(min_dim-1, min_dim-1))) + ", requested error= " +
+                             std::to_string(error));
+  }
+
+  int64_t rank = 1;
+  // find the right rank for this.
+  for (int64_t i = 1; i < min_dim; ++i) {
+    if (std::abs(A(i, i)) < error) { break; }
+    rank++;
+  }
+
+  Matrix interp(A.cols, rank);
+  solve_r_block(interp, A, rank);
+  // Bring pivots in C-style.
+  std::vector<int64_t> c_pivots(jpvt.size());
+  for (unsigned i = 0; i < jpvt.size(); ++i) {
+    c_pivots[i] = jpvt[i] - 1;
+  }
+
+  return {std::move(interp), std::move(c_pivots), rank};
+}
+
+
+std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
+  Matrix interp(A.rows, rank), pivots(A.cols, 1);
+  std::vector<double> tau(std::min(A.rows, A.cols));
+  std::vector<int> jpvt(A.cols);
+  Matrix R11(rank, rank), R12(rank, A.cols - rank);
+
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
+  solve_r_block(interp, A, rank);
+  for (int i = 0; i < A.cols; ++i) {
+    pivots(i, 0) = jpvt[i];
+  }
+  return {std::move(interp), std::move(pivots)};
+}
+
 }  // namespace Hatrix

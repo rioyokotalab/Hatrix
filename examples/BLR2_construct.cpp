@@ -44,8 +44,8 @@ double rel_error(const Hatrix::Matrix& A, const Hatrix::Matrix& B) {
 namespace Hatrix {
   class BLR2 {
   private:
-    RowMap U;
-    ColMap V;
+    RowMap<Matrix> U;
+    ColMap<Matrix> V;
     RowColMap<bool> is_admissible;
     RowColMap<Matrix> D, S;
     int64_t N, nblocks, rank, admis;

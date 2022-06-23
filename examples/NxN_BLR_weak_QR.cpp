@@ -30,9 +30,9 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
   for (int i = 0; i < n_blocks; ++i) {
     for (int j = 0; j < n_blocks; ++j) {      
       A.D.insert(i, j,
-		 Hatrix::generate_laplacend_matrix(randpts,
-						   block_size, block_size,
-						   i*block_size, j*block_size));
+                 Hatrix::generate_laplacend_matrix(randpts,
+                                                   block_size, block_size,
+                                                   i*block_size, j*block_size));
     }
   }
   // Also store expected errors to check against later
@@ -82,8 +82,8 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
       if (i == j)
         continue;
       else {
-	fdiff = Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j] - A.D(i, j));
-	diff += fdiff * fdiff;
+        fdiff = Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j] - A.D(i, j));
+        diff += fdiff * fdiff;
       }
     }
   }
@@ -92,14 +92,14 @@ Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
 }
 
 void triangularize_block_column(int64_t k, Hatrix::BLR& A,
-				Hatrix::BLR& Y, Hatrix::BLR& T, int64_t n_blocks) {
+                                Hatrix::BLR& Y, Hatrix::BLR& T, int64_t n_blocks) {
   Hatrix::Matrix Ak(A.D(k, k).rows + (n_blocks-k-1) * A.V[k].rows, A.D(k, k).cols);
   std::vector<int64_t> split_indices{A.D(k, k).rows};
   for(int64_t i = k+1; i < (n_blocks-1); i++) {
     split_indices.push_back(split_indices[i-k-1] + A.V[k].rows);
   }
   std::vector<Hatrix::Matrix> Ak_parts = Ak.split(split_indices,
-						  std::vector<int64_t>{}, false);
+                                                  std::vector<int64_t>{}, false);
   Ak_parts[0] = A.D(k, k);
   for(int64_t i = k+1; i < n_blocks; i++) {
     Hatrix::Matrix SV = A.S(i, k) * A.V[k];
@@ -118,31 +118,31 @@ void triangularize_block_column(int64_t k, Hatrix::BLR& A,
 }
 
 RowColMap compute_YTY(int64_t k, bool transT, const Hatrix::BLR& Y, const Hatrix::BLR& T,
-		      int64_t n_blocks) {
+                      int64_t n_blocks) {
   RowColMap YTY;
   for(int64_t i = k; i < n_blocks; i++) {
     Hatrix::Matrix YT = Hatrix::triangular_matmul_out(T.D(k, k),
-						      i == k ? Hatrix::matmul(Y.U[k], Y.D(k, k),
-									      true) : Y.S(i, k),
-						      Hatrix::Right, Hatrix::Upper,
-						      transT, false);
+                                                      i == k ? Hatrix::matmul(Y.U[k], Y.D(k, k),
+                                                                              true) : Y.S(i, k),
+                                                      Hatrix::Right, Hatrix::Upper,
+                                                      transT, false);
     for(int64_t j = k; j < n_blocks; j++) {
       YTY.insert(i, j, Hatrix::matmul(YT, j == k ? transpose(Y.D(k, k)) :
-				      Hatrix::matmul(Y.S(j, k), Y.U[j], true, true)));
+                                      Hatrix::matmul(Y.S(j, k), Y.U[j], true, true)));
     }
   }
   return YTY;
 }
 
 void apply_block_column_reflector(int64_t k, int64_t j, bool trans,
-				  Hatrix::BLR& C, const Hatrix::BLR& Y, const Hatrix::BLR& T,
-				  const RowColMap& YTY, int64_t n_blocks) {
+                                  Hatrix::BLR& C, const Hatrix::BLR& Y, const Hatrix::BLR& T,
+                                  const RowColMap& YTY, int64_t n_blocks) {
   //Precompute for applying onto j-th block-column
   Hatrix::Matrix YT_kk = Hatrix::triangular_matmul_out(T.D(k, k), Y.D(k, k),
-						       Hatrix::Right, Hatrix::Upper,
-						       trans, false);
+                                                       Hatrix::Right, Hatrix::Upper,
+                                                       trans, false);
   Hatrix::Matrix YTY_kk = Hatrix::matmul(YT_kk, Y.D(k, k), false, true);
-  Hatrix::RowMap tmp;
+  Hatrix::RowMap<Hatrix::Matrix> tmp;
   for(int64_t i = k; i < n_blocks; i++) {
     if(i == j) {
       tmp.insert(i, Hatrix::matmul(C.D(i, j), C.V[j], false, true));
@@ -157,28 +157,28 @@ void apply_block_column_reflector(int64_t k, int64_t j, bool trans,
       Hatrix::Matrix Cij(C.D(i, j));
       Hatrix::Matrix Sij(i == k ? YT_kk.cols : Y.U[i].cols, C.V[j].rows);
       for(int64_t l = k; l < n_blocks; l++) {
-	if(i == l && l == j) {
-	  Hatrix::matmul(i == k ? YTY_kk : Y.U[i] * YTY(i, l),
-			 Cij, C.D(i, j), false, false, -1, 1);
-	}
-	else {
-	  Hatrix::matmul(i == k ? Hatrix::matmul(Y.S(l, k), Y.U[l], true, true) : YTY(i, l),
-			 tmp[l], Sij, false, false, 1, 1);
-	}
+        if(i == l && l == j) {
+          Hatrix::matmul(i == k ? YTY_kk : Y.U[i] * YTY(i, l),
+                         Cij, C.D(i, j), false, false, -1, 1);
+        }
+        else {
+          Hatrix::matmul(i == k ? Hatrix::matmul(Y.S(l, k), Y.U[l], true, true) : YTY(i, l),
+                         tmp[l], Sij, false, false, 1, 1);
+        }
       }
       Hatrix::matmul(i == k ? YT_kk : Y.U[i], Sij * C.V[j],
-		     C.D(i, j), false, false, -1, 1);
+                     C.D(i, j), false, false, -1, 1);
     }
     else { //Admissible C(i, j)
       for(int64_t l = k; l < n_blocks; l++) {
-	Hatrix::matmul(YTY(i, l), tmp[l], C.S(i, j), false, false, -1, 1);
+        Hatrix::matmul(YTY(i, l), tmp[l], C.S(i, j), false, false, -1, 1);
       }
     }
   }
 }
 				
 std::tuple<Hatrix::BLR, Hatrix::BLR, Hatrix::BLR> qr_BLR(const Hatrix::BLR& A,
-							 int64_t n_blocks) {
+                                                         int64_t n_blocks) {
   Hatrix::BLR Y, T;
   Hatrix::BLR R(A);
 
@@ -197,7 +197,7 @@ std::tuple<Hatrix::BLR, Hatrix::BLR, Hatrix::BLR> qr_BLR(const Hatrix::BLR& A,
 }
 
 Hatrix::BLR left_multiply_Q(const Hatrix::BLR& Y, const Hatrix::BLR& T, bool trans,
-			    const Hatrix::BLR& A, int64_t n_blocks) {
+                            const Hatrix::BLR& A, int64_t n_blocks) {
   Hatrix::BLR C;
   for(int64_t i = 0; i < n_blocks; i++) {
     C.U.insert(i, Hatrix::Matrix(Y.U[i]));
@@ -213,7 +213,7 @@ Hatrix::BLR left_multiply_Q(const Hatrix::BLR& Y, const Hatrix::BLR& T, bool tra
     for(int64_t k = 0; k < n_blocks; k++) {
       RowColMap YTY = compute_YTY(k, trans, Y, T, n_blocks);
       for(int64_t j = k; j < n_blocks; j++) {
-	apply_block_column_reflector(k, j, trans, C, Y, T, YTY, n_blocks);
+        apply_block_column_reflector(k, j, trans, C, Y, T, YTY, n_blocks);
       }
     }
   }
@@ -221,7 +221,7 @@ Hatrix::BLR left_multiply_Q(const Hatrix::BLR& Y, const Hatrix::BLR& T, bool tra
     for(int64_t k = n_blocks-1; k >= 0; k--) {
       RowColMap YTY = compute_YTY(k, trans, Y, T, n_blocks);
       for(int64_t j = k; j < n_blocks; j++) {
-	apply_block_column_reflector(k, j, trans, C, Y, T, YTY, n_blocks);
+        apply_block_column_reflector(k, j, trans, C, Y, T, YTY, n_blocks);
       }
     }
   }
@@ -245,12 +245,12 @@ int main(int argc, char** argv) {
   for (int64_t i = 0; i < n_blocks; i++) {
     for (int64_t j = 0; j < n_blocks; j++) {
       if (i == j) {
-	fnorm = Hatrix::norm(A.D(i, j));
-	fdiff = Hatrix::norm(QR.D(i, j) - A.D(i, j));
+        fnorm = Hatrix::norm(A.D(i, j));
+        fdiff = Hatrix::norm(QR.D(i, j) - A.D(i, j));
       } else {
-	fnorm = Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j]);
+        fnorm = Hatrix::norm(A.U[i] * A.S(i, j) * A.V[j]);
         fdiff = Hatrix::norm(QR.U[i] * QR.S(i, j) * QR.V[j] -
-			     A.U[i] * A.S(i, j) * A.V[j]);
+                             A.U[i] * A.S(i, j) * A.V[j]);
       }
       norm += fnorm * fnorm;
       diff += fdiff * fdiff;
@@ -268,11 +268,11 @@ int main(int argc, char** argv) {
   for(int64_t i = 0; i < n_blocks; i++) {
     for(int64_t j = 0; j < n_blocks; j++) {
       if(i == j) {
-	I.D.insert(i, j, Hatrix::generate_identity_matrix(Y.D(i, j).rows,
-							  Y.D(i, j).cols));
+        I.D.insert(i, j, Hatrix::generate_identity_matrix(Y.D(i, j).rows,
+                                                          Y.D(i, j).cols));
       }
       else {
-	I.S.insert(i, j, Hatrix::Matrix(I.U[i].cols, I.V[j].rows));
+        I.S.insert(i, j, Hatrix::Matrix(I.U[i].cols, I.V[j].rows));
       }
     }
   }
@@ -281,7 +281,7 @@ int main(int argc, char** argv) {
   for (int64_t i = 0; i < n_blocks; i++) {
     for (int64_t j = 0; j < n_blocks; j++) {
       if (i == j) {
-	fdiff = Hatrix::norm(QtQ.D(i, j) - I.D(i, j));
+        fdiff = Hatrix::norm(QtQ.D(i, j) - I.D(i, j));
       } else {
         fdiff = Hatrix::norm(QtQ.U[i] * QtQ.S(i, j) * QtQ.V[j]);
       }

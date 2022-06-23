@@ -1,0 +1,50 @@
+#!/bin/bash
+#PJM -L "node=4"
+#PJM -L "rscgrp=cx-small"
+#PJM -L "elapse=2:00:00"
+#PJM --mpi "proc=8"
+#PJM -e error.log
+#PJM -j
+
+module purge
+module load gcc/8.4.0 openmpi cmake
+source /home/center/opt/x86_64/cores/intel/compilers_and_libraries_2020.4.304/linux/mkl/bin/mklvars.sh intel64
+
+export I_MPI_CXX=g++
+
+make clean
+make -j HSS_scalapack
+
+export MKL_NUM_THREADS=1
+
+
+
+# for nprocs in 4; do
+mpirun -n $PJM_MPI_PROC -machinefile $PJM_O_NODEINF -npernode 2 \
+       --report-bindings --bind-to socket \
+       ./bin/HSS_scalapack --N 65536 \
+       --nleaf 1024 \
+       --kernel_func laplace \
+       --kind_of_geometry grid \
+       --ndim 1 \
+       --max_rank 1000 \
+       --accuracy 1e-11 \
+       --admis 0 \
+       --admis_kind diagonal \
+       --construct_algorithm miro \
+       --add_diag 1e-8 \
+       --use_nested_basis
+# done
+# mpirun -n 4 \
+#        ./bin/HSS_scalapack --N 16384 \
+#        --nleaf 1024 \
+#        --kernel_func laplace \
+#        --kind_of_geometry grid \
+#        --ndim 1 \
+#        --max_rank 500 \
+#        --accuracy 1e-11 \
+#        --admis 0 \
+#        --admis_kind diagonal \
+#        --construct_algorithm miro \
+#        --add_diag 1e-8 \
+#        --use_nested_basis

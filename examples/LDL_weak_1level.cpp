@@ -23,22 +23,22 @@ std::vector<double> equally_spaced_vector(int64_t N, double minVal, double maxVa
 }
 
 class BLR2_SPD {
-public:
+ public:
   Hatrix::RowColMap<Hatrix::Matrix> D, S;
-  Hatrix::RowMap U, Uc;
+  Hatrix::RowMap<Hatrix::Matrix> U, Uc;
   int64_t N, block_size, n_blocks, rank, admis;
   double construct_error;
 
   BLR2_SPD(const randvec_t& randpts, int64_t N, int64_t block_size, int64_t rank,
            int64_t admis):
-    N(N), block_size(block_size), n_blocks(N/block_size), rank(rank), admis(admis)
+      N(N), block_size(block_size), n_blocks(N/block_size), rank(rank), admis(admis)
   {
     for (int64_t i = 0; i < n_blocks; ++i) {
       for (int64_t j = 0; j < n_blocks; ++j) {
-	D.insert(i, j,
-		   Hatrix::generate_laplacend_matrix(randpts,
-						     block_size, block_size,
-						     i*block_size, j*block_size));
+        D.insert(i, j,
+                 Hatrix::generate_laplacend_matrix(randpts,
+                                                   block_size, block_size,
+                                                   i*block_size, j*block_size));
       }
     }
     // Also store expected errors to check against later
@@ -49,36 +49,36 @@ public:
     std::vector<Hatrix::Matrix> Y;
     for (int64_t i = 0; i < n_blocks; ++i) {
       Y.push_back(
-		  Hatrix::generate_random_matrix(block_size, rank + oversampling));
+          Hatrix::generate_random_matrix(block_size, rank + oversampling));
     }
     for (int64_t i = 0; i < n_blocks; ++i) {
       Hatrix::Matrix AY(block_size, rank + oversampling);
       for (int64_t j = 0; j < n_blocks; ++j) {
-	if (i == j) continue;
-	Hatrix::matmul(D(i, j), Y[j], AY);
+        if (i == j) continue;
+        Hatrix::matmul(D(i, j), Y[j], AY);
       }
       std::tie(Ui, Sij, Vj, error) = Hatrix::truncated_svd(AY, rank);
       U.insert(i, std::move(Ui));
     }
     for (int i = 0; i < n_blocks; ++i) {
       for (int j = 0; j < n_blocks; ++j) {
-	if (i != j) {
-	  S.insert(i, j,
-		   Hatrix::matmul(Hatrix::matmul(U[i], D(i, j), true), U[j]));
-	}
+        if (i != j) {
+          S.insert(i, j,
+                   Hatrix::matmul(Hatrix::matmul(U[i], D(i, j), true), U[j]));
+        }
       }
     }
     double diff = 0, norm = 0, fnorm, fdiff;
     for (int i = 0; i < n_blocks; ++i) {
       for (int j = 0; j < n_blocks; ++j) {
-	fnorm = Hatrix::norm(D(i, j));
-	norm += fnorm * fnorm;
-	if (i == j)
-	  continue;
-	else {
-	  fdiff = Hatrix::norm(U[i] * S(i, j) * transpose(U[j]) - D(i, j));
-	  diff += fdiff * fdiff;
-	}
+        fnorm = Hatrix::norm(D(i, j));
+        norm += fnorm * fnorm;
+        if (i == j)
+          continue;
+        else {
+          fdiff = Hatrix::norm(U[i] * S(i, j) * transpose(U[j]) - D(i, j));
+          diff += fdiff * fdiff;
+        }
       }
     }
     construct_error = std::sqrt(diff/norm);
@@ -118,7 +118,7 @@ void partial_ldl_diag(BLR2_SPD& A, int i) {
   auto D_splits = A.D(i, i).split(vec{c_size}, vec{c_size});
   Hatrix::ldl(D_splits[0]);
   Hatrix::solve_triangular(D_splits[0], D_splits[2], Hatrix::Right,
-			   Hatrix::Lower, true, true, 1.);
+                           Hatrix::Lower, true, true, 1.);
   Hatrix::solve_diagonal(D_splits[0], D_splits[2], Hatrix::Right, 1.);
   //Compute Schur's complement
   Hatrix::Matrix L_oc(D_splits[2].rows, D_splits[2].cols);
@@ -143,11 +143,11 @@ Hatrix::Matrix factorize(BLR2_SPD& A) {
   for(int64_t i = 0; i < A.n_blocks; i++) {
     for(int64_t j = 0; j < A.n_blocks; j++) {
       if(i == j) {
-	auto D_split = A.D(i, j).split(vec{c_size}, vec{c_size});
-	last_splits[i * A.n_blocks + j] = D_split[3];
+        auto D_split = A.D(i, j).split(vec{c_size}, vec{c_size});
+        last_splits[i * A.n_blocks + j] = D_split[3];
       }
       else {
-	last_splits[i * A.n_blocks + j] = A.S(i, j);
+        last_splits[i * A.n_blocks + j] = A.S(i, j);
       }
     }
   }
@@ -178,11 +178,11 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
     //Solve triangular from diagonal partial factorizations
     if(c_size > 0) {
       auto Li_splits = A.D(i, i).split(local_split_indices,
-				       local_split_indices);
+                                       local_split_indices);
       Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
-			       Hatrix::Left, Hatrix::Lower, true);
+                               Hatrix::Left, Hatrix::Lower, true);
       Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i], b_block_co_splits[2*i+1],
-		     false, false, -1, 1);
+                     false, false, -1, 1);
     }
   }
   //Gather o parts
@@ -198,7 +198,7 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
   if(c_size > 0) {
     for(int i = 0; i < A.n_blocks; i++) {
       auto Li_splits = A.D(i, i).split(local_split_indices,
-				       local_split_indices);
+                                       local_split_indices);
       Hatrix::solve_diagonal(Li_splits[0], b_block_co_splits[2*i], Hatrix::Left);
     }
   }
@@ -214,11 +214,11 @@ void substitute(BLR2_SPD& A, Hatrix::Matrix& root, Hatrix::Matrix& b) {
   for(int i = 0; i < A.n_blocks; i++) {
     if(c_size > 0) {
       auto Li_splits = A.D(i, i).split(local_split_indices,
-				       local_split_indices);
+                                       local_split_indices);
       Hatrix::matmul(Li_splits[2], b_block_co_splits[2*i+1], b_block_co_splits[2*i],
-		     true, false, -1., 1.);
+                     true, false, -1., 1.);
       Hatrix::solve_triangular(Li_splits[0], b_block_co_splits[2*i],
-			       Hatrix::Left, Hatrix::Lower, true, true);
+                               Hatrix::Left, Hatrix::Lower, true, true);
     }
     //Multiply with orthogonal matrix
     Hatrix::Matrix bi(b_block_splits[i].rows, b_block_splits[i].cols);

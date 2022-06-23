@@ -4,12 +4,14 @@
 #SBATCH -J GPROF
 #SBATCH --time=72:00:00
 
-source ~/.bashrc
+source /etc/profile.d/modules.sh
+module load cmake lapack/3.9.0 openmpi/4.0.5 gcc/7.5
 
 rm -rf build
 mkdir build
 cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=$PWD -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS=-pg -DCMAKE_EXE_LINKER_FLAGS=-pg -DCMAKE_SHARED_LINKER_FLAGS=-pg
+cmake .. -DCMAKE_INSTALL_PREFIX=$PWD -DCMAKE_BUILD_TYPE=Debug \
+      -DCMAKE_CXX_FLAGS=-pg -DCMAKE_EXE_LINKER_FLAGS=-pg -DCMAKE_SHARED_LINKER_FLAGS=-pg
 make -j all
 
 # 32768
