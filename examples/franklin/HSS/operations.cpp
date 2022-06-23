@@ -100,6 +100,19 @@ void factorize(SymmetricSharedBasisMatrix& A) {
   cholesky(A.D(0, 0, 0), Hatrix::Lower);
 }
 
+static void
+solve_forward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
+                    const int64_t level) {
+
+}
+
+static int64_t
+permute_forward(Matrix& x_level, int64_t level, int64_t permute_offset) {
+
+  return permute_offset;
+}
+
+
 Matrix
 solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
   Matrix x(b);
