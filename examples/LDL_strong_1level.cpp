@@ -146,9 +146,9 @@ class BLR2_SPD {
 
   void calc_geometry_based_admissibility(const Domain& domain);
   int64_t get_block_size_col(const Domain& domain, int64_t parent, int64_t level);
-  void factorize_level(int64_t level, int64_t nblocks, const Domain& domain, RowMap& r);
+  void factorize_level(int64_t level, int64_t nblocks, const Domain& domain, RowMap<Matrix>& r);
   int64_t find_all_dense_row();
-  void update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r);
+  void update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap<Matrix>& r);
 
  public:
   BLR2_SPD(const Domain& domain, const int64_t N, const int64_t rank,
@@ -945,7 +945,7 @@ double BLR2_SPD::low_rank_block_ratio() {
   return low_rank / total;
 }
 
-void BLR2_SPD::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap& r) {
+void BLR2_SPD::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap<Matrix>& r) {
   int64_t nblocks = level_blocks[level];
   int64_t block_size = D(row, row, level).rows;
   Matrix row_block(block_size, 0);
@@ -979,7 +979,7 @@ void BLR2_SPD::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F
 
 void BLR2_SPD::factorize_level(int64_t level, int64_t nblocks,
                                const Domain& domain,
-                               RowMap& r) {
+                               RowMap<Matrix>& r) {
   RowColMap<Matrix> F;      // fill-in blocks.
 
   for (int64_t block = 0; block < nblocks; ++block) {
@@ -1315,7 +1315,7 @@ void BLR2_SPD::factorize_level(int64_t level, int64_t nblocks,
 void BLR2_SPD::factorize(const Domain& domain) {
   int64_t level = height;
   int64_t nblocks = level_blocks[level];
-  RowMap r;
+  RowMap<Matrix> r;
   factorize_level(level, nblocks, domain, r);
 
   // Merge the unfactorized parts into root level

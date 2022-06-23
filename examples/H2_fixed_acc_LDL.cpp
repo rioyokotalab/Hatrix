@@ -128,7 +128,7 @@ class SymmetricH2 {
   bool col_has_admissible_blocks(int64_t col, int64_t level);
   Matrix generate_block_row(int64_t block, int64_t block_size,
                             const Domain& domain, int64_t level,
-                            const Matrix& rand, bool sample=true);
+                            const Matrix& rand, bool sample=false);
   std::tuple<Matrix, Matrix>
   generate_row_cluster_bases(int64_t block, int64_t block_size,
                              const Domain& domain, int64_t level,
@@ -146,10 +146,10 @@ class SymmetricH2 {
   void actually_print_structure(int64_t level);
 
   void update_row_cluster_bases(int64_t row, int64_t level,
-                                RowColMap<Matrix>& F, RowMap& r);
+                                RowColMap<Matrix>& F, RowMap<Matrix>& r);
   void factorize_level(const Domain& domain,
                        int64_t level, int64_t nblocks,
-                       RowMap& r);
+                       RowMap<Matrix>& r);
   int64_t permute_forward(Matrix& x, int64_t level, int64_t rank_offset);
   int64_t permute_backward(Matrix& x, int64_t level, int64_t rank_offset);
   void solve_forward_level(Matrix& x_level, int64_t level);
@@ -1148,7 +1148,7 @@ double SymmetricH2::low_rank_block_ratio() {
 }
 
 void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
-                                           RowColMap<Matrix>& F, RowMap& r) {
+                                           RowColMap<Matrix>& F, RowMap<Matrix>& r) {
   int64_t nblocks = level_blocks[level];
   int64_t block_size = D(row, row, level).rows;
   Matrix block_row(block_size, 0);
@@ -1194,7 +1194,7 @@ void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
 
 void SymmetricH2::factorize_level(const Domain& domain,
                                   int64_t level, int64_t nblocks,
-                                  RowMap& r) {
+                                  RowMap<Matrix>& r) {
   RowColMap<Matrix> F;      // fill-in blocks.
   for (int64_t block = 0; block < nblocks; ++block) {
     if (block > 0) {
@@ -1552,7 +1552,7 @@ void SymmetricH2::factorize_level(const Domain& domain,
 
 void SymmetricH2::factorize(const Domain& domain) {
   int64_t level = height;
-  RowMap r;
+  RowMap<Matrix> r;
 
   for (; level > 0; --level) {
     int64_t nblocks = level_blocks[level];
