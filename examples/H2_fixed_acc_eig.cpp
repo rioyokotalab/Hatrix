@@ -176,7 +176,7 @@ class SymmetricH2 {
               const double accuracy, const double admis,
               const std::string& admis_kind, const int64_t matrix_type,
               const Matrix& rand);
-  double construction_relative_error(const Domain& domain);
+  double construction_absolute_error(const Domain& domain);
   void print_structure();
   double low_rank_block_ratio();
   void factorize(const Domain& domain);
@@ -430,7 +430,7 @@ Matrix Domain::generate_rank_heat_map() {
       Matrix block = Hatrix::generate_p2p_interactions(*this, i, j);
 
       Matrix Utemp, Stemp, Vtemp;
-      std::tie(Utemp, Stemp, Vtemp) = error_svd(block, 1e-9);
+      std::tie(Utemp, Stemp, Vtemp) = error_svd(block, 1e-9, false);
       int64_t rank = Stemp.rows;
 
       out(i, j) = rank;
@@ -869,13 +869,13 @@ SymmetricH2::generate_row_cluster_bases(int64_t block, int64_t block_size,
                                         const Domain& domain, int64_t level,
                                         const Matrix& rand) {
   Matrix block_row = generate_block_row(block, block_size, domain, level, rand);
-  Matrix Ui, R;
-  std::tie(Ui, R) = truncated_pivoted_qr(block_row, accuracy);
-  Matrix Si(R.rows, R.rows);
-  Matrix Vi(R.rows, R.cols);
-  rq(R, Si, Vi);
-  // Matrix Ui, Si, Vi;
-  // std::tie(Ui, Si, Vi) = error_svd(block_row, accuracy);
+  // Matrix Ui, R;
+  // std::tie(Ui, R) = truncated_pivoted_qr(block_row, accuracy, false);
+  // Matrix Si(R.rows, R.rows);
+  // Matrix Vi(R.rows, R.cols);
+  // rq(R, Si, Vi);
+  Matrix Ui, Si, Vi;
+  std::tie(Ui, Si, Vi) = error_svd(block_row, accuracy, false);
 
   int64_t rank = Ui.cols;
   min_rank = std::min(min_rank, rank);
@@ -929,13 +929,13 @@ SymmetricH2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2
   matmul(Ubig_child1, block_row_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Ubig_child2, block_row_splits[1], temp_splits[1], true, false, 1, 0);
 
-  Matrix Utransfer, R;
-  std::tie(Utransfer, R) = truncated_pivoted_qr(temp, accuracy);
-  Matrix Si(R.rows, R.rows);
-  Matrix Vi(R.rows, R.cols);
-  rq(R, Si, Vi);
-  // Matrix Utransfer, Si, Vi;
-  // std::tie(Utransfer, Si, Vi) = error_svd(temp, accuracy);
+  // Matrix Utransfer, R;
+  // std::tie(Utransfer, R) = truncated_pivoted_qr(temp, accuracy, false);
+  // Matrix Si(R.rows, R.rows);
+  // Matrix Vi(R.rows, R.cols);
+  // rq(R, Si, Vi);
+  Matrix Utransfer, Si, Vi;
+  std::tie(Utransfer, Si, Vi) = error_svd(temp, accuracy, false);
 
   int64_t rank = Utransfer.cols;
   min_rank = std::min(min_rank, rank);
@@ -1066,7 +1066,6 @@ SymmetricH2::SymmetricH2(const Domain& domain, const int64_t N, const int64_t nl
   }
 
   is_admissible.insert(0, 0, 0, false);
-  // PV =  (1 / double(N)) * 1e-3;
 
   int64_t all_dense_row = find_all_dense_row();
   if (all_dense_row != -1) {
@@ -1082,9 +1081,8 @@ SymmetricH2::SymmetricH2(const Domain& domain, const int64_t N, const int64_t nl
   }
 }
 
-double SymmetricH2::construction_relative_error(const Domain& domain) {
+double SymmetricH2::construction_absolute_error(const Domain& domain) {
   double error = 0;
-  double dense_norm = 0;
   int64_t nblocks = level_blocks[height];
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1093,7 +1091,6 @@ double SymmetricH2::construction_relative_error(const Domain& domain) {
         Matrix actual = Hatrix::generate_p2p_interactions(domain, i, j);
         Matrix expected = D(i, j, height);
         error += pow(norm(actual - expected), 2);
-        dense_norm += pow(norm(actual), 2);
       }
     }
   }
@@ -1111,14 +1108,13 @@ double SymmetricH2::construction_relative_error(const Domain& domain) {
           Matrix actual_matrix =
               Hatrix::generate_p2p_interactions(domain, row, col, level, height);
 
-          dense_norm += pow(norm(actual_matrix), 2);
           error += pow(norm(expected_matrix - actual_matrix), 2);
         }
       }
     }
   }
 
-  return std::sqrt(error / dense_norm);
+  return std::sqrt(error);
 }
 
 void SymmetricH2::actually_print_structure(int64_t level) {
@@ -1189,13 +1185,13 @@ void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
     }
   }
 
-  Matrix UN_row, R;
-  std::tie(UN_row, R) = truncated_pivoted_qr(block_row, accuracy);
-  Matrix SN_row(R.rows, R.rows);
-  Matrix VNT_row(R.rows, R.cols);
-  rq(R, SN_row, VNT_row);
-  // Matrix UN_row, SN_row, VNT_row;
-  // std::tie(UN_row, SN_row, VNT_row) = error_svd(block_row, accuracy);
+  // Matrix UN_row, R;
+  // std::tie(UN_row, R) = truncated_pivoted_qr(block_row, accuracy, false);
+  // Matrix SN_row(R.rows, R.rows);
+  // Matrix VNT_row(R.rows, R.cols);
+  // rq(R, SN_row, VNT_row);
+  Matrix UN_row, SN_row, VNT_row;
+  std::tie(UN_row, SN_row, VNT_row) = error_svd(block_row, accuracy, false);
 
   int64_t rank = UN_row.cols;
   min_rank = std::min(min_rank, rank);
@@ -2117,13 +2113,13 @@ int main(int argc, char ** argv) {
   const double admis = argc > 4 ? atof(argv[4]) : 1.0;
   // diagonal_admis or geometry_admis
   const std::string admis_kind = argc > 5 ? std::string(argv[5]) : "diagonal_admis";
-  const double ev_tol = argc > 6 ? atof(argv[6]) : 1e-5;
-  const int64_t m  = argc > 7 ? atoi(argv[7]) : 1;
-
+  const int64_t ndim  = argc > 6 ? atoi(argv[6]) : 2;
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = H2_MATRIX;
-  const int64_t ndim = 3; // Unit sphere
+  const int64_t matrix_type = argc > 7 ? atoi(argv[7]) : 1;
+  const double ev_tol = argc > 8 ? atof(argv[8]) : 1e-5;
+  const int64_t m  = argc > 9 ? atoi(argv[9]) : 1;
+  PV = (1/(double)N) * 1e-2;
 
   Hatrix::Context::init();
 
@@ -2144,7 +2140,7 @@ int main(int argc, char ** argv) {
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();  
-  double construct_error = A.construction_relative_error(domain);
+  double construct_error = A.construction_absolute_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
 
   std::cout << "N=" << N
