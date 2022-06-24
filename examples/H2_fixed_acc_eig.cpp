@@ -1474,9 +1474,6 @@ void SymmetricH2::factorize_level(const Domain& domain,
                 // Update the co block within the fill-in.
                 matmul(lower0_scaled, right_splits[1], fill_in_splits[1],
                        false, false, -1.0, 1.0);
-                // Update the oo block within the fill-in.
-                matmul(lower2_scaled, right_splits[1], fill_in_splits[3],
-                       false, false, -1.0, 1.0);
               }
               else {
                 Matrix &fill_in = F(i, j);
