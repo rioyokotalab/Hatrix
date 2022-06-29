@@ -869,13 +869,13 @@ SymmetricH2::generate_row_cluster_bases(int64_t block, int64_t block_size,
                                         const Domain& domain, int64_t level,
                                         const Matrix& rand) {
   Matrix block_row = generate_block_row(block, block_size, domain, level, rand);
-  // Matrix Ui, R;
-  // std::tie(Ui, R) = truncated_pivoted_qr(block_row, accuracy, false);
-  // Matrix Si(R.rows, R.rows);
-  // Matrix Vi(R.rows, R.cols);
-  // rq(R, Si, Vi);
-  Matrix Ui, Si, Vi;
-  std::tie(Ui, Si, Vi) = error_svd(block_row, accuracy, false);
+  Matrix Ui, R;
+  std::tie(Ui, R) = truncated_pivoted_qr(block_row, accuracy, false);
+  Matrix Si(R.rows, R.rows);
+  Matrix Vi(R.rows, R.cols);
+  rq(R, Si, Vi);
+  // Matrix Ui, Si, Vi;
+  // std::tie(Ui, Si, Vi) = error_svd(block_row, accuracy, false);
 
   int64_t rank = Ui.cols;
   min_rank = std::min(min_rank, rank);
@@ -929,13 +929,13 @@ SymmetricH2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2
   matmul(Ubig_child1, block_row_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Ubig_child2, block_row_splits[1], temp_splits[1], true, false, 1, 0);
 
-  // Matrix Utransfer, R;
-  // std::tie(Utransfer, R) = truncated_pivoted_qr(temp, accuracy, false);
-  // Matrix Si(R.rows, R.rows);
-  // Matrix Vi(R.rows, R.cols);
-  // rq(R, Si, Vi);
-  Matrix Utransfer, Si, Vi;
-  std::tie(Utransfer, Si, Vi) = error_svd(temp, accuracy, false);
+  Matrix Utransfer, R;
+  std::tie(Utransfer, R) = truncated_pivoted_qr(temp, accuracy, false);
+  Matrix Si(R.rows, R.rows);
+  Matrix Vi(R.rows, R.cols);
+  rq(R, Si, Vi);
+  // Matrix Utransfer, Si, Vi;
+  // std::tie(Utransfer, Si, Vi) = error_svd(temp, accuracy, false);
 
   int64_t rank = Utransfer.cols;
   min_rank = std::min(min_rank, rank);
@@ -1170,51 +1170,20 @@ void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
   int64_t block_size = D(row, row, level).rows;
   Matrix block_row(block_size, 0);
 
-  // Miro approach
-  if (matrix_type == BLR2_MATRIX) {
-    for (int64_t j = 0; j < nblocks; j++) {
-      if (is_admissible.exists(row, j, level) && is_admissible(row, j, level)) {
-        block_row = concat(block_row, matmul(U(row, level), S(row, j, level)), 1);
-      }
-    }
-  }
-  else {
-    block_row = concat(block_row, matmul(U(row, level), Srow(row, level)), 1);
-  }
+  block_row = concat(block_row, matmul(U(row, level), Srow(row, level)), 1);
   for (int64_t j = 0; j < nblocks; ++j) {
     if (F.exists(row, j)) {
       block_row = concat(block_row, F(row, j), 1);
     }
   }
 
-  // // Add fill-in contribution using gram matrix approach of MiaoMiaoMa UMV (2019)
-  // if (matrix_type == BLR2_MATRIX) {
-  //   Matrix S_sum(U(row, level).cols, U(row, level).cols);
-  //   for (int64_t j = 0; j < nblocks; j++) {
-  //     if (is_admissible.exists(row, j, level) && is_admissible(row, j, level)) {
-  //       matmul(S(row, j, level), S(row, j, level), S_sum, false, true, 1.0, 1.0);
-  //     }
-  //   }
-  //   block_row = concat(block_row, matmul(U(row, level), matmul(S_sum, U(row, level), false, true)), 1);
-  // }
-  // else {
-  //   Matrix Z = matmul(U(row, level), Srow(row, level));
-  //   block_row = concat(block_row, matmul(Z, Z, false, true), 1);
-  // }
-  // for (int64_t j = 0; j < nblocks; j++) {
-  //   if (F.exists(row, j)) {
-  //     // Add fill-in contribution
-  //     matmul(F(row, j), F(row, j), block_row, false, true, 1.0, 1.0);
-  //   }
-  // }
-
-  // Matrix UN_row, R;
-  // std::tie(UN_row, R) = truncated_pivoted_qr(block_row, accuracy, false);
-  // Matrix SN_row(R.rows, R.rows);
-  // Matrix VNT_row(R.rows, R.cols);
-  // rq(R, SN_row, VNT_row);
-  Matrix UN_row, SN_row, VNT_row;
-  std::tie(UN_row, SN_row, VNT_row) = error_svd(block_row, accuracy, false);
+  Matrix UN_row, R;
+  std::tie(UN_row, R) = truncated_pivoted_qr(block_row, accuracy, false);
+  Matrix SN_row(R.rows, R.rows);
+  Matrix VNT_row(R.rows, R.cols);
+  rq(R, SN_row, VNT_row);
+  // Matrix UN_row, SN_row, VNT_row;
+  // std::tie(UN_row, SN_row, VNT_row) = error_svd(block_row, accuracy, false);
 
   int64_t rank = UN_row.cols;
   min_rank = std::min(min_rank, rank);
@@ -2244,7 +2213,6 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();  
   double construct_error = A.construction_absolute_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
-  A.print_structure();
 
   std::cout << "N=" << N
             << " nleaf=" << nleaf
