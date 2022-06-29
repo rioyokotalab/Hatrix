@@ -26,6 +26,7 @@ else()
   endif()
 endif()
 
+add_compile_options(-O3)
 add_library(Hatrix
   src/util/matrix_generators.cpp
   src/util/helpers.cpp
