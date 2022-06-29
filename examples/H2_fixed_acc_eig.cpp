@@ -1257,7 +1257,6 @@ void SymmetricH2::factorize_level(const Domain& domain,
     auto diagonal_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
     Matrix& Dcc = diagonal_splits[0];
     ldl(Dcc);
-    // std::cout << "Factorizing D(" << block << "," << block << ")" << std::endl;
 
     // TRSM with cc blocks on the column
     for (int64_t i = block+1; i < nblocks; ++i) {
@@ -1456,10 +1455,8 @@ void SymmetricH2::factorize_level(const Domain& domain,
           // Save or accumulate with existing fill-in
           if (!F.exists(i, j)) {
             F.insert(i, j, std::move(fill_in));
-            // std::cout << "SC into new b*b fill-in F(" << i << "," << j << ")" << std::endl;
           }
           else {
-            // std::cout << "SC into existing b*b fill-in F(" << i << "," << j << ")" << std::endl;
             assert(F(i, j).rows == D(i, block, level).rows);
             assert(F(i, j).cols == D(block, j, level).cols);
             F(i, j) += fill_in;
@@ -1507,10 +1504,8 @@ void SymmetricH2::factorize_level(const Domain& domain,
           // Save or accumulate with existing fill-in
           if (!F.exists(i, j)) {
             F.insert(i, j, std::move(projected_fill_in));
-            // std::cout << "SC into new b*rank fill-in F(" << i << "," << j << ")" << std::endl;
           }
           else {
-            // std::cout << "SC into existing b*rank fill-in F(" << i << "," << j << ")" << std::endl;
             assert(F(i, j).rows == D(i, block, level).rows);
             assert(F(i, j).cols == D(block, j, level).cols);
             F(i, j) += projected_fill_in;
@@ -1556,10 +1551,8 @@ void SymmetricH2::factorize_level(const Domain& domain,
           // Save or accumulate with existing fill-in
           if (!F.exists(i, j)) {
             F.insert(i, j, std::move(projected_fill_in));
-            // std::cout << "SC into new rank*b fill-in F(" << i << "," << j << ")" << std::endl;
           }
           else {
-            // std::cout << "SC into existing rank*b fill-in F(" << i << "," << j << ")" << std::endl;
             assert(F(i, j).rows == D(i, block, level).rows);
             assert(F(i, j).cols == D(block, j, level).cols);
             F(i, j) += projected_fill_in;
@@ -1600,10 +1593,8 @@ void SymmetricH2::factorize_level(const Domain& domain,
           // Save or accumulate with existing fill-in
           if (!F.exists(i, j)) {
             F.insert(i, j, std::move(projected_fill_in));
-            // std::cout << "SC into new rank*rank fill-in F(" << i << "," << j << ")" << std::endl;
           }
           else {
-            // std::cout << "SC into existing rank*rank fill-in F(" << i << "," << j << ")" << std::endl;
             assert(F(i, j).rows == D(i, block, level).rows);
             assert(F(i, j).cols == D(block, j, level).cols);
             F(i, j) += projected_fill_in;
@@ -1615,7 +1606,6 @@ void SymmetricH2::factorize_level(const Domain& domain,
 }
 
 void SymmetricH2::factorize(const Domain& domain) {
-  // std::cout << "===========BEGIN FACTORIZE==============" << std::endl;
   int64_t level = height;
   RowColMap<Matrix> F;
   RowMap r;
@@ -1776,7 +1766,6 @@ void SymmetricH2::factorize(const Domain& domain) {
 
   // Factorize remaining root level
   ldl(D(0, 0, level));
-  // std::cout << "===========FINISH FACTORIZE==============" << std::endl;
 }
 
 // Permute the vector forward and return the offset at which the new vector begins.
@@ -2110,7 +2099,6 @@ SymmetricH2::inertia(const Domain& domain, const double lambda, bool &singular) 
       }
     }
   }
-  // std::cout << "D_lambda\n"; D_lambda.print();
   int64_t negative_elements_count = 0;
   for(int64_t i = 0; i < D_lambda.rows; i++) {
     negative_elements_count += (D_lambda(i, 0) < 0 ? 1 : 0);
