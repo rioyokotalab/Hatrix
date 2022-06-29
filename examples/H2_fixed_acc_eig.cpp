@@ -1829,6 +1829,7 @@ int64_t SymmetricH2::permute_backward(Matrix& x, const int64_t level, int64_t ra
   return c_offset;
 }
 
+// TODO Fix this, adjust to correct factorization step
 void SymmetricH2::solve_forward_level(Matrix& x_level, int64_t level) {
   int64_t nblocks = level_blocks[level];
   std::vector<int64_t> row_offsets;
@@ -1891,6 +1892,7 @@ void SymmetricH2::solve_forward_level(Matrix& x_level, int64_t level) {
   }
 }
 
+// TODO Fix this, adjust to correct factorization step
 void SymmetricH2::solve_backward_level(Matrix& x_level, int64_t level) {
   int64_t nblocks = level_blocks[level];
   std::vector<int64_t> col_offsets;
@@ -1952,6 +1954,7 @@ void SymmetricH2::solve_backward_level(Matrix& x_level, int64_t level) {
   }
 }
 
+// TODO Fix this, adjust to correct factorization step
 void SymmetricH2::solve_diagonal_level(Matrix& x_level, int64_t level) {
   int64_t nblocks = level_blocks[level];
   std::vector<int64_t> col_offsets;
@@ -1975,6 +1978,7 @@ void SymmetricH2::solve_diagonal_level(Matrix& x_level, int64_t level) {
   }
 }
 
+// TODO Fix this, adjust to correct factorization step
 Matrix SymmetricH2::solve(const Matrix& b, int64_t _level) {
   Matrix x(b);
   int64_t level = _level;
