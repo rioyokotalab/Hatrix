@@ -27,7 +27,7 @@ double PV = 1e-3;
 Hatrix::Matrix prepend_complement(const Hatrix::Matrix &Q) {
   Hatrix::Matrix Q_F(Q.rows, Q.rows);
   Hatrix::Matrix Q_full, R;
-  std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+  std::tie(Q_full, R) = Hatrix::qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
 
   for (int64_t i = 0; i < Q_F.rows; ++i) {
     for (int64_t j = 0; j < Q_F.cols - Q.cols; ++j) {
@@ -164,7 +164,7 @@ class SymmetricH2 {
                                 RowColMap<Matrix>& F, RowMap& r);
   void factorize_level(const Domain& domain,
                        int64_t level, int64_t nblocks,
-                       RowMap& r);
+                       RowColMap<Matrix>& F, RowMap& r);
   int64_t permute_forward(Matrix& x, int64_t level, int64_t rank_offset);
   int64_t permute_backward(Matrix& x, int64_t level, int64_t rank_offset);
   void solve_forward_level(Matrix& x_level, int64_t level);
@@ -1183,27 +1183,11 @@ void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
   }
   for (int64_t j = 0; j < nblocks; ++j) {
     if (F.exists(row, j)) {
-      if (F(row, j).rows == block_size && F(row, j).cols == U(j, level).cols)  {
-        // Approach 1: project with VjVj^T (tall-skinny fill-in already has Vj at the end)
-        block_row = concat(block_row, matmul(F(row, j), U(j, level), false, true), 1);
-
-        // Approach 2: do nothing (fill-in ends with Vj)
-        // block_row = concat(block_row, F(row, j), 1);
-      }
-      else if (F(row, j).rows == block_size && F(row, j).cols == U(j, level).rows) {
-        // Approach 1: project with VjVj^T (full fill-in does not have Vj at the end)
-        // block_row = concat(block_row, matmul(matmul(F(row, j), U(j, level)), U(j, level), false, true), 1);
-
-        // Approach 2: multiply with Vj
-        block_row = concat(block_row, matmul(F(row, j), U(j, level)), 1);
-
-        // Approach 3: do nothing
-        // block_row = concat(block_row, F(row, j), 1);
-      }
+      block_row = concat(block_row, F(row, j), 1);
     }
   }
 
-  // Add fill-in contribution using gram matrix approach of MiaoMiaoMa UMV (2019)
+  // // Add fill-in contribution using gram matrix approach of MiaoMiaoMa UMV (2019)
   // if (matrix_type == BLR2_MATRIX) {
   //   Matrix S_sum(U(row, level).cols, U(row, level).cols);
   //   for (int64_t j = 0; j < nblocks; j++) {
@@ -1250,8 +1234,7 @@ void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
 
 void SymmetricH2::factorize_level(const Domain& domain,
                                   int64_t level, int64_t nblocks,
-                                  RowMap& r) {
-  RowColMap<Matrix> F;      // fill-in blocks.
+                                  RowColMap<Matrix>& F, RowMap& r) {
   for (int64_t block = 0; block < nblocks; ++block) {
     if (block > 0) {
       int64_t block_size = D(block, block, level).rows;
@@ -1266,74 +1249,53 @@ void SymmetricH2::factorize_level(const Domain& domain,
       // Update cluster bases if necessary
       if (found_row_fill_in) {
         update_row_cluster_bases(block, level, F, r);
-        // Update S along the row
-        for (int64_t j = 0; j < nblocks; ++j) {
-          if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-            Matrix Sbar_block_j = matmul(r(block), S(block, j, level));
-
-            if (F.exists(block, j)) {
-              if (F(block, j).rows == block_size && F(block, j).cols == U(j, level).cols) {
-                Sbar_block_j += matmul(U(block, level), F(block, j), true, false);
-              }
-              else if (F(block, j).rows == block_size && F(block, j).cols == block_size) {
-                Sbar_block_j +=
-                    matmul(matmul(U(block, level), F(block, j), true, false), U(j, level));
-              }
-              F.erase(block, j);
-            }
-
-            S.erase(block, j, level);
-            S.insert(block, j, level, std::move(Sbar_block_j));
-          }
-        }
-        // Update S along the column
-        for (int i = 0; i < nblocks; ++i) {
-          if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-            Matrix Sbar_i_block = matmul(S(i, block, level), r(block), false, true);
-            if (F.exists(i, block)) {
-              if (F(i, block).rows == U(i, level).cols && F(i, block).cols == block_size) {
-                Sbar_i_block += matmul(F(i, block), U(block, level));
-              }
-              else if (F(i, block).rows == block_size && F(i, block).cols == block_size) {
-                Sbar_i_block += matmul(U(i, level),
-                                       matmul(F(i, block), U(block, level)), true, false);
-              }
-              F.erase(i, block);
-            }
-
-            S.erase(i, block, level);
-            S.insert(i, block, level, std::move(Sbar_i_block));
-          }
-        }
       }
     }
 
     Matrix U_F = prepend_complement(U(block, level));
+    // Apply to dense blocks along the row
     for (int j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
-        D(block, j, level) = matmul(U_F, D(block, j, level), true);
+        if (j < block) {
+          // Do not touch the eliminated part (cc and oc)
+          int64_t left_col_split = D(block, j, level).cols - U(j, level).cols;
+          auto D_splits = D(block, j, level).split(vec{}, vec{left_col_split});
+          D_splits[1] = matmul(U_F, D_splits[1], true);
+        }
+        else {
+          D(block, j, level) = matmul(U_F, D(block, j, level), true);
+        }
       }
     }
+    // Apply to dense blocks along the column
     for (int i = 0; i < nblocks; ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
-        D(i, block, level) = matmul(D(i, block, level), U_F);
+        if (i < block) {
+          // Do not touch the eliminated part (cc and co)
+          int64_t up_row_split = D(i, block, level).rows - U(i, level).cols;
+          auto D_splits = D(i, block, level).split(vec{up_row_split}, vec{});
+          D_splits[1] = matmul(D_splits[1], U_F);
+        }
+        else {
+          D(i, block, level) = matmul(D(i, block, level), U_F);
+        }
       }
     }
 
-    int64_t row_split = D(block, block, level).rows - U(block, level).cols,
-            col_split = D(block, block, level).cols - U(block, level).cols;
     // The diagonal block is split along the row and column.
-    auto diagonal_splits = D(block, block, level).split(vec{row_split}, vec{col_split});
+    int64_t diag_row_split = D(block, block, level).rows - U(block, level).cols;
+    int64_t diag_col_split = D(block, block, level).cols - U(block, level).cols;
+    auto diagonal_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
     Matrix& Dcc = diagonal_splits[0];
     ldl(Dcc);
     // std::cout << "Factorizing D(" << block << "," << block << ")" << std::endl;
 
     // TRSM with cc blocks on the column
-    for (int64_t i = block + 1; i < nblocks; ++i) {
+    for (int64_t i = block+1; i < nblocks; ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
         int64_t lower_row_split = D(i, block, level).rows -
                                   (level == height ? U(i, level).cols : U(i * 2, level + 1).cols);
-        auto D_splits = D(i, block, level).split(vec{lower_row_split}, vec{col_split});
+        auto D_splits = D(i, block, level).split(vec{lower_row_split}, vec{diag_col_split});
         solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Lower, true, true);
         solve_diagonal(Dcc, D_splits[0], Hatrix::Right);
       }
@@ -1345,7 +1307,7 @@ void SymmetricH2::factorize_level(const Domain& domain,
                                   (i <= block || level == height ?
                                    U(i, level).cols :
                                    U(i * 2, level + 1).cols);
-        auto D_splits = D(i, block, level).split(vec{lower_row_split}, vec{col_split});
+        auto D_splits = D(i, block, level).split(vec{lower_row_split}, vec{diag_col_split});
         solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Lower, true, true);
         solve_diagonal(Dcc, D_splits[2], Hatrix::Right);
       }
@@ -1356,7 +1318,7 @@ void SymmetricH2::factorize_level(const Domain& domain,
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
         int64_t right_col_split = D(block, j, level).cols -
                                   (level == height ? U(j, level).cols : U(j * 2, level + 1).cols);
-        auto D_splits = D(block, j, level).split(vec{row_split}, vec{right_col_split});
+        auto D_splits = D(block, j, level).split(vec{diag_row_split}, vec{right_col_split});
         solve_triangular(Dcc, D_splits[0], Hatrix::Left, Hatrix::Lower, true, false);
         solve_diagonal(Dcc, D_splits[0], Hatrix::Left);
       }
@@ -1368,7 +1330,7 @@ void SymmetricH2::factorize_level(const Domain& domain,
                                   (j <= block || level == height ?
                                    U(j, level).cols :
                                    U(j * 2, level + 1).cols);
-        auto D_splits = D(block, j, level).split(vec{row_split}, vec{right_col_split});
+        auto D_splits = D(block, j, level).split(vec{diag_row_split}, vec{right_col_split});
         solve_triangular(Dcc, D_splits[1], Hatrix::Left, Hatrix::Lower, true, false);
         solve_diagonal(Dcc, D_splits[1], Hatrix::Left);
       }
@@ -1386,11 +1348,9 @@ void SymmetricH2::factorize_level(const Domain& domain,
           int64_t right_col_rank =
               level == height ? U(j, level).cols : U(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - lower_row_rank},
-              vec{D(i, block, level).cols - U(block, level).cols});
+              vec{D(i, block, level).rows - lower_row_rank}, vec{diag_col_split});
           auto right_splits = D(block, j, level).split(
-              vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - right_col_rank});
+              vec{diag_row_split}, vec{D(block, j, level).cols - right_col_rank});
           auto reduce_splits = D(i, j, level).split(
               vec{D(i, j, level).rows - lower_row_rank},
               vec{D(i, j, level).cols - right_col_rank});
@@ -1400,7 +1360,6 @@ void SymmetricH2::factorize_level(const Domain& domain,
           // Update cc part
           matmul(lower0_scaled, right_splits[0], reduce_splits[0],
                  false, false, -1.0, 1.0);
-          // std::cout << "SC into dense block D(" << i << "," << j << ")_cc" << std::endl;
         }
       }
     }
@@ -1414,13 +1373,11 @@ void SymmetricH2::factorize_level(const Domain& domain,
           int64_t lower_row_rank =
               level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
           int64_t right_col_rank =
-              level == height ? U(j, level).cols : U(j * 2, level + 1).cols;
+              (j <= block || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - lower_row_rank},
-              vec{D(i, block, level).cols - U(block, level).cols});
+              vec{D(i, block, level).rows - lower_row_rank}, vec{diag_col_split});
           auto right_splits = D(block, j, level).split(
-              vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - right_col_rank});
+              vec{diag_row_split}, vec{D(block, j, level).cols - right_col_rank});
           auto reduce_splits = D(i, j, level).split(
               vec{D(i, j, level).rows - lower_row_rank},
               vec{D(i, j, level).cols - right_col_rank});
@@ -1430,7 +1387,6 @@ void SymmetricH2::factorize_level(const Domain& domain,
           // Update co part
           matmul(lower0_scaled, right_splits[1], reduce_splits[1],
                  false, false, -1.0, 1.0);
-          // std::cout << "SC into dense block D(" << i << "," << j << ")_co" << std::endl;
         }
       }
     }
@@ -1442,15 +1398,13 @@ void SymmetricH2::factorize_level(const Domain& domain,
             (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, j, level) && !is_admissible(i, j, level))) {
           int64_t lower_row_rank =
-              level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
+              (i <= block || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
           int64_t right_col_rank =
               level == height ? U(j, level).cols : U(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - lower_row_rank},
-              vec{D(i, block, level).cols - U(block, level).cols});
+              vec{D(i, block, level).rows - lower_row_rank}, vec{diag_col_split});
           auto right_splits = D(block, j, level).split(
-              vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - right_col_rank});
+              vec{diag_row_split}, vec{D(block, j, level).cols - right_col_rank});
           auto reduce_splits = D(i, j, level).split(
               vec{D(i, j, level).rows - lower_row_rank},
               vec{D(i, j, level).cols - right_col_rank});
@@ -1460,7 +1414,6 @@ void SymmetricH2::factorize_level(const Domain& domain,
           // Update oc part
           matmul(lower2_scaled, right_splits[0], reduce_splits[2],
                  false, false, -1.0, 1.0);
-          // std::cout << "SC into dense block D(" << i << "," << j << ")_oc" << std::endl;
         }
       }
     }
@@ -1472,15 +1425,13 @@ void SymmetricH2::factorize_level(const Domain& domain,
             (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, j, level) && !is_admissible(i, j, level))) {
           int64_t lower_row_rank =
-              level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
+              (i <= block || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
           int64_t right_col_rank =
-              level == height ? U(j, level).cols : U(j * 2, level + 1).cols;
+              (j <= block || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - lower_row_rank},
-              vec{D(i, block, level).cols - U(block, level).cols});
+              vec{D(i, block, level).rows - lower_row_rank}, vec{diag_col_split});
           auto right_splits = D(block, j, level).split(
-              vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - right_col_rank});
+              vec{diag_row_split}, vec{D(block, j, level).cols - right_col_rank});
           auto reduce_splits = D(i, j, level).split(
               vec{D(i, j, level).rows - lower_row_rank},
               vec{D(i, j, level).cols - right_col_rank});
@@ -1490,13 +1441,12 @@ void SymmetricH2::factorize_level(const Domain& domain,
           // Update oo part
           matmul(lower2_scaled, right_splits[1], reduce_splits[3],
                  false, false, -1.0, 1.0);
-          // std::cout << "SC into dense block D(" << i << "," << j << ")_oo" << std::endl;
         }
       }
     }
 
     // Schur's complement into low-rank block (fill-in)
-    // cc x cc -> cc
+    // Produces b*b fill-in
     for (int64_t i = block+1; i < nblocks; ++i) {
       for (int64_t j = block+1; j < nblocks; ++j) {
         if ((is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) &&
@@ -1507,218 +1457,187 @@ void SymmetricH2::factorize_level(const Domain& domain,
           int64_t right_col_rank =
               level == height ? U(j, level).cols : U(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - lower_row_rank},
-              vec{D(i, block, level).cols - U(block, level).cols});
+              vec{D(i, block, level).rows - lower_row_rank}, vec{diag_col_split});
           auto right_splits = D(block, j, level).split(
-              vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - right_col_rank});
-
+              vec{diag_row_split}, vec{D(block, j, level).cols - right_col_rank});
           Matrix lower0_scaled(lower_splits[0]);
+          Matrix lower2_scaled(lower_splits[2]);
           column_scale(lower0_scaled, Dcc);
-          if (F.exists(i, j)) {
-            Matrix& fill_in = F(i, j);
-            if ((fill_in.rows == D(i, block, level).rows) &&
-                (fill_in.cols == D(block, j, level).cols)) {
-              // Part of existing nb*nb fill-in
-              auto fill_in_splits = fill_in.split(vec{fill_in.rows - lower_row_rank},
-                                                  vec{fill_in.cols - right_col_rank});
-              // Update cc part of fill-in block
-              matmul(lower0_scaled, right_splits[0], fill_in_splits[0],
-                     false, false, -1.0, 1.0);
-              // std::cout << "SC into existing nb*nb LR block F(" << i << "," << j << ")_cc" << std::endl;
-            }
+          column_scale(lower2_scaled, Dcc);
+
+          // Create b*b fill-in block
+          int64_t nrows = D(i, block, level).rows;
+          int64_t ncols = D(block, j, level).cols;
+          Matrix fill_in(nrows, ncols);
+          auto fill_in_splits = fill_in.split(vec{nrows - lower_row_rank},
+                                              vec{ncols - right_col_rank});
+          // Fill cc part
+          matmul(lower0_scaled, right_splits[0], fill_in_splits[0],
+                 false, false, -1.0, 1.0);
+          // Fill co part
+          matmul(lower0_scaled, right_splits[1], fill_in_splits[1],
+                 false, false, -1.0, 1.0);
+          // Fill oc part
+          matmul(lower2_scaled, right_splits[0], fill_in_splits[2],
+                 false, false, -1.0, 1.0);
+          // Fill oo part
+          matmul(lower2_scaled, right_splits[1], fill_in_splits[3],
+                 false, false, -1.0, 1.0);
+
+          // Save or accumulate with existing fill-in
+          if (!F.exists(i, j)) {
+            F.insert(i, j, std::move(fill_in));
+            // std::cout << "SC into new b*b fill-in F(" << i << "," << j << ")" << std::endl;
           }
           else {
-            int64_t nrows = D(i, block, level).rows;
-            int64_t ncols = D(block, j, level).cols;
-            Matrix fill_in(nrows, ncols);
-            auto fill_in_splits = fill_in.split(vec{nrows - lower_row_rank},
-                                                vec{ncols - right_col_rank});
-            // Update cc part of fill-in block
-            matmul(lower0_scaled, right_splits[0], fill_in_splits[0],
-                   false, false, -1.0, 1.0);
-            F.insert(i, j, std::move(fill_in));
-            // std::cout << "SC into new nb*nb LR block F(" << i << "," << j << ")_cc" << std::endl;
+            // std::cout << "SC into existing b*b fill-in F(" << i << "," << j << ")" << std::endl;
+            assert(F(i, j).rows == D(i, block, level).rows);
+            assert(F(i, j).cols == D(block, j, level).cols);
+            F(i, j) += fill_in;
           }
         }
       }
     }
     // Schur's complement into low-rank block (fill-in)
-    // cc x co -> co
+    // Produces b*rank fill-in
     for (int64_t i = block+1; i < nblocks; ++i) {
-      for (int64_t j = 0; j < nblocks; ++j) {
+      for (int64_t j = 0; j < block; ++j) {
         if ((is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) &&
             (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, j, level) && is_admissible(i, j, level))) {
           int64_t lower_row_rank =
               level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
-          int64_t right_col_rank =
-              level == height ? U(j, level).cols : U(j * 2, level + 1).cols;
+          int64_t right_col_rank = U(j, level).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - lower_row_rank},
-              vec{D(i, block, level).cols - U(block, level).cols});
+              vec{D(i, block, level).rows - lower_row_rank}, vec{diag_col_split});
           auto right_splits = D(block, j, level).split(
-              vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - right_col_rank});
-
+              vec{diag_row_split}, vec{D(block, j, level).cols - right_col_rank});
           Matrix lower0_scaled(lower_splits[0]);
+          Matrix lower2_scaled(lower_splits[2]);
           column_scale(lower0_scaled, Dcc);
-          if (F.exists(i, j)) {
-            Matrix& fill_in = F(i, j);
-            if ((fill_in.rows == D(i, block, level).rows) &&
-                (fill_in.cols == D(block, j, level).cols)) {
-              // Part of nb*nb fill-in
-              auto fill_in_splits = fill_in.split(vec{fill_in.rows - lower_row_rank},
-                                                  vec{fill_in.cols - right_col_rank});
-              // Update co part of fill-in block
-              matmul(lower0_scaled, right_splits[1], fill_in_splits[1],
-                     false, false, -1.0, 1.0);
-              // std::cout << "SC into existing nb*nb LR block F(" << i << "," << j << ")_co" << std::endl;
-            }
-            else if ((fill_in.rows == D(i, block, level).rows) &&
-                     (fill_in.cols == right_col_rank)) {
-              // Part of existing nb*rank fill-in
-              auto fill_in_splits = fill_in.split(vec{fill_in.rows - lower_row_rank},
-                                                  vec{});
-              // Update co part of fill-in block
-              matmul(lower0_scaled, right_splits[1], fill_in_splits[0],
-                     false, false, -1.0, 1.0);
-              // std::cout << "SC into existing nb*rank LR block F(" << i << "," << j << ")_co" << std::endl;
-            }
+          column_scale(lower2_scaled, Dcc);
+
+          // Create b*rank fill-in block
+          int64_t nrows = D(i, block, level).rows;
+          int64_t ncols = right_col_rank;
+          Matrix fill_in(nrows, ncols);
+          auto fill_in_splits = fill_in.split(vec{nrows - lower_row_rank},
+                                              vec{});
+          // Fill co part
+          matmul(lower0_scaled, right_splits[1], fill_in_splits[0],
+                 false, false, -1.0, 1.0);
+          // Fill oo part
+          matmul(lower2_scaled, right_splits[1], fill_in_splits[1],
+                 false, false, -1.0, 1.0);
+
+          // b*rank fill-in always has a form of Aik*Vk_c * inv(Akk_cc) x (Uk_c)^T*Akj*Vj_o
+          // Convert to b*b block by applying (Vj_o)^T from right
+          // Which is safe from bases update since j has been eliminated before (j < k)
+          Matrix projected_fill_in = matmul(fill_in, U(j, level), false, true);
+
+          // Save or accumulate with existing fill-in
+          if (!F.exists(i, j)) {
+            F.insert(i, j, std::move(projected_fill_in));
+            // std::cout << "SC into new b*rank fill-in F(" << i << "," << j << ")" << std::endl;
           }
           else {
-            // Must be a new nb*rank fill-in
-            int64_t nrows = D(i, block, level).rows;
-            int64_t ncols = right_col_rank;
-            Matrix fill_in(nrows, ncols);
-            auto fill_in_splits = fill_in.split(vec{nrows - lower_row_rank},
-                                                vec{});
-            // Update co part of fill-in block
-            matmul(lower0_scaled, right_splits[1], fill_in_splits[0],
-                   false, false, -1.0, 1.0);
-            F.insert(i, j, std::move(fill_in));
-            // std::cout << "SC into new nb*rank LR block F(" << i << "," << j << ")_co" << std::endl;
+            // std::cout << "SC into existing b*rank fill-in F(" << i << "," << j << ")" << std::endl;
+            assert(F(i, j).rows == D(i, block, level).rows);
+            assert(F(i, j).cols == D(block, j, level).cols);
+            F(i, j) += projected_fill_in;
           }
         }
       }
     }
     // Schur's complement into low-rank block (fill-in)
-    // oc x cc -> oc
-    for (int64_t i = 0; i < nblocks; ++i) {
+    // Produces rank*b fill-in
+    for (int64_t i = 0; i < block; ++i) {
       for (int64_t j = block+1; j < nblocks; ++j) {
         if ((is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) &&
             (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, j, level) && is_admissible(i, j, level))) {
-          int64_t lower_row_rank =
-              level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
+          int64_t lower_row_rank = U(i, level).cols;
           int64_t right_col_rank =
               level == height ? U(j, level).cols : U(j * 2, level + 1).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - lower_row_rank},
-              vec{D(i, block, level).cols - U(block, level).cols});
+              vec{D(i, block, level).rows - lower_row_rank}, vec{diag_col_split});
           auto right_splits = D(block, j, level).split(
-              vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - right_col_rank});
-
+              vec{diag_row_split}, vec{D(block, j, level).cols - right_col_rank});
           Matrix lower2_scaled(lower_splits[2]);
           column_scale(lower2_scaled, Dcc);
-          if (F.exists(i, j)) {
-            Matrix& fill_in = F(i, j);
-            if ((fill_in.rows == D(i, block, level).rows) &&
-                (fill_in.cols == D(block, j, level).cols)) {
-              // Part of nb*nb fill-in
-              auto fill_in_splits = fill_in.split(vec{fill_in.rows - lower_row_rank},
-                                                  vec{fill_in.cols - right_col_rank});
-              // Update oc part of fill-in block
-              matmul(lower2_scaled, right_splits[0], fill_in_splits[2],
-                     false, false, -1.0, 1.0);
-              // std::cout << "SC into existing nb*nb LR block F(" << i << "," << j << ")_oc" << std::endl;
-            }
-            else if ((fill_in.rows == lower_row_rank) &&
-                     (fill_in.cols == D(block, j, level).cols)) {
-              // Part of existing rank*nb fill-in
-              auto fill_in_splits = fill_in.split(vec{},
-                                                  vec{fill_in.cols - right_col_rank});
-              // Update oc part of fill-in block
-              matmul(lower2_scaled, right_splits[0], fill_in_splits[0],
-                     false, false, -1.0, 1.0);
-              // std::cout << "SC into existing rank*nb LR block F(" << i << "," << j << ")_oc" << std::endl;
-            }
+
+          // Create rank*b fill-in block
+          int64_t nrows = lower_row_rank;
+          int64_t ncols = D(block, j, level).cols;
+          Matrix fill_in(nrows, ncols);
+          auto fill_in_splits = fill_in.split(vec{},
+                                              vec{ncols - right_col_rank});
+          // Fill oc part
+          matmul(lower2_scaled, right_splits[0], fill_in_splits[0],
+                 false, false, -1.0, 1.0);
+          // Fill oo part
+          matmul(lower2_scaled, right_splits[1], fill_in_splits[1],
+                 false, false, -1.0, 1.0);
+
+          // rank*b fill-in always has a form of (Ui_o)^T*Aik*Vk_c * inv(Akk_cc) * (Uk_c)^T*A_kj
+          // Convert to b*b block by applying Ui_o from left
+          // Which is safe from bases update since i has been eliminated before (i < k)
+          Matrix projected_fill_in = matmul(U(i, level), fill_in);
+
+          // Save or accumulate with existing fill-in
+          if (!F.exists(i, j)) {
+            F.insert(i, j, std::move(projected_fill_in));
+            // std::cout << "SC into new rank*b fill-in F(" << i << "," << j << ")" << std::endl;
           }
           else {
-            // Must be a new rank*nb fill-in
-            int64_t nrows = lower_row_rank;
-            int64_t ncols = D(block, j, level).cols;
-            Matrix fill_in(nrows, ncols);
-            auto fill_in_splits = fill_in.split(vec{},
-                                                vec{ncols - right_col_rank});
-            matmul(lower2_scaled, right_splits[0], fill_in_splits[0],
-                   false, false, -1.0, 1.0);
-            F.insert(i, j, std::move(fill_in));
-            // std::cout << "SC into new rank*nb LR block F(" << i << "," << j << ")_oc" << std::endl;
+            // std::cout << "SC into existing rank*b fill-in F(" << i << "," << j << ")" << std::endl;
+            assert(F(i, j).rows == D(i, block, level).rows);
+            assert(F(i, j).cols == D(block, j, level).cols);
+            F(i, j) += projected_fill_in;
           }
         }
       }
     }
     // Schur's complement into low-rank block (fill-in)
-    // oc x co -> oo
-    for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j < nblocks; ++j) {
+    // Produces rank*rank fill-in
+    for (int64_t i = 0; i < block; ++i) {
+      for (int64_t j = 0; j < block; ++j) {
         if ((is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) &&
             (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
             (is_admissible.exists(i, j, level) && is_admissible(i, j, level))) {
-          int64_t lower_row_rank =
-              level == height ? U(i, level).cols : U(i * 2, level + 1).cols;
-          int64_t right_col_rank =
-              level == height ? U(j, level).cols : U(j * 2, level + 1).cols;
+          int64_t lower_row_rank = U(i, level).cols;
+          int64_t right_col_rank = U(j, level).cols;
           auto lower_splits = D(i, block, level).split(
-              vec{D(i, block, level).rows - lower_row_rank},
-              vec{D(i, block, level).cols - U(block, level).cols});
+              vec{D(i, block, level).rows - lower_row_rank}, vec{diag_col_split});
           auto right_splits = D(block, j, level).split(
-              vec{D(block, j, level).rows - U(block, level).cols},
-              vec{D(block, j, level).cols - right_col_rank});
-
+              vec{diag_row_split}, vec{D(block, j, level).cols - right_col_rank});
           Matrix lower2_scaled(lower_splits[2]);
           column_scale(lower2_scaled, Dcc);
-          if (F.exists(i, j)) {
-            Matrix& fill_in = F(i, j);
-            if ((fill_in.rows == D(i, block, level).rows) &&
-                (fill_in.cols == D(block, j, level).cols)) {
-              // Part of nb*nb fill-in
-              auto fill_in_splits = fill_in.split(vec{fill_in.rows - lower_row_rank},
-                                                  vec{fill_in.cols - right_col_rank});
-              // Update oo part of fill-in block
-              matmul(lower2_scaled, right_splits[1], fill_in_splits[3],
-                   false, false, -1.0, 1.0);
-              // std::cout << "SC into existing nb*nb LR block F(" << i << "," << j << ")_oo" << std::endl;
-            }
-            else if ((fill_in.rows == D(i, block, level).rows) &&
-                     (fill_in.cols == right_col_rank)) {
-              // Part of nb*rank fill-in
-              auto fill_in_splits = fill_in.split(vec{fill_in.rows - lower_row_rank},
-                                                  vec{});
-              // Update oo part of fill-in block
-              matmul(lower2_scaled, right_splits[1], fill_in_splits[1],
-                   false, false, -1.0, 1.0);
-              // std::cout << "SC into existing nb*rank LR block F(" << i << "," << j << ")_oo" << std::endl;
-            }
-            else if ((fill_in.rows == lower_row_rank) &&
-                     (fill_in.cols == D(block, j, level).cols)) {
-              // Part of rank*nb fill-in
-              auto fill_in_splits = fill_in.split(vec{},
-                                                  vec{fill_in.cols - right_col_rank});
-              // Update oo part of fill-in block
-              matmul(lower2_scaled, right_splits[1], fill_in_splits[1],
-                   false, false, -1.0, 1.0);
-              // std::cout << "SC into existing rank*nb LR block F(" << i << "," << j << ")_oo" << std::endl;
-            }
+
+          // Create rank*rank fill-in block
+          int64_t nrows = lower_row_rank;
+          int64_t ncols = right_col_rank;
+          Matrix fill_in(nrows, ncols);
+          // Fill oo part
+          matmul(lower2_scaled, right_splits[1], fill_in,
+                 false, false, -1.0, 1.0);
+
+          // rank*rank fill-in always has a form of (Ui_o)^T*Aik*Vk_c * inv(Akk_cc) * (Uk_c)^T*A_kj*Vj_o
+          // Convert to b*b block by applying Ui_o from left and (Vj_o)^T from right
+          // Which is safe from bases update since i and j have been eliminated before (i,j < k)
+          Matrix projected_fill_in = matmul(matmul(U(i, level), fill_in),
+                                            U(j, level), false, true);
+
+          // Save or accumulate with existing fill-in
+          if (!F.exists(i, j)) {
+            F.insert(i, j, std::move(projected_fill_in));
+            // std::cout << "SC into new rank*rank fill-in F(" << i << "," << j << ")" << std::endl;
           }
           else {
-            // Must be a new rank*rank fill-in
-            // Update S(i, j, level) directly since they share U and V bases
-            matmul(lower2_scaled, right_splits[1], S(i, j, level),
-                   false, false, -1.0, 1.0);
-            // std::cout << "SC into rank*rank LR block S(" << i << "," << j << ")_oo" << std::endl;
+            // std::cout << "SC into existing rank*rank fill-in F(" << i << "," << j << ")" << std::endl;
+            assert(F(i, j).rows == D(i, block, level).rows);
+            assert(F(i, j).cols == D(block, j, level).cols);
+            F(i, j) += projected_fill_in;
           }
         }
       }
@@ -1729,6 +1648,7 @@ void SymmetricH2::factorize_level(const Domain& domain,
 void SymmetricH2::factorize(const Domain& domain) {
   // std::cout << "===========BEGIN FACTORIZE==============" << std::endl;
   int64_t level = height;
+  RowColMap<Matrix> F;
   RowMap r;
 
   for (; level > 0; --level) {
@@ -1747,7 +1667,26 @@ void SymmetricH2::factorize(const Domain& domain) {
       break;
     }
 
-    factorize_level(domain, level, nblocks, r);
+    factorize_level(domain, level, nblocks, F, r);
+
+    // Update coupling matrices of admissible blocks in the current level
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+          if (r.exists(i)) {
+            S(i, j, level) = matmul(r(i), S(i, j, level));
+          }
+          if (r.exists(j)) {
+            S(i, j, level) = matmul(S(i, j, level), r(j), false, true);
+          }
+          if (F.exists(i, j)) {
+            Matrix projected_fill_in = matmul(matmul(U(i, level), F(i, j), true),
+                                              U(j, level));
+            S(i, j, level) += projected_fill_in;
+          }
+        }
+      }
+    }
 
     // Update transfer matrices on one level higher.
     int64_t parent_level = level - 1;
@@ -1783,7 +1722,6 @@ void SymmetricH2::factorize(const Domain& domain) {
 
         U.erase(parent_node, parent_level);
         U.insert(parent_node, parent_level, std::move(temp));
-        // TODO Update S block in parent node as well (reflect bases update if any)
       }
       else {
         // Use identity matrix as U bases whenever all dense row is encountered during merge
@@ -1864,6 +1802,7 @@ void SymmetricH2::factorize(const Domain& domain) {
         }
       }
     }
+    F.erase_all();
   } // for (; level > 0; --level)
 
   // Factorize remaining root level
