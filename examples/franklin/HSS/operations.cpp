@@ -194,8 +194,15 @@ solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
     level_offset = permute_forward(A, x, level, level_offset);
   }
 
+  x_splits = x.split(std::vector<int64_t>(1, level_offset), {});
+  Matrix x_last(x_splits[1]);
+
   // last block forward
+  solve_triangular(A.D(0, 0, 0), x_last, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
   // last block backward
+  solve_triangular(A.D(0, 0, 0), x_last, Hatrix::Left, Hatrix::Lower, false, true, 1.0);
+
+  x_splits[1] = x_last;
 
   // backward substitution.
   for (int64_t level = A.min_level+1; level <= A.max_level; ++level) {
