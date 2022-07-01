@@ -133,6 +133,41 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
   }
 }
 
+static void
+solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
+                     const int64_t level) {
+  int64_t nblocks = pow(2, level);
+  std::vector<int64_t> col_offsets;
+  int64_t nrows = 0;
+  for (int64_t i = 0; i < nblocks; ++i) {
+    col_offsets.push_back(nrows + A.D(i, i, level).cols);
+    nrows += A.D(i, i, level).cols;
+  }
+  std::vector<Matrix> x_level_split = x_level.split(col_offsets, {});
+
+  // backward substition using cc blocks
+  for (int64_t block = nblocks-1; block >= 0; --block) {
+    int64_t rank = A.ranks(block, level);
+    int64_t row_split = A.D(block, block, level).rows - rank;
+    int64_t col_split = A.D(block, block, level).cols - rank;
+    auto block_splits = SPLIT_DENSE(A.D(block, block, level), row_split, col_split);
+
+    Matrix x_block(x_level_split[block]);
+    auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+    matmul(block_splits[2], x_block_splits[1], x_block_splits[0], true, false, -1.0, 1.0);
+    solve_triangular(block_splits[0], x_block_splits[0],
+                     Hatrix::Left, Hatrix::Lower, false, true, 1.0);
+    x_level_split[block] = x_block;
+  }
+
+  for (int64_t block = nblocks-1; block >= 0; --block) {
+    auto V_F = make_complement(A.U(block, level));
+    Matrix prod = matmul(V_F, x_level_split[block]);
+    x_level_split[block] = prod;
+  }
+
+}
+
 static int64_t
 permute_forward(const SymmetricSharedBasisMatrix& A,
                 Matrix& x, int64_t level, int64_t permute_offset) {
@@ -246,6 +281,15 @@ solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
     Matrix x_level(n, 1);
 
     level_offset = permute_backward(A, x, level, level_offset);
+    for (int64_t i = 0; i < x_level.rows; ++i) {
+      x_level(i, 0) = x(level_offset + i, 0);
+    }
+
+    solve_backward_level(A, x_level, level);
+
+    for (int64_t i = 0; i < x_level.rows; ++i) {
+      x(level_offset + i, 0) = x_level(i, 0);
+    }
 
   }
   return x;
