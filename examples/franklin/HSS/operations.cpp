@@ -167,6 +167,39 @@ permute_forward(const SymmetricSharedBasisMatrix& A,
   return permute_offset;
 }
 
+static int64_t
+permute_backward(const SymmetricSharedBasisMatrix& A,
+                 Matrix& x, const int64_t level, int64_t rank_offset) {
+  Matrix copy(x);
+  int64_t num_nodes = pow(2, level);
+  int64_t c_offset = rank_offset;
+  for (int64_t block = 0; block < num_nodes; ++block) {
+    c_offset -= A.D(block, block, level).cols - A.ranks(block, level);
+  }
+
+  int64_t csize_offset = 0, bsize_offset = 0, rsize_offset = 0;
+  for (int64_t block = 0; block < num_nodes; ++block) {
+    int64_t cols = A.D(block, block, level).cols;
+    int64_t c_size = cols - A.ranks(block, level);
+
+    for (int64_t i = 0; i < c_size; ++i) {
+      copy(c_offset + bsize_offset + i, 0) = x(c_offset + csize_offset + i, 0);
+    }
+
+    for (int64_t i = 0; i < A.ranks(block, level); ++i) {
+      copy(c_offset + bsize_offset + c_size + i, 0) = x(rank_offset + rsize_offset + i, 0);
+    }
+
+    csize_offset += c_size;
+    bsize_offset += cols;
+    rsize_offset += A.ranks(block, level);
+  }
+
+  x = copy;
+
+  return c_offset;
+}
+
 
 Matrix
 solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
@@ -198,14 +231,21 @@ solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
   Matrix x_last(x_splits[1]);
 
   // last block forward
-  solve_triangular(A.D(0, 0, 0), x_last, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+  solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
   // last block backward
-  solve_triangular(A.D(0, 0, 0), x_last, Hatrix::Left, Hatrix::Lower, false, true, 1.0);
+  solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, false, true, 1.0);
 
   x_splits[1] = x_last;
 
   // backward substitution.
   for (int64_t level = A.min_level+1; level <= A.max_level; ++level) {
+    int64_t nblocks = pow(2, level);
+
+    int64_t n = 0;
+    for (int64_t i = 0; i < nblocks; ++i) { n += A.D(i, i, level).cols; }
+    Matrix x_level(n, 1);
+
+    level_offset = permute_backward(A, x, level, level_offset);
 
   }
   return x;
