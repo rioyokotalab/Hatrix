@@ -103,7 +103,34 @@ void factorize(SymmetricSharedBasisMatrix& A) {
 static void
 solve_forward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
                     const int64_t level) {
+  int64_t nblocks = pow(2, level);
+  std::vector<int64_t> row_offsets;
+  int64_t nrows = 0;
+  for (int64_t i = 0; i < nblocks; ++i) {
+    row_offsets.push_back(nrows + A.D(i, i, level).rows);
+    nrows += A.D(i, i, level).rows;
+  }
+  std::vector<Matrix> x_level_split = x_level.split(row_offsets, {});
 
+  for (int64_t block = 0; block < nblocks; ++block) {
+    Matrix U_F = make_complement(A.U(block, level));
+    Matrix prod = matmul(U_F, x_level_split[block], true);
+    x_level_split[block] = prod;
+  }
+
+  // forward substitution with cc blocks
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t row_split = A.D(block, block, level).rows - A.ranks(block, level);
+    int64_t col_split = A.D(block, block, level).cols - A.ranks(block, level);
+    auto block_splits = SPLIT_DENSE(A.D(block, block, level), row_split, col_split);
+
+    Matrix x_block(x_level_split[block]);
+    auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+
+    solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
+    matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
+    x_level_split[block] = x_block;
+  }
 }
 
 static int64_t
