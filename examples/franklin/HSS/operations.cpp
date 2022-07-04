@@ -290,7 +290,6 @@ solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
     for (int64_t i = 0; i < x_level.rows; ++i) {
       x(level_offset + i, 0) = x_level(i, 0);
     }
-
   }
   return x;
 }
