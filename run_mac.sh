@@ -28,7 +28,7 @@ for nprocs in 1; do
                    --nleaf 32 \
                    --kernel_func laplace \
                    --kind_of_geometry col_file_3d \
-                   --geometry_file /Users/sameer/57114x1.dat
+                   --geometry_file /Users/sameer/57114x1.dat \
                    --ndim 1 \
                    --max_rank 32 \
                    --accuracy 1e-11 \

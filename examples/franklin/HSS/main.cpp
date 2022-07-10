@@ -34,6 +34,9 @@ int main(int argc, char* argv[]) {
   else if (opts.kind_of_geometry == CIRCULAR) {
     domain.generate_circular_particles(0, opts.N);
   }
+  else if (opts.kind_of_geometry == COL_FILE_3D) {
+    domain.read_col_file_3d(opts.geometry_file);
+  }
   domain.divide_domain_and_create_particle_boxes(opts.nleaf);
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
