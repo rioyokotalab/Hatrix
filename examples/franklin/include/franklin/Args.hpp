@@ -15,6 +15,7 @@ namespace Hatrix {
     kernel_function kernel;    // kernel function for matrix generation
     std::string kernel_verbose; // name of the kernel function
     KIND_OF_GEOMETRY kind_of_geometry;
+    std::string geometry_file; // if the geometry is to be read from a file.
     int64_t ndim;
     int64_t max_rank;
     double admis;               // admissibility value

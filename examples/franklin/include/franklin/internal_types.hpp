@@ -8,7 +8,7 @@ namespace Hatrix {
   constexpr int INIT_VALUE = -1;
   constexpr int oversampling = 5;
   enum KERNEL_FUNC {LAPLACE, SQR_EXP, SINE};
-  enum KIND_OF_GEOMETRY {GRID, CIRCULAR};
+  enum KIND_OF_GEOMETRY {GRID, CIRCULAR, COL_FILE_3D};
   enum ADMIS_KIND {DIAGONAL, GEOMETRY};
   enum CONSTRUCT_ALGORITHM {MIRO, MIRO_FASTER, ID_RANDOM};
 
