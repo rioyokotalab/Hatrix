@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
-  Matrix x = generate_random_matrix(opts.N, 1);
+  Matrix x = generate_range_matrix(opts.N, 1, 0);
   Matrix b;
   Matrix HSS_solution;
 
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
   Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
   double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
-  double solve_error = Hatrix::norm(dense_solution - HSS_solution) / Hatrix::norm(dense_solution);
+  double solve_error = Hatrix::norm(dense_solution - HSS_solution) / opts.N;Hatrix::norm(dense_solution);
 
   std::cout << "-------------------------------\n";
   std::cout << "N               : " << opts.N << std::endl;

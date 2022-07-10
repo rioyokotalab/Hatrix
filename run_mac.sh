@@ -24,13 +24,13 @@ export TMPDIR=/tmp
 # done
 
 for nprocs in 1; do
-    ./bin/HSS_main --N 1024 \
-                   --nleaf 128 \
+    ./bin/HSS_main --N 128 \
+                   --nleaf 32 \
                    --kernel_func laplace \
                    --kind_of_geometry circular \
                    --ndim 1 \
-                   --max_rank 100 \
-                   --accuracy 1e-5 \
+                   --max_rank 32 \
+                   --accuracy 1e-11 \
                    --admis 0 \
                    --admis_kind diagonal \
                    --construct_algorithm miro \

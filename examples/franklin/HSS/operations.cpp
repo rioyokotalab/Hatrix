@@ -34,14 +34,14 @@ factorize_level(const int64_t level,
                 SymmetricSharedBasisMatrix& A) {
   int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    int64_t block_rank = A.ranks(block, level);
+    int64_t rank = A.ranks(block, level);
     int64_t block_size = A.D(block, block, level).rows;
     Matrix U_F = make_complement(A.U(block, level));
 
     // TODO: use triangular matrix and use a trinangular matrix multiplication.
     A.D(block, block, level) = matmul((matmul(U_F, A.D(block, block, level), true, false)),
                                     U_F);
-    int64_t split_size = block_size - block_rank;
+    int64_t split_size = block_size - rank;
 
     auto D_splits = SPLIT_DENSE(A.D(block, block, level), split_size, split_size);
     Matrix& Dcc = D_splits[0];
@@ -120,14 +120,16 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
 
   // forward substitution with cc blocks
   for (int64_t block = 0; block < nblocks; ++block) {
-    int64_t row_split = A.D(block, block, level).rows - A.ranks(block, level);
-    int64_t col_split = A.D(block, block, level).cols - A.ranks(block, level);
+    int64_t rank = A.ranks(block, level);
+    int64_t row_split = A.D(block, block, level).rows - rank;
+    int64_t col_split = A.D(block, block, level).cols - rank;
     auto block_splits = SPLIT_DENSE(A.D(block, block, level), row_split, col_split);
 
     Matrix x_block(x_level_split[block]);
     auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
 
-    solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, true);
+    solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, false,
+                     false, 1.0);
     matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
     x_level_split[block] = x_block;
   }
@@ -165,7 +167,6 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     Matrix prod = matmul(V_F, x_level_split[block]);
     x_level_split[block] = prod;
   }
-
 }
 
 static int64_t
@@ -266,7 +267,7 @@ solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
   Matrix x_last(x_splits[1]);
 
   // last block forward
-  solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, true, false, 1.0);
+  solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, false, false, 1.0);
   // last block backward
   solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, false, true, 1.0);
 
