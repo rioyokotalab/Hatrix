@@ -24,8 +24,8 @@ export TMPDIR=/tmp
 # done
 
 for nprocs in 1; do
-    ./bin/HSS_main --N 128 \
-                   --nleaf 32 \
+    lldb -- ./bin/HSS_main --N 57114 \
+                   --nleaf 128 \
                    --kernel_func laplace \
                    --kind_of_geometry col_file_3d \
                    --geometry_file /Users/sameer/57114x1.dat \
