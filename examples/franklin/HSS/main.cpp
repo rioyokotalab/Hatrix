@@ -34,12 +34,16 @@ int main(int argc, char* argv[]) {
   else if (opts.kind_of_geometry == CIRCULAR) {
     domain.generate_circular_particles(0, opts.N);
   }
+  else if (opts.kind_of_geometry == COL_FILE_3D) {
+    domain.read_col_file_3d(opts.geometry_file);
+  }
   domain.divide_domain_and_create_particle_boxes(opts.nleaf);
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
   Matrix x = generate_random_matrix(opts.N, 1);
+  x *= 1000;
   Matrix b;
   Matrix HSS_solution;
 
@@ -50,10 +54,10 @@ int main(int argc, char* argv[]) {
     auto begin_construct = std::chrono::system_clock::now();
     SymmetricSharedBasisMatrix A;
     if (opts.admis_kind == DIAGONAL) {
-      init_diagonal_admis(A, opts);
+      init_diagonal_admis(A, domain, opts);
     }
     else {
-      init_geometry_admis(A, opts);
+      init_geometry_admis(A, domain, opts);
     }
     construct_h2_matrix_miro(A, domain, opts);
     auto stop_construct = std::chrono::system_clock::now();
@@ -72,7 +76,7 @@ int main(int argc, char* argv[]) {
   Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
   double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
-  double solve_error = Hatrix::norm(dense_solution - HSS_solution) / Hatrix::norm(dense_solution);
+  double solve_error = Hatrix::norm(dense_solution - HSS_solution) / opts.N;
 
   std::cout << "-------------------------------\n";
   std::cout << "N               : " << opts.N << std::endl;

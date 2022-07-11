@@ -10,6 +10,7 @@ namespace Hatrix {
     {"nleaf",               required_argument, 0, 'l'},
     {"kernel_func",         required_argument, 0, 'k'},
     {"kind_of_geometry",    required_argument, 0, 'g'},
+    {"geometry_file",       required_argument, 0, 'f'},
     {"ndim",                required_argument, 0, 'd'},
     {"max_rank",            required_argument, 0, 'r'},
     {"accuracy",            required_argument, 0, 'e'},
@@ -61,7 +62,7 @@ namespace Hatrix {
       max_rank(2),
       admis(0),
       accuracy(1),
-      add_diag(1-4),
+      add_diag(1e-4),
       admis_kind(DIAGONAL),
       construct_algorithm(MIRO),
       use_nested_basis(true),
@@ -71,7 +72,7 @@ namespace Hatrix {
     KERNEL_FUNC kfunc;
     while(1) {
       int option_index;
-      int c = getopt_long(argc, argv, "n:l:k:g:d:r:e:a:m:c:z:bvh",
+      int c = getopt_long(argc, argv, "n:l:k:f:g:d:r:e:a:m:c:z:bvh",
                           long_options, &option_index);
 
       if (c == -1) break;
@@ -100,6 +101,9 @@ namespace Hatrix {
         }
         else if (!strcmp(optarg, "circular")) {
           kind_of_geometry = CIRCULAR;
+        }
+        else if (!strcmp(optarg, "col_file_3d")) {
+          kind_of_geometry = COL_FILE_3D;
         }
         else {
           throw std::invalid_argument("Cannot support " +
@@ -131,6 +135,9 @@ namespace Hatrix {
                                       std::string(optarg) +
                                       " for --admis_kind (-m).");
         }
+        break;
+      case 'f':
+        geometry_file = std::string(optarg);
         break;
       case 'c':
         if (!strcmp(optarg, "miro")) {
@@ -181,7 +188,12 @@ namespace Hatrix {
             "--N (-n)                                    : Number of points to consider (%lld).\n"
             "--nleaf (-l)                                : Max. number of points in a leaf node (%lld).\n"
             "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
-            "--kind_of_geometry (-g) [sphere|grid]       : Kind of geometry of the points  (%s).\n"
+            "--kind_of_geometry (-g) [sphere|grid|       \n"
+            " 3d_col_fild]                               : Kind of geometry of the points (%s). \n"
+            "                                              If specifying 3d_col_file you must specify a geometry \n"
+            "                                              file with fields <x y z cluster_num> using. \n"
+            "                                              geometry_file or -f. \n"
+            "--geometry_file (-f)                        : Geometry file. Reader format determined by --kind_of_geometry (%s). \n"
             "--ndim (-d)                                 : Number of dimensions of the geometry (%lld).\n"
             "--max_rank (-r)                             : Maximum rank (%lld).\n"
             "--accuracy (-e)                             : Desired accuracy for construction. > 0 for constant rank construction. (%lf).\n"
@@ -197,6 +209,7 @@ namespace Hatrix {
             nleaf,
             kernel_verbose.c_str(),
             geometry_to_string(kind_of_geometry).c_str(),
+            "",
             ndim,
             max_rank,
             accuracy,

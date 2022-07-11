@@ -28,6 +28,7 @@ namespace Hatrix {
     void generate_circular_particles(double min_val, double max_val);
     void divide_domain_and_create_particle_boxes(int64_t nleaf);
     void generate_grid_particles();
+    void read_col_file_3d(const std::string& geometry_file);
     void print_file(std::string file_name);
   };
 }

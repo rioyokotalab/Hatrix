@@ -739,7 +739,8 @@ namespace Hatrix {
   }
 
 
-  void H2::update_row_basis(int64_t row, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& r) {
+  void H2::update_row_basis(int64_t row,
+                            int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& r) {
     int64_t nblocks = level_blocks[level];
     int64_t block_size = D(row, row, level).rows;
     Matrix row_block(block_size, 0);
@@ -771,7 +772,8 @@ namespace Hatrix {
     r.insert(row, std::move(r_row));
   }
 
-  void H2::update_col_basis(int64_t col, int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& t) {
+  void H2::update_col_basis(int64_t col,
+                            int64_t level, RowColMap<Matrix>& F, RowMap<Hatrix::Matrix>& t) {
     int64_t block_size = D(col, col, level).rows;
     int64_t nblocks = level_blocks[level];
     Matrix col_block(0, block_size);

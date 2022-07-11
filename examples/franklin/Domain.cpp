@@ -256,4 +256,18 @@ namespace Hatrix {
       orthogonal_recursive_bisection_3dim(0, N, std::string(""), nleaf, 0);
     }
   }
+
+  void
+  Domain::read_col_file_3d(const std::string& geometry_file) {
+    std::ifstream file;
+    file.open(geometry_file, std::ios::in);
+    double x, y, z, kmeans_index;
+
+    for (int64_t line = 0; line < N; ++line) {
+      file >> x >> y >> z >> kmeans_index;
+      particles.push_back(Hatrix::Particle(x, y, z, kmeans_index));
+    }
+
+    file.close();
+  }
 }

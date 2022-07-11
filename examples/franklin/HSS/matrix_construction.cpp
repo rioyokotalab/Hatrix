@@ -59,13 +59,13 @@ static int64_t diagonal_admis_init(SymmetricSharedBasisMatrix& A, const Args& op
   return diagonal_admis_init(A, opts, level-1);
 }
 
-void init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {
-  A.max_level = int64_t(log2(opts.N / opts.nleaf));
+void init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+  A.max_level = int64_t(log2(domain.boxes.size())); // 2^max_level = num_leaf_boxes
   A.min_level = diagonal_admis_init(A, opts, A.max_level);
   A.is_admissible.insert(0, 0, 0, false);
 }
 
-void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {
+void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   throw std::exception();
 }
 
@@ -358,9 +358,6 @@ reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
 
           dense_norm += pow(norm(actual_matrix), 2);
           error += pow(norm(expected_matrix - actual_matrix), 2);
-
-          std::cout << "r: " << row << " c: " << col << " l: "
-                    << level << std::sqrt(error / dense_norm) << std::endl;
         }
       }
     }

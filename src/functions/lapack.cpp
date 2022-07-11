@@ -109,12 +109,10 @@ Matrix lu_solve(const Matrix& A, const Matrix& b) {
 Matrix cholesky_solve(const Matrix&A, const Matrix& b, const Mode uplo) {
   Matrix x(b);
   Matrix Ac(A);
-  LAPACKE_dppsv(LAPACK_COL_MAJOR,
-                uplo == Lower ? 'L' : 'U',
-                Ac.rows, x.cols,
-                &Ac,
-                &x,
-                x.stride);
+
+  cholesky(Ac, uplo);
+  solve_triangular(Ac, x, Hatrix::Left, uplo, false, false, 1.0);
+  solve_triangular(Ac, x, Hatrix::Left, uplo, false, true, 1.0);
 
   return x;
 }

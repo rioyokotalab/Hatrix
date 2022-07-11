@@ -34,14 +34,14 @@ factorize_level(const int64_t level,
                 SymmetricSharedBasisMatrix& A) {
   int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    int64_t block_rank = A.ranks(block, level);
+    int64_t rank = A.ranks(block, level);
     int64_t block_size = A.D(block, block, level).rows;
     Matrix U_F = make_complement(A.U(block, level));
 
     // TODO: use triangular matrix and use a trinangular matrix multiplication.
     A.D(block, block, level) = matmul((matmul(U_F, A.D(block, block, level), true, false)),
                                     U_F);
-    int64_t split_size = block_size - block_rank;
+    int64_t split_size = block_size - rank;
 
     auto D_splits = SPLIT_DENSE(A.D(block, block, level), split_size, split_size);
     Matrix& Dcc = D_splits[0];
@@ -100,27 +100,197 @@ void factorize(SymmetricSharedBasisMatrix& A) {
   cholesky(A.D(0, 0, 0), Hatrix::Lower);
 }
 
+static void
+solve_forward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
+                    const int64_t level) {
+  int64_t nblocks = pow(2, level);
+  std::vector<int64_t> row_offsets;
+  int64_t nrows = 0;
+  for (int64_t i = 0; i < nblocks; ++i) {
+    row_offsets.push_back(nrows + A.D(i, i, level).rows);
+    nrows += A.D(i, i, level).rows;
+  }
+  std::vector<Matrix> x_level_split = x_level.split(row_offsets, {});
+
+  for (int64_t block = 0; block < nblocks; ++block) {
+    Matrix U_F = make_complement(A.U(block, level));
+    Matrix prod = matmul(U_F, x_level_split[block], true);
+    x_level_split[block] = prod;
+  }
+
+  // forward substitution with cc blocks
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t rank = A.ranks(block, level);
+    int64_t row_split = A.D(block, block, level).rows - rank;
+    int64_t col_split = A.D(block, block, level).cols - rank;
+    auto block_splits = SPLIT_DENSE(A.D(block, block, level), row_split, col_split);
+
+    Matrix x_block(x_level_split[block]);
+    auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+
+    solve_triangular(block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Lower, false,
+                     false, 1.0);
+    matmul(block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
+    x_level_split[block] = x_block;
+  }
+}
+
+static void
+solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
+                     const int64_t level) {
+  int64_t nblocks = pow(2, level);
+  std::vector<int64_t> col_offsets;
+  int64_t nrows = 0;
+  for (int64_t i = 0; i < nblocks; ++i) {
+    col_offsets.push_back(nrows + A.D(i, i, level).cols);
+    nrows += A.D(i, i, level).cols;
+  }
+  std::vector<Matrix> x_level_split = x_level.split(col_offsets, {});
+
+  // backward substition using cc blocks
+  for (int64_t block = nblocks-1; block >= 0; --block) {
+    int64_t rank = A.ranks(block, level);
+    int64_t row_split = A.D(block, block, level).rows - rank;
+    int64_t col_split = A.D(block, block, level).cols - rank;
+    auto block_splits = SPLIT_DENSE(A.D(block, block, level), row_split, col_split);
+
+    Matrix x_block(x_level_split[block]);
+    auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
+    matmul(block_splits[2], x_block_splits[1], x_block_splits[0], true, false, -1.0, 1.0);
+    solve_triangular(block_splits[0], x_block_splits[0],
+                     Hatrix::Left, Hatrix::Lower, false, true, 1.0);
+    x_level_split[block] = x_block;
+  }
+
+  for (int64_t block = nblocks-1; block >= 0; --block) {
+    auto V_F = make_complement(A.U(block, level));
+    Matrix prod = matmul(V_F, x_level_split[block]);
+    x_level_split[block] = prod;
+  }
+}
+
+static int64_t
+permute_forward(const SymmetricSharedBasisMatrix& A,
+                Matrix& x, int64_t level, int64_t permute_offset) {
+  Matrix copy(x);
+  int64_t num_nodes = pow(2, level);
+  int64_t c_offset = permute_offset;
+  for (int64_t block = 0; block < num_nodes; ++block) {
+    permute_offset += A.D(block, block, level).rows - A.ranks(block, level);
+  }
+
+  int64_t csize_offset = 0, bsize_offset = 0, rsize_offset = 0;
+  for (int64_t block = 0; block < num_nodes; ++block) {
+    int64_t rows = A.D(block, block, level).rows;
+    int64_t c_size = rows - A.ranks(block, level);
+
+    // copy the complement part of the vector into the temporary vector
+    for (int64_t i = 0; i < c_size; ++i) {
+      copy(c_offset + csize_offset + i, 0) = x(c_offset + bsize_offset + i, 0);
+    }
+    // copy the rank part of the vector into the temporary vector
+    for (int64_t i = 0; i < A.ranks(block, level); ++i) {
+      copy(permute_offset + rsize_offset + i, 0) =
+        x(c_offset + bsize_offset + c_size + i, 0);
+    }
+
+    csize_offset += c_size;
+    bsize_offset += rows;
+    rsize_offset += A.ranks(block, level);
+  }
+
+  x = copy;
+  return permute_offset;
+}
+
+static int64_t
+permute_backward(const SymmetricSharedBasisMatrix& A,
+                 Matrix& x, const int64_t level, int64_t rank_offset) {
+  Matrix copy(x);
+  int64_t num_nodes = pow(2, level);
+  int64_t c_offset = rank_offset;
+  for (int64_t block = 0; block < num_nodes; ++block) {
+    c_offset -= A.D(block, block, level).cols - A.ranks(block, level);
+  }
+
+  int64_t csize_offset = 0, bsize_offset = 0, rsize_offset = 0;
+  for (int64_t block = 0; block < num_nodes; ++block) {
+    int64_t cols = A.D(block, block, level).cols;
+    int64_t c_size = cols - A.ranks(block, level);
+
+    for (int64_t i = 0; i < c_size; ++i) {
+      copy(c_offset + bsize_offset + i, 0) = x(c_offset + csize_offset + i, 0);
+    }
+
+    for (int64_t i = 0; i < A.ranks(block, level); ++i) {
+      copy(c_offset + bsize_offset + c_size + i, 0) = x(rank_offset + rsize_offset + i, 0);
+    }
+
+    csize_offset += c_size;
+    bsize_offset += cols;
+    rsize_offset += A.ranks(block, level);
+  }
+
+  x = copy;
+
+  return c_offset;
+}
+
+
 Matrix
 solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
   Matrix x(b);
   int64_t level_offset = 0;
-  int64_t level = A.max_level;
+  std::vector<Matrix> x_splits;
 
   // forward substitution.
-  // std::vector<Hatrix::Matrix> x_offset_views = x.split(std::vector<int64_t>(1, 0),
-  //                                                      {});
   for (int64_t level = A.max_level; level > A.min_level; --level) {
     int nblocks = pow(2, level);
-    // solve_forward_level(A, x_offset_views[1], level);
-    // level_offset = permute_forward(x, level, rhs_offset);
+    int64_t n = 0;              // total vector length due to variable ranks.
+    for (int64_t i = 0; i < nblocks; ++i) { n += A.D(i, i, level).rows; }
+
+    Matrix x_level(n, 1);
+    for (int64_t i = 0; i < x_level.rows; ++i) {
+      x_level(i, 0) = x(level_offset + i, 0);
+    }
+
+    solve_forward_level(A, x_level, level);
+
+    for (int64_t i = 0; i < x_level.rows; ++i) {
+      x(level_offset + i, 0) = x_level(i, 0);
+    }
+
+    level_offset = permute_forward(A, x, level, level_offset);
   }
 
+  x_splits = x.split(std::vector<int64_t>(1, level_offset), {});
+  Matrix x_last(x_splits[1]);
+
   // last block forward
+  solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, false, false, 1.0);
   // last block backward
+  solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, false, true, 1.0);
+
+  x_splits[1] = x_last;
 
   // backward substitution.
   for (int64_t level = A.min_level+1; level <= A.max_level; ++level) {
+    int64_t nblocks = pow(2, level);
 
+    int64_t n = 0;
+    for (int64_t i = 0; i < nblocks; ++i) { n += A.D(i, i, level).cols; }
+    Matrix x_level(n, 1);
+
+    level_offset = permute_backward(A, x, level, level_offset);
+    for (int64_t i = 0; i < x_level.rows; ++i) {
+      x_level(i, 0) = x(level_offset + i, 0);
+    }
+
+    solve_backward_level(A, x_level, level);
+
+    for (int64_t i = 0; i < x_level.rows; ++i) {
+      x(level_offset + i, 0) = x_level(i, 0);
+    }
   }
   return x;
 }
