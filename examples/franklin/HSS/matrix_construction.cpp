@@ -59,13 +59,13 @@ static int64_t diagonal_admis_init(SymmetricSharedBasisMatrix& A, const Args& op
   return diagonal_admis_init(A, opts, level-1);
 }
 
-void init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {
-  A.max_level = int64_t(log2(opts.N / opts.nleaf));
+void init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+  A.max_level = int64_t(log2(domain.boxes.size())); // 2^max_level = num_leaf_boxes
   A.min_level = diagonal_admis_init(A, opts, A.max_level);
   A.is_admissible.insert(0, 0, 0, false);
 }
 
-void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Args& opts) {
+void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   throw std::exception();
 }
 
@@ -80,9 +80,23 @@ generate_column_block(int64_t block, int64_t block_size,
   auto rand_splits = rand.split(nblocks, 1);
   Matrix AY(block_size, rand.cols);
 
+  std::cout << "split blocks: ";
+  for (int i = 0; i < nblocks; ++i) {
+    std::cout << "i: " << dense_splits[i * nblocks + i].rows << std::endl;
+  }
+  std::cout << std::endl;
+
   for (int64_t j = 0; j < nblocks; ++j) {
     if (A.is_admissible.exists(block, j, level) &&
         !A.is_admissible(block, j, level)) { continue; }
+    std::cout << " level: " << level
+              << " j: " << j
+              << " d.rows= " << dense_splits[block * nblocks + j].rows
+              << " d.cols= " << dense_splits[block * nblocks + j].cols
+              << " rnd.rows= " << rand_splits[j].rows
+              << " rnd.cols= " << rand_splits[j].cols
+              << " AY.rows= " << AY.rows
+              << " AY.cols= " << AY.cols << std::endl;
     matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
   }
 
@@ -280,9 +294,17 @@ void construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A,
                               const Domain& domain,
                               const Args& opts) {
   int64_t P = opts.max_rank;
+  std::cout << "max: " << A.max_level << " min: " << A.min_level << std::endl;
+  std::cout << "domain blocks: ";
+  for (int i = 0; i < domain.boxes.size(); ++i) {
+    std::cout << domain.boxes[i].num_particles << " ";
+  }
+  std::cout << std::endl;
   Matrix dense = generate_p2p_matrix(domain, opts.kernel);
   Matrix rand = generate_random_matrix(opts.N, P);
   generate_leaf_nodes(domain, A, dense, rand, opts);
+
+
 
   RowLevelMap Uchild = A.U;
 

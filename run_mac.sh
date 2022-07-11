@@ -24,13 +24,12 @@ export TMPDIR=/tmp
 # done
 
 for nprocs in 1; do
-    lldb -- ./bin/HSS_main --N 57114 \
-                   --nleaf 128 \
+    ./bin/HSS_main --N 1000 \
+                   --nleaf 90 \
                    --kernel_func laplace \
-                   --kind_of_geometry col_file_3d \
-                   --geometry_file /Users/sameer/57114x1.dat \
+                   --kind_of_geometry circular \
                    --ndim 1 \
-                   --max_rank 32 \
+                   --max_rank 90 \
                    --accuracy 1e-11 \
                    --admis 0 \
                    --admis_kind diagonal \
