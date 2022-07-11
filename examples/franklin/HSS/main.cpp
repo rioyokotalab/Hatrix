@@ -42,8 +42,6 @@ int main(int argc, char* argv[]) {
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
-  std::cout << "finish domain generation.\n";
-
   Matrix x = generate_range_matrix(opts.N, 1, 0);
   Matrix b;
   Matrix HSS_solution;
@@ -65,13 +63,11 @@ int main(int argc, char* argv[]) {
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
 
-    std::cout << "finish construction.\n";
-
     b = matmul(A, x);
     HSS_max_rank = A.max_rank();
 
-    // factorize(A);
-    // HSS_solution = solve(A, x);
+    factorize(A);
+    HSS_solution = solve(A, x);
   }
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
@@ -79,7 +75,7 @@ int main(int argc, char* argv[]) {
   Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
   double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
-  double solve_error = Hatrix::norm(dense_solution - HSS_solution) / opts.N;Hatrix::norm(dense_solution);
+  double solve_error = Hatrix::norm(dense_solution - HSS_solution) / opts.N;
 
   std::cout << "-------------------------------\n";
   std::cout << "N               : " << opts.N << std::endl;
