@@ -62,7 +62,7 @@ namespace Hatrix {
       max_rank(2),
       admis(0),
       accuracy(1),
-      add_diag(1-4),
+      add_diag(1e-4),
       admis_kind(DIAGONAL),
       construct_algorithm(MIRO),
       use_nested_basis(true),

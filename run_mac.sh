@@ -34,6 +34,6 @@ for nprocs in 1; do
                    --admis 0 \
                    --admis_kind diagonal \
                    --construct_algorithm miro \
-                   --add_diag 1e-5 \
+                   --add_diag 1e-7 \
                    --use_nested_basis
 done

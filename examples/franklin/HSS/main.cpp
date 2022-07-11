@@ -42,7 +42,8 @@ int main(int argc, char* argv[]) {
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
-  Matrix x = generate_range_matrix(opts.N, 1, 0);
+  Matrix x = generate_random_matrix(opts.N, 1);
+  x *= 1000;
   Matrix b;
   Matrix HSS_solution;
 
