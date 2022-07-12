@@ -163,10 +163,10 @@ class SymmetricH2 {
   Matrix compute_S_sum(int64_t row, int64_t row_level);
   Matrix compute_S_concat(int64_t row, int64_t row_level);
   void update_row_cluster_bases(int64_t row, int64_t level,
-                                RowColLevelMap<Matrix>& F, RowMap& r);
+                                RowColLevelMap<Matrix>& F, RowMap<Matrix>& r);
   void factorize_level(const Domain& domain,
                        int64_t level, int64_t nblocks,
-                       RowColLevelMap<Matrix>& F, RowMap& r);
+                       RowColLevelMap<Matrix>& F, RowMap<Matrix>& r);
   int64_t permute_forward(Matrix& x, int64_t level, int64_t rank_offset);
   int64_t permute_backward(Matrix& x, int64_t level, int64_t rank_offset);
   void solve_forward_level(Matrix& x_level, int64_t level);
@@ -1223,7 +1223,7 @@ Matrix SymmetricH2::compute_S_sum(int64_t row, int64_t row_level) {
 }
 
 void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
-                                           RowColLevelMap<Matrix>& F, RowMap& r) {
+                                           RowColLevelMap<Matrix>& F, RowMap<Matrix>& r) {
   int64_t nblocks = level_blocks[level];
   int64_t block_size = D(row, row, level).rows;
   Matrix block_row(block_size, 0);
@@ -1271,7 +1271,7 @@ void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
 
 void SymmetricH2::factorize_level(const Domain& domain,
                                   int64_t level, int64_t nblocks,
-                                  RowColLevelMap<Matrix>& F, RowMap& r) {
+                                  RowColLevelMap<Matrix>& F, RowMap<Matrix>& r) {
   int64_t parent_level = level - 1;
   for (int64_t block = 0; block < nblocks; ++block) {
     int64_t parent_node = block / 2;
@@ -1751,7 +1751,7 @@ void SymmetricH2::factorize_level(const Domain& domain,
 void SymmetricH2::factorize(const Domain& domain) {
   int64_t level = height;
   RowColLevelMap<Matrix> F;
-  RowMap r;
+  RowMap<Matrix> r;
 
   for (; level > 0; --level) {
     int64_t nblocks = level_blocks[level];
