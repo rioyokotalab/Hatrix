@@ -14,12 +14,15 @@
 #include <functional>
 #include <fstream>
 #include <chrono>
+#include <stdexcept>
 
 #include "Hatrix/Hatrix.h"
 
+// Comment the following line to use SVD instead of pivoted QR for low-rank compression
+#define USE_QR_COMPRESSION
+
 using vec = std::vector<int64_t>;
 
-// Construction of BLR2 strong admis matrix based on geometry based admis condition.
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 double PV = 1e-3;
 
@@ -84,7 +87,9 @@ class Domain {
 class H2 {
  public:
   int64_t N, nleaf, n_blocks;
-  double accuracy, admis;
+  double accuracy;
+  int64_t rank;
+  double admis;
   std::string admis_kind;
   int64_t matrix_type;
   int64_t height;
@@ -107,32 +112,30 @@ class H2 {
   int64_t get_block_size_col(const Domain& domain, int64_t parent, int64_t level);
   bool row_has_admissible_blocks(int64_t row, int64_t level);
   bool col_has_admissible_blocks(int64_t col, int64_t level);
+  std::tuple<Matrix, Matrix, Matrix> svd_like_compression(Matrix& A);
   Matrix generate_block_row(int64_t block, int64_t block_size,
                             const Domain& domain, int64_t level,
-                            const Matrix& rand, bool sample=true);
-  std::tuple<Matrix, Matrix>
-  generate_row_cluster_bases(int64_t block, int64_t block_size,
-                             const Domain& domain, int64_t level,
-                             const Matrix& rand);
+                            const Matrix& rand);
   Matrix generate_block_column(int64_t block, int64_t block_size,
                                const Domain& domain, int64_t level,
-                               const Matrix& rand, bool sample=true);
-  std::tuple<Matrix, Matrix>
-  generate_column_cluster_bases(int64_t block, int64_t block_size,
-                                const Domain& domain, int64_t level,
-                                const Matrix& rand);
+                               const Matrix& rand);
+  Matrix generate_row_cluster_bases(int64_t block, int64_t block_size,
+                                    const Domain& domain, int64_t level,
+                                    const Matrix& rand);
+  Matrix generate_column_cluster_bases(int64_t block, int64_t block_size,
+                                       const Domain& domain, int64_t level,
+                                       const Matrix& rand);
   void generate_leaf_nodes(const Domain& domain, const Matrix& rand);
 
-  std::tuple<Matrix, Matrix>
-  generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
-                             int64_t block_size, const Domain& domain, int64_t level,
-                             const Matrix& rand);
-  std::tuple<Matrix, Matrix>
-  generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
-                             int64_t block_size, const Domain& domain, int64_t level,
-                             const Matrix& rand);
+  Matrix generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
+                                    int64_t block_size, const Domain& domain, int64_t level,
+                                    const Matrix& rand);
+  Matrix generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
+                                    int64_t block_size, const Domain& domain, int64_t level,
+                                    const Matrix& rand);
   std::tuple<RowLevelMap, ColLevelMap>
-  generate_transfer_matrices(const Domain& domain, int64_t level, const Matrix& rand,
+  generate_transfer_matrices(const Domain& domain,
+                             int64_t level, const Matrix& rand,
                              RowLevelMap& Uchild, ColLevelMap& Vchild);
   Matrix get_Ubig(int64_t node, int64_t level);
   Matrix get_Vbig(int64_t node, int64_t level);
@@ -140,10 +143,10 @@ class H2 {
 
  public:
   H2(const Domain& domain, const int64_t N, const int64_t nleaf,
-     const double accuracy, const double admis,
+     const double accuracy, const int64_t rank, const double admis,
      const std::string& admis_kind, const int64_t matrix_type,
      const Matrix& rand);
-  double construction_relative_error(const Domain& domain);
+  double construction_absolute_error(const Domain& domain);
   void print_structure();
   double low_rank_block_ratio();
   void print_ranks();
@@ -389,7 +392,7 @@ Matrix Domain::generate_rank_heat_map() {
       Matrix block = Hatrix::generate_p2p_interactions(*this, i, j);
 
       Matrix Utemp, Stemp, Vtemp;
-      std::tie(Utemp, Stemp, Vtemp) = error_svd(block, 1e-9);
+      std::tie(Utemp, Stemp, Vtemp) = error_svd(block, 1e-9, false);
       int64_t rank = Stemp.rows;
 
       out(i, j) = rank;
@@ -779,9 +782,9 @@ int64_t H2::get_block_size_col(const Domain& domain, int64_t parent, int64_t lev
 
 bool H2::row_has_admissible_blocks(int64_t row, int64_t level) {
   bool has_admis = false;
-  for (int64_t i = 0; i < level_blocks[level]; ++i) {
-    if (!is_admissible.exists(row, i, level) ||
-        (is_admissible.exists(row, i, level) && is_admissible(row, i, level))) {
+  for (int64_t j = 0; j < level_blocks[level]; ++j) {
+    if ((!is_admissible.exists(row, j, level)) || // part of upper level admissible block
+        (is_admissible.exists(row, j, level) && is_admissible(row, j, level))) {
       has_admis = true;
       break;
     }
@@ -791,84 +794,113 @@ bool H2::row_has_admissible_blocks(int64_t row, int64_t level) {
 
 bool H2::col_has_admissible_blocks(int64_t col, int64_t level) {
   bool has_admis = false;
-  for (int64_t j = 0; j < level_blocks[level]; ++j) {
-    if (!is_admissible.exists(j, col, level) ||
-        (is_admissible.exists(j, col, level) && is_admissible(j, col, level))) {
+  for (int64_t i = 0; i < level_blocks[level]; ++i) {
+    if ((!is_admissible.exists(i, col, level)) || // part of upper level admissible block
+        (is_admissible.exists(i, col, level) && is_admissible(i, col, level))) {
       has_admis = true;
       break;
     }
   }
-
   return has_admis;
+}
+
+std::tuple<Matrix, Matrix, Matrix> H2::svd_like_compression(Matrix& A) {
+  Matrix Ui, Si, Vi;
+  if (accuracy == 0.) {  // Fixed rank
+    double error;
+    std::tie(Ui, Si, Vi, error) = truncated_svd(A, std::min(rank, A.min_dim()));
+  }
+  else {  // Fixed accuracy
+#ifdef USE_QR_COMPRESSION
+    Matrix R;
+    std::tie(Ui, R) = truncated_pivoted_qr(A, accuracy, false);
+    Si = Matrix(R.rows, R.rows);
+    Vi = Matrix(R.rows, R.cols);
+    rq(R, Si, Vi);
+#else
+    std::tie(Ui, Si, Vi) = error_svd(A, accuracy, false);
+#endif
+  }
+  return {std::move(Ui), std::move(Si), std::move(Vi)};
 }
 
 Matrix H2::generate_block_row(int64_t block, int64_t block_size,
                               const Domain& domain, int64_t level,
-                              const Matrix& rand, bool sample) {
+                              const Matrix& rand) {
   int64_t nblocks = level_blocks[level];
-  auto rand_splits = rand.split(nblocks, 1);
+  std::vector<Matrix> rand_splits;
+  bool sample = (rank > 0);
+  if (sample) {
+    rand_splits = rand.split(nblocks, 1);
+  }
 
   Matrix block_row(block_size, sample ? rand.cols : 0);
   for (int64_t j = 0; j < nblocks; ++j) {
-    if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) { continue; }
-    if (sample) {
-      matmul(generate_p2p_interactions(domain, block, j, level, height), rand_splits[j],
-             block_row, false, false, 1.0, 1.0);
-    }
-    else {
-      block_row =
-          concat(block_row, generate_p2p_interactions(domain, block, j, level, height), 1);
+    if ((!is_admissible.exists(block, j, level)) || // part of upper level admissible block
+        (is_admissible.exists(block, j, level) && is_admissible(block, j, level))) {
+      if (sample) {
+        matmul(generate_p2p_interactions(domain, block, j, level, height), rand_splits[j],
+               block_row, false, false, 1.0, 1.0);
+      }
+      else {
+        block_row =
+            concat(block_row, generate_p2p_interactions(domain, block, j, level, height), 1);
+      }
     }
   }
   return block_row;
 }
 
-std::tuple<Matrix, Matrix>
-H2::generate_row_cluster_bases(int64_t block, int64_t block_size,
-                               const Domain& domain, int64_t level,
-                               const Matrix& rand) {
-  Matrix block_row = generate_block_row(block, block_size, domain, level, rand);
-  Matrix Ui, Vi;
-  std::tie(Ui, Vi) = truncated_pivoted_qr(block_row, accuracy);
-  int64_t rank = Ui.cols;
-  min_rank = std::min(min_rank, rank);
-  max_rank = std::max(max_rank, rank);
-  return {std::move(Ui), std::move(Vi)};
-}
-
 Matrix H2::generate_block_column(int64_t block, int64_t block_size,
                                  const Domain& domain, int64_t level,
-                                 const Matrix& rand, bool sample) {
+                                 const Matrix& rand) {
   int64_t nblocks = level_blocks[level];
-  auto rand_splits = rand.split(nblocks, 1);
+  std::vector<Matrix> rand_splits;
+  bool sample = (rank > 0);
+  if (sample) {
+    rand_splits = rand.split(nblocks, 1);
+  }
 
   Matrix block_column(sample ? rand.cols : 0, block_size);
   for (int64_t i = 0; i < nblocks; ++i) {
-    if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) { continue; }
-    if (sample) {
-      matmul(rand_splits[i],
-             generate_p2p_interactions(domain, i, block, level, height),
-             block_column, true, false, 1.0, 1.0);
-    }
-    else {
-      block_column =
-          concat(block_column, generate_p2p_interactions(domain, i, block, level, height), 0);
+    if ((!is_admissible.exists(i, block, level)) || // part of upper level admissible block
+        (is_admissible.exists(i, block, level) && is_admissible(i, block, level))) {
+      if (sample) {
+        matmul(rand_splits[i], generate_p2p_interactions(domain, i, block, level, height),
+               block_column, true, false, 1.0, 1.0);
+      }
+      else {
+        block_column =
+            concat(block_column, generate_p2p_interactions(domain, i, block, level, height), 0);
+      }
     }
   }
   return block_column;
 }
 
-std::tuple<Matrix, Matrix>
-H2::generate_column_cluster_bases(int64_t block, int64_t block_size,
-                                  const Domain& domain, int64_t level,
-                                  const Matrix& rand) {
+Matrix H2::generate_row_cluster_bases(int64_t block, int64_t block_size,
+                                      const Domain& domain, int64_t level,
+                                      const Matrix& rand) {
+  Matrix block_row = generate_block_row(block, block_size, domain, level, rand);
+  Matrix Ui, Si, Vi;
+  std::tie(Ui, Si, Vi) = svd_like_compression(block_row);
+  min_rank = std::min(min_rank, Ui.cols);
+  max_rank = std::max(max_rank, Ui.cols);
+
+  return Ui;
+}
+
+Matrix H2::generate_column_cluster_bases(int64_t block, int64_t block_size,
+                                         const Domain& domain, int64_t level,
+                                         const Matrix& rand) {
   Matrix block_column_T = transpose(generate_block_column(block, block_size, domain, level, rand));
-  Matrix Ui, Vi;
-  std::tie(Ui, Vi) = Hatrix::truncated_pivoted_qr(block_column_T, accuracy);
-  int64_t rank = Ui.cols;
-  min_rank = std::min(min_rank, rank);
-  max_rank = std::max(max_rank, rank);
-  return {std::move(Ui), std::move(Vi)};
+  Matrix Ui, Si, Vi;
+  std::tie(Ui, Si, Vi) = svd_like_compression(block_column_T);
+  min_rank = std::min(min_rank, Ui.cols);
+  max_rank = std::max(max_rank, Ui.cols);
+
+  // Return U of transposed block_column = V bases
+  return Ui;
 }
 
 void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
@@ -884,17 +916,13 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
   }
   // Generate leaf level U
   for (int64_t i = 0; i < nblocks; ++i) {
-    Matrix Utemp, _;
-    std::tie(Utemp, _) =
-        generate_row_cluster_bases(i, domain.boxes[i].num_particles, domain, height, rand);
-    U.insert(i, height, std::move(Utemp));
+    U.insert(i, height,
+             generate_row_cluster_bases(i, domain.boxes[i].num_particles, domain, height, rand));
   }
   // Generate leaf level V
   for (int64_t j = 0; j < nblocks; ++j) {
-    Matrix Vtemp, _;
-    std::tie(Vtemp, _) =
-        generate_column_cluster_bases(j, domain.boxes[j].num_particles, domain, height, rand);
-    V.insert(j, height, std::move(Vtemp));
+    V.insert(j, height,
+             generate_column_cluster_bases(j, domain.boxes[j].num_particles, domain, height, rand));
   }
   // Generate S coupling matrices
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -910,10 +938,9 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
   }
 }
 
-std::tuple<Matrix, Matrix>
-H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
-                               int64_t block_size, const Domain& domain, int64_t level,
-                               const Matrix& rand) {
+Matrix H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t node,
+                                      int64_t block_size, const Domain& domain, int64_t level,
+                                      const Matrix& rand) {
   Matrix block_row = generate_block_row(node, block_size, domain, level, rand);
   auto block_row_splits = block_row.split(2, 1);
 
@@ -922,19 +949,18 @@ H2::generate_U_transfer_matrix(Matrix& Ubig_child1, Matrix& Ubig_child2, int64_t
 
   matmul(Ubig_child1, block_row_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Ubig_child2, block_row_splits[1], temp_splits[1], true, false, 1, 0);
-  Matrix Utransfer, Vi;
-  std::tie(Utransfer, Vi) = truncated_pivoted_qr(temp, accuracy);
 
-  int64_t rank = Utransfer.cols;
-  min_rank = std::min(min_rank, rank);
-  max_rank = std::max(max_rank, rank);
-  return {std::move(Utransfer), std::move(Vi)};
+  Matrix Ui, Si, Vi;
+  std::tie(Ui, Si, Vi) = svd_like_compression(temp);
+  min_rank = std::min(min_rank, Ui.cols);
+  max_rank = std::max(max_rank, Ui.cols);
+
+  return Ui;
 }
 
-std::tuple<Matrix, Matrix>
-H2::generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
-                               int64_t block_size, const Domain& domain, int64_t level,
-                               const Matrix& rand) {
+Matrix H2::generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t node,
+                                      int64_t block_size, const Domain& domain, int64_t level,
+                                      const Matrix& rand) {
   Matrix block_column_T = transpose(generate_block_column(node, block_size, domain, level, rand));
   auto block_column_T_splits = block_column_T.split(2, 1);
 
@@ -943,13 +969,14 @@ H2::generate_V_transfer_matrix(Matrix& Vbig_child1, Matrix& Vbig_child2, int64_t
 
   matmul(Vbig_child1, block_column_T_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Vbig_child2, block_column_T_splits[1], temp_splits[1], true, false, 1, 0);
-  Matrix Vtransfer, Vi;
-  std::tie(Vtransfer, Vi) = truncated_pivoted_qr(temp, accuracy);
 
-  int64_t rank = Vtransfer.cols;
-  min_rank = std::min(min_rank, rank);
-  max_rank = std::max(max_rank, rank);
-  return {std::move(Vtransfer), std::move(Vi)};
+  Matrix Ui, Si, Vi;
+  std::tie(Ui, Si, Vi) = svd_like_compression(temp);
+  min_rank = std::min(min_rank, Ui.cols);
+  max_rank = std::max(max_rank, Ui.cols);
+
+  // Return U of transposed block_column = V bases
+  return Ui;
 }
 
 std::tuple<RowLevelMap, ColLevelMap>
@@ -971,10 +998,9 @@ H2::generate_transfer_matrices(const Domain& domain, int64_t level, const Matrix
       // Generate row cluster transfer matrix.
       Matrix& Ubig_child1 = Uchild(child1, child_level);
       Matrix& Ubig_child2 = Uchild(child2, child_level);
-      Matrix Utransfer, _;
-      std::tie(Utransfer, _) = generate_U_transfer_matrix(Ubig_child1, Ubig_child2,
-                                                          node, block_size, domain, level, rand);
-      U.insert(node, level, std::move(Utransfer));
+      U.insert(node, level,
+               generate_U_transfer_matrix(Ubig_child1, Ubig_child2, node,
+                                          block_size, domain, level, rand));
 
       // Generate the full bases to pass onto the parent.
       auto Utransfer_splits = U(node, level).split(vec{Ubig_child1.cols}, vec{});
@@ -985,15 +1011,13 @@ H2::generate_transfer_matrices(const Domain& domain, int64_t level, const Matrix
       matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
       Ubig_parent.insert(node, level, std::move(Ubig));
     }
-
     if (col_has_admissible_blocks(node, level) && height != 1) {
       // Generate column cluster transfer matrix.
       Matrix& Vbig_child1 = Vchild(child1, child_level);
       Matrix& Vbig_child2 = Vchild(child2, child_level);
-      Matrix Vtransfer, _;
-      std::tie(Vtransfer, _) = generate_V_transfer_matrix(Vbig_child1, Vbig_child2,
-                                                          node, block_size, domain, level, rand);
-      V.insert(node, level, std::move(Vtransfer));
+      V.insert(node, level,
+               generate_V_transfer_matrix(Vbig_child1, Vbig_child2, node,
+                                          block_size, domain, level, rand));
 
       // Generate the full bases for passing onto the upper level.
       auto Vtransfer_splits = V(node, level).split(vec{Vbig_child1.cols}, vec{});
@@ -1009,9 +1033,9 @@ H2::generate_transfer_matrices(const Domain& domain, int64_t level, const Matrix
   for (int64_t row = 0; row < nblocks; ++row) {
     for (int64_t col = 0; col < nblocks; ++col) {
       if (is_admissible.exists(row, col, level) && is_admissible(row, col, level)) {
-        Matrix D = generate_p2p_interactions(domain, row, col, level, height);
+        Matrix dense = generate_p2p_interactions(domain, row, col, level, height);
 
-        S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), D, true, false),
+        S.insert(row, col, level, matmul(matmul(Ubig_parent(row, level), dense, true, false),
                                          Vbig_parent(col, level)));
       }
     }
@@ -1060,10 +1084,10 @@ Matrix H2::get_Vbig(int64_t node, int64_t level) {
 }
 
 H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
-       const double accuracy, const double admis,
+       const double accuracy, const int64_t rank, const double admis,
        const std::string& admis_kind, const int64_t matrix_type,
        const Matrix& rand)
-    : N(N), nleaf(nleaf), accuracy(accuracy),
+    : N(N), nleaf(nleaf), accuracy(accuracy), rank(rank),
       admis(admis), admis_kind(admis_kind), matrix_type(matrix_type),
       min_rank(N), max_rank(-N) {
   if (admis_kind == "geometry_admis") {
@@ -1113,7 +1137,6 @@ H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
   }
 
   is_admissible.insert(0, 0, 0, false);
-  PV =  (1 / double(N)) * 1e-3;
 
   int64_t all_dense_row = find_all_dense_row();
   if (all_dense_row != -1) {
@@ -1126,13 +1149,13 @@ H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
   ColLevelMap Vchild = V;
 
   for (int64_t level = height-1; level > 0; --level) {
-    std::tie(Uchild, Vchild) = generate_transfer_matrices(domain, level, rand, Uchild, Vchild);
+    std::tie(Uchild, Vchild) =
+        generate_transfer_matrices(domain, level, rand, Uchild, Vchild);
   }
 }
 
-double H2::construction_relative_error(const Domain& domain) {
+double H2::construction_absolute_error(const Domain& domain) {
   double error = 0;
-  double dense_norm = 0;
   int64_t nblocks = level_blocks[height];
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1141,7 +1164,6 @@ double H2::construction_relative_error(const Domain& domain) {
         Matrix actual = Hatrix::generate_p2p_interactions(domain, i, j);
         Matrix expected = D(i, j, height);
         error += pow(norm(actual - expected), 2);
-        dense_norm += pow(norm(actual), 2);
       }
     }
   }
@@ -1159,14 +1181,13 @@ double H2::construction_relative_error(const Domain& domain) {
           Matrix actual_matrix =
               Hatrix::generate_p2p_interactions(domain, row, col, level, height);
 
-          dense_norm += pow(norm(actual_matrix), 2);
           error += pow(norm(expected_matrix - actual_matrix), 2);
         }
       }
     }
   }
 
-  return std::sqrt(error / dense_norm);
+  return std::sqrt(error);
 }
 
 void H2::actually_print_structure(int64_t level) {
@@ -1229,7 +1250,7 @@ void H2::print_ranks() {
         std::cout << "empty";
       }
       std::cout << ", row_rank=" << (U.exists(block, level) ?
-                                   U(block, level).cols : -1)
+                                     U(block, level).cols : -1)
                 << ", col_rank=" << (V.exists(block, level) ?
                                      V(block, level).cols : -1)
                 << std::endl;
@@ -1243,20 +1264,22 @@ int main(int argc, char ** argv) {
   const int64_t N = argc > 1 ? atoi(argv[1]) : 256;
   const int64_t nleaf = argc > 2 ? atoi(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1e-5;
-  const double admis = argc > 4 ? atof(argv[4]) : 1.0;
+  const int64_t rank = argc > 4 ? atoi(argv[4]) : 0;
+  const double admis = argc > 5 ? atof(argv[5]) : 1.0;
   // diagonal_admis or geometry_admis
-  const std::string admis_kind = argc > 5 ? std::string(argv[5]) : "diagonal_admis";
+  const std::string admis_kind = argc > 6 ? std::string(argv[6]) : "diagonal_admis";
+  const int64_t ndim  = argc > 7 ? atoi(argv[7]) : 2;
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = argc > 6 ? atoi(argv[6]) : 1;
+  const int64_t matrix_type = argc > 8 ? atoi(argv[8]) : 1;
+  PV = (1/(double)N) * 1e-2;
 
   Hatrix::Context::init();
 
   const auto start_particles = std::chrono::system_clock::now();
-  constexpr int64_t ndim = 3;
   Hatrix::Domain domain(N, ndim);
   // Laplace kernel
-  domain.generate_particles(0, N); // Unit sphere
+  domain.generate_particles(0, N);
   // domain.generate_starsh_grid_particles();
   Hatrix::kernel_function = Hatrix::laplace_kernel;
   domain.divide_domain_and_create_particle_boxes(nleaf);
@@ -1264,34 +1287,33 @@ int main(int argc, char ** argv) {
   const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                          (stop_particles - start_particles).count();
 
-  const int64_t sample_size = 100;
+  const int64_t oversampling = 5;
+  const int64_t sample_size = rank > 0 ? rank + oversampling : 0;
   Hatrix::Matrix rand = Hatrix::generate_random_matrix(N, sample_size);
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::H2 A(domain, N, nleaf, accuracy, admis, admis_kind, matrix_type, rand);
+  Hatrix::H2 A(domain, N, nleaf, accuracy, rank, admis, admis_kind, matrix_type, rand);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                (stop_construct - start_construct).count();
-  double construct_error, lr_ratio, solve_error;
-  construct_error = A.construction_relative_error(domain);
-  lr_ratio = A.low_rank_block_ratio();
-
-  Hatrix::Context::finalize();
+                                (stop_construct - start_construct).count();  
+  double construct_error = A.construction_absolute_error(domain);
+  double lr_ratio = A.low_rank_block_ratio();
 
   std::cout << "N=" << N
             << " nleaf=" << nleaf
             << " accuracy=" << accuracy
+            << " rank=" << rank
             << " admis=" << admis << std::setw(3)
             << " ndim=" << ndim
             << " height=" << A.height
             << " admis_kind=" << admis_kind
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
-            << " LR%=" << std::setprecision(5) << lr_ratio * 100 << "%"
-            << " min_rank=" << A.min_rank
-            << " max_rank=" << A.max_rank
-            << " construct_error=" << std::setprecision(5) << construct_error
+            << " LR%=" << lr_ratio * 100 << "%"
+            << " construct_min_rank=" << A.min_rank
+            << " construct_max_rank=" << A.max_rank
             << " construct_time=" << construct_time
-            << " particle_time=" << particle_construct_time
+            << " construct_error=" << std::scientific << construct_error
             << std::endl;
 
+  Hatrix::Context::finalize();
   return 0;
 }
