@@ -14,6 +14,7 @@
 #include <functional>
 #include <fstream>
 #include <chrono>
+#include <stdexcept>
 
 #include "Hatrix/Hatrix.h"
 
@@ -820,7 +821,8 @@ int64_t SymmetricH2::get_block_size_col(const Domain& domain, int64_t parent, in
 bool SymmetricH2::row_has_admissible_blocks(int64_t row, int64_t level) {
   bool has_admis = false;
   for (int64_t j = 0; j < level_blocks[level]; ++j) {
-    if (is_admissible.exists(row, j, level) && is_admissible(row, j, level)) {
+    if ((!is_admissible.exists(row, j, level)) || // part of upper level admissible block
+        (is_admissible.exists(row, j, level) && is_admissible(row, j, level))) {
       has_admis = true;
       break;
     }
@@ -831,7 +833,8 @@ bool SymmetricH2::row_has_admissible_blocks(int64_t row, int64_t level) {
 bool SymmetricH2::col_has_admissible_blocks(int64_t col, int64_t level) {
   bool has_admis = false;
   for (int64_t i = 0; i < level_blocks[level]; ++i) {
-    if (is_admissible.exists(i, col, level) && is_admissible(i, col, level)) {
+    if ((!is_admissible.exists(i, col, level)) || // part of upper level admissible block
+        (is_admissible.exists(i, col, level) && is_admissible(i, col, level))) {
       has_admis = true;
       break;
     }
@@ -1260,11 +1263,6 @@ void SymmetricH2::factorize_level(const Domain& domain,
     }
 
     // Multiplication with U_F
-    if (U(block, level).rows <= U(block, level).cols) {
-      std::cout << "Found full-rank cluster bases at U(" << block << "," << level << "), "
-                << "aborting" << std::endl;
-      abort();
-    }
     Matrix U_F = prepend_complement(U(block, level));
     // Multiply to dense blocks along the row in current level
     for (int j = 0; j < nblocks; ++j) {
@@ -1696,18 +1694,16 @@ void SymmetricH2::factorize(const Domain& domain) {
 
   for (; level > 0; --level) {
     int64_t nblocks = level_blocks[level];
-    bool is_all_dense_level = false;
+    // Make sure all cluster bases exist and none of them is full-rank
     for (int64_t i = 0; i < nblocks; ++i) {
       if (!U.exists(i, level)) {
-        is_all_dense_level = true;
+        throw std::logic_error("Cluster bases not found at U(" + std::to_string(i) +
+                               "," + std::to_string(level) + ")");
       }
-    }
-    if (is_all_dense_level) {
-      if (level != 1) {
-        std::cout << "found an all dense block on level " << level << ". Aborting.\n";
-        abort();
+      if (U(i, level).rows <= U(i, level).cols) {
+        throw std::domain_error("Full rank cluster bases found at U(" + std::to_string(i) +
+                                "," + std::to_string(level) + ")");
       }
-      break;
     }
 
     factorize_level(domain, level, nblocks, F, r);
