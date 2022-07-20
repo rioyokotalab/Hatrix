@@ -54,3 +54,8 @@ foreach(EXAMPLE ${HATRIX_EXAMPLES})
   add_executable(${EXAMPLE} ${EXAMPLE}.cpp)
   target_link_libraries(${EXAMPLE} Hatrix)
 endforeach()
+
+find_package(MPI REQUIRED)
+add_executable(SymmH2_ULV_SC22 SymmH2_ULV_SC22.cpp)
+target_compile_options(SymmH2_ULV_SC22 PRIVATE -DUSE_MKL -D_PROF)
+target_link_libraries(SymmH2_ULV_SC22 MPI::MPI_CXX Hatrix)
