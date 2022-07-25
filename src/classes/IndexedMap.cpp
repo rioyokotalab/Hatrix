@@ -19,7 +19,7 @@ void RowMap<T>::insert(int64_t key, T&& matrix) {
     std::cout << "RowMap<T>::insert() -> Element at <" << key << "> exists and cannot be inserted." << std::endl;
     abort();
   }
-  map.insert({key, std::move(matrix)});
+  map.insert({key, std::forward<T>(matrix)});
 }
 
 template <class T>
@@ -63,17 +63,17 @@ const T& RowColMap<T>::operator[](
 
 template<class T>
 void RowColMap<T>::insert(int64_t row, int64_t col, T&& value) {
-  (*this).insert({row, col}, std::move(value));
+  (*this).insert({row, col}, std::forward<T>(value));
 }
 template<class T>
 void RowColMap<T>::insert(const std::tuple<int64_t, int64_t>& key,
-                       T&& value) {
+                          T&& value) {
   if ((*this).exists(key)) {
     std::cout << "Element at <" << std::get<0>(key) << "," << std::get<1>(key)
               << "> exists and cannot be inserted." << std::endl;
     abort();
   }
-  map.insert({key, std::move(value)});
+  map.insert({key, std::forward<T>(value)});
 }
 
 template<class T>
@@ -134,11 +134,11 @@ const T& RowColLevelMap<T>::operator()(int64_t row, int64_t col, int64_t level) 
 
 template <class T>
 void RowColLevelMap<T>::insert(int64_t row, int64_t col, int64_t level, T&& matrix) {
-  map.insert({{row, col, level}, std::move(matrix)});
+  map.insert({{row, col, level}, std::forward<T>(matrix)});
 }
 template <class T>
 void RowColLevelMap<T>::insert(const std::tuple<int64_t, int64_t, int64_t>& key, T&& matrix) {
-  map.insert({key, std::move(matrix)});
+  map.insert({key, std::forward<T>(matrix)});
 }
 
 template <class T>
