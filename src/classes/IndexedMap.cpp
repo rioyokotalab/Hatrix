@@ -160,6 +160,10 @@ void RowColLevelMap<T>::erase(int64_t row, int64_t col, int64_t level) {
   map.erase({row, col, level});
 }
 
+template <class T>
+void RowColLevelMap<T>::erase_all() {
+  map.erase(map.begin(), map.end());
+}
 
 template <class T>
 bool RowColLevelMap<T>::exists(int64_t row, int64_t col, int64_t level) const {

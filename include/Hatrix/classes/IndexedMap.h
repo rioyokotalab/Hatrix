@@ -118,6 +118,9 @@ public:
   bool exists(int64_t row, int64_t col, int64_t level) const;
 
   void erase(int64_t row, int64_t col, int64_t level);
+
+  // Destructively clear all keys in the map.
+  void erase_all();
 };
 
 }  // namespace Hatrix
