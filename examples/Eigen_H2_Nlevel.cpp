@@ -185,11 +185,11 @@ class SymmetricH2 {
   void factorize(const Domain& domain);
   void print_ranks();
   std::tuple<int64_t, int64_t> inertia(const Domain& domain,
-                                       const double lambda, bool &singular);
+                                       const double lambda, bool &singular) const;
   std::tuple<double, int64_t, double>
   get_mth_eigenvalue(const Domain& domain, const int64_t m,
                      const double ev_tol,
-                     double left, double right);
+                     double left, double right) const;
 };
 
 double laplace_kernel(const std::vector<double>& coords_row,
@@ -1331,36 +1331,36 @@ void SymmetricH2::factorize_level(const Domain& domain,
     }
     // At non-leaf level, U(block, level) may not have orthonormal columns
     // So multiplication with U_F may update coupling or transfer matrices
-    if (level < height && !found_row_fill_in) {
-      Matrix UTxU = matmul(U(block, level), U(block, level), true, false);
-      // Apply to S along the row in current level
-      for (int j = 0; j < nblocks; ++j) {
-        if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
-          S(block, j, level) = matmul(UTxU, S(block, j, level));
-        }
-      }
-      // Apply to S along the column in current level
-      for (int i = 0; i < nblocks; ++i) {
-        if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
-          S(i, block, level) = matmul(S(i, block, level), UTxU);
-        }
-      }
-      // Update transfer matrix
-      if (parent_level > 0 && row_has_admissible_blocks(parent_node, parent_level)) {
-        int64_t c1 = parent_node * 2;
-        int64_t c2 = parent_node * 2 + 1;
-        Matrix& Utransfer = U(parent_node, parent_level);
-        auto Utransfer_splits = Utransfer.split(vec{U(c1, level).cols}, vec{});
-        Matrix temp(Utransfer);
-        auto temp_splits = temp.split(vec{U(c1, level).cols}, vec{});
-        if (block == c1) {
-          matmul(UTxU, temp_splits[0], Utransfer_splits[0], false, false, 1, 0);
-        }
-        else { // block == c2
-          matmul(UTxU, temp_splits[1], Utransfer_splits[1], false, false, 1, 0);
-        }
-      }
-    }
+    // if (level < height && !found_row_fill_in) {
+    //   Matrix UTxU = matmul(U(block, level), U(block, level), true, false);
+    //   // Apply to S along the row in current level
+    //   for (int j = 0; j < nblocks; ++j) {
+    //     if (is_admissible.exists(block, j, level) && is_admissible(block, j, level)) {
+    //       S(block, j, level) = matmul(UTxU, S(block, j, level));
+    //     }
+    //   }
+    //   // Apply to S along the column in current level
+    //   for (int i = 0; i < nblocks; ++i) {
+    //     if (is_admissible.exists(i, block, level) && is_admissible(i, block, level)) {
+    //       S(i, block, level) = matmul(S(i, block, level), UTxU);
+    //     }
+    //   }
+    //   // Update transfer matrix
+    //   if (parent_level > 0 && row_has_admissible_blocks(parent_node, parent_level)) {
+    //     int64_t c1 = parent_node * 2;
+    //     int64_t c2 = parent_node * 2 + 1;
+    //     Matrix& Utransfer = U(parent_node, parent_level);
+    //     auto Utransfer_splits = Utransfer.split(vec{U(c1, level).cols}, vec{});
+    //     Matrix temp(Utransfer);
+    //     auto temp_splits = temp.split(vec{U(c1, level).cols}, vec{});
+    //     if (block == c1) {
+    //       matmul(UTxU, temp_splits[0], Utransfer_splits[0], false, false, 1, 0);
+    //     }
+    //     else { // block == c2
+    //       matmul(UTxU, temp_splits[1], Utransfer_splits[1], false, false, 1, 0);
+    //     }
+    //   }
+    // }
 
     // The diagonal block is split along the row and column.
     int64_t diag_row_split = D(block, block, level).rows - U(block, level).cols;
@@ -1908,7 +1908,7 @@ void SymmetricH2::print_ranks() {
 }
 
 std::tuple<int64_t, int64_t>
-SymmetricH2::inertia(const Domain& domain, const double lambda, bool &singular) {
+SymmetricH2::inertia(const Domain& domain, const double lambda, bool &singular) const {
   SymmetricH2 A_shifted(*this);
   // Shift leaf level diagonal blocks
   int64_t leaf_nblocks = level_blocks[height];
@@ -1946,7 +1946,7 @@ SymmetricH2::inertia(const Domain& domain, const double lambda, bool &singular) 
 std::tuple<double, int64_t, double>
 SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m,
                                 const double ev_tol,
-                                double left, double right) {
+                                double left, double right) const {
   int64_t shift_max_rank = max_rank;
   double max_rank_shift = -1;
   bool singular = false;
@@ -2091,3 +2091,4 @@ int main(int argc, char ** argv) {
   Hatrix::Context::finalize();
   return 0;
 }
+
