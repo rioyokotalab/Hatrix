@@ -8,11 +8,24 @@
 #include "Hatrix/Hatrix.h"
 
 namespace Hatrix {
+  // Hierarchy of sorted particles.
+  class Cell {
+  public:
+    std::vector<Cell> cells;
+    std::vector<double> center;
+    int64_t start_index, end_index;
+
+    Cell(std::vector<double> _center, int64_t pstart, int64_t pend);
+    Cell() = delete;
+  };
+
   class Domain {
   public:
     std::vector<Hatrix::Particle> particles;
     std::vector<Hatrix::Box> boxes;
     int64_t N, ndim;
+    Cell * tree;
+
   private:
     // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
     void orthogonal_recursive_bisection_1dim(int64_t start, int64_t end,
@@ -30,5 +43,8 @@ namespace Hatrix {
     void generate_grid_particles();
     void read_col_file_3d(const std::string& geometry_file);
     void print_file(std::string file_name);
+
+    // Build tree using co-oridinate sorting similar to exafmm. Uses the new Cell struct.
+    void build_tree(const int64_t max_nleaf);
   };
 }

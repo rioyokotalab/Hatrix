@@ -536,7 +536,7 @@ void buildTree(int64_t* ncells, struct Cell* cells, struct Body* bodies, int64_t
       c0->Body[1] = loc;
       c1->Body[0] = loc;
       c1->Body[1] = i_end;
-      
+
       c0->Level = ci->Level + 1;
       c1->Level = ci->Level + 1;
       c0->Procs[0] = ci->Procs[0];
@@ -640,7 +640,7 @@ void getList(char NoF, int64_t* len, int64_t rels[], int64_t ncells, const struc
   const struct Cell* Ci = &cells[i];
   const struct Cell* Cj = &cells[j];
   int64_t ilevel = Ci->Level;
-  int64_t jlevel = Cj->Level; 
+  int64_t jlevel = Cj->Level;
   if (ilevel == jlevel) {
     int admis = admis_check(theta, Ci->C, Cj->C, Ci->R, Cj->R);
     int write_far = NoF == 'F' || NoF == 'f';
@@ -668,10 +668,12 @@ int comp_int_64(const void *a, const void *b) {
   return c < 0 ? -1 : (int)(c > 0);
 }
 
-void traverse(char NoF, struct CSC* rels, int64_t ncells, const struct Cell* cells, double theta) {
+void traverse(char NoF, struct CSC* rels, int64_t ncells,
+              const struct Cell* cells, double theta) {
   rels->M = ncells;
   rels->N = ncells;
-  int64_t* rel_arr = (int64_t*)malloc(sizeof(int64_t) * (ncells * ncells + ncells + 1));
+  int64_t* rel_arr = (int64_t*)malloc(sizeof(int64_t) *
+                                      (ncells * ncells + ncells + 1));
   int64_t len = 0;
   getList(NoF, &len, &rel_arr[ncells + 1], ncells, cells, 0, 0, theta);
 
@@ -915,7 +917,7 @@ void i_local(int64_t* ilocal, const struct CellComm* comm) {
   int64_t nend = comm->Comms.ColIndex[p + 1];
   const int64_t* ngbs_iter = &ngbs[nbegin];
   int64_t slen = 0;
-  while (ngbs_iter != &ngbs[nend] && 
+  while (ngbs_iter != &ngbs[nend] &&
   comm->ProcBoxesEnd[*ngbs_iter] <= iglobal) {
     slen = slen + comm->ProcBoxesEnd[*ngbs_iter] - comm->ProcBoxes[*ngbs_iter];
     ngbs_iter = ngbs_iter + 1;
@@ -934,7 +936,7 @@ void i_global(int64_t* iglobal, const struct CellComm* comm) {
   int64_t nbegin = comm->Comms.ColIndex[p];
   int64_t nend = comm->Comms.ColIndex[p + 1];
   const int64_t* ngbs_iter = &ngbs[nbegin];
-  while (ngbs_iter != &ngbs[nend] && 
+  while (ngbs_iter != &ngbs[nend] &&
   comm->ProcBoxesEnd[*ngbs_iter] <= (comm->ProcBoxes[*ngbs_iter] + ilocal)) {
     ilocal = ilocal - comm->ProcBoxesEnd[*ngbs_iter] + comm->ProcBoxes[*ngbs_iter];
     ngbs_iter = ngbs_iter + 1;
@@ -1004,7 +1006,7 @@ void relations(struct CSC rels[], int64_t ncells, const struct Cell* cells, cons
   int __mpi_rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &__mpi_rank);
   int64_t mpi_rank = __mpi_rank;
-  
+
   for (int64_t i = 0; i <= levels; i++) {
     int64_t jbegin = 0, jend = ncells;
     get_level(&jbegin, &jend, cells, i, -1);
@@ -1043,7 +1045,7 @@ void evalD(void(*ef)(double*), struct Matrix* D, int64_t ncells, const struct Ce
   int __mpi_rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &__mpi_rank);
   int64_t mpi_rank = __mpi_rank;
-  
+
   int64_t jbegin = 0, jend = ncells;
   get_level(&jbegin, &jend, cells, level, -1);
   int64_t ibegin = jbegin, iend = jend;
@@ -1069,16 +1071,16 @@ void evalD(void(*ef)(double*), struct Matrix* D, int64_t ncells, const struct Ce
   }
 }
 
-struct SampleBodies 
+struct SampleBodies
 { int64_t LTlen, *FarLens, *FarAvails, **FarBodies, *CloseLens, *CloseAvails, **CloseBodies, *SkeLens, **Skeletons; };
 
-void buildSampleBodies(struct SampleBodies* sample, int64_t sp_max_far, int64_t sp_max_near, int64_t nbodies, int64_t ncells, const struct Cell* cells, 
+void buildSampleBodies(struct SampleBodies* sample, int64_t sp_max_far, int64_t sp_max_near, int64_t nbodies, int64_t ncells, const struct Cell* cells,
 const struct CSC* rels, const int64_t* lt_child, const struct Base* basis_lo, int64_t level) {
   int __mpi_rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &__mpi_rank);
   int64_t mpi_rank = __mpi_rank;
   const int64_t LEN_CHILD = 2;
-  
+
   int64_t jbegin = 0, jend = ncells;
   get_level(&jbegin, &jend, cells, level, -1);
   int64_t ibegin = jbegin, iend = jend;
@@ -1307,7 +1309,7 @@ void dist_double(double* arr[], const struct CellComm* comm) {
 #endif
 }
 
-void buildBasis(void(*ef)(double*), struct Base basis[], int64_t ncells, struct Cell* cells, const struct CSC* rel_near, int64_t levels, 
+void buildBasis(void(*ef)(double*), struct Base basis[], int64_t ncells, struct Cell* cells, const struct CSC* rel_near, int64_t levels,
 const struct CellComm* comm, const struct Body* bodies, int64_t nbodies, double epi, int64_t mrank, int64_t sp_pts) {
 
   for (int64_t l = levels; l >= 0; l--) {
@@ -1426,7 +1428,7 @@ const struct CellComm* comm, const struct Body* bodies, int64_t nbodies, double 
 
         for (int64_t j = 0; j < rank; j++) {
           int64_t piv = (int64_t)pa[j] - 1;
-          if (piv != j) { 
+          if (piv != j) {
             int64_t c = samples.Skeletons[i][piv];
             samples.Skeletons[i][piv] = samples.Skeletons[i][j];
             samples.Skeletons[i][j] = c;
@@ -1575,7 +1577,7 @@ void allocNodes(struct Node A[], const struct Base basis[], const struct CSC rel
     double* data = NULL;
     if (count > 0)
       data = (double*)calloc(count, sizeof(double));
-    
+
     for (int64_t x = 0; x < nnz; x++) {
       int64_t dim_y = arr_m[x].M;
       int64_t dim_x = arr_m[x].N;
@@ -1619,7 +1621,7 @@ void factorNode(struct Matrix* A_cc, struct Matrix* A_oc, struct Matrix* A_oo, c
     AV_o[x] = (struct Matrix){ &data[dim_y * dimc_x], dim_y, diml_x };
     data = data + dim_y * dim_x;
   }
-  
+
   int64_t ibegin = 0, iend = 0;
   self_local_range(&ibegin, &iend, comm);
   int64_t lbegin = ibegin;
@@ -1654,7 +1656,7 @@ void factorNode(struct Matrix* A_cc, struct Matrix* A_oc, struct Matrix* A_oo, c
   free(AV_c);
 }
 
-void nextNode(struct Matrix* Mup, const struct CSC* rels_up, const struct Matrix* Mlow, const struct Matrix* Slow, const int64_t* lchild, 
+void nextNode(struct Matrix* Mup, const struct CSC* rels_up, const struct Matrix* Mlow, const struct Matrix* Slow, const int64_t* lchild,
 const struct CSC* rels_low_near, const struct CSC* rels_low_far, const struct CellComm* comm_up, const struct CellComm* comm_low) {
   int64_t nloc = 0, nend = 0, ploc = 0, pend = 0;
   self_local_range(&nloc, &nend, comm_up);
@@ -1761,7 +1763,7 @@ void allocRightHandSides(char mvsv, struct RightHandSides rhs[], const struct Ba
     double* data = NULL;
     if (count > 0)
       data = (double*)calloc(count, sizeof(double));
-    
+
     for (int64_t j = 0; j < len_arr; j++) {
       arr_m[j].A = data;
       int64_t len = arr_m[j].M;
@@ -1945,7 +1947,7 @@ void solveA(struct RightHandSides rhs[], const struct Node A[], const struct Bas
   }
   cpyMatToMat(rhs[0].X[0].M, 1, &rhs[0].X[0], &rhs[0].B[0], 0, 0, 0, 0);
   mat_solve('A', &rhs[0].B[0], &A[0].A[0]);
-  
+
   for (int64_t i = 1; i <= levels; i++) {
     permuteAndMerge('B', rhs[i].XoL, rhs[i - 1].B, basis[i - 1].Lchild, &comm[i - 1]);
     int64_t xlen = rhs[i].Xlen;
@@ -1959,7 +1961,7 @@ void solveA(struct RightHandSides rhs[], const struct Node A[], const struct Bas
       arr_comm[j] = rhs[i].XcM[j].A;
     arr_comm[xlen] = arr_comm[xlen - 1] + rhs[i].XcM[xlen - 1].M;
     dist_double_svbk('B', arr_comm, &comm[i]);
-    
+
     svAccBk(rhs[i].XcM, rhs[i].XoL, rhs[i].B, basis[i].Uc, basis[i].Uo, A[i].A_cc, A[i].A_oc, &rels[i], &comm[i]);
     dist_double_svbk('F', arr_comm, &comm[i]);
     free(arr_comm);
@@ -2006,7 +2008,7 @@ void matVecA(struct RightHandSides rhs[], const struct Node A[], const struct Ba
     free(arr_comm);
     permuteAndMerge('F', rhs[i].XcM, rhs[i - 1].X, basis[i - 1].Lchild, &comm[i - 1]);
   }
-  
+
   for (int64_t i = 1; i <= levels; i++) {
     permuteAndMerge('B', rhs[i].XoL, rhs[i - 1].B, basis[i - 1].Lchild, &comm[i - 1]);
     horizontalPass(rhs[i].XoL, rhs[i].XcM, A[i].S, &rels_far[i], &comm[i]);
@@ -2046,11 +2048,11 @@ int main(int argc, char* argv[]) {
   int64_t levels = (int64_t)log2((double)Nbody / leaf_size);
   int64_t Nleaf = (int64_t)1 << levels;
   int64_t ncells = Nleaf + Nleaf - 1;
-  
+
   //void(*ef)(double*) = laplace3d;
   void(*ef)(double*) = yukawa3d;
   set_kernel_constants(1.e-3 / Nbody, 1.);
-  
+
   struct Body* body = (struct Body*)malloc(sizeof(struct Body) * Nbody);
   struct Cell* cell = (struct Cell*)malloc(sizeof(struct Cell) * ncells);
   struct CSC cellNear, cellFar;
@@ -2091,7 +2093,7 @@ int main(int argc, char* argv[]) {
   startTimer(&construct_time, &construct_comm_time);
   buildBasis(ef, basis, ncells, cell, rels_near, levels, cell_comm, body, Nbody, epi, rank_max, sp_pts);
   stopTimer(&construct_time, &construct_comm_time);
-  
+
   allocNodes(nodes, basis, rels_near, rels_far, cell_comm, levels);
 
   evalD(ef, nodes[levels].A, ncells, cell, body, &rels_near[levels], levels);
@@ -2105,9 +2107,9 @@ int main(int argc, char* argv[]) {
     for (int64_t i = 0; i <= levels; i++)
       rightHandSides_free(&rhs[i]);
   }
-  else 
+  else
     mat_vec_reference(ef, body_local[0], body_local[1], X1, Nbody, body);
-  
+
   double factor_time, factor_comm_time;
   startTimer(&factor_time, &factor_comm_time);
   factorA(nodes, basis, rels_near, rels_far, cell_comm, levels);
@@ -2147,7 +2149,7 @@ int main(int argc, char* argv[]) {
       "Err: %e\n"
       "Program: %lf s. COMM: %lf s.\n",
       (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
-      construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time, 
+      construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
       (double)mem_basis * 1.e-9, (double)mem_A * 1.e-9, (double)mem_X * 1.e-9, err, prog_time, cm_time);
 
   for (int64_t i = 0; i <= levels; i++) {
@@ -2160,7 +2162,7 @@ int main(int argc, char* argv[]) {
   }
   csc_free(&cellFar);
   csc_free(&cellNear);
-  
+
   free(body);
   free(cell);
   free(rels_far);

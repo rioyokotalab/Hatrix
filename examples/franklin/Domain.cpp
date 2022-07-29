@@ -270,4 +270,34 @@ namespace Hatrix {
 
     file.close();
   }
+
+  void
+  Domain::build_tree(const int64_t max_nleaf) {
+    // find the min index in each dimension
+    std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
+      Xmax(ndim, std::numeric_limits<double>::min()),
+      domain_center(ndim);
+
+    for (int64_t i = 0; i < particles.size(); ++i) {
+      for (int64_t k = 0; k < ndim; ++k) {
+        if (Xmax[k] < particles[i].coords[k]) {
+          Xmax[k] = particles[i].coords[k];
+        }
+        if (Xmin[k] > particles[i].coords[k]) {
+          Xmin[k] = particles[i].coords[k];
+        }
+      }
+    }
+
+    // set the center point
+    for (int64_t k = 0; k < ndim; ++k) {
+      domain_center[k] = (Xmax[k] - Xmin[k]) / 2;
+    }
+
+    tree = new Cell(domain_center, 0, N);
+  }
+
+  Cell::Cell(std::vector<double> _center, int64_t pstart, int64_t pend) :
+    center(_center), start_index(pstart), end_index(pend) {
+  }
 }
