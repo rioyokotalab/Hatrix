@@ -1,3 +1,6 @@
+add_subdirectory(common)
+include_directories(common)
+
 if(USE_CUDA)
   list(APPEND HATRIX_EXAMPLES
     NxN_BlockDense_LU
