@@ -182,6 +182,10 @@ class Domain {
       particles.emplace_back(Particle(0, 0, 1, 0));
 
       const int64_t mlen = N - 2;
+      if (mlen < 0) {
+        std::cout << "N has to be >=2 for unit sphere mesh" << std::endl;
+        exit(EXIT_FAILURE);
+      }
       if (mlen > 0) {
         const double alen = std::sqrt((double)mlen);
         const int64_t m = (int64_t)std::ceil(alen);
@@ -214,49 +218,39 @@ class Domain {
   void generate_unit_cubical_mesh() {
     if (ndim == 2) {
       // Generate a unit square with N points on the sides
-      const int64_t mlen = (int64_t)std::ceil((double)N / 4.);
-      const double alen = std::sqrt((double)mlen);
-      const int64_t m = (int64_t)std::ceil(alen);
-      const int64_t n = (int64_t)std::ceil((double)mlen / m);
-
-      const double seg_fv = 1. / ((double)m - 1);
-      const double seg_su = 1. / ((double)n + 1);
-
-      for (int64_t i = 0; i < N; i++) {
-        const int64_t face = i / mlen;
-        const int64_t ii = i - face * mlen;
-        const int64_t x = ii / m;
-        const int64_t y = ii - x * m;
-        const int64_t x2 = y & 1;
-
-        double u, v;
-        double px, py;
-
-        switch (face) {
-          case 0: // POSITIVE X
-            v = y * seg_fv;
-            px = 1.;
-            py = 2. * v - 1.;
-            break;
-          case 1: // NEGATIVE X
-            v = y * seg_fv;
-            px = -1.;
-            py = 2. * v - 1.;
-            break;
-          case 2: // POSITIVE Y
-            u = (0.5 * x2 + x + 1) * seg_su;
-            px = 2. * u - 1.;
-            py = 1.;
-            break;
-          case 3: // NEGATIVE Y
-            u = (0.5 * x2 + x + 1) * seg_su;
-            px = 2. * u - 1.;
-            py = -1.;
-            break;
-        }
-
+      if (N < 4) {
+        std::cout << "N has to be >=4 for unit square mesh" << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      // Taken from H2Lib: Library/curve2d.c
+      const double a = 0.5;
+      const int64_t top = N / 4;
+      const int64_t left = N / 2;
+      const int64_t bottom = 3 * N / 4;
+      int64_t i = 0;
+      for (i = 0; i < top; i++) {
+        const double x = a - 2.0 * a * i / top;
+        const double y = a;
         const double value = (double)i / (double)N;
-        particles.emplace_back(Particle(px, py, value));
+        particles.emplace_back(Particle(x, y, value));
+      }
+      for (; i < left; i++) {
+        const double x = -a;
+        const double y = a - 2.0 * a * (i - top) / (left - top);
+        const double value = (double)i / (double)N;
+        particles.emplace_back(Particle(x, y, value));
+      }
+      for (; i < bottom; i++) {
+        const double x = -a + 2.0 * a * (i - left) / (bottom - left);
+        const double y = -a;
+        const double value = (double)i / (double)N;
+        particles.emplace_back(Particle(x, y, value));
+      }
+      for (; i < N; i++) {
+        const double x = a;
+        const double y = -a + 2.0 * a * (i - bottom) / (N - bottom);
+        const double value = (double)i / (double)N;
+        particles.emplace_back(Particle(x, y, value));
       }
     }
     else if (ndim == 3) {
@@ -394,15 +388,17 @@ class Domain {
     const std::vector<char> axis{'x', 'y', 'z'};
 
     std::ofstream file;
-    file.open(file_name, std::ios::app | std::ios::out);
+    file.open(file_name, std::ios::out);
     for (int64_t k = 0; k < ndim; k++) {
-      file << axis[k] << ",";
+      if (k > 0) file << ",";
+      file << axis[k];
     }
     file << std::endl;
 
     for (int64_t i = 0; i < N; i++) {
       for (int64_t k = 0; k < ndim; k++) {
-        file << particles[i].coords[k] << ",";
+        if (k > 0) file << ",";
+        file << particles[i].coords[k];
       }
       file << std::endl;
     }
