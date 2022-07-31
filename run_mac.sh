@@ -24,11 +24,11 @@ export TMPDIR=/tmp
 # done
 
 for nprocs in 1; do
-    lldb -- ./bin/HSS_main --N 1024 \
+    ./bin/HSS_main --N 1024 \
          --nleaf 128 \
          --kernel_func laplace \
          --kind_of_geometry circular \
-         --ndim 3 \
+         --ndim 2 \
          --max_rank 90 \
          --accuracy 1e-11 \
          --admis 0 \

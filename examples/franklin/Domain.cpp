@@ -228,7 +228,9 @@ namespace Hatrix {
       // std::random_device rd;  // Will be used to obtain a seed for the random number engine
       std::mt19937 gen(1); // Standard mersenne_twister_engine seeded with 1 every time.
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
+
       double radius = 1.0;
+
       for (int64_t i = 0; i < N; ++i) {
         // double phi = dis(gen);
         // double theta = dis(gen);
@@ -271,6 +273,49 @@ namespace Hatrix {
     file.close();
   }
 
+  int
+  Domain::get_quadrant(std::vector<double>& p_coords,
+                       std::vector<double>& c_coords) {
+    int quadrant = 0;
+    if (ndim == 2) {
+      quadrant = (p_coords[0] > c_coords[0]) +
+        ((p_coords[1] > c_coords[1]) << 1);
+    }
+    else if (ndim == 3) {
+      quadrant = p_coords[0] > c_coords[0] +
+        ((p_coords[1] > c_coords[1]) << 1) +
+        ((p_coords[2] > c_coords[2]) << 2);
+    }
+  }
+
+  void
+  Domain::split_cell(Cell* cell, int64_t pstart, int64_t pend) {
+    // sort particles into quadrants
+    std::vector<int64_t> sizes(pow(2, ndim), 0);
+    std::vector<int64_t> offsets(sizes.size(), 0);
+    int64_t cell_particles = pend - pstart;
+    for (int i = 0; i < sizes.size(); ++i) {
+      offsets[i] = i * (cell_particles / sizes.size());
+    }
+
+    // count particles in quadrants
+    for (int64_t i = pstart; i < pend; ++i) {
+      int quadrant = get_quadrant(particles[i].coords,
+                                  cell->center);
+      sizes[quadrant]++;
+    }
+
+    // int64_t offset = pstart;
+    // for (int64_t i = 0; i < sizes.size(); ++i) {
+    //   offsets[i] = offset;
+    //   offset += sizes[i];
+    // }
+    // sort bodies by quadrant
+    for (int64_t i = pstart; i < pend; ++i) {
+
+    }
+  }
+
   void
   Domain::build_tree(const int64_t max_nleaf) {
     // find the min index in each dimension
@@ -291,10 +336,15 @@ namespace Hatrix {
 
     // set the center point
     for (int64_t k = 0; k < ndim; ++k) {
-      domain_center[k] = (Xmax[k] - Xmin[k]) / 2;
+      domain_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
     }
 
+    std::cout << Xmin[0] << " " << Xmin[1] << std::endl;
+    std::cout << Xmax[0] << " " <<  Xmax[1]  << std::endl;
+
+    // build the largest node of the tree.
     tree = new Cell(domain_center, 0, N);
+    split_cell(tree, 0, N);
   }
 
   Cell::Cell(std::vector<double> _center, int64_t pstart, int64_t pend) :

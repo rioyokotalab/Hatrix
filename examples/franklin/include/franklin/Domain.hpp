@@ -36,6 +36,10 @@ namespace Hatrix {
     void orthogonal_recursive_bisection_3dim(int64_t start, int64_t end,
                                              std::string morton_index,
                                              int64_t nleaf, int64_t axis);
+    void split_cell(Cell* cell, int64_t start_index, int64_t end_index);
+    int
+    get_quadrant(std::vector<double>& p_coords,
+                 std::vector<double>& c_coords);
   public:
     Domain(int64_t N, int64_t ndim);
     void generate_circular_particles(double min_val, double max_val);
