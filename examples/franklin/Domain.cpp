@@ -294,11 +294,12 @@ namespace Hatrix {
   Domain::split_cell(Cell* cell, int64_t pstart, int64_t pend,
                      std::vector<Hatrix::Particle>& buffer) {
     // sort particles into quadrants
-    std::vector<int64_t> sizes(pow(2, ndim), 0);
-    std::vector<int64_t> offsets(sizes.size(), 0);
+    int64_t quadrants = pow(2, ndim);
+    std::vector<int64_t> sizes(quadrants, 0);
+    std::vector<int64_t> offsets(quadrants, 0);
     int64_t cell_particles = pend - pstart;
-    for (int i = 0; i < sizes.size(); ++i) {
-      offsets[i] = i * (cell_particles / sizes.size());
+    for (int i = 0; i < quadrants; ++i) {
+      offsets[i] = i * (cell_particles / quadrants);
     }
 
     // count particles in quadrants
@@ -309,14 +310,13 @@ namespace Hatrix {
     }
 
     int64_t offset = pstart;
-
-    for (int64_t i = 0; i < sizes.size(); ++i) {
+    for (int64_t i = 0; i < quadrants; ++i) {
       offsets[i] = offset;
       offset += sizes[i];
     }
 
-    std::vector<int64_t> counter(sizes.size(), 0); // storage of counters in offsets
-    for (int64_t i = 0; i < sizes.size(); ++i) {
+    std::vector<int64_t> counter(quadrants, 0); // storage of counters in offsets
+    for (int64_t i = 0; i < quadrants; ++i) {
       counter[i] = offsets[i];
     }
 
@@ -329,6 +329,13 @@ namespace Hatrix {
         buffer[counter[quadrant]].coords[k] = particles[i].coords[k];
       }
       counter[quadrant]++;      // increment counters for bodies in each quadrant.
+    }
+
+    // loop over children and recurse
+    for (int64_t d = 0; d < quadrants; ++d) {
+      std::vector<double> center;
+      Cell child();
+      cell->cells.push_back();
     }
   }
 
