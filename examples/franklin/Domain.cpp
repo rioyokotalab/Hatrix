@@ -286,10 +286,13 @@ namespace Hatrix {
         ((p_coords[1] > c_coords[1]) << 1) +
         ((p_coords[2] > c_coords[2]) << 2);
     }
+
+    return quadrant;
   }
 
   void
-  Domain::split_cell(Cell* cell, int64_t pstart, int64_t pend) {
+  Domain::split_cell(Cell* cell, int64_t pstart, int64_t pend,
+                     std::vector<Hatrix::Particle>& buffer) {
     // sort particles into quadrants
     std::vector<int64_t> sizes(pow(2, ndim), 0);
     std::vector<int64_t> offsets(sizes.size(), 0);
@@ -305,14 +308,27 @@ namespace Hatrix {
       sizes[quadrant]++;
     }
 
-    // int64_t offset = pstart;
-    // for (int64_t i = 0; i < sizes.size(); ++i) {
-    //   offsets[i] = offset;
-    //   offset += sizes[i];
-    // }
+    int64_t offset = pstart;
+
+    for (int64_t i = 0; i < sizes.size(); ++i) {
+      offsets[i] = offset;
+      offset += sizes[i];
+    }
+
+    std::vector<int64_t> counter(sizes.size(), 0); // storage of counters in offsets
+    for (int64_t i = 0; i < sizes.size(); ++i) {
+      counter[i] = offsets[i];
+    }
+
     // sort bodies by quadrant
     for (int64_t i = pstart; i < pend; ++i) {
-
+      int quadrant = get_quadrant(particles[i].coords,
+                                  cell->center);
+      // out-of-place copy of the particles according to quadrant
+      for (int64_t k = 0; k < ndim; ++k) {
+        buffer[counter[quadrant]].coords[k] = particles[i].coords[k];
+      }
+      counter[quadrant]++;      // increment counters for bodies in each quadrant.
     }
   }
 
@@ -322,6 +338,9 @@ namespace Hatrix {
     std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
       Xmax(ndim, std::numeric_limits<double>::min()),
       domain_center(ndim);
+
+    // copy particles into a buffer
+    std::vector<Hatrix::Particle> buffer = particles;
 
     for (int64_t i = 0; i < particles.size(); ++i) {
       for (int64_t k = 0; k < ndim; ++k) {
@@ -344,7 +363,7 @@ namespace Hatrix {
 
     // build the largest node of the tree.
     tree = new Cell(domain_center, 0, N);
-    split_cell(tree, 0, N);
+    split_cell(tree, 0, N, buffer);
   }
 
   Cell::Cell(std::vector<double> _center, int64_t pstart, int64_t pend) :
