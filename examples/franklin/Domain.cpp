@@ -278,13 +278,13 @@ namespace Hatrix {
                        std::vector<double>& c_coords) {
     int quadrant = 0;
     if (ndim == 2) {
-      quadrant = (p_coords[0] > c_coords[0]) +
-        ((p_coords[1] > c_coords[1]) << 1);
+      quadrant = (p_coords[0] < c_coords[0]) +
+        ((p_coords[1] < c_coords[1]) << 1);
     }
     else if (ndim == 3) {
-      quadrant = p_coords[0] > c_coords[0] +
-        ((p_coords[1] > c_coords[1]) << 1) +
-        ((p_coords[2] > c_coords[2]) << 2);
+      quadrant = p_coords[0] < c_coords[0] +
+        ((p_coords[1] < c_coords[1]) << 1) +
+        ((p_coords[2] < c_coords[2]) << 2);
     }
 
     return quadrant;
@@ -296,7 +296,7 @@ namespace Hatrix {
     // sort particles into quadrants
     int64_t quadrants = pow(2, ndim);
     std::vector<int64_t> sizes(quadrants, 0);
-    std::vector<int64_t> offsets(quadrants, 0);
+    std::vector<int64_t> offsets(quadrants+1, 0);
     int64_t cell_particles = pend - pstart;
     for (int i = 0; i < quadrants; ++i) {
       offsets[i] = i * (cell_particles / quadrants);
@@ -314,6 +314,7 @@ namespace Hatrix {
       offsets[i] = offset;
       offset += sizes[i];
     }
+    offsets[quadrants] = offset;
 
     std::vector<int64_t> counter(quadrants, 0); // storage of counters in offsets
     for (int64_t i = 0; i < quadrants; ++i) {
@@ -331,11 +332,34 @@ namespace Hatrix {
       counter[quadrant]++;      // increment counters for bodies in each quadrant.
     }
 
+    // for (int i = 0; i <= quadrants; ++i) {
+    //   std::cout << offsets[i] << " ";
+    // }
+    // std::cout << std::endl;
+
     // loop over children and recurse
     for (int64_t d = 0; d < quadrants; ++d) {
-      std::vector<double> center;
-      Cell child();
-      cell->cells.push_back();
+      std::vector<double> cell_center(ndim, 0),
+        Xmin(ndim, std::numeric_limits<double>::max()),
+        Xmax(ndim, std::numeric_limits<double>::min());
+
+      for (int64_t i = offsets[d]; i < offsets[d+1]; ++i) {
+        for (int64_t k = 0; k < ndim; ++k) {
+          if (Xmax[k] < buffer[i].coords[k]) {
+            Xmax[k] = buffer[i].coords[k];
+          }
+          if (Xmin[k] > buffer[i].coords[k]) {
+            Xmin[k] = buffer[i].coords[k];
+          }
+        }
+      }
+
+      for (int64_t k = 0; k < ndim; ++k) {
+        cell_center[k] = (Xmax[k] + Xmin[k]) / 2;
+      }
+
+      Cell child(cell_center, offsets[d], offsets[d+1]);
+      cell->cells.push_back(child);
     }
   }
 
