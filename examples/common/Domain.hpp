@@ -25,144 +25,96 @@ class Domain {
   std::vector<Box> boxes;
 
  private:
+  double get_coord_max(const int64_t begin_index, const int64_t end_index,
+                       const int64_t axis) const {
+    assert(axis < ndim);
+    double c_max = particles[begin_index].coords[axis];
+    for (int64_t i = begin_index+1; i <= end_index; i++) {
+      c_max = std::max(c_max, particles[i].coords[axis]);
+    }
+    return c_max;
+  }
+
+  double get_coord_min(const int64_t begin_index, const int64_t end_index,
+                       const int64_t axis) const {
+    assert(axis < ndim);
+    double c_min = particles[begin_index].coords[axis];
+    for (int64_t i = begin_index+1; i <= end_index; i++) {
+      c_min = std::min(c_min, particles[i].coords[axis]);
+    }
+    return c_min;
+  }
+
   // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
-  void orthogonal_recursive_bisection_1dim(const int64_t left, const int64_t right,
-                                           const std::string morton_index, const int64_t nleaf) {
-    // Sort the particles only by the X axis since that is the only axis that needs to be bisected.
+  void orthogonal_recursive_bisection(const int64_t left, const int64_t right,
+                                      const std::string morton_index, const int64_t nleaf) {
+    // Sort particle based on axis with largest radius
+    double coord_min[3], coord_max[3], r[3], center[3];
+    double radius_max = 0.;
+    int64_t sort_axis = 0;
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      coord_min[axis] = get_coord_min(left, right - 1, axis);
+      coord_max[axis] = get_coord_max(left, right - 1, axis);
+      r[axis] = (coord_max[axis] - coord_min[axis]) / 2.;
+      center[axis] = (coord_min[axis] + coord_max[axis]) / 2.;
+
+      if (r[axis] > radius_max) {
+        radius_max = r[axis];
+        sort_axis = axis;
+      }
+    }
     std::sort(particles.begin() + left, particles.begin() + right,
-              [](const Particle& lhs, const Particle& rhs) {
-                return lhs.coords[0] < rhs.coords[0];
+              [sort_axis](const Particle& lhs, const Particle& rhs) {
+                return lhs.coords[sort_axis] < rhs.coords[sort_axis];
               });
 
     const int64_t num_particles = right - left;
     if (num_particles <= nleaf) {
-      const double start_coord_x = particles[left].coords[0];
-      const double end_coord_x = particles[right - 1].coords[0];
-      const double center_x = (start_coord_x + end_coord_x) / 2;
-      const double diameter = end_coord_x - start_coord_x;
-      boxes.emplace_back(Box(num_particles, left, right - 1,
-                             diameter, center_x, morton_index));
+      if (ndim == 1) {
+        boxes.emplace_back(Box(num_particles, left, right - 1,
+                               center[0], r[0], morton_index));
+      }
+      if (ndim == 2) {
+        boxes.emplace_back(Box(num_particles, left, right - 1,
+                               center[0], center[1], r[0], r[1],
+                               morton_index));
+      }
+      if (ndim == 3) {
+        boxes.emplace_back(Box(num_particles, left, right - 1,
+                               center[0], center[1], center[2],
+                               r[0], r[1], r[2],
+                               morton_index));
+      }
     }
     else {  // Recurse and split again
       const int64_t mid = (left + right) / 2;
       // First half
-      orthogonal_recursive_bisection_1dim(left, mid, morton_index + "0", nleaf);
+      orthogonal_recursive_bisection(left, mid, morton_index + "0", nleaf);
       // Second half
-      orthogonal_recursive_bisection_1dim(mid, right, morton_index + "1", nleaf);
-    }
-  }
-
-  void orthogonal_recursive_bisection_2dim(const int64_t left, const int64_t right,
-                                           const std::string morton_index, const int64_t nleaf,
-                                           const int64_t axis) {
-    // Sort particles by axis
-    std::sort(particles.begin() + left, particles.begin() + right,
-              [axis](const Particle& lhs, const Particle& rhs) {
-                return lhs.coords[axis] < rhs.coords[axis];
-              });
-
-    const int64_t num_particles = right - left;
-    if (num_particles <= nleaf) {
-      if (axis == ndim-1) {
-        const int64_t begin_index = left;
-        const int64_t end_index = right - 1;
-
-        double x_max, y_max, x_min, y_min;
-        x_min = x_max = particles[begin_index].coords[0];
-        y_min = y_max = particles[begin_index].coords[1];
-        for (int64_t i = begin_index + 1; i <= end_index; i++) {
-          x_min = std::min(x_min, particles[i].coords[0]);
-          y_min = std::min(y_min, particles[i].coords[1]);
-
-          x_max = std::max(x_max, particles[i].coords[0]);
-          y_max = std::max(y_max, particles[i].coords[1]);
-        }
-        const double dx = x_max - x_min;
-        const double dy = y_max - y_min;
-        const double diameter = (dx * dx) + (dy * dy);
-        const double center_x = (x_min + x_max) / 2.;
-        const double center_y = (y_min + y_max) / 2.;
-
-        boxes.emplace_back(Box(num_particles, begin_index, end_index,
-                               diameter, center_x, center_y, morton_index));
-      }
-      else {
-        orthogonal_recursive_bisection_2dim(left, right, morton_index,
-                                            nleaf, (axis + 1) % ndim);
-      }
-    }
-    else {
-      const int64_t mid = (left + right) / 2;
-      orthogonal_recursive_bisection_2dim(left, mid, morton_index + "0",
-                                          nleaf, (axis + 1) % ndim);
-      orthogonal_recursive_bisection_2dim(mid, right, morton_index + "1",
-                                          nleaf, (axis + 1) % ndim);
-    }
-  }
-
-  void orthogonal_recursive_bisection_3dim(const int64_t left, const int64_t right,
-                                           const std::string morton_index, const int64_t nleaf,
-                                           const int64_t axis) {
-    // Sort particles by axis
-    std::sort(particles.begin() + left, particles.begin() + right,
-              [axis](const Particle& lhs, const Particle& rhs) {
-                return lhs.coords[axis] < rhs.coords[axis];
-              });
-
-    const int64_t num_particles = right - left;
-    if (num_particles <= nleaf) {
-      if (axis == ndim-1) {
-        const int64_t begin_index = left;
-        const int64_t end_index = right - 1;
-
-        double x_max, y_max, z_max;
-        double x_min, y_min, z_min;
-        x_min = x_max = particles[begin_index].coords[0];
-        y_min = y_max = particles[begin_index].coords[1];
-        z_min = z_max = particles[begin_index].coords[2];
-        for (int64_t i = begin_index+1; i <= end_index; i++) {
-          x_min = std::min(x_min, particles[i].coords[0]);
-          y_min = std::min(y_min, particles[i].coords[1]);
-          z_min = std::min(z_min, particles[i].coords[2]);
-
-          x_max = std::max(x_max, particles[i].coords[0]);
-          y_max = std::max(y_max, particles[i].coords[1]);
-          z_max = std::max(z_max, particles[i].coords[2]);
-        }
-        const double dx = x_max - x_min;
-        const double dy = y_max - y_min;
-        const double dz = z_max - z_min;
-        const double diameter = (dx * dx) + (dy * dy) + (dz * dz);
-        const double center_x = (x_min + x_max) / 2.;
-        const double center_y = (y_min + y_max) / 2.;
-        const double center_z = (z_min + z_max) / 2.;
-
-        boxes.emplace_back(Box(num_particles, begin_index, end_index,
-                               diameter, center_x, center_y, center_z,
-                               morton_index));
-      }
-      else {
-        // Sort by next axis
-        orthogonal_recursive_bisection_3dim(left, right, morton_index,
-                                            nleaf, (axis+1) % ndim);
-      }
-    }
-    else {
-      const int64_t mid = (left + right) / 2;
-      orthogonal_recursive_bisection_3dim(left, mid, morton_index + "0",
-                                          nleaf, (axis+1) % ndim);
-      orthogonal_recursive_bisection_3dim(mid, right, morton_index + "1",
-                                          nleaf, (axis+1) % ndim);
+      orthogonal_recursive_bisection(mid, right, morton_index + "1", nleaf);
     }
   }
 
  public:
   Domain(const int64_t _N, const int64_t _ndim)
       : N(_N), ndim(_ndim) {
-    if (ndim < 1) {
+    if (ndim < 1 || ndim > 3) {
       std::cout << "invalid ndim : " << ndim << std::endl;
       exit(EXIT_FAILURE);
     }
+  }
+
+  void divide_domain_and_create_particle_boxes(const int64_t nleaf) {
+    orthogonal_recursive_bisection(0, N, "", nleaf);
+  }
+
+  // Check admissibility on leaf-level boxes
+  bool check_admis(const double theta,
+                   const int64_t source, const int64_t target) const {
+    const auto diameter = std::min(boxes[source].get_diameter(),
+                                   boxes[target].get_diameter());
+    const auto distance = boxes[source].distance_from(boxes[target]);
+    return distance > (theta * diameter);
   }
 
   void generate_unit_circular_mesh() {
@@ -345,27 +297,7 @@ class Domain {
     }
   }
 
-  void divide_domain_and_create_particle_boxes(const int64_t nleaf) {
-    if (ndim == 1) {
-      orthogonal_recursive_bisection_1dim(0, N, "", nleaf);
-    }
-    else if (ndim == 2) {
-      orthogonal_recursive_bisection_2dim(0, N, "", nleaf, 0);
-    }
-    else if (ndim == 3) {
-      orthogonal_recursive_bisection_3dim(0, N, "", nleaf, 0);
-    }
-  }
-
-  // Check admissibility on leaf-level boxes
-  bool check_admis(const double theta,
-                   const int64_t source, const int64_t target) const {
-    const auto min_diameter = std::min(boxes[source].diameter, boxes[target].diameter);
-    const auto distance = boxes[source].distance_from(boxes[target]);
-    return distance > (theta * min_diameter);
-  }
-
-  void print_to_file(const std::string& file_name) const {
+  void print_particles_to_file(const std::string& file_name) const {
     const std::vector<char> axis{'x', 'y', 'z'};
 
     std::ofstream file;
