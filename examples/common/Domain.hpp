@@ -178,40 +178,21 @@ class Domain {
       }
     }
     else if (ndim == 3) {
-      // Generate a unit sphere mesh with N points on the surface.
-      particles.emplace_back(Particle(0, 0, 1, 0));
+      // Generate a unit sphere mesh with N uniformly spaced points on the surface
+      // https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
+      const double phi = M_PI * (3. - std::sqrt(5.));  // golden angle in radians
+      for (int64_t i = 0; i < N; i++) {
+        const double y = 1. - ((double)i / ((double)N - 1)) * 2.;  // y goes from 1 to -1
 
-      const int64_t mlen = N - 2;
-      if (mlen < 0) {
-        std::cout << "N has to be >=2 for unit sphere mesh" << std::endl;
-        exit(EXIT_FAILURE);
+        // Note: setting constant radius = 1 will produce a cylindrical shape
+        const double radius = std::sqrt(1. - y * y);  // radius at y
+        const double theta = (double)i * phi;
+
+        const double x = radius * std::cos(theta);
+        const double z = radius * std::sin(theta);
+        const double value = (double)i / (double)N;
+        particles.emplace_back(Particle(x, y, z, value));
       }
-      if (mlen > 0) {
-        const double alen = std::sqrt((double)mlen);
-        const int64_t m = (int64_t)std::ceil(alen);
-        const int64_t n = (int64_t)std::ceil((double)mlen / (double)m);
-
-        const double seg_theta = M_PI / ((double)m + 1);
-        const double seg_phi = 2.0 * M_PI / (double)n;
-
-        for (int64_t i = 0; i < mlen; i++) {
-          const int64_t x = i / m;
-          const int64_t y = 1 + i - x * m;
-          const int64_t x2 = !(y & 1);
-
-          const double theta = y * seg_theta;
-          const double phi = (0.5 * x2 + x) * seg_phi;
-
-          const double cost = std::cos(theta);
-          const double sint = std::sin(theta);
-          const double cosp = std::cos(phi);
-          const double sinp = std::sin(phi);
-          const double value = (double)i / (double)N;
-
-          particles.emplace_back(Particle(sint * cosp, sint * sinp, cost, value));
-        }
-      }
-      particles.emplace_back(Particle(0, 0, -1, ((double)N - 1) / (double)N));
     }
   }
 
