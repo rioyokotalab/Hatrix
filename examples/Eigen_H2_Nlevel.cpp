@@ -1536,9 +1536,6 @@ int main(int argc, char ** argv) {
             << std::defaultfloat
             << std::endl;
 
-  std::string filename = geom_name + "-" + std::to_string(N) + ".csv";
-  domain.print_to_file(filename);
-
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
 

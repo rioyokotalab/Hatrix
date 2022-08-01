@@ -597,7 +597,7 @@ H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
   }
   else {
     std::cout << "wrong admis condition: " << admis_kind << std::endl;
-    abort();
+    exit(EXIT_FAILURE);
   }
 
   is_admissible.insert(0, 0, 0, false);
@@ -605,7 +605,7 @@ H2::H2(const Domain& domain, const int64_t N, const int64_t nleaf,
   int64_t all_dense_row = find_all_dense_row();
   if (all_dense_row != -1) {
     std::cout << "found all dense row at " << all_dense_row << ". Aborting.\n";
-    abort();
+    exit(EXIT_FAILURE);
   }
 
   generate_leaf_nodes(domain, rand);
