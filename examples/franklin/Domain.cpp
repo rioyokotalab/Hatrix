@@ -292,12 +292,18 @@ namespace Hatrix {
 
   void
   Domain::split_cell(Cell* cell, int64_t pstart, int64_t pend,
+                     const int64_t max_nleaf,
                      std::vector<Hatrix::Particle>& buffer) {
     // sort particles into quadrants
     int64_t quadrants = pow(2, ndim);
     std::vector<int64_t> sizes(quadrants, 0);
     std::vector<int64_t> offsets(quadrants+1, 0);
     int64_t cell_particles = pend - pstart;
+
+    if (cell_particles <= max_nleaf) {
+      return;
+    }
+
     for (int i = 0; i < quadrants; ++i) {
       offsets[i] = i * (cell_particles / quadrants);
     }
@@ -332,11 +338,6 @@ namespace Hatrix {
       counter[quadrant]++;      // increment counters for bodies in each quadrant.
     }
 
-    // for (int i = 0; i <= quadrants; ++i) {
-    //   std::cout << offsets[i] << " ";
-    // }
-    // std::cout << std::endl;
-
     // loop over children and recurse
     for (int64_t d = 0; d < quadrants; ++d) {
       std::vector<double> cell_center(ndim, 0),
@@ -354,12 +355,18 @@ namespace Hatrix {
         }
       }
 
+      double radius = 0;
       for (int64_t k = 0; k < ndim; ++k) {
         cell_center[k] = (Xmax[k] + Xmin[k]) / 2;
+        radius += pow(Xmax[k] - Xmin[k], 2);
       }
+      radius = sqrt(radius);
 
-      Cell child(cell_center, offsets[d], offsets[d+1]);
+      Cell child(cell_center, offsets[d], offsets[d+1], radius);
       cell->cells.push_back(child);
+
+      std::cout << "split d: " << d << std::endl;
+      split_cell(&child, offsets[d], offsets[d+1], max_nleaf, buffer);
     }
   }
 
@@ -369,6 +376,7 @@ namespace Hatrix {
     std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
       Xmax(ndim, std::numeric_limits<double>::min()),
       domain_center(ndim);
+    double radius = 0;
 
     // copy particles into a buffer
     std::vector<Hatrix::Particle> buffer = particles;
@@ -387,17 +395,19 @@ namespace Hatrix {
     // set the center point
     for (int64_t k = 0; k < ndim; ++k) {
       domain_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
+      radius += pow(Xmax[k] - Xmin[k], 2);
     }
+    radius = sqrt(radius);
 
     std::cout << Xmin[0] << " " << Xmin[1] << std::endl;
     std::cout << Xmax[0] << " " <<  Xmax[1]  << std::endl;
 
     // build the largest node of the tree.
-    tree = new Cell(domain_center, 0, N);
-    split_cell(tree, 0, N, buffer);
+    tree = new Cell(domain_center, 0, N, radius);
+    split_cell(tree, 0, N, max_nleaf, buffer);
   }
 
-  Cell::Cell(std::vector<double> _center, int64_t pstart, int64_t pend) :
-    center(_center), start_index(pstart), end_index(pend) {
-  }
+  Cell::Cell(std::vector<double> _center, int64_t pstart,
+             int64_t pend, double _radius) :
+    center(_center), start_index(pstart), end_index(pend), radius(_radius) {}
 }

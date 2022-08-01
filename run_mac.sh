@@ -37,3 +37,5 @@ for nprocs in 1; do
          --add_diag 1e-7 \
          --use_nested_basis
 done
+
+# profile strumpack and see where N^2 is happening.
