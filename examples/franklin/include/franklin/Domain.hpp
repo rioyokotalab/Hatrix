@@ -38,7 +38,9 @@ namespace Hatrix {
                                              std::string morton_index,
                                              int64_t nleaf, int64_t axis);
     void split_cell(Cell* cell, int64_t start_index, int64_t end_index,
-                    const int64_t max_nleaf, std::vector<Hatrix::Particle>& buffer);
+                    const int64_t max_nleaf,
+                    std::vector<Hatrix::Particle>& bodies,
+                    std::vector<Hatrix::Particle>& buffer);
     int
     get_quadrant(std::vector<double>& p_coords,
                  std::vector<double>& c_coords);

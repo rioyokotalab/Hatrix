@@ -293,6 +293,7 @@ namespace Hatrix {
   void
   Domain::split_cell(Cell* cell, int64_t pstart, int64_t pend,
                      const int64_t max_nleaf,
+                     std::vector<Hatrix::Particle>& bodies,
                      std::vector<Hatrix::Particle>& buffer) {
     // sort particles into quadrants
     int64_t quadrants = pow(2, ndim);
@@ -333,7 +334,7 @@ namespace Hatrix {
                                   cell->center);
       // out-of-place copy of the particles according to quadrant
       for (int64_t k = 0; k < ndim; ++k) {
-        buffer[counter[quadrant]].coords[k] = particles[i].coords[k];
+        buffer[counter[quadrant]].coords[k] = bodies[i].coords[k];
       }
       counter[quadrant]++;      // increment counters for bodies in each quadrant.
     }
@@ -366,7 +367,7 @@ namespace Hatrix {
       cell->cells.push_back(child);
 
       std::cout << "split d: " << d << std::endl;
-      split_cell(&child, offsets[d], offsets[d+1], max_nleaf, buffer);
+      split_cell(&child, offsets[d], offsets[d+1], max_nleaf, buffer, bodies);
     }
   }
 
@@ -404,7 +405,7 @@ namespace Hatrix {
 
     // build the largest node of the tree.
     tree = new Cell(domain_center, 0, N, radius);
-    split_cell(tree, 0, N, max_nleaf, buffer);
+    split_cell(tree, 0, N, max_nleaf, particles, buffer);
   }
 
   Cell::Cell(std::vector<double> _center, int64_t pstart,
