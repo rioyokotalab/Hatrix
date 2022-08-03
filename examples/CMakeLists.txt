@@ -47,8 +47,8 @@ else()
     LDL_strong_Nlevel
     H2_fixed_acc_UMV_svd
     H2_fixed_acc_UMV_qr
-    H2_fixed_acc_LDL
     Construction_H2_Nlevel
+    LDL_H2_Nlevel
     Eigen_H2_Nlevel
   )
 endif()
