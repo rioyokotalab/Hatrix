@@ -62,13 +62,25 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
 std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
                                                          int64_t rank);
 
-// Compute truncated SVD for given accuracy threshold.
+/*
+  Compute truncated SVD for given accuracy threshold, such that
+    |A-USV|_2 <= eps * |A|_2  ,if relative = true
+    |A-USV|_2 <= eps          ,otherwise
+  where |A|_2 is the 2-norm of the matrix A
+*/
 std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative=true);
 
-// Pivoted QR that stops as soon as the desired accuracy is reached
-// Modification of LAPACK's dgeqp3 routine
+/*
+  Compute truncated pivoted QR that stops as soon as the desired accuracy
+  is reached, such that
+    |A-QR|_F <= eps * |A|_F,  ,if relative = true
+    |A-QR|_F <= eps           ,otherwise
+  where |A|_F is the Frobenius norm of the matrix A
+  This is a modification of LAPACK's dgeqp3 routine
+*/
 std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative=true);
 
+// Compute the Frobenius norm of a matrix
 double norm(const Matrix& A);
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T);

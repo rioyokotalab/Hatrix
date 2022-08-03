@@ -677,7 +677,7 @@ void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
     More accurate than Approach 1 since it consider the updated coupling matrices during
     factorization of previous clusters
     Current implementation is quite slow since it traverse from level to root every time
-    TODO implement a faster variant like in MiaoMiaoMa2019_UMV paper.
+    TODO implement a faster variant like in MiaoMiaoMa2019_UMV paper (Algorithm 1)
   */
   // Matrix S_block_row = compute_Srow(row, level);
   // block_row = concat(block_row, matmul(U(row, level), S_block_row), 1);

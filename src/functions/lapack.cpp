@@ -398,7 +398,8 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
     }
     // Update partial column norm
     for(int j=r+1; j<n; j++) {
-      //See LAPACK Working Note 176 (Section 3.2.1) for detail
+      // See LAPACK Working Note 176 (Section 3.2.1) for detail
+      // https://netlib.org/lapack/lawnspdf/lawn176.pdf
       if(cnorm[j] != 0.0) {
         double temp = std::fabs(A(r, j)/cnorm[j]);
         temp = std::fmax(0.0, (1-temp)*(1+temp));
