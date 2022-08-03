@@ -37,10 +37,13 @@ namespace Hatrix {
     void orthogonal_recursive_bisection_3dim(int64_t start, int64_t end,
                                              std::string morton_index,
                                              int64_t nleaf, int64_t axis);
+    // The direction parameter determines whether the copying of data is happening into
+    // bodies or buffer array.
     void split_cell(Cell* cell, int64_t start_index, int64_t end_index,
                     const int64_t max_nleaf,
                     std::vector<Hatrix::Particle>& bodies,
-                    std::vector<Hatrix::Particle>& buffer);
+                    std::vector<Hatrix::Particle>& buffer,
+                    bool direction=false);
     int
     get_quadrant(std::vector<double>& p_coords,
                  std::vector<double>& c_coords);

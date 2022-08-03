@@ -294,7 +294,8 @@ namespace Hatrix {
   Domain::split_cell(Cell* cell, int64_t pstart, int64_t pend,
                      const int64_t max_nleaf,
                      std::vector<Hatrix::Particle>& bodies,
-                     std::vector<Hatrix::Particle>& buffer) {
+                     std::vector<Hatrix::Particle>& buffer,
+                     bool direction) {
     // sort particles into quadrants
     int64_t quadrants = pow(2, ndim);
     std::vector<int64_t> sizes(quadrants, 0);
@@ -302,6 +303,11 @@ namespace Hatrix {
     int64_t cell_particles = pend - pstart;
 
     if (cell_particles <= max_nleaf) {
+      if (direction) {
+        for (int64_t i = pstart; i < pend; ++i) {
+          for ()
+        }
+      }
       return;
     }
 
