@@ -212,8 +212,8 @@ namespace Hatrix {
     }
     else if (ndim == 2) {
       // Generate a unit circle with N points on the circumference.
-      std::random_device rd;  // Will be used to obtain a seed for the random number engine
-      std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+      // std::random_device rd;  // Will be used to obtain a seed for the random number engine
+      std::mt19937 gen(1); // seed with 1.
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
       for (int64_t i = 0; i < N; ++i) {
@@ -223,6 +223,7 @@ namespace Hatrix {
 
         particles.push_back(Hatrix::Particle(x, y, min_val + (double(i) / double(range))));
       }
+
     }
     else if (ndim == 3) {
       // Generate a unit sphere geometry with N points on the surface.

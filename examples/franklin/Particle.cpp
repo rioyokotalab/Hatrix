@@ -1,5 +1,6 @@
 #include "franklin/Particle.hpp"
 #include <vector>
+#include <iostream>
 
 namespace Hatrix {
   Particle::Particle(double x, double _value) : value(_value)  {
@@ -20,4 +21,14 @@ namespace Hatrix {
   Particle::Particle(std::vector<double> _coords, double _value) :
     coords(_coords), value(_value) {}
 
+  void Particle::print() {
+    std::cout << "<";
+    for (int64_t i = 0; i < coords.size(); ++i) {
+      std::cout << coords[i];
+      if (i < coords.size()-1) {
+        std::cout << ",";
+      }
+    }
+    std::cout << ">";
+  }
 }
