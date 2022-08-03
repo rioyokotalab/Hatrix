@@ -18,6 +18,10 @@ namespace Hatrix {
 
     Cell(std::vector<double> _center, int64_t pstart, int64_t pend, double _radius);
     Cell() = delete;
+
+    // print the structure of the tree.
+    void print(int level=0);
+    int nchildren();
   };
 
   class Domain {

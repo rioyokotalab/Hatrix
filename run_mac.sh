@@ -24,8 +24,8 @@ export TMPDIR=/tmp
 # done
 
 for nprocs in 1; do
-    ./bin/HSS_main --N 256 \
-         --nleaf 32 \
+    ./bin/HSS_main --N 512 \
+         --nleaf 64 \
          --kernel_func laplace \
          --kind_of_geometry circular \
          --ndim 2 \

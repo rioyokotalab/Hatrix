@@ -213,16 +213,13 @@ namespace Hatrix {
       std::mt19937 gen(1); // Standard mersenne_twister_engine seeded with rd()
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
-      for (int64_t i = 1; i < N; ++i) {
+      for (int64_t i = 0; i < N; ++i) {
         double theta = (i * 2.0 * M_PI) / N ;
         double x = radius * cos(theta);
         double y = radius * sin(theta);
 
         particles.push_back(Hatrix::Particle(x, y, min_val + (double(i) / double(range))));
       }
-
-      particles.push_back(Hatrix::Particle(1, -1e-8, 2.0));
-      // particles.push_bacK(Hatrix::Particle());
     }
     else if (ndim == 3) {
       // Generate a unit sphere geometry with N points on the surface.
@@ -313,6 +310,36 @@ namespace Hatrix {
           }
         }
       }
+
+      // TODO: remove repetition.
+      std::vector<double> cell_center(ndim, 0),
+        Xmin(ndim, std::numeric_limits<double>::max()),
+        Xmax(ndim, std::numeric_limits<double>::min());
+
+      for (int64_t i = pstart; i < pend; ++i) {
+        for (int64_t k = 0; k < ndim; ++k) {
+          if (Xmax[k] < buffer[i].coords[k]) {
+            Xmax[k] = buffer[i].coords[k];
+          }
+          if (Xmin[k] > buffer[i].coords[k]) {
+            Xmin[k] = buffer[i].coords[k];
+          }
+        }
+      }
+
+      double radius = 0;
+      for (int64_t k = 0; k < ndim; ++k) {
+        cell_center[k] = (Xmax[k] + Xmin[k]) / 2;
+        radius += pow(Xmax[k] - Xmin[k], 2);
+      }
+      radius = sqrt(radius) / 2;
+
+      std::cout << "start: " << pstart << " end: " << pend
+                << " particles: " << cell_particles  << std::endl;
+
+      Cell child(cell_center, pstart, pend, radius);
+      cell->cells.push_back(child);
+
       return;
     }
 
@@ -347,53 +374,40 @@ namespace Hatrix {
       for (int64_t k = 0; k < ndim; ++k) {
         buffer[counter[quadrant]].coords[k] = bodies[i].coords[k];
       }
-
-      // buffer[counter[quadrant]].print();
-      // std::cout << " " << quadrant << std::endl;
       counter[quadrant]++;      // increment counters for bodies in each quadrant.
     }
 
-    std::cout << "sizes: ";
-    for (int i = 0; i < sizes.size(); ++i) {
-      std::cout << sizes[i] << " ";
-    }
-    std::cout << std::endl;
-
-
-    std::cout << "offsets: ";
-    for (int i = 0; i < offsets.size(); ++i) {
-      std::cout << offsets[i] << " ";
-    }
-    std::cout << std::endl;
-
     // loop over children and recurse
     for (int64_t d = 0; d < quadrants; ++d) {
-      std::vector<double> cell_center(ndim, 0),
-        Xmin(ndim, std::numeric_limits<double>::max()),
-        Xmax(ndim, std::numeric_limits<double>::min());
+      if (sizes[d]) {
+        std::vector<double> cell_center(ndim, 0),
+          Xmin(ndim, std::numeric_limits<double>::max()),
+          Xmax(ndim, std::numeric_limits<double>::min());
 
-      for (int64_t i = offsets[d]; i < offsets[d+1]; ++i) {
-        for (int64_t k = 0; k < ndim; ++k) {
-          if (Xmax[k] < buffer[i].coords[k]) {
-            Xmax[k] = buffer[i].coords[k];
-          }
-          if (Xmin[k] > buffer[i].coords[k]) {
-            Xmin[k] = buffer[i].coords[k];
+        for (int64_t i = offsets[d]; i < offsets[d+1]; ++i) {
+          for (int64_t k = 0; k < ndim; ++k) {
+            if (Xmax[k] < buffer[i].coords[k]) {
+              Xmax[k] = buffer[i].coords[k];
+            }
+            if (Xmin[k] > buffer[i].coords[k]) {
+              Xmin[k] = buffer[i].coords[k];
+            }
           }
         }
+
+        double radius = 0;
+        for (int64_t k = 0; k < ndim; ++k) {
+          cell_center[k] = (Xmax[k] + Xmin[k]) / 2;
+          radius += pow(Xmax[k] - Xmin[k], 2);
+        }
+        radius = sqrt(radius) / 2;
+
+        Cell child(cell_center, offsets[d], offsets[d+1], radius);
+        cell->cells.push_back(child);
+
+        split_cell(&cell->cells[cell->cells.size()-1],
+                   offsets[d], offsets[d+1], max_nleaf, buffer, bodies, !direction);
       }
-
-      double radius = 0;
-      for (int64_t k = 0; k < ndim; ++k) {
-        cell_center[k] = (Xmax[k] + Xmin[k]) / 2;
-        radius += pow(Xmax[k] - Xmin[k], 2);
-      }
-      radius = sqrt(radius);
-
-      Cell child(cell_center, offsets[d], offsets[d+1], radius);
-      cell->cells.push_back(child);
-
-      split_cell(&child, offsets[d], offsets[d+1], max_nleaf, buffer, bodies, !direction);
     }
   }
 
@@ -424,17 +438,38 @@ namespace Hatrix {
       domain_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
       radius += pow(Xmax[k] - Xmin[k], 2);
     }
-    radius = sqrt(radius);
-
-    std::cout << Xmin[0] << " " << Xmin[1] << std::endl;
-    std::cout << Xmax[0] << " " <<  Xmax[1]  << std::endl;
+    radius = sqrt(radius) / 2;
 
     // build the largest node of the tree.
     tree = new Cell(domain_center, 0, N, radius);
     split_cell(tree, 0, N, max_nleaf, particles, buffer, false);
+
+    std::cout << "nchild: " << tree->nchildren() << std::endl;
   }
 
   Cell::Cell(std::vector<double> _center, int64_t pstart,
              int64_t pend, double _radius) :
     center(_center), start_index(pstart), end_index(pend), radius(_radius) {}
+
+  void
+  Cell::print(int level) {
+    std::cout << "level: " << level << std::endl;
+    std::cout << "start: " << start_index << " stop: " << end_index
+              << " radius: " << radius << std::endl;
+    for (int i = 0; i < cells.size(); ++i) {
+      cells[i].print(level+1);
+    }
+  }
+
+  int
+  Cell::nchildren() {
+    if (cells.size()) {
+      for (int i = 0; i < cells.size(); ++i) {
+        return cells[i].nchildren() + 1;
+      }
+    }
+    else {
+      return 1;
+    }
+  }
 }
