@@ -660,14 +660,22 @@ void SymmetricH2::update_row_cluster_bases(int64_t row, int64_t level,
   int64_t block_size = D(row, row, level).rows;
   Matrix block_row(block_size, 0);
 
-  // Concatenation approach
-  // Option 1: Use pre-computed Srow (less accurate)
+  /*
+    Approach 1: Use pre-computed Srow of original matrix (less accurate)
+  */
   block_row = concat(block_row, matmul(U(row, level), Srow(row, level)), 1);
 
-  // Option 2: Compute Srow by traversing the matrix
+  /*
+    Approach 2: Compute Srow by traversing the matrix.
+    More accurate than Approach 1 since it consider the updated coupling matrices during
+    factorization of previous clusters
+    Current implementation is quite slow since it traverse from level to root every time
+    TODO implement a faster variant like in MiaoMiaoMa2019_UMV paper.
+  */
   // Matrix S_block_row = compute_Srow(row, level);
   // block_row = concat(block_row, matmul(U(row, level), S_block_row), 1);
 
+  // Concat fill-in blocks
   for (int64_t j = 0; j < nblocks; ++j) {
     if (F.exists(row, j, level)) {
       block_row = concat(block_row, F(row, j, level), 1);
