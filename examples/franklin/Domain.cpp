@@ -411,19 +411,15 @@ namespace Hatrix {
     }
   }
 
-  void
-  Domain::build_tree(const int64_t max_nleaf) {
-    // find the min index in each dimension
+  void Domain::orb_split(Cell& cell, int64_t pstart, int64_t pend,
+                         const int64_t max_nleaf, int64_t dim) {
     std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
       Xmax(ndim, std::numeric_limits<double>::min()),
-      domain_center(ndim);
-    double radius = 0;
+      cell_center(ndim, 0);
 
-    // copy particles into a buffer
-    std::vector<Hatrix::Particle> buffer = particles;
-
-    for (int64_t i = 0; i < particles.size(); ++i) {
-      for (int64_t k = 0; k < ndim; ++k) {
+    // calculate the min and max points for this cell
+    for (int64_t i = pstart; i < pend; ++i) {
+      for (int k = 0; k < ndim; ++k) {
         if (Xmax[k] < particles[i].coords[k]) {
           Xmax[k] = particles[i].coords[k];
         }
@@ -433,19 +429,73 @@ namespace Hatrix {
       }
     }
 
-    // set the center point
+    // set the center point and radius
+    cell.radius = 0;
     for (int64_t k = 0; k < ndim; ++k) {
-      domain_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
-      radius += pow(Xmax[k] - Xmin[k], 2);
+      cell_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
+      cell.radius += pow(Xmax[k] - Xmin[k], 2);
     }
-    radius = sqrt(radius) / 2;
+    cell.radius = sqrt(cell.radius) / 2;
+    cell.center = cell_center;
+    cell.start_index = pstart;
+    cell.end_index = pend;
 
-    // build the largest node of the tree.
-    tree = new Cell(domain_center, 0, N, radius);
-    split_cell(tree, 0, N, max_nleaf, particles, buffer, false);
+    // we have hit the leaf level.
+    if (pend - pstart <= max_nleaf) {
+      return;
+    }
 
-    std::cout << "nchild: " << tree->nchildren() << std::endl;
+    // permute the points along dim using the median as the splitting point.
+    std::sort(particles.begin() + pstart, // TODO: is there a way to not sort?
+              partciles.begin() + pend,
+              [&](const Particle& lhs, const Particle& rhs) {
+                return lhs.coords[dim] < rhs.coords[dim];
+              });
+    int64_t mid = ceil(double(pstart + pend) / 2.0);
+
+    for (int64_t i = pstart; i < mid; ++i) {
+      buffer[i] = particles[i];
+    }
   }
+
+  void
+  Domain::build_tree(const int64_t max_nleaf) {
+    orb_split(tree, 0, N, max_nleaf, 0);
+    // // find the min index in each dimension
+    // std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
+    //   Xmax(ndim, std::numeric_limits<double>::min()),
+    //   domain_center(ndim);
+    // double radius = 0;
+
+    // // copy particles into a buffer
+    // std::vector<Hatrix::Particle> buffer = particles;
+
+    // for (int64_t i = 0; i < particles.size(); ++i) {
+    //   for (int64_t k = 0; k < ndim; ++k) {
+    //     if (Xmax[k] < particles[i].coords[k]) {
+    //       Xmax[k] = particles[i].coords[k];
+    //     }
+    //     if (Xmin[k] > particles[i].coords[k]) {
+    //       Xmin[k] = particles[i].coords[k];
+    //     }
+    //   }
+    // }
+
+    // // set the center point
+    // for (int64_t k = 0; k < ndim; ++k) {
+    //   domain_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
+    //   radius += pow(Xmax[k] - Xmin[k], 2);
+    // }
+    // radius = sqrt(radius) / 2;
+
+    // // build the largest node of the tree.
+    // tree = new Cell(domain_center, 0, N, radius);
+    // split_cell(tree, 0, N, max_nleaf, particles, buffer, false);
+
+    // std::cout << "nchild: " << tree->nchildren() << std::endl;
+  }
+
+  Cell::Cell() : start_index(-1), end_index(-1), radius(-1) {}
 
   Cell::Cell(std::vector<double> _center, int64_t pstart,
              int64_t pend, double _radius) :

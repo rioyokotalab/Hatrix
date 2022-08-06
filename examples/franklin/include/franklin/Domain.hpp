@@ -17,7 +17,7 @@ namespace Hatrix {
     double radius;
 
     Cell(std::vector<double> _center, int64_t pstart, int64_t pend, double _radius);
-    Cell() = delete;
+    Cell();
 
     // print the structure of the tree.
     void print(int level=0);
@@ -29,7 +29,7 @@ namespace Hatrix {
     std::vector<Hatrix::Particle> particles;
     std::vector<Hatrix::Box> boxes;
     int64_t N, ndim;
-    Cell * tree;
+    Cell tree;
 
   private:
     // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
@@ -51,6 +51,13 @@ namespace Hatrix {
     int
     get_quadrant(std::vector<double>& p_coords,
                  std::vector<double>& c_coords);
+
+    void
+    orb_split(Cell& cell, int64_t pstart, int64_t pend,
+              const int64_t max_nleaf, int64_t dim,
+              std::vector<Hatrix::Particle>& bodies,
+              std::vector<Hatrix::Particle>& buffer,
+              bool direction);
   public:
     Domain(int64_t N, int64_t ndim);
     void generate_circular_particles(double min_val, double max_val);
