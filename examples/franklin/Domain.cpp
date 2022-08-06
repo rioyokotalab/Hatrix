@@ -273,146 +273,12 @@ namespace Hatrix {
     file.close();
   }
 
-  int
-  Domain::get_quadrant(std::vector<double>& p_coords,
-                       std::vector<double>& c_coords) {
-    int quadrant = 0;
-    if (ndim == 2) {
-      quadrant = (p_coords[0] < c_coords[0]) +
-        ((p_coords[1] < c_coords[1]) << 1);
-    }
-    else if (ndim == 3) {
-      quadrant = p_coords[0] < c_coords[0] +
-        ((p_coords[1] < c_coords[1]) << 1) +
-        ((p_coords[2] < c_coords[2]) << 2);
-    }
-
-    return quadrant;
-  }
-
-  void
-  Domain::split_cell(Cell* cell, int64_t pstart, int64_t pend,
-                     const int64_t max_nleaf,
-                     std::vector<Hatrix::Particle>& bodies,
-                     std::vector<Hatrix::Particle>& buffer,
-                     bool direction) {
-    // sort particles into quadrants
-    int64_t quadrants = pow(2, ndim);
-    std::vector<int64_t> sizes(quadrants, 0);
-    std::vector<int64_t> offsets(quadrants+1, 0);
-    int64_t cell_particles = pend - pstart;
-
-    if (cell_particles <= max_nleaf) {
-      if (direction) {
-        for (int64_t i = pstart; i < pend; ++i) {
-          for (int64_t k = 0; k < ndim; ++k) {
-            buffer[i].coords[k] = bodies[i].coords[k];
-          }
-        }
-      }
-
-      // TODO: remove repetition.
-      std::vector<double> cell_center(ndim, 0),
-        Xmin(ndim, std::numeric_limits<double>::max()),
-        Xmax(ndim, std::numeric_limits<double>::min());
-
-      for (int64_t i = pstart; i < pend; ++i) {
-        for (int64_t k = 0; k < ndim; ++k) {
-          if (Xmax[k] < buffer[i].coords[k]) {
-            Xmax[k] = buffer[i].coords[k];
-          }
-          if (Xmin[k] > buffer[i].coords[k]) {
-            Xmin[k] = buffer[i].coords[k];
-          }
-        }
-      }
-
-      double radius = 0;
-      for (int64_t k = 0; k < ndim; ++k) {
-        cell_center[k] = (Xmax[k] + Xmin[k]) / 2;
-        radius += pow(Xmax[k] - Xmin[k], 2);
-      }
-      radius = sqrt(radius) / 2;
-
-      std::cout << "start: " << pstart << " end: " << pend
-                << " particles: " << cell_particles  << std::endl;
-
-      Cell child(cell_center, pstart, pend, radius);
-      cell->cells.push_back(child);
-
-      return;
-    }
-
-    for (int i = 0; i < quadrants; ++i) {
-      offsets[i] = i * (cell_particles / quadrants);
-    }
-
-    // count particles in quadrants
-    for (int64_t i = pstart; i < pend; ++i) {
-      int quadrant = get_quadrant(particles[i].coords,
-                                  cell->center);
-      sizes[quadrant]++;
-    }
-
-    int64_t offset = pstart;
-    for (int64_t i = 0; i < quadrants; ++i) {
-      offsets[i] = offset;
-      offset += sizes[i];
-    }
-    offsets[quadrants] = offset;
-
-    std::vector<int64_t> counter(quadrants, 0); // storage of counters in offsets
-    for (int64_t i = 0; i < quadrants; ++i) {
-      counter[i] = offsets[i];
-    }
-
-    // sort bodies by quadrant
-    for (int64_t i = pstart; i < pend; ++i) {
-      int quadrant = get_quadrant(particles[i].coords,
-                                  cell->center);
-      // out-of-place copy of the particles according to quadrant
-      for (int64_t k = 0; k < ndim; ++k) {
-        buffer[counter[quadrant]].coords[k] = bodies[i].coords[k];
-      }
-      counter[quadrant]++;      // increment counters for bodies in each quadrant.
-    }
-
-    // loop over children and recurse
-    for (int64_t d = 0; d < quadrants; ++d) {
-      if (sizes[d]) {
-        std::vector<double> cell_center(ndim, 0),
-          Xmin(ndim, std::numeric_limits<double>::max()),
-          Xmax(ndim, std::numeric_limits<double>::min());
-
-        for (int64_t i = offsets[d]; i < offsets[d+1]; ++i) {
-          for (int64_t k = 0; k < ndim; ++k) {
-            if (Xmax[k] < buffer[i].coords[k]) {
-              Xmax[k] = buffer[i].coords[k];
-            }
-            if (Xmin[k] > buffer[i].coords[k]) {
-              Xmin[k] = buffer[i].coords[k];
-            }
-          }
-        }
-
-        double radius = 0;
-        for (int64_t k = 0; k < ndim; ++k) {
-          cell_center[k] = (Xmax[k] + Xmin[k]) / 2;
-          radius += pow(Xmax[k] - Xmin[k], 2);
-        }
-        radius = sqrt(radius) / 2;
-
-        Cell child(cell_center, offsets[d], offsets[d+1], radius);
-        cell->cells.push_back(child);
-
-        split_cell(&cell->cells[cell->cells.size()-1],
-                   offsets[d], offsets[d+1], max_nleaf, buffer, bodies, !direction);
-      }
-    }
-  }
-
-  void Domain::orb_split(Cell& cell, int64_t pstart, int64_t pend,
-                         const int64_t max_nleaf, int64_t dim) {
+  void Domain::orb_split(Cell& cell,
+                         const int64_t pstart,
+                         const int64_t pend,
+                         const int64_t max_nleaf,
+                         const int64_t dim,
+                         const int64_t level) {
     std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
       Xmax(ndim, std::numeric_limits<double>::min()),
       cell_center(ndim, 0);
@@ -439,87 +305,43 @@ namespace Hatrix {
     cell.center = cell_center;
     cell.start_index = pstart;
     cell.end_index = pend;
+    cell.level = level;
 
-    // we have hit the leaf level.
+    // we have hit the leaf level. return without sorting.
     if (pend - pstart <= max_nleaf) {
       return;
     }
 
     // permute the points along dim using the median as the splitting point.
     std::sort(particles.begin() + pstart, // TODO: is there a way to not sort?
-              partciles.begin() + pend,
+              particles.begin() + pend,
               [&](const Particle& lhs, const Particle& rhs) {
                 return lhs.coords[dim] < rhs.coords[dim];
               });
     int64_t mid = ceil(double(pstart + pend) / 2.0);
-
-    for (int64_t i = pstart; i < mid; ++i) {
-      buffer[i] = particles[i];
-    }
+    cell.cells.resize(2);
+    orb_split(cell.cells[0], pstart, mid, max_nleaf, (dim+1) % ndim, level+1);
+    orb_split(cell.cells[1], mid, pend, max_nleaf, (dim+1) % ndim, level+1);
   }
 
   void
   Domain::build_tree(const int64_t max_nleaf) {
-    orb_split(tree, 0, N, max_nleaf, 0);
-    // // find the min index in each dimension
-    // std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
-    //   Xmax(ndim, std::numeric_limits<double>::min()),
-    //   domain_center(ndim);
-    // double radius = 0;
-
-    // // copy particles into a buffer
-    // std::vector<Hatrix::Particle> buffer = particles;
-
-    // for (int64_t i = 0; i < particles.size(); ++i) {
-    //   for (int64_t k = 0; k < ndim; ++k) {
-    //     if (Xmax[k] < particles[i].coords[k]) {
-    //       Xmax[k] = particles[i].coords[k];
-    //     }
-    //     if (Xmin[k] > particles[i].coords[k]) {
-    //       Xmin[k] = particles[i].coords[k];
-    //     }
-    //   }
-    // }
-
-    // // set the center point
-    // for (int64_t k = 0; k < ndim; ++k) {
-    //   domain_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
-    //   radius += pow(Xmax[k] - Xmin[k], 2);
-    // }
-    // radius = sqrt(radius) / 2;
-
-    // // build the largest node of the tree.
-    // tree = new Cell(domain_center, 0, N, radius);
-    // split_cell(tree, 0, N, max_nleaf, particles, buffer, false);
-
-    // std::cout << "nchild: " << tree->nchildren() << std::endl;
+    orb_split(tree, 0, N, max_nleaf, 0, 0);
   }
 
-  Cell::Cell() : start_index(-1), end_index(-1), radius(-1) {}
+  Cell::Cell() : start_index(-1), end_index(-1), radius(-1), level(-1) {}
 
   Cell::Cell(std::vector<double> _center, int64_t pstart,
              int64_t pend, double _radius) :
     center(_center), start_index(pstart), end_index(pend), radius(_radius) {}
 
   void
-  Cell::print(int level) {
+  Cell::print() {
     std::cout << "level: " << level << std::endl;
     std::cout << "start: " << start_index << " stop: " << end_index
               << " radius: " << radius << std::endl;
     for (int i = 0; i < cells.size(); ++i) {
-      cells[i].print(level+1);
-    }
-  }
-
-  int
-  Cell::nchildren() {
-    if (cells.size()) {
-      for (int i = 0; i < cells.size(); ++i) {
-        return cells[i].nchildren() + 1;
-      }
-    }
-    else {
-      return 1;
+      cells[i].print();
     }
   }
 }

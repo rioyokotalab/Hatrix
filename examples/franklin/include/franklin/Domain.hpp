@@ -13,15 +13,14 @@ namespace Hatrix {
   public:
     std::vector<Cell> cells;
     std::vector<double> center;
-    int64_t start_index, end_index;
+    int64_t start_index, end_index, level;
     double radius;
 
     Cell(std::vector<double> _center, int64_t pstart, int64_t pend, double _radius);
     Cell();
 
     // print the structure of the tree.
-    void print(int level=0);
-    int nchildren();
+    void print();
   };
 
   class Domain {
@@ -53,11 +52,12 @@ namespace Hatrix {
                  std::vector<double>& c_coords);
 
     void
-    orb_split(Cell& cell, int64_t pstart, int64_t pend,
-              const int64_t max_nleaf, int64_t dim,
-              std::vector<Hatrix::Particle>& bodies,
-              std::vector<Hatrix::Particle>& buffer,
-              bool direction);
+    orb_split(Cell& cell,
+              const int64_t pstart,
+              const int64_t pend,
+              const int64_t max_nleaf,
+              const int64_t dim,
+              const int64_t level);
   public:
     Domain(int64_t N, int64_t ndim);
     void generate_circular_particles(double min_val, double max_val);
