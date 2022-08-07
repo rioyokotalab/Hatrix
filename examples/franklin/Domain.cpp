@@ -29,130 +29,6 @@ namespace Hatrix {
     file.close();
   }
 
-  // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
-  void
-  Domain::orthogonal_recursive_bisection_1dim(int64_t start,
-                                              int64_t end,
-                                              std::string morton_index,
-                                              int64_t nleaf) {
-    // Sort the particles only by the X axis since that is the only axis that needs to be bisected.
-    std::sort(particles.begin()+start,
-              particles.begin()+end, [](const Particle& lhs, const Particle& rhs) {
-                return lhs.coords[0] < rhs.coords[0];
-              });
-
-    int64_t num_points = end - start;
-    // found a box with the correct number of points.
-    if (num_points <= nleaf) {
-      auto start_coord_x = particles[start].coords[0];
-      auto end_coord_x = particles[end-1].coords[0];
-      auto center_x = (start_coord_x + end_coord_x) / 2;
-      auto diameter = end_coord_x - start_coord_x;
-      boxes.push_back(Box(diameter, center_x, start, end-1, morton_index, num_points));
-    }
-    else {                    // recurse further and split again.
-      int64_t middle = (start + end) / 2;
-      // first half
-      orthogonal_recursive_bisection_1dim(start, middle, morton_index + "0", nleaf);
-      // second half
-      orthogonal_recursive_bisection_1dim(middle, end, morton_index + "1", nleaf);
-    }
-  }
-
-  void
-  Domain::orthogonal_recursive_bisection_2dim(int64_t start,
-                                              int64_t end,
-                                              std::string morton_index,
-                                              int64_t nleaf,
-                                              int64_t axis) {
-    std::sort(particles.begin() + start,
-              particles.begin() + end, [&](const Particle& lhs, const Particle& rhs) {
-                return lhs.coords[axis] < rhs.coords[axis];
-              });
-
-    int64_t num_points = end - start;
-    if (num_points <= nleaf) {
-      if (axis == ndim-1) {
-        int64_t start_index = start;
-        int64_t end_index = end - 1;
-
-        double diameter = 0;
-        for (int64_t k = 0; k < ndim; ++k) {
-          diameter += pow(particles[start_index].coords[k] - particles[end_index].coords[k], 2);
-        }
-        diameter = std::sqrt(diameter);
-
-        double center_x = (particles[start_index].coords[0] + particles[end_index].coords[0]) / 2;
-        double center_y = (particles[start_index].coords[1] + particles[end_index].coords[1]) / 2;
-
-        boxes.push_back(Box(diameter,
-                            center_x,
-                            center_y,
-                            start_index,
-                            end_index,
-                            morton_index,
-                            num_points));
-      }
-      else {
-        orthogonal_recursive_bisection_2dim(start, end, morton_index, nleaf, (axis + 1) % ndim);
-      }
-    }
-    else {
-      int64_t middle = (start + end) / 2;
-      orthogonal_recursive_bisection_2dim(start,
-                                          middle,
-                                          morton_index + "0",
-                                          nleaf,
-                                          (axis + 1) % ndim);
-      orthogonal_recursive_bisection_2dim(middle, end, morton_index + "1", nleaf, (axis + 1) % ndim);
-    }
-  }
-
-  void
-  Domain::orthogonal_recursive_bisection_3dim(int64_t start, int64_t end, std::string morton_index,
-                                              int64_t nleaf, int64_t axis) {
-    std::sort(particles.begin() + start,
-              particles.begin() + end,
-              [&](const Particle& lhs, const Particle& rhs) {
-                return lhs.coords[axis] < rhs.coords[axis];
-              });
-    int64_t num_points = end - start;
-    if (num_points <= nleaf) {
-      if (axis == ndim-1) {
-        int64_t start_index = start;
-        int64_t end_index = end - 1;
-
-        double diameter = 0;
-        for (int64_t k = 0; k < ndim; ++k) {
-          diameter += pow(particles[start_index].coords[k] - particles[end_index].coords[k], 2);
-        }
-        diameter = std::sqrt(diameter);
-
-        double center_x = (particles[start_index].coords[0] + particles[end_index].coords[0]) / 2;
-        double center_y = (particles[start_index].coords[1] + particles[end_index].coords[1]) / 2;
-        double center_z = (particles[start_index].coords[2] + particles[end_index].coords[2]) / 2;
-
-        boxes.push_back(Box(diameter,
-                            center_x,
-                            center_y,
-                            center_z,
-                            start_index,
-                            end_index,
-                            morton_index,
-                            num_points));
-      }
-      else {
-        orthogonal_recursive_bisection_3dim(start, end, morton_index, nleaf, (axis+1) % ndim);
-      }
-    }
-    else {
-      int64_t middle = (start + end) / 2;
-      orthogonal_recursive_bisection_3dim(start, middle, morton_index + "0", nleaf, (axis+1)%ndim);
-      orthogonal_recursive_bisection_3dim(middle, end, morton_index + "1", nleaf, (axis+1)%ndim);
-    }
-  }
-
-
   Domain::Domain(int64_t N, int64_t ndim) : N(N), ndim(ndim) {
     if (ndim <= 0) {
       std::cout << "invalid ndim : " << ndim << std::endl;
@@ -247,18 +123,6 @@ namespace Hatrix {
     }
   }
 
-  void Domain::divide_domain_and_create_particle_boxes(int64_t nleaf) {
-    if (ndim == 1) {
-      orthogonal_recursive_bisection_1dim(0, N, std::string(""), nleaf);
-    }
-    else if (ndim == 2) {
-      orthogonal_recursive_bisection_2dim(0, N, std::string(""), nleaf, 0);
-    }
-    else if (ndim == 3) {
-      orthogonal_recursive_bisection_3dim(0, N, std::string(""), nleaf, 0);
-    }
-  }
-
   void
   Domain::read_col_file_3d(const std::string& geometry_file) {
     std::ifstream file;
@@ -278,7 +142,8 @@ namespace Hatrix {
                          const int64_t pend,
                          const int64_t max_nleaf,
                          const int64_t dim,
-                         const int64_t level) {
+                         const int64_t level,
+                         uint32_t level_index) {
     std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
       Xmax(ndim, std::numeric_limits<double>::min()),
       cell_center(ndim, 0);
@@ -306,6 +171,7 @@ namespace Hatrix {
     cell.start_index = pstart;
     cell.end_index = pend;
     cell.level = level;
+    cell.level_index = level_index;
 
     // we have hit the leaf level. return without sorting.
     if (pend - pstart <= max_nleaf) {
@@ -313,20 +179,21 @@ namespace Hatrix {
     }
 
     // permute the points along dim using the median as the splitting point.
-    std::sort(particles.begin() + pstart, // TODO: is there a way to not sort?
+    std::sort(particles.begin() + pstart, // TODO: is there a way to not sort? try k-th largest element.
               particles.begin() + pend,
               [&](const Particle& lhs, const Particle& rhs) {
                 return lhs.coords[dim] < rhs.coords[dim];
               });
     int64_t mid = ceil(double(pstart + pend) / 2.0);
     cell.cells.resize(2);
-    orb_split(cell.cells[0], pstart, mid, max_nleaf, (dim+1) % ndim, level+1);
-    orb_split(cell.cells[1], mid, pend, max_nleaf, (dim+1) % ndim, level+1);
+    orb_split(cell.cells[0], pstart, mid, max_nleaf, (dim+1) % ndim, level+1, level_index << 1);
+    orb_split(cell.cells[1], mid, pend, max_nleaf, (dim+1) % ndim, level+1, (level_index << 1) + 1);
   }
 
   void
   Domain::build_tree(const int64_t max_nleaf) {
-    orb_split(tree, 0, N, max_nleaf, 0, 0);
+    orb_split(tree, 0, N, max_nleaf, 0, 0, 0);
+    tree.print();
   }
 
   Cell::Cell() : start_index(-1), end_index(-1), radius(-1), level(-1) {}
@@ -339,7 +206,9 @@ namespace Hatrix {
   Cell::print() {
     std::cout << "level: " << level << std::endl;
     std::cout << "start: " << start_index << " stop: " << end_index
-              << " radius: " << radius << std::endl;
+              << " radius: " << radius
+              << " index: " << level_index
+              << std::endl;
     for (int i = 0; i < cells.size(); ++i) {
       cells[i].print();
     }

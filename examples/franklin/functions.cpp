@@ -97,21 +97,12 @@ namespace Hatrix {
     int64_t cols =  domain.particles.size();
     Matrix out(rows, cols);
 
-    std::vector<Particle> particles;
-
-    for (unsigned irow = 0; irow < domain.boxes.size(); ++irow) {
-      int64_t source = domain.boxes[irow].start_index;
-      for (int64_t n = 0; n < domain.boxes[irow].num_particles; ++n) {
-        particles.push_back(domain.particles[source + n]);
-      }
-    }
-
     #pragma omp parallel for
     for (int64_t i = 0; i < rows; ++i) {
       #pragma omp parallel for
       for (int64_t j = 0; j < cols; ++j) {
-        out(i, j) = kernel(particles[i].coords,
-                           particles[j].coords);
+        out(i, j) = kernel(domain.particles[i].coords,
+                           domain.particles[j].coords);
       }
     }
 
