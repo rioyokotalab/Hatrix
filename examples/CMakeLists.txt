@@ -42,13 +42,11 @@ else()
     UMV_strong_1level_better_index
     UMV_BLR2_far_dense
     H2_far_dense_construct
-    UMV_H2_far_dense
     LDL_strong_1level
     LDL_strong_Nlevel
-    H2_fixed_acc_UMV_svd
-    H2_fixed_acc_UMV_qr
     Construction_H2_Nlevel
     LDL_H2_Nlevel
+    UMV_H2_Nlevel
     Eigen_H2_Nlevel
   )
 endif()
