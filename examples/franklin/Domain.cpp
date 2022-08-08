@@ -8,6 +8,14 @@
 #include "franklin/franklin.hpp"
 
 namespace Hatrix {
+  int64_t
+  Domain::cell_size(int64_t level_index, int64_t level) const {
+    int64_t pstart, pend;
+    search_tree_for_nodes(tree, level_index, level, pstart, pend);
+
+    return pend - pstart;
+  }
+
   void
   Domain::print_file(std::string file_name) {
     std::vector<char> coords{'x', 'y', 'z'};

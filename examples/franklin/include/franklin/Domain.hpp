@@ -48,5 +48,7 @@ namespace Hatrix {
 
     // Build tree using co-oridinate sorting similar to exafmm. Uses the new Cell struct.
     void build_tree(const int64_t max_nleaf);
+
+    int64_t cell_size(int64_t level_index, int64_t level) const;
   };
 }

@@ -6,12 +6,20 @@
 #include "internal_types.hpp"
 
 namespace Hatrix {
+  void
+  search_tree_for_nodes(const Cell& tree, const int64_t level_index, const int64_t level,
+                        int64_t &pstart, int64_t &pend);
+
   void generate_p2p_interactions(const Domain& domain,
                                  int64_t irow, int64_t icol,
                                  const kernel_function& kernel,
                                  const int64_t rows, const int64_t cols,
                                  double* out,
                                  const int64_t ld);
+
+  // Generate the P2P interactions between cells irow and icol on level.
+  // This the out variant of the function. It assumes that the Matrix out
+  // has the appropriate length of rows and columns.
   void generate_p2p_interactions(const Domain& domain,
                                  int64_t irow, int64_t icol,
                                  int64_t level, int64_t height,
