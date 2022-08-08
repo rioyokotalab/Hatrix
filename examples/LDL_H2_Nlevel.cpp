@@ -1589,11 +1589,6 @@ int main(int argc, char ** argv) {
   // 1: H2
   const int64_t matrix_type = argc > 10 ? atol(argv[10]) : 1;
 
-  // Eigenvalue computation parameters
-  const double ev_tol = argc > 11 ? atof(argv[11]) : 1.e-3;
-  int64_t m_begin = argc > 12 ? atol(argv[12]) : 1;
-  int64_t m_end = argc > 13 ? atol(argv[13]) : m_begin;
-
   Hatrix::Context::init();
 
   Hatrix::set_kernel_constants(1e-3, 1.);
