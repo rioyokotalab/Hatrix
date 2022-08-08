@@ -235,7 +235,7 @@ std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t ran
   std::vector<int64_t> pivots(Q.cols);
   for (unsigned i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
 
-  return {std::move(Q), std::move(pivots)};
+  return std::make_tuple(std::move(Q), std::move(pivots));
 }
 
 std::tuple<Matrix, std::vector<int64_t>, int64_t>
@@ -264,7 +264,7 @@ error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
   std::vector<int64_t> pivots(jpvt.size());
   for (unsigned i = 0; i < jpvt.size(); ++i) { pivots[i] = jpvt[i] - 1; }
 
-  return {std::move(Q), std::move(pivots), rank};
+  return std::make_tuple(std::move(Q), std::move(pivots), rank);
 }
 
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
@@ -302,7 +302,7 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
   Matrix S(A.min_dim(), A.min_dim());
   Matrix V(A.min_dim(), A.cols);
   double expected_err = truncated_svd(A, U, S, V, rank);
-  return {std::move(U), std::move(S), std::move(V), expected_err};
+  return std::make_tuple(std::move(U), std::move(S), std::move(V), expected_err);
 }
 
 std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t rank) {
@@ -331,7 +331,7 @@ std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relativ
   S.shrink(rank, rank);
   V.shrink(rank, V.cols);
 
-  return {std::move(U), std::move(S), std::move(V)};
+  return std::make_tuple(std::move(U), std::move(S), std::move(V));
 }
 
 std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative) {
@@ -364,7 +364,7 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
   if(max_cnorm <= tol) {
     Matrix Q(m, 1); Q(0,0) = 1.0;
     Matrix R(1, n);
-    return {Q, R};
+    return std::make_tuple(std::move(Q), std::move(R));
   }
   while((r < min_dim) && (max_cnorm > error)) {
     // Select pivot column and swap
@@ -398,7 +398,8 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
     }
     // Update partial column norm
     for(int j=r+1; j<n; j++) {
-      //See LAPACK Working Note 176 (Section 3.2.1) for detail
+      // See LAPACK Working Note 176 (Section 3.2.1) for detail
+      // https://netlib.org/lapack/lawnspdf/lawn176.pdf
       if(cnorm[j] != 0.0) {
         double temp = std::fabs(A(r, j)/cnorm[j]);
         temp = std::fmax(0.0, (1-temp)*(1+temp));
@@ -449,7 +450,7 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
     }
   }
   // Return truncated Q and permuted R
-  return {Q, RP};
+  return std::make_tuple(std::move(Q), std::move(RP));
 }
 
 double norm(const Matrix& A) {
@@ -527,9 +528,8 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
     c_pivots[i] = jpvt[i] - 1;
   }
 
-  return {std::move(interp), std::move(c_pivots), rank};
+  return std::make_tuple(std::move(interp), std::move(c_pivots), rank);
 }
-
 
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
   Matrix interp(A.rows, rank), pivots(A.cols, 1);
@@ -542,7 +542,15 @@ std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
   for (int i = 0; i < A.cols; ++i) {
     pivots(i, 0) = jpvt[i];
   }
-  return {std::move(interp), std::move(pivots)};
+  return std::make_tuple(std::move(interp), std::move(pivots));
+}
+
+std::vector<double> get_eigenvalues(const Matrix& A) {
+  assert(A.rows == A.cols);
+  Matrix Ac(A);
+  std::vector<double> eigv(Ac.rows, 0);
+  LAPACKE_dsyev(LAPACK_COL_MAJOR, 'N', 'L', Ac.rows, &Ac, Ac.stride, eigv.data());
+  return eigv;
 }
 
 }  // namespace Hatrix
