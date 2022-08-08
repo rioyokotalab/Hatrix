@@ -814,7 +814,7 @@ Matrix H2::compute_Scol(int64_t col, int64_t level) {
       int64_t c1 = parent_node * 2;
       int64_t c2 = parent_node * 2 + 1;
       auto Vtransfer_splits = Vtransfer.split(vec{V(c1, level).cols}, vec{});
-      T = matmul(Vtransfer_splits[col == c1 ? 0 : 1], T, true, false);
+      T = matmul(T, Vtransfer_splits[col == c1 ? 0 : 1]);
     }
     col = parent_node; // Go up to parent node
   }
@@ -887,8 +887,7 @@ void H2::update_column_cluster_bases(int64_t col, int64_t level,
     TODO implement a faster variant like in MiaoMiaoMa2019_UMV paper (Algorithm 1)
   */
   // Matrix S_block_col = compute_Scol(col, level);
-  // block_column = concat(block_column,
-  //                       matmul(S_block_row, V(col, level), false, true), 0);
+  // block_column = concat(block_column, matmul(S_block_col, V(col, level), false, true), 0);
 
   // Concat fill-in blocks
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1039,6 +1038,7 @@ void H2::factorize_level(const Domain& domain,
     // The diagonal block is split along the row and column.
     int64_t diag_row_split = D(block, block, level).rows - U(block, level).cols;
     int64_t diag_col_split = D(block, block, level).cols - V(block, level).cols;
+    assert(diag_row_split == diag_col_split);
     auto diagonal_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
     Matrix& Dcc = diagonal_splits[0];
     lu(Dcc);
