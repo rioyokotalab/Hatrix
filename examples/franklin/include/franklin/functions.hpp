@@ -6,52 +6,30 @@
 #include "internal_types.hpp"
 
 namespace Hatrix {
-  void
-  search_tree_for_nodes(const Cell& tree, const int64_t level_index, const int64_t level,
-                        int64_t &pstart, int64_t &pend);
 
-  void generate_p2p_interactions(const Domain& domain,
-                                 int64_t irow, int64_t icol,
-                                 const kernel_function& kernel,
-                                 const int64_t rows, const int64_t cols,
-                                 double* out,
-                                 const int64_t ld);
-
-  // Generate the P2P interactions between cells irow and icol on level.
-  // This the out variant of the function. It assumes that the Matrix out
-  // has the appropriate length of rows and columns.
-  void generate_p2p_interactions(const Domain& domain,
-                                 int64_t irow, int64_t icol,
-                                 int64_t level, int64_t height,
-                                 const kernel_function& kernel,
-                                 Matrix& out);
-  Matrix generate_p2p_interactions(const Domain& domain,
-                                   int64_t irow, int64_t icol,
-                                   int64_t level, int64_t height,
-                                   const kernel_function& kernel);
-
-  // Generate a P2P matrix directly from the particles of the domain. Assumes that
-  // the particles in the domain are appropriately sorted.
-  Matrix generate_p2p_matrix(const Domain& domain,
-                             const kernel_function& kernel);
-
-  // Generates p2p interactions between the particles of two boxes specified by irow
-  // and icol. ndim specifies the dimensionality of the particles present in domain.
-  // Uses a kernel_function for generating the interaction.
-  Matrix generate_p2p_interactions(const Domain& domain,
-                                   int64_t irow, int64_t icol,
-                                   const kernel_function& kernel);
-  void generate_p2p_interactions(const Domain& domain,
-                                 int64_t irow, int64_t icol,
-                                 const kernel_function& kernel,
-                                 Matrix& out);
-
-  double laplace_kernel(const std::vector<double>& coords_row,
-                        const std::vector<double>& coords_col,
-                        const double eta);
   // double sqrexp_kernel(const std::vector<double>& coords_row,
   //                      const std::vector<double>& coords_col);
   // double block_sin(const std::vector<double>& coords_row,
   //                  const std::vector<double>& coords_col);
+
+  void generate_p2p_interactions(const Domain& domain,
+                                 int64_t irow,
+                                 int64_t icol,
+                                 int64_t level,
+                                 const kernel_function& kernel,
+                                 Matrix& out);
+
+  Matrix generate_p2p_interactions(const Domain& domain,
+                                   int64_t irow,
+                                   int64_t icol,
+                                   int64_t level,
+                                   const kernel_function& kernel);
+
+  Matrix generate_p2p_matrix(const Domain& domain,
+                             const kernel_function& kernel);
+
+  double laplace_kernel(const std::vector<double>& coords_row,
+                        const std::vector<double>& coords_col,
+                        const double eta);
 
 }

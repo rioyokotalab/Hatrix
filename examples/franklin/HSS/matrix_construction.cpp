@@ -333,7 +333,7 @@ reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) && !A.is_admissible(i, j, A.max_level)) {
-        Matrix actual = generate_p2p_interactions(domain, i, j, opts.kernel);
+        Matrix actual = generate_p2p_interactions(domain, i, j, A.max_level, opts.kernel);
         Matrix expected = A.D(i, j, A.max_level);
         error += pow(norm(actual - expected), 2);
         dense_norm += pow(norm(actual), 2);
@@ -353,7 +353,7 @@ reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
           Matrix expected_matrix = matmul(matmul(Ubig, A.S(row, col, level)),
                                           Vbig, false, true);
           Matrix actual_matrix =
-            Hatrix::generate_p2p_interactions(domain, row, col, level,
+            Hatrix::generate_p2p_interactions(domain, row, col,
                                               A.max_level, opts.kernel);
 
           dense_norm += pow(norm(actual_matrix), 2);

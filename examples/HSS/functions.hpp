@@ -8,6 +8,16 @@
 namespace Hatrix {
   void generate_p2p_interactions(const Domain& domain,
                                  int64_t irow, int64_t icol,
+                                 const kernel_function& kernel,
+                                 const int64_t rows, const int64_t cols,
+                                 double* out,
+                                 const int64_t ld);
+
+  // Generate the P2P interactions between cells irow and icol on level.
+  // This the out variant of the function. It assumes that the Matrix out
+  // has the appropriate length of rows and columns.
+  void generate_p2p_interactions(const Domain& domain,
+                                 int64_t irow, int64_t icol,
                                  int64_t level, int64_t height,
                                  const kernel_function& kernel,
                                  Matrix& out);
@@ -15,12 +25,15 @@ namespace Hatrix {
                                    int64_t irow, int64_t icol,
                                    int64_t level, int64_t height,
                                    const kernel_function& kernel);
+
+  // Generate a P2P matrix directly from the particles of the domain. Assumes that
+  // the particles in the domain are appropriately sorted.
   Matrix generate_p2p_matrix(const Domain& domain,
                              const kernel_function& kernel);
 
   // Generates p2p interactions between the particles of two boxes specified by irow
   // and icol. ndim specifies the dimensionality of the particles present in domain.
-  // Uses a laplace kernel for generating the interaction.
+  // Uses a kernel_function for generating the interaction.
   Matrix generate_p2p_interactions(const Domain& domain,
                                    int64_t irow, int64_t icol,
                                    const kernel_function& kernel);
