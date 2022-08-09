@@ -53,12 +53,7 @@ int main(int argc, char* argv[]) {
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
     SymmetricSharedBasisMatrix A;
-    if (opts.admis_kind == DIAGONAL) {
-      init_diagonal_admis(A, domain, opts);
-    }
-    else {
-      init_geometry_admis(A, domain, opts);
-    }
+    init_diagonal_admis(A, domain, opts);
     construct_h2_matrix_miro(A, domain, opts);
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<

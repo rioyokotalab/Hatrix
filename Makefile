@@ -2,7 +2,7 @@ TOPSRCDIR = .
 include $(TOPSRCDIR)/common.mk
 
 DIRS := src/classes src/functions src/util examples/franklin \
-	examples/franklin/HSS
+	examples/franklin/HSS examples/franklin/H2
 OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
@@ -64,13 +64,23 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-# non-distributed code.
+# non-distributed HSS code.
 .PHONY: examples/franklin/HSS
 examples/franklin/HSS:
 	$(MAKE) -C $@
 
 HSS_main : % : dirs examples/franklin/HSS
 	$(CXX) libHSS_main.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+# non-distributed H2 code
+.PHONY: examples/franklin/H2
+examples/franklin/H2:
+	$(MAKE) -C $@
+
+HSS_main : % : dirs examples/franklin/H2
+	$(CXX) libH2_main.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
