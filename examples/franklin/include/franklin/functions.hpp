@@ -12,6 +12,12 @@ namespace Hatrix {
   // double block_sin(const std::vector<double>& coords_row,
   //                  const std::vector<double>& coords_col);
 
+  void
+  search_tree_for_nodes(const Cell& tree,
+                        const int64_t level_index,
+                        const int64_t level,
+                        int64_t &pstart, int64_t &pend);
+
   void generate_p2p_interactions(const Domain& domain,
                                  int64_t irow,
                                  int64_t icol,

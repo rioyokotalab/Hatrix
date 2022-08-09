@@ -221,4 +221,17 @@ namespace Hatrix {
       cells[i].print();
     }
   }
+
+  int64_t
+  Cell::height() const {
+    if (cells.size() > 0) {
+      int64_t left = cells[0].height() + 1;
+      int64_t right = cells[1].height() + 1;
+
+      return (left > right) ? left : right;
+    }
+    else {
+      return 1;
+    }
+  }
 }

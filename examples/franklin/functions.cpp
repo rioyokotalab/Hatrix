@@ -73,6 +73,19 @@ namespace Hatrix {
     return out;
   }
 
+  double laplace_kernel(const std::vector<double>& coords_row,
+                        const std::vector<double>& coords_col,
+                        const double eta) {
+    int64_t ndim = coords_row.size();
+    double rij = 0;
+    for (int64_t k = 0; k < ndim; ++k) {
+      rij += pow(coords_row[k] - coords_col[k], 2);
+    }
+    double out = 1 / (std::sqrt(rij) + eta);
+
+    return out;
+  }
+
 
   // double
   // block_sin(const std::vector<double>& coords_row,
@@ -110,17 +123,4 @@ namespace Hatrix {
   //     return sigma * exp(dist);
   //   }
   // }
-
-  double laplace_kernel(const std::vector<double>& coords_row,
-                        const std::vector<double>& coords_col,
-                        const double eta) {
-    int64_t ndim = coords_row.size();
-    double rij = 0;
-    for (int64_t k = 0; k < ndim; ++k) {
-      rij += pow(coords_row[k] - coords_col[k], 2);
-    }
-    double out = 1 / (std::sqrt(rij) + eta);
-
-    return out;
-  }
 }

@@ -22,6 +22,7 @@ namespace Hatrix {
 
     // print the structure of the tree.
     void print();
+    int64_t height() const;
   };
 
   class Domain {
