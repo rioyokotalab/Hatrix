@@ -201,7 +201,6 @@ namespace Hatrix {
   void
   Domain::build_tree(const int64_t max_nleaf) {
     orb_split(tree, 0, N, max_nleaf, 0, 0, 0);
-    tree.print();
   }
 
   Cell::Cell() : start_index(-1), end_index(-1), radius(-1), level(-1) {}
