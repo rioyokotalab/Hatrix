@@ -15,6 +15,7 @@
 #include "franklin/franklin.hpp"
 
 #include "h2_construction.hpp"
+#include "h2_operations.hpp"
 
 using namespace Hatrix;
 
