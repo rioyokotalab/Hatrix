@@ -129,7 +129,6 @@ generate_leaf_nodes(const Domain& domain,
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
-
     A.U.insert(i,
                A.max_level,
                generate_column_bases(i,
@@ -291,7 +290,7 @@ static void
 actually_print_h2_structure(const SymmetricSharedBasisMatrix& A, const int64_t level) {
   if (level == 0) { return; }
   int64_t nblocks = pow(2, level);
-  std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
+  std::cout << "LEVEL:" << level << " NBLOCKS: " << nblocks << std::endl;
   for (int64_t i = 0; i < nblocks; ++i) {
     // if (level == A.max_level) {
     //   std::cout << A.U(i, A.max_level).rows << " ";

@@ -210,7 +210,7 @@ namespace Hatrix {
     center(_center), start_index(pstart), end_index(pend), radius(_radius) {}
 
   void
-  Cell::print() {
+  Cell::print() const {
     std::cout << "level: " << level << std::endl;
     std::cout << "start: " << start_index << " stop: " << end_index
               << " radius: " << radius

@@ -21,7 +21,7 @@ namespace Hatrix {
     Cell();
 
     // print the structure of the tree.
-    void print();
+    void print() const;
     int64_t height() const;
   };
 

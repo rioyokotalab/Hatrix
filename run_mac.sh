@@ -3,7 +3,7 @@
 make -j HSS_main
 export TMPDIR=/tmp
 
-make -j H2_main
+# make -j H2_main
 
 # for N in 8192; do
 #     for matrix_type in 1; do
@@ -34,7 +34,7 @@ for nprocs in 1; do
          --max_rank 25 \
          --accuracy 1e-11 \
          --admis 2 \
-         --admis_kind geometry \
+         --admis_kind diagonal \
          --construct_algorithm miro \
          --add_diag 1e-7 \
          --use_nested_basis

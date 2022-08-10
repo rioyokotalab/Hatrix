@@ -14,12 +14,10 @@ namespace Hatrix {
       return;
     }
 
-    if (tree.cells.size() == 0) {
-      throw std::exception();
+    if (tree.cells.size() > 0) {
+      search_tree_for_nodes(tree.cells[0], level_index, level, pstart, pend);
+      search_tree_for_nodes(tree.cells[1], level_index, level, pstart, pend);
     }
-
-    search_tree_for_nodes(tree.cells[0], level_index, level, pstart, pend);
-    search_tree_for_nodes(tree.cells[1], level_index, level, pstart, pend);
   }
 
   void generate_p2p_interactions(const Domain& domain,
