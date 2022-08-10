@@ -42,5 +42,25 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
 void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   A.max_level = domain.tree.height() - 1;
   dual_tree_traversal(A, domain.tree, domain.tree, domain, opts);
-  A.min_level = 0;
+  for (int64_t l = A.max_level; l > 0; --l) {
+    int64_t nblocks = pow(2, l);
+    bool all_dense = true;
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) {
+          all_dense = false;
+        }
+      }
+    }
+
+    if (all_dense) {
+      A.min_level = l;
+      break;
+    }
+  }
+}
+
+void
+construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+
 }
