@@ -1,8 +1,7 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/common.mk
 
-DIRS := src/classes src/functions src/util examples/franklin \
-	examples/franklin/HSS examples/franklin/H2
+DIRS := src/classes src/functions src/util examples/franklin
 OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
@@ -115,7 +114,7 @@ test: $(TEST_EXECUTABLES)
 .PHONY: clean
 .SILENT: clean
 clean:
-	for dir in $(DIRS) $(TEST) $(EXAMPLES); do \
+	for dir in $(DIRS) examples/franklin/HSS examples/franklin/H2 $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/ *.a
