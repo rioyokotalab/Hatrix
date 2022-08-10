@@ -1,7 +1,7 @@
 #!/bin/bash
 
-make -j HSS_main
-export TMPDIR=/tmp
+# make -j HSS_main
+# export TMPDIR=/tmp
 
 
 make -j H2_main
@@ -27,7 +27,7 @@ make -j H2_main
 # done
 
 for nprocs in 1; do
-    lldb -- ./bin/H2_main --N 512 \
+    ./bin/H2_main --N 512 \
          --nleaf 64 \
          --kernel_func laplace \
          --kind_of_geometry circular \

@@ -20,10 +20,10 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
     for (int64_t k = 0; k < opts.ndim; ++k) {
       distance += pow(Ci.center[k] - Cj.center[k], 2);
     }
-    distance = sqrt(distance);
+    // distance = sqrt(distance);
     bool well_separated = false;
 
-    if (distance * opts.admis > Ci.radius + Cj.radius) { // well-separated blocks.
+    if (distance * opts.admis * opts.admis >= pow(Ci.radius + Cj.radius, 2)) { // well-separated blocks.
       well_separated = true;
     }
 
@@ -58,8 +58,6 @@ void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, co
       break;
     }
   }
-
-  A.print_structure();
 }
 
 static Matrix
