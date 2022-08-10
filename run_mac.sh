@@ -3,6 +3,8 @@
 make -j HSS_main
 export TMPDIR=/tmp
 
+# make -j H2_main
+
 # for N in 8192; do
 #     for matrix_type in 1; do
 #         for admis in 0.4; do
@@ -24,16 +26,18 @@ export TMPDIR=/tmp
 # done
 
 for nprocs in 1; do
-    lldb -- ./bin/HSS_main --N 1024 \
-         --nleaf 128 \
+    ./bin/HSS_main --N 512 \
+         --nleaf 64 \
          --kernel_func laplace \
          --kind_of_geometry circular \
-         --ndim 3 \
-         --max_rank 90 \
+         --ndim 2 \
+         --max_rank 25 \
          --accuracy 1e-11 \
-         --admis 0 \
-         --admis_kind geometry \
+         --admis 2 \
+         --admis_kind diagonal \
          --construct_algorithm miro \
          --add_diag 1e-7 \
          --use_nested_basis
 done
+
+# profile strumpack and see where N^2 is happening.

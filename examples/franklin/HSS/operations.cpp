@@ -1,6 +1,4 @@
 #include "franklin/franklin.hpp"
-
-#include "SymmetricSharedBasisMatrix.hpp"
 #include "operations.hpp"
 
 #define SPLIT_DENSE(dense, row_split, col_split)        \

@@ -1,7 +1,7 @@
-#include "SymmetricSharedBasisMatrix.hpp"
+#pragma once
 
-using namespace Hatrix;
+#include "franklin/franklin.hpp"
 
-void factorize(SymmetricSharedBasisMatrix& A);
-Matrix solve(const SymmetricSharedBasisMatrix& A, const Matrix& x);
-Matrix matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x);
+void factorize(Hatrix::SymmetricSharedBasisMatrix& A);
+Hatrix::Matrix solve(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x);
+Hatrix::Matrix matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x);

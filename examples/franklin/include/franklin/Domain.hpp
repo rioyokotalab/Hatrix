@@ -13,38 +13,43 @@ namespace Hatrix {
   public:
     std::vector<Cell> cells;
     std::vector<double> center;
-    int64_t start_index, end_index;
+    int64_t start_index, end_index, level;
+    uint32_t level_index;
+    double radius;
 
-    Cell(std::vector<double> _center, int64_t pstart, int64_t pend);
-    Cell() = delete;
+    Cell(std::vector<double> _center, int64_t pstart, int64_t pend, double _radius);
+    Cell();
+
+    // print the structure of the tree.
+    void print() const;
+    int64_t height() const;
   };
 
   class Domain {
   public:
     std::vector<Hatrix::Particle> particles;
-    std::vector<Hatrix::Box> boxes;
+    Cell tree;
     int64_t N, ndim;
-    Cell * tree;
 
   private:
-    // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
-    void orthogonal_recursive_bisection_1dim(int64_t start, int64_t end,
-                                             std::string morton_index, int64_t nleaf);
-    void orthogonal_recursive_bisection_2dim(int64_t start, int64_t end,
-                                             std::string morton_index, int64_t nleaf,
-                                             int64_t axis);
-    void orthogonal_recursive_bisection_3dim(int64_t start, int64_t end,
-                                             std::string morton_index,
-                                             int64_t nleaf, int64_t axis);
+    void
+    orb_split(Cell& cell,
+              const int64_t pstart,
+              const int64_t pend,
+              const int64_t max_nleaf,
+              const int64_t dim,
+              const int64_t level,
+              const uint32_t level_index);
   public:
     Domain(int64_t N, int64_t ndim);
     void generate_circular_particles(double min_val, double max_val);
-    void divide_domain_and_create_particle_boxes(int64_t nleaf);
     void generate_grid_particles();
     void read_col_file_3d(const std::string& geometry_file);
     void print_file(std::string file_name);
 
     // Build tree using co-oridinate sorting similar to exafmm. Uses the new Cell struct.
     void build_tree(const int64_t max_nleaf);
+
+    int64_t cell_size(int64_t level_index, int64_t level) const;
   };
 }

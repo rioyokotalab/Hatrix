@@ -3,11 +3,9 @@
 #include <cmath>
 
 #include "Hatrix/Hatrix.h"
-
 #include "franklin/franklin.hpp"
 
 #include "matrix_construction.hpp"
-#include "SymmetricSharedBasisMatrix.hpp"
 
 using namespace Hatrix;
 
@@ -48,7 +46,7 @@ static int64_t diagonal_admis_init(SymmetricSharedBasisMatrix& A, const Args& op
   if (level == A.max_level) {
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j <= i; ++j) {
-        A.is_admissible.insert(i, j, level, std::abs(i - j) > opts.admis);
+        A.is_admissible.insert(i, j, level, i != j);
       }
     }
   }
@@ -59,14 +57,11 @@ static int64_t diagonal_admis_init(SymmetricSharedBasisMatrix& A, const Args& op
   return diagonal_admis_init(A, opts, level-1);
 }
 
-void init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
-  A.max_level = int64_t(log2(domain.boxes.size())); // 2^max_level = num_leaf_boxes
+void
+init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+  A.max_level = domain.tree.height() - 1;
   A.min_level = diagonal_admis_init(A, opts, A.max_level);
   A.is_admissible.insert(0, 0, 0, false);
-}
-
-void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
-  throw std::exception();
 }
 
 static Matrix
@@ -137,7 +132,7 @@ generate_leaf_nodes(const Domain& domain,
     A.U.insert(i,
                A.max_level,
                generate_column_bases(i,
-                                     domain.boxes[i].num_particles,
+                                     domain.cell_size(i, A.max_level),
                                      A.max_level,
                                      A,
                                      dense,
@@ -295,11 +290,11 @@ static void
 actually_print_h2_structure(const SymmetricSharedBasisMatrix& A, const int64_t level) {
   if (level == 0) { return; }
   int64_t nblocks = pow(2, level);
-  std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
+  std::cout << "LEVEL:" << level << " NBLOCKS: " << nblocks << std::endl;
   for (int64_t i = 0; i < nblocks; ++i) {
-    if (level == A.max_level) {
-      std::cout << A.U(i, A.max_level).rows << " ";
-    }
+    // if (level == A.max_level) {
+    //   std::cout << A.U(i, A.max_level).rows << " ";
+    // }
     std::cout << "| " ;
     for (int64_t j = 0; j < nblocks; ++j) {
       if (A.is_admissible.exists(i, j, level)) {
@@ -333,7 +328,7 @@ reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) && !A.is_admissible(i, j, A.max_level)) {
-        Matrix actual = generate_p2p_interactions(domain, i, j, opts.kernel);
+        Matrix actual = generate_p2p_interactions(domain, i, j, A.max_level, opts.kernel);
         Matrix expected = A.D(i, j, A.max_level);
         error += pow(norm(actual - expected), 2);
         dense_norm += pow(norm(actual), 2);
@@ -353,7 +348,7 @@ reconstruct_accuracy(const SymmetricSharedBasisMatrix& A,
           Matrix expected_matrix = matmul(matmul(Ubig, A.S(row, col, level)),
                                           Vbig, false, true);
           Matrix actual_matrix =
-            Hatrix::generate_p2p_interactions(domain, row, col, level,
+            Hatrix::generate_p2p_interactions(domain, row, col,
                                               A.max_level, opts.kernel);
 
           dense_norm += pow(norm(actual_matrix), 2);

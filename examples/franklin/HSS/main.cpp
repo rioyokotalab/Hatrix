@@ -14,7 +14,6 @@
 
 #include "franklin/franklin.hpp"
 
-#include "SymmetricSharedBasisMatrix.hpp"
 #include "operations.hpp"
 #include "matrix_construction.hpp"
 
@@ -38,7 +37,6 @@ int main(int argc, char* argv[]) {
     domain.read_col_file_3d(opts.geometry_file);
   }
   domain.build_tree(opts.nleaf);
-  // domain.divide_domain_and_create_particle_boxes(opts.nleaf);
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
@@ -54,12 +52,7 @@ int main(int argc, char* argv[]) {
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
     SymmetricSharedBasisMatrix A;
-    if (opts.admis_kind == DIAGONAL) {
-      init_diagonal_admis(A, domain, opts);
-    }
-    else {
-      init_geometry_admis(A, domain, opts);
-    }
+    init_diagonal_admis(A, domain, opts);
     construct_h2_matrix_miro(A, domain, opts);
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<

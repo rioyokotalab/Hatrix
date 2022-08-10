@@ -1,6 +1,5 @@
 #include "Hatrix/Hatrix.h"
-
-#include "SymmetricSharedBasisMatrix.hpp"
+#include "franklin/franklin.hpp"
 
 using namespace Hatrix;
 
