@@ -58,6 +58,8 @@ void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, co
       break;
     }
   }
+
+  A.print_structure();
 }
 
 void

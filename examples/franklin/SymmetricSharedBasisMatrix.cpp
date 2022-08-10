@@ -47,3 +47,29 @@ int64_t SymmetricSharedBasisMatrix::max_rank() {
 
   return m_rank;
 }
+
+void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
+  if (level == min_level) { return; }
+  int64_t nblocks = pow(2, level);
+  std::cout << "LEVEL:" << level << " NBLOCKS: " << nblocks << std::endl;
+  for (int64_t i = 0; i < nblocks; ++i) {
+    std::cout << "| " ;
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (is_admissible.exists(i, j, level)) {
+        std::cout << is_admissible(i, j, level) << " | " ;
+      }
+      else {
+        std::cout << "  | ";
+      }
+    }
+    std::cout << std::endl;
+  }
+
+  std::cout << std::endl;
+
+  actually_print_structure(level-1);
+}
+
+void SymmetricSharedBasisMatrix::print_structure() {
+  actually_print_structure(max_level);
+}
