@@ -6,7 +6,8 @@
 #include "franklin/franklin.hpp"
 
 #include "h2_construction.hpp"
-#include "SymmetricSharedBasisMatrix.hpp"
+
+using namespace Hatrix;
 
 static void
 dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& Cj,

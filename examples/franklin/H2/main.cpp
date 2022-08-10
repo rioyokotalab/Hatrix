@@ -14,8 +14,6 @@
 
 #include "franklin/franklin.hpp"
 
-#include "SymmetricSharedBasisMatrix.hpp"
-#include "h2_operations.hpp"
 #include "h2_construction.hpp"
 
 using namespace Hatrix;

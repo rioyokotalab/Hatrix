@@ -14,7 +14,6 @@
 
 #include "franklin/franklin.hpp"
 
-#include "SymmetricSharedBasisMatrix.hpp"
 #include "operations.hpp"
 #include "matrix_construction.hpp"
 

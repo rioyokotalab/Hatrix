@@ -1,7 +1,6 @@
 #pragma once
 
 #include "franklin/franklin.hpp"
-#include "SymmetricSharedBasisMatrix.hpp"
 
 void init_diagonal_admis(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain& domain,
                          const Hatrix::Args& opts);

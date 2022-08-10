@@ -79,7 +79,7 @@ HSS_main : % : dirs examples/franklin/HSS
 examples/franklin/H2:
 	$(MAKE) -C $@
 
-HSS_main : % : dirs examples/franklin/H2
+H2_main : % : dirs examples/franklin/H2
 	$(CXX) libH2_main.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/

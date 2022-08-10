@@ -3,6 +3,8 @@
 make -j HSS_main
 export TMPDIR=/tmp
 
+make -j H2_main
+
 # for N in 8192; do
 #     for matrix_type in 1; do
 #         for admis in 0.4; do

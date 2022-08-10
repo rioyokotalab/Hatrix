@@ -3,11 +3,9 @@
 #include <cmath>
 
 #include "Hatrix/Hatrix.h"
-
 #include "franklin/franklin.hpp"
 
 #include "matrix_construction.hpp"
-#include "SymmetricSharedBasisMatrix.hpp"
 
 using namespace Hatrix;
 
