@@ -323,17 +323,26 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
     x_hat_offset += pow(2, child_level);
   }
-  std::cout << "min level: " << A.min_level << std::endl;
-  int64_t level = 1;
 
   // b_hat does the product in reverse so matrices are pushed from the back.
   std::vector<Matrix> b_hat;
+  int64_t nblocks = pow(2, A.min_level);
+  for (int64_t i = 0; i < nblocks; ++i) {
+    b_hat.push_back(Matrix(A.ranks(i, A.min_level), 1));
+  }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (A.is_admissible.exists(i, j, A.min_level) &&
+          A.is_admissible(i, j, A.min_level)) {
+        matmul(A.S(i, j, A.min_level), x_hat[x_hat_offset + j], b_hat[i]);
+        matmul(A.S(i, j, A.min_level), x_hat[x_hat_offset + i],
+               b_hat[j], true, false);
+      }
+    }
+  }
 
   // Multiply the S blocks at the top-most level with the corresponding xhat.
-  Matrix b1_2 = matmul(A.S(1, 0, level), x_hat[x_hat_offset]);
-  Matrix b1_1 = matmul(A.S(1, 0, level), x_hat[x_hat_offset+1], true, false);
-  b_hat.push_back(b1_1);
-  b_hat.push_back(b1_2);
   int b_hat_offset = 0;
 
   for (int64_t level = 1; level < A.max_level; ++level) {

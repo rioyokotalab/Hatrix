@@ -41,17 +41,19 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   }
 
   // b_hat does the product in reverse so matrices are pushed from the back.
-  int64_t nblocks = pow(2, A.min_level);
   std::vector<Matrix> b_hat;
+  int64_t nblocks = pow(2, A.min_level);
   for (int64_t i = 0; i < nblocks; ++i) {
     b_hat.push_back(Matrix(A.ranks(i, A.min_level), 1));
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
-        matmul(A.S(i, j, A.min_level), x_hat[x_hat_offset+j], b_hat[i], false, false, 1.0, 1.0);
-        matmul(A.S(i, j, A.min_level), x_hat[x_hat_offset+i], b_hat[j], true, false, 1.0, 1.0);
+      if (A.is_admissible.exists(i, j, A.min_level) &&
+          A.is_admissible(i, j, A.min_level)) {
+        matmul(A.S(i, j, A.min_level), x_hat[x_hat_offset + j], b_hat[i]);
+        matmul(A.S(i, j, A.min_level), x_hat[x_hat_offset + i],
+               b_hat[j], true, false);
       }
     }
   }
