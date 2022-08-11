@@ -345,7 +345,7 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   // Multiply the S blocks at the top-most level with the corresponding xhat.
   int b_hat_offset = 0;
 
-  for (int64_t level = 1; level < A.max_level; ++level) {
+  for (int64_t level = A.min_level; level < A.max_level; ++level) {
     int64_t nblocks = pow(2, level);
     int64_t child_level = level + 1;
     x_hat_offset -= pow(2, child_level);
