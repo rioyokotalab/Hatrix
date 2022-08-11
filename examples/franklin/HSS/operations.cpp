@@ -362,19 +362,19 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
       b_hat.push_back(Matrix(Ub_splits[1], true));
     }
 
-    for (int64_t row = 0; row < nblocks; ++row) {
-      int c_r1 = row * 2, c_r2 = row * 2 + 1;
+    for (int64_t row = 0; row < pow(2, child_level); ++row) {
+      for (int64_t col = 0; col < row; ++col) {
+        if (A.is_admissible.exists(row, col, child_level) &&
+            A.is_admissible(row, col, child_level)) {
+          matmul(A.S(row, col, child_level),
+                 x_hat[x_hat_offset + col],
+                 b_hat[b_hat_offset + nblocks + row]);
 
-      Matrix bb = matmul(A.S(c_r2, c_r1, child_level),
-                         x_hat[x_hat_offset + c_r2],
-                         true,
-                         false);
-
-      Matrix b_r2_cl = matmul(A.S(c_r2, c_r1, child_level),
-                              x_hat[x_hat_offset + c_r1]);
-
-      b_hat[b_hat_offset + nblocks + c_r1] += bb;
-      b_hat[b_hat_offset + nblocks + c_r2] += b_r2_cl;
+          matmul(A.S(row, col, child_level),
+                 x_hat[x_hat_offset + row],
+                 b_hat[b_hat_offset + nblocks + col], true, false);
+        }
+      }
     }
 
     b_hat_offset += nblocks;
