@@ -76,7 +76,8 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
       Matrix Ub = matmul(A.U(row, level),
                          b_hat[b_hat_offset + row]);
       auto Ub_splits = Ub.split(std::vector<int64_t>(1,
-                                                     A.U(c_r1, child_level).cols));
+                                                     A.U(c_r1, child_level).cols),
+                                {});
 
       Matrix b_r1_cl = matmul(A.S(c_r2, c_r1, child_level),
                               x_hat[x_hat_offset + c_r2],

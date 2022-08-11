@@ -4,7 +4,7 @@ make -j HSS_main
 export TMPDIR=/tmp
 
 
-# make -j H2_main
+make -j H2_main
 
 # for N in 8192; do
 #     for matrix_type in 1; do
@@ -27,7 +27,7 @@ export TMPDIR=/tmp
 # done
 
 for nprocs in 1; do
-    lldb -- ./bin/HSS_main --N 256 \
+    lldb -- ./bin/H2_main --N 1024 \
          --nleaf 64 \
          --kernel_func laplace \
          --kind_of_geometry circular \
