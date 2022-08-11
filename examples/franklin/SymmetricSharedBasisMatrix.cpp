@@ -49,7 +49,6 @@ int64_t SymmetricSharedBasisMatrix::max_rank() {
 }
 
 void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
-  if (level == min_level) { return; }
   int64_t nblocks = pow(2, level);
   std::cout << "LEVEL:" << level << " NBLOCKS: " << nblocks << std::endl;
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -66,6 +65,8 @@ void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
   }
 
   std::cout << std::endl;
+
+  if (level == min_level) { return; }
 
   actually_print_structure(level-1);
 }

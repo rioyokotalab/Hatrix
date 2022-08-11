@@ -21,7 +21,7 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   }
 
   int64_t x_hat_offset = 0;     // index offset for the x_hat array.
-  for (int64_t level = A.max_level - 1; level > A.min_level; --level) {
+  for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
     int64_t nblocks = pow(2, level);
     int64_t child_level = level + 1;
     for (int64_t i = 0; i < nblocks; ++i) {
@@ -59,10 +59,6 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   }
 
   // Multiply the S blocks at the top-most level with the corresponding xhat.
-  // Matrix b1_2 = matmul(A.S(1, 0, level), x_hat[x_hat_offset]);
-  // Matrix b1_1 = matmul(A.S(1, 0, level), x_hat[x_hat_offset+1], true, false);
-  // b_hat.push_back(b1_1);
-  // b_hat.push_back(b1_2);
   int b_hat_offset = 0;
 
   for (int64_t level = A.min_level; level < A.max_level; ++level) {
@@ -75,23 +71,30 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
       Matrix Ub = matmul(A.U(row, level),
                          b_hat[b_hat_offset + row]);
-      auto Ub_splits = Ub.split(std::vector<int64_t>(1,
-                                                     A.U(c_r1, child_level).cols),
+      auto Ub_splits = Ub.split(std::vector<int64_t>(1, A.U(c_r1, child_level).cols),
                                 {});
 
-      Matrix b_r1_cl = matmul(A.S(c_r2, c_r1, child_level),
-                              x_hat[x_hat_offset + c_r2],
-                              true,
-                              false);
-      b_hat.push_back(b_r1_cl + Ub_splits[0]);
-
-      Matrix b_r2_cl = matmul(A.S(c_r2, c_r1, child_level),
-                              x_hat[x_hat_offset + c_r1]);
-      b_hat.push_back(b_r2_cl + Ub_splits[1]);
+      b_hat.push_back(Matrix(Ub_splits[0], true));
+      b_hat.push_back(Matrix(Ub_splits[1], true));
     }
+
+    for (int64_t row = 0; row < pow(2, child_level); ++row) {
+      for (int64_t col = 0; col < row; ++col) {
+        if (A.is_admissible.exists(row, col, child_level) &&
+            A.is_admissible(row, col, child_level)) {
+          matmul(A.S(row, col, child_level),
+                 x_hat[x_hat_offset + col],
+                 b_hat[b_hat_offset + nblocks + row]);
+
+          matmul(A.S(row, col, child_level),
+                 x_hat[x_hat_offset + row],
+                 b_hat[b_hat_offset + nblocks + col], true, false);
+        }
+      }
+    }
+
     b_hat_offset += nblocks;
   }
-
 
   Matrix b(x.rows, 1);
   auto b_splits = b.split(leaf_nblocks, 1);

@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
     A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
-    // b = matmul(A, x);
+    b = matmul(A, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();

@@ -63,6 +63,8 @@ void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, co
       break;
     }
   }
+
+  A.min_level++;
 }
 
 static Matrix
