@@ -98,10 +98,18 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
   Matrix b(x.rows, 1);
   auto b_splits = b.split(leaf_nblocks, 1);
-  for (int i = 0; i < leaf_nblocks; ++i) {
-    Matrix temp = matmul(A.U(i, A.max_level), b_hat[b_hat_offset + i]) +
-      matmul(A.D(i, i, A.max_level), x_splits[i]);
-    b_splits[i] = temp;
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    matmul(A.U(i, A.max_level), b_hat[b_hat_offset + i], b_splits[i]);
+  }
+
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    for (int64_t j = 0; j < leaf_nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) && !A.is_admissible(i, j, A.max_level)) {
+        matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+      }
+    }
+    // Matrix temp = b_splits[i] + ;
+    // b_splits[i] = temp;
   }
 
   return b;
