@@ -108,8 +108,6 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
         matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
       }
     }
-    // Matrix temp = b_splits[i] + ;
-    // b_splits[i] = temp;
   }
 
   return b;

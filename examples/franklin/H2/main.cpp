@@ -42,6 +42,7 @@ int main(int argc, char* argv[]) {
 
   Matrix b;
   double construct_time, matvec_time;
+  int64_t construct_max_rank;
   Matrix x = generate_random_matrix(opts.N, 1);
   x *= 1000;
 
@@ -53,7 +54,8 @@ int main(int argc, char* argv[]) {
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
-    A.print_structure();
+
+    construct_max_rank = A.max_rank();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);
@@ -71,6 +73,7 @@ int main(int argc, char* argv[]) {
   std::cout << "N               : " << opts.N << std::endl;
   std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
   std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+  std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
   std::cout << "NLEAF           : " << opts.nleaf << "\n"
             << "Domain(ms)      : " << domain_time << "\n"
             << "Contruct(ms)    : " << construct_time << "\n"
