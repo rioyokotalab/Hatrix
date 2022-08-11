@@ -60,7 +60,7 @@ static int64_t diagonal_admis_init(SymmetricSharedBasisMatrix& A, const Args& op
 void
 init_diagonal_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   A.max_level = domain.tree.height() - 1;
-  A.min_level = diagonal_admis_init(A, opts, A.max_level);
+  A.min_level = diagonal_admis_init(A, opts, A.max_level) + 1;
   A.is_admissible.insert(0, 0, 0, false);
 }
 

@@ -54,7 +54,7 @@ factorize_level(const int64_t level,
 }
 
 void factorize(SymmetricSharedBasisMatrix& A) {
-  for (int64_t level = A.max_level; level > A.min_level; --level) {
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
     factorize_level(level, A);
 
     int64_t parent_level = level-1;
@@ -242,7 +242,7 @@ solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
   std::vector<Matrix> x_splits;
 
   // forward substitution.
-  for (int64_t level = A.max_level; level > A.min_level; --level) {
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
     int nblocks = pow(2, level);
     int64_t n = 0;              // total vector length due to variable ranks.
     for (int64_t i = 0; i < nblocks; ++i) { n += A.D(i, i, level).rows; }
@@ -265,14 +265,14 @@ solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
   Matrix x_last(x_splits[1]);
 
   // last block forward
-  solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, false, false, 1.0);
+  solve_triangular(A.D(0, 0, 0), x_last, Hatrix::Left, Hatrix::Lower, false, false, 1.0);
   // last block backward
-  solve_triangular(A.D(0, 0, A.min_level), x_last, Hatrix::Left, Hatrix::Lower, false, true, 1.0);
+  solve_triangular(A.D(0, 0, 0), x_last, Hatrix::Left, Hatrix::Lower, false, true, 1.0);
 
   x_splits[1] = x_last;
 
   // backward substitution.
-  for (int64_t level = A.min_level+1; level <= A.max_level; ++level) {
+  for (int64_t level = A.min_level; level <= A.max_level; ++level) {
     int64_t nblocks = pow(2, level);
 
     int64_t n = 0;
@@ -305,7 +305,7 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   }
 
   int x_hat_offset = 0;
-  for (int64_t level = A.max_level - 1; level > 0; --level) {
+  for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
     int64_t nblocks = pow(2, level);
     int64_t child_level = level + 1;
     for (int64_t i = 0; i < nblocks; ++i) {
@@ -323,6 +323,7 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
     x_hat_offset += pow(2, child_level);
   }
+  std::cout << "min level: " << A.min_level << std::endl;
   int64_t level = 1;
 
   // b_hat does the product in reverse so matrices are pushed from the back.
@@ -341,10 +342,10 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
     x_hat_offset -= pow(2, child_level);
 
     for (int64_t row = 0; row < nblocks; ++row) {
-      int c_r1 = row * 2, c_r2 = row * 2 + 1;
-
       Matrix Ub = matmul(A.U(row, level),
                          b_hat[b_hat_offset + row]);
+
+      int c_r1 = row * 2, c_r2 = row * 2 + 1;
       auto Ub_splits = Ub.split(std::vector<int64_t>(1, A.U(c_r1, child_level).cols),
                                 {});
 

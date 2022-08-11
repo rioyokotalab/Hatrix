@@ -57,10 +57,10 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   }
 
   // Multiply the S blocks at the top-most level with the corresponding xhat.
-  Matrix b1_2 = matmul(A.S(1, 0, level), x_hat[x_hat_offset]);
-  Matrix b1_1 = matmul(A.S(1, 0, level), x_hat[x_hat_offset+1], true, false);
-  b_hat.push_back(b1_1);
-  b_hat.push_back(b1_2);
+  // Matrix b1_2 = matmul(A.S(1, 0, level), x_hat[x_hat_offset]);
+  // Matrix b1_1 = matmul(A.S(1, 0, level), x_hat[x_hat_offset+1], true, false);
+  // b_hat.push_back(b1_1);
+  // b_hat.push_back(b1_2);
   int b_hat_offset = 0;
 
   for (int64_t level = A.min_level; level < A.max_level; ++level) {
@@ -73,8 +73,8 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
       Matrix Ub = matmul(A.U(row, level),
                          b_hat[b_hat_offset + row]);
-      auto Ub_splits = Ub.split(std::vector<int64_t>(1, A.U(c_r1, child_level).cols),
-                                {});
+      auto Ub_splits = Ub.split(std::vector<int64_t>(1,
+                                                     A.U(c_r1, child_level).cols));
 
       Matrix b_r1_cl = matmul(A.S(c_r2, c_r1, child_level),
                               x_hat[x_hat_offset + c_r2],
