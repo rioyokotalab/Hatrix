@@ -36,6 +36,7 @@ int main(int argc, char* argv[]) {
     domain.read_col_file_3d(opts.geometry_file);
   }
   domain.build_tree(opts.nleaf);
+  std::cout << "radius: " << domain.tree.radius << std::endl;
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
