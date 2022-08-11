@@ -27,7 +27,7 @@ make -j H2_main
 # done
 
 for nprocs in 1; do
-    ./bin/H2_main --N 512 \
+    ./bin/H2_main --N 1024 \
          --nleaf 64 \
          --kernel_func laplace \
          --kind_of_geometry circular \
