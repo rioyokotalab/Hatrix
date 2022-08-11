@@ -36,7 +36,6 @@ int main(int argc, char* argv[]) {
     domain.read_col_file_3d(opts.geometry_file);
   }
   domain.build_tree(opts.nleaf);
-  std::cout << "radius: " << domain.tree.radius << std::endl;
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
@@ -54,10 +53,10 @@ int main(int argc, char* argv[]) {
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
-
     A.print_structure();
+
     auto begin_matvec = std::chrono::system_clock::now();
-    b = matmul(A, x);
+    // b = matmul(A, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
