@@ -353,6 +353,10 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
     std::cout << "bhat offset: " << b_hat_offset << std::endl;
 
     for (int64_t row = 0; row < nblocks; ++row) {
+
+    }
+
+    for (int64_t row = 0; row < nblocks; ++row) {
       int c_r1 = row * 2, c_r2 = row * 2 + 1;
 
       Matrix bb = matmul(A.S(c_r2, c_r1, child_level),
@@ -360,16 +364,19 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
                          true,
                          false);
 
+      b_hat.push_back(bb);
       Matrix b_r2_cl = matmul(A.S(c_r2, c_r1, child_level),
                               x_hat[x_hat_offset + c_r1]);
+
+      b_hat.push_back(b_r2_cl);
 
       Matrix Ub = matmul(A.U(row, level),
                          b_hat[b_hat_offset + row]);
       auto Ub_splits = Ub.split(std::vector<int64_t>(1, A.U(c_r1, child_level).cols),
                                 {});
 
-      b_hat.push_back(bb + Ub_splits[0]);
-      b_hat.push_back(b_r2_cl + Ub_splits[1]);
+      b_hat[b_hat_offset + nblocks + c_r1] += Ub_splits[0];
+      b_hat[b_hat_offset + nblocks + c_r2] += Ub_splits[1];
     }
     b_hat_offset += nblocks;
   }
