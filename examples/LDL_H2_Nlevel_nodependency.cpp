@@ -638,6 +638,7 @@ void SymmetricH2::pre_compute_fill_in(const int64_t level,
   const int64_t nblocks = level_blocks[level];
   for (int64_t k = 0; k < nblocks; k++) {
     Matrix Dkk = D(k, k, level);
+    ldl(Dkk);
     for (int64_t i = 0; i < nblocks; i++) {
       if (i != k && is_admissible.exists(i, k, level) && !is_admissible(i, k, level)) {
         Matrix Dik = D(i, k, level);
@@ -1317,7 +1318,6 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();  
   double construct_error = A.construction_absolute_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
-  A.print_structure();
 
   std::cout << "N=" << N
             << " nleaf=" << nleaf
