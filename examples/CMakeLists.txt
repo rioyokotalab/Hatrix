@@ -49,6 +49,7 @@ else()
     UMV_H2_Nlevel
     Eigen_H2_Nlevel
     LDL_H2_Nlevel_nodependency
+    UMV_H2_Nlevel_nodependency
   )
 endif()
 
