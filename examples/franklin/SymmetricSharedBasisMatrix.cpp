@@ -48,6 +48,10 @@ int64_t SymmetricSharedBasisMatrix::max_rank() {
   return m_rank;
 }
 
+int64_t SymmetricSharedBasisMatrix::average_rank() {
+  return 0;
+}
+
 void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
   int64_t nblocks = pow(2, level);
   std::cout << "LEVEL:" << level << " NBLOCKS: " << nblocks << std::endl;

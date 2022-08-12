@@ -9,6 +9,15 @@
 
 using namespace Hatrix;
 
+void factorize(Hatrix::SymmetricSharedBasisMatrix& A) {
+
+}
+
+Hatrix::Matrix solve(const Hatrix::SymmetricSharedBasisMatrix& A,
+                     const Hatrix::Matrix& x) {
+
+}
+
 Matrix
 matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
   int leaf_nblocks = pow(2, A.max_level);

@@ -14,6 +14,7 @@ namespace Hatrix {
 
     Matrix Ubig(int64_t node, int64_t level) const;
     int64_t max_rank();
+    int64_t average_rank();
     void print_structure();
 
   private:

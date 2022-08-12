@@ -40,9 +40,10 @@ int main(int argc, char* argv[]) {
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
-  Matrix b;
-  double construct_time, matvec_time;
-  int64_t construct_max_rank;
+  Matrix b, h2_solution;
+  double construct_time, matvec_time, factor_time, solve_time;
+  int64_t construct_max_rank, construct_average_rank,
+    post_factor_max_rank, post_factor_average_rank;
   Matrix x = generate_random_matrix(opts.N, 1);
   x *= 1000;
 
@@ -56,18 +57,37 @@ int main(int argc, char* argv[]) {
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
 
     construct_max_rank = A.max_rank();
+    construct_average_rank = A.average_rank();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
+
+    auto begin_factor = std::chrono::system_clock::now();
+    factorize(A);
+    auto stop_factor = std::chrono::system_clock::now();
+    factor_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_factor - begin_factor).count();
+
+    post_factor_max_rank = A.max_rank();
+    post_factor_average_rank = A.average_rank();
+
+    auto begin_solve = std::chrono::system_clock::now();
+    h2_solution = solve(A, x);
+    auto stop_solve = std::chrono::system_clock::now();
+    solve_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_solve - begin_solve).count();
+
   }
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
+  Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
   double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
+  double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
 
   std::cout << "----------------------------\n";
   std::cout << "N               : " << opts.N << std::endl;
