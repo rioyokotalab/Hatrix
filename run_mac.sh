@@ -27,7 +27,7 @@ make -j H2_main
 # done
 
 for adm in 0.8; do
-    ./bin/H2_main --N 1024 \
+    ./bin/H2_main --N 512 \
          --nleaf 128 \
          --kernel_func laplace \
          --kind_of_geometry circular \

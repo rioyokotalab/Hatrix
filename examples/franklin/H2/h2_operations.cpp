@@ -9,13 +9,95 @@
 
 using namespace Hatrix;
 
-void factorize(Hatrix::SymmetricSharedBasisMatrix& A) {
+static Matrix
+make_complement(const Matrix& Q) {
+  Hatrix::Matrix Q_F(Q.rows, Q.rows);
+  Hatrix::Matrix Q_full, R;
+  std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
 
+  for (int64_t i = 0; i < Q_F.rows; ++i) {
+    for (int64_t j = 0; j < Q_F.cols - Q.cols; ++j) {
+      Q_F(i, j) = Q_full(i, j + Q.cols);
+    }
+  }
+
+  for (int64_t i = 0; i < Q_F.rows; ++i) {
+    for (int64_t j = 0; j < Q.cols; ++j) {
+      Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+    }
+  }
+  return Q_F;
 }
 
-Hatrix::Matrix solve(const Hatrix::SymmetricSharedBasisMatrix& A,
-                     const Hatrix::Matrix& x) {
+static void
+factorize_level(SymmetricSharedBasisMatrix& A,
+                int64_t level, RowColLevelMap<Matrix>& F,
+                RowMap<Matrix>& r, RowMap<Matrix>& t) {
+  int64_t nblocks = pow(2, level);
 
+  for (int64_t block = 0; block < nblocks; ++block) {
+    bool found_row_fill_in = false, found_col_fill_in = false;
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      if (F.exists(i, block, level)) {
+        found_row_fill_in = true;
+        break;
+      }
+    }
+
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (F.exists(block, j, level)) {
+        found_col_fill_in = true;
+        break;
+      }
+    }
+
+
+    if (found_row_fill_in) {    // update row cluster bases
+    }
+
+    if (found_col_fill_in) {    // update col cluster bases
+    }
+
+    auto U_F = make_complement(A.U(block, level));
+
+    // left multiply with the transpose of the complement along the row.
+    for (int64_t i = 0; i < nblocks; ++i) {
+      if (A.is_admissible.exists(i, block, level) &&
+          !A.is_admissible(i, block, level)) {
+      }
+    }
+
+    // right multiply with the complement along the column.
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(block, j, level) &&
+          !A.is_admissible(block, j, level)) {
+
+      }
+    }
+  }
+}
+
+void
+factorize(Hatrix::SymmetricSharedBasisMatrix& A) {
+  RowColLevelMap<Matrix> F;
+
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
+    RowMap<Matrix> r, t;
+    // PLU of one level of the H2 matrix.
+    factorize_level(A, level, F, r, t);
+
+    // Update coupling matrices of each admissible block.
+    // Merge and permute to prepare for the next level.
+  }
+}
+
+Hatrix::Matrix
+solve(const Hatrix::SymmetricSharedBasisMatrix& A,
+      const Hatrix::Matrix& x) {
+  Matrix b(x);
+
+  return b;
 }
 
 Matrix
