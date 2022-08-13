@@ -37,11 +37,9 @@ SymmetricSharedBasisMatrix::Ubig(int64_t node, int64_t level) const {
 
 int64_t SymmetricSharedBasisMatrix::max_rank() {
   int64_t m_rank = 0;
-  for (int64_t level = min_level+1; level <= max_level; ++level) {
+  for (int64_t level = min_level; level <= max_level; ++level) {
     for (int64_t node = 0; node < pow(2, level); ++node) {
-      if (ranks(node, level) > m_rank) {
-        m_rank = ranks(node, level);
-      }
+      m_rank = std::max(ranks(node, level), m_rank);
     }
   }
 

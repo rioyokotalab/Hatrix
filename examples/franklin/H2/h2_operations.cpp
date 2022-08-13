@@ -9,6 +9,16 @@
 
 using namespace Hatrix;
 
+#define SPLIT_DENSE(dense, row_split, col_split)        \
+  dense.split(std::vector<int64_t>(1, row_split),       \
+              std::vector<int64_t>(1, col_split));
+
+static std::vector<Matrix>
+split_dense(const Matrix& dense, int64_t row_split, int64_t col_split) {
+  return dense.split(std::vector<int64_t>(1, row_split),
+                     std::vector<int64_t>(1, col_split));
+}
+
 static Matrix
 make_complement(const Matrix& Q) {
   Hatrix::Matrix Q_F(Q.rows, Q.rows);
@@ -36,6 +46,8 @@ factorize_level(SymmetricSharedBasisMatrix& A,
   int64_t nblocks = pow(2, level);
 
   for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t block_size = A.D(block, block, level).rows,
+      rank = A.ranks(block, level);
     bool found_row_fill_in = false, found_col_fill_in = false;
 
     for (int64_t i = 0; i < nblocks; ++i) {
@@ -75,7 +87,79 @@ factorize_level(SymmetricSharedBasisMatrix& A,
 
       }
     }
-  }
+
+    // start with partial cholesky factorization.
+    auto diagonal_splits = split_dense(A.D(block, block, level),
+                                       block_size - rank,
+                                       block_size - rank);
+    Matrix& Dcc = diagonal_splits[0];
+    Matrix& Doc = diagonal_splits[2];
+
+    cholesky(Dcc, Hatrix::Lower);
+
+    // TRSM with CC blocks along the 'block' column.
+    for (int64_t i = 0; i < nblocks; ++i) {
+      if (A.is_admissible.exists(i, block, level) &&
+          !A.is_admissible(i, block, level)) {
+
+      }
+    }
+
+    // TRSM with oc blocks along the 'block' column.
+    for (int64_t i = 0; i < nblocks; ++i) {
+      if (A.is_admissible.exists(i, block, level) &&
+          !A.is_admissible(i, block, level)) {
+      }
+    }
+
+
+    // ------- Compute Schur's complements --------
+
+    // Schur's complement for cc blocks. cc = cc - cc * cc
+    for (int64_t i = block + 1; i < nblocks; ++i) {
+      for (int64_t j = block + 1; j <= i; ++j) {
+        if (i == j) {
+
+        }
+        else {
+
+        }
+      }
+    }
+
+    // Schur's complement for oc blocks. oc = oc - oc * cc
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = block + 1; j <= i; ++j) {
+        if (i == j) {
+        }
+        else {
+        }
+      }
+    }
+
+    // Schur's complement for co blocks. co = co - cc * oc.T
+    for (int64_t i = block+1; i < nblocks; ++i) {
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (i == j) {
+
+        }
+        else {
+
+        }
+      }
+    }
+
+    // Schur's complement for oo blocks. oo = oo - oc * oc.T
+    for (int64_t i = 0; i < nblocks; ++i) {
+      for (int64_t j = 0; j <= i; ++j) {
+        if (i == j) {
+
+        }
+        else {
+        }
+      }
+    }
+  } // for (int block = 0; block < nblocks; ++block)
 }
 
 void
