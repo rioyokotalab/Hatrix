@@ -1,6 +1,8 @@
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
 
+#include <cmath>
+
 using namespace Hatrix;
 
 Matrix
