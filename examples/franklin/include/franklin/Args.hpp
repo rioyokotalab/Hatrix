@@ -26,6 +26,7 @@ namespace Hatrix {
     bool use_nested_basis;      // whether to use nested basis in construction
     bool verbose;             // whether execution is verbose.
     bool is_symmetric;
+    int num_args;               // number of arguments actually passed by the user.
 
     Args(int argc=0, char **argv=NULL);
     void usage(const char *name);

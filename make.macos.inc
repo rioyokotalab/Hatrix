@@ -13,6 +13,8 @@ LDFLAGS        = $(shell pkg-config --libs gtest_main gtest) \
 SLATE_LIB      = -L/Users/sameer/gitrepos/slate/build/lib -lslate -llapackpp -lblaspp \
 	         -rpath /Users/sameer/gitrepos/slate/build/lib
 SCALAPACK_LIB   = -L/opt/homebrew/Cellar/scalapack/2.1.0_3/lib -lscalapack
+PARSEC_INCLUDE = $(shell pkg-config --cflags parsec)
+PARSEC_LIB     = $(shell pkg-config --libs parsec) -rpath /Users/sameer/gitrepos/parsec/build/parsec
 RM           = rm -rf
 AR           = ar
 ARFLAGS      = -rv

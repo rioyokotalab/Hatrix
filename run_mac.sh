@@ -1,10 +1,9 @@
 #!/bin/bash
 
-make -j HSS_main
-export TMPDIR=/tmp
-
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/Users/sameer/gitrepos/parsec/build/lib/pkgconfig
 
 make -j H2_main
+make -j H2_dtd
 
 # for N in 8192; do
 #     for matrix_type in 1; do
@@ -27,7 +26,7 @@ make -j H2_main
 # done
 
 for adm in 0.8; do
-    ./bin/H2_main --N 512 \
+    ./bin/H2_dtd --N 512 \
          --nleaf 128 \
          --kernel_func laplace \
          --kind_of_geometry circular \
