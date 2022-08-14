@@ -11,3 +11,7 @@
 source /vol0004/apps/oss/spack/share/spack/setup-env.sh
 
 source ~/.bashrc
+
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/vol0003/hp190122/u01594/gitrepos/lorapo/stars-h-rio/build/installdir/lib/pkgconfig
+
+make -j H2_main

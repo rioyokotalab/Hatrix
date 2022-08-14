@@ -1,11 +1,12 @@
 LAPACK_INCLUDE =
-LAPACK_LIB     =
+LAPACK_LIB     = -L$FJSVXTCLANGA/lib64 -lfjlapacksve
 BLAS_INCLUDE   =
-BLAS_LIB       =
+BLAS_LIB       = -SSL2
 CXX            = FCC
 MPICXX         = mpiFCC
-CXXFLAGS       = -Nclang -O3 -g --std=c++11
-LDFLAGS        =
+CXXFLAGS       = -Nclang -O3 -fopenmp -g $(shell pkg-config --cflags gtest gtest_main) \
+                 -I. -I$(TOPSRCDIR)/include/
+LDFLAGS        = $(shell pkg-config --libs gtest_main gtest) $(LAPACK_LIB) $(BLAS_LIB)
 SCALAPACK_LIB  =
 RM           = rm -rf
 AR           = ar
