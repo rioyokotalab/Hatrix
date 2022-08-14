@@ -26,15 +26,15 @@ make -j H2_main
 #     done
 # done
 
-for nprocs in 1; do
-    ./Bin/H2_main --N 512 \
-         --nleaf 64 \
+for adm in 0.8; do
+    ./bin/H2_main --N 512 \
+         --nleaf 128 \
          --kernel_func laplace \
          --kind_of_geometry circular \
          --ndim 2 \
-         --max_rank 25 \
+         --max_rank 50 \
          --accuracy 1e-11 \
-         --admis 2 \
+         --admis $adm \
          --admis_kind geometry \
          --construct_algorithm miro \
          --add_diag 1e-7 \

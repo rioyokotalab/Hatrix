@@ -94,7 +94,6 @@ namespace Hatrix {
     else if (ndim == 2) {
       // Generate a unit circle with N points on the circumference.
       // std::random_device rd;  // Will be used to obtain a seed for the random number engine
-      std::mt19937 gen(1); // Standard mersenne_twister_engine seeded with rd()
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
       for (int64_t i = 0; i < N; ++i) {
@@ -102,31 +101,24 @@ namespace Hatrix {
         double x = radius * cos(theta);
         double y = radius * sin(theta);
 
-        particles.push_back(Hatrix::Particle(x, y, min_val + (double(i) / double(range))));
+        particles.emplace_back(Hatrix::Particle(x, y, min_val + (double(i) / double(range))));
       }
     }
     else if (ndim == 3) {
-      // Generate a unit sphere geometry with N points on the surface.
-      // http://www.cpp.re/forum/windows/262648/
-      // https://neil-strickland.staff.shef.ac.uk/courses/MAS243/lectures/handout10.pdf
-      // std::random_device rd;  // Will be used to obtain a seed for the random number engine
-      std::mt19937 gen(1); // Standard mersenne_twister_engine seeded with 1 every time.
-      std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
+      // Generate a unit sphere mesh with N uniformly spaced points on the surface
+      // https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
+      const double phi = M_PI * (3. - std::sqrt(5.));  // golden angle in radians
+      for (int64_t i = 0; i < N; i++) {
+        const double y = 1. - ((double)i / ((double)N - 1)) * 2.;  // y goes from 1 to -1
 
-      double radius = 1.0;
+        // Note: setting constant radius = 1 will produce a cylindrical shape
+        const double radius = std::sqrt(1. - y * y);  // radius at y
+        const double theta = (double)i * phi;
 
-      for (int64_t i = 0; i < N; ++i) {
-        // double phi = dis(gen);
-        // double theta = dis(gen);
-        double phi = dis(gen);
-        double theta = dis(gen);
-
-        double x = radius * sin(phi) * cos(theta);
-        double y = radius * sin(phi) * sin(theta);
-        double z = radius * cos(phi);
-
-        particles.push_back(Hatrix::Particle(x, y, z,
-                                             min_val + (double(i) / double(range))));
+        const double x = radius * std::cos(theta);
+        const double z = radius * std::sin(theta);
+        const double value = (double)i / (double)N;
+        particles.emplace_back(Particle(x, y, z, value));
       }
     }
   }
@@ -172,9 +164,9 @@ namespace Hatrix {
     cell.radius = 0;
     for (int64_t k = 0; k < ndim; ++k) {
       cell_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
-      cell.radius += pow(Xmax[k] - Xmin[k], 2);
+      // set radius to the max distance along any dimension.
+      cell.radius = std::max((Xmax[k] - Xmin[k]) / 2, cell.radius);
     }
-    cell.radius = sqrt(cell.radius) / 2;
     cell.center = cell_center;
     cell.start_index = pstart;
     cell.end_index = pend;
@@ -187,11 +179,13 @@ namespace Hatrix {
     }
 
     // permute the points along dim using the median as the splitting point.
-    std::sort(particles.begin() + pstart, // TODO: is there a way to not sort? try k-th largest element.
+    // TODO: is there a way to not sort? try k-th largest element.
+    std::sort(particles.begin() + pstart,
               particles.begin() + pend,
               [&](const Particle& lhs, const Particle& rhs) {
                 return lhs.coords[dim] < rhs.coords[dim];
               });
+
     int64_t mid = ceil(double(pstart + pend) / 2.0);
     cell.cells.resize(2);
     orb_split(cell.cells[0], pstart, mid, max_nleaf, (dim+1) % ndim, level+1, level_index << 1);

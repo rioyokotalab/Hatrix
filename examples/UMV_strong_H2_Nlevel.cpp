@@ -782,7 +782,7 @@ namespace Hatrix {
         }
       }
 
-      // Schur's compliment between cc blocks
+      // Schur's compliment between cc blocks. 1
       for (int i = block+1; i < nblocks; ++i) {
         for (int j = block+1; j < nblocks; ++j) {
           if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
@@ -803,7 +803,7 @@ namespace Hatrix {
         }
       }
 
-      // Schur's compliment between oc and co blocks
+      // Schur's compliment between oc and co blocks. 2
       for (int i = 0; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
@@ -823,7 +823,7 @@ namespace Hatrix {
         }
       }
 
-      // Schur's compliment co and cc blocks.
+      // Schur's compliment co and cc blocks. 3
       for (int i = block+1; i < nblocks; ++i) {
         for (int j = 0; j < nblocks; ++j) {
           if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
@@ -866,7 +866,7 @@ namespace Hatrix {
         }
       }
 
-      // Schur's compliment between co and cc blocks
+      // Schur's compliment between oc and cc blocks. 4
       for (int i = 0; i < nblocks; ++i) {
         for (int j = block+1; j < nblocks; ++j) {
           if ((is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) &&
