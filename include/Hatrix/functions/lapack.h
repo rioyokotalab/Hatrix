@@ -67,8 +67,15 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
     |A-USV|_2 <= eps * |A|_2  ,if relative = true
     |A-USV|_2 <= eps          ,otherwise
   where |A|_2 is the 2-norm of the matrix A
+  @param A The matrix to be approximated
+  @param eps The desired accuracy threshold
+  @param relative If true use relative error, otherwise use absolute error
+  @param ret_truncated If true return truncated U,S,V, otherwise return full, non-truncated U,S,V
+  @return tuple(U, S, V, rank)
 */
-std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative=true);
+std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
+                                                      bool relative=true,
+                                                      bool ret_truncated=true);
 
 /*
   Compute truncated pivoted QR that stops as soon as the desired accuracy
@@ -77,8 +84,15 @@ std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relativ
     |A-QR|_F <= eps           ,otherwise
   where |A|_F is the Frobenius norm of the matrix A
   This is a modification of LAPACK's dgeqp3 routine
+  @param A The matrix to be approximated
+  @param eps The desired accuracy threshold
+  @param relative If true use relative error, otherwise use absolute error
+  @param ret_truncated If true return truncated Q and R, otherwise return full, non-truncated Q and R
+  @return tuple(Q, R, rank)
 */
-std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative=true);
+std::tuple<Matrix, Matrix, int64_t> error_pivoted_qr(Matrix& A, double eps,
+                                                     bool relative=true,
+                                                     bool ret_truncated=true);
 
 // Compute the Frobenius norm of a matrix
 double norm(const Matrix& A);

@@ -270,6 +270,7 @@ bool H2::col_has_admissible_blocks(int64_t col, int64_t level) {
 
 std::tuple<Matrix, Matrix, Matrix> H2::svd_like_compression(Matrix& A) {
   Matrix Ui, Si, Vi;
+  int64_t _rank;
   if (accuracy == 0.) {  // Fixed rank
     double error;
     std::tie(Ui, Si, Vi, error) = truncated_svd(A, std::min(rank, A.min_dim()));
@@ -277,12 +278,12 @@ std::tuple<Matrix, Matrix, Matrix> H2::svd_like_compression(Matrix& A) {
   else {  // Fixed accuracy
 #ifdef USE_QR_COMPRESSION
     Matrix R;
-    std::tie(Ui, R) = truncated_pivoted_qr(A, accuracy, false);
+    std::tie(Ui, R, _rank) = error_pivoted_qr(A, accuracy, false);
     Si = Matrix(R.rows, R.rows);
     Vi = Matrix(R.rows, R.cols);
     rq(R, Si, Vi);
 #else
-    std::tie(Ui, Si, Vi) = error_svd(A, accuracy, false);
+    std::tie(Ui, Si, Vi, _rank) = error_svd(A, accuracy, false);
 #endif
   }
   return std::make_tuple(std::move(Ui), std::move(Si), std::move(Vi));

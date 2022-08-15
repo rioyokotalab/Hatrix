@@ -400,8 +400,8 @@ Matrix Domain::generate_rank_heat_map() {
       Matrix block = Hatrix::generate_p2p_interactions(*this, i, j);
 
       Matrix Utemp, Stemp, Vtemp;
-      std::tie(Utemp, Stemp, Vtemp) = error_svd(block, 1e-9);
-      int64_t rank = Stemp.rows;
+      int64_t rank;
+      std::tie(Utemp, Stemp, Vtemp, rank) = error_svd(block, 1e-9);
 
       out(i, j) = rank;
     }

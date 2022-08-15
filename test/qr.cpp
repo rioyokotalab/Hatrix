@@ -7,7 +7,7 @@
 
 class QRTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>> {};
-class TruncatedPivotedQRTests
+class ErrorPivotedQRTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, double>> {};
 class HouseholderQRCompactWYTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {};
@@ -46,7 +46,7 @@ TEST_P(QRTests, qr) {
   Hatrix::Context::finalize();
 }
 
-TEST_P(TruncatedPivotedQRTests, ThresholdBasedTruncation) {
+TEST_P(ErrorPivotedQRTests, ThresholdBasedTruncation) {
   Hatrix::Context::init();
   int64_t m, n;
   double eps;
@@ -56,7 +56,8 @@ TEST_P(TruncatedPivotedQRTests, ThresholdBasedTruncation) {
   const Hatrix::Matrix D = Hatrix::generate_low_rank_matrix(m, n);
   Hatrix::Matrix A(D);
   Hatrix::Matrix Q, RP;
-  std::tie(Q, RP) = truncated_pivoted_qr(A, eps);
+  int64_t rank;
+  std::tie(Q, RP, rank) = error_pivoted_qr(A, eps);
 
   // Check dimensions
   EXPECT_EQ(Q.rows, D.rows);
@@ -69,7 +70,7 @@ TEST_P(TruncatedPivotedQRTests, ThresholdBasedTruncation) {
   Hatrix::Context::finalize();
 }
 
-TEST_P(TruncatedPivotedQRTests, ZeroMatrixHandler) {
+TEST_P(ErrorPivotedQRTests, ZeroMatrixHandler) {
   Hatrix::Context::init();
   int64_t m, n;
   double eps;
@@ -79,7 +80,8 @@ TEST_P(TruncatedPivotedQRTests, ZeroMatrixHandler) {
   const Hatrix::Matrix D(m, n);
   Hatrix::Matrix A(D);
   Hatrix::Matrix Q, RP;
-  std::tie(Q, RP) = truncated_pivoted_qr(A, eps);
+  int64_t rank;
+  std::tie(Q, RP, rank) = error_pivoted_qr(A, eps);
   
   // Check dimensions
   EXPECT_EQ(Q.rows, D.rows);
@@ -197,7 +199,7 @@ INSTANTIATE_TEST_SUITE_P(LAPACK, QRTests,
                                          std::make_tuple(16, 8, 8),
                                          std::make_tuple(8, 16, 8)));
 
-INSTANTIATE_TEST_SUITE_P(LAPACK, TruncatedPivotedQRTests,
+INSTANTIATE_TEST_SUITE_P(LAPACK, ErrorPivotedQRTests,
                          testing::Values(std::make_tuple(32, 32, 1e-6),
                                          std::make_tuple(32, 24, 1e-6),
                                          std::make_tuple(24, 32, 1e-6),

@@ -1,5 +1,6 @@
 #include "Hatrix/functions/math_common.h"
 #include "Hatrix/functions/lapack.h"
+#include "Hatrix/util/matrix_generators.h"
 
 #include <algorithm>
 #include <cassert>
@@ -310,7 +311,9 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t ran
   return truncated_svd(Ac, rank);
 }
 
-std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative) {
+std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
+                                                      bool relative,
+                                                      bool ret_truncated) {
   Matrix U(A.rows, A.min_dim());
   Matrix S(A.min_dim(), A.min_dim());
   Matrix V(A.min_dim(), A.cols);
@@ -320,21 +323,25 @@ std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relativ
   double error = eps;
   if(relative) error *= S(0, 0);
 
-  int rank = 1;
-  int irow = 1;
+  int64_t rank = 1;
+  int64_t irow = 1;
   while (rank < S.rows && S(irow, irow) > error) {
     rank += 1;
     irow += 1;
   }
 
-  U.shrink(U.rows, rank);
-  S.shrink(rank, rank);
-  V.shrink(rank, V.cols);
+  if (ret_truncated) {
+    U.shrink(U.rows, rank);
+    S.shrink(rank, rank);
+    V.shrink(rank, V.cols);
+  }
 
-  return std::make_tuple(std::move(U), std::move(S), std::move(V));
+  return std::make_tuple(std::move(U), std::move(S), std::move(V), rank);
 }
 
-std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative) {
+std::tuple<Matrix, Matrix, int64_t> error_pivoted_qr(Matrix& A, double eps,
+                                                     bool relative,
+                                                     bool ret_truncated) {
   // Pointer aliases
   double* a = &A;
   const int m = A.rows;
@@ -362,9 +369,13 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
   double max_cnorm = *std::max_element(cnorm.begin(), cnorm.end());
   //Handle zero matrix case
   if(max_cnorm <= tol) {
-    Matrix Q(m, 1); Q(0,0) = 1.0;
-    Matrix R(1, n);
-    return std::make_tuple(std::move(Q), std::move(R));
+    Matrix Q = generate_identity_matrix(m, m);
+    Matrix R(m, n);
+    if (ret_truncated) {
+      Q.shrink(m, 1);
+      R.shrink(1, n);
+    }
+    return std::make_tuple(std::move(Q), std::move(R), 1);
   }
   while((r < min_dim) && (max_cnorm > error)) {
     // Select pivot column and swap
@@ -423,19 +434,19 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
     r++;
     max_cnorm = *std::max_element(cnorm.begin() + r, cnorm.end());
   }
-  // Construct truncated Q
-  Matrix Q(m, r);
+  // Construct full Q
+  Matrix Q(m, m);
   // Copy strictly lower triangular (or trapezoidal) part of A into Q
-  for(int i=0; i<Q.rows; i++) {
+  for(int i=0; i<m; i++) {
     for(int j=0; j<std::min(i, r); j++) {
       Q(i, j) = A(i, j);
     }
   }
   LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, r, &Q, Q.stride, &tau[0]);
-  // Construct truncated R
-  Matrix R(r, n);
-  // Copy first r rows of upper triangular part of A into R
-  for(int i=0; i<r; i++) {
+  // Construct full R
+  Matrix R(m, n);
+  // Copy first m rows of upper triangular part of A into R
+  for(int i=0; i<m; i++) {
     for(int j=i; j<n; j++) {
       R(i, j) = A(i, j);
     }
@@ -449,8 +460,11 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
       RP(i, j) = R(i, ipivT[j]);
     }
   }
-  // Return truncated Q and permuted R
-  return std::make_tuple(std::move(Q), std::move(RP));
+  if (ret_truncated) {
+    Q.shrink(m, r);
+    RP.shrink(r, n);
+  }
+  return std::make_tuple(std::move(Q), std::move(RP), std::move(r));
 }
 
 double norm(const Matrix& A) {

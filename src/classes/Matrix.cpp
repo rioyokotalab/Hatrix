@@ -353,8 +353,9 @@ Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
       Matrix Utemp, Stemp, Vtemp;
-      std::tie(Utemp, Stemp, Vtemp) = Hatrix::error_svd(this_splits[i * nblocks + j], accuracy);
-      out(i, j) = Stemp.rows;
+      int64_t rank;
+      std::tie(Utemp, Stemp, Vtemp, rank) = Hatrix::error_svd(this_splits[i * nblocks + j], accuracy);
+      out(i, j) = rank;
     }
   }
 
