@@ -31,10 +31,10 @@ namespace Hatrix {
     search_tree_for_nodes(domain.tree, irow, level, source_pstart, source_pend);
     search_tree_for_nodes(domain.tree, icol, level, target_pstart, target_pend);
 
-    for (int64_t i = source_pstart; i < source_pend; ++i) {
-      for (int64_t j = target_pstart; j < target_pend; ++j) {
-        out(i, j) = kernel(domain.particles[i].coords,
-                           domain.particles[j].coords);
+    for (int64_t i = 0; i < source_pend - source_pstart; ++i) {
+      for (int64_t j = 0; j < target_pend - target_pstart; ++j) {
+        out(i, j) = kernel(domain.particles[i + source_pstart].coords,
+                           domain.particles[j + target_pstart].coords);
       }
     }
   }

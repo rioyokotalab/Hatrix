@@ -69,7 +69,7 @@ examples/franklin/H2_dtd:
 	$(MAKE) -C $@
 
 H2_dtd : % : dirs examples/franklin/H2_dtd
-	$(CXX) libH2_dtd.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) -o $@; \
+	$(MPICXX) libH2_dtd.a libfranklin.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 

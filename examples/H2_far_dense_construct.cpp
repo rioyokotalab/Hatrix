@@ -782,7 +782,8 @@ namespace Hatrix {
     // Generate U leaf blocks
     for (int64_t i = 0; i < nblocks; ++i) {
       Matrix Utemp, Stemp;
-      std::tie(Utemp, Stemp)= generate_column_bases(i, domain.boxes[i].num_particles, domain, Y, height);
+      std::tie(Utemp, Stemp)= generate_column_bases(i, domain.boxes[i].num_particles,
+                                                    domain, Y, height);
       U.insert(i, height, std::move(Utemp));
       Scol.insert(i, height, std::move(Stemp));
     }
@@ -790,7 +791,8 @@ namespace Hatrix {
     // Generate V leaf blocks
     for (int64_t j = 0; j < nblocks; ++j) {
       Matrix Stemp, Vtemp;
-      std::tie(Stemp, Vtemp) = generate_row_bases(j, domain.boxes[j].num_particles, domain, Y, height);
+      std::tie(Stemp, Vtemp) = generate_row_bases(j, domain.boxes[j].num_particles, domain, Y,
+                                                  height);
       V.insert(j, height, std::move(Vtemp));
       Srow.insert(j, height, std::move(Stemp));
     }

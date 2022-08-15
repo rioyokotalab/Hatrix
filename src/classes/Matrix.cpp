@@ -291,12 +291,14 @@ void Matrix::print() const {
         std::cout << std::setw(10) << 0 << " ";
       }
       else {
-        std::cout << std::setprecision(3) << std::setw(10) <<  (*this)(i, j) << " ";
+        std::cout << std::fixed << std::setprecision(3) << std::setw(10) <<  (*this)(i, j) << " ";
         }
     }
     std::cout << "\n";
   }
   std::cout << "\n";
+
+  std::cout << std::scientific;
 }
 
 void Matrix::print_meta() const {
@@ -385,4 +387,11 @@ Matrix Matrix::swap_cols(const std::vector<int64_t>& col_indices) {
   return out;
 }
 
+void Matrix::destructive_resize(const int64_t nrows, const int64_t ncols) {
+  rows = nrows;
+  cols = ncols;
+  stride = nrows;
+  is_view = false;
+  data_ptr = new double[rows * cols];
+}
 }  // namespace Hatrix

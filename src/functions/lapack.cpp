@@ -186,8 +186,10 @@ void rq(Matrix& A, Matrix& R, Matrix& Q) {
   LAPACKE_dorgrq(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
 }
 
-// TODO: complete this function  get rid of return warnings. Also return empty R. Needs dummy alloc now.
-std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret, bool pivoted) {
+// TODO: complete this function  get rid of return warnings.
+// Also return empty R. Needs dummy alloc now.
+std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode,
+                              Lapack::QR_ret qr_ret, bool pivoted) {
   Matrix R(1, 1);
 
   if (mode == Lapack::Full) {
@@ -252,7 +254,9 @@ error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
 
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
   for (int64_t i = 1; i < Q.min_dim(); ++i) {
-    if ((rank >= max_rank && max_rank > 0) || std::abs(Q(i,i)) < error) { break; }
+    if ((rank >= max_rank && max_rank > 0) || std::abs(Q(i,i)) < error) {
+      break;
+    }
     rank++;
   }
 
@@ -509,7 +513,8 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
   int64_t min_dim = A.min_dim();
   if (std::abs(A(min_dim-1, min_dim-1)) > error) {
     throw std::runtime_error("ID failed since the requested error cannot be reached. Min. error= " +
-                             std::to_string(std::abs(A(min_dim-1, min_dim-1))) + ", requested error= " +
+                             std::to_string(std::abs(A(min_dim-1, min_dim-1))) +
+                             ", requested error= " +
                              std::to_string(error));
   }
 

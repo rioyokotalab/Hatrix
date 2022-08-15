@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <exception>
 #include <cmath>
+#include <random>
 
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
@@ -47,6 +48,7 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
 void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   A.max_level = domain.tree.height() - 1;
   dual_tree_traversal(A, domain.tree, domain.tree, domain, opts);
+  A.min_level = 0;
   for (int64_t l = A.max_level; l > 0; --l) {
     int64_t nblocks = pow(2, l);
     bool all_dense = true;
@@ -198,7 +200,8 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
 }
 
 static bool
-row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row, int64_t level) {
+row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
+                          int64_t level) {
   bool has_admis = false;
 
   for (int64_t i = 0; i < pow(2, level); ++i) {
@@ -214,7 +217,8 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row, int6
 
 
 static RowLevelMap
-generate_transfer_matrices(const int64_t level,
+generate_transfer_matrices(const Domain& domain,
+                           const int64_t level,
                            const RowLevelMap& Uchild,
                            SymmetricSharedBasisMatrix& A,
                            const Matrix& dense,
@@ -222,6 +226,9 @@ generate_transfer_matrices(const int64_t level,
                            const Args& opts) {
   int64_t nblocks = pow(2, level);
   auto dense_splits = dense.split(nblocks, nblocks);
+
+  std::mt19937 gen(0);
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
 
   RowLevelMap Ubig_parent;
   for (int64_t node = 0; node < nblocks; ++node) {
@@ -265,8 +272,29 @@ generate_transfer_matrices(const int64_t level,
         Matrix Sdense = matmul(matmul(Ubig_parent(i, level),
                                       dense_splits[i * nblocks + j], true, false),
                                Ubig_parent(j, level));
-
         A.S.insert(i, j, level, std::move(Sdense));
+      }
+    }
+  }
+
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j  = 0; j < i; ++j) {
+      if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
+
+        // std::cout << "i: " << i << " j: " << j << " lvl: " << level;
+        // A.S(i, j, level).print_meta();
+        auto blk = matmul(matmul(Ubig_parent(i, level), A.S(i, j, level)),
+                          Ubig_parent(j, level), false, true);
+
+
+        Matrix Aij = generate_p2p_interactions(domain, i, j, level, opts.kernel);
+
+
+        // (blk - Aij).print();
+        // Aij.print();
+        // std::cout << " norm: " << norm(blk - Aij) << " stuf: "
+        //           << std::endl;
+        // matmul(Ubig_map(i, level), Ubig_map(i, level), true, false).print();
       }
     }
   }
@@ -284,6 +312,6 @@ construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A, const Domain& domain, co
   RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.max_level-1; level > 0; --level) {
-    Uchild = generate_transfer_matrices(level, Uchild, A, dense, rand, opts);
+    Uchild = generate_transfer_matrices(domain, level, Uchild, A, dense, rand, opts);
   }
 }
