@@ -1005,6 +1005,14 @@ void H2::factorize_level(const int64_t level) {
     // The diagonal block is split along the row and column.
     int64_t diag_row_split = D(block, block, level).rows - U(block, level).cols;
     int64_t diag_col_split = D(block, block, level).cols - V(block, level).cols;
+    /*
+      Checks whether row basis rank == column basis rank
+      If the following assertion failed, it means that there exists a cluster whose
+      row basis rank is not equal to its column basis rank, leading to a rectangular diagonal block.
+      The code should be adjusted to handle this case if necessary
+     */
+    assert(diag_row_split == diag_col_split);
+
     auto diagonal_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
     Matrix& Dcc = diagonal_splits[0];
     lu(Dcc);
@@ -1498,8 +1506,7 @@ int main(int argc, char ** argv) {
             << " construct_time=" << construct_time
             << std::scientific
             << " construct_error=" << construct_error
-            << std::defaultfloat
-            << std::endl;
+            << std::defaultfloat;
 
   const auto start_factor = std::chrono::system_clock::now();
   A.factorize();
@@ -1517,7 +1524,7 @@ int main(int argc, char ** argv) {
                             (solve_stop - solve_start).count();
   double solve_error = Hatrix::norm(x_solve - x);
 
-  std::cout << "factor_min_rank=" << A.get_basis_min_rank()
+  std::cout << " factor_min_rank=" << A.get_basis_min_rank()
             << " factor_max_rank=" << A.get_basis_max_rank()
             << " factor_time=" << factor_time
             << " solve_time=" << solve_time
