@@ -1151,7 +1151,7 @@ void H2::factorize() {
               if (is_admissible.exists(c1, c2, level) && !is_admissible(c1, c2, level)) {
                 auto D_splits = D(c1, c2, level).split(
                     vec{D(c1, c2, level).rows - U(c1, level).cols},
-                    vec{D(c1, c2, level).cols - U(c2, level).cols});
+                    vec{D(c1, c2, level).cols - V(c2, level).cols});
                 D_unelim_splits[ic1 * j_children.size() + jc2] = D_splits[3];
               }
               else if (is_admissible.exists(c1, c2, level) && is_admissible(c1, c2, level)) {
@@ -1207,13 +1207,13 @@ int64_t H2::permute_backward(Matrix& x, const int64_t level, int64_t rank_offset
   const int64_t nblocks = level_blocks[level];
   int64_t c_offset = rank_offset;
   for (int64_t block = 0; block < nblocks; block++) {
-    c_offset -= D(block, block, level).cols - U(block, level).cols;
+    c_offset -= D(block, block, level).cols - V(block, level).cols;
   }
 
   int64_t csize_offset = 0, bsize_offset = 0, rsize_offset = 0;
   for (int64_t block = 0; block < nblocks; block++) {
     const int64_t cols = D(block, block, level).cols;
-    const int64_t rank = U(block, level).cols;
+    const int64_t rank = V(block, level).cols;
     const int64_t c_size = cols - rank;
 
     for (int64_t i = 0; i < c_size; i++) {
