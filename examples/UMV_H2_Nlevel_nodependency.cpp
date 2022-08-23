@@ -23,7 +23,6 @@
 // Comment the following line to use SVD instead of pivoted QR for low-rank compression
 // #define USE_QR_COMPRESSION
 
-constexpr double EPS = 1e-13;
 using vec = std::vector<int64_t>;
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 
