@@ -1505,7 +1505,8 @@ int main(int argc, char ** argv) {
             << " construct_time=" << construct_time
             << std::scientific
             << " construct_error=" << construct_error
-            << std::defaultfloat;
+            << std::defaultfloat
+            << " " << std::flush;
 
   const auto start_factor = std::chrono::system_clock::now();
   A.factorize();
@@ -1523,7 +1524,7 @@ int main(int argc, char ** argv) {
                             (solve_stop - solve_start).count();
   double solve_error = Hatrix::norm(x_solve - x);
 
-  std::cout << " factor_min_rank=" << A.get_basis_min_rank()
+  std::cout << "factor_min_rank=" << A.get_basis_min_rank()
             << " factor_max_rank=" << A.get_basis_max_rank()
             << " factor_time=" << factor_time
             << " solve_time=" << solve_time
