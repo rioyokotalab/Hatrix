@@ -6,7 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "Particle.hpp"
+#include "Body.hpp"
+#include "Cell.hpp"
 #include "Domain.hpp"
 #include "Hatrix/Hatrix.h"
 
@@ -22,8 +23,7 @@ void set_kernel_constants(double _PV, double _alpha) {
 }
 
 using kernel_func_t =
-    std::function<double(const std::vector<double>& coords_row,
-                         const std::vector<double>& coords_col)>;
+    std::function<double(const Body& source, const Body& target)>;
 
 kernel_func_t kernel_function;
 
@@ -31,110 +31,49 @@ void set_kernel_function(kernel_func_t _kernel_function) {
   kernel_function = _kernel_function;
 }
 
-double p2p_distance(const std::vector<double>& coords_row,
-                    const std::vector<double>& coords_col) {
+double p2p_distance(const Body& source, const Body& target) {
   double r = 0;
-  const int64_t ndim = coords_row.size();
-  for (int64_t k = 0; k < ndim; ++k) {
-    r += (coords_row[k] - coords_col[k]) *
-         (coords_row[k] - coords_col[k]);
+  for (uint64_t axis = 0; axis < 3; axis++) {
+    r += (source.X[axis] - target.X[axis]) *
+         (source.X[axis] - target.X[axis]);
   }
   return std::sqrt(r);
 }
 
-double laplace_kernel(const std::vector<double>& coords_row,
-                      const std::vector<double>& coords_col) {
-  const double r = p2p_distance(coords_row, coords_col) + PV;
+double laplace_kernel(const Body& source, const Body& target) {
+  const double r = p2p_distance(source, target) + PV;
   const double out = 1. / r;
   return out;
 }
 
-double yukawa_kernel(const std::vector<double>& coords_row,
-                     const std::vector<double>& coords_col) {
-  const double r = p2p_distance(coords_row, coords_col) + PV;
+double yukawa_kernel(const Body& source, const Body& target) {
+  const double r = p2p_distance(source, target) + PV;
   const double out = std::exp(alpha * -r) / r;
   return out;
 }
 
-std::vector<int64_t> leaf_indices(const int64_t node, const int64_t level,
-                                  const int64_t height) {
-  std::vector<int64_t> indices;
-  if (level == height) {
-    indices.push_back(node);
-  }
-  else {
-    auto c1_indices = leaf_indices(node * 2 + 0, level + 1, height);
-    auto c2_indices = leaf_indices(node * 2 + 1, level + 1, height);
-    indices.insert(indices.end(), c1_indices.begin(), c1_indices.end());
-    indices.insert(indices.end(), c2_indices.begin(), c2_indices.end());
-  }
-
-  return indices;
-}
-
-Matrix generate_p2p_interactions(const Domain& domain,
-                                 const int64_t row, const int64_t col,
-                                 const int64_t level, const int64_t height) {
-  // Get source and target particles by gathering leaf level boxes
-  const auto source_leaf_indices = leaf_indices(row, level, height);
-  const auto target_leaf_indices = leaf_indices(col, level, height);
-  std::vector<Particle> source_particles, target_particles;
-  for (int64_t i = 0; i < source_leaf_indices.size(); i++) {
-    const auto source_box_idx = source_leaf_indices[i];
-    const auto offset = domain.boxes[source_box_idx].begin_index;
-    for (int64_t k = 0; k < domain.boxes[source_box_idx].num_particles; k++) {
-      source_particles.push_back(domain.particles[offset + k]);
-    }
-  }
-  for (int64_t i = 0; i < target_leaf_indices.size(); i++) {
-    const auto target_box_idx = target_leaf_indices[i];
-    const auto offset = domain.boxes[target_box_idx].begin_index;
-    for (int64_t k = 0; k < domain.boxes[target_box_idx].num_particles; k++) {
-      target_particles.push_back(domain.particles[offset + k]);
-    }
-  }
+Matrix generate_p2p_matrix(const Domain& domain,
+                           const int64_t row, const int64_t col, const int64_t level) {
+  const auto source_num = domain.get_cell_number(level, row);
+  const auto target_num = domain.get_cell_number(level, col);
+  const auto& source = domain.cells[source_num];
+  const auto& target = domain.cells[target_num];
 
   // Prepare output matrix
-  int64_t nrows = 0, ncols = 0;
-  for (int64_t i = 0; i < source_leaf_indices.size(); i++) {
-    const auto source_box_idx = source_leaf_indices[i];
-    nrows += domain.boxes[source_box_idx].num_particles;
-  }
-  for (int64_t i = 0; i < target_leaf_indices.size(); i++) {
-    const auto target_box_idx = target_leaf_indices[i];
-    ncols += domain.boxes[target_box_idx].num_particles;
-  }
+  int64_t nrows = source.nbodies;
+  int64_t ncols = target.nbodies;
   Matrix out(nrows, ncols);
   for (int64_t i = 0; i < nrows; i++) {
     for (int64_t j = 0; j < ncols; j++) {
-      out(i, j) = kernel_function(source_particles[i].coords,
-                                  target_particles[j].coords);
+      out(i, j) = kernel_function(domain.bodies[source.body + i],
+                                  domain.bodies[target.body + j]);
     }
   }
   return out;
 }
 
 Matrix generate_p2p_matrix(const Domain& domain) {
-  // Gather all particles
-  std::vector<Particle> particles;
-  for (int64_t i = 0; i < domain.boxes.size(); i++) {
-    const auto box_offset = domain.boxes[i].begin_index;
-    for (int64_t k = 0; k < domain.boxes[i].num_particles; k++) {
-      particles.push_back(domain.particles[box_offset + k]);
-    }
-  }
-
-  // Prepare output matrix
-  const int64_t nrows =  domain.particles.size();
-  const int64_t ncols =  domain.particles.size();
-  Matrix out(nrows, ncols);
-  for (int64_t i = 0; i < nrows; i++) {
-    for (int64_t j = 0; j < ncols; j++) {
-      out(i, j) = kernel_function(particles[i].coords,
-                                  particles[j].coords);
-    }
-  }
-  return out;
+  return generate_p2p_matrix(domain, 0, 0, 0);
 }
 
 Matrix prepend_complement_basis(const Matrix &Q) {

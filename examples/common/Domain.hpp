@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "Particle.hpp"
-#include "Box.hpp"
+#include "Body.hpp"
+#include "Cell.hpp"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -20,83 +20,109 @@ namespace Hatrix {
 
 class Domain {
  public:
-  int64_t N, ndim;
-  std::vector<Particle> particles;
-  std::vector<Box> boxes;
+  uint64_t N, ndim;
+  std::vector<Body> bodies;
+  uint64_t ncells, tree_height;
+  std::vector<Cell> cells;
 
  private:
-  double get_coord_max(const int64_t begin_index, const int64_t end_index,
-                       const int64_t axis) const {
+  double get_Xmax(const uint64_t body_start, const uint64_t body_end,
+                  const uint64_t axis) const {
     assert(axis < ndim);
-    double c_max = particles[begin_index].coords[axis];
-    for (int64_t i = begin_index+1; i <= end_index; i++) {
-      c_max = std::max(c_max, particles[i].coords[axis]);
+    double Xmax = bodies[body_start].X[axis];
+    for (uint64_t i = body_start + 1; i <= body_end ; i++) {
+      Xmax = std::max(Xmax, bodies[i].X[axis]);
     }
-    return c_max;
+    return Xmax;
   }
 
-  double get_coord_min(const int64_t begin_index, const int64_t end_index,
-                       const int64_t axis) const {
+  double get_Xmin(const uint64_t body_start, const uint64_t body_end,
+                  const uint64_t axis) const {
     assert(axis < ndim);
-    double c_min = particles[begin_index].coords[axis];
-    for (int64_t i = begin_index+1; i <= end_index; i++) {
-      c_min = std::min(c_min, particles[i].coords[axis]);
+    double Xmin = bodies[body_start].X[axis];
+    for (uint64_t i = body_start + 1; i <= body_end ; i++) {
+      Xmin = std::min(Xmin, bodies[i].X[axis]);
     }
-    return c_min;
+    return Xmin;
   }
 
-  // https://www.csd.uwo.ca/~mmorenom/cs2101a_moreno/Barnes-Hut_Algorithm.pdf
-  void orthogonal_recursive_bisection(const int64_t left, const int64_t right,
-                                      const std::string morton_index, const int64_t nleaf) {
-    // Sort particle based on axis with largest radius
-    double coord_min[3], coord_max[3], r[3], center[3];
+  void orthogonal_recursive_bisection(
+      const uint64_t left, const uint64_t right, const uint64_t leaf_size,
+      const uint64_t level, const uint64_t index) {
+    // Initialize cell
+    const uint64_t loc = get_cell_number(level, index);
+    cells[loc].body = left;
+    cells[loc].nbodies = right - left;
+    cells[loc].level = level;
+    cells[loc].index = index;
     double radius_max = 0.;
-    int64_t sort_axis = 0;
-    for (int64_t axis = 0; axis < ndim; axis++) {
-      coord_min[axis] = get_coord_min(left, right - 1, axis);
-      coord_max[axis] = get_coord_max(left, right - 1, axis);
-      r[axis] = (coord_max[axis] - coord_min[axis]) / 2.;
-      center[axis] = (coord_min[axis] + coord_max[axis]) / 2.;
+    uint64_t sort_axis = 0;
+    for (uint64_t axis = 0; axis < ndim; axis++) {
+      const auto Xmin = get_Xmin(left, right - 1, axis);
+      const auto Xmax = get_Xmax(left, right - 1, axis);
+      const auto diam = Xmax - Xmin;
+      cells[loc].center[axis] = (Xmin + Xmax) / 2.;
+      cells[loc].radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
 
-      if (r[axis] > radius_max) {
-        radius_max = r[axis];
+      if (cells[loc].radius[axis] > radius_max) {
+        radius_max = cells[loc].radius[axis];
         sort_axis = axis;
       }
     }
-    std::sort(particles.begin() + left, particles.begin() + right,
-              [sort_axis](const Particle& lhs, const Particle& rhs) {
-                return lhs.coords[sort_axis] < rhs.coords[sort_axis];
-              });
 
-    const int64_t num_particles = right - left;
-    if (num_particles <= nleaf) {
-      if (ndim == 1) {
-        boxes.emplace_back(Box(num_particles, left, right - 1,
-                               center[0], r[0], morton_index));
+    if (cells[loc].nbodies <= leaf_size) {  // Leaf level is reached
+      cells[loc].child = -1;
+      cells[loc].nchilds = 0;
+      return;
+    }
+
+    // Sort bodies based on axis with largest radius
+    std::sort(bodies.begin() + left, bodies.begin() + right,
+              [sort_axis](const Body& lhs, const Body& rhs) {
+                return lhs.X[sort_axis] < rhs.X[sort_axis];
+              });
+    // Split into two equal parts
+    const auto mid = (left + right) / 2;
+    cells[loc].child = get_cell_number(level + 1, index << 1);
+    cells[loc].nchilds = 2;
+    orthogonal_recursive_bisection(left, mid, leaf_size, level + 1, index << 1);
+    orthogonal_recursive_bisection(mid, right, leaf_size, level + 1, (index << 1) + 1);
+  }
+
+  bool is_well_separated(const Cell& source, const Cell& target,
+                         const double theta) const {
+    const auto distance = source.distance_from(target);
+    const auto diameter = std::min(source.get_diameter(), target.get_diameter());
+    return distance > (theta * diameter);
+  }
+
+  void dual_tree_traversal(Cell& Ci, Cell& Cj, const double theta) {
+    const auto i_level = Ci.level;
+    const auto j_level = Cj.level;
+    bool admissible = false;
+    if (i_level == j_level) {
+      admissible = is_well_separated(Ci, Cj, theta);
+      if (admissible) {
+        Ci.far_siblings.push_back(get_cell_number(Cj.level, Cj.index));
       }
-      if (ndim == 2) {
-        boxes.emplace_back(Box(num_particles, left, right - 1,
-                               center[0], center[1], r[0], r[1],
-                               morton_index));
-      }
-      if (ndim == 3) {
-        boxes.emplace_back(Box(num_particles, left, right - 1,
-                               center[0], center[1], center[2],
-                               r[0], r[1], r[2],
-                               morton_index));
+      else {
+        Ci.near_siblings.push_back(get_cell_number(Cj.level, Cj.index));
       }
     }
-    else {  // Recurse and split again
-      const int64_t mid = (left + right) / 2;
-      // First half
-      orthogonal_recursive_bisection(left, mid, morton_index + "0", nleaf);
-      // Second half
-      orthogonal_recursive_bisection(mid, right, morton_index + "1", nleaf);
+    if (!admissible) {
+      if (i_level <= j_level && !Ci.is_leaf()) {
+        dual_tree_traversal(cells[Ci.child], Cj, theta);
+        dual_tree_traversal(cells[Ci.child + 1], Cj, theta);
+      }
+      else if (j_level <= i_level && !Cj.is_leaf()) {
+        dual_tree_traversal(Ci, cells[Cj.child], theta);
+        dual_tree_traversal(Ci, cells[Cj.child + 1], theta);
+      }
     }
   }
 
  public:
-  Domain(const int64_t _N, const int64_t _ndim)
+  Domain(const uint64_t _N, const uint64_t _ndim)
       : N(_N), ndim(_ndim) {
     if (ndim < 1 || ndim > 3) {
       std::cout << "invalid ndim : " << ndim << std::endl;
@@ -104,20 +130,31 @@ class Domain {
     }
   }
 
-  void divide_domain_and_create_particle_boxes(const int64_t nleaf) {
-    orthogonal_recursive_bisection(0, N, "", nleaf);
+  uint64_t get_cell_number(const uint64_t level, const uint64_t index) const {
+    return (1 << level) - 1 + index;
   }
 
-  // Check admissibility on leaf-level boxes
-  bool check_admis(const double theta,
-                   const int64_t source, const int64_t target) const {
-    const auto diameter = std::min(boxes[source].get_diameter(),
-                                   boxes[target].get_diameter());
-    const auto distance = boxes[source].distance_from(boxes[target]);
-    return distance > (theta * diameter);
+  void build_tree(const uint64_t leaf_size) {
+    // Assume balanced binary tree
+    tree_height = (uint64_t)std::log2((double)N / (double)leaf_size);
+    const uint64_t nleaf_cells = (uint64_t)1 << tree_height;
+    ncells = 2 * nleaf_cells - 1;
+    // Initialize empty cells
+    cells.resize(ncells);
+    // Partition
+    orthogonal_recursive_bisection(0, N, leaf_size, 0, 0);
   }
 
-  void generate_unit_circular_mesh() {
+  void build_interactions(const double theta) {
+    dual_tree_traversal(cells[0], cells[0], theta);
+    // Sort cell numbers in interacion lists
+    for (auto& cell: cells) {
+      std::sort(cell.near_siblings.begin(), cell.near_siblings.end());
+      std::sort(cell.far_siblings.begin(), cell.far_siblings.end());
+    }
+  }
+
+  void initialize_unit_circular_mesh() {
     if (ndim == 2) {
       // Generate a unit circle with N points on the circumference.
       for (int64_t i = 0; i < N; i++) {
@@ -126,7 +163,7 @@ class Domain {
         const double y = sin(theta);
         const double value = (double)i / (double)N;
 
-        particles.emplace_back(Particle(x, y, value));
+        bodies.emplace_back(Body(x, y, value));
       }
     }
     else if (ndim == 3) {
@@ -143,12 +180,12 @@ class Domain {
         const double x = radius * std::cos(theta);
         const double z = radius * std::sin(theta);
         const double value = (double)i / (double)N;
-        particles.emplace_back(Particle(x, y, z, value));
+        bodies.emplace_back(Body(x, y, z, value));
       }
     }
   }
 
-  void generate_unit_cubical_mesh() {
+  void initialize_unit_cubical_mesh() {
     if (ndim == 2) {
       // Generate a unit square with N points on the sides
       if (N < 4) {
@@ -165,25 +202,25 @@ class Domain {
         const double x = a - 2.0 * a * i / top;
         const double y = a;
         const double value = (double)i / (double)N;
-        particles.emplace_back(Particle(x, y, value));
+        bodies.emplace_back(Body(x, y, value));
       }
       for (; i < left; i++) {
         const double x = -a;
         const double y = a - 2.0 * a * (i - top) / (left - top);
         const double value = (double)i / (double)N;
-        particles.emplace_back(Particle(x, y, value));
+        bodies.emplace_back(Body(x, y, value));
       }
       for (; i < bottom; i++) {
         const double x = -a + 2.0 * a * (i - left) / (bottom - left);
         const double y = -a;
         const double value = (double)i / (double)N;
-        particles.emplace_back(Particle(x, y, value));
+        bodies.emplace_back(Body(x, y, value));
       }
       for (; i < N; i++) {
         const double x = a;
         const double y = -a + 2.0 * a * (i - bottom) / (N - bottom);
         const double value = (double)i / (double)N;
-        particles.emplace_back(Particle(x, y, value));
+        bodies.emplace_back(Body(x, y, value));
       }
     }
     else if (ndim == 3) {
@@ -254,12 +291,12 @@ class Domain {
         }
 
         const double value = (double)i / (double)N;
-        particles.emplace_back(Particle(px, py, pz, value));
+        bodies.emplace_back(Body(px, py, pz, value));
       }
     }
   }
 
-  void generate_starsh_uniform_grid() {
+  void initialize_starsh_uniform_grid() {
     const int64_t side = std::ceil(
         std::pow((double)N, 1. / (double)ndim)); // size of each side of the grid
     int64_t total = side;
@@ -283,7 +320,7 @@ class Domain {
       for (k = 0; k < ndim; k++) {
         points[k] = coord[pivot[k] + k * side];
       }
-      particles.emplace_back(Particle(points, 0));
+      bodies.emplace_back(Body(points, 0));
 
       k = ndim - 1;
       pivot[k]++;
@@ -297,7 +334,7 @@ class Domain {
     }
   }
 
-  void print_particles_to_file(const std::string& file_name) const {
+  void print_bodies_to_file(const std::string& file_name) const {
     const std::vector<char> axis{'x', 'y', 'z'};
 
     std::ofstream file;
@@ -311,7 +348,7 @@ class Domain {
     for (int64_t i = 0; i < N; i++) {
       for (int64_t k = 0; k < ndim; k++) {
         if (k > 0) file << ",";
-        file << particles[i].coords[k];
+        file << bodies[i].X[k];
       }
       file << std::endl;
     }
