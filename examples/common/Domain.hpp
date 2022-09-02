@@ -123,6 +123,19 @@ class Domain {
     }
   }
 
+  // Sort locations within cell's interaction lists
+  void sort_interactions() {
+    for (auto& cell: cells) {
+      std::sort(cell.near_list.begin(), cell.near_list.end());
+      std::sort(cell.far_list.begin(), cell.far_list.end());
+    }
+  }
+
+  // Remove element by value from STL container
+  void erase_by_value(std::vector<uint64_t>& vec, const uint64_t value) {
+    vec.erase(std::remove(vec.begin(), vec.end(), value), vec.end());
+  }
+
  public:
   Domain(const uint64_t _N, const uint64_t _ndim)
       : N(_N), ndim(_ndim) {
@@ -149,11 +162,61 @@ class Domain {
 
   void build_interactions(const double theta) {
     dual_tree_traversal(cells[0], cells[0], theta);
-    // Sort cell locations in interacion lists
-    for (auto& cell: cells) {
-      std::sort(cell.near_list.begin(), cell.near_list.end());
-      std::sort(cell.far_list.begin(), cell.far_list.end());
+    sort_interactions();
+  }
+
+  /*
+    Refine interactions resulting from non-optimal partitioning
+    This basically merge 2x2 admissible block into a single upper level admissible block.
+  */
+  void refine_interactions() {
+    for (uint64_t level = tree_height; level > 0; level--) {
+      const uint64_t level_ncells = (uint64_t)std::pow(2., level);
+      const uint64_t level_offset = ((uint64_t)1 << level) - 1;
+      for (uint64_t i = 0; i < level_ncells; i += 2) {
+        for (uint64_t j = i + 2; j < level_ncells; j += 2) {
+          const auto i1 = level_offset + i;
+          const auto i2 = level_offset + i + 1;
+          const auto j1 = level_offset + j;
+          const auto j2 = level_offset + j + 1;
+          const bool i1_j1_found =
+              std::find(cells[i1].far_list.begin(), cells[i1].far_list.end(), j1) !=
+              cells[i1].far_list.end();
+          const bool i1_j2_found =
+              std::find(cells[i1].far_list.begin(), cells[i1].far_list.end(), j2) !=
+              cells[i1].far_list.end();
+          const bool i2_j1_found =
+              std::find(cells[i2].far_list.begin(), cells[i2].far_list.end(), j1) !=
+              cells[i2].far_list.end();
+          const bool i2_j2_found =
+              std::find(cells[i2].far_list.begin(), cells[i2].far_list.end(), j2) !=
+              cells[i2].far_list.end();
+          if (i1_j1_found && i1_j2_found &&
+              i2_j1_found && i2_j2_found) {
+            // Erase from each other's far_list
+            erase_by_value(cells[i1].far_list, j1);
+            erase_by_value(cells[i1].far_list, j2);
+            erase_by_value(cells[i2].far_list, j1);
+            erase_by_value(cells[i2].far_list, j2);
+            // Erase from j1 and j2 as well due to symmetricity
+            erase_by_value(cells[j1].far_list, i1);
+            erase_by_value(cells[j1].far_list, i2);
+            erase_by_value(cells[j2].far_list, i1);
+            erase_by_value(cells[j2].far_list, i2);
+
+            const auto parent_i = cells[i1].parent;
+            const auto parent_j = cells[j1].parent;
+            // Erase from parent's near_list
+            erase_by_value(cells[parent_i].near_list, parent_j);
+            erase_by_value(cells[parent_j].near_list, parent_i);
+            // Insert to parent's far_list
+            cells[parent_i].far_list.push_back(parent_j);
+            cells[parent_j].far_list.push_back(parent_i);
+          }
+        }
+      }
     }
+    sort_interactions();
   }
 
   void initialize_unit_circular_mesh() {
