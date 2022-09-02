@@ -103,13 +103,13 @@ void H2::initialize_geometry_admissibility(const Domain& domain) {
     const auto i = cell.index;
     level_blocks[level]++;
     // Near interaction list: inadmissible dense blocks
-    for (const auto near_num: cell.near_siblings) {
-      const auto j_near = domain.cells[near_num].index;
+    for (const auto near_loc: cell.near_list) {
+      const auto j_near = domain.cells[near_loc].index;
       is_admissible.insert(i, j_near, level, false);
     }
     // Far interaction list: admissible low-rank blocks
-    for (const auto far_num: cell.far_siblings) {
-      const auto j_far = domain.cells[far_num].index;
+    for (const auto far_loc: cell.far_list) {
+      const auto j_far = domain.cells[far_loc].index;
       is_admissible.insert(i, j_far, level, true);
     }
   }
@@ -148,8 +148,8 @@ int64_t H2::find_all_dense_row() const {
 }
 
 int64_t H2::get_block_size(const Domain& domain, const int64_t node, const int64_t level) const {
-  const auto cell_num = domain.get_cell_number(level, node);
-  return domain.cells[cell_num].nbodies;
+  const auto loc = domain.get_cell_loc(node, level);
+  return domain.cells[loc].nbodies;
 }
 
 bool H2::row_has_admissible_blocks(const int64_t row, const int64_t level) const {

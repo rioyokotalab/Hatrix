@@ -8,19 +8,20 @@ namespace Hatrix {
 
 class Cell {
  public:
-  uint64_t body;         // Index of first body within Domain.bodies
+  int64_t body;          // Loc of first body within Domain.bodies
   uint64_t nbodies;      // Number of bodies within Cell
-  uint64_t child;        // Index of first child within Domain.cells
+  int64_t child;         // Loc of first child within Domain.cells
   uint64_t nchilds;      // Number of children
+  int64_t parent;        // Loc of parent within Domain cells
   uint64_t level;        // Level in tree
   uint64_t index;        // Corresponding block index in matrix
   double center[3];
   double radius[3];
-  std::vector<uint64_t> near_siblings;
-  std::vector<uint64_t> far_siblings;
+  std::vector<uint64_t> near_list;
+  std::vector<uint64_t> far_list;
 
-  Cell() : body(0), nbodies(0), child(0),
-           nchilds(0), level(0), index(0) {
+  Cell() : body(-1), nbodies(0), child(-1),
+           nchilds(0), parent(-1), level(0), index(0) {
     for (uint64_t axis = 0; axis < 3; axis++) {
       center[axis] = 0;
       radius[axis] = 0;

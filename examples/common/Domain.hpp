@@ -50,7 +50,7 @@ class Domain {
       const uint64_t left, const uint64_t right, const uint64_t leaf_size,
       const uint64_t level, const uint64_t index) {
     // Initialize cell
-    const uint64_t loc = get_cell_number(level, index);
+    const auto loc = get_cell_loc(index, level);
     cells[loc].body = left;
     cells[loc].nbodies = right - left;
     cells[loc].level = level;
@@ -83,8 +83,10 @@ class Domain {
               });
     // Split into two equal parts
     const auto mid = (left + right) / 2;
-    cells[loc].child = get_cell_number(level + 1, index << 1);
+    cells[loc].child = get_cell_loc(index << 1, level + 1);
     cells[loc].nchilds = 2;
+    cells[cells[loc].child].parent = loc;
+    cells[cells[loc].child + 1].parent = loc;
     orthogonal_recursive_bisection(left, mid, leaf_size, level + 1, index << 1);
     orthogonal_recursive_bisection(mid, right, leaf_size, level + 1, (index << 1) + 1);
   }
@@ -103,10 +105,10 @@ class Domain {
     if (i_level == j_level) {
       admissible = is_well_separated(Ci, Cj, theta);
       if (admissible) {
-        Ci.far_siblings.push_back(get_cell_number(Cj.level, Cj.index));
+        Ci.far_list.push_back(get_cell_loc(Cj.index, Cj.level));
       }
       else {
-        Ci.near_siblings.push_back(get_cell_number(Cj.level, Cj.index));
+        Ci.near_list.push_back(get_cell_loc(Cj.index, Cj.level));
       }
     }
     if (!admissible) {
@@ -130,7 +132,7 @@ class Domain {
     }
   }
 
-  uint64_t get_cell_number(const uint64_t level, const uint64_t index) const {
+  uint64_t get_cell_loc(const uint64_t index, const uint64_t level) const {
     return (1 << level) - 1 + index;
   }
 
@@ -147,10 +149,10 @@ class Domain {
 
   void build_interactions(const double theta) {
     dual_tree_traversal(cells[0], cells[0], theta);
-    // Sort cell numbers in interacion lists
+    // Sort cell locations in interacion lists
     for (auto& cell: cells) {
-      std::sort(cell.near_siblings.begin(), cell.near_siblings.end());
-      std::sort(cell.far_siblings.begin(), cell.far_siblings.end());
+      std::sort(cell.near_list.begin(), cell.near_list.end());
+      std::sort(cell.far_list.begin(), cell.far_list.end());
     }
   }
 

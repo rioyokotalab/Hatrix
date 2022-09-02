@@ -54,10 +54,10 @@ double yukawa_kernel(const Body& source, const Body& target) {
 
 Matrix generate_p2p_matrix(const Domain& domain,
                            const int64_t row, const int64_t col, const int64_t level) {
-  const auto source_num = domain.get_cell_number(level, row);
-  const auto target_num = domain.get_cell_number(level, col);
-  const auto& source = domain.cells[source_num];
-  const auto& target = domain.cells[target_num];
+  const auto source_loc = domain.get_cell_loc(row, level);
+  const auto target_loc = domain.get_cell_loc(col, level);
+  const auto& source = domain.cells[source_loc];
+  const auto& target = domain.cells[target_loc];
 
   // Prepare output matrix
   int64_t nrows = source.nbodies;
