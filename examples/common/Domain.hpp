@@ -124,7 +124,7 @@ class Domain {
   }
 
   // Sort locations within cell's interaction lists
-  void sort_interactions() {
+  void sort_interaction_lists() {
     for (auto& cell: cells) {
       std::sort(cell.near_list.begin(), cell.near_list.end());
       std::sort(cell.far_list.begin(), cell.far_list.end());
@@ -134,6 +134,51 @@ class Domain {
   // Remove element by value from STL container
   void erase_by_value(std::vector<uint64_t>& vec, const uint64_t value) {
     vec.erase(std::remove(vec.begin(), vec.end(), value), vec.end());
+  }
+
+  double dist2(const Body& a, const Body& b) const {
+    double dist = 0;
+    for (uint64_t axis = 0; axis < 3; axis++) {
+      dist += (a.X[axis] - b.X[axis]) *
+              (a.X[axis] - b.X[axis]);
+    }
+    return dist;
+  }
+
+  std::vector<uint64_t> get_sample_bodies(const std::vector<uint64_t>& bodies_loc,
+                                          uint64_t sample_size) const {
+    const uint64_t nbodies = bodies_loc.size();
+    sample_size = std::min(nbodies, sample_size);
+    // Select sample bodies with Farthest Point Sampling (FPS)
+    std::vector<bool> chosen(nbodies, false);
+    // Start with the middle as pivot
+    auto pivot = nbodies / 2;
+    chosen[pivot] = true;
+    for (uint64_t k = 1; k < sample_size; k++) {
+      // Add the farthest body from pivot into sample
+      double max_dist2 = -1.;
+      int64_t farthest_idx = -1;
+      for (uint64_t i = 0; i < nbodies; i++) {
+        if(!chosen[i]) {
+          const double dist2_i = dist2(bodies[bodies_loc[pivot]],
+                                       bodies[bodies_loc[i]]);
+          if (dist2_i > max_dist2) {
+            max_dist2 = dist2_i;
+            farthest_idx = i;
+          }
+        }
+      }
+      chosen[farthest_idx] = true;
+      pivot = farthest_idx;
+    }
+    std::vector<uint64_t> samples_loc;
+    samples_loc.reserve(sample_size);
+    for (uint64_t i = 0; i < nbodies; i++) {
+      if (chosen[i]) {
+        samples_loc.push_back(bodies_loc[i]);
+      }
+    }
+    return samples_loc;
   }
 
  public:
@@ -162,7 +207,7 @@ class Domain {
 
   void build_interactions(const double theta) {
     dual_tree_traversal(cells[0], cells[0], theta);
-    sort_interactions();
+    sort_interaction_lists();
   }
 
   /*
@@ -171,8 +216,8 @@ class Domain {
   */
   void refine_interactions() {
     for (uint64_t level = tree_height; level > 0; level--) {
-      const uint64_t level_ncells = (uint64_t)std::pow(2., level);
-      const uint64_t level_offset = ((uint64_t)1 << level) - 1;
+      const auto level_ncells = (uint64_t)1 << level;
+      const auto level_offset = level_ncells - 1;
       for (uint64_t i = 0; i < level_ncells; i += 2) {
         for (uint64_t j = i + 2; j < level_ncells; j += 2) {
           const auto i1 = level_offset + i;
@@ -216,7 +261,58 @@ class Domain {
         }
       }
     }
-    sort_interactions();
+    sort_interaction_lists();
+  }
+
+  void select_sample_bodies(const uint64_t sample_bodies_size,
+                            const uint64_t sample_farfield_size) {
+    // Bottom-up pass to select cell's sample bodies
+    for (uint64_t level = tree_height; level > 0; level--) {
+      const auto level_ncells = (uint64_t)1 << level;
+      const auto level_offset = level_ncells - 1;
+      for (uint64_t node = 0; node < level_ncells; node++) {
+        const auto loc = level_offset + node;
+        std::vector<uint64_t> sample_candidates;
+        if (level == tree_height) {
+          // Leaf level: candidates are from its bodies
+          sample_candidates.assign(cells[loc].nbodies, 0);
+          for (uint64_t i = 0; i < cells[loc].nbodies; i++) {
+            sample_candidates[i] = cells[loc].body + i;
+          }
+        }
+        else {
+          // Non-leaf level: candidates are from children's samples
+          const auto c1_loc = cells[loc].child;
+          const auto c2_loc = cells[loc].child + 1;
+          sample_candidates.insert(sample_candidates.end(),
+                                   cells[c1_loc].sample_bodies.begin(),
+                                   cells[c1_loc].sample_bodies.end());
+          sample_candidates.insert(sample_candidates.end(),
+                                   cells[c2_loc].sample_bodies.begin(),
+                                   cells[c2_loc].sample_bodies.end());
+        }
+        cells[loc].sample_bodies = get_sample_bodies(sample_candidates, sample_bodies_size);
+      }
+    }
+    // Top-down pass to select cell's farfield sample
+    for (uint64_t level = 1; level <= tree_height; level++) {
+      const auto level_ncells = (uint64_t)1 << level;
+      const auto level_offset = level_ncells - 1;
+      for (uint64_t node = 0; node < level_ncells; node++) {
+        const auto loc = level_offset + node;
+        const auto parent_loc = cells[loc].parent;
+        auto farfield = cells[parent_loc].sample_farfield;
+        if (farfield.size() > 0 || cells[loc].far_list.size() > 0) {
+          // If node has non-empty farfield
+          for (auto far_loc: cells[loc].far_list) {
+            farfield.insert(farfield.end(),
+                            cells[far_loc].sample_bodies.begin(),
+                            cells[far_loc].sample_bodies.end());
+          }
+          cells[loc].sample_farfield = get_sample_bodies(farfield, sample_farfield_size);
+        }
+      }
+    }
   }
 
   void initialize_unit_circular_mesh() {

@@ -17,8 +17,10 @@ class Cell {
   uint64_t index;        // Corresponding block index in matrix
   double center[3];
   double radius[3];
-  std::vector<uint64_t> near_list;
-  std::vector<uint64_t> far_list;
+  std::vector<uint64_t> near_list;        // Loc of cells within near interaction list
+  std::vector<uint64_t> far_list;         // Loc of cells within far interaction list
+  std::vector<uint64_t> sample_bodies;    // Loc of sample bodies representing this cell
+  std::vector<uint64_t> sample_farfield;  // Loc of sample bodies representing the farfield
 
   Cell() : body(-1), nbodies(0), child(-1),
            nchilds(0), parent(-1), level(0), index(0) {

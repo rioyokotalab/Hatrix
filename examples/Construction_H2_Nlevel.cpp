@@ -683,7 +683,7 @@ int main(int argc, char ** argv) {
   }
   domain.build_tree(leaf_size);
   domain.build_interactions(admis);
-  domain.refine_interactions();
+  domain.select_sample_bodies(leaf_size, sample_size);
   const auto stop_particles = std::chrono::system_clock::now();
   const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                          (stop_particles - start_particles).count();
