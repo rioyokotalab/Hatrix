@@ -53,23 +53,39 @@ double yukawa_kernel(const Body& source, const Body& target) {
 }
 
 Matrix generate_p2p_matrix(const Domain& domain,
-                           const int64_t row, const int64_t col, const int64_t level) {
+                           const std::vector<int64_t>& source,
+                           const std::vector<int64_t>& target,
+                           const uint64_t source_offset = 0,
+                           const uint64_t target_offset = 0) {
+  const uint64_t nrows = source.size();
+  const uint64_t ncols = target.size();
+  Matrix out(nrows, ncols);
+  for (uint64_t i = 0; i < nrows; i++) {
+    for (uint64_t j = 0; j < ncols; j++) {
+      out(i, j) = kernel_function(domain.bodies[source_offset + source[i]],
+                                  domain.bodies[target_offset + target[j]]);
+    }
+  }
+  return out;
+}
+
+Matrix generate_p2p_matrix(const Domain& domain,
+                           const uint64_t row, const uint64_t col, const uint64_t level) {
   const auto source_loc = domain.get_cell_loc(row, level);
   const auto target_loc = domain.get_cell_loc(col, level);
   const auto& source = domain.cells[source_loc];
   const auto& target = domain.cells[target_loc];
 
-  // Prepare output matrix
-  int64_t nrows = source.nbodies;
-  int64_t ncols = target.nbodies;
-  Matrix out(nrows, ncols);
-  for (int64_t i = 0; i < nrows; i++) {
-    for (int64_t j = 0; j < ncols; j++) {
-      out(i, j) = kernel_function(domain.bodies[source.body + i],
-                                  domain.bodies[target.body + j]);
-    }
+  std::vector<int64_t> source_bodies, target_bodies;
+  source_bodies.reserve(source.nbodies);
+  target_bodies.reserve(target.nbodies);
+  for (uint64_t i = 0; i < source.nbodies; i++) {
+    source_bodies.push_back(source.body + i);
   }
-  return out;
+  for (uint64_t j = 0; j < target.nbodies; j++) {
+    target_bodies.push_back(target.body + j);
+  }
+  return generate_p2p_matrix(domain, source_bodies, target_bodies);
 }
 
 Matrix generate_p2p_matrix(const Domain& domain) {

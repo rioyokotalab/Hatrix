@@ -145,8 +145,8 @@ class Domain {
     return dist;
   }
 
-  std::vector<uint64_t> get_sample_bodies(const std::vector<uint64_t>& bodies_loc,
-                                          uint64_t sample_size) const {
+  std::vector<int64_t> get_sample_bodies(const std::vector<int64_t>& bodies_loc,
+                                         uint64_t sample_size) const {
     const uint64_t nbodies = bodies_loc.size();
     sample_size = std::min(nbodies, sample_size);
     // Select sample bodies with Farthest Point Sampling (FPS)
@@ -171,7 +171,7 @@ class Domain {
       chosen[farthest_idx] = true;
       pivot = farthest_idx;
     }
-    std::vector<uint64_t> samples_loc;
+    std::vector<int64_t> samples_loc;
     samples_loc.reserve(sample_size);
     for (uint64_t i = 0; i < nbodies; i++) {
       if (chosen[i]) {
@@ -272,7 +272,7 @@ class Domain {
       const auto level_offset = level_ncells - 1;
       for (uint64_t node = 0; node < level_ncells; node++) {
         const auto loc = level_offset + node;
-        std::vector<uint64_t> sample_candidates;
+        std::vector<int64_t> sample_candidates;
         if (level == tree_height) {
           // Leaf level: candidates are from its bodies
           sample_candidates.assign(cells[loc].nbodies, 0);
