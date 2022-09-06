@@ -31,7 +31,7 @@ class SymmetricH2 {
   int64_t max_rank;
   double admis;
   int64_t height;
-  RowLevelMap U;
+  RowLevelMap U, R_row;
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
   std::vector<int64_t> level_blocks;
@@ -166,7 +166,23 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         for (uint64_t i = 0; i < rank; i++) {
           node_skeleton.push_back(node_rows[pivot_cols[i]]);
         }
-        U.insert(node, level, std::move(PxU));
+        // Multiply with child R if necessary
+        if (level < height) {
+          const auto child_level = level + 1;
+          const auto child1 = node * 2;
+          const auto child2 = node * 2 + 1;
+          auto PxU_splits = PxU.split(vec{U(child1, child_level).cols}, vec{});
+          triangular_matmul(R_row(child1, child_level), PxU_splits[0],
+                            Hatrix::Left, Hatrix::Upper, false, false, 1);
+          triangular_matmul(R_row(child2, child_level), PxU_splits[1],
+                            Hatrix::Left, Hatrix::Upper, false, false, 1);
+        }
+        // Orthogonalize basis
+        Matrix Q(PxU.rows, PxU.cols);
+        Matrix R(PxU.cols, PxU.cols);
+        qr(PxU, Q, R);
+        U.insert(node, level, std::move(Q));
+        R_row.insert(node, level, std::move(R));
         skeleton_rows.insert(node, level, std::move(node_skeleton));
       }
     }
@@ -190,9 +206,13 @@ void SymmetricH2::generate_coupling_matrices(const Domain& domain) {
           const auto& skeleton_j = skeleton_rows(j, level);
           const auto i_offset = domain.cells[domain.get_cell_loc(i, level)].body;
           const auto j_offset = domain.cells[domain.get_cell_loc(j, level)].body;
-          S.insert(i, j, level,
-                   generate_p2p_matrix(domain, skeleton_i, skeleton_j,
-                                       i_offset, j_offset));
+          Matrix skeleton = generate_p2p_matrix(domain, skeleton_i, skeleton_j,
+                                                i_offset, j_offset);
+          triangular_matmul(R_row(i, level), skeleton, Hatrix::Left, Hatrix::Upper,
+                            false, false, 1.);
+          triangular_matmul(R_row(j, level), skeleton, Hatrix::Right, Hatrix::Upper,
+                            true, false, 1.);
+          S.insert(i, j, level, std::move(skeleton));
         }
       }
     }
