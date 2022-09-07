@@ -463,6 +463,7 @@ int main(int argc, char ** argv) {
             << " LR%=" << lr_ratio * 100 << "%"
             << " construct_min_rank=" << A.get_basis_min_rank()
             << " construct_max_rank=" << A.get_basis_max_rank()
+            << " particle_time=" << particle_construct_time
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error
             << std::endl;
