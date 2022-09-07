@@ -28,6 +28,7 @@ class SymmetricH2 {
  public:
   int64_t N, leaf_size;
   double accuracy;
+  double ID_tolerance;
   int64_t max_rank;
   double admis;
   int64_t height;
@@ -146,7 +147,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         Matrix U_node;
         std::vector<int64_t> pivot_cols;
         int64_t rank;
-        std::tie(U_node, pivot_cols, rank) = error_interpolate(block_row_T, accuracy * 1.e-1);
+        std::tie(U_node, pivot_cols, rank) = error_interpolate(block_row_T, ID_tolerance);
         // Create transpose of pivot_cols = pivot_rows
         std::vector<int64_t> pivot_rows(pivot_cols.size(), 0);
         for (int64_t i = 0; i < pivot_cols.size(); i++) {
@@ -244,6 +245,9 @@ SymmetricH2::SymmetricH2(const Domain& domain,
                          const double accuracy, const int64_t max_rank, const double admis)
     : N(N), leaf_size(leaf_size), accuracy(accuracy),
       max_rank(max_rank), admis(admis) {
+  // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
+  // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
+  ID_tolerance = accuracy * 1e-2;
   initialize_geometry_admissibility(domain);
   generate_row_cluster_basis(domain);
   generate_coupling_matrices(domain);
