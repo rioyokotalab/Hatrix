@@ -146,36 +146,51 @@ class Domain {
   }
 
   std::vector<int64_t> select_cluster_sample_bodies(
-      const std::vector<int64_t>& bodies_loc, int64_t sample_size) const {
+      const std::vector<int64_t>& bodies_loc,
+      const int64_t _sample_size, const int64_t sampling_alg) const {
     const int64_t nbodies = bodies_loc.size();
-    sample_size = std::min(nbodies, sample_size);
-    // Select sample bodies with Farthest Point Sampling (FPS)
-    std::vector<bool> chosen(nbodies, false);
-    // Start with the middle as pivot
-    auto pivot = nbodies / 2;
-    chosen[pivot] = true;
-    for (int64_t k = 1; k < sample_size; k++) {
-      // Add the farthest body from pivot into sample
-      double max_dist2 = -1.;
-      int64_t farthest_idx = -1;
-      for (int64_t i = 0; i < nbodies; i++) {
-        if(!chosen[i]) {
-          const double dist2_i = dist2(bodies[bodies_loc[pivot]],
-                                       bodies[bodies_loc[i]]);
-          if (dist2_i > max_dist2) {
-            max_dist2 = dist2_i;
-            farthest_idx = i;
-          }
-        }
-      }
-      chosen[farthest_idx] = true;
-      pivot = farthest_idx;
-    }
+    const int64_t sample_size = std::min(nbodies, _sample_size);
     std::vector<int64_t> samples_loc;
     samples_loc.reserve(sample_size);
-    for (int64_t i = 0; i < nbodies; i++) {
-      if (chosen[i]) {
-        samples_loc.push_back(bodies_loc[i]);
+
+    switch (sampling_alg) {
+      case 0: {  // Select based on equally spaced indices
+        const int64_t d = (int64_t)std::floor((double)nbodies / (double)sample_size);
+        int64_t k = 0;
+        for (int64_t i = 0; i < sample_size; i++) {
+          samples_loc.push_back(bodies_loc[k]);
+          k += d;
+        }
+        break;
+      }
+      case 1: {  // Farthest Point Sampling (FPS)
+        std::vector<bool> chosen(nbodies, false);
+        // Start with the middle as pivot
+        auto pivot = nbodies / 2;
+        chosen[pivot] = true;
+        for (int64_t k = 1; k < sample_size; k++) {
+          // Add the farthest body from pivot into sample
+          double max_dist2 = -1.;
+          int64_t farthest_idx = -1;
+          for (int64_t i = 0; i < nbodies; i++) {
+            if(!chosen[i]) {
+              const double dist2_i = dist2(bodies[bodies_loc[pivot]],
+                                           bodies[bodies_loc[i]]);
+              if (dist2_i > max_dist2) {
+                max_dist2 = dist2_i;
+                farthest_idx = i;
+              }
+            }
+          }
+          chosen[farthest_idx] = true;
+          pivot = farthest_idx;
+        }
+        for (int64_t i = 0; i < nbodies; i++) {
+          if (chosen[i]) {
+            samples_loc.push_back(bodies_loc[i]);
+          }
+        }
+        break;
       }
     }
     return samples_loc;
@@ -265,7 +280,8 @@ class Domain {
   }
 
   void select_sample_bodies(const int64_t sample_bodies_size,
-                            const int64_t sample_farfield_size) {
+                            const int64_t sample_farfield_size,
+                            const int64_t sampling_alg = 1) {
     // Bottom-up pass to select cell's sample bodies
     for (int64_t level = tree_height; level > 0; level--) {
       const auto level_ncells = (int64_t)1 << level;
@@ -291,7 +307,9 @@ class Domain {
                                    cells[c2_loc].sample_bodies.begin(),
                                    cells[c2_loc].sample_bodies.end());
         }
-        cells[loc].sample_bodies = select_cluster_sample_bodies(sample_candidates, sample_bodies_size);
+        cells[loc].sample_bodies = select_cluster_sample_bodies(sample_candidates,
+                                                                sample_bodies_size,
+                                                                sampling_alg);
       }
     }
     // Top-down pass to select cell's farfield sample
@@ -309,7 +327,9 @@ class Domain {
                             cells[far_loc].sample_bodies.begin(),
                             cells[far_loc].sample_bodies.end());
           }
-          cells[loc].sample_farfield = select_cluster_sample_bodies(farfield, sample_farfield_size);
+          cells[loc].sample_farfield = select_cluster_sample_bodies(farfield,
+                                                                    sample_farfield_size,
+                                                                    sampling_alg);
         }
       }
     }
