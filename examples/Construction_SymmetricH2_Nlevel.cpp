@@ -44,7 +44,7 @@ class SymmetricH2 {
   bool row_has_admissible_blocks(const int64_t row, const int64_t level) const;
 
   Matrix generate_admissible_block_row(const Domain& domain,
-                                       const uint64_t node, const uint64_t level,
+                                       const int64_t node, const int64_t level,
                                        const std::vector<int64_t>& node_rows) const;
   void generate_row_cluster_basis(const Domain& domain);
   void generate_coupling_matrices(const Domain& domain);
@@ -102,7 +102,7 @@ bool SymmetricH2::row_has_admissible_blocks(const int64_t row, const int64_t lev
 }
 
 Matrix SymmetricH2::generate_admissible_block_row(const Domain& domain,
-                                                  const uint64_t node, const uint64_t level,
+                                                  const int64_t node, const int64_t level,
                                                   const std::vector<int64_t>& node_rows) const {
   const auto loc = domain.get_cell_loc(node, level);
   const auto& source = domain.cells[loc];
@@ -111,16 +111,16 @@ Matrix SymmetricH2::generate_admissible_block_row(const Domain& domain,
 }
 
 void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
-  for (uint64_t level = height; level > 0; level--) {
+  for (int64_t level = height; level > 0; level--) {
     const auto num_nodes = level_blocks[level];
-    for (uint64_t node = 0; node < num_nodes; node++) {
+    for (int64_t node = 0; node < num_nodes; node++) {
       if (row_has_admissible_blocks(node, level)) {
         std::vector<int64_t> node_rows;
         if (level == height) {
           // Leaf level: use all bodies as skeleton
           const auto block_size = get_block_size(domain, node, level);
           node_rows.reserve(block_size);
-          for (uint64_t i = 0; i < block_size; i++) {
+          for (int64_t i = 0; i < block_size; i++) {
             node_rows.push_back(i);
           }
         }
@@ -133,11 +133,11 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
           const auto& child2_skeleton = skeleton_rows(child2, child_level);
           node_rows.reserve(child1_skeleton.size() +
                             child2_skeleton.size());
-          for (uint64_t i = 0; i < child1_skeleton.size(); i++) {
+          for (int64_t i = 0; i < child1_skeleton.size(); i++) {
             node_rows.push_back(child1_skeleton[i]);
           }
           const auto offset = get_block_size(domain, child1, child_level);
-          for (uint64_t i = 0; i < child2_skeleton.size(); i++) {
+          for (int64_t i = 0; i < child2_skeleton.size(); i++) {
             node_rows.push_back(offset + child2_skeleton[i]);
           }
         }
@@ -149,21 +149,21 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         std::tie(U_node, pivot_cols, rank) = error_interpolate(block_row_T, accuracy * 1.e-1);
         // Create transpose of pivot_cols = pivot_rows
         std::vector<int64_t> pivot_rows(pivot_cols.size(), 0);
-        for (uint64_t i = 0; i < pivot_cols.size(); i++) {
+        for (int64_t i = 0; i < pivot_cols.size(); i++) {
           pivot_rows[pivot_cols[i]] = i;
         }
         // Permute row of U based on pivot_rows
         Matrix PxU(U_node.rows, U_node.cols);
-        for (uint64_t i = 0; i < pivot_rows.size(); i++) {
+        for (int64_t i = 0; i < pivot_rows.size(); i++) {
           const auto row = pivot_rows[i];
-          for (uint64_t j = 0; j < U_node.cols; j++) {
+          for (int64_t j = 0; j < U_node.cols; j++) {
             PxU(i, j) = U_node(row, j);
           }
         }
         // Convert local row indices to global skeleton indices
         std::vector<int64_t> node_skeleton;
         node_skeleton.reserve(rank);
-        for (uint64_t i = 0; i < rank; i++) {
+        for (int64_t i = 0; i < rank; i++) {
           node_skeleton.push_back(node_rows[pivot_cols[i]]);
         }
         // Multiply with child R if necessary
@@ -190,10 +190,10 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
 }
 
 void SymmetricH2::generate_coupling_matrices(const Domain& domain) {
-  for (uint64_t level = height; level > 0; level--) {
+  for (int64_t level = height; level > 0; level--) {
     const auto num_nodes = level_blocks[level];
-    for (uint64_t i = 0; i < num_nodes; i++) {
-      for (uint64_t j = 0; j < num_nodes; j++) {
+    for (int64_t i = 0; i < num_nodes; i++) {
+      for (int64_t j = 0; j < num_nodes; j++) {
         // Inadmissible leaf blocks
         if (level == height &&
             is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
@@ -433,7 +433,7 @@ int main(int argc, char ** argv) {
   }
   domain.build_tree(leaf_size);
   domain.build_interactions(admis);
-  domain.select_sample_bodies(sample_size, sample_size);
+  domain.select_sample_bodies(sample_size, sample_size + 10);
   const auto stop_particles = std::chrono::system_clock::now();
   const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                          (stop_particles - start_particles).count();
@@ -451,12 +451,7 @@ int main(int argc, char ** argv) {
             << " accuracy=" << accuracy
             << " max_rank=" << max_rank
             << " sample_size=" << sample_size
-            << " compress_alg="
-#ifdef USE_QR_COMPRESSION
-            << "QR"
-#else
-            << "SVD"
-#endif
+            << " compress_alg=" << "ID"
             << " admis=" << admis << std::setw(3)
             << " kernel=" << kernel_name
             << " geometry=" << geom_name

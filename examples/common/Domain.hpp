@@ -20,35 +20,35 @@ namespace Hatrix {
 
 class Domain {
  public:
-  uint64_t N, ndim;
+  int64_t N, ndim;
+  int64_t ncells, tree_height;
   std::vector<Body> bodies;
-  uint64_t ncells, tree_height;
   std::vector<Cell> cells;
 
  private:
-  double get_Xmax(const uint64_t body_start, const uint64_t body_end,
-                  const uint64_t axis) const {
+  double get_Xmax(const int64_t body_start, const int64_t body_end,
+                  const int64_t axis) const {
     assert(axis < ndim);
     double Xmax = bodies[body_start].X[axis];
-    for (uint64_t i = body_start + 1; i <= body_end ; i++) {
+    for (int64_t i = body_start + 1; i <= body_end ; i++) {
       Xmax = std::max(Xmax, bodies[i].X[axis]);
     }
     return Xmax;
   }
 
-  double get_Xmin(const uint64_t body_start, const uint64_t body_end,
-                  const uint64_t axis) const {
+  double get_Xmin(const int64_t body_start, const int64_t body_end,
+                  const int64_t axis) const {
     assert(axis < ndim);
     double Xmin = bodies[body_start].X[axis];
-    for (uint64_t i = body_start + 1; i <= body_end ; i++) {
+    for (int64_t i = body_start + 1; i <= body_end ; i++) {
       Xmin = std::min(Xmin, bodies[i].X[axis]);
     }
     return Xmin;
   }
 
   void orthogonal_recursive_bisection(
-      const uint64_t left, const uint64_t right, const uint64_t leaf_size,
-      const uint64_t level, const uint64_t index) {
+      const int64_t left, const int64_t right, const int64_t leaf_size,
+      const int64_t level, const int64_t index) {
     // Initialize cell
     const auto loc = get_cell_loc(index, level);
     cells[loc].body = left;
@@ -56,8 +56,8 @@ class Domain {
     cells[loc].level = level;
     cells[loc].index = index;
     double radius_max = 0.;
-    uint64_t sort_axis = 0;
-    for (uint64_t axis = 0; axis < ndim; axis++) {
+    int64_t sort_axis = 0;
+    for (int64_t axis = 0; axis < ndim; axis++) {
       const auto Xmin = get_Xmin(left, right - 1, axis);
       const auto Xmax = get_Xmax(left, right - 1, axis);
       const auto diam = Xmax - Xmin;
@@ -132,33 +132,33 @@ class Domain {
   }
 
   // Remove element by value from STL container
-  void erase_by_value(std::vector<uint64_t>& vec, const uint64_t value) {
+  void erase_by_value(std::vector<int64_t>& vec, const int64_t value) {
     vec.erase(std::remove(vec.begin(), vec.end(), value), vec.end());
   }
 
   double dist2(const Body& a, const Body& b) const {
     double dist = 0;
-    for (uint64_t axis = 0; axis < 3; axis++) {
+    for (int64_t axis = 0; axis < 3; axis++) {
       dist += (a.X[axis] - b.X[axis]) *
               (a.X[axis] - b.X[axis]);
     }
     return dist;
   }
 
-  std::vector<int64_t> get_sample_bodies(const std::vector<int64_t>& bodies_loc,
-                                         uint64_t sample_size) const {
-    const uint64_t nbodies = bodies_loc.size();
+  std::vector<int64_t> select_cluster_sample_bodies(
+      const std::vector<int64_t>& bodies_loc, int64_t sample_size) const {
+    const int64_t nbodies = bodies_loc.size();
     sample_size = std::min(nbodies, sample_size);
     // Select sample bodies with Farthest Point Sampling (FPS)
     std::vector<bool> chosen(nbodies, false);
     // Start with the middle as pivot
     auto pivot = nbodies / 2;
     chosen[pivot] = true;
-    for (uint64_t k = 1; k < sample_size; k++) {
+    for (int64_t k = 1; k < sample_size; k++) {
       // Add the farthest body from pivot into sample
       double max_dist2 = -1.;
       int64_t farthest_idx = -1;
-      for (uint64_t i = 0; i < nbodies; i++) {
+      for (int64_t i = 0; i < nbodies; i++) {
         if(!chosen[i]) {
           const double dist2_i = dist2(bodies[bodies_loc[pivot]],
                                        bodies[bodies_loc[i]]);
@@ -173,7 +173,7 @@ class Domain {
     }
     std::vector<int64_t> samples_loc;
     samples_loc.reserve(sample_size);
-    for (uint64_t i = 0; i < nbodies; i++) {
+    for (int64_t i = 0; i < nbodies; i++) {
       if (chosen[i]) {
         samples_loc.push_back(bodies_loc[i]);
       }
@@ -182,22 +182,22 @@ class Domain {
   }
 
  public:
-  Domain(const uint64_t _N, const uint64_t _ndim)
+  Domain(const int64_t _N, const int64_t _ndim)
       : N(_N), ndim(_ndim) {
-    if (ndim < 1 || ndim > 3) {
+    if (ndim < 1 || ndim > MAX_NDIM) {
       std::cout << "invalid ndim : " << ndim << std::endl;
       exit(EXIT_FAILURE);
     }
   }
 
-  uint64_t get_cell_loc(const uint64_t index, const uint64_t level) const {
+  int64_t get_cell_loc(const int64_t index, const int64_t level) const {
     return (1 << level) - 1 + index;
   }
 
-  void build_tree(const uint64_t leaf_size) {
+  void build_tree(const int64_t leaf_size) {
     // Assume balanced binary tree
-    tree_height = (uint64_t)std::log2((double)N / (double)leaf_size);
-    const uint64_t nleaf_cells = (uint64_t)1 << tree_height;
+    tree_height = (int64_t)std::log2((double)N / (double)leaf_size);
+    const int64_t nleaf_cells = (int64_t)1 << tree_height;
     ncells = 2 * nleaf_cells - 1;
     // Initialize empty cells
     cells.resize(ncells);
@@ -215,11 +215,11 @@ class Domain {
     This basically merge 2x2 admissible block into a single upper level admissible block.
   */
   void refine_interactions() {
-    for (uint64_t level = tree_height; level > 0; level--) {
-      const auto level_ncells = (uint64_t)1 << level;
+    for (int64_t level = tree_height; level > 0; level--) {
+      const auto level_ncells = (int64_t)1 << level;
       const auto level_offset = level_ncells - 1;
-      for (uint64_t i = 0; i < level_ncells; i += 2) {
-        for (uint64_t j = i + 2; j < level_ncells; j += 2) {
+      for (int64_t i = 0; i < level_ncells; i += 2) {
+        for (int64_t j = i + 2; j < level_ncells; j += 2) {
           const auto i1 = level_offset + i;
           const auto i2 = level_offset + i + 1;
           const auto j1 = level_offset + j;
@@ -264,19 +264,19 @@ class Domain {
     sort_interaction_lists();
   }
 
-  void select_sample_bodies(const uint64_t sample_bodies_size,
-                            const uint64_t sample_farfield_size) {
+  void select_sample_bodies(const int64_t sample_bodies_size,
+                            const int64_t sample_farfield_size) {
     // Bottom-up pass to select cell's sample bodies
-    for (uint64_t level = tree_height; level > 0; level--) {
-      const auto level_ncells = (uint64_t)1 << level;
+    for (int64_t level = tree_height; level > 0; level--) {
+      const auto level_ncells = (int64_t)1 << level;
       const auto level_offset = level_ncells - 1;
-      for (uint64_t node = 0; node < level_ncells; node++) {
+      for (int64_t node = 0; node < level_ncells; node++) {
         const auto loc = level_offset + node;
         std::vector<int64_t> sample_candidates;
         if (level == tree_height) {
           // Leaf level: candidates are from its bodies
           sample_candidates.assign(cells[loc].nbodies, 0);
-          for (uint64_t i = 0; i < cells[loc].nbodies; i++) {
+          for (int64_t i = 0; i < cells[loc].nbodies; i++) {
             sample_candidates[i] = cells[loc].body + i;
           }
         }
@@ -291,14 +291,14 @@ class Domain {
                                    cells[c2_loc].sample_bodies.begin(),
                                    cells[c2_loc].sample_bodies.end());
         }
-        cells[loc].sample_bodies = get_sample_bodies(sample_candidates, sample_bodies_size);
+        cells[loc].sample_bodies = select_cluster_sample_bodies(sample_candidates, sample_bodies_size);
       }
     }
     // Top-down pass to select cell's farfield sample
-    for (uint64_t level = 1; level <= tree_height; level++) {
-      const auto level_ncells = (uint64_t)1 << level;
+    for (int64_t level = 1; level <= tree_height; level++) {
+      const auto level_ncells = (int64_t)1 << level;
       const auto level_offset = level_ncells - 1;
-      for (uint64_t node = 0; node < level_ncells; node++) {
+      for (int64_t node = 0; node < level_ncells; node++) {
         const auto loc = level_offset + node;
         const auto parent_loc = cells[loc].parent;
         auto farfield = cells[parent_loc].sample_farfield;
@@ -309,7 +309,7 @@ class Domain {
                             cells[far_loc].sample_bodies.begin(),
                             cells[far_loc].sample_bodies.end());
           }
-          cells[loc].sample_farfield = get_sample_bodies(farfield, sample_farfield_size);
+          cells[loc].sample_farfield = select_cluster_sample_bodies(farfield, sample_farfield_size);
         }
       }
     }

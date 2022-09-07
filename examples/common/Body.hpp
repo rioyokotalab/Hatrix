@@ -5,10 +5,12 @@
 
 namespace Hatrix {
 
+constexpr int64_t MAX_NDIM = 3;
+
 class Body {
  public:
   double value;
-  double X[3]; // Position
+  double X[MAX_NDIM];  // Position
 
   Body(const double x, const double _value)
       : value(_value) {
@@ -36,8 +38,8 @@ class Body {
     X[0] = 0;
     X[1] = 0;
     X[2] = 0;
-    const auto ndim = std::min((uint64_t)3, (uint64_t)_X.size());
-    for (uint64_t axis = 0; axis < ndim; axis++) {
+    const auto ndim = std::min(MAX_NDIM, (int64_t)_X.size());
+    for (int64_t axis = 0; axis < ndim; axis++) {
       X[axis] = _X[axis];
     }
   }

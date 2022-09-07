@@ -33,7 +33,7 @@ void set_kernel_function(kernel_func_t _kernel_function) {
 
 double p2p_distance(const Body& source, const Body& target) {
   double r = 0;
-  for (uint64_t axis = 0; axis < 3; axis++) {
+  for (int64_t axis = 0; axis < 3; axis++) {
     r += (source.X[axis] - target.X[axis]) *
          (source.X[axis] - target.X[axis]);
   }
@@ -55,13 +55,13 @@ double yukawa_kernel(const Body& source, const Body& target) {
 Matrix generate_p2p_matrix(const Domain& domain,
                            const std::vector<int64_t>& source,
                            const std::vector<int64_t>& target,
-                           const uint64_t source_offset = 0,
-                           const uint64_t target_offset = 0) {
-  const uint64_t nrows = source.size();
-  const uint64_t ncols = target.size();
+                           const int64_t source_offset = 0,
+                           const int64_t target_offset = 0) {
+  const int64_t nrows = source.size();
+  const int64_t ncols = target.size();
   Matrix out(nrows, ncols);
-  for (uint64_t i = 0; i < nrows; i++) {
-    for (uint64_t j = 0; j < ncols; j++) {
+  for (int64_t i = 0; i < nrows; i++) {
+    for (int64_t j = 0; j < ncols; j++) {
       out(i, j) = kernel_function(domain.bodies[source_offset + source[i]],
                                   domain.bodies[target_offset + target[j]]);
     }
@@ -70,7 +70,7 @@ Matrix generate_p2p_matrix(const Domain& domain,
 }
 
 Matrix generate_p2p_matrix(const Domain& domain,
-                           const uint64_t row, const uint64_t col, const uint64_t level) {
+                           const int64_t row, const int64_t col, const int64_t level) {
   const auto source_loc = domain.get_cell_loc(row, level);
   const auto target_loc = domain.get_cell_loc(col, level);
   const auto& source = domain.cells[source_loc];
@@ -79,10 +79,10 @@ Matrix generate_p2p_matrix(const Domain& domain,
   std::vector<int64_t> source_bodies, target_bodies;
   source_bodies.reserve(source.nbodies);
   target_bodies.reserve(target.nbodies);
-  for (uint64_t i = 0; i < source.nbodies; i++) {
+  for (int64_t i = 0; i < source.nbodies; i++) {
     source_bodies.push_back(source.body + i);
   }
-  for (uint64_t j = 0; j < target.nbodies; j++) {
+  for (int64_t j = 0; j < target.nbodies; j++) {
     target_bodies.push_back(target.body + j);
   }
   return generate_p2p_matrix(domain, source_bodies, target_bodies);
