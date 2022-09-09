@@ -1,3 +1,4 @@
+#include "Hatrix/functions/arithmetics.h"
 #include "Hatrix/functions/math_common.h"
 #include "Hatrix/functions/lapack.h"
 #include "Hatrix/util/matrix_generators.h"
@@ -551,6 +552,62 @@ std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
     pivots(i, 0) = jpvt[i];
   }
   return std::make_tuple(std::move(interp), std::move(pivots));
+}
+
+std::tuple<Matrix, std::vector<int64_t>> truncated_id_row(Matrix& A, int64_t rank) {
+  assert(rank <= A.min_dim());
+  Matrix ATrans = transpose(A);
+  std::vector<double> tau(ATrans.min_dim());
+  std::vector<int> jpvt(ATrans.cols);
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, ATrans.rows, ATrans.cols, &ATrans, ATrans.stride, jpvt.data(), tau.data());
+
+  Matrix U(ATrans.cols, rank);
+  solve_r_block(U, ATrans, rank);
+  std::vector<int64_t> skel_rows(jpvt.size()), U_rows(jpvt.size());
+  for (int64_t i = 0; i < skel_rows.size(); i++) {
+    skel_rows[i] = jpvt[i] - 1;
+    U_rows[skel_rows[i]] = i;
+  }
+  // Permute rows of U
+  Matrix PU(U.rows, U.cols);
+  for (int64_t i = 0; i < PU.rows; i++) {
+    const auto row = U_rows[i];
+    for (int64_t j = 0; j < PU.cols; j++) {
+      PU(i, j) = U(row, j);
+    }
+  }
+  return std::make_tuple(std::move(PU), std::move(skel_rows));
+}
+
+std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double error) {
+  Matrix ATrans = transpose(A);
+  int64_t min_dim = ATrans.min_dim();
+  std::vector<double> tau(min_dim);
+  std::vector<int> jpvt(ATrans.cols);
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, ATrans.rows, ATrans.cols, &ATrans, ATrans.stride, jpvt.data(), tau.data());
+
+  // Find truncation rank based on specified tolerance
+  int64_t rank = 1;
+  while(rank < min_dim && std::abs(ATrans(rank, rank)) > error) {
+    rank++;
+  }
+
+  Matrix U(ATrans.cols, rank);
+  solve_r_block(U, ATrans, rank);
+  std::vector<int64_t> skel_rows(jpvt.size()), U_rows(jpvt.size());
+  for (int64_t i = 0; i < skel_rows.size(); i++) {
+    skel_rows[i] = jpvt[i] - 1;
+    U_rows[skel_rows[i]] = i;
+  }
+  // Permute rows of U
+  Matrix PU(U.rows, U.cols);
+  for (int64_t i = 0; i < PU.rows; i++) {
+    const auto row = U_rows[i];
+    for (int64_t j = 0; j < PU.cols; j++) {
+      PU(i, j) = U(row, j);
+    }
+  }
+  return std::make_tuple(std::move(PU), std::move(skel_rows));
 }
 
 std::vector<double> get_eigenvalues(const Matrix& A) {
