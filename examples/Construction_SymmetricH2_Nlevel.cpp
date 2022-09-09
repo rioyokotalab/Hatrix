@@ -411,7 +411,6 @@ int main(int argc, char ** argv) {
     }
   }
 
-  const auto start_particles = std::chrono::system_clock::now();
   Hatrix::Domain domain(N, ndim);
   std::string geom_name = std::to_string(ndim) + "d-";
   switch (geom_type) {
@@ -437,10 +436,11 @@ int main(int argc, char ** argv) {
   }
   domain.build_tree(leaf_size);
   domain.build_interactions(admis);
-  domain.select_sample_bodies(sample_size, sample_size + 10);
-  const auto stop_particles = std::chrono::system_clock::now();
-  const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                         (stop_particles - start_particles).count();
+  const auto start_sample = std::chrono::system_clock::now();
+  domain.select_sample_bodies(2 * leaf_size, sample_size, 2);
+  const auto stop_sample = std::chrono::system_clock::now();
+  const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                             (stop_sample - start_sample).count();
 
   const auto start_construct = std::chrono::system_clock::now();
   Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, max_rank, admis);
@@ -463,7 +463,7 @@ int main(int argc, char ** argv) {
             << " LR%=" << lr_ratio * 100 << "%"
             << " construct_min_rank=" << A.get_basis_min_rank()
             << " construct_max_rank=" << A.get_basis_max_rank()
-            << " particle_time=" << particle_construct_time
+            << " sample_time=" << sample_time
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error
             << std::endl;

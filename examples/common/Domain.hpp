@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -163,7 +164,24 @@ class Domain {
         }
         break;
       }
-      case 1: {  // Farthest Point Sampling (FPS)
+      case 1: {  // Random sampling
+        static std::mt19937 g(0);  // Use fixed seed for reproducibility
+        std::vector<int64_t> random_indices(nbodies, 0);
+        for (int64_t i = 0; i < nbodies; i++) {
+          random_indices[i] = i;
+        }
+        // Random shuffle 3 times
+        for (int64_t i = 0; i < 3; i++) {
+          std::shuffle(random_indices.begin(), random_indices.end(), g);
+        }
+        // Choose sample based on random indices
+        for (int64_t i = 0; i < sample_size; i++) {
+          const auto ridx = random_indices[i];
+          samples_loc.push_back(bodies_loc[ridx]);
+        }
+        break;
+      }
+      case 2: {  // Farthest Point Sampling (FPS)
         std::vector<bool> chosen(nbodies, false);
         // Start with the middle as pivot
         auto pivot = nbodies / 2;
@@ -281,7 +299,7 @@ class Domain {
 
   void select_sample_bodies(const int64_t sample_bodies_size,
                             const int64_t sample_farfield_size,
-                            const int64_t sampling_alg = 1) {
+                            const int64_t sampling_alg = 0) {
     // Bottom-up pass to select cell's sample bodies
     for (int64_t level = tree_height; level > 0; level--) {
       const auto level_ncells = (int64_t)1 << level;
