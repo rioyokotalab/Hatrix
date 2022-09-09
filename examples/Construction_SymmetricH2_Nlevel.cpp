@@ -144,11 +144,16 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         }
         Matrix adm_block_row =
             generate_admissible_block_row(domain, node, level,node_rows);
-        Matrix Ui;
+        // SVD to get column basis
+        Matrix Ui, Si, Vi;
+        int64_t rank;
+        std::tie(Ui, Si, Vi, rank) = error_svd(adm_block_row, ID_tolerance, false, true);
+        // ID to get skeleton rows
+        Matrix UxS = matmul(Ui, Si);
+        Matrix U_node;
         std::vector<int64_t> skel_rows;
-        std::tie(Ui, skel_rows) = error_id_row(adm_block_row, ID_tolerance);
-        int64_t rank = Ui.cols;
-        // Convert local row indices to global skeleton indices
+        std::tie(U_node, skel_rows) = truncated_id_row(UxS, rank);
+        // Construct global skeleton row indices
         std::vector<int64_t> skel_node;
         skel_node.reserve(rank);
         for (int64_t i = 0; i < rank; i++) {
@@ -159,16 +164,16 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
           const auto child_level = level + 1;
           const auto child1 = node * 2;
           const auto child2 = node * 2 + 1;
-          auto Ui_splits = Ui.split(vec{U(child1, child_level).cols}, vec{});
-          triangular_matmul(R_row(child1, child_level), Ui_splits[0],
+          auto U_node_splits = U_node.split(vec{U(child1, child_level).cols}, vec{});
+          triangular_matmul(R_row(child1, child_level), U_node_splits[0],
                             Hatrix::Left, Hatrix::Upper, false, false, 1);
-          triangular_matmul(R_row(child2, child_level), Ui_splits[1],
+          triangular_matmul(R_row(child2, child_level), U_node_splits[1],
                             Hatrix::Left, Hatrix::Upper, false, false, 1);
         }
         // Orthogonalize basis
-        Matrix Q(Ui.rows, Ui.cols);
-        Matrix R(Ui.cols, Ui.cols);
-        qr(Ui, Q, R);
+        Matrix Q(U_node.rows, U_node.cols);
+        Matrix R(U_node.cols, U_node.cols);
+        qr(U_node, Q, R);
         U.insert(node, level, std::move(Q));
         R_row.insert(node, level, std::move(R));
         skeleton_rows.insert(node, level, std::move(skel_node));
