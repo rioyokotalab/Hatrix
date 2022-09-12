@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <limits>
 #include <random>
 #include <string>
 #include <vector>
@@ -140,7 +141,7 @@ class Domain {
   // Compute squared euclidean distance between two bodies
   double dist2(const Body& a, const Body& b) const {
     double dist = 0;
-    for (int64_t axis = 0; axis < 3; axis++) {
+    for (int64_t axis = 0; axis < ndim; axis++) {
       dist += (a.X[axis] - b.X[axis]) *
               (a.X[axis] - b.X[axis]);
     }
@@ -184,8 +185,36 @@ class Domain {
       }
       case 2: {  // Farthest Point Sampling (FPS)
         std::vector<bool> chosen(nbodies, false);
-        // Start with the middle as pivot
-        auto pivot = nbodies / 2;
+        // Find center coordinates
+        double Xmax[MAX_NDIM], Xmin[MAX_NDIM];
+        for (int64_t axis = 0; axis < ndim; axis++) {
+          Xmin[axis] = bodies[bodies_loc[0]].X[axis];
+          Xmax[axis] = bodies[bodies_loc[0]].X[axis];
+        }
+        for (int64_t i = 1; i < nbodies; i++) {
+          for (int64_t axis = 0; axis < ndim; axis++) {
+            Xmin[axis] = std::min(Xmin[axis], bodies[bodies_loc[i]].X[axis]);
+            Xmax[axis] = std::max(Xmax[axis], bodies[bodies_loc[i]].X[axis]);
+          }
+        }
+        double center[MAX_NDIM];
+        for (int64_t axis = 0; axis < ndim; axis++) {
+          center[axis] = (Xmax[axis] - Xmin[axis]) / 2.;
+        }
+        // Start with point closest to the center as pivot
+        int64_t pivot = -1;
+        double min_dist2 = std::numeric_limits<double>::max();
+        for (int64_t i = 0; i < nbodies; i++) {
+          double dist2_i = 0;
+          for (int64_t axis = 0; axis < ndim; axis++) {
+            dist2_i += (bodies[bodies_loc[i]].X[axis] - center[axis]) *
+                       (bodies[bodies_loc[i]].X[axis] - center[axis]);
+          }
+          if (dist2_i < min_dist2) {
+            min_dist2 = dist2_i;
+            pivot = i;
+          }
+        }
         chosen[pivot] = true;
         for (int64_t k = 1; k < sample_size; k++) {
           // Add the farthest body from pivot into sample
