@@ -367,20 +367,26 @@ int main(int argc, char ** argv) {
   const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-5;
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
-  const int64_t sample_size = argc > 5 ? atol(argv[5]) : 100;
-  const double admis = argc > 6 ? atof(argv[6]) : 1.0;
+  const double admis = argc > 5 ? atof(argv[5]) : 1.0;
+  const int64_t sample_size = argc > 6 ? atol(argv[6]) : 100;
+
+  // Specify bodies sampling technique
+  // 0: Choose bodies with equally spaced indices
+  // 1: Choose bodies random indices
+  // 2: Farthest Point Sampling
+  const int64_t sampling_alg = argc > 7 ? atol(argv[7]) : 0;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
-  const int64_t kernel_type = argc > 7 ? atol(argv[7]) : 0;
+  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
   // 1: Unit Cubical
   // 2: StarsH Uniform Grid
-  const int64_t geom_type = argc > 8 ? atol(argv[8]) : 0;
-  const int64_t ndim  = argc > 9 ? atol(argv[9]) : 2;
+  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
+  const int64_t ndim  = argc > 10 ? atol(argv[10]) : 2;
 
   Hatrix::Context::init();
 
@@ -426,10 +432,26 @@ int main(int argc, char ** argv) {
       geom_name += "circular_mesh";
     }
   }
+  std::string sampling_alg_name = "";
+  switch (sampling_alg) {
+    case 0: {
+      sampling_alg_name = "equally_spaced_indices";
+      break;
+    }
+    case 1: {
+      sampling_alg_name = "random_indices";
+      break;
+    }
+    case 2: {
+      sampling_alg_name = "farthest_point_sampling";
+      break;
+    }
+  }
+
   domain.build_tree(leaf_size);
   domain.build_interactions(admis);
   const auto start_sample = std::chrono::system_clock::now();
-  domain.select_sample_bodies(leaf_size, sample_size, 2);
+  domain.select_sample_bodies(leaf_size, sample_size, sampling_alg);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();
@@ -446,9 +468,10 @@ int main(int argc, char ** argv) {
             << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
             << " max_rank=" << max_rank
-            << " sample_size=" << sample_size
-            << " compress_alg=" << "ID"
             << " admis=" << admis << std::setw(3)
+            << " sample_size=" << sample_size
+            << " sampling_alg=" << sampling_alg_name
+            << " compress_alg=" << "ID"
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
             << " height=" << A.height
