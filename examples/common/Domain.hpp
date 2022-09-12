@@ -137,6 +137,7 @@ class Domain {
     vec.erase(std::remove(vec.begin(), vec.end(), value), vec.end());
   }
 
+  // Compute squared euclidean distance between two bodies
   double dist2(const Body& a, const Body& b) const {
     double dist = 0;
     for (int64_t axis = 0; axis < 3; axis++) {
@@ -305,29 +306,26 @@ class Domain {
       const auto level_ncells = (int64_t)1 << level;
       const auto level_offset = level_ncells - 1;
       for (int64_t node = 0; node < level_ncells; node++) {
-        const auto loc = level_offset + node;
+        auto& cell = cells[level_offset + node];
         std::vector<int64_t> sample_candidates;
         if (level == tree_height) {
           // Leaf level: candidates are from its bodies
-          sample_candidates.assign(cells[loc].nbodies, 0);
-          for (int64_t i = 0; i < cells[loc].nbodies; i++) {
-            sample_candidates[i] = cells[loc].body + i;
-          }
+          sample_candidates = cell.get_bodies();
         }
         else {
           // Non-leaf level: candidates are from children's samples
-          const auto c1_loc = cells[loc].child;
-          const auto c2_loc = cells[loc].child + 1;
+          const auto& child1 = cells[cell.child];
+          const auto& child2 = cells[cell.child + 1];
           sample_candidates.insert(sample_candidates.end(),
-                                   cells[c1_loc].sample_bodies.begin(),
-                                   cells[c1_loc].sample_bodies.end());
+                                   child1.sample_bodies.begin(),
+                                   child1.sample_bodies.end());
           sample_candidates.insert(sample_candidates.end(),
-                                   cells[c2_loc].sample_bodies.begin(),
-                                   cells[c2_loc].sample_bodies.end());
+                                   child2.sample_bodies.begin(),
+                                   child2.sample_bodies.end());
         }
-        cells[loc].sample_bodies = select_cluster_sample_bodies(sample_candidates,
-                                                                sample_bodies_size,
-                                                                sampling_alg);
+        cell.sample_bodies = select_cluster_sample_bodies(sample_candidates,
+                                                          sample_bodies_size,
+                                                          sampling_alg);
       }
     }
     // Top-down pass to select cell's farfield sample
@@ -335,19 +333,19 @@ class Domain {
       const auto level_ncells = (int64_t)1 << level;
       const auto level_offset = level_ncells - 1;
       for (int64_t node = 0; node < level_ncells; node++) {
-        const auto loc = level_offset + node;
-        const auto parent_loc = cells[loc].parent;
-        auto farfield = cells[parent_loc].sample_farfield;
-        if (farfield.size() > 0 || cells[loc].far_list.size() > 0) {
+        auto& cell = cells[level_offset + node];
+        const auto& parent = cells[cell.parent];
+        if (cell.far_list.size() > 0 || parent.sample_farfield.size() > 0) {
           // If node has non-empty farfield
-          for (auto far_loc: cells[loc].far_list) {
+          auto farfield = parent.sample_farfield;
+          for (auto far_loc: cell.far_list) {
             farfield.insert(farfield.end(),
                             cells[far_loc].sample_bodies.begin(),
                             cells[far_loc].sample_bodies.end());
           }
-          cells[loc].sample_farfield = select_cluster_sample_bodies(farfield,
-                                                                    sample_farfield_size,
-                                                                    sampling_alg);
+          cell.sample_farfield = select_cluster_sample_bodies(farfield,
+                                                              sample_farfield_size,
+                                                              sampling_alg);
         }
       }
     }

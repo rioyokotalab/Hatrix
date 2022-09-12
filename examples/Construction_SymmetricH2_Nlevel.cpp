@@ -143,7 +143,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
           }
         }
         Matrix adm_block_row =
-            generate_admissible_block_row(domain, node, level,node_rows);
+            generate_admissible_block_row(domain, node, level, node_rows);
         // SVD to get column basis
         Matrix Ui, Si, Vi;
         int64_t rank;
@@ -153,7 +153,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         Matrix U_node;
         std::vector<int64_t> skel_rows;
         std::tie(U_node, skel_rows) = truncated_id_row(UxS, rank);
-        // Construct global skeleton row indices
+        // Construct local skeleton row indices within node
         std::vector<int64_t> skel_node;
         skel_node.reserve(rank);
         for (int64_t i = 0; i < rank; i++) {
@@ -170,7 +170,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
           triangular_matmul(R_row(child2, child_level), U_node_splits[1],
                             Hatrix::Left, Hatrix::Upper, false, false, 1);
         }
-        // Orthogonalize basis
+        // Orthogonalize basis with QR
         Matrix Q(U_node.rows, U_node.cols);
         Matrix R(U_node.cols, U_node.cols);
         qr(U_node, Q, R);
@@ -239,7 +239,7 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       max_rank(max_rank), admis(admis) {
   // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  ID_tolerance = accuracy * 1e-2;
+  ID_tolerance = accuracy * 1e-4;
   initialize_geometry_admissibility(domain);
   generate_row_cluster_basis(domain);
   generate_coupling_matrices(domain);
@@ -429,7 +429,7 @@ int main(int argc, char ** argv) {
   domain.build_tree(leaf_size);
   domain.build_interactions(admis);
   const auto start_sample = std::chrono::system_clock::now();
-  domain.select_sample_bodies(2 * leaf_size, sample_size, 2);
+  domain.select_sample_bodies(leaf_size, sample_size, 2);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();

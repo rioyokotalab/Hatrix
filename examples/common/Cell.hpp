@@ -56,6 +56,15 @@ class Cell {
     }
     return dist;
   }
+
+  std::vector<int64_t> get_bodies() const {
+    std::vector<int64_t> bodies;
+    bodies.reserve(nbodies);
+    for (int64_t i = 0; i < nbodies; i++) {
+      bodies.push_back(body + i);
+    }
+    return bodies;
+  }
 };
 
 } // namespace Hatrix
