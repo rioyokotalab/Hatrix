@@ -28,16 +28,14 @@ class Domain {
   std::vector<Cell> cells;
 
  private:
-  double get_Xmax(const int64_t body_start, const int64_t body_end,
-                  const int64_t axis) const {
+  double get_Xmin(const std::vector<int64_t>& loc, const int64_t axis) const {
     assert(axis < ndim);
-    double Xmax = bodies[body_start].X[axis];
-    for (int64_t i = body_start + 1; i <= body_end ; i++) {
-      Xmax = std::max(Xmax, bodies[i].X[axis]);
+    double Xmin = bodies[loc[0]].X[axis];
+    for (int64_t i = 1; i < loc.size(); i++) {
+      Xmin = std::min(Xmin, bodies[loc[i]].X[axis]);
     }
-    return Xmax;
+    return Xmin;
   }
-
   double get_Xmin(const int64_t body_start, const int64_t body_end,
                   const int64_t axis) const {
     assert(axis < ndim);
@@ -46,6 +44,24 @@ class Domain {
       Xmin = std::min(Xmin, bodies[i].X[axis]);
     }
     return Xmin;
+  }
+
+  double get_Xmax(const std::vector<int64_t>& loc, const int64_t axis) const {
+    assert(axis < ndim);
+    double Xmax = bodies[loc[0]].X[axis];
+    for (int64_t i = 1; i < loc.size(); i++) {
+      Xmax = std::max(Xmax, bodies[loc[i]].X[axis]);
+    }
+    return Xmax;
+  }
+  double get_Xmax(const int64_t body_start, const int64_t body_end,
+                  const int64_t axis) const {
+    assert(axis < ndim);
+    double Xmax = bodies[body_start].X[axis];
+    for (int64_t i = body_start + 1; i <= body_end ; i++) {
+      Xmax = std::max(Xmax, bodies[i].X[axis]);
+    }
+    return Xmax;
   }
 
   void orthogonal_recursive_bisection(
@@ -138,14 +154,121 @@ class Domain {
     vec.erase(std::remove(vec.begin(), vec.end(), value), vec.end());
   }
 
-  // Compute squared euclidean distance between two bodies
-  double dist2(const Body& a, const Body& b) const {
+  // Compute squared euclidean distance between two coordinates
+  double dist2(const double* a_X, const double* b_X) const {
     double dist = 0;
     for (int64_t axis = 0; axis < ndim; axis++) {
-      dist += (a.X[axis] - b.X[axis]) *
-              (a.X[axis] - b.X[axis]);
+      dist += (a_X[axis] - b_X[axis]) *
+              (a_X[axis] - b_X[axis]);
     }
     return dist;
+  }
+
+  // Taken from: H2Pack GitHub
+  // Decompose an integer into the sum of multiple integers which are approximately proportional
+  // to another floating point array.
+  // Input parameters:
+  //   nelem      : Number of integers after decomposition
+  //   decomp_sum : The target number to be decomposed
+  //   prop       : Floating point array as the proportions
+  // Output parameter:
+  //   decomp : Decomposed values, decomp[i] ~= prop[i] / sum(prop[0:nelem-1]) * decomp_sum
+  // Return value: product(decomp[0:nelem-1])
+  int64_t proportional_int_decompose(const int64_t nelem, const int64_t decomp_sum,
+                                     const double* prop, int64_t* decomp) const {
+    double sum_prop = 0.0;
+    for (int64_t i = 0; i < nelem; i++) {
+      sum_prop += prop[i];
+    }
+    std::vector<double> decomp_prop(nelem, 0);
+    int decomp_sum0 = 0;
+    for (int64_t i = 0; i < nelem; i++) {
+      decomp_prop[i] = (double)decomp_sum * prop[i] / sum_prop;
+      decomp[i] = (int64_t)std::floor(decomp_prop[i]);
+      decomp_sum0 += decomp[i];
+    }
+    for (int64_t k = decomp_sum0; k < decomp_sum; k++) {
+      // Add 1 to the position that got hit most by floor
+      int64_t min_idx = 0;
+      double max_diff = decomp_prop[0] - (double)decomp[0];
+      for (int64_t i = 1; i < nelem; i++) {
+        const auto diff = decomp_prop[i] - (double)decomp[i];
+        if (diff > max_diff) {
+          max_diff = diff;
+          min_idx = i;
+        }
+      }
+      decomp[min_idx]++;
+    }
+    int64_t prod1 = 1;
+    for (int64_t i = 0; i < nelem; i++) prod1 *= (decomp[i] + 1);
+    return prod1;
+  }
+
+  // Source: https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c
+  std::vector<Body> build_anchor_grid(const int64_t pt_dim,
+                                      const double coord_min[MAX_NDIM],
+                                      const double coord_max[MAX_NDIM],
+                                      const double enbox_size[MAX_NDIM],
+                                      const int64_t grid_size[MAX_NDIM],
+                                      const int64_t grid_algo = 0) const {
+    int64_t max_grid_size = 0;
+    int64_t anchor_npt = 1;
+    for (int64_t i = 0; i < pt_dim; i++) {
+      max_grid_size = (grid_size[i] > max_grid_size) ? grid_size[i] : max_grid_size;
+      anchor_npt *= (grid_size[i] + 1);
+    }
+    max_grid_size++;
+
+    // 1. Assign anchor points in each dimension
+    std::vector<double> anchor_dim(pt_dim * max_grid_size);
+    for (int64_t i = 0; i < pt_dim; i++) {
+      if (grid_size[i] == 0) {
+        const auto offset_i = i * max_grid_size;
+        anchor_dim[offset_i] = (coord_min[i] + coord_max[i]) * 0.5;
+      }
+    }
+    if (grid_algo == 0) {  // Default
+      const double c0 = 1.0;
+      const double c1 = 0.5;
+      const double c2 = 0.25;
+      for (int64_t i = 0; i < pt_dim; i++) {
+        const auto size_i = c0 * enbox_size[i] / ((double)grid_size[i] + c1);
+        const auto offset_i = i * max_grid_size;
+        for (int64_t j = 0; j <= grid_size[i]; j++) {
+          anchor_dim[offset_i + j] = coord_min[i] + c2 * size_i + size_i * (double)j;
+        }
+      }
+    }
+    else {  // Chebyshev anchor points
+      for (int64_t i = 0; i < pt_dim; i++) {
+        if (grid_size[i] == 0) continue;
+        const auto offset_i = i * max_grid_size;
+        const auto s0 = 0.5 * (coord_max[i] + coord_min[i]);
+        const auto s1 = 0.5 * (coord_max[i] - coord_min[i]);
+        const auto s2 = M_PI / (2.0 * (double)grid_size[i] + 2);
+        for (int64_t j = 0; j <= grid_size[i]; j++) {
+          const double v0 = 2.0 * (double)j + 1.0;
+          const double v1 = std::cos(v0 * s2);
+          anchor_dim[offset_i + j] = s0 + s1 * v1;
+        }
+      }
+    }
+    // 2. Do a tensor product to get all anchor points
+    std::vector<Body> anchor_coord;
+    anchor_coord.resize(anchor_npt);
+    int64_t stride[MAX_NDIM + 1];
+    stride[0] = 1;
+    for (int64_t i = 0; i < pt_dim; i++) {
+      stride[i + 1] = stride[i] * (grid_size[i] + 1);
+    }
+    for (int64_t i = 0; i < anchor_npt; i++) {
+      for (int64_t j = 0; j < pt_dim; j++) {
+        const int64_t dim_idx = (i / stride[j]) % (grid_size[j] + 1);
+        anchor_coord[i].X[j] = anchor_dim[j * max_grid_size + dim_idx];
+      }
+    }
+    return anchor_coord;
   }
 
   std::vector<int64_t> select_cluster_sample_bodies(
@@ -185,31 +308,18 @@ class Domain {
       }
       case 2: {  // Farthest Point Sampling (FPS)
         std::vector<bool> chosen(nbodies, false);
-        // Find center coordinates
-        double Xmax[MAX_NDIM], Xmin[MAX_NDIM];
-        for (int64_t axis = 0; axis < ndim; axis++) {
-          Xmin[axis] = bodies[bodies_loc[0]].X[axis];
-          Xmax[axis] = bodies[bodies_loc[0]].X[axis];
-        }
-        for (int64_t i = 1; i < nbodies; i++) {
-          for (int64_t axis = 0; axis < ndim; axis++) {
-            Xmin[axis] = std::min(Xmin[axis], bodies[bodies_loc[i]].X[axis]);
-            Xmax[axis] = std::max(Xmax[axis], bodies[bodies_loc[i]].X[axis]);
-          }
-        }
+        // Find center of enclosing box
         double center[MAX_NDIM];
         for (int64_t axis = 0; axis < ndim; axis++) {
-          center[axis] = (Xmax[axis] - Xmin[axis]) / 2.;
+          const auto Xmin = get_Xmin(bodies_loc, axis);
+          const auto Xmax = get_Xmax(bodies_loc, axis);
+          center[axis] = (Xmax + Xmin) / 2.;
         }
         // Start with point closest to the center as pivot
         int64_t pivot = -1;
         double min_dist2 = std::numeric_limits<double>::max();
         for (int64_t i = 0; i < nbodies; i++) {
-          double dist2_i = 0;
-          for (int64_t axis = 0; axis < ndim; axis++) {
-            dist2_i += (bodies[bodies_loc[i]].X[axis] - center[axis]) *
-                       (bodies[bodies_loc[i]].X[axis] - center[axis]);
-          }
+          const auto dist2_i = dist2(center, bodies[bodies_loc[i]].X);
           if (dist2_i < min_dist2) {
             min_dist2 = dist2_i;
             pivot = i;
@@ -222,8 +332,8 @@ class Domain {
           int64_t farthest_idx = -1;
           for (int64_t i = 0; i < nbodies; i++) {
             if(!chosen[i]) {
-              const double dist2_i = dist2(bodies[bodies_loc[pivot]],
-                                           bodies[bodies_loc[i]]);
+              const auto dist2_i = dist2(bodies[bodies_loc[pivot]].X,
+                                         bodies[bodies_loc[i]].X);
               if (dist2_i > max_dist2) {
                 max_dist2 = dist2_i;
                 farthest_idx = i;
@@ -237,6 +347,42 @@ class Domain {
           if (chosen[i]) {
             samples_loc.push_back(bodies_loc[i]);
           }
+        }
+        break;
+      }
+      case 3: {  // Anchor Net Method
+        double Xmax[MAX_NDIM], Xmin[MAX_NDIM], diameter[MAX_NDIM];
+        for (int64_t axis = 0; axis < ndim; axis++) {
+          Xmin[axis] = get_Xmin(bodies_loc, axis);
+          Xmax[axis] = get_Xmax(bodies_loc, axis);
+          diameter[axis] = Xmax[axis] - Xmin[axis];
+        }
+        int64_t grid_size[MAX_NDIM];
+        const auto anchor_npt = proportional_int_decompose(ndim, sample_size, diameter, grid_size);
+        if (anchor_npt < nbodies) {
+          const auto anchor_bodies = build_anchor_grid(ndim, Xmin, Xmax, diameter, grid_size, 0);
+          assert(anchor_npt == anchor_bodies.size());
+          std::vector<bool> chosen(nbodies, false);
+          for (int64_t i = 0; i < anchor_npt; i++) {
+            int64_t min_idx = -1;
+            double min_dist2 = std::numeric_limits<double>::max();
+            for (int64_t j = 0; j < nbodies; j++) {
+              const auto dist2_ij = dist2(anchor_bodies[i].X, bodies[bodies_loc[j]].X);
+              if (dist2_ij < min_dist2) {
+                min_dist2 = dist2_ij;
+                min_idx = j;
+              }
+            }
+            chosen[min_idx] = true;
+          }
+          for (int64_t i = 0; i < nbodies; i++) {
+            if (chosen[i]) {
+              samples_loc.push_back(bodies_loc[i]);
+            }
+          }
+        }
+        else {
+          samples_loc = bodies_loc;
         }
         break;
       }

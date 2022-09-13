@@ -12,6 +12,12 @@ class Body {
   double value;
   double X[MAX_NDIM];  // Position
 
+  Body() {
+    for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
+      X[axis] = 0;
+    }
+  }
+
   Body(const double x, const double _value)
       : value(_value) {
     X[0] = x;
