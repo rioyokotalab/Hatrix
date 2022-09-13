@@ -364,8 +364,8 @@ int main(int argc, char ** argv) {
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-5;
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
   const double admis = argc > 5 ? atof(argv[5]) : 1.0;
-  const int64_t sample_self_size = argc > 6 ? atol(argv[6]) : 2 * leaf_size;
-  const int64_t sample_far_size = argc > 7 ? atol(argv[7]) : 10 * sample_self_size;
+  int64_t sample_self_size = argc > 6 ? atol(argv[6]) : 2 * leaf_size;
+  int64_t sample_far_size = argc > 7 ? atol(argv[7]) : 10 * sample_self_size;
 
   // Specify bodies sampling technique
   // 0: Choose bodies with equally spaced indices
@@ -471,8 +471,7 @@ int main(int argc, char ** argv) {
             << " accuracy=" << accuracy
             << " max_rank=" << max_rank
             << " admis=" << admis << std::setw(3)
-            << " sample_self_size=" << sample_self_size
-            << " sample_far_size=" << sample_far_size
+            << " sample_size=" << domain.get_max_farfield_size()
             << " sampling_alg=" << sampling_alg_name
             << " compress_alg=" << "ID"
             << " kernel=" << kernel_name

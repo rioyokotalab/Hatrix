@@ -527,6 +527,15 @@ class Domain {
     }
   }
 
+  int64_t get_max_farfield_size() const {
+    int64_t max_farfield_size = 0;
+    for (int64_t loc = 0; loc < ncells; loc++) {
+      const auto& cell = cells[loc];
+      max_farfield_size = std::max(max_farfield_size, (int64_t)cell.sample_farfield.size());
+    }
+    return max_farfield_size;
+  }
+
   void initialize_unit_circular_mesh() {
     if (ndim == 2) {
       // Generate a unit circle with N points on the circumference.
