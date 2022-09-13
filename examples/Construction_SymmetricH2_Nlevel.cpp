@@ -364,25 +364,27 @@ int main(int argc, char ** argv) {
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-5;
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
   const double admis = argc > 5 ? atof(argv[5]) : 1.0;
-  const int64_t sample_size = argc > 6 ? atol(argv[6]) : 100;
+  const int64_t sample_self_size = argc > 6 ? atol(argv[6]) : 2 * leaf_size;
+  const int64_t sample_far_size = argc > 7 ? atol(argv[7]) : 10 * sample_self_size;
 
   // Specify bodies sampling technique
   // 0: Choose bodies with equally spaced indices
   // 1: Choose bodies random indices
   // 2: Farthest Point Sampling
-  const int64_t sampling_alg = argc > 7 ? atol(argv[7]) : 0;
+  // 3: Anchor Net
+  const int64_t sampling_alg = argc > 8 ? atol(argv[8]) : 0;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
-  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
+  const int64_t kernel_type = argc > 9 ? atol(argv[9]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
   // 1: Unit Cubical
   // 2: StarsH Uniform Grid
-  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
-  const int64_t ndim  = argc > 10 ? atol(argv[10]) : 2;
+  const int64_t geom_type = argc > 10 ? atol(argv[10]) : 0;
+  const int64_t ndim  = argc > 11 ? atol(argv[11]) : 2;
 
   Hatrix::Context::init();
 
@@ -451,8 +453,6 @@ int main(int argc, char ** argv) {
   domain.build_tree(leaf_size);
   domain.build_interactions(admis);
   const auto start_sample = std::chrono::system_clock::now();
-  const auto sample_self_size = sample_size;
-  const auto sample_far_size = sample_size;
   domain.select_sample_bodies(sample_self_size, sample_far_size, sampling_alg);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
@@ -471,7 +471,8 @@ int main(int argc, char ** argv) {
             << " accuracy=" << accuracy
             << " max_rank=" << max_rank
             << " admis=" << admis << std::setw(3)
-            << " sample_size=" << sample_size
+            << " sample_self_size=" << sample_self_size
+            << " sample_far_size=" << sample_far_size
             << " sampling_alg=" << sampling_alg_name
             << " compress_alg=" << "ID"
             << " kernel=" << kernel_name
