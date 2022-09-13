@@ -32,7 +32,7 @@ class SymmetricH2 {
   int64_t max_rank;
   double admis;
   int64_t height;
-  RowLevelMap U, R_row;
+  RowLevelMap U;
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
   std::vector<int64_t> level_blocks;
@@ -44,9 +44,6 @@ class SymmetricH2 {
   int64_t get_block_size(const Domain& domain, const int64_t node, const int64_t level) const;
   bool row_has_admissible_blocks(const int64_t row, const int64_t level) const;
 
-  Matrix generate_admissible_block_row(const Domain& domain,
-                                       const int64_t node, const int64_t level,
-                                       const std::vector<int64_t>& node_rows) const;
   void generate_row_cluster_basis(const Domain& domain);
   void generate_coupling_matrices(const Domain& domain);
 
@@ -102,77 +99,41 @@ bool SymmetricH2::row_has_admissible_blocks(const int64_t row, const int64_t lev
   return has_admis;
 }
 
-Matrix SymmetricH2::generate_admissible_block_row(const Domain& domain,
-                                                  const int64_t node, const int64_t level,
-                                                  const std::vector<int64_t>& node_rows) const {
-  const auto loc = domain.get_cell_loc(node, level);
-  const auto& source = domain.cells[loc];
-  return generate_p2p_matrix(domain, node_rows, source.sample_farfield,
-                             source.body, 0);
-}
-
 void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
   for (int64_t level = height; level > 0; level--) {
     const auto num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
       if (row_has_admissible_blocks(node, level)) {
-        std::vector<int64_t> node_rows;
+        const auto loc = domain.get_cell_loc(node, level);
+        const auto& cell = domain.cells[loc];
+        std::vector<int64_t> skeleton;
         if (level == height) {
           // Leaf level: use all bodies as skeleton
-          const auto block_size = get_block_size(domain, node, level);
-          node_rows.reserve(block_size);
-          for (int64_t i = 0; i < block_size; i++) {
-            node_rows.push_back(i);
-          }
+          skeleton = cell.get_bodies();
         }
         else {
-          // Non-leaf level: concat children's skeleton
-          const auto child_level = level + 1;
-          const auto child1 = node * 2;
-          const auto child2 = node * 2 + 1;
-          const auto& child1_skeleton = skeleton_rows(child1, child_level);
-          const auto& child2_skeleton = skeleton_rows(child2, child_level);
-          node_rows.reserve(child1_skeleton.size() +
-                            child2_skeleton.size());
-          for (int64_t i = 0; i < child1_skeleton.size(); i++) {
-            node_rows.push_back(child1_skeleton[i]);
-          }
-          const auto offset = get_block_size(domain, child1, child_level);
-          for (int64_t i = 0; i < child2_skeleton.size(); i++) {
-            node_rows.push_back(offset + child2_skeleton[i]);
-          }
+          // Non-leaf level: gather children's skeleton
+          const auto& child1 = domain.cells[cell.child];
+          const auto& child2 = domain.cells[cell.child + 1];
+          const auto& child1_skeleton = skeleton_rows(child1.index, child1.level);
+          const auto& child2_skeleton = skeleton_rows(child2.index, child2.level);
+          skeleton.insert(skeleton.end(), child1_skeleton.begin(), child1_skeleton.end());
+          skeleton.insert(skeleton.end(), child2_skeleton.begin(), child2_skeleton.end());
         }
-        Matrix adm_block_row =
-            generate_admissible_block_row(domain, node, level, node_rows);
-        // ID to get column basis and skeleton rows
+        Matrix adm_block_row = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
+        // ID compress
         Matrix U_node;
-        std::vector<int64_t> skel_rows;
-        std::tie(U_node, skel_rows) = error_id_row(adm_block_row, ID_tolerance);
+        std::vector<int64_t> ipiv_rows;
+        std::tie(U_node, ipiv_rows) = error_id_row(adm_block_row, ID_tolerance);
         int64_t rank = U_node.cols;
-        // Construct local skeleton row indices within node
-        std::vector<int64_t> skel_node;
-        skel_node.reserve(rank);
+        // Convert ipiv to node skeleton rows to be used by parent
+        std::vector<int64_t> skel_rows;
+        skel_rows.reserve(rank);
         for (int64_t i = 0; i < rank; i++) {
-          skel_node.push_back(node_rows[skel_rows[i]]);
+          skel_rows.push_back(skeleton[ipiv_rows[i]]);
         }
-        // Multiply with child R if necessary
-        if (level < height) {
-          const auto child_level = level + 1;
-          const auto child1 = node * 2;
-          const auto child2 = node * 2 + 1;
-          auto U_node_splits = U_node.split(vec{U(child1, child_level).cols}, vec{});
-          triangular_matmul(R_row(child1, child_level), U_node_splits[0],
-                            Hatrix::Left, Hatrix::Upper, false, false, 1);
-          triangular_matmul(R_row(child2, child_level), U_node_splits[1],
-                            Hatrix::Left, Hatrix::Upper, false, false, 1);
-        }
-        // Orthogonalize basis with QR
-        Matrix Q(U_node.rows, U_node.cols);
-        Matrix R(U_node.cols, U_node.cols);
-        qr(U_node, Q, R);
-        U.insert(node, level, std::move(Q));
-        R_row.insert(node, level, std::move(R));
-        skeleton_rows.insert(node, level, std::move(skel_node));
+        U.insert(node, level, std::move(U_node));
+        skeleton_rows.insert(node, level, std::move(skel_rows));
       }
     }
   }
@@ -193,15 +154,7 @@ void SymmetricH2::generate_coupling_matrices(const Domain& domain) {
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
           const auto& skeleton_i = skeleton_rows(i, level);
           const auto& skeleton_j = skeleton_rows(j, level);
-          const auto i_offset = domain.cells[domain.get_cell_loc(i, level)].body;
-          const auto j_offset = domain.cells[domain.get_cell_loc(j, level)].body;
-          Matrix skeleton = generate_p2p_matrix(domain, skeleton_i, skeleton_j,
-                                                i_offset, j_offset);
-          triangular_matmul(R_row(i, level), skeleton, Hatrix::Left, Hatrix::Upper,
-                            false, false, 1.);
-          triangular_matmul(R_row(j, level), skeleton, Hatrix::Right, Hatrix::Upper,
-                            true, false, 1.);
-          S.insert(i, j, level, std::move(skeleton));
+          S.insert(i, j, level, generate_p2p_matrix(domain, skeleton_i, skeleton_j));
         }
       }
     }
@@ -471,8 +424,8 @@ int main(int argc, char ** argv) {
             << " accuracy=" << accuracy
             << " max_rank=" << max_rank
             << " admis=" << admis << std::setw(3)
-            << " sample_size=" << domain.get_max_farfield_size()
             << " sampling_alg=" << sampling_alg_name
+            << " sample_size=" << (sampling_alg == 3 ? domain.get_max_farfield_size() : sample_far_size)
             << " compress_alg=" << "ID"
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
