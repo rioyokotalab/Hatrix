@@ -473,8 +473,8 @@ class Domain {
     sort_interaction_lists();
   }
 
-  void select_sample_bodies(const int64_t sample_bodies_size,
-                            const int64_t sample_farfield_size,
+  void select_sample_bodies(const int64_t sample_self_size,
+                            const int64_t sample_far_size,
                             const int64_t sampling_alg = 0) {
     // Bottom-up pass to select cell's sample bodies
     for (int64_t level = tree_height; level > 0; level--) {
@@ -499,7 +499,7 @@ class Domain {
                                    child2.sample_bodies.end());
         }
         cell.sample_bodies = select_cluster_sample_bodies(sample_candidates,
-                                                          sample_bodies_size,
+                                                          sample_self_size,
                                                           sampling_alg);
       }
     }
@@ -519,7 +519,7 @@ class Domain {
                             cells[far_loc].sample_bodies.end());
           }
           cell.sample_farfield = select_cluster_sample_bodies(farfield,
-                                                              sample_farfield_size,
+                                                              sample_far_size,
                                                               sampling_alg);
         }
       }
