@@ -521,6 +521,7 @@ class Domain {
           cell.sample_farfield = select_cluster_sample_bodies(farfield,
                                                               sample_far_size,
                                                               sampling_alg);
+          std::sort(cell.sample_farfield.begin(), cell.sample_farfield.end());
         }
       }
     }
