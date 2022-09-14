@@ -482,23 +482,23 @@ class Domain {
       const auto level_offset = level_ncells - 1;
       for (int64_t node = 0; node < level_ncells; node++) {
         auto& cell = cells[level_offset + node];
-        std::vector<int64_t> sample_candidates;
+        std::vector<int64_t> initial_sample;
         if (level == tree_height) {
-          // Leaf level: candidates are from its bodies
-          sample_candidates = cell.get_bodies();
+          // Leaf level: use all bodies as initial sample
+          initial_sample = cell.get_bodies();
         }
         else {
-          // Non-leaf level: candidates are from children's samples
+          // Non-leaf level: gather children's samples
           const auto& child1 = cells[cell.child];
           const auto& child2 = cells[cell.child + 1];
-          sample_candidates.insert(sample_candidates.end(),
-                                   child1.sample_bodies.begin(),
-                                   child1.sample_bodies.end());
-          sample_candidates.insert(sample_candidates.end(),
-                                   child2.sample_bodies.begin(),
-                                   child2.sample_bodies.end());
+          initial_sample.insert(initial_sample.end(),
+                                child1.sample_bodies.begin(),
+                                child1.sample_bodies.end());
+          initial_sample.insert(initial_sample.end(),
+                                child2.sample_bodies.begin(),
+                                child2.sample_bodies.end());
         }
-        cell.sample_bodies = select_cluster_sample_bodies(sample_candidates,
+        cell.sample_bodies = select_cluster_sample_bodies(initial_sample,
                                                           sample_self_size,
                                                           sampling_alg);
       }
@@ -510,18 +510,18 @@ class Domain {
       for (int64_t node = 0; node < level_ncells; node++) {
         auto& cell = cells[level_offset + node];
         const auto& parent = cells[cell.parent];
-        if (cell.far_list.size() > 0 || parent.sample_farfield.size() > 0) {
+        if (parent.sample_farfield.size() > 0 || cell.far_list.size() > 0) {
           // If node has non-empty farfield
-          auto farfield = parent.sample_farfield;
+          auto initial_sample = parent.sample_farfield;
           for (auto far_loc: cell.far_list) {
-            farfield.insert(farfield.end(),
-                            cells[far_loc].sample_bodies.begin(),
-                            cells[far_loc].sample_bodies.end());
+            initial_sample.insert(initial_sample.end(),
+                                  cells[far_loc].sample_bodies.begin(),
+                                  cells[far_loc].sample_bodies.end());
           }
-          cell.sample_farfield = select_cluster_sample_bodies(farfield,
+          cell.sample_farfield = select_cluster_sample_bodies(initial_sample,
                                                               sample_far_size,
                                                               sampling_alg);
-          std::sort(cell.sample_farfield.begin(), cell.sample_farfield.end());
+          // std::sort(cell.sample_farfield.begin(), cell.sample_farfield.end());
         }
       }
     }
