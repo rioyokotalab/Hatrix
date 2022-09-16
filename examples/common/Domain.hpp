@@ -28,69 +28,52 @@ class Domain {
   std::vector<Cell> cells;
 
  private:
-  double get_Xmin(const std::vector<int64_t>& loc, const int64_t axis) const {
+  double get_Xmin(const std::vector<int64_t>& body_idx, const int64_t axis) const {
     assert(axis < ndim);
-    double Xmin = bodies[loc[0]].X[axis];
-    for (int64_t i = 1; i < loc.size(); i++) {
-      Xmin = std::min(Xmin, bodies[loc[i]].X[axis]);
-    }
-    return Xmin;
-  }
-  double get_Xmin(const int64_t body_start, const int64_t body_end,
-                  const int64_t axis) const {
-    assert(axis < ndim);
-    double Xmin = bodies[body_start].X[axis];
-    for (int64_t i = body_start + 1; i <= body_end ; i++) {
-      Xmin = std::min(Xmin, bodies[i].X[axis]);
+    double Xmin = bodies[body_idx[0]].X[axis];
+    for (int64_t i = 1; i < body_idx.size(); i++) {
+      Xmin = std::min(Xmin, bodies[body_idx[i]].X[axis]);
     }
     return Xmin;
   }
 
-  double get_Xmax(const std::vector<int64_t>& loc, const int64_t axis) const {
+  double get_Xmax(const std::vector<int64_t>& body_idx, const int64_t axis) const {
     assert(axis < ndim);
-    double Xmax = bodies[loc[0]].X[axis];
-    for (int64_t i = 1; i < loc.size(); i++) {
-      Xmax = std::max(Xmax, bodies[loc[i]].X[axis]);
-    }
-    return Xmax;
-  }
-  double get_Xmax(const int64_t body_start, const int64_t body_end,
-                  const int64_t axis) const {
-    assert(axis < ndim);
-    double Xmax = bodies[body_start].X[axis];
-    for (int64_t i = body_start + 1; i <= body_end ; i++) {
-      Xmax = std::max(Xmax, bodies[i].X[axis]);
+    double Xmax = bodies[body_idx[0]].X[axis];
+    for (int64_t i = 1; i < body_idx.size(); i++) {
+      Xmax = std::max(Xmax, bodies[body_idx[i]].X[axis]);
     }
     return Xmax;
   }
 
   void orthogonal_recursive_bisection(
       const int64_t left, const int64_t right, const int64_t leaf_size,
-      const int64_t level, const int64_t index) {
+      const int64_t level, const int64_t block_index) {
     // Initialize cell
-    const auto loc = get_cell_loc(index, level);
-    cells[loc].body = left;
-    cells[loc].nbodies = right - left;
-    cells[loc].level = level;
-    cells[loc].index = index;
+    const auto cell_idx = get_cell_idx(block_index, level);
+    auto& cell = cells[cell_idx];
+    cell.body_offset = left;
+    cell.nbodies = right - left;
+    cell.level = level;
+    cell.block_index = block_index;
     double radius_max = 0.;
     int64_t sort_axis = 0;
     for (int64_t axis = 0; axis < ndim; axis++) {
-      const auto Xmin = get_Xmin(left, right - 1, axis);
-      const auto Xmax = get_Xmax(left, right - 1, axis);
+      const auto Xmin = get_Xmin(cell.get_bodies(), axis);
+      const auto Xmax = get_Xmax(cell.get_bodies(), axis);
       const auto diam = Xmax - Xmin;
-      cells[loc].center[axis] = (Xmin + Xmax) / 2.;
-      cells[loc].radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
+      cell.center[axis] = (Xmin + Xmax) / 2.;
+      cell.radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
 
-      if (cells[loc].radius[axis] > radius_max) {
-        radius_max = cells[loc].radius[axis];
+      if (cell.radius[axis] > radius_max) {
+        radius_max = cell.radius[axis];
         sort_axis = axis;
       }
     }
 
-    if (cells[loc].nbodies <= leaf_size) {  // Leaf level is reached
-      cells[loc].child = -1;
-      cells[loc].nchilds = 0;
+    if (cell.nbodies <= leaf_size) {  // Leaf level is reached
+      cell.child = -1;
+      cell.nchilds = 0;
       return;
     }
 
@@ -101,12 +84,12 @@ class Domain {
               });
     // Split into two equal parts
     const auto mid = (left + right) / 2;
-    cells[loc].child = get_cell_loc(index << 1, level + 1);
-    cells[loc].nchilds = 2;
-    cells[cells[loc].child].parent = loc;
-    cells[cells[loc].child + 1].parent = loc;
-    orthogonal_recursive_bisection(left, mid, leaf_size, level + 1, index << 1);
-    orthogonal_recursive_bisection(mid, right, leaf_size, level + 1, (index << 1) + 1);
+    cell.child = get_cell_idx(block_index << 1, level + 1);
+    cell.nchilds = 2;
+    cells[cell.child].parent = cell_idx;
+    cells[cell.child + 1].parent = cell_idx;
+    orthogonal_recursive_bisection(left, mid, leaf_size, level + 1, block_index << 1);
+    orthogonal_recursive_bisection(mid, right, leaf_size, level + 1, (block_index << 1) + 1);
   }
 
   bool is_well_separated(const Cell& source, const Cell& target,
@@ -123,10 +106,10 @@ class Domain {
     if (i_level == j_level) {
       admissible = is_well_separated(Ci, Cj, theta);
       if (admissible) {
-        Ci.far_list.push_back(get_cell_loc(Cj.index, Cj.level));
+        Ci.far_list.push_back(get_cell_idx(Cj.block_index, Cj.level));
       }
       else {
-        Ci.near_list.push_back(get_cell_loc(Cj.index, Cj.level));
+        Ci.near_list.push_back(get_cell_idx(Cj.block_index, Cj.level));
       }
     }
     if (!admissible) {
@@ -141,7 +124,7 @@ class Domain {
     }
   }
 
-  // Sort locations within cell's interaction lists
+  // Sort indices within cell's interaction lists
   void sort_interaction_lists() {
     for (auto& cell: cells) {
       std::sort(cell.near_list.begin(), cell.near_list.end());
@@ -206,33 +189,32 @@ class Domain {
   }
 
   // Source: https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c
-  std::vector<Body> build_anchor_grid(const int64_t pt_dim,
-                                      const double coord_min[MAX_NDIM],
+  std::vector<Body> build_anchor_grid(const double coord_min[MAX_NDIM],
                                       const double coord_max[MAX_NDIM],
                                       const double enbox_size[MAX_NDIM],
                                       const int64_t grid_size[MAX_NDIM],
                                       const int64_t grid_algo = 0) const {
     int64_t max_grid_size = 0;
     int64_t anchor_npt = 1;
-    for (int64_t i = 0; i < pt_dim; i++) {
+    for (int64_t i = 0; i < ndim; i++) {
       max_grid_size = (grid_size[i] > max_grid_size) ? grid_size[i] : max_grid_size;
       anchor_npt *= (grid_size[i] + 1);
     }
     max_grid_size++;
 
     // 1. Assign anchor points in each dimension
-    std::vector<double> anchor_dim(pt_dim * max_grid_size);
-    for (int64_t i = 0; i < pt_dim; i++) {
+    std::vector<double> anchor_dim(ndim * max_grid_size);
+    for (int64_t i = 0; i < ndim; i++) {
       if (grid_size[i] == 0) {
         const auto offset_i = i * max_grid_size;
         anchor_dim[offset_i] = (coord_min[i] + coord_max[i]) * 0.5;
       }
     }
-    if (grid_algo == 0) {  // Default
+    if (grid_algo == 0) {  // Default: grid_algo == 6 in H2Pack code
       const double c0 = 1.0;
       const double c1 = 0.5;
       const double c2 = 0.25;
-      for (int64_t i = 0; i < pt_dim; i++) {
+      for (int64_t i = 0; i < ndim; i++) {
         const auto size_i = c0 * enbox_size[i] / ((double)grid_size[i] + c1);
         const auto offset_i = i * max_grid_size;
         for (int64_t j = 0; j <= grid_size[i]; j++) {
@@ -240,8 +222,8 @@ class Domain {
         }
       }
     }
-    else {  // Chebyshev anchor points
-      for (int64_t i = 0; i < pt_dim; i++) {
+    else {  // Chebyshev anchor points: grid_algo == 2 in H2Pack code
+      for (int64_t i = 0; i < ndim; i++) {
         if (grid_size[i] == 0) continue;
         const auto offset_i = i * max_grid_size;
         const auto s0 = 0.5 * (coord_max[i] + coord_min[i]);
@@ -259,11 +241,11 @@ class Domain {
     anchor_coord.resize(anchor_npt);
     int64_t stride[MAX_NDIM + 1];
     stride[0] = 1;
-    for (int64_t i = 0; i < pt_dim; i++) {
+    for (int64_t i = 0; i < ndim; i++) {
       stride[i + 1] = stride[i] * (grid_size[i] + 1);
     }
     for (int64_t i = 0; i < anchor_npt; i++) {
-      for (int64_t j = 0; j < pt_dim; j++) {
+      for (int64_t j = 0; j < ndim; j++) {
         const int64_t dim_idx = (i / stride[j]) % (grid_size[j] + 1);
         anchor_coord[i].X[j] = anchor_dim[j * max_grid_size + dim_idx];
       }
@@ -271,20 +253,21 @@ class Domain {
     return anchor_coord;
   }
 
-  std::vector<int64_t> select_cluster_sample_bodies(
-      const std::vector<int64_t>& bodies_loc,
-      const int64_t _sample_size, const int64_t sampling_alg) const {
-    const int64_t nbodies = bodies_loc.size();
+  std::vector<int64_t> select_sample_bodies(const std::vector<int64_t>& body_idx,
+                                            const int64_t _sample_size,
+                                            const int64_t sampling_algo,
+                                            const int64_t grid_algo = 0) const {
+    const int64_t nbodies = body_idx.size();
     const int64_t sample_size = std::min(nbodies, _sample_size);
-    std::vector<int64_t> samples_loc;
-    samples_loc.reserve(sample_size);
+    std::vector<int64_t> sample_idx;
 
-    switch (sampling_alg) {
+    switch (sampling_algo) {
       case 0: {  // Select based on equally spaced indices
         const int64_t d = (int64_t)std::floor((double)nbodies / (double)sample_size);
         int64_t k = 0;
+        sample_idx.reserve(sample_size);
         for (int64_t i = 0; i < sample_size; i++) {
-          samples_loc.push_back(bodies_loc[k]);
+          sample_idx.push_back(body_idx[k]);
           k += d;
         }
         break;
@@ -300,9 +283,10 @@ class Domain {
           std::shuffle(random_indices.begin(), random_indices.end(), g);
         }
         // Choose sample based on random indices
+        sample_idx.reserve(sample_size);
         for (int64_t i = 0; i < sample_size; i++) {
           const auto ridx = random_indices[i];
-          samples_loc.push_back(bodies_loc[ridx]);
+          sample_idx.push_back(body_idx[ridx]);
         }
         break;
       }
@@ -311,15 +295,15 @@ class Domain {
         // Find center of enclosing box
         double center[MAX_NDIM];
         for (int64_t axis = 0; axis < ndim; axis++) {
-          const auto Xmin = get_Xmin(bodies_loc, axis);
-          const auto Xmax = get_Xmax(bodies_loc, axis);
+          const auto Xmin = get_Xmin(body_idx, axis);
+          const auto Xmax = get_Xmax(body_idx, axis);
           center[axis] = (Xmax + Xmin) / 2.;
         }
         // Start with point closest to the center as pivot
         int64_t pivot = -1;
         double min_dist2 = std::numeric_limits<double>::max();
         for (int64_t i = 0; i < nbodies; i++) {
-          const auto dist2_i = dist2(center, bodies[bodies_loc[i]].X);
+          const auto dist2_i = dist2(center, bodies[body_idx[i]].X);
           if (dist2_i < min_dist2) {
             min_dist2 = dist2_i;
             pivot = i;
@@ -332,8 +316,8 @@ class Domain {
           int64_t farthest_idx = -1;
           for (int64_t i = 0; i < nbodies; i++) {
             if(!chosen[i]) {
-              const auto dist2_i = dist2(bodies[bodies_loc[pivot]].X,
-                                         bodies[bodies_loc[i]].X);
+              const auto dist2_i = dist2(bodies[body_idx[pivot]].X,
+                                         bodies[body_idx[i]].X);
               if (dist2_i > max_dist2) {
                 max_dist2 = dist2_i;
                 farthest_idx = i;
@@ -343,31 +327,31 @@ class Domain {
           chosen[farthest_idx] = true;
           pivot = farthest_idx;
         }
+        sample_idx.reserve(sample_size);
         for (int64_t i = 0; i < nbodies; i++) {
           if (chosen[i]) {
-            samples_loc.push_back(bodies_loc[i]);
+            sample_idx.push_back(body_idx[i]);
           }
         }
         break;
       }
       case 3: {  // Anchor Net Method
-        double Xmax[MAX_NDIM], Xmin[MAX_NDIM], diameter[MAX_NDIM];
+        double coord_max[MAX_NDIM], coord_min[MAX_NDIM], diameter[MAX_NDIM];
         for (int64_t axis = 0; axis < ndim; axis++) {
-          Xmin[axis] = get_Xmin(bodies_loc, axis);
-          Xmax[axis] = get_Xmax(bodies_loc, axis);
-          diameter[axis] = Xmax[axis] - Xmin[axis];
+          coord_min[axis] = get_Xmin(body_idx, axis);
+          coord_max[axis] = get_Xmax(body_idx, axis);
+          diameter[axis] = coord_max[axis] - coord_min[axis];
         }
         int64_t grid_size[MAX_NDIM];
         const auto anchor_npt = proportional_int_decompose(ndim, sample_size, diameter, grid_size);
         if (anchor_npt < nbodies) {
-          const auto anchor_bodies = build_anchor_grid(ndim, Xmin, Xmax, diameter, grid_size, 0);
-          assert(anchor_npt == anchor_bodies.size());
+          const auto anchor_bodies = build_anchor_grid(coord_min, coord_max, diameter, grid_size, grid_algo);
           std::vector<bool> chosen(nbodies, false);
           for (int64_t i = 0; i < anchor_npt; i++) {
             int64_t min_idx = -1;
             double min_dist2 = std::numeric_limits<double>::max();
             for (int64_t j = 0; j < nbodies; j++) {
-              const auto dist2_ij = dist2(anchor_bodies[i].X, bodies[bodies_loc[j]].X);
+              const auto dist2_ij = dist2(anchor_bodies[i].X, bodies[body_idx[j]].X);
               if (dist2_ij < min_dist2) {
                 min_dist2 = dist2_ij;
                 min_idx = j;
@@ -375,19 +359,20 @@ class Domain {
             }
             chosen[min_idx] = true;
           }
+          sample_idx.reserve(anchor_npt);
           for (int64_t i = 0; i < nbodies; i++) {
             if (chosen[i]) {
-              samples_loc.push_back(bodies_loc[i]);
+              sample_idx.push_back(body_idx[i]);
             }
           }
         }
         else {
-          samples_loc = bodies_loc;
+          sample_idx = body_idx;
         }
         break;
       }
     }
-    return samples_loc;
+    return sample_idx;
   }
 
  public:
@@ -399,8 +384,8 @@ class Domain {
     }
   }
 
-  int64_t get_cell_loc(const int64_t index, const int64_t level) const {
-    return (1 << level) - 1 + index;
+  int64_t get_cell_idx(const int64_t block_index, const int64_t level) const {
+    return (1 << level) - 1 + block_index;
   }
 
   void build_tree(const int64_t leaf_size) {
@@ -473,9 +458,9 @@ class Domain {
     sort_interaction_lists();
   }
 
-  void select_sample_bodies(const int64_t sample_self_size,
-                            const int64_t sample_far_size,
-                            const int64_t sampling_alg = 0) {
+  void build_sample_bodies(const int64_t sample_self_size,
+                           const int64_t sample_far_size,
+                           const int64_t sampling_algo = 0) {
     // Bottom-up pass to select cell's sample bodies
     for (int64_t level = tree_height; level > 0; level--) {
       const auto level_ncells = (int64_t)1 << level;
@@ -498,9 +483,9 @@ class Domain {
                                 child2.sample_bodies.begin(),
                                 child2.sample_bodies.end());
         }
-        cell.sample_bodies = select_cluster_sample_bodies(initial_sample,
-                                                          sample_self_size,
-                                                          sampling_alg);
+        cell.sample_bodies = select_sample_bodies(initial_sample,
+                                                  sample_self_size,
+                                                  sampling_algo, 0);
       }
     }
     // Top-down pass to select cell's farfield sample
@@ -513,15 +498,14 @@ class Domain {
         if (parent.sample_farfield.size() > 0 || cell.far_list.size() > 0) {
           // If node has non-empty farfield
           auto initial_sample = parent.sample_farfield;
-          for (auto far_loc: cell.far_list) {
+          for (auto far_idx: cell.far_list) {
             initial_sample.insert(initial_sample.end(),
-                                  cells[far_loc].sample_bodies.begin(),
-                                  cells[far_loc].sample_bodies.end());
+                                  cells[far_idx].sample_bodies.begin(),
+                                  cells[far_idx].sample_bodies.end());
           }
-          cell.sample_farfield = select_cluster_sample_bodies(initial_sample,
-                                                              sample_far_size,
-                                                              sampling_alg);
-          // std::sort(cell.sample_farfield.begin(), cell.sample_farfield.end());
+          cell.sample_farfield = select_sample_bodies(initial_sample,
+                                                      sample_far_size,
+                                                      sampling_algo, 1);
         }
       }
     }
@@ -529,9 +513,8 @@ class Domain {
 
   int64_t get_max_farfield_size() const {
     int64_t max_farfield_size = 0;
-    for (int64_t loc = 0; loc < ncells; loc++) {
-      const auto& cell = cells[loc];
-      max_farfield_size = std::max(max_farfield_size, (int64_t)cell.sample_farfield.size());
+    for (int64_t i = 0; i < ncells; i++) {
+      max_farfield_size = std::max(max_farfield_size, (int64_t)cells[i].sample_farfield.size());
     }
     return max_farfield_size;
   }

@@ -67,24 +67,24 @@ void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
   level_blocks.assign(height + 1, 0);
   for (const auto& cell: domain.cells) {
     const auto level = cell.level;
-    const auto i = cell.index;
+    const auto i = cell.block_index;
     level_blocks[level]++;
     // Near interaction list: inadmissible dense blocks
-    for (const auto near_loc: cell.near_list) {
-      const auto j_near = domain.cells[near_loc].index;
+    for (const auto near_idx: cell.near_list) {
+      const auto j_near = domain.cells[near_idx].block_index;
       is_admissible.insert(i, j_near, level, false);
     }
     // Far interaction list: admissible low-rank blocks
-    for (const auto far_loc: cell.far_list) {
-      const auto j_far = domain.cells[far_loc].index;
+    for (const auto far_idx: cell.far_list) {
+      const auto j_far = domain.cells[far_idx].block_index;
       is_admissible.insert(i, j_far, level, true);
     }
   }
 }
 
 int64_t SymmetricH2::get_block_size(const Domain& domain, const int64_t node, const int64_t level) const {
-  const auto loc = domain.get_cell_loc(node, level);
-  return domain.cells[loc].nbodies;
+  const auto idx = domain.get_cell_idx(node, level);
+  return domain.cells[idx].nbodies;
 }
 
 bool SymmetricH2::row_has_admissible_blocks(const int64_t row, const int64_t level) const {
@@ -104,8 +104,8 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
     const auto num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
       if (row_has_admissible_blocks(node, level)) {
-        const auto loc = domain.get_cell_loc(node, level);
-        const auto& cell = domain.cells[loc];
+        const auto idx = domain.get_cell_idx(node, level);
+        const auto& cell = domain.cells[idx];
         std::vector<int64_t> skeleton;
         if (level == height) {
           // Leaf level: use all bodies as skeleton
@@ -115,8 +115,8 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
           // Non-leaf level: gather children's skeleton
           const auto& child1 = domain.cells[cell.child];
           const auto& child2 = domain.cells[cell.child + 1];
-          const auto& child1_skeleton = skeleton_rows(child1.index, child1.level);
-          const auto& child2_skeleton = skeleton_rows(child2.index, child2.level);
+          const auto& child1_skeleton = skeleton_rows(child1.block_index, child1.level);
+          const auto& child2_skeleton = skeleton_rows(child2.block_index, child2.level);
           skeleton.insert(skeleton.end(), child1_skeleton.begin(), child1_skeleton.end());
           skeleton.insert(skeleton.end(), child2_skeleton.begin(), child2_skeleton.end());
         }
@@ -147,8 +147,7 @@ void SymmetricH2::generate_coupling_matrices(const Domain& domain) {
         // Inadmissible leaf blocks
         if (level == height &&
             is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
-          D.insert(i, j, level,
-                   generate_p2p_matrix(domain, i, j, level));
+          D.insert(i, j, level, generate_p2p_matrix(domain, i, j, level));
         }
         // Admissible blocks
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
@@ -318,14 +317,14 @@ int main(int argc, char ** argv) {
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
   const double admis = argc > 5 ? atof(argv[5]) : 1.0;
   int64_t sample_self_size = argc > 6 ? atol(argv[6]) : 2 * leaf_size;
-  int64_t sample_far_size = argc > 7 ? atol(argv[7]) : 10 * sample_self_size;
+  int64_t sample_far_size = argc > 7 ? atol(argv[7]) : 5 * sample_self_size;
 
   // Specify bodies sampling technique
   // 0: Choose bodies with equally spaced indices
   // 1: Choose bodies random indices
   // 2: Farthest Point Sampling
   // 3: Anchor Net
-  const int64_t sampling_alg = argc > 8 ? atol(argv[8]) : 0;
+  const int64_t sampling_algo = argc > 8 ? atol(argv[8]) : 0;
 
   // Specify kernel function
   // 0: Laplace Kernel
@@ -383,22 +382,22 @@ int main(int argc, char ** argv) {
       geom_name += "circular_mesh";
     }
   }
-  std::string sampling_alg_name = "";
-  switch (sampling_alg) {
+  std::string sampling_algo_name = "";
+  switch (sampling_algo) {
     case 0: {
-      sampling_alg_name = "equally_spaced_indices";
+      sampling_algo_name = "equally_spaced_indices";
       break;
     }
     case 1: {
-      sampling_alg_name = "random_indices";
+      sampling_algo_name = "random_indices";
       break;
     }
     case 2: {
-      sampling_alg_name = "farthest_point_sampling";
+      sampling_algo_name = "farthest_point_sampling";
       break;
     }
     case 3: {
-      sampling_alg_name = "anchor_grid";
+      sampling_algo_name = "anchor_grid";
       break;
     }
   }
@@ -406,7 +405,7 @@ int main(int argc, char ** argv) {
   domain.build_tree(leaf_size);
   domain.build_interactions(admis);
   const auto start_sample = std::chrono::system_clock::now();
-  domain.select_sample_bodies(sample_self_size, sample_far_size, sampling_alg);
+  domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();
@@ -424,8 +423,8 @@ int main(int argc, char ** argv) {
             << " accuracy=" << accuracy
             << " max_rank=" << max_rank
             << " admis=" << admis << std::setw(3)
-            << " sampling_alg=" << sampling_alg_name
-            << " sample_size=" << (sampling_alg == 3 ? domain.get_max_farfield_size() : sample_far_size)
+            << " sampling_algo=" << sampling_algo_name
+            << " sample_size=" << (sampling_algo == 3 ? domain.get_max_farfield_size() : sample_far_size)
             << " compress_alg=" << "ID"
             << " kernel=" << kernel_name
             << " geometry=" << geom_name

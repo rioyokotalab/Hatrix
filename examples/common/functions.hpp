@@ -71,21 +71,12 @@ Matrix generate_p2p_matrix(const Domain& domain,
 
 Matrix generate_p2p_matrix(const Domain& domain,
                            const int64_t row, const int64_t col, const int64_t level) {
-  const auto source_loc = domain.get_cell_loc(row, level);
-  const auto target_loc = domain.get_cell_loc(col, level);
-  const auto& source = domain.cells[source_loc];
-  const auto& target = domain.cells[target_loc];
+  const auto source_idx = domain.get_cell_idx(row, level);
+  const auto target_idx = domain.get_cell_idx(col, level);
+  const auto& source = domain.cells[source_idx];
+  const auto& target = domain.cells[target_idx];
 
-  std::vector<int64_t> source_bodies, target_bodies;
-  source_bodies.reserve(source.nbodies);
-  target_bodies.reserve(target.nbodies);
-  for (int64_t i = 0; i < source.nbodies; i++) {
-    source_bodies.push_back(source.body + i);
-  }
-  for (int64_t j = 0; j < target.nbodies; j++) {
-    target_bodies.push_back(target.body + j);
-  }
-  return generate_p2p_matrix(domain, source_bodies, target_bodies);
+  return generate_p2p_matrix(domain, source.get_bodies(), target.get_bodies());
 }
 
 Matrix generate_p2p_matrix(const Domain& domain) {

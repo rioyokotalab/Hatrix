@@ -41,12 +41,9 @@ class Body {
 
   Body(const std::vector<double>& _X, const double _value)
       : value(_value) {
-    X[0] = 0;
-    X[1] = 0;
-    X[2] = 0;
     const auto ndim = std::min(MAX_NDIM, (int64_t)_X.size());
-    for (int64_t axis = 0; axis < ndim; axis++) {
-      X[axis] = _X[axis];
+    for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
+      X[axis] = axis < ndim ? _X[axis] : 0;
     }
   }
 
