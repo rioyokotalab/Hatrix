@@ -273,7 +273,7 @@ class Domain {
         break;
       }
       case 1: {  // Random sampling
-        static std::mt19937 g(0);  // Use fixed seed for reproducibility
+        static std::mt19937 g(N);  // Use N as seed for reproducibility
         std::vector<int64_t> random_indices(nbodies, 0);
         for (int64_t i = 0; i < nbodies; i++) {
           random_indices[i] = i;
