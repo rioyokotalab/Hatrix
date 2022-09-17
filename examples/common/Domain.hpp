@@ -622,7 +622,15 @@ class Domain {
   }
 
   void initialize_unit_circular_mesh() {
-    if (ndim == 2) {
+    if (ndim == 1) {
+      // Generate uniform points within a unit straight line
+      const auto x = equally_spaced_vector(N, 0, 1);
+      for (int64_t i = 0; i < N; i++) {
+        const double value = (double)i / (double)N;
+        bodies.emplace_back(Body(x[i], value));
+      }
+    }
+    else if (ndim == 2) {
       // Generate a unit circle with N points on the circumference.
       for (int64_t i = 0; i < N; i++) {
         const double theta = (i * 2.0 * M_PI) / (double)N;
@@ -653,7 +661,15 @@ class Domain {
   }
 
   void initialize_unit_cubical_mesh() {
-    if (ndim == 2) {
+    if (ndim == 1) {
+      // Generate uniform points within a unit straight line
+      const auto x = equally_spaced_vector(N, 0, 1);
+      for (int64_t i = 0; i < N; i++) {
+        const double value = (double)i / (double)N;
+        bodies.emplace_back(Body(x[i], value));
+      }
+    }
+    else if (ndim == 2) {
       // Generate a unit square with N points on the sides
       if (N < 4) {
         std::cout << "N has to be >=4 for unit square mesh" << std::endl;
