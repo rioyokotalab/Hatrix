@@ -54,6 +54,16 @@ class Domain {
     return Xmax;
   }
 
+  // Compute squared euclidean distance between two coordinates
+  double dist2(const double* a_X, const double* b_X) const {
+    double dist = 0;
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      dist += (a_X[axis] - b_X[axis]) *
+              (a_X[axis] - b_X[axis]);
+    }
+    return dist;
+  }
+
   void orthogonal_recursive_bisection(
       const int64_t left, const int64_t right, const int64_t leaf_size,
       const int64_t level, const int64_t block_index) {
@@ -102,9 +112,10 @@ class Domain {
 
   bool is_well_separated(const Cell& source, const Cell& target,
                          const double theta) const {
-    const auto distance = source.distance_from(target);
-    const auto diameter = std::min(source.get_diameter(), target.get_diameter());
-    return distance > (theta * diameter);
+    const auto distance = dist2(source.center, target.center);
+    const auto source_size = source.get_radius();
+    const auto target_size = target.get_radius();
+    return (distance > (theta * (source_size + target_size)));
   }
 
   void dual_tree_traversal(Cell& Ci, Cell& Cj, const double theta) {
@@ -143,16 +154,6 @@ class Domain {
   // Remove element by value from STL container
   void erase_by_value(std::vector<int64_t>& vec, const int64_t value) {
     vec.erase(std::remove(vec.begin(), vec.end(), value), vec.end());
-  }
-
-  // Compute squared euclidean distance between two coordinates
-  double dist2(const double* a_X, const double* b_X) const {
-    double dist = 0;
-    for (int64_t axis = 0; axis < ndim; axis++) {
-      dist += (a_X[axis] - b_X[axis]) *
-              (a_X[axis] - b_X[axis]);
-    }
-    return dist;
   }
 
   // Taken from: H2Pack GitHub

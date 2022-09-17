@@ -48,15 +48,6 @@ class Cell {
     return 4. * get_radius();
   }
 
-  double distance_from(const Cell& other) const {
-    double dist = 0;
-    for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
-      dist += (center[axis] - other.center[axis]) *
-              (center[axis] - other.center[axis]);
-    }
-    return dist;
-  }
-
   std::vector<int64_t> get_bodies() const {
     std::vector<int64_t> bodies;
     bodies.reserve(nbodies);
