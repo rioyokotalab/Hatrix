@@ -22,9 +22,6 @@ void set_kernel_constants(double _PV, double _alpha) {
   alpha = _alpha;
 }
 
-using kernel_func_t =
-    std::function<double(const Body& source, const Body& target)>;
-
 kernel_func_t kernel_function;
 
 void set_kernel_function(kernel_func_t _kernel_function) {

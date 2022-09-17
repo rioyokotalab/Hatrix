@@ -187,7 +187,7 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       max_rank(max_rank), admis(admis) {
   // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  ID_tolerance = accuracy * 1e-2;
+  ID_tolerance = accuracy * 1e-4;
   initialize_geometry_admissibility(domain);
   generate_row_cluster_basis(domain);
   generate_coupling_matrices(domain);
@@ -404,6 +404,12 @@ int main(int argc, char ** argv) {
 
   domain.build_tree(leaf_size);
   domain.build_interactions(admis);
+  if (sampling_algo == 3) {
+    const auto r = domain.adaptive_anchor_grid_size(Hatrix::kernel_function,
+                                                    leaf_size, admis, accuracy);
+    sample_self_size = r;
+    sample_far_size = r > 3 ? std::max(r + 3, (int64_t)10) : r + 3;
+  }
   const auto start_sample = std::chrono::system_clock::now();
   domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo);
   const auto stop_sample = std::chrono::system_clock::now();
@@ -424,7 +430,9 @@ int main(int argc, char ** argv) {
             << " max_rank=" << max_rank
             << " admis=" << admis << std::setw(3)
             << " sampling_algo=" << sampling_algo_name
-            << " sample_size=" << (sampling_algo == 3 ? domain.get_max_farfield_size() : sample_far_size)
+            << " sample_self_size=" << sample_self_size
+            << " sample_far_size=" << sample_far_size
+            << " sample_farfield_max_size=" << domain.get_max_farfield_size()
             << " compress_alg=" << "ID"
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
