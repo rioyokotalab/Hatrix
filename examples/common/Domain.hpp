@@ -8,6 +8,7 @@
 #include <fstream>
 #include <limits>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -264,13 +265,14 @@ class Domain {
 
   std::vector<int64_t> select_sample_bodies(const std::vector<Body>& bodies_arr,
                                             const std::vector<int64_t>& bodies_idx,
-                                            const int64_t _sample_size,
+                                            const int64_t sample_size,
                                             const int64_t sampling_algo,
                                             const int64_t grid_algo = 0) const {
     const int64_t nbodies = bodies_idx.size();
-    const int64_t sample_size = std::min(nbodies, _sample_size);
+    if (sample_size >= nbodies) {
+      return bodies_idx;
+    }
     std::vector<int64_t> sample_idx;
-
     switch (sampling_algo) {
       case 0: {  // Select based on equally spaced indices
         const int64_t d = (int64_t)std::floor((double)nbodies / (double)sample_size);
@@ -381,6 +383,10 @@ class Domain {
         }
         break;
       }
+      default: { // No sampling
+        sample_idx = bodies_idx;
+        break;
+      }
     }
     return sample_idx;
   }
@@ -470,7 +476,9 @@ class Domain {
 
   int64_t adaptive_anchor_grid_size(kernel_func_t kernel_function,
                                     const int64_t leaf_size,
-                                    const double theta, const double tol) {
+                                    const double theta,
+                                    const double ID_tol,
+                                    const double stop_tol) {
     double L = 0;
     for (int64_t axis = 0; axis < ndim; axis++) {
       const auto Xmin = get_Xmin(bodies, cells[0].get_bodies(), axis);
@@ -481,7 +489,7 @@ class Domain {
 
     // Create two sets of points in unit boxes
     const auto box_nbodies = 2 * leaf_size;
-    const auto shift = L * (theta == 0. ? 1. : theta);
+    const auto shift = L * (theta == 0 ? 1 : theta);
     std::vector<Body> box1, box2;
     std::vector<int64_t> box_idx;
     box_idx.resize(box_nbodies);
@@ -530,14 +538,13 @@ class Domain {
     }
     int64_t r = 1;
     bool stop = false;
-    const double stop_tol = std::max(1e-15, tol * 1e-4);
     while (!stop) {
       const auto box2_sample = select_sample_bodies(box2, box_idx, r, 3, 0);
       // A1 = kernel(box1, box2_sample)
       Matrix A1 = generate_matrix(box1, box2, box_idx, box2_sample);
       Matrix U;
       std::vector<int64_t> ipiv_rows;
-      std::tie(U, ipiv_rows) = error_id_row(A1, stop_tol);
+      std::tie(U, ipiv_rows) = error_id_row(A1, ID_tol);
       int64_t rank = U.cols;
       // A2 = A(ipiv_rows[:rank], :)
       Matrix A2(rank, A.cols);
@@ -548,7 +555,7 @@ class Domain {
       }
       Matrix UxA2 = matmul(U, A2);
       const double error = norm(A - UxA2);
-      if ((error < tol * 0.1) || ((box_nbodies - box2_sample.size()) < (box_nbodies / 10))) {
+      if ((error < stop_tol) || ((box_nbodies - box2_sample.size()) < (box_nbodies / 10))) {
         stop = true;
       }
       else {
@@ -560,7 +567,8 @@ class Domain {
 
   void build_sample_bodies(const int64_t sample_self_size,
                            const int64_t sample_far_size,
-                           const int64_t sampling_algo = 0) {
+                           const int64_t sampling_algo,
+                           const int64_t initial_far_sp) {
     // Bottom-up pass to select cell's sample bodies
     for (int64_t level = tree_height; level > 0; level--) {
       const auto level_ncells = (int64_t)1 << level;
@@ -594,22 +602,121 @@ class Domain {
       const auto level_offset = level_ncells - 1;
       for (int64_t node = 0; node < level_ncells; node++) {
         auto& cell = cells[level_offset + node];
+        if (cell.far_list.size() == 0) continue;
+
+        int64_t far_nbodies = 0;
+        for (const auto far_idx: cell.far_list) {
+          far_nbodies += cells[far_idx].sample_bodies.size();
+        }
         const auto& parent = cells[cell.parent];
-        if (parent.sample_farfield.size() > 0 || cell.far_list.size() > 0) {
-          // If node has non-empty farfield
-          auto initial_sample = parent.sample_farfield;
-          for (auto far_idx: cell.far_list) {
+        auto initial_sample = parent.sample_farfield;
+        if ((sampling_algo != 3) || (initial_far_sp == 0) ||
+            (parent.sample_farfield.size() > far_nbodies)) {
+          // Put all sample_bodies of far nodes into initial sample
+          for (const auto far_idx: cell.far_list) {
             initial_sample.insert(initial_sample.end(),
                                   cells[far_idx].sample_bodies.begin(),
                                   cells[far_idx].sample_bodies.end());
           }
-          cell.sample_farfield = select_sample_bodies(bodies, initial_sample,
-                                                      sample_far_size,
-                                                      sampling_algo, 1);
-          if (sampling_algo < 2) {
-            std::sort(cell.sample_farfield.begin(), cell.sample_farfield.end());
+        }
+        else {
+          const int64_t num_far_nodes = cell.far_list.size();
+          // 1. Find center of each far-node's sample bodies using average of coordinate values
+          std::vector<double> centers(ndim * num_far_nodes);  // column major, each column is a coordinate
+          for (int64_t i = 0; i < num_far_nodes; i++) {
+            const auto far_idx = cell.far_list[i];
+            const auto& far_cell = cells[far_idx];
+            const auto far_cell_nsamples = far_cell.sample_bodies.size();
+            std::vector<double> sum(ndim, 0);
+            for (const auto body_idx: far_cell.sample_bodies) {
+              for (int64_t axis = 0; axis < ndim; axis++) {
+                sum[axis] += bodies[body_idx].X[axis];
+              }
+            }
+            for (int64_t axis = 0; axis < ndim; axis++) {
+              centers[i * ndim + axis] = sum[axis] / (double)far_cell_nsamples;
+            }
+          }
+          // 2. Build anchor grid on far-node's sample bodies
+          double far_node_xmin[MAX_NDIM], far_node_xmax[MAX_NDIM];
+          for (int64_t i = 0; i < num_far_nodes; i++) {
+            const auto far_idx = cell.far_list[i];
+            const auto& far_cell = cells[far_idx];
+            for (int64_t axis = 0; axis < ndim; axis++) {
+              const auto Xmin = get_Xmin(bodies, far_cell.sample_bodies, axis);
+              const auto Xmax = get_Xmax(bodies, far_cell.sample_bodies, axis);
+              far_node_xmin[axis] = i == 0 ? Xmin : std::min(far_node_xmin[axis], Xmin);
+              far_node_xmax[axis] = i == 0 ? Xmax : std::max(far_node_xmax[axis], Xmax);
+            }
+          }
+          double far_node_box_size[MAX_NDIM];
+          for (int64_t axis = 0; axis < ndim; axis++) {
+            far_node_box_size[axis] = far_node_xmax[axis] - far_node_xmin[axis];
+          }
+          int64_t far_node_grid_size[MAX_NDIM];
+          proportional_int_decompose(ndim, sample_far_size, far_node_box_size, far_node_grid_size);
+          const auto anchor_bodies = build_anchor_grid(far_node_xmin,
+                                                       far_node_xmax,
+                                                       far_node_box_size,
+                                                       far_node_grid_size,
+                                                       1);
+          // 3. For each anchor point, assign it to the closest center
+          const int64_t anchor_npt = anchor_bodies.size();
+          std::vector<int64_t> closest_center(anchor_npt, 0);
+          std::vector<int64_t> center_group_cnt(num_far_nodes, 0);
+          for (int64_t k = 0; k < anchor_npt; k++) {
+            int64_t min_idx = 0;
+            double min_dist = dist2(anchor_bodies[k].X, centers.data());
+            for (int64_t i = 1; i < num_far_nodes; i++) {
+              const auto dist2_i = dist2(anchor_bodies[k].X, centers.data() + i * ndim);
+              if (dist2_i < min_dist) {
+                min_dist = dist2_i;
+                min_idx = i;
+              }
+            }
+            closest_center[k] = min_idx;
+            center_group_cnt[min_idx]++;
+          }
+          // 4. For each anchor point, select sample point from it's closest center group (far node)
+          std::set<int64_t> far_nodes_sample;
+          for (int64_t k = 0; k < anchor_npt; k++) {
+            const auto closest_cell_idx = cell.far_list[closest_center[k]];
+            const auto& closest_cell = cells[closest_cell_idx];
+            int64_t min_body_idx = -1;
+            double min_dist = std::numeric_limits<double>::max();
+            for (const auto body_idx: closest_cell.sample_bodies) {
+              const auto dist_idx = dist2(anchor_bodies[k].X, bodies[body_idx].X);
+              if (dist_idx < min_dist) {
+                min_dist = dist_idx;
+                min_body_idx = body_idx;
+              }
+            }
+            far_nodes_sample.insert(min_body_idx);
+          }
+          // 5. Select one sample body each from cell that has no closest anchor point
+          for (int64_t i = 0; i < num_far_nodes; i++) {
+            if (center_group_cnt[i] > 0) continue;
+            const auto far_idx = cell.far_list[i];
+            const auto& far_cell = cells[far_idx];
+            int64_t min_body_idx = -1;
+            double min_dist = std::numeric_limits<double>::max();
+            for (const auto body_idx: far_cell.sample_bodies) {
+              const auto dist_idx = dist2(centers.data() + i * ndim, bodies[body_idx].X);
+              if (dist_idx < min_dist) {
+                min_dist = dist_idx;
+                min_body_idx = body_idx;
+              }
+            }
+            far_nodes_sample.insert(min_body_idx);
+          }
+          // 6. Insert to initial sample
+          for (const auto body_idx: far_nodes_sample) {
+            initial_sample.push_back(body_idx);
           }
         }
+        cell.sample_farfield = select_sample_bodies(bodies, initial_sample,
+                                                    sample_far_size,
+                                                    sampling_algo, 1);
       }
     }
   }
