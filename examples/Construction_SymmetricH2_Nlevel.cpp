@@ -229,10 +229,10 @@ double SymmetricH2::construction_error(const Domain& domain) const {
   for (int64_t i = 0; i < level_blocks[height]; i++) {
     for (int64_t j = 0; j < level_blocks[height]; j++) {
       if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
-        const Matrix expected = Hatrix::generate_p2p_matrix(domain, i, j, height);
-        const Matrix actual = D(i, j, height);
-        const auto dnorm = norm(expected);
-        const auto diff = norm(actual - expected);
+        const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, height);
+        const Matrix A_ij = D(i, j, height);
+        const auto dnorm = norm(D_ij);
+        const auto diff = norm(A_ij - D_ij);
         dense_norm += dnorm * dnorm;
         diff_norm += diff * diff;
       }
@@ -243,12 +243,12 @@ double SymmetricH2::construction_error(const Domain& domain) const {
     for (int64_t i = 0; i < level_blocks[level]; i++) {
       for (int64_t j = 0; j < level_blocks[level]; j++) {
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-          const Matrix expected = Hatrix::generate_p2p_matrix(domain, i, j, level);
+          const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, level);
           const Matrix Ubig = get_Ubig(i, level);
           const Matrix Vbig = get_Ubig(j, level);
-          const Matrix actual = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
-          const auto dnorm = norm(expected);
-          const auto diff = norm(actual - expected);
+          const Matrix A_ij = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
+          const auto dnorm = norm(D_ij);
+          const auto diff = norm(A_ij - D_ij);
           dense_norm += dnorm * dnorm;
           diff_norm += diff * diff;
         }
