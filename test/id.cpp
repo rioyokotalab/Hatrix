@@ -7,7 +7,7 @@
 
 class InterpolateTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {};
 class TruncatedIDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>> {};
-class ErrorIDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t, double>> {};
+class ErrorIDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t, double, bool>> {};
 
 using namespace Hatrix;
 
@@ -129,13 +129,14 @@ TEST_P(ErrorIDTests, error_id_row) {
   Hatrix::Context::init();
   int64_t m, n;
   double eps;
-  std::tie(m, n, eps) = GetParam();
+  bool relative;
+  std::tie(m, n, eps, relative) = GetParam();
 
   const Hatrix::Matrix D = Hatrix::generate_low_rank_matrix(m, n);
   Hatrix::Matrix A(D);
   Hatrix::Matrix U;
   std::vector<int64_t> skel_rows;
-  std::tie(U, skel_rows) = Hatrix::error_id_row(A, eps * 1e-1);
+  std::tie(U, skel_rows) = Hatrix::error_id_row(A, eps * 1e-1, relative);
 
   const int64_t rank = U.cols;
   Matrix A_skel_rows(rank, A.cols);
@@ -152,8 +153,10 @@ TEST_P(ErrorIDTests, error_id_row) {
   EXPECT_EQ(A_skel_rows.cols, D.cols);
 
   // Check compression error
-  const double error = Hatrix::norm(D - Hatrix::matmul(U, A_skel_rows));
-  EXPECT_NEAR(error, eps, eps);
+  const double dnorm = Hatrix::norm(D);
+  const double diff = Hatrix::norm(D - Hatrix::matmul(U, A_skel_rows));
+  const double error = relative ? diff / dnorm : diff;
+  EXPECT_NEAR(error, 0, eps);
   Hatrix::Context::finalize();
 }
 
@@ -178,13 +181,22 @@ INSTANTIATE_TEST_SUITE_P(INTERPOLATE, TruncatedIDTests,
                                          std::make_tuple(24, 32, 24)));
 
 INSTANTIATE_TEST_SUITE_P(INTERPOLATE, ErrorIDTests,
-                         testing::Values(std::make_tuple(32, 32, 1e-6),
-                                         std::make_tuple(32, 24, 1e-6),
-                                         std::make_tuple(24, 32, 1e-6),
-                                         std::make_tuple(32, 32, 1e-8),
-                                         std::make_tuple(32, 24, 1e-8),
-                                         std::make_tuple(24, 32, 1e-8),
-                                         std::make_tuple(32, 32, 1e-10),
-                                         std::make_tuple(32, 24, 1e-10),
-                                         std::make_tuple(24, 32, 1e-10)));
+                         testing::Values(std::make_tuple(32, 32, 1e-6, true),
+                                         std::make_tuple(32, 24, 1e-6, true),
+                                         std::make_tuple(24, 32, 1e-6, true),
+                                         std::make_tuple(32, 32, 1e-8, true),
+                                         std::make_tuple(32, 24, 1e-8, true),
+                                         std::make_tuple(24, 32, 1e-8, true),
+                                         std::make_tuple(32, 32, 1e-10, true),
+                                         std::make_tuple(32, 24, 1e-10, true),
+                                         std::make_tuple(24, 32, 1e-10, true),
+                                         std::make_tuple(32, 32, 1e-6, false),
+                                         std::make_tuple(32, 24, 1e-6, false),
+                                         std::make_tuple(24, 32, 1e-6, false),
+                                         std::make_tuple(32, 32, 1e-8, false),
+                                         std::make_tuple(32, 24, 1e-8, false),
+                                         std::make_tuple(24, 32, 1e-8, false),
+                                         std::make_tuple(32, 32, 1e-10, false),
+                                         std::make_tuple(32, 24, 1e-10, false),
+                                         std::make_tuple(24, 32, 1e-10, false)));
 

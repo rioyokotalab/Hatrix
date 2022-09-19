@@ -555,7 +555,7 @@ class Domain {
       Matrix A1 = generate_matrix(box1, box2, box_idx, box2_sample);
       Matrix U;
       std::vector<int64_t> ipiv_rows;
-      std::tie(U, ipiv_rows) = error_id_row(A1, ID_tol);
+      std::tie(U, ipiv_rows) = error_id_row(A1, ID_tol, false);
       int64_t rank = U.cols;
       // A2 = A(ipiv_rows[:rank], :)
       Matrix A2(rank, A.cols);

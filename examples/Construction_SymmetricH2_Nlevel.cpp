@@ -124,7 +124,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         // ID compress
         Matrix U_node;
         std::vector<int64_t> ipiv_rows;
-        std::tie(U_node, ipiv_rows) = error_id_row(adm_block_row, ID_tolerance);
+        std::tie(U_node, ipiv_rows) = error_id_row(adm_block_row, ID_tolerance, false);
         int64_t rank = U_node.cols;
         // Convert ipiv to node skeleton rows to be used by parent
         std::vector<int64_t> skel_rows;

@@ -121,7 +121,7 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank);
 
 std::tuple<Matrix, std::vector<int64_t>> truncated_id_row(Matrix& A, int64_t rank);
-std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double error);
+std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double error, bool relative);
 
 std::vector<double> get_eigenvalues(const Matrix& A);
 
