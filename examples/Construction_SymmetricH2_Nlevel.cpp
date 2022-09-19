@@ -323,9 +323,8 @@ int main(int argc, char ** argv) {
   // 0: Choose bodies with equally spaced indices
   // 1: Choose bodies random indices
   // 2: Farthest Point Sampling
-  // 3: Anchor Net (initial_far_sp=0)
-  // 4: Anchor Net (initial_far_sp=1)
-  int64_t sampling_algo = argc > 8 ? atol(argv[8]) : 0;
+  // 3: Anchor Net
+  const int64_t sampling_algo = argc > 8 ? atol(argv[8]) : 0;
 
   // Specify kernel function
   // 0: Laplace Kernel
@@ -384,7 +383,6 @@ int main(int argc, char ** argv) {
     }
   }
   std::string sampling_algo_name = "";
-  int64_t initial_far_sp = 0;
   switch (sampling_algo) {
     case 0: {
       sampling_algo_name = "equally_spaced_indices";
@@ -400,13 +398,6 @@ int main(int argc, char ** argv) {
     }
     case 3: {
       sampling_algo_name = "anchor_net";
-      initial_far_sp = 0;
-      break;
-    }
-    case 4: {
-      sampling_algo_name = "anchor_net";
-      sampling_algo = 3;
-      initial_far_sp = 1;
       break;
     }
   }
@@ -420,6 +411,7 @@ int main(int argc, char ** argv) {
   //   sample_self_size = r;
   //   sample_far_size = r > 3 ? std::max(r + 3, (int64_t)10) : r + 3;
   // }
+  const auto initial_far_sp = 1;
   domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo, initial_far_sp);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>

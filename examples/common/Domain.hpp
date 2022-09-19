@@ -623,7 +623,7 @@ class Domain {
         auto initial_sample = parent.sample_farfield;
         if ((sampling_algo != 3) || (initial_far_sp == 0) ||
             (parent.sample_farfield.size() > far_nbodies)) {
-          // Put all sample_bodies of far nodes into initial sample
+          // Put all sample_bodies of far nodes (in the same level) into initial sample
           for (const auto far_idx: cell.far_list) {
             initial_sample.insert(initial_sample.end(),
                                   cells[far_idx].sample_bodies.begin(),
@@ -631,6 +631,9 @@ class Domain {
           }
         }
         else {
+          // Put only samples of far nodes (in the same level) into initial sample
+          // So that the initial sample contain a the same proportion of
+          // current level far-bodies and parent's far-bodies
           const int64_t num_far_nodes = cell.far_list.size();
           // 1. Find centroid of each far-node's sample bodies
           std::vector<double> centers(ndim * num_far_nodes);  // column major, each column is a coordinate
