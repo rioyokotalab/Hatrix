@@ -55,6 +55,17 @@ class Domain {
     return Xmax;
   }
 
+  double get_Xsum(const std::vector<Body>& bodies_arr,
+                  const std::vector<int64_t>& bodies_idx,
+                  const int64_t axis) const {
+    assert(axis < ndim);
+    double sum = 0;
+    for (int64_t i = 0; i < bodies_idx.size(); i++) {
+      sum += bodies_arr[bodies_idx[i]].X[axis];
+    }
+    return sum;
+  }
+
   // Compute squared euclidean distance between two coordinates
   double dist2(const double* a_X, const double* b_X) const {
     double dist = 0;
@@ -80,9 +91,10 @@ class Domain {
     for (int64_t axis = 0; axis < ndim; axis++) {
       const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
       const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
+      const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
       const auto diam = Xmax - Xmin;
-      cell.center[axis] = (Xmin + Xmax) / 2.;
-      cell.radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
+      cell.center[axis] = Xsum / (double)cell.nbodies;
+      cell.radius[axis] = diam / 2.;
 
       if (cell.radius[axis] > radius_max) {
         radius_max = cell.radius[axis];
@@ -304,14 +316,13 @@ class Domain {
       }
       case 2: {  // Farthest Point Sampling (FPS)
         std::vector<bool> chosen(nbodies, false);
-        // Find center of enclosing box
+        // Find centroid of bodies
         double center[MAX_NDIM];
         for (int64_t axis = 0; axis < ndim; axis++) {
-          const auto Xmin = get_Xmin(bodies, bodies_idx, axis);
-          const auto Xmax = get_Xmax(bodies, bodies_idx, axis);
-          center[axis] = (Xmax + Xmin) / 2.;
+          const auto Xsum = get_Xsum(bodies, bodies_idx, axis);
+          center[axis] = Xsum / (double)bodies_idx.size();
         }
-        // Start with point closest to the center as pivot
+        // Start with point closest to the centroid as pivot
         int64_t pivot = -1;
         double min_dist2 = std::numeric_limits<double>::max();
         for (int64_t i = 0; i < nbodies; i++) {
@@ -621,20 +632,15 @@ class Domain {
         }
         else {
           const int64_t num_far_nodes = cell.far_list.size();
-          // 1. Find center of each far-node's sample bodies using average of coordinate values
+          // 1. Find centroid of each far-node's sample bodies
           std::vector<double> centers(ndim * num_far_nodes);  // column major, each column is a coordinate
           for (int64_t i = 0; i < num_far_nodes; i++) {
             const auto far_idx = cell.far_list[i];
             const auto& far_cell = cells[far_idx];
             const auto far_cell_nsamples = far_cell.sample_bodies.size();
-            std::vector<double> sum(ndim, 0);
-            for (const auto body_idx: far_cell.sample_bodies) {
-              for (int64_t axis = 0; axis < ndim; axis++) {
-                sum[axis] += bodies[body_idx].X[axis];
-              }
-            }
             for (int64_t axis = 0; axis < ndim; axis++) {
-              centers[i * ndim + axis] = sum[axis] / (double)far_cell_nsamples;
+              const auto sum = get_Xsum(bodies, far_cell.sample_bodies, axis);
+              centers[i * ndim + axis] = sum / (double)far_cell_nsamples;
             }
           }
           // 2. Build anchor grid on far-node's sample bodies
