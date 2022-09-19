@@ -28,6 +28,7 @@ class SymmetricH2 {
  public:
   int64_t N, leaf_size;
   double accuracy;
+  bool use_rel_acc;
   double ID_tolerance;
   int64_t max_rank;
   double admis;
@@ -52,11 +53,12 @@ class SymmetricH2 {
  public:
   SymmetricH2(const Domain& domain,
               const int64_t N, const int64_t leaf_size,
-              const double accuracy, const int64_t max_rank, const double admis);
+              const double accuracy, const bool use_rel_acc,
+              const int64_t max_rank, const double admis);
 
   int64_t get_basis_min_rank() const;
   int64_t get_basis_max_rank() const;
-  double construction_absolute_error(const Domain& domain) const;
+  double construction_error(const Domain& domain) const;
   void print_structure(const int64_t level) const;
   void print_ranks() const;
   double low_rank_block_ratio() const;
@@ -124,7 +126,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         // ID compress
         Matrix U_node;
         std::vector<int64_t> ipiv_rows;
-        std::tie(U_node, ipiv_rows) = error_id_row(adm_block_row, ID_tolerance, false);
+        std::tie(U_node, ipiv_rows) = error_id_row(adm_block_row, ID_tolerance, use_rel_acc);
         int64_t rank = U_node.cols;
         // Convert ipiv to node skeleton rows to be used by parent
         std::vector<int64_t> skel_rows;
@@ -182,9 +184,10 @@ Matrix SymmetricH2::get_Ubig(const int64_t node, const int64_t level) const {
 
 SymmetricH2::SymmetricH2(const Domain& domain,
                          const int64_t N, const int64_t leaf_size,
-                         const double accuracy, const int64_t max_rank, const double admis)
+                         const double accuracy, const bool use_rel_acc,
+                         const int64_t max_rank, const double admis)
     : N(N), leaf_size(leaf_size), accuracy(accuracy),
-      max_rank(max_rank), admis(admis) {
+      use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis) {
   // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
   ID_tolerance = accuracy * 1e-1;
@@ -219,16 +222,19 @@ int64_t SymmetricH2::get_basis_max_rank() const {
   return rank_max;
 }
 
-double SymmetricH2::construction_absolute_error(const Domain& domain) const {
-  double error = 0;
+double SymmetricH2::construction_error(const Domain& domain) const {
+  double dense_norm = 0;
+  double diff_norm = 0;
   // Inadmissible blocks (only at leaf level)
   for (int64_t i = 0; i < level_blocks[height]; i++) {
     for (int64_t j = 0; j < level_blocks[height]; j++) {
       if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
-        const Matrix actual = Hatrix::generate_p2p_matrix(domain, i, j, height);
-        const Matrix expected = D(i, j, height);
-        const auto diff = norm(expected - actual);
-        error += diff * diff;
+        const Matrix expected = Hatrix::generate_p2p_matrix(domain, i, j, height);
+        const Matrix actual = D(i, j, height);
+        const auto dnorm = norm(expected);
+        const auto diff = norm(actual - expected);
+        dense_norm += dnorm * dnorm;
+        diff_norm += diff * diff;
       }
     }
   }
@@ -237,18 +243,19 @@ double SymmetricH2::construction_absolute_error(const Domain& domain) const {
     for (int64_t i = 0; i < level_blocks[level]; i++) {
       for (int64_t j = 0; j < level_blocks[level]; j++) {
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+          const Matrix expected = Hatrix::generate_p2p_matrix(domain, i, j, level);
           const Matrix Ubig = get_Ubig(i, level);
           const Matrix Vbig = get_Ubig(j, level);
-          const Matrix expected_matrix = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
-          const Matrix actual_matrix =
-              Hatrix::generate_p2p_matrix(domain, i, j, level);
-          const auto diff = norm(expected_matrix - actual_matrix);
-          error += diff * diff;
+          const Matrix actual = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
+          const auto dnorm = norm(expected);
+          const auto diff = norm(actual - expected);
+          dense_norm += dnorm * dnorm;
+          diff_norm += diff * diff;
         }
       }
     }
   }
-  return std::sqrt(error);
+  return (use_rel_acc ? std::sqrt(diff_norm / dense_norm) : std::sqrt(diff_norm));
 }
 
 void SymmetricH2::print_structure(const int64_t level) const {
@@ -337,6 +344,7 @@ int main(int argc, char ** argv) {
   // 2: StarsH Uniform Grid
   const int64_t geom_type = argc > 10 ? atol(argv[10]) : 0;
   const int64_t ndim  = argc > 11 ? atol(argv[11]) : 2;
+  const bool use_rel_acc = argc > 12 ? (atol(argv[12]) == 1) : false;
 
   Hatrix::Context::init();
 
@@ -411,23 +419,24 @@ int main(int argc, char ** argv) {
   //   sample_self_size = r;
   //   sample_far_size = r > 3 ? std::max(r + 3, (int64_t)10) : r + 3;
   // }
-  const auto initial_far_sp = 1;
+  const int64_t initial_far_sp = 1;
   domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo, initial_far_sp);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();
 
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, max_rank, admis);
+  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                (stop_construct - start_construct).count();  
-  double construct_error = A.construction_absolute_error(domain);
+                                (stop_construct - start_construct).count();
+  double construct_error = A.construction_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
 
   std::cout << "N=" << N
             << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
+            << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
             << " max_rank=" << max_rank
             << " admis=" << admis << std::setw(3)
             << " sampling_algo=" << sampling_algo_name
