@@ -57,16 +57,16 @@ TEST_P(ErrorPivotedQRTests, ThresholdBasedTruncation) {
   Hatrix::Matrix A(D);
   Hatrix::Matrix Q, RP;
   int64_t rank;
-  std::tie(Q, RP, rank) = error_pivoted_qr(A, eps);
+  std::tie(Q, RP, rank) = error_pivoted_qr(A, eps * 0.1);
 
   // Check dimensions
   EXPECT_EQ(Q.rows, D.rows);
   EXPECT_EQ(Q.cols, RP.rows);
   EXPECT_EQ(RP.cols, D.cols);
-  
+
   // Check compression error
   const double error = Hatrix::norm(D - Hatrix::matmul(Q, RP));
-  EXPECT_NEAR(error, eps, 10*eps);
+  EXPECT_NEAR(error, 0, eps);
   Hatrix::Context::finalize();
 }
 
