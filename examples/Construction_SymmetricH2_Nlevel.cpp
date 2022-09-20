@@ -128,6 +128,11 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         std::vector<int64_t> ipiv_rows;
         std::tie(U_node, ipiv_rows) = error_id_row(adm_block_row, ID_tolerance, use_rel_acc);
         int64_t rank = U_node.cols;
+        if (max_rank > 0 && rank > max_rank) {
+          // Truncate to max_rank
+          U_node.shrink(U_node.rows, max_rank);
+          rank = max_rank;
+        }
         // Convert ipiv to node skeleton rows to be used by parent
         std::vector<int64_t> skel_rows;
         skel_rows.reserve(rank);
