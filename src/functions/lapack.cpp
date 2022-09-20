@@ -601,7 +601,12 @@ std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double eps, boo
   std::vector<int64_t> skel_rows;
   std::vector<double> tau;
   std::tie(rank, skel_rows, tau) = partial_pivoted_qr(ATrans, eps, relative);
-
+  // Handle zero matrix case
+  if (rank == 0) {
+    rank = 1;
+    Matrix U = generate_identity_matrix(ATrans.cols, rank);
+    return std::make_tuple(std::move(U), std::move(skel_rows));
+  }
   // Construct interpolation matrix U
   Matrix U(ATrans.cols, rank);
   solve_r_block(U, ATrans, rank);
