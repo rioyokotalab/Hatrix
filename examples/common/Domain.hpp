@@ -613,13 +613,13 @@ class Domain {
       const auto level_offset = level_ncells - 1;
       for (int64_t node = 0; node < level_ncells; node++) {
         auto& cell = cells[level_offset + node];
-        if (cell.far_list.size() == 0) continue;
+        const auto& parent = cells[cell.parent];
+        if ((parent.sample_farfield.size() == 0) && (cell.far_list.size() == 0)) continue;
 
         int64_t far_nbodies = 0;
         for (const auto far_idx: cell.far_list) {
           far_nbodies += cells[far_idx].sample_bodies.size();
         }
-        const auto& parent = cells[cell.parent];
         auto initial_sample = parent.sample_farfield;
         if ((sampling_algo != 3) || (initial_far_sp == 0) ||
             (parent.sample_farfield.size() > far_nbodies)) {
