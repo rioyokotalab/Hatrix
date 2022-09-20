@@ -33,7 +33,7 @@ class SymmetricH2 {
   int64_t max_rank;
   double admis;
   int64_t height;
-  RowLevelMap U;
+  RowLevelMap U, R_row;
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
   std::vector<int64_t> level_blocks;
@@ -134,7 +134,24 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
         for (int64_t i = 0; i < rank; i++) {
           skel_rows.push_back(skeleton[ipiv_rows[i]]);
         }
-        U.insert(node, level, std::move(U_node));
+        // Multiply U with child R
+        if (level < height) {
+          const auto& child1 = domain.cells[cell.child];
+          const auto& child2 = domain.cells[cell.child + 1];
+          const auto& child1_skeleton = skeleton_rows(child1.block_index, child1.level);
+          const auto& child2_skeleton = skeleton_rows(child2.block_index, child2.level);
+          auto U_node_splits = U_node.split(vec{(int64_t)child1_skeleton.size()}, vec{});
+          triangular_matmul(R_row(child1.block_index, child1.level), U_node_splits[0],
+                            Hatrix::Left, Hatrix::Upper, false, false, 1);
+          triangular_matmul(R_row(child2.block_index, child2.level), U_node_splits[1],
+                            Hatrix::Left, Hatrix::Upper, false, false, 1);
+        }
+        // Orthogonalize basis with QR
+        Matrix Q(U_node.rows, U_node.cols);
+        Matrix R(U_node.cols, U_node.cols);
+        qr(U_node, Q, R);
+        U.insert(node, level, std::move(Q));
+        R_row.insert(node, level, std::move(R));
         skeleton_rows.insert(node, level, std::move(skel_rows));
       }
     }
@@ -155,7 +172,13 @@ void SymmetricH2::generate_coupling_matrices(const Domain& domain) {
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
           const auto& skeleton_i = skeleton_rows(i, level);
           const auto& skeleton_j = skeleton_rows(j, level);
-          S.insert(i, j, level, generate_p2p_matrix(domain, skeleton_i, skeleton_j));
+          Matrix skeleton_matrix = generate_p2p_matrix(domain, skeleton_i, skeleton_j);
+          // Multiply with R from left and right
+          triangular_matmul(R_row(i, level), skeleton_matrix,
+                            Hatrix::Left, Hatrix::Upper, false, false, 1);
+          triangular_matmul(R_row(j, level), skeleton_matrix,
+                            Hatrix::Right, Hatrix::Upper, true, false, 1);
+          S.insert(i, j, level, std::move(skeleton_matrix));
         }
       }
     }
