@@ -99,35 +99,38 @@ class H2 {
 };
 
 void H2::initialize_geometry_admissibility(const Domain& domain) {
-  height = domain.tree_height;
-  level_blocks.assign(height + 1, 0);
-  for (const auto& cell: domain.cells) {
-    const auto level = cell.level;
-    const auto i = cell.block_index;
-    level_blocks[level]++;
-    // Near interaction list: inadmissible dense blocks
-    for (const auto near_loc: cell.near_list) {
-      const auto j_near = domain.cells[near_loc].block_index;
-      is_admissible.insert(i, j_near, level, false);
-    }
-    // Far interaction list: admissible low-rank blocks
-    for (const auto far_loc: cell.far_list) {
-      const auto j_far = domain.cells[far_loc].block_index;
-      is_admissible.insert(i, j_far, level, true);
+  if (matrix_type == H2_MATRIX) {
+    height = domain.tree_height;
+    level_blocks.assign(height + 1, 0);
+    for (const auto& cell: domain.cells) {
+      const auto level = cell.level;
+      const auto i = cell.block_index;
+      level_blocks[level]++;
+      // Near interaction list: inadmissible dense blocks
+      for (const auto near_idx: cell.near_list) {
+        const auto j_near = domain.cells[near_idx].block_index;
+        is_admissible.insert(i, j_near, level, false);
+      }
+      // Far interaction list: admissible low-rank blocks
+      for (const auto far_idx: cell.far_list) {
+        const auto j_far = domain.cells[far_idx].block_index;
+        is_admissible.insert(i, j_far, level, true);
+      }
     }
   }
-  if (matrix_type == BLR2_MATRIX) {
-    const int64_t nleaf_cells = level_blocks[height];
+  else if (matrix_type == BLR2_MATRIX) {
     height = 1;
-    level_blocks.resize(2);
+    level_blocks.assign(height + 1, 0);
     level_blocks[0] = 1;
-    level_blocks[1] = nleaf_cells;
+    level_blocks[1] = (int64_t)1 << domain.tree_height;
     // Subdivide into BLR
+    is_admissible.insert(0, 0, 0, false);
     for (int64_t i = 0; i < level_blocks[height]; i++) {
       for (int64_t j = 0; j < level_blocks[height]; j++) {
-        if (!is_admissible.exists(i, j, height)) {  // Upper level admissible block
-          is_admissible.insert(i, j, height, true);
-        }
+        const auto level = domain.tree_height;
+        const auto& source = domain.cells[domain.get_cell_idx(i, level)];
+        const auto& target = domain.cells[domain.get_cell_idx(j, level)];
+        is_admissible.insert(i, j, height, domain.is_well_separated(source, target, admis));
       }
     }
   }
@@ -151,7 +154,8 @@ int64_t H2::find_all_dense_row() const {
 }
 
 int64_t H2::get_block_size(const Domain& domain, const int64_t node, const int64_t level) const {
-  const auto idx = domain.get_cell_idx(node, level);
+  const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+  const auto idx = domain.get_cell_idx(node, node_level);
   return domain.cells[idx].nbodies;
 }
 
@@ -209,16 +213,17 @@ Matrix H2::generate_block_row(const Domain& domain, const Matrix& rand,
   }
 
   Matrix block_row(block_size, sample ? rand.cols : 0);
+  const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
   for (int64_t j = 0; j < nblocks; j++) {
     if ((!is_admissible.exists(node, j, level)) || // part of upper level admissible block
         (is_admissible.exists(node, j, level) && is_admissible(node, j, level))) {
       if (sample) {
-        matmul(generate_p2p_matrix(domain, node, j, level), rand_splits[j],
+        matmul(generate_p2p_matrix(domain, node, j, node_level), rand_splits[j],
                block_row, false, false, 1.0, 1.0);
       }
       else {
         block_row =
-            concat(block_row, generate_p2p_matrix(domain, node, j, level), 1);
+            concat(block_row, generate_p2p_matrix(domain, node, j, node_level), 1);
       }
     }
   }
@@ -236,17 +241,18 @@ Matrix H2::generate_block_col(const Domain& domain, const Matrix& rand,
   }
 
   Matrix block_column(sample ? rand.cols : 0, block_size);
+  const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
   for (int64_t i = 0; i < nblocks; i++) {
     if ((!is_admissible.exists(i, node, level)) || // part of upper level admissible block
         (is_admissible.exists(i, node, level) && is_admissible(i, node, level))) {
       if (sample) {
         matmul(rand_splits[i],
-               generate_p2p_matrix(domain, i, node, level),
+               generate_p2p_matrix(domain, i, node, node_level),
                block_column, true, false, 1.0, 1.0);
       }
       else {
         block_column =
-            concat(block_column, generate_p2p_matrix(domain, i, node, level), 0);
+            concat(block_column, generate_p2p_matrix(domain, i, node, node_level), 0);
       }
     }
   }
@@ -281,12 +287,13 @@ H2::generate_col_cluster_basis(const Domain& domain, const Matrix& rand,
 
 void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
   const int64_t nblocks = level_blocks[height];
+  const auto leaf_level = matrix_type == BLR2_MATRIX ? domain.tree_height : height;
   // Generate inadmissible leaf blocks
   for (int64_t i = 0; i < nblocks; i++) {
     for (int64_t j = 0; j < nblocks; j++) {
       if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
         D.insert(i, j, height,
-                 generate_p2p_matrix(domain, i, j, height));
+                 generate_p2p_matrix(domain, i, j, leaf_level));
       }
     }
   }
@@ -314,7 +321,7 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
   for (int64_t i = 0; i < nblocks; i++) {
     for (int64_t j = 0; j < nblocks; j++) {
       if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
-        Matrix dense = generate_p2p_matrix(domain, i, j, height);
+        Matrix dense = generate_p2p_matrix(domain, i, j, leaf_level);
         S.insert(i, j, height,
                  matmul(matmul(U(i, height), dense, true, false),
                         V(j, height)));
@@ -529,7 +536,8 @@ double H2::construction_absolute_error(const Domain& domain) const {
   for (int64_t i = 0; i < level_blocks[height]; i++) {
     for (int64_t j = 0; j < level_blocks[height]; j++) {
       if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
-        const Matrix actual = Hatrix::generate_p2p_matrix(domain, i, j, height);
+        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : height;
+        const Matrix actual = Hatrix::generate_p2p_matrix(domain, i, j, node_level);
         const Matrix expected = D(i, j, height);
         error += pow(norm(actual - expected), 2);
       }
@@ -543,8 +551,9 @@ double H2::construction_absolute_error(const Domain& domain) const {
           const Matrix Ubig = get_Ubig(i, level);
           const Matrix Vbig = get_Vbig(j, level);
           const Matrix expected_matrix = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
+          const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
           const Matrix actual_matrix =
-              Hatrix::generate_p2p_matrix(domain, i, j, level);
+              Hatrix::generate_p2p_matrix(domain, i, j, node_level);
           error += pow(norm(expected_matrix - actual_matrix), 2);
         }
       }
