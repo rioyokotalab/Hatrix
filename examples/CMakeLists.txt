@@ -45,9 +45,10 @@ else()
     LDL_strong_1level
     LDL_strong_Nlevel
     Construction_H2_Nlevel
-    LDL_H2_Nlevel
+    LDL_SymmetricH2_Nlevel
+    Eigen_SymmetricH2_Nlevel
     UMV_H2_Nlevel
-    Eigen_H2_Nlevel
+    Construction_SymmetricH2_Nlevel_with_sampling
   )
 endif()
 
