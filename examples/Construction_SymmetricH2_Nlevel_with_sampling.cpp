@@ -122,6 +122,8 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
           skeleton.insert(skeleton.end(), child1_skeleton.begin(), child1_skeleton.end());
           skeleton.insert(skeleton.end(), child2_skeleton.begin(), child2_skeleton.end());
         }
+        // Key to order N complexity is here:
+        // The size of adm_block_row is always constant: ID_skeleton_size x sample_far_size
         Matrix adm_block_row = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
         // ID compress
         Matrix U_node;
@@ -348,30 +350,38 @@ double SymmetricH2::low_rank_block_ratio() const {
 int main(int argc, char ** argv) {
   const int64_t N = argc > 1 ? atol(argv[1]) : 256;
   const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
-  const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-5;
+  const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-8;
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
-  const double admis = argc > 5 ? atof(argv[5]) : 1.0;
-  int64_t sample_self_size = argc > 6 ? atol(argv[6]) : 2 * leaf_size;
-  int64_t sample_far_size = argc > 7 ? atol(argv[7]) : 5 * sample_self_size;
-
-  // Specify bodies sampling technique
-  // 0: Choose bodies with equally spaced indices
-  // 1: Choose bodies random indices
-  // 2: Farthest Point Sampling
-  // 3: Anchor Net
-  const int64_t sampling_algo = argc > 8 ? atol(argv[8]) : 0;
+  const double admis = argc > 5 ? atof(argv[5]) : 3;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
-  const int64_t kernel_type = argc > 9 ? atol(argv[9]) : 0;
+  const int64_t kernel_type = argc > 6 ? atol(argv[6]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
   // 1: Unit Cubical
   // 2: StarsH Uniform Grid
-  const int64_t geom_type = argc > 10 ? atol(argv[10]) : 0;
-  const int64_t ndim  = argc > 11 ? atol(argv[11]) : 2;
+  const int64_t geom_type = argc > 7 ? atol(argv[7]) : 0;
+  const int64_t ndim  = argc > 8 ? atol(argv[8]) : 1;
+
+  // Specify sampling technique
+  // 0: Choose bodies with equally spaced indices
+  // 1: Choose bodies random indices
+  // 2: Farthest Point Sampling
+  // 3: Anchor Net method
+  const int64_t sampling_algo = argc > 9 ? atol(argv[9]) : 3;
+  // Specify maximum number of sample points that represents a cluster
+  // For anchor-net method: size of grid
+  int64_t sample_self_size = argc > 10 ? atol(argv[10]) :
+                             (ndim == 1 ? 10 * leaf_size : 30);
+  // Specify maximum number of sample points that represents a cluster's far-field
+  // For anchor-net method: size of grid
+  int64_t sample_far_size = argc > 11 ? atol(argv[11]) :
+                            (ndim == 1 ? 10 * leaf_size + 10: sample_self_size + 5);
+
+  // Use relative or absolute error threshold
   const bool use_rel_acc = argc > 12 ? (atol(argv[12]) == 1) : false;
 
   Hatrix::Context::init();
@@ -442,13 +452,20 @@ int main(int argc, char ** argv) {
   domain.build_interactions(admis);
   const auto start_sample = std::chrono::system_clock::now();
   // if (sampling_algo == 3) {
+  //   // It is also possible to determine the minimum sample size to reach a desired accuracy.
+  //   // The HiDR paper does this by increasing the sample_size until the accuracy of 1e-2 * err_tol is reached.
+  //   // However, a good geometry partitioning technique is required for the estimate sample_size to work,
+  //   // because it assumes that each cluster contain uniformly distributed points, which may not be
+  //   // be produced by our current, simple partitioning method
+  //   // Source: https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c
+  //   const double ID_compress_tol = accuracy * 1e-1;
+  //   const double sampling_stop_tol = accuracy * 1e-2;
   //   const auto r = domain.adaptive_anchor_grid_size(Hatrix::kernel_function, leaf_size, admis,
-  //                                                   accuracy * 1e-1, accuracy * 1e-2);
+  //                                                   ID_compress_tol, sampling_stop_tol);
   //   sample_self_size = r;
   //   sample_far_size = r > 3 ? std::max(r + 3, (int64_t)10) : r + 3;
   // }
-  const int64_t initial_far_sp = 1;
-  domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo, initial_far_sp);
+  domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();
