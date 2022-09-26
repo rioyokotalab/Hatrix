@@ -46,9 +46,9 @@ else()
     LDL_strong_Nlevel
     Construction_SymmetricH2_Nlevel_with_sampling
     Construction_H2_Nlevel
-#    UMV_H2_Nlevel
-#    LDL_H2_Nlevel
-#    Eigen_H2_Nlevel
+    LDL_SymmetricH2_Nlevel
+    Eigen_SymmetricH2_Nlevel
+    UMV_H2_Nlevel
 #    UMV_H2_Nlevel_nodependency
 #    LDL_H2_Nlevel_nodependency
 #    Eigen_H2_Nlevel_nodependency

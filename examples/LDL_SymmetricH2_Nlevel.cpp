@@ -20,36 +20,23 @@
 #include "Domain.hpp"
 #include "functions.hpp"
 
+// H2-Construction employ multiplication with a random matrix to reduce far-block matrix size
+// Quite accurate and does not rely on ID but incur O(N^2) complexity to construct basis and coupling matrices
+
 // Comment the following line to use SVD instead of pivoted QR for low-rank compression
 // #define USE_QR_COMPRESSION
 
-constexpr double EPS = 1e-13;
 using vec = std::vector<int64_t>;
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
-
-Hatrix::Matrix diag(const Hatrix::Matrix& A) {
-  Hatrix::Matrix diag(A.min_dim(), 1);
-  for(int64_t i = 0; i < A.min_dim(); i++) {
-    diag(i, 0) = A(i, i);
-  }
-  return diag;
-}
-
-void shift_diag(Hatrix::Matrix& A, const double shift) {
-  for(int64_t i = 0; i < A.min_dim(); i++) {
-    A(i, i) += shift;
-  }
-}
 
 namespace Hatrix {
 
 class SymmetricH2 {
  public:
-  int64_t N, nleaf, n_blocks;
+  int64_t N, leaf_size;
   double accuracy;
   int64_t max_rank;
   double admis;
-  std::string admis_kind;
   int64_t matrix_type;
   int64_t height;
   RowLevelMap U;
@@ -59,32 +46,25 @@ class SymmetricH2 {
   std::vector<int64_t> level_blocks;
 
  private:
+  void initialize_geometry_admissibility(const Domain& domain);
+
   int64_t find_all_dense_row() const;
-  void coarsen_blocks(const int64_t level);
-
-  int64_t geometry_admis_non_leaf(const int64_t nblocks, const int64_t level);
-  int64_t calc_geometry_based_admissibility(const Domain& domain);
-  void calc_diagonal_based_admissibility(const int64_t level);
-
-  int64_t get_block_size_row(const Domain& domain, const int64_t node, const int64_t level) const;
+  int64_t get_block_size(const Domain& domain, const int64_t node, const int64_t level) const;
   bool row_has_admissible_blocks(const int64_t row, const int64_t level) const;
 
   std::tuple<Matrix, Matrix, Matrix, int64_t> svd_like_compression(Matrix& A) const;
 
   Matrix generate_block_row(const Domain& domain, const Matrix& rand,
-                            const int64_t node, const int64_t level,
-                            const int64_t block_size) const;
+                            const int64_t node, const int64_t level) const;
   std::tuple<Matrix, Matrix>
   generate_row_cluster_basis(const Domain& domain, const Matrix& rand,
-                             const int64_t node, const int64_t level,
-                             const int64_t block_size) const;
+                             const int64_t node, const int64_t level) const;
   void generate_leaf_nodes(const Domain& domain, const Matrix& rand);
 
   std::tuple<Matrix, Matrix>
   generate_U_transfer_matrix(const Domain& domain, const Matrix& rand,
                              const Matrix& Ubig_child1, const Matrix& Ubig_child2,
-                             const int64_t node, const int64_t level,
-                             const int64_t block_size) const;
+                             const int64_t node, const int64_t level) const;
   RowLevelMap
   generate_transfer_matrices(const Domain& domain, const Matrix& rand, const int64_t level,
                              RowLevelMap& Uchild);
@@ -105,10 +85,9 @@ class SymmetricH2 {
 
  public:
   SymmetricH2(const Domain& domain, const Matrix& rand,
-              const int64_t N, const int64_t nleaf,
+              const int64_t N, const int64_t leaf_size,
               const double accuracy, const int64_t max_rank,
-              const double admis, const std::string& admis_kind,
-              const int64_t matrix_type);
+              const double admis, const int64_t matrix_type);
 
   int64_t get_basis_min_rank() const;
   int64_t get_basis_max_rank() const;
@@ -119,11 +98,42 @@ class SymmetricH2 {
 
   void factorize();
   Matrix solve(const Matrix& b) const;
-  std::tuple<int64_t, int64_t> inertia(const double lambda, bool &singular) const;
-  std::tuple<double, int64_t, double>
-  get_mth_eigenvalue(const int64_t m, const double ev_tol,
-                     double left, double right) const;
 };
+
+void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
+  height = domain.tree_height;
+  level_blocks.assign(height + 1, 0);
+  for (const auto& cell: domain.cells) {
+    const auto level = cell.level;
+    const auto i = cell.block_index;
+    level_blocks[level]++;
+    // Near interaction list: inadmissible dense blocks
+    for (const auto near_loc: cell.near_list) {
+      const auto j_near = domain.cells[near_loc].block_index;
+      is_admissible.insert(i, j_near, level, false);
+    }
+    // Far interaction list: admissible low-rank blocks
+    for (const auto far_loc: cell.far_list) {
+      const auto j_far = domain.cells[far_loc].block_index;
+      is_admissible.insert(i, j_far, level, true);
+    }
+  }
+  if (matrix_type == BLR2_MATRIX) {
+    const int64_t nleaf_cells = level_blocks[height];
+    height = 1;
+    level_blocks.resize(2);
+    level_blocks[0] = 1;
+    level_blocks[1] = nleaf_cells;
+    // Subdivide into BLR
+    for (int64_t i = 0; i < level_blocks[height]; i++) {
+      for (int64_t j = 0; j < level_blocks[height]; j++) {
+        if (!is_admissible.exists(i, j, height)) {  // Upper level admissible block
+          is_admissible.insert(i, j, height, true);
+        }
+      }
+    }
+  }
+}
 
 int64_t SymmetricH2::find_all_dense_row() const {
   const int64_t nblocks = level_blocks[height];
@@ -142,117 +152,10 @@ int64_t SymmetricH2::find_all_dense_row() const {
   return -1;
 }
 
-void SymmetricH2::coarsen_blocks(const int64_t level) {
-  const int64_t child_level = level + 1;
-  const int64_t nblocks = (int64_t)std::pow(2, level);
-  for (int64_t i = 0; i < nblocks; i++) {
-    std::vector<int64_t> row_children({i * 2, i * 2 + 1});
-    for (int64_t j = 0; j < nblocks; j++) {
-      std::vector<int64_t> col_children({j * 2, j * 2 + 1});
-
-      bool admis_block = true;
-      for (int64_t c1 = 0; c1 < 2; c1++) {
-        for (int64_t c2 = 0; c2 < 2; c2++) {
-          if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
-              !is_admissible(row_children[c1], col_children[c2], child_level)) {
-            admis_block = false;
-          }
-        }
-      }
-      if (admis_block) {
-        for (int64_t c1 = 0; c1 < 2; c1++) {
-          for (int64_t c2 = 0; c2 < 2; c2++) {
-            is_admissible.erase(row_children[c1], col_children[c2], child_level);
-          }
-        }
-      }
-      is_admissible.insert(i, j, level, std::move(admis_block));
-    }
-  }
-}
-
-int64_t SymmetricH2::geometry_admis_non_leaf(const int64_t nblocks, const int64_t level) {
-  const int64_t child_level = level - 1;
-  level_blocks.push_back(nblocks);
-
-  if (nblocks == 1) { return level; }
-
-  for (int64_t i = 0; i < nblocks; i++) {
-    std::vector<int64_t> row_children({i * 2, i * 2 + 1});
-    for (int64_t j = 0; j < nblocks; j++) {
-      std::vector<int64_t> col_children({j * 2, j * 2 + 1});
-
-      bool admis_block = true;
-      for (int64_t c1 = 0; c1 < 2; c1++) {
-        for (int64_t c2 = 0; c2 < 2; c2++) {
-          if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
-              !is_admissible(row_children[c1], col_children[c2], child_level)) {
-            admis_block = false;
-          }
-        }
-      }
-      if (admis_block) {
-        for (int64_t c1 = 0; c1 < 2; c1++) {
-          for (int64_t c2 = 0; c2 < 2; c2++) {
-            is_admissible.erase(row_children[c1], col_children[c2], child_level);
-          }
-        }
-      }
-      is_admissible.insert(i, j, level, std::move(admis_block));
-    }
-  }
-
-  return geometry_admis_non_leaf(nblocks/2, level+1);
-}
-
-int64_t SymmetricH2::calc_geometry_based_admissibility(const Domain& domain) {
-  const int64_t nblocks = domain.boxes.size();
-  level_blocks.push_back(nblocks);
-  const int64_t level = 0;
-  for (int64_t i = 0; i < nblocks; i++) {
-    for (int64_t j = 0; j < nblocks; j++) {
-      is_admissible.insert(i, j, level, domain.check_admis(admis, i, j));
-    }
-  }
-
-  if (matrix_type == BLR2_MATRIX) {
-    level_blocks.push_back(1);
-    return 1;
-  }
-  else {
-    return geometry_admis_non_leaf(nblocks / 2, level+1);
-  }
-}
-
-void SymmetricH2::calc_diagonal_based_admissibility(const int64_t level) {
-  const int64_t nblocks = (int64_t)std::pow(2, level);
-  level_blocks.push_back(nblocks);
-  if (level == 0) { return; }
-  if (level == height) {
-    for (int64_t i = 0; i < nblocks; i++) {
-      for (int64_t j = 0; j < nblocks; j++) {
-        bool is_admissible_block = std::abs(i - j) > admis;
-        is_admissible.insert(i, j, level, std::move(is_admissible_block));
-      }
-    }
-  }
-  else {
-    coarsen_blocks(level);
-  }
-
-  calc_diagonal_based_admissibility(level-1);
-}
-
-int64_t SymmetricH2::get_block_size_row(const Domain& domain, const int64_t node, const int64_t level) const {
-  if (level == height) {
-    return domain.boxes[node].num_particles;
-  }
-  const int64_t child_level = level + 1;
-  const int64_t child1 = node * 2;
-  const int64_t child2 = node * 2 + 1;
-
-  return get_block_size_row(domain, child1, child_level) +
-      get_block_size_row(domain, child2, child_level);
+int64_t SymmetricH2::get_block_size(const Domain& domain,
+                                    const int64_t node, const int64_t level) const {
+  const auto idx = domain.get_cell_idx(node, level);
+  return domain.cells[idx].nbodies;
 }
 
 bool SymmetricH2::row_has_admissible_blocks(const int64_t row, const int64_t level) const {
@@ -267,7 +170,8 @@ bool SymmetricH2::row_has_admissible_blocks(const int64_t row, const int64_t lev
   return has_admis;
 }
 
-std::tuple<Matrix, Matrix, Matrix, int64_t> SymmetricH2::svd_like_compression(Matrix& A) const {
+std::tuple<Matrix, Matrix, Matrix, int64_t>
+SymmetricH2::svd_like_compression(Matrix& A) const {
   Matrix Ui, Si, Vi;
   int64_t rank;
 #ifdef USE_QR_COMPRESSION
@@ -287,9 +191,9 @@ std::tuple<Matrix, Matrix, Matrix, int64_t> SymmetricH2::svd_like_compression(Ma
 }
 
 Matrix SymmetricH2::generate_block_row(const Domain& domain, const Matrix& rand,
-                                       const int64_t node, const int64_t level,
-                                       const int64_t block_size) const {
+                                       const int64_t node, const int64_t level) const {
   const int64_t nblocks = level_blocks[level];
+  const int64_t block_size = get_block_size(domain, node, level);
   const bool sample = (rand.cols > 0);
   std::vector<Matrix> rand_splits;
   if (sample) {
@@ -301,12 +205,12 @@ Matrix SymmetricH2::generate_block_row(const Domain& domain, const Matrix& rand,
     if ((!is_admissible.exists(node, j, level)) || // part of upper level admissible block
         (is_admissible.exists(node, j, level) && is_admissible(node, j, level))) {
       if (sample) {
-        matmul(generate_p2p_interactions(domain, node, j, level, height), rand_splits[j],
+        matmul(generate_p2p_matrix(domain, node, j, level), rand_splits[j],
                block_row, false, false, 1.0, 1.0);
       }
       else {
         block_row =
-            concat(block_row, generate_p2p_interactions(domain, node, j, level, height), 1);
+            concat(block_row, generate_p2p_matrix(domain, node, j, level), 1);
       }
     }
   }
@@ -315,9 +219,8 @@ Matrix SymmetricH2::generate_block_row(const Domain& domain, const Matrix& rand,
 
 std::tuple<Matrix, Matrix>
 SymmetricH2::generate_row_cluster_basis(const Domain& domain, const Matrix& rand,
-                                        const int64_t node, const int64_t level,
-                                        const int64_t block_size) const {
-  Matrix block_row = generate_block_row(domain, rand, node, level, block_size);
+                                        const int64_t node, const int64_t level) const {
+  Matrix block_row = generate_block_row(domain, rand, node, level);
   Matrix Ui, Si, Vi_T;
   int64_t rank;
   std::tie(Ui, Si, Vi_T, rank) = svd_like_compression(block_row);
@@ -334,7 +237,7 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) 
     for (int64_t j = 0; j < nblocks; j++) {
       if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
         D.insert(i, j, height,
-                 generate_p2p_interactions(domain, i, j, height, height));
+                 generate_p2p_matrix(domain, i, j, height));
       }
     }
   }
@@ -343,7 +246,7 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) 
     if (row_has_admissible_blocks(i, height)) {
       Matrix Ui, UxS;
       std::tie(Ui, UxS) =
-          generate_row_cluster_basis(domain, rand, i, height, domain.boxes[i].num_particles);
+          generate_row_cluster_basis(domain, rand, i, height);
       U.insert(i, height, std::move(Ui));
       US_row.insert(i, height, std::move(UxS));
     }
@@ -352,7 +255,7 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) 
   for (int64_t i = 0; i < nblocks; i++) {
     for (int64_t j = 0; j < nblocks; j++) {
       if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
-        Matrix dense = generate_p2p_interactions(domain, i, j, height, height);
+        Matrix dense = generate_p2p_matrix(domain, i, j, height);
         S.insert(i, j, height,
                  matmul(matmul(U(i, height), dense, true, false),
                         U(j, height)));
@@ -364,9 +267,8 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) 
 std::tuple<Matrix, Matrix>
 SymmetricH2::generate_U_transfer_matrix(const Domain& domain, const Matrix& rand,
                                         const Matrix& Ubig_child1, const Matrix& Ubig_child2,
-                                        const int64_t node, const int64_t level,
-                                        const int64_t block_size) const {
-  Matrix block_row = generate_block_row(domain, rand, node, level, block_size);
+                                        const int64_t node, const int64_t level) const {
+  Matrix block_row = generate_block_row(domain, rand, node, level);
   auto block_row_splits = block_row.split(2, 1);
 
   Matrix temp(Ubig_child1.cols + Ubig_child2.cols, block_row.cols);
@@ -385,27 +287,26 @@ SymmetricH2::generate_U_transfer_matrix(const Domain& domain, const Matrix& rand
 }
 
 RowLevelMap
-SymmetricH2::generate_transfer_matrices(const Domain& domain, const Matrix& rand, const int64_t level,
-                                        RowLevelMap& Uchild) {
+SymmetricH2::generate_transfer_matrices(const Domain& domain, const Matrix& rand,
+                                        const int64_t level, RowLevelMap& Uchild) {
   // Generate the actual bases for the upper level and pass it to this
   // function again for generating transfer matrices at successive levels.
   RowLevelMap Ubig_parent;
 
   const int64_t nblocks = level_blocks[level];
   for (int64_t node = 0; node < nblocks; node++) {
-    int64_t child1 = node * 2;
-    int64_t child2 = node * 2 + 1;
-    int64_t child_level = level + 1;
+    const int64_t block_size = get_block_size(domain, node, level);
+    const int64_t child1 = node * 2;
+    const int64_t child2 = node * 2 + 1;
+    const int64_t child_level = level + 1;
 
     if (level > 0 && row_has_admissible_blocks(node, level)) {
-      const int64_t block_size = get_block_size_row(domain, node, level);
       // Generate row cluster transfer matrix.
       const Matrix& Ubig_child1 = Uchild(child1, child_level);
       const Matrix& Ubig_child2 = Uchild(child2, child_level);
       Matrix Utransfer, UxS;
       std::tie(Utransfer, UxS) =
-          generate_U_transfer_matrix(domain, rand, Ubig_child1, Ubig_child2,
-                                     node, level, block_size);
+          generate_U_transfer_matrix(domain, rand, Ubig_child1, Ubig_child2, node, level);
       U.insert(node, level, std::move(Utransfer));
       US_row.insert(node, level, std::move(UxS));
 
@@ -423,7 +324,7 @@ SymmetricH2::generate_transfer_matrices(const Domain& domain, const Matrix& rand
   for (int64_t i = 0; i < nblocks; i++) {
     for (int64_t j = 0; j < nblocks; j++) {
       if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-        Matrix D = generate_p2p_interactions(domain, i, j, level, height);
+        Matrix D = generate_p2p_matrix(domain, i, j, level);
 
         S.insert(i, j, level, matmul(matmul(Ubig_parent(i, level), D, true, false),
                                      Ubig_parent(j, level)));
@@ -454,65 +355,12 @@ Matrix SymmetricH2::get_Ubig(const int64_t node, const int64_t level) const {
 }
 
 SymmetricH2::SymmetricH2(const Domain& domain, const Matrix& rand,
-                         const int64_t N, const int64_t nleaf,
+                         const int64_t N, const int64_t leaf_size,
                          const double accuracy, const int64_t max_rank,
-                         const double admis, const std::string& admis_kind,
-                         const int64_t matrix_type)
-    : N(N), nleaf(nleaf), accuracy(accuracy), max_rank(max_rank),
-      admis(admis), admis_kind(admis_kind), matrix_type(matrix_type) {
-  if (admis_kind == "geometry_admis") {
-    // TODO: use dual tree traversal for this.
-    height = calc_geometry_based_admissibility(domain);
-    // reverse the levels stored in the admis blocks.
-    RowColLevelMap<bool> temp_is_admissible;
-
-    for (int64_t level = 0; level < height; level++) {
-      const int64_t nblocks = level_blocks[level];
-      for (int64_t i = 0; i < nblocks; i++) {
-        for (int64_t j = 0; j < nblocks; j++) {
-          if (is_admissible.exists(i, j, level)) {
-            bool value = is_admissible(i, j, level);
-            temp_is_admissible.insert(i, j, height - level,
-                                      std::move(value));
-          }
-        }
-      }
-    }
-
-    is_admissible = temp_is_admissible;
-    std::reverse(std::begin(level_blocks), std::end(level_blocks));
-  }
-  else if (admis_kind == "diagonal_admis") {
-    if (matrix_type == BLR2_MATRIX) {
-      height = 1;
-      const int64_t nblocks = domain.boxes.size();
-      for (int64_t i = 0; i < nblocks; i++) {
-        for (int64_t j = 0; j < nblocks; j++) {
-          is_admissible.insert(i, j, height, std::abs(i - j) > admis);
-        }
-      }
-      level_blocks.push_back(1);
-      level_blocks.push_back(nblocks);
-    }
-    else if (matrix_type == H2_MATRIX) {
-      height = int64_t(log2(N / nleaf));
-      calc_diagonal_based_admissibility(height);
-      std::reverse(std::begin(level_blocks), std::end(level_blocks));
-    }
-  }
-  else {
-    std::cout << "wrong admis condition: " << admis_kind << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
-  is_admissible.insert(0, 0, 0, false);
-
-  const int64_t all_dense_row = find_all_dense_row();
-  if (all_dense_row != -1) {
-    std::cout << "found all dense row at " << all_dense_row << ". Aborting.\n";
-    exit(EXIT_FAILURE);
-  }
-
+                         const double admis, const int64_t matrix_type)
+    : N(N), leaf_size(leaf_size), accuracy(accuracy), max_rank(max_rank),
+      admis(admis), matrix_type(matrix_type) {
+  initialize_geometry_admissibility(domain);
   generate_leaf_nodes(domain, rand);
   RowLevelMap Uchild = U;
 
@@ -553,7 +401,7 @@ double SymmetricH2::construction_absolute_error(const Domain& domain) const {
   for (int64_t i = 0; i < level_blocks[height]; i++) {
     for (int64_t j = 0; j < level_blocks[height]; j++) {
       if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
-        const Matrix actual = Hatrix::generate_p2p_interactions(domain, i, j, height, height);
+        const Matrix actual = Hatrix::generate_p2p_matrix(domain, i, j, height);
         const Matrix expected = D(i, j, height);
         error += pow(norm(actual - expected), 2);
       }
@@ -568,7 +416,7 @@ double SymmetricH2::construction_absolute_error(const Domain& domain) const {
           const Matrix Vbig = get_Ubig(j, level);
           const Matrix expected_matrix = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
           const Matrix actual_matrix =
-              Hatrix::generate_p2p_interactions(domain, i, j, level, height);
+              Hatrix::generate_p2p_matrix(domain, i, j, level);
           error += pow(norm(expected_matrix - actual_matrix), 2);
         }
       }
@@ -1538,102 +1386,32 @@ Matrix SymmetricH2::solve(const Matrix& b) const {
   return x;
 }
 
-std::tuple<int64_t, int64_t>
-SymmetricH2::inertia(const double lambda, bool &singular) const {
-  SymmetricH2 A_shifted(*this);
-  // Shift leaf level diagonal blocks
-  int64_t leaf_nblocks = level_blocks[height];
-  for(int64_t block = 0; block < leaf_nblocks; block++) {
-    shift_diag(A_shifted.D(block, block, height), -lambda);
-  }
-  // LDL Factorize
-  A_shifted.factorize();
-  // // Gather values in D
-  Matrix D_lambda(0, 0);
-  for(int64_t level = height; level >= 0; level--) {
-    int64_t nblocks = level_blocks[level];
-    for(int64_t block = 0; block < nblocks; block++) {
-      if(level == 0) {
-        D_lambda = concat(D_lambda, diag(A_shifted.D(block, block, level)), 0);
-      }
-      else {
-        int64_t rank = A_shifted.U(block, level).cols;
-        int64_t row_split = A_shifted.D(block, block, level).rows - rank;
-        int64_t col_split = A_shifted.D(block, block, level).cols - rank;
-        auto D_splits = A_shifted.D(block, block, level).split(vec{row_split},
-                                                               vec{col_split});
-        D_lambda = concat(D_lambda, diag(D_splits[0]), 0);
-      }
-    }
-  }
-  int64_t negative_elements_count = 0;
-  for(int64_t i = 0; i < D_lambda.rows; i++) {
-    negative_elements_count += (D_lambda(i, 0) < 0 ? 1 : 0);
-    if(std::isnan(D_lambda(i, 0)) || std::abs(D_lambda(i, 0)) < EPS) singular = true;
-  }
-  return {negative_elements_count, A_shifted.get_basis_max_rank()};
-}
-
-std::tuple<double, int64_t, double>
-SymmetricH2::get_mth_eigenvalue(const int64_t m, const double ev_tol,
-                                double left, double right) const {
-  int64_t shift_max_rank = get_basis_max_rank();
-  double max_rank_shift = -1;
-  bool singular = false;
-  while((right - left) >= ev_tol) {
-    const auto mid = (left + right) / 2;
-    int64_t value, factor_max_rank;
-    std::tie(value, factor_max_rank) = (*this).inertia(mid, singular);
-    if(singular) {
-      std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
-      break;
-    }
-    if(factor_max_rank >= shift_max_rank) {
-      shift_max_rank = factor_max_rank;
-      max_rank_shift = mid;
-    }
-    if(value >= m) right = mid;
-    else left = mid;
-  }
-  return {(left + right) / 2, shift_max_rank, max_rank_shift};
-}
-
 } // namespace Hatrix
 
 int main(int argc, char ** argv) {
   const int64_t N = argc > 1 ? atol(argv[1]) : 256;
-  const int64_t nleaf = argc > 2 ? atol(argv[2]) : 32;
+  const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-5;
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
-  const int64_t sample_size = argc > 5 ? atol(argv[5]) : 100;
+  const int64_t random_matrix_size = argc > 5 ? atol(argv[5]) : 100;
   const double admis = argc > 6 ? atof(argv[6]) : 1.0;
-
-  // Specify admissibility type
-  // diagonal_admis: Admissibility based on absolute distance from diagonal block
-  // geometry_admis: Admissibility based on particles' geometric distance
-  const std::string admis_kind = argc > 7 ? std::string(argv[7]) : "geometry_admis";
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
-  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
+  const int64_t kernel_type = argc > 7 ? atol(argv[7]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
   // 1: Unit Cubical
   // 2: StarsH Uniform Grid
-  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
-  const int64_t ndim  = argc > 10 ? atol(argv[10]) : 2;
+  const int64_t geom_type = argc > 8 ? atol(argv[8]) : 0;
+  const int64_t ndim  = argc > 9 ? atol(argv[9]) : 2;
 
   // Specify compressed representation
   // 0: BLR2
-  // 1: SymmetricH2
-  const int64_t matrix_type = argc > 11 ? atol(argv[11]) : 1;
-
-  // Eigenvalue computation parameters
-  const double ev_tol = argc > 12 ? atof(argv[12]) : 1.e-3;
-  int64_t m_begin = argc > 13 ? atol(argv[13]) : 1;
-  int64_t m_end = argc > 14 ? atol(argv[14]) : m_begin;
+  // 1: H2
+  const int64_t matrix_type = argc > 10 ? atol(argv[10]) : 1;
 
   Hatrix::Context::init();
 
@@ -1661,33 +1439,34 @@ int main(int argc, char ** argv) {
   std::string geom_name = std::to_string(ndim) + "d-";
   switch (geom_type) {
     case 0: {
-      domain.generate_unit_circular_mesh();
+      domain.initialize_unit_circular_mesh();
       geom_name += "circular_mesh";
       break;
     }
     case 1: {
-      domain.generate_unit_cubical_mesh();
+      domain.initialize_unit_cubical_mesh();
       geom_name += "cubical_mesh";
       break;
     }
     case 2: {
-      domain.generate_starsh_uniform_grid();
+      domain.initialize_starsh_uniform_grid();
       geom_name += "starsh_uniform_grid";
       break;
     }
     default: {
-      domain.generate_unit_circular_mesh();
+      domain.initialize_unit_circular_mesh();
       geom_name += "circular_mesh";
     }
   }
-  domain.divide_domain_and_create_particle_boxes(nleaf);
+  domain.build_tree(leaf_size);
+  domain.build_interactions(admis);
   const auto stop_particles = std::chrono::system_clock::now();
   const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                          (stop_particles - start_particles).count();
 
-  Hatrix::Matrix rand = Hatrix::generate_random_matrix(N, sample_size);
+  Hatrix::Matrix rand = Hatrix::generate_random_matrix(N, random_matrix_size);
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::SymmetricH2 A(domain, rand, N, nleaf, accuracy, max_rank, admis, admis_kind, matrix_type);
+  Hatrix::SymmetricH2 A(domain, rand, N, leaf_size, accuracy, max_rank, admis, matrix_type);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();  
@@ -1695,10 +1474,10 @@ int main(int argc, char ** argv) {
   double lr_ratio = A.low_rank_block_ratio();
 
   std::cout << "N=" << N
-            << " nleaf=" << nleaf
+            << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
             << " max_rank=" << max_rank
-            << " sample_size=" << sample_size
+            << " random_matrix_size=" << random_matrix_size
             << " compress_alg="
 #ifdef USE_QR_COMPRESSION
             << "QR"
@@ -1706,7 +1485,6 @@ int main(int argc, char ** argv) {
             << "SVD"
 #endif
             << " admis=" << admis << std::setw(3)
-            << " admis_kind=" << admis_kind
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
@@ -1718,60 +1496,31 @@ int main(int argc, char ** argv) {
             << std::scientific
             << " construct_error=" << construct_error
             << std::defaultfloat
-            << std::endl;
+            << " " << std::flush;
+
+  const auto start_factor = std::chrono::system_clock::now();
+  A.factorize();
+  const auto stop_factor = std::chrono::system_clock::now();
+  const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                             (stop_factor - start_factor).count();
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-  auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
+  Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Matrix b = Hatrix::matmul(Adense, x);
+  const auto solve_start = std::chrono::system_clock::now();
+  Hatrix::Matrix x_solve = A.solve(b);
+  const auto solve_stop = std::chrono::system_clock::now();
+  const double solve_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                            (solve_stop - solve_start).count();
+  double solve_error = Hatrix::norm(x_solve - x);
 
-  bool s = false;
-  auto b = 10 * (1. / Hatrix::PV);
-  auto a = -b;
-  int64_t v_a, v_b, _;
-  std::tie(v_a, _) = A.inertia(a, s);
-  std::tie(v_b, _) = A.inertia(b, s);
-  if(v_a != 0 || v_b != N) {
-    std::cerr << "Warning: starting interval does not contain the whole spectrum" << std::endl
-              << "at N=" << N << ",nleaf=" << nleaf << ",accuracy=" << accuracy
-              << ",admis=" << admis << ",b=" << b << std::endl;
-    a *= 2;
-    b *= 2;
-  }
-
-  std::mt19937 g(N);
-  std::vector<int64_t> random_m(N, 0);
-  for (int64_t i = 0; i < N; i++) {
-    random_m[i] = i + 1;
-  }
-  bool rand_m = (m_begin == 0);
-  if (rand_m) {
-    m_end--;
-    std::shuffle(random_m.begin(), random_m.end(), g);
-  }
-  for (int64_t k = m_begin; k <= m_end; k++) {
-    const int64_t m = rand_m ? random_m[k] : k;
-    double h2_mth_eigv, max_rank_shift;
-    int64_t factor_max_rank;
-    const auto eig_start = std::chrono::system_clock::now();
-    std::tie(h2_mth_eigv, factor_max_rank, max_rank_shift) =
-        A.get_mth_eigenvalue(m, ev_tol, a, b);
-    const auto eig_stop = std::chrono::system_clock::now();
-    const double eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                            (eig_stop - eig_start).count();
-    double eig_abs_err = std::abs(h2_mth_eigv - lapack_eigv[m - 1]);
-    bool success = (eig_abs_err < (0.5 * ev_tol));
-    std::cout << "m=" << m
-              << " ev_tol=" << ev_tol
-              << " eig_time=" << eig_time
-              << " factor_max_rank=" << factor_max_rank
-              << " max_rank_shift=" << max_rank_shift
-              << " lapack_eigv=" << std::setprecision(10) << lapack_eigv[m - 1]
-              << " h2_eigv=" << std::setprecision(10) << h2_mth_eigv
-              << " eig_abs_err=" << std::scientific << eig_abs_err << std::defaultfloat
-              << " success=" << (success ? "TRUE" : "FALSE")
-              << std::endl;
-  }
+  std::cout << "factor_min_rank=" << A.get_basis_min_rank()
+            << " factor_max_rank=" << A.get_basis_max_rank()
+            << " factor_time=" << factor_time
+            << " solve_time=" << solve_time
+            << " solve_error=" << solve_error
+            << std::endl;
 
   Hatrix::Context::finalize();
   return 0;
 }
-
