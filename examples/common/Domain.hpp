@@ -123,14 +123,6 @@ class Domain {
     orthogonal_recursive_bisection(mid, right, leaf_size, level + 1, (block_index << 1) + 1);
   }
 
-  bool is_well_separated(const Cell& source, const Cell& target,
-                         const double theta) const {
-    const auto distance = dist2(source.center, target.center);
-    const auto source_size = source.get_radius();
-    const auto target_size = target.get_radius();
-    return (distance > (theta * (source_size + target_size)));
-  }
-
   void dual_tree_traversal(Cell& Ci, Cell& Cj, const double theta) {
     const auto i_level = Ci.level;
     const auto j_level = Cj.level;
@@ -413,6 +405,14 @@ class Domain {
 
   int64_t get_cell_idx(const int64_t block_index, const int64_t level) const {
     return (1 << level) - 1 + block_index;
+  }
+
+  bool is_well_separated(const Cell& source, const Cell& target,
+                         const double theta) const {
+    const auto distance = dist2(source.center, target.center);
+    const auto source_size = source.get_radius();
+    const auto target_size = target.get_radius();
+    return (distance > (theta * (source_size + target_size)));
   }
 
   void build_tree(const int64_t leaf_size) {

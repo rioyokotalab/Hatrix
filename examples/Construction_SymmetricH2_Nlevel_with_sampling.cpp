@@ -22,6 +22,19 @@
 
 using vec = std::vector<int64_t>;
 
+/*
+ * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
+ * where every cell has two children. However, we can enforce BLR2 structure by a simple workaround
+ * that use only the leaf level cells. One thing to keep in mind is that
+ * the leaf level in H2-matrix structure (leaf_level = height = 1) is different to
+ * the actual leaf level of the domain partition tree (leaf_level = domain.tree_height).
+ * This means that we have to adjust the level in some tasks that require cell information, such as:
+ * - Getting cell index from (block_index, level)
+ * - Generating p2p_matrix using block_index and level
+ * See parts that involve matrix_type below
+ */
+enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
+
 namespace Hatrix {
 
 class SymmetricH2 {
@@ -32,6 +45,7 @@ class SymmetricH2 {
   double ID_tolerance;
   int64_t max_rank;
   double admis;
+  int64_t matrix_type;
   int64_t height;
   RowLevelMap U, R_row;
   RowColLevelMap<Matrix> D, S;
@@ -54,7 +68,8 @@ class SymmetricH2 {
   SymmetricH2(const Domain& domain,
               const int64_t N, const int64_t leaf_size,
               const double accuracy, const bool use_rel_acc,
-              const int64_t max_rank, const double admis);
+              const int64_t max_rank, const double admis,
+              const int64_t matrix_type);
 
   int64_t get_basis_min_rank() const;
   int64_t get_basis_max_rank() const;
@@ -65,27 +80,46 @@ class SymmetricH2 {
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
-  height = domain.tree_height;
-  level_blocks.assign(height + 1, 0);
-  for (const auto& cell: domain.cells) {
-    const auto level = cell.level;
-    const auto i = cell.block_index;
-    level_blocks[level]++;
-    // Near interaction list: inadmissible dense blocks
-    for (const auto near_idx: cell.near_list) {
-      const auto j_near = domain.cells[near_idx].block_index;
-      is_admissible.insert(i, j_near, level, false);
+  if (matrix_type == H2_MATRIX) {
+    height = domain.tree_height;
+    level_blocks.assign(height + 1, 0);
+    for (const auto& cell: domain.cells) {
+      const auto level = cell.level;
+      const auto i = cell.block_index;
+      level_blocks[level]++;
+      // Near interaction list: inadmissible dense blocks
+      for (const auto near_idx: cell.near_list) {
+        const auto j_near = domain.cells[near_idx].block_index;
+        is_admissible.insert(i, j_near, level, false);
+      }
+      // Far interaction list: admissible low-rank blocks
+      for (const auto far_idx: cell.far_list) {
+        const auto j_far = domain.cells[far_idx].block_index;
+        is_admissible.insert(i, j_far, level, true);
+      }
     }
-    // Far interaction list: admissible low-rank blocks
-    for (const auto far_idx: cell.far_list) {
-      const auto j_far = domain.cells[far_idx].block_index;
-      is_admissible.insert(i, j_far, level, true);
+  }
+  else if (matrix_type == BLR2_MATRIX) {
+    height = 1;
+    level_blocks.assign(height + 1, 0);
+    level_blocks[0] = 1;
+    level_blocks[1] = (int64_t)1 << domain.tree_height;
+    // Subdivide into BLR
+    is_admissible.insert(0, 0, 0, false);
+    for (int64_t i = 0; i < level_blocks[height]; i++) {
+      for (int64_t j = 0; j < level_blocks[height]; j++) {
+        const auto level = domain.tree_height;
+        const auto& source = domain.cells[domain.get_cell_idx(i, level)];
+        const auto& target = domain.cells[domain.get_cell_idx(j, level)];
+        is_admissible.insert(i, j, height, domain.is_well_separated(source, target, admis));
+      }
     }
   }
 }
 
 int64_t SymmetricH2::get_block_size(const Domain& domain, const int64_t node, const int64_t level) const {
-  const auto idx = domain.get_cell_idx(node, level);
+  const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+  const auto idx = domain.get_cell_idx(node, node_level);
   return domain.cells[idx].nbodies;
 }
 
@@ -106,7 +140,8 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain) {
     const auto num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
       if (row_has_admissible_blocks(node, level)) {
-        const auto idx = domain.get_cell_idx(node, level);
+        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+        const auto idx = domain.get_cell_idx(node, node_level);
         const auto& cell = domain.cells[idx];
         std::vector<int64_t> skeleton;
         if (level == height) {
@@ -173,7 +208,8 @@ void SymmetricH2::generate_coupling_matrices(const Domain& domain) {
         // Inadmissible leaf blocks
         if (level == height &&
             is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
-          D.insert(i, j, level, generate_p2p_matrix(domain, i, j, level));
+          const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+          D.insert(i, j, level, generate_p2p_matrix(domain, i, j, node_level));
         }
         // Admissible blocks
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
@@ -215,9 +251,10 @@ Matrix SymmetricH2::get_Ubig(const int64_t node, const int64_t level) const {
 SymmetricH2::SymmetricH2(const Domain& domain,
                          const int64_t N, const int64_t leaf_size,
                          const double accuracy, const bool use_rel_acc,
-                         const int64_t max_rank, const double admis)
+                         const int64_t max_rank, const double admis,
+                         const int64_t matrix_type)
     : N(N), leaf_size(leaf_size), accuracy(accuracy),
-      use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis) {
+      use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
   // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
   ID_tolerance = accuracy * 1e-1;
@@ -259,7 +296,8 @@ double SymmetricH2::construction_error(const Domain& domain) const {
   for (int64_t i = 0; i < level_blocks[height]; i++) {
     for (int64_t j = 0; j < level_blocks[height]; j++) {
       if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
-        const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, height);
+        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : height;
+        const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, node_level);
         const Matrix A_ij = D(i, j, height);
         const auto dnorm = norm(D_ij);
         const auto diff = norm(A_ij - D_ij);
@@ -273,7 +311,8 @@ double SymmetricH2::construction_error(const Domain& domain) const {
     for (int64_t i = 0; i < level_blocks[level]; i++) {
       for (int64_t j = 0; j < level_blocks[level]; j++) {
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-          const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, level);
+          const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+          const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, node_level);
           const Matrix Ubig = get_Ubig(i, level);
           const Matrix Vbig = get_Ubig(j, level);
           const Matrix A_ij = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
@@ -384,6 +423,11 @@ int main(int argc, char ** argv) {
   // Use relative or absolute error threshold
   const bool use_rel_acc = argc > 12 ? (atol(argv[12]) == 1) : false;
 
+  // Specify compressed representation
+  // 0: BLR2
+  // 1: H2
+  const int64_t matrix_type = argc > 13 ? atol(argv[13]) : 1;
+
   Hatrix::Context::init();
 
   Hatrix::set_kernel_constants(1e-3 / (double)N, 1.);
@@ -471,7 +515,7 @@ int main(int argc, char ** argv) {
                              (stop_sample - start_sample).count();
 
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis);
+  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
@@ -491,6 +535,7 @@ int main(int argc, char ** argv) {
             << " compress_alg=" << "ID"
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
+            << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << " height=" << A.height
             << " LR%=" << lr_ratio * 100 << "%"
             << " construct_min_rank=" << A.get_basis_min_rank()
