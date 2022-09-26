@@ -20,6 +20,9 @@
 #include "Domain.hpp"
 #include "functions.hpp"
 
+// H2-Construction employ multiplication with a random matrix to reduce far-block matrix size
+// Quite accurate and does not rely on ID but incur O(N^2) complexity to construct basis and coupling matrices
+
 // Comment the following line to use SVD instead of pivoted QR for low-rank compression
 // #define USE_QR_COMPRESSION
 
@@ -616,7 +619,7 @@ int main(int argc, char ** argv) {
   const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-5;
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
-  const int64_t sample_size = argc > 5 ? atol(argv[5]) : 100;
+  const int64_t random_matrix_size = argc > 5 ? atol(argv[5]) : 100;
   const double admis = argc > 6 ? atof(argv[6]) : 1.0;
 
   // Specify kernel function
@@ -687,7 +690,7 @@ int main(int argc, char ** argv) {
   const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                          (stop_particles - start_particles).count();
 
-  Hatrix::Matrix rand = Hatrix::generate_random_matrix(N, sample_size);
+  Hatrix::Matrix rand = Hatrix::generate_random_matrix(N, random_matrix_size);
   const auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(domain, rand, N, leaf_size, accuracy, max_rank, admis, matrix_type);
   const auto stop_construct = std::chrono::system_clock::now();
@@ -700,7 +703,7 @@ int main(int argc, char ** argv) {
             << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
             << " max_rank=" << max_rank
-            << " sample_size=" << sample_size
+            << " random_matrix_size=" << random_matrix_size
             << " compress_alg="
 #ifdef USE_QR_COMPRESSION
             << "QR"
