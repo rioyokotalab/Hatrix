@@ -49,9 +49,6 @@ else()
     LDL_SymmetricH2_Nlevel
     Eigen_SymmetricH2_Nlevel
     UMV_H2_Nlevel
-#    UMV_H2_Nlevel_nodependency
-#    LDL_H2_Nlevel_nodependency
-#    Eigen_H2_Nlevel_nodependency
   )
 endif()
 
