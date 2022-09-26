@@ -20,14 +20,26 @@
 #include "Domain.hpp"
 #include "functions.hpp"
 
+constexpr double EPS = 1e-13;
+using vec = std::vector<int64_t>;
+
 // H2-Construction employ multiplication with a random matrix to reduce far-block matrix size
 // Quite accurate and does not rely on ID but incur O(N^2) complexity to construct basis and coupling matrices
 
 // Comment the following line to use SVD instead of pivoted QR for low-rank compression
 // #define USE_QR_COMPRESSION
 
-constexpr double EPS = 1e-13;
-using vec = std::vector<int64_t>;
+/*
+ * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
+ * where every cell has two children. However, we can enforce BLR2 structure by a simple workaround
+ * that use only the leaf level cells. One thing to keep in mind is that
+ * the leaf level in H2-matrix structure (leaf_level = height = 1) is different to
+ * the actual leaf level of the domain partition tree (leaf_level = domain.tree_height).
+ * This means that we have to adjust the level in some tasks that require cell information, such as:
+ * - Getting cell index from (block_index, level)
+ * - Generating p2p_matrix using block_index and level
+ * See parts that involve matrix_type below
+ */
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 
 Hatrix::Matrix diag(const Hatrix::Matrix& A) {
