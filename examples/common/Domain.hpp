@@ -866,7 +866,44 @@ class Domain {
     }
   }
 
-  void print_bodies_to_file(const std::string& file_name) const {
+  void read_bodies_ELSES(const std::string& file_name) {
+    std::ifstream file;
+    file.open(file_name);
+    int64_t num_particles;
+    file >> num_particles;
+    constexpr int64_t num_atoms_per_particle = 4;
+    ndim = 3;
+    N = num_particles * num_atoms_per_particle;
+
+    file.ignore(1, '\n'); //Ignore newline after num_atoms
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore line before atom positions
+    int64_t body_idx = 0;
+    for(int64_t i = 0; i < num_particles; i++) {
+      std::string pref;
+      double x, y, z;
+      file >> pref >> x >> y >> z;
+      file.ignore(1, '\n'); //Ignore newline
+      for (int64_t k = 0; k < num_atoms_per_particle; k++) {
+        bodies.emplace_back(Body(x, y, z, (double)body_idx));
+        body_idx++;
+      }
+    }
+    file.close();
+  }
+
+  void print_bodies() const {
+    std::cout << N << " " << ndim << std::endl;
+    for (int64_t i = 0; i < N; i++) {
+      std::cout << "val=" << bodies[i].value << ", pos=(";
+      for (int64_t k = 0; k < ndim; k++) {
+        if (k > 0) std::cout << ",";
+        std::cout << bodies[i].X[k];
+      }
+      std::cout << ")" << std::endl;
+    }
+  }
+
+  void write_bodies(const std::string& file_name) const {
     const std::vector<char> axis{'x', 'y', 'z'};
 
     std::ofstream file;
