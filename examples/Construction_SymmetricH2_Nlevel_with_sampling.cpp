@@ -501,11 +501,11 @@ int main(int argc, char ** argv) {
   //   // However, a good geometry partitioning technique is required for the estimate sample_size to work,
   //   // because it assumes that each cluster contain uniformly distributed points, which may not be
   //   // be produced by our current, simple partitioning method
-  //   // Source: https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c
   //   const double ID_compress_tol = accuracy * 1e-1;
   //   const double sampling_stop_tol = accuracy * 1e-2;
-  //   const auto r = domain.adaptive_anchor_grid_size(Hatrix::kernel_function, leaf_size, admis,
-  //                                                   ID_compress_tol, sampling_stop_tol);
+  //   const auto r =
+  //       adaptive_anchor_grid_size(domain, Hatrix::kernel_function, leaf_size,
+  //                                 admis, ID_compress_tol, sampling_stop_tol);
   //   sample_self_size = r;
   //   sample_far_size = r > 3 ? std::max(r + 3, (int64_t)10) : r + 3;
   // }
