@@ -28,6 +28,7 @@ class Domain {
   int64_t ncells, tree_height;
   std::vector<Body> bodies;
   std::vector<Cell> cells;
+  Matrix p2p_matrix;
 
   static int64_t get_cell_idx(const int64_t block_index, const int64_t level) {
     return (1 << level) - 1 + block_index;
@@ -875,7 +876,7 @@ class Domain {
     ndim = 3;
     N = num_particles * num_atoms_per_particle;
 
-    file.ignore(1, '\n'); //Ignore newline after num_atoms
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore the rest of line after num_particles
     file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore line before atom positions
     int64_t body_idx = 0;
     for(int64_t i = 0; i < num_particles; i++) {
@@ -891,16 +892,28 @@ class Domain {
     file.close();
   }
 
-  void print_bodies() const {
-    std::cout << N << " " << ndim << std::endl;
-    for (int64_t i = 0; i < N; i++) {
-      std::cout << "val=" << bodies[i].value << ", pos=(";
-      for (int64_t k = 0; k < ndim; k++) {
-        if (k > 0) std::cout << ",";
-        std::cout << bodies[i].X[k];
-      }
-      std::cout << ")" << std::endl;
+  void read_p2p_matrix_ELSES(const std::string& file_name) {
+    std::ifstream file;
+    file.open(file_name);
+    // Ignore first two lines
+    const int64_t nskip_lines = 2;
+    for (int64_t i = 0; i < nskip_lines; i++) {
+      file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
+
+    int64_t nrows, ncols, nnz;
+    file >> nrows >> ncols >> nnz;
+    Matrix D(nrows, ncols);
+    D = 0; // Initialize with zero entries
+    int64_t row, col;
+    double val;
+    for(int64_t k = 0; k < nnz; k++) {
+      file >> col >> row >> val;
+      D(row - 1, col - 1) = val;
+      D(col - 1, row - 1) = val; // Symmetric
+    }
+    file.close();
+    p2p_matrix = std::move(D);
   }
 
   void write_bodies(const std::string& file_name) const {
@@ -912,14 +925,14 @@ class Domain {
       if (k > 0) file << ",";
       file << axis[k];
     }
-    file << std::endl;
+    file << ",value" << std::endl;
 
     for (int64_t i = 0; i < N; i++) {
       for (int64_t k = 0; k < ndim; k++) {
         if (k > 0) file << ",";
         file << bodies[i].X[k];
       }
-      file << std::endl;
+      file << "," << bodies[i].value << std::endl;
     }
 
     file.close();
