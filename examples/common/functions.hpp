@@ -14,7 +14,8 @@
 namespace Hatrix {
 
 using kernel_func_t =
-    std::function<double(const Body& source, const Body& target)>;
+    std::function<double(const Domain& domain,
+                         const Body& source, const Body& target)>;
 
 // Kernel constants
 double PV = 1e-3;
@@ -40,16 +41,25 @@ double p2p_distance(const Body& source, const Body& target) {
   return std::sqrt(r);
 }
 
-double laplace_kernel(const Body& source, const Body& target) {
+double laplace_kernel(const Domain& domain,
+                      const Body& source, const Body& target) {
   const double r = p2p_distance(source, target) + PV;
   const double out = 1. / r;
   return out;
 }
 
-double yukawa_kernel(const Body& source, const Body& target) {
+double yukawa_kernel(const Domain& domain,
+                     const Body& source, const Body& target) {
   const double r = p2p_distance(source, target) + PV;
   const double out = std::exp(alpha * -r) / r;
   return out;
+}
+
+double ELSES_dense_input(const Domain& domain,
+                         const Body& source, const Body& target) {
+  const auto row = (int64_t)source.value;
+  const auto col = (int64_t)target.value;
+  return domain.p2p_matrix(row, col);
 }
 
 Matrix generate_p2p_matrix(const Domain& domain,
@@ -62,7 +72,8 @@ Matrix generate_p2p_matrix(const Domain& domain,
   Matrix out(nrows, ncols);
   for (int64_t i = 0; i < nrows; i++) {
     for (int64_t j = 0; j < ncols; j++) {
-      out(i, j) = kernel_function(domain.bodies[source_offset + source[i]],
+      out(i, j) = kernel_function(domain,
+                                  domain.bodies[source_offset + source[i]],
                                   domain.bodies[target_offset + target[j]]);
     }
   }
@@ -119,7 +130,7 @@ int64_t adaptive_anchor_grid_size(const Domain& domain,
     }
   }
 
-  auto generate_matrix = [kernel_function]
+  auto generate_matrix = [kernel_function, &domain]
                          (const std::vector<Body>& source,
                           const std::vector<Body>& target,
                           const std::vector<int64_t>& source_idx,
@@ -127,7 +138,8 @@ int64_t adaptive_anchor_grid_size(const Domain& domain,
     Matrix out(source_idx.size(), target_idx.size());
     for (int64_t i = 0; i < out.rows; i++) {
       for (int64_t j = 0; j < out.cols; j++) {
-        out(i, j) = kernel_function(source[source_idx[i]],
+        out(i, j) = kernel_function(domain,
+                                    source[source_idx[i]],
                                     target[target_idx[j]]);
       }
     }
