@@ -105,7 +105,7 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
     std::tie(Ui, pivots) = pivoted_qr(AY, rank);
   }
   else {
-    std::tie(Ui, pivots, rank) = error_pivoted_qr(AY, opts.accuracy, opts.max_rank);
+    std::tie(Ui, pivots, rank) = error_pivoted_qr_max_rank(AY, opts.accuracy, (int64_t)opts.max_rank);
   }
 
   A.ranks.insert(block, level, std::move(rank));
@@ -191,7 +191,7 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
     std::tie(Utransfer, pivots) = pivoted_qr(temp, rank);
   }
   else {
-    std::tie(Utransfer, pivots, rank) = error_pivoted_qr(temp, opts.accuracy, opts.max_rank);
+    std::tie(Utransfer, pivots, rank) = error_pivoted_qr_max_rank(temp, opts.accuracy, opts.max_rank);
   }
 
   A.ranks.insert(node, level, std::move(rank));
@@ -273,28 +273,6 @@ generate_transfer_matrices(const Domain& domain,
                                       dense_splits[i * nblocks + j], true, false),
                                Ubig_parent(j, level));
         A.S.insert(i, j, level, std::move(Sdense));
-      }
-    }
-  }
-
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j  = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
-
-        // std::cout << "i: " << i << " j: " << j << " lvl: " << level;
-        // A.S(i, j, level).print_meta();
-        auto blk = matmul(matmul(Ubig_parent(i, level), A.S(i, j, level)),
-                          Ubig_parent(j, level), false, true);
-
-
-        Matrix Aij = generate_p2p_interactions(domain, i, j, level, opts.kernel);
-
-
-        // (blk - Aij).print();
-        // Aij.print();
-        // std::cout << " norm: " << norm(blk - Aij) << " stuf: "
-        //           << std::endl;
-        // matmul(Ubig_map(i, level), Ubig_map(i, level), true, false).print();
       }
     }
   }

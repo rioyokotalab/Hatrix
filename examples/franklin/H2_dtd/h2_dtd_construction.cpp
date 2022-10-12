@@ -103,8 +103,6 @@ pivoted_QR(double* A, int M, int N,
   int LWORK = WORK[0];
   WORK.resize(LWORK);
 
-  // std::cout << "post \n";
-
   pdgeqpf_(&M, &N,
            A, &IA, &JA, DESCA,
            IPIV.data(), TAU.data(), WORK.data(),
@@ -126,10 +124,8 @@ pivoted_QR(double* A, int M, int N,
       int lcol = indxg2l(g_col, NB, MPIGRID[1]) - 1;
 
       RANKVECTOR[diagonals++] = abs(A[lrow + lcol * local_rows_A]);
-      // std::cout << abs(A[lrow + lcol * local_rows_A]) << " ";
     }
   }
-  // std::cout << std::endl;
 
   std::vector<int> DIAGONAL_COUNTS(MPISIZE);
   MPI_Allgather((void*)&diagonals, 1, MPI_INT,
@@ -225,8 +221,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
               AY_MEM, &IC, &JC, AY);
     }
   }
-
-  // std::cout << "finish generation\n";
 
   // generate column bases from the randomized blocks.
   for (int block = 0; block < nblocks; ++block) {
@@ -327,20 +321,16 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
     Matrix U(U_nrows, U_ncols);
 
+    int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
+    Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
     descset_(U_block, &block_size, &rank, &block_size, &rank,
-              &ZERO, &ZERO, &NODE_CONTEXT, &block_size, &info);
+              &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &block_size, &info);
 
     // copy out the U block into its own dedicated storage.
     pdgemr2d_(&block_size, &rank,
               AY_MEM, &IA, &JA, AY,
               &U, &ONE, &ONE, U_block,
               &BLACS_CONTEXT);
-
-    // for (int i = 0; i < U.rows; ++i) {
-    //   for (int j = 0; j < U.cols; ++j) {
-    //     U(i, j)= 2;
-    //   }
-    // }
 
     if (mpi_rank(block) == MPIRANK) {
       A.U.insert(block, A.max_level,
@@ -350,20 +340,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     // ranks are stored in all processes.
     A.ranks.insert(block, A.max_level, std::move(rank));
   }
-
-  // std::mt19937 gen(0);
-  // std::uniform_real_distribution<double> dist(0.0, 1.0);
-
-  // for (int i = 0; i < nblocks; ++i) {
-  //   for (int ii = 0; ii < A.U(i, A.max_level).rows; ++ii) {
-  //     for (int jj = 0; jj < A.U(i, A.max_level).cols; ++jj) {
-  //       A.U(i, A.max_level)(ii, jj) = 2; //dist(gen);
-  //     }
-  //   }
-  // }
-
-  // MPI_Barrier(MPI_COMM_WORLD);
-  // std::cout << "finish column bases\n";
 
   std::vector<int> comm_world_ranks(MPISIZE);
   comm_world_ranks[0] = 0;
@@ -432,7 +408,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
-        // std::cout << "S i: " << i << " j: " << j << std::endl;
         int Uj_nrows = domain.cell_size(j, A.max_level);
         int Uj_ncols = A.ranks(j, A.max_level);
         MPI_Request request;
@@ -601,8 +576,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     }
     Matrix U(U_nrows, U_ncols);
 
+    int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
+    Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
     descset_(U_block.data(), &Utransfer_nrows, &qr_rank, &Utransfer_nrows, &qr_rank,
-             &ZERO, &ZERO, &NODE_CONTEXT, &Utransfer_nrows, &info);
+             &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &Utransfer_nrows, &info);
 
     IA = 1; for (int i = 0; i < c1; ++i) { IA += A.ranks(i, child_level); }
     JA = 1;
@@ -694,6 +671,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   int Stemp_local_cols = numroc_(&N, &DENSE_NBROW, &MYCOL, &ZERO, &MPIGRID[1]);
   std::vector<double> Stemp_mem(Stemp_local_rows * Stemp_local_cols);
 
+  if (Stemp_local_rows == 0) { Stemp_local_rows = 1; }
+
   descinit_(Stemp.data(), &max_rank, &N, &Stemp_NBROW, &DENSE_NBROW,
             &ZERO, &ZERO, &BLACS_CONTEXT, &Stemp_local_rows, &info);
 
@@ -716,7 +695,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     for (int j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) &&
           A.is_admissible(i, j, level)) {
-        // std::cout << "Sgen: i " << i << " j " << j << std::endl;
         int row_block_size = domain.cell_size(i, level);
         int col_block_size = domain.cell_size(j, level);
         int row_rank = A.ranks(i, level);
@@ -775,8 +753,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
         }
         Matrix S(S_nrows, S_ncols);
 
+        int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
+        Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
+
         descset_(DESCS.data(), &S_nrows, &S_ncols, &S_nrows, &S_ncols,
-                 &ZERO, &ZERO, &NODE_CONTEXT, &S_nrows, &info);
+                 &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &S_nrows, &info);
 
         IA = IC;
         JA = JC;
@@ -880,6 +861,4 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A,
 
   free(RAND_MEM);
   free(AY_MEM);
-
-  // MPI_Barrier(MPI_COMM_WORLD);
 }

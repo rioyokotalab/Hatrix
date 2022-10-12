@@ -243,7 +243,7 @@ std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t ran
 }
 
 std::tuple<Matrix, std::vector<int64_t>, int64_t>
-error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
+error_pivoted_qr_max_rank(const Matrix& A, double error, int64_t max_rank) {
   Matrix Q(A, true);
   std::vector<double> tau(Q.rows);
   std::vector<int> jpvt(Q.cols);

@@ -197,15 +197,7 @@ multiply_S(Hatrix::SymmetricSharedBasisMatrix& A,
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
-
-        // for (int ii = 0; ii < A.S(i, j, level).rows; ++ii) {
-        //   for (int jj = 0; jj < A.S(i, j, level).cols; ++jj) {
-        //     A.S(i, j, level)(ii, jj) = dist(gen);
-        //   }
-        // }
-
         matmul(A.S(i, j, level), x_hat[x_hat_offset + j], b_hat[b_hat_offset + i]);
-        // A.S(i, j, level).print();
         matmul(A.S(i, j, level), x_hat[x_hat_offset + i],
                b_hat[b_hat_offset + j], true, false);
       }
@@ -225,13 +217,6 @@ matmul(SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
   // V leaf nodes
   for (int i = 0; i < leaf_nblocks; ++i) {
-
-    // for (int ii = 0; ii < A.U(i, A.max_level).rows; ++ii) {
-    //   for (int jj = 0; jj < A.U(i, A.max_level).cols; ++jj) {
-    //     A.U(i, A.max_level)(ii, jj) = 2.3;
-    //   }
-    // }
-
     x_hat.push_back(matmul(A.U(i, A.max_level), x_splits[i], true, false, 1.0));
   }
 
@@ -240,13 +225,6 @@ matmul(SymmetricSharedBasisMatrix& A, const Matrix& x) {
     int64_t nblocks = pow(2, level);
     int64_t child_level = level + 1;
     for (int64_t i = 0; i < nblocks; ++i) {
-
-      // for (int ii = 0; ii < A.U(i, level).rows; ++ii) {
-      //   for (int jj = 0; jj < A.U(i, level).cols; ++jj) {
-      //     A.U(i, level)(ii, jj) = dist(gen);
-      //   }
-      // }
-
       int64_t c1 = i * 2;
       int64_t c2 = i * 2 + 1;
 
@@ -273,11 +251,6 @@ matmul(SymmetricSharedBasisMatrix& A, const Matrix& x) {
   int64_t b_hat_offset = 0;
   multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset, A.min_level);
 
-  // for (int i = 0; i < b_hat.size(); ++i) {
-  //   b_hat[i].print();
-  // }
-
-
   // Multiply the S block with the col bases transfer matrices.
   for (int64_t level = A.min_level; level < A.max_level; ++level) {
     int64_t nblocks = pow(2, level);
@@ -285,15 +258,7 @@ matmul(SymmetricSharedBasisMatrix& A, const Matrix& x) {
     x_hat_offset -= pow(2, child_level);
 
     for (int64_t row = 0; row < nblocks; ++row) {
-
-      // for (int ii = 0; ii < A.U(row, level).rows; ++ii) {
-      //   for (int jj = 0; jj < A.U(row, level).cols; ++jj) {
-      //     A.U(row, level)(ii, jj) = dist(gen);
-      //   }
-      // }
-
       int c_r1 = row * 2, c_r2 = row * 2 + 1;
-
       Matrix Ub = matmul(A.U(row, level),
                          b_hat[b_hat_offset + row]);
       auto Ub_splits = Ub.split(std::vector<int64_t>(1, A.U(c_r1, child_level).cols),

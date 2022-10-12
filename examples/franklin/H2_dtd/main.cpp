@@ -160,7 +160,7 @@ int main (int argc, char **argv) {
 
   auto start_construct = std::chrono::system_clock::now();
 
-  Cblacs_get(0, 0, &BLACS_CONTEXT );
+  Cblacs_get(-1, 0, &BLACS_CONTEXT );
   Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
 
@@ -212,6 +212,7 @@ int main (int argc, char **argv) {
   int B_CHECK_local_cols = numroc_(&ONE, &ONE, &MYCOL, &ZERO, &MPIGRID[1]);
   std::vector<double> B_CHECK_mem(B_CHECK_local_rows * B_CHECK_local_cols, 0),
     X_mem(B_CHECK_local_rows * B_CHECK_local_cols);
+
   descinit_(DESCB_CHECK.data(), &N, &ONE, &DENSE_NBROW, &ONE,
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
   descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
@@ -294,6 +295,7 @@ int main (int argc, char **argv) {
   /* Cleaning up parsec context */
   parsec_fini(&parsec);
 
+  Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);
   MPI_Finalize();
 
