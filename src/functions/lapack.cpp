@@ -1,5 +1,7 @@
+#include "Hatrix/functions/arithmetics.h"
 #include "Hatrix/functions/math_common.h"
 #include "Hatrix/functions/lapack.h"
+#include "Hatrix/util/matrix_generators.h"
 
 #include <algorithm>
 #include <cassert>
@@ -314,7 +316,9 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t ran
   return truncated_svd(Ac, rank);
 }
 
-std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relative) {
+std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
+                                                      bool relative,
+                                                      bool ret_truncated) {
   Matrix U(A.rows, A.min_dim());
   Matrix S(A.min_dim(), A.min_dim());
   Matrix V(A.min_dim(), A.cols);
@@ -324,55 +328,56 @@ std::tuple<Matrix, Matrix, Matrix> error_svd(Matrix& A, double eps, bool relativ
   double error = eps;
   if(relative) error *= S(0, 0);
 
-  int rank = 1;
-  int irow = 1;
+  int64_t rank = 1;
+  int64_t irow = 1;
   while (rank < S.rows && S(irow, irow) > error) {
     rank += 1;
     irow += 1;
   }
 
-  U.shrink(U.rows, rank);
-  S.shrink(rank, rank);
-  V.shrink(rank, V.cols);
+  if (ret_truncated) {
+    U.shrink(U.rows, rank);
+    S.shrink(rank, rank);
+    V.shrink(rank, V.cols);
+  }
 
-  return std::make_tuple(std::move(U), std::move(S), std::move(V));
+  return std::make_tuple(std::move(U), std::move(S), std::move(V), rank);
 }
 
-std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool relative) {
+std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>
+partial_pivoted_qr(Matrix& A, const double stop_tol, bool relative) {
   // Pointer aliases
   double* a = &A;
-  const int m = A.rows;
-  const int n = A.cols;
-  const int lda = A.stride;
+  const int64_t m = A.rows;
+  const int64_t n = A.cols;
+  const int64_t lda = A.stride;
 
   // Initialize variables for pivoted QR
-  double error = eps;
+  double error = stop_tol;
   if(relative) error *= norm(A);
   const double tol = LAPACKE_dlamch('e');
   const double tol3z = std::sqrt(tol);
   const int min_dim = A.min_dim();
   std::vector<double> tau(min_dim, 0);
-  std::vector<double> ipiv(n, 0);
+  std::vector<int64_t> ipiv(n, 0);
   std::vector<double> cnorm(n, 0);
   std::vector<double> partial_cnorm(n, 0);
-  for(int j=0; j<n; j++) {
+  for(int64_t j = 0; j < n; j++) {
     ipiv[j] = j;
     cnorm[j] = cblas_dnrm2(m, a + j * lda, 1);
     partial_cnorm[j] = cnorm[j];
   }
 
   // Begin pivoted QR
-  int r = 0;
+  int64_t r = 0;
   double max_cnorm = *std::max_element(cnorm.begin(), cnorm.end());
-  //Handle zero matrix case
+  // Handle zero matrix case
   if(max_cnorm <= tol) {
-    Matrix Q(m, 1); Q(0,0) = 1.0;
-    Matrix R(1, n);
-    return std::make_tuple(std::move(Q), std::move(R));
+    return std::make_tuple(0, std::move(ipiv), std::move(tau));
   }
   while((r < min_dim) && (max_cnorm > error)) {
     // Select pivot column and swap
-    const int k = std::max_element(cnorm.begin() + r, cnorm.end()) - cnorm.begin();
+    const int64_t k = std::max_element(cnorm.begin() + r, cnorm.end()) - cnorm.begin();
     cblas_dswap(m, a + r * lda, 1, a + k * lda, 1);
     std::swap(cnorm[r], cnorm[k]);
     std::swap(partial_cnorm[r], partial_cnorm[k]);
@@ -380,14 +385,14 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
 
     // Generate householder reflector to annihilate A(r+1:m, r)
     double *arr = a + r + (r * lda);
-    if(r < (m-1)) {
+    if(r < (m - 1)) {
       LAPACKE_dlarfg(m-r, arr, arr+1, 1, &tau[r]);
     }
     else {
       LAPACKE_dlarfg(1, arr, arr, 1, &tau[r]);
     }
 
-    if(r < (min_dim-1)) {
+    if(r < (min_dim - 1)) {
       // Apply reflector to A(r:m,r+1:n) from left
       const double _arr = *arr;
       *arr = 1.0;
@@ -401,7 +406,7 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
       *arr = _arr;
     }
     // Update partial column norm
-    for(int j=r+1; j<n; j++) {
+    for(int64_t j = r + 1; j < n; j++) {
       // See LAPACK Working Note 176 (Section 3.2.1) for detail
       // https://netlib.org/lapack/lawnspdf/lawn176.pdf
       if(cnorm[j] != 0.0) {
@@ -427,34 +432,59 @@ std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, double eps, bool rela
     r++;
     max_cnorm = *std::max_element(cnorm.begin() + r, cnorm.end());
   }
-  // Construct truncated Q
-  Matrix Q(m, r);
+  return std::make_tuple(std::move(r), std::move(ipiv), std::move(tau));
+}
+
+std::tuple<Matrix, Matrix, int64_t> error_pivoted_qr(Matrix& A, double eps,
+                                                     bool relative,
+                                                     bool ret_truncated) {
+  const int64_t m = A.rows;
+  const int64_t n = A.cols;
+  int64_t rank;
+  std::vector<int64_t> ipiv;
+  std::vector<double> tau;
+  std::tie(rank, ipiv, tau) = partial_pivoted_qr(A, eps, relative);
+  // Handle zero matrix case
+  if(rank == 0) {
+    Matrix Q = generate_identity_matrix(m, m);
+    Matrix R(m, n);
+    if (ret_truncated) {
+      Q.shrink(m, 1);
+      R.shrink(1, n);
+    }
+    return std::make_tuple(std::move(Q), std::move(R), 1);
+  }
+  // Construct full Q
+  Matrix Q(m, m);
   // Copy strictly lower triangular (or trapezoidal) part of A into Q
-  for(int i=0; i<Q.rows; i++) {
-    for(int j=0; j<std::min(i, r); j++) {
+  for(int64_t i = 0; i < m; i++) {
+    for(int64_t j = 0; j < std::min(i, rank); j++) {
       Q(i, j) = A(i, j);
     }
   }
-  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, r, &Q, Q.stride, &tau[0]);
-  // Construct truncated R
-  Matrix R(r, n);
-  // Copy first r rows of upper triangular part of A into R
-  for(int i=0; i<r; i++) {
-    for(int j=i; j<n; j++) {
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, rank, &Q, Q.stride, &tau[0]);
+  // Construct full R
+  Matrix R(m, n);
+  // Copy first m rows of upper triangular part of A into R
+  for(int64_t i = 0; i < m; i++) {
+    for(int j = i; j < n; j++) {
       R(i, j) = A(i, j);
     }
   }
   // Permute columns of R
   std::vector<int> ipivT(ipiv.size(), 0);
-  for(size_t i=0; i<ipiv.size(); i++) ipivT[ipiv[i]] = i;
+  for(int64_t i = 0; i < ipiv.size(); i++) ipivT[ipiv[i]] = i;
   Matrix RP(R);
-  for(int i=0; i<R.rows; i++) {
-    for(int j=0; j<R.cols; j++) {
+  for(int64_t i = 0; i < R.rows; i++) {
+    for(int64_t j = 0; j < R.cols; j++) {
       RP(i, j) = R(i, ipivT[j]);
     }
   }
-  // Return truncated Q and permuted R
-  return std::make_tuple(std::move(Q), std::move(RP));
+  if (ret_truncated) {
+    Q.shrink(m, rank);
+    RP.shrink(rank, n);
+  }
+  return std::make_tuple(std::move(Q), std::move(RP), std::move(rank));
 }
 
 double norm(const Matrix& A) {
@@ -511,13 +541,6 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, jpvt.data(), tau.data());
 
   int64_t min_dim = A.min_dim();
-  if (std::abs(A(min_dim-1, min_dim-1)) > error) {
-    throw std::runtime_error("ID failed since the requested error cannot be reached. Min. error= " +
-                             std::to_string(std::abs(A(min_dim-1, min_dim-1))) +
-                             ", requested error= " +
-                             std::to_string(error));
-  }
-
   int64_t rank = 1;
   // find the right rank for this.
   for (int64_t i = 1; i < min_dim; ++i) {
@@ -548,6 +571,62 @@ std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
     pivots(i, 0) = jpvt[i];
   }
   return std::make_tuple(std::move(interp), std::move(pivots));
+}
+
+std::tuple<Matrix, std::vector<int64_t>> truncated_id_row(Matrix& A, int64_t rank) {
+  assert(rank <= A.min_dim());
+  Matrix ATrans = transpose(A);
+  std::vector<double> tau(ATrans.min_dim());
+  std::vector<int> jpvt(ATrans.cols);
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, ATrans.rows, ATrans.cols, &ATrans, ATrans.stride, jpvt.data(), tau.data());
+
+  Matrix U(ATrans.cols, rank);
+  solve_r_block(U, ATrans, rank);
+  std::vector<int64_t> skel_rows(jpvt.size()), U_rows(jpvt.size());
+  for (int64_t i = 0; i < skel_rows.size(); i++) {
+    skel_rows[i] = jpvt[i] - 1;
+    U_rows[skel_rows[i]] = i;
+  }
+  // Permute rows of U
+  Matrix PU(U.rows, U.cols);
+  for (int64_t i = 0; i < PU.rows; i++) {
+    const auto row = U_rows[i];
+    for (int64_t j = 0; j < PU.cols; j++) {
+      PU(i, j) = U(row, j);
+    }
+  }
+  return std::make_tuple(std::move(PU), std::move(skel_rows));
+}
+
+std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double eps, bool relative) {
+  // Perform partial pivoted qr on A^T
+  Matrix ATrans = transpose(A);
+  int64_t rank;
+  std::vector<int64_t> skel_rows;
+  std::vector<double> tau;
+  std::tie(rank, skel_rows, tau) = partial_pivoted_qr(ATrans, eps, relative);
+  // Handle zero matrix case
+  if (rank == 0) {
+    rank = 1;
+    Matrix U = generate_identity_matrix(ATrans.cols, rank);
+    return std::make_tuple(std::move(U), std::move(skel_rows));
+  }
+  // Construct interpolation matrix U
+  Matrix U(ATrans.cols, rank);
+  solve_r_block(U, ATrans, rank);
+  // Permute rows of U
+  std::vector<int64_t> U_rows(skel_rows.size());
+  for (int64_t i = 0; i < skel_rows.size(); i++) {
+    U_rows[skel_rows[i]] = i;
+  }
+  Matrix PU(U.rows, U.cols);
+  for (int64_t i = 0; i < PU.rows; i++) {
+    const auto row = U_rows[i];
+    for (int64_t j = 0; j < PU.cols; j++) {
+      PU(i, j) = U(row, j);
+    }
+  }
+  return std::make_tuple(std::move(PU), std::move(skel_rows));
 }
 
 std::vector<double> get_eigenvalues(const Matrix& A) {

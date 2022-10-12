@@ -3,7 +3,10 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(policies)
 set_policies()
 
-set(default_build_type "Release")
+# Use Release build by default
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
 option(Hatrix_CPU_ONLY "Build Hatrix without GPU usage." ON)
 
@@ -26,7 +29,13 @@ else()
   endif()
 endif()
 
-add_compile_options(-O3)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_compile_options(-g)
+endif()
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  add_compile_options(-O3)
+endif()
+
 add_library(Hatrix
   src/util/matrix_generators.cpp
   src/util/helpers.cpp

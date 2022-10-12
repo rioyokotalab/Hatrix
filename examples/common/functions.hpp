@@ -6,11 +6,15 @@
 #include <string>
 #include <vector>
 
-#include "Particle.hpp"
+#include "Body.hpp"
+#include "Cell.hpp"
 #include "Domain.hpp"
 #include "Hatrix/Hatrix.h"
 
 namespace Hatrix {
+
+using kernel_func_t =
+    std::function<double(const Body& source, const Body& target)>;
 
 // Kernel constants
 double PV = 1e-3;
@@ -21,126 +25,169 @@ void set_kernel_constants(double _PV, double _alpha) {
   alpha = _alpha;
 }
 
-using kernel_func_t =
-    std::function<double(const std::vector<double>& coords_row,
-                         const std::vector<double>& coords_col)>;
-
 kernel_func_t kernel_function;
 
 void set_kernel_function(kernel_func_t _kernel_function) {
   kernel_function = _kernel_function;
 }
 
-double p2p_distance(const std::vector<double>& coords_row,
-                    const std::vector<double>& coords_col) {
+double p2p_distance(const Body& source, const Body& target) {
   double r = 0;
-  const int64_t ndim = coords_row.size();
-  for (int64_t k = 0; k < ndim; ++k) {
-    r += (coords_row[k] - coords_col[k]) *
-         (coords_row[k] - coords_col[k]);
+  for (int64_t axis = 0; axis < 3; axis++) {
+    r += (source.X[axis] - target.X[axis]) *
+         (source.X[axis] - target.X[axis]);
   }
   return std::sqrt(r);
 }
 
-double laplace_kernel(const std::vector<double>& coords_row,
-                      const std::vector<double>& coords_col) {
-  const double r = p2p_distance(coords_row, coords_col) + PV;
+double laplace_kernel(const Body& source, const Body& target) {
+  const double r = p2p_distance(source, target) + PV;
   const double out = 1. / r;
   return out;
 }
 
-double yukawa_kernel(const std::vector<double>& coords_row,
-                     const std::vector<double>& coords_col) {
-  const double r = p2p_distance(coords_row, coords_col) + PV;
+double yukawa_kernel(const Body& source, const Body& target) {
+  const double r = p2p_distance(source, target) + PV;
   const double out = std::exp(alpha * -r) / r;
   return out;
 }
 
-std::vector<int64_t> leaf_indices(const int64_t node, const int64_t level,
-                                  const int64_t height) {
-  std::vector<int64_t> indices;
-  if (level == height) {
-    indices.push_back(node);
-  }
-  else {
-    auto c1_indices = leaf_indices(node * 2 + 0, level + 1, height);
-    auto c2_indices = leaf_indices(node * 2 + 1, level + 1, height);
-    indices.insert(indices.end(), c1_indices.begin(), c1_indices.end());
-    indices.insert(indices.end(), c2_indices.begin(), c2_indices.end());
-  }
-
-  return indices;
-}
-
-Matrix generate_p2p_interactions(const Domain& domain,
-                                 const int64_t row, const int64_t col,
-                                 const int64_t level, const int64_t height) {
-  // Get source and target particles by gathering leaf level boxes
-  const auto source_leaf_indices = leaf_indices(row, level, height);
-  const auto target_leaf_indices = leaf_indices(col, level, height);
-  std::vector<Particle> source_particles, target_particles;
-  for (int64_t i = 0; i < source_leaf_indices.size(); i++) {
-    const auto source_box_idx = source_leaf_indices[i];
-    const auto offset = domain.boxes[source_box_idx].begin_index;
-    for (int64_t k = 0; k < domain.boxes[source_box_idx].num_particles; k++) {
-      source_particles.push_back(domain.particles[offset + k]);
-    }
-  }
-  for (int64_t i = 0; i < target_leaf_indices.size(); i++) {
-    const auto target_box_idx = target_leaf_indices[i];
-    const auto offset = domain.boxes[target_box_idx].begin_index;
-    for (int64_t k = 0; k < domain.boxes[target_box_idx].num_particles; k++) {
-      target_particles.push_back(domain.particles[offset + k]);
-    }
-  }
-
-  // Prepare output matrix
-  int64_t nrows = 0, ncols = 0;
-  for (int64_t i = 0; i < source_leaf_indices.size(); i++) {
-    const auto source_box_idx = source_leaf_indices[i];
-    nrows += domain.boxes[source_box_idx].num_particles;
-  }
-  for (int64_t i = 0; i < target_leaf_indices.size(); i++) {
-    const auto target_box_idx = target_leaf_indices[i];
-    ncols += domain.boxes[target_box_idx].num_particles;
-  }
+Matrix generate_p2p_matrix(const Domain& domain,
+                           const std::vector<int64_t>& source,
+                           const std::vector<int64_t>& target,
+                           const int64_t source_offset = 0,
+                           const int64_t target_offset = 0) {
+  const int64_t nrows = source.size();
+  const int64_t ncols = target.size();
   Matrix out(nrows, ncols);
   for (int64_t i = 0; i < nrows; i++) {
     for (int64_t j = 0; j < ncols; j++) {
-      out(i, j) = kernel_function(source_particles[i].coords,
-                                  target_particles[j].coords);
+      out(i, j) = kernel_function(domain.bodies[source_offset + source[i]],
+                                  domain.bodies[target_offset + target[j]]);
     }
   }
   return out;
+}
+
+Matrix generate_p2p_matrix(const Domain& domain,
+                           const int64_t row, const int64_t col,
+                           const int64_t level) {
+  const auto source_idx = domain.get_cell_idx(row, level);
+  const auto target_idx = domain.get_cell_idx(col, level);
+  const auto& source = domain.cells[source_idx];
+  const auto& target = domain.cells[target_idx];
+
+  return generate_p2p_matrix(domain, source.get_bodies(), target.get_bodies());
 }
 
 Matrix generate_p2p_matrix(const Domain& domain) {
-  // Gather all particles
-  std::vector<Particle> particles;
-  for (int64_t i = 0; i < domain.boxes.size(); i++) {
-    const auto box_offset = domain.boxes[i].begin_index;
-    for (int64_t k = 0; k < domain.boxes[i].num_particles; k++) {
-      particles.push_back(domain.particles[box_offset + k]);
+  return generate_p2p_matrix(domain, 0, 0, 0);
+}
+
+// Source: https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c
+int64_t adaptive_anchor_grid_size(const Domain& domain,
+                                  kernel_func_t kernel_function,
+                                  const int64_t leaf_size,
+                                  const double theta,
+                                  const double ID_tol,
+                                  const double stop_tol) {
+  double L = 0;
+  for (int64_t axis = 0; axis < domain.ndim; axis++) {
+    const auto Xmin = Domain::get_Xmin(domain.bodies,
+                                       domain.cells[0].get_bodies(), axis);
+    const auto Xmax = Domain::get_Xmax(domain.bodies,
+                                       domain.cells[0].get_bodies(), axis);
+    L = std::max(L, Xmax - Xmin);
+  }
+  L /= 6.0; // Extra step taken from H2Pack MATLAB reference
+
+  // Create two sets of points in unit boxes
+  const auto box_nbodies = 2 * leaf_size;
+  const auto shift = L * (theta == 0 ? 1 : theta);
+  std::vector<Body> box1, box2;
+  std::vector<int64_t> box_idx;
+  box_idx.resize(box_nbodies);
+  box1.resize(box_nbodies);
+  box2.resize(box_nbodies);
+  std::mt19937 gen(1234); // Fixed seed for reproducibility
+  std::uniform_real_distribution<double> dist(0, 1);
+  for (int64_t i = 0; i < box_nbodies; i++) {
+    box_idx[i] = i;
+    for (int64_t axis = 0; axis < domain.ndim; axis++) {
+      box1[i].X[axis] = L * dist(gen);
+      box2[i].X[axis] = L * dist(gen) + shift;
     }
   }
 
-  // Prepare output matrix
-  const int64_t nrows =  domain.particles.size();
-  const int64_t ncols =  domain.particles.size();
-  Matrix out(nrows, ncols);
-  for (int64_t i = 0; i < nrows; i++) {
-    for (int64_t j = 0; j < ncols; j++) {
-      out(i, j) = kernel_function(particles[i].coords,
-                                  particles[j].coords);
+  auto generate_matrix = [kernel_function]
+                         (const std::vector<Body>& source,
+                          const std::vector<Body>& target,
+                          const std::vector<int64_t>& source_idx,
+                          const std::vector<int64_t>& target_idx) {
+    Matrix out(source_idx.size(), target_idx.size());
+    for (int64_t i = 0; i < out.rows; i++) {
+      for (int64_t j = 0; j < out.cols; j++) {
+        out(i, j) = kernel_function(source[source_idx[i]],
+                                    target[target_idx[j]]);
+      }
+    }
+    return out;
+  };
+  Matrix A = generate_matrix(box1, box2, box_idx, box_idx);
+  // Find anchor grid size r by checking approximation error to A
+  double box2_xmin[MAX_NDIM], box2_xmax[MAX_NDIM];
+  for (int64_t i = 0; i < box_nbodies; i++) {
+    for (int64_t axis = 0; axis < domain.ndim; axis++) {
+      if (i == 0) {
+        box2_xmin[axis] = box2[i].X[axis];
+        box2_xmax[axis] = box2[i].X[axis];
+      }
+      else {
+        box2_xmin[axis] = std::min(box2_xmin[axis], box2[i].X[axis]);
+        box2_xmax[axis] = std::max(box2_xmax[axis], box2[i].X[axis]);
+      }
     }
   }
-  return out;
+  double box2_size[MAX_NDIM];
+  for (int64_t axis = 0; axis < domain.ndim; axis++) {
+    box2_size[axis] = box2_xmax[axis] - box2_xmin[axis];
+  }
+  int64_t r = 1;
+  bool stop = false;
+  while (!stop) {
+    const auto box2_sample =
+        Domain::select_sample_bodies(domain.ndim, box2, box_idx, r, 3, 0);
+    // A1 = kernel(box1, box2_sample)
+    Matrix A1 = generate_matrix(box1, box2, box_idx, box2_sample);
+    Matrix U;
+    std::vector<int64_t> ipiv_rows;
+    std::tie(U, ipiv_rows) = error_id_row(A1, ID_tol, false);
+    int64_t rank = U.cols;
+    // A2 = A(ipiv_rows[:rank], :)
+    Matrix A2(rank, A.cols);
+    for (int64_t i = 0; i < rank; i++) {
+      for (int64_t j = 0; j < A.cols; j++) {
+        A2(i, j) = A(ipiv_rows[i], j);
+      }
+    }
+    Matrix UxA2 = matmul(U, A2);
+    const double error = norm(A - UxA2);
+    if ((error < stop_tol) ||
+        ((box_nbodies - box2_sample.size()) < (box_nbodies / 10))) {
+      stop = true;
+    }
+    else {
+      r++;
+    }
+  }
+  return r;
 }
 
 Matrix prepend_complement_basis(const Matrix &Q) {
   Matrix Q_F(Q.rows, Q.rows);
   Matrix Q_full, R;
-  std::tie(Q_full, R) = qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+  std::tie(Q_full, R) =
+      qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
 
   for (int64_t i = 0; i < Q_F.rows; i++) {
     for (int64_t j = 0; j < Q_F.cols - Q.cols; j++) {
