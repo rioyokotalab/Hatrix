@@ -138,6 +138,9 @@ class Matrix {
 
   Matrix swap_rows(const std::vector<int64_t>& row_indices);
   Matrix swap_cols(const std::vector<int64_t>& col_indices);
+
+  // Destructively resize.
+  void destructive_resize(const int64_t nrows, const int64_t ncols);
 };
 
 }  // namespace Hatrix

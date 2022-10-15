@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <exception>
 #include <cmath>
+#include <random>
 
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
@@ -169,7 +170,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A) {
   for (int64_t level = A.max_level; level >= A.min_level; --level) {
     RowMap<Matrix> r, t;
     // PLU of one level of the H2 matrix.
-    factorize_level(A, level, F, r, t);
+    //    factorize_level(A, level, F, r, t);
 
     // Update coupling matrices of each admissible block.
     // Merge and permute to prepare for the next level.
@@ -184,11 +185,35 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   return b;
 }
 
+static void
+multiply_S(Hatrix::SymmetricSharedBasisMatrix& A,
+           std::vector<Matrix>& x_hat, std::vector<Matrix>& b_hat,
+           int x_hat_offset, int b_hat_offset, int level) {
+  int64_t nblocks = pow(2, level);
+
+  std::mt19937 gen(0);
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
+        matmul(A.S(i, j, level), x_hat[x_hat_offset + j], b_hat[b_hat_offset + i]);
+        matmul(A.S(i, j, level), x_hat[x_hat_offset + i],
+               b_hat[b_hat_offset + j], true, false);
+      }
+    }
+  }
+
+}
+
 Matrix
-matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
+matmul(SymmetricSharedBasisMatrix& A, const Matrix& x) {
   int leaf_nblocks = pow(2, A.max_level);
   std::vector<Matrix> x_hat;
   auto x_splits = x.split(leaf_nblocks, 1);
+
+  std::mt19937 gen(0);
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
 
   // V leaf nodes
   for (int i = 0; i < leaf_nblocks; ++i) {
@@ -222,20 +247,11 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
     b_hat.push_back(Matrix(A.ranks(i, A.min_level), 1));
   }
 
-  for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, A.min_level) &&
-          A.is_admissible(i, j, A.min_level)) {
-        matmul(A.S(i, j, A.min_level), x_hat[x_hat_offset + j], b_hat[i]);
-        matmul(A.S(i, j, A.min_level), x_hat[x_hat_offset + i],
-               b_hat[j], true, false);
-      }
-    }
-  }
-
   // Multiply the S blocks at the top-most level with the corresponding xhat.
-  int b_hat_offset = 0;
+  int64_t b_hat_offset = 0;
+  multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset, A.min_level);
 
+  // Multiply the S block with the col bases transfer matrices.
   for (int64_t level = A.min_level; level < A.max_level; ++level) {
     int64_t nblocks = pow(2, level);
     int64_t child_level = level + 1;
@@ -243,7 +259,6 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
     for (int64_t row = 0; row < nblocks; ++row) {
       int c_r1 = row * 2, c_r2 = row * 2 + 1;
-
       Matrix Ub = matmul(A.U(row, level),
                          b_hat[b_hat_offset + row]);
       auto Ub_splits = Ub.split(std::vector<int64_t>(1, A.U(c_r1, child_level).cols),
@@ -253,37 +268,37 @@ matmul(const SymmetricSharedBasisMatrix& A, const Matrix& x) {
       b_hat.push_back(Matrix(Ub_splits[1], true));
     }
 
-    for (int64_t row = 0; row < pow(2, child_level); ++row) {
-      for (int64_t col = 0; col < row; ++col) {
-        if (A.is_admissible.exists(row, col, child_level) &&
-            A.is_admissible(row, col, child_level)) {
-          matmul(A.S(row, col, child_level),
-                 x_hat[x_hat_offset + col],
-                 b_hat[b_hat_offset + nblocks + row]);
-
-          matmul(A.S(row, col, child_level),
-                 x_hat[x_hat_offset + row],
-                 b_hat[b_hat_offset + nblocks + col], true, false);
-        }
-      }
-    }
+    multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset + nblocks, child_level);
 
     b_hat_offset += nblocks;
   }
 
+  // Multiply with the leaf level transfer matrices.
   Matrix b(x.rows, 1);
   auto b_splits = b.split(leaf_nblocks, 1);
   for (int64_t i = 0; i < leaf_nblocks; ++i) {
     matmul(A.U(i, A.max_level), b_hat[b_hat_offset + i], b_splits[i]);
   }
 
+
+  // Multiply with the dense blocks to obtain the final product in b_splits.
+  for (int i = 0; i < leaf_nblocks; ++i) {
+    matmul(A.D(i, i, A.max_level), x_splits[i], b_splits[i]);
+  }
+
   for (int64_t i = 0; i < leaf_nblocks; ++i) {
-    for (int64_t j = 0; j < leaf_nblocks; ++j) {
-      if (A.is_admissible.exists(i, j, A.max_level) && !A.is_admissible(i, j, A.max_level)) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
+        // TODO: make the diagonal tringular and remove this.
         matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+        if (i != j) {
+          matmul(A.D(i, j, A.max_level), x_splits[i], b_splits[j], true, false);
+        }
       }
     }
   }
+
 
   return b;
 }

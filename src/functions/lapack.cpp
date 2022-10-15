@@ -188,8 +188,10 @@ void rq(Matrix& A, Matrix& R, Matrix& Q) {
   LAPACKE_dorgrq(LAPACK_COL_MAJOR, Q.rows, Q.cols, k, &Q, Q.stride, tau.data());
 }
 
-// TODO: complete this function  get rid of return warnings. Also return empty R. Needs dummy alloc now.
-std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode, Lapack::QR_ret qr_ret, bool pivoted) {
+// TODO: complete this function  get rid of return warnings.
+// Also return empty R. Needs dummy alloc now.
+std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode,
+                              Lapack::QR_ret qr_ret, bool pivoted) {
   Matrix R(1, 1);
 
   if (mode == Lapack::Full) {
@@ -241,7 +243,7 @@ std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t ran
 }
 
 std::tuple<Matrix, std::vector<int64_t>, int64_t>
-error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
+error_pivoted_qr_max_rank(const Matrix& A, double error, int64_t max_rank) {
   Matrix Q(A, true);
   std::vector<double> tau(Q.rows);
   std::vector<int> jpvt(Q.cols);
@@ -254,7 +256,9 @@ error_pivoted_qr(const Matrix& A, double error, int64_t max_rank) {
 
   LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
   for (int64_t i = 1; i < Q.min_dim(); ++i) {
-    if ((rank >= max_rank && max_rank > 0) || std::abs(Q(i,i)) < error) { break; }
+    if ((rank >= max_rank && max_rank > 0) || std::abs(Q(i,i)) < error) {
+      break;
+    }
     rank++;
   }
 

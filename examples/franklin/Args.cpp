@@ -76,6 +76,7 @@ namespace Hatrix {
                           long_options, &option_index);
 
       if (c == -1) break;
+      num_args++;
       switch(c) {
       case 'n':
         N = std::stol(optarg);

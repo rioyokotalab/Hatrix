@@ -55,6 +55,7 @@ int main(int argc, char* argv[]) {
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
+    // A.print_structure();
 
     construct_max_rank = A.max_rank();
     construct_average_rank = A.average_rank();
@@ -82,6 +83,8 @@ int main(int argc, char* argv[]) {
 
   }
 
+  // x.print();
+
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
   Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
@@ -93,6 +96,7 @@ int main(int argc, char* argv[]) {
   std::cout << "N               : " << opts.N << std::endl;
   std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
   std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+  std::cout << "ADMIS           : " << opts.admis << std::endl;
   std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
   std::cout << "NLEAF           : " << opts.nleaf << "\n"
             << "Domain(ms)      : " << domain_time << "\n"

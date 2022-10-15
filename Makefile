@@ -63,6 +63,16 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
+# parsec H2 matrix
+.PHONY: examples/franklin/H2_dtd
+examples/franklin/H2_dtd:
+	$(MAKE) -C $@
+
+H2_dtd : % : dirs examples/franklin/H2_dtd
+	$(MPICXX) libH2_dtd.a libfranklin.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
 # non-distributed HSS code.
 .PHONY: examples/franklin/HSS
 examples/franklin/HSS:
@@ -114,7 +124,7 @@ test: $(TEST_EXECUTABLES)
 .PHONY: clean
 .SILENT: clean
 clean:
-	for dir in $(DIRS) examples/franklin/HSS examples/franklin/H2 $(TEST) $(EXAMPLES); do \
+	for dir in $(DIRS) examples/franklin/HSS examples/franklin/H2 examples/franklin/H2_dtd $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/ *.a
