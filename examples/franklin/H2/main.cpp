@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
   int64_t construct_max_rank, construct_average_rank,
     post_factor_max_rank, post_factor_average_rank;
   Matrix x = generate_random_matrix(opts.N, 1);
-  x *= 1000;
+  x *= 10000000;
 
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
-    // A.print_structure();
+    A.print_structure();
 
     construct_max_rank = A.max_rank();
     construct_average_rank = A.average_rank();
@@ -83,8 +83,6 @@ int main(int argc, char* argv[]) {
 
   }
 
-  // x.print();
-
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
   Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
@@ -101,6 +99,9 @@ int main(int argc, char* argv[]) {
   std::cout << "NLEAF           : " << opts.nleaf << "\n"
             << "Domain(ms)      : " << domain_time << "\n"
             << "Contruct(ms)    : " << construct_time << "\n"
+            << "Factor(ms)      : " << factor_time << "\n"
+            << "Solve(ms)       : " << solve_time << "\n"
+            << "Solve error     : " << solve_error << "\n"
             << "Construct error : " << matvec_error << std::endl;
   std::cout << "----------------------------\n";
 

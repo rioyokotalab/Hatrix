@@ -288,10 +288,10 @@ void Matrix::print() const {
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
       if ((*this)(i, j) > -1e-10 && (*this)(i, j) < 1e-10) {
-        std::cout << std::setw(10) << 0 << " ";
+        std::cout << std::setw(15) << 0 << " ";
       }
       else {
-        std::cout << std::fixed << std::setprecision(3) << std::setw(10) <<  (*this)(i, j) << " ";
+        std::cout << std::setprecision(5) << std::setw(15) <<  (*this)(i, j) << " ";
         }
     }
     std::cout << "\n";

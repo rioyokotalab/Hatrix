@@ -49,6 +49,11 @@ Matrix& operator*=(Matrix& A, double alpha) {
   return A;
 }
 
+Matrix& operator/=(Matrix& A, double alpha) {
+  Hatrix::scale(A, 1/alpha);
+  return A;
+}
+
 Matrix operator*(const Matrix& A, double alpha) {
   Matrix C(A);
   C *= alpha;
