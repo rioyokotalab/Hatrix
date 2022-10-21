@@ -220,6 +220,35 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A, Lapack::QR_mode mode,
   abort();
 }
 
+std::tuple<Matrix,Matrix> pivoted_qr_nopiv_return(const Matrix& A, int64_t rank) {
+  if (rank < 0) {
+    std::invalid_argument("pivoted_qr()-> expected rank > 0, but got rank=" +
+                          std::to_string(rank));
+  }
+
+  Matrix Q(A, true);
+  std::vector<double> tau(Q.rows);
+  std::vector<int> jpvt(Q.cols);
+
+  LAPACKE_dgeqp3(LAPACK_COL_MAJOR, Q.rows, Q.cols, &Q, Q.stride, jpvt.data(), tau.data());
+
+  // Construct full R
+  Matrix R(rank, A.cols);
+  // Copy first m rows of upper triangular part of A into R
+  for(int64_t i = 0; i < R.rows; i++) {
+    for(int j = i; j < R.cols; j++) {
+      R(i, j) = Q(i, j);
+    }
+  }
+
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.min_dim(), Q.min_dim(), &Q, Q.stride, tau.data());
+
+  Q.shrink(Q.rows, rank);
+
+  return {std::move(Q), std::move(R)};
+}
+
+
 std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t rank) {
   if (rank < 0) {
     std::invalid_argument("pivoted_qr()-> expected rank > 0, but got rank=" +

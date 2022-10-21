@@ -15,10 +15,16 @@ Matrix matmul(const Matrix& A, const Matrix& B, bool transA = false,
 
 // If transA is false:
 //   C = alpha * A * A' + beta * C
+// if transA is true:
+//   C = alpha * A' * A + beta * C
 // A has to be symmetric.
 void syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
             double beta);
 
+
+// Compute matrix product with one triangular matrix. A is the triangular matrix here.
+// B = alpha * op(A) * B
+// op(A) is one of op(A) = A, or op(A) = A'
 void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
                        bool transA, bool diag, double alpha = 1.0);
 

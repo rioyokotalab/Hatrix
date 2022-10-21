@@ -20,7 +20,7 @@ Matrix& operator+=(Matrix& A, const Matrix& B) {
 }
 
 Matrix operator+(const Matrix& A, const Matrix& B) {
-  Matrix C(A);
+  Matrix C(A, true);
   C += B;
   return C;
 }
@@ -35,7 +35,7 @@ Matrix& operator-=(Matrix& A, const Matrix& B) {
 }
 
 Matrix operator-(const Matrix& A, const Matrix& B) {
-  Matrix C(A);
+  Matrix C(A, true);
   C -= B;
   return C;
 }
@@ -55,13 +55,13 @@ Matrix& operator/=(Matrix& A, double alpha) {
 }
 
 Matrix operator*(const Matrix& A, double alpha) {
-  Matrix C(A);
+  Matrix C(A, true);
   C *= alpha;
   return C;
 }
 
 Matrix operator*(double alpha, const Matrix& A) {
-  Matrix C(A);
+  Matrix C(A, true);
   C *= alpha;
   return C;
 }

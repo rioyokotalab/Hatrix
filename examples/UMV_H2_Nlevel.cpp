@@ -17,8 +17,9 @@
 #include <stdexcept>
 
 #include "Hatrix/Hatrix.h"
-#include "Domain.hpp"
-#include "functions.hpp"
+#include "common/functions.hpp"
+#include "common/Domain.hpp"
+
 
 using vec = std::vector<int64_t>;
 
@@ -1702,7 +1703,8 @@ int main(int argc, char ** argv) {
   Hatrix::H2 A(domain, rand, N, leaf_size, accuracy, max_rank, admis, matrix_type);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                (stop_construct - start_construct).count();  
+                                (stop_construct - start_construct).count();
+  A.print_structure(A.height);
   double construct_error = A.construction_absolute_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
 

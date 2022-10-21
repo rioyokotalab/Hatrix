@@ -11,10 +11,10 @@ export TMPDIR=/tmp
 make -j H2_main
 make -j H2_dtd
 
-for adm in 0.8; do
-    nleaf=64
+for adm in 0.8 1.8; do
+    nleaf=128
     ndim=1
-    max_rank=40
+    max_rank=100
     for N in 2048; do
         ./bin/H2_main --N $N \
                       --nleaf $nleaf \
@@ -22,11 +22,11 @@ for adm in 0.8; do
                       --kind_of_geometry circular \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-11 \
+                      --accuracy 1e-7 \
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \
-                      --add_diag 1e-8 \
+                      --add_diag 1e-6 \
                       --use_nested_basis
     done
 done

@@ -41,7 +41,9 @@ int64_t SymmetricSharedBasisMatrix::max_rank() {
   int64_t m_rank = 0;
   for (int64_t level = min_level; level <= max_level; ++level) {
     for (int64_t node = 0; node < pow(2, level); ++node) {
-      m_rank = std::max(ranks(node, level), m_rank);
+      if (ranks.exists(node, level)) {
+        m_rank = std::max(ranks(node, level), m_rank);
+      }
     }
   }
 

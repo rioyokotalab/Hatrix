@@ -273,6 +273,21 @@ TEST(MatrixTests, split_no_split) {
   }
 }
 
+TEST(MatrixTests, split_null_at_the_end) {
+  RecordProperty("description",
+                 "Produce empty splits in location 1, 2 and 3. The full matrix is present in location 0.");
+  int64_t N = 40;
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(N, N);
+  std::vector<Hatrix::Matrix> A_splits = A.split(std::vector<int64_t>(1, N),
+                                                 std::vector<int64_t>(1, N), false);
+
+  for (int i = 0; i < A_splits[0].rows; ++i) {
+    for (int j = 0; j < A_splits[0].cols; ++j) {
+      EXPECT_EQ(A(i, j), A_splits[0](i, j));
+    }
+  }
+}
+
 TEST(MatrixTests, split_vector_row_end) {
   int64_t N = 40;
   Hatrix::Matrix V = Hatrix::generate_random_matrix(N, 1);
