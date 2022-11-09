@@ -25,6 +25,13 @@ TEST_P(ArithmeticTests, PlusOperator) {
     for (int64_t j = 0; j < A.cols; ++j) {
       EXPECT_EQ(C(i, j), A(i, j) + B(i, j));
     }
+
+  // Check that A and B are unmodified.
+  for (int64_t i = 0; i < A.rows; ++i)
+    for (int64_t j = 0; j < A.cols; ++j) {
+      EXPECT_NE(C(i, j), A(i, j));
+      EXPECT_NE(C(i, j), B(i, j));
+    }
 }
 
 TEST_P(ArithmeticTests, PlusEqualsOperator) {
@@ -53,6 +60,13 @@ TEST_P(ArithmeticTests, MinusOperator) {
   for (int64_t i = 0; i < A.rows; ++i)
     for (int64_t j = 0; j < A.cols; ++j) {
       EXPECT_EQ(C(i, j), A(i, j) - B(i, j));
+    }
+
+  // Check that A and B are unmodified.
+  for (int64_t i = 0; i < A.rows; ++i)
+    for (int64_t j = 0; j < A.cols; ++j) {
+      EXPECT_NE(C(i, j), A(i, j));
+      EXPECT_NE(C(i, j), B(i, j));
     }
 }
 

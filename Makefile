@@ -6,7 +6,7 @@ OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
 TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \
-	qr Matrix norms id
+	qr Matrix norms id cholesky
 EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	2x2_BlockDense_QR \
 	2x2_BLR_LU \
@@ -37,8 +37,8 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	UMV_strong_1level_better_index \
 	UMV_BLR2_far_dense \
 	H2_far_dense_construct \
-	UMV_H2_far_dense \
-	svd_vs_id
+	svd_vs_id \
+	UMV_H2_Nlevel
 
 
 .PHONY: dirs $(DIRS)

@@ -58,6 +58,8 @@ public:
   bool exists(int64_t key) const;
 
   void erase(int64_t key);
+
+  void erase_all();
 };
 template<typename T> using ColMap  = RowMap<T>;
 using RankMap = RowMap<std::vector<int64_t>>;

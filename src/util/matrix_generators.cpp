@@ -1,4 +1,5 @@
 #include "Hatrix/util/matrix_generators.h"
+#include "Hatrix/functions/blas.h"
 
 #include <cmath>
 #include <cstdint>
@@ -6,8 +7,16 @@
 
 namespace Hatrix {
 
+Matrix generate_random_spd_matrix(int64_t rows, double diag_scale) {
+  Matrix A = generate_random_matrix(rows, rows);
+  Matrix SPD = matmul(A, A, true, false);
+  for (int i = 0; i < rows; ++i) { A(i,i) *= diag_scale; }
+
+  return SPD;
+}
+
 Matrix generate_random_matrix(int64_t rows, int64_t cols) {
-  std::mt19937 gen(1);
+  std::mt19937 gen(100);
   std::uniform_real_distribution<double> dist(0.0, 1.0);
   Matrix out(rows, cols);
   for (int64_t i = 0; i < rows; ++i) {

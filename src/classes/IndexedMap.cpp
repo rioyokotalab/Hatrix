@@ -39,6 +39,12 @@ void RowMap<T>::erase(int64_t key) {
   map.erase({key});
 }
 
+template<class T>
+void RowMap<T>::erase_all() {
+  map.erase(map.begin(), map.end());
+}
+
+
 template class RowMap<Matrix>;
 template class RowMap<std::vector<int64_t>>;
 

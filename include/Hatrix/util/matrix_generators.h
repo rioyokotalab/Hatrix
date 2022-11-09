@@ -6,6 +6,8 @@
 
 namespace Hatrix {
 
+Matrix generate_random_spd_matrix(int64_t rows, double diag_scale=1.0);
+
 Matrix generate_random_matrix(int64_t rows, int64_t cols);
 
 Matrix generate_low_rank_matrix(int64_t rows, int64_t cols);

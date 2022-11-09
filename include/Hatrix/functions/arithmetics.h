@@ -14,6 +14,8 @@ Matrix& operator*=(Matrix& A, double alpha);
 Matrix operator*(const Matrix& A, double alpha);
 Matrix operator*(double alpha, const Matrix& A);
 
+Matrix& operator/=(Matrix& A, double alpha);
+
 Matrix abs(const Matrix& A);
 Matrix transpose(const Matrix& A);
 Matrix lower_tri(const Matrix& A, bool diag=false);

@@ -2,7 +2,9 @@
 
 #include "franklin/franklin.hpp"
 
-void factorize(Hatrix::SymmetricSharedBasisMatrix& A);
+extern Hatrix::RowLevelMap US;
+
+void factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts);
 Hatrix::Matrix solve(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x);
 
 // matvec routine

@@ -6,6 +6,7 @@
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
 
+#include "h2_operations.hpp"
 #include "h2_construction.hpp"
 
 using namespace Hatrix;
@@ -67,6 +68,8 @@ void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, co
   }
 
   A.min_level++;
+
+  // remove all blocks in the upper triangle
 }
 
 static Matrix
@@ -108,6 +111,10 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
     std::tie(Ui, pivots, rank) = error_pivoted_qr_max_rank(AY, opts.accuracy, (int64_t)opts.max_rank);
   }
 
+  Matrix _U, _S, _V; double _error;
+  std::tie(_U, _S, _V, _error) = truncated_svd(AY, rank);
+  US.insert(block, level, std::move(_S));
+
   A.ranks.insert(block, level, std::move(rank));
 
   return std::move(Ui);
@@ -123,10 +130,11 @@ generate_leaf_nodes(const Domain& domain,
   auto dense_splits = dense.split(nblocks, nblocks);
 
   for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < nblocks; ++j) {
+    for (int64_t j = 0; j <= i; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           !A.is_admissible(i, j, A.max_level)) {
         // TODO: Make this only a lower triangular matrix with the diagonal.
+        // Will need a special type.
         Matrix Aij(dense_splits[i * nblocks + j], true);
         A.D.insert(i, j, A.max_level, std::move(Aij));
       }
@@ -194,6 +202,10 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
     std::tie(Utransfer, pivots, rank) = error_pivoted_qr_max_rank(temp, opts.accuracy, opts.max_rank);
   }
 
+  Matrix _U, _S, _V; double _error;
+  std::tie(_U, _S, _V, _error) = truncated_svd(temp, rank);
+  US.insert(node, level, std::move(_S));
+
   A.ranks.insert(node, level, std::move(rank));
 
   return std::move(Utransfer);
@@ -236,11 +248,11 @@ generate_transfer_matrices(const Domain& domain,
     int64_t c2 = node * 2 + 1;
     int64_t child_level = level + 1;
 
-    if (row_has_admissible_blocks(A, node, level) && A.max_level != 1) {
-      const Matrix& Ubig_c1 = Uchild(c1, child_level);
-      const Matrix& Ubig_c2 = Uchild(c2, child_level);
-      int64_t block_size = Ubig_c1.rows + Ubig_c2.rows;
+    const Matrix& Ubig_c1 = Uchild(c1, child_level);
+    const Matrix& Ubig_c2 = Uchild(c2, child_level);
+    int64_t block_size = Ubig_c1.rows + Ubig_c2.rows;
 
+    if (row_has_admissible_blocks(A, node, level) && A.max_level != 1) {
       Matrix Utransfer = generate_U_transfer_matrix(Ubig_c1,
                                                     Ubig_c2,
                                                     node,
@@ -262,6 +274,16 @@ generate_transfer_matrices(const Domain& domain,
 
       A.U.insert(node, level, std::move(Utransfer));
       Ubig_parent.insert(node, level, std::move(Ubig));
+    }
+    else {                      // add identity transfer matrix
+      int64_t rank = std::max(A.ranks(c1, child_level), A.ranks(c2, child_level));
+      Ubig_parent.insert(node, level,
+                         generate_identity_matrix(block_size, rank));
+      A.U.insert(node, level,
+                 generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
+                                          rank));
+
+      A.ranks.insert(node, level, std::move(rank));
     }
   }
 

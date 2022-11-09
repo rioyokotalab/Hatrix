@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iterator>
 #include <iomanip>
+#include <random>
 
 #include "Hatrix/Hatrix.h"
 
@@ -44,8 +45,11 @@ int main(int argc, char* argv[]) {
   double construct_time, matvec_time, factor_time, solve_time;
   int64_t construct_max_rank, construct_average_rank,
     post_factor_max_rank, post_factor_average_rank;
-  Matrix x = generate_random_matrix(opts.N, 1);
-  x *= 1000;
+
+  std::mt19937 gen(1);
+  std::uniform_real_distribution<double> dist(100, 10000);
+  Matrix x(opts.N, 1);
+  for (int i = 0; i < opts.N; ++i) { x(i, 0) = dist(gen); }
 
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
@@ -55,7 +59,7 @@ int main(int argc, char* argv[]) {
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
-    // A.print_structure();
+    A.print_structure();
 
     construct_max_rank = A.max_rank();
     construct_average_rank = A.average_rank();
@@ -67,7 +71,7 @@ int main(int argc, char* argv[]) {
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
 
     auto begin_factor = std::chrono::system_clock::now();
-    factorize(A);
+    factorize(A, opts);
     auto stop_factor = std::chrono::system_clock::now();
     factor_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_factor - begin_factor).count();
@@ -80,10 +84,11 @@ int main(int argc, char* argv[]) {
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_solve - begin_solve).count();
-
   }
-
-  // x.print();
+  else {
+    std::cerr << "Not implemented for non-symmetric matrices." << std::endl;
+    abort();
+  }
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
@@ -101,6 +106,9 @@ int main(int argc, char* argv[]) {
   std::cout << "NLEAF           : " << opts.nleaf << "\n"
             << "Domain(ms)      : " << domain_time << "\n"
             << "Contruct(ms)    : " << construct_time << "\n"
+            << "Factor(ms)      : " << factor_time << "\n"
+            << "Solve(ms)       : " << solve_time << "\n"
+            << "Solve error     : " << solve_error << "\n"
             << "Construct error : " << matvec_error << std::endl;
   std::cout << "----------------------------\n";
 

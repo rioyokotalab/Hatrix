@@ -41,6 +41,8 @@ void qr(Matrix& A, Matrix& Q, Matrix& R);
 // Return <Q, pivots>
 std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t rank);
 
+std::tuple<Matrix,Matrix> pivoted_qr_nopiv_return(const Matrix& A, int64_t rank);
+
 // Returns <Q, pivots, rank>
 std::tuple<Matrix, std::vector<int64_t>, int64_t> error_pivoted_qr_max_rank(const Matrix& A,
                                                                    double error,
