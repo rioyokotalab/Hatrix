@@ -347,3 +347,11 @@ matmul(SymmetricSharedBasisMatrix& A,
     }
   }
 }
+
+void factorize(SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
+
+}
+
+void solve(SymmetricSharedBasisMatrix& A, std::vector<Matrix>& x, std::vector<Matrix>& h2_solution) {
+
+}

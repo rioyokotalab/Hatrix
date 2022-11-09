@@ -218,8 +218,6 @@ int main (int argc, char **argv) {
   descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
 
-  // std::cout << "MPIRANK : " << MPIRANK << " numel: " <<  B_CHECK_local_rows * B_CHECK_local_cols << std::endl;
-
   std::mt19937 gen(MPIRANK);
   std::uniform_real_distribution<double> dist(0.0, 1.0);
   for (int block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
@@ -240,20 +238,14 @@ int main (int argc, char **argv) {
 
   redistribute_vector2scalapack(x, X_mem, A, opts);
 
-  // MPI_Barrier(MPI_COMM_WORLD);
-  // std::cout << "REDIST\n";
-
   auto start_matvec = std::chrono::system_clock::now();
   matmul(A, domain, x, b);      // H2 matrix matvec. H2_A * x = b.
   auto stop_matvec = std::chrono::system_clock::now();
   double matvec_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_matvec - start_matvec).count();
 
-  // MPI_Barrier(MPI_COMM_WORLD);
-
   // H2 matvec verification.
 
-  // generate the distributed P2P matrix.
   double ALPHA = 1.0;
   double BETA = 0.0;
 
@@ -280,12 +272,17 @@ int main (int argc, char **argv) {
     difference.push_back(b_check[i] - b[i]);
   }
 
-  // std::cout << "b chk: " << dist_norm2(b_check) <<  " b: " << dist_norm2(b)
-  //           << " nrm: " << nrm <<  std::endl;
-
   double diff_norm = dist_norm2(difference);
   double b_check_norm = dist_norm2(b_check);
   double construction_error = diff_norm / b_check_norm;
+
+  std::vector<Matrix> h2_solution;
+  for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
+    h2_solution.push_back(Matrix(opts.nleaf, 1));
+  }
+
+  factorize(A, opts);
+  solve(A, x, h2_solution);
 
   /* Registering the dtd_handle with PARSEC context */
   rc = parsec_context_add_taskpool( parsec, dtd_tp );

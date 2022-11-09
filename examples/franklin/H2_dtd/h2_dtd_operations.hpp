@@ -12,3 +12,10 @@ matmul(Hatrix::SymmetricSharedBasisMatrix& A,
        const Hatrix::Domain& domain,
        std::vector<Hatrix::Matrix>& x,
        std::vector<Hatrix::Matrix>& b);
+
+void
+factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts);
+
+void
+solve(Hatrix::SymmetricSharedBasisMatrix& A,
+      std::vector<Hatrix::Matrix>& x, std::vector<Hatrix::Matrix>& h2_solution);

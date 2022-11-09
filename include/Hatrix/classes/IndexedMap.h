@@ -70,6 +70,8 @@ class RowColMap {
   std::unordered_map<std::tuple<int64_t, int64_t>, T> map;
 
  public:
+  void deep_copy(const RowColMap<T>& A);
+
   T& operator()(int64_t row, int64_t col);
   const T& operator()(int64_t row, int64_t col) const;
 
@@ -105,6 +107,8 @@ private:
   std::unordered_map<std::tuple<int64_t, int64_t, int64_t>, T> map;
 
 public:
+  void deep_copy(const RowColLevelMap<T>& A);
+
   T& operator()(int64_t row, int64_t col, int64_t level);
   const T& operator()(int64_t row, int64_t col, int64_t level) const;
 
