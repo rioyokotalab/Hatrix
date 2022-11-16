@@ -79,15 +79,17 @@ else()
   target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} OpenMP::OpenMP_CXX)
 endif()
 
-
 find_package(GSL REQUIRED)    # See below (2)
 target_link_libraries(Hatrix GSL::gsl)
+
+include(find_or_download)
+# JSON writer
+find_or_download(nlohmann_json)
 
 add_subdirectory(examples)
 
 if(${Hatrix_BUILD_TESTS})
   enable_testing()
-  include(find_or_download)
   find_or_download(GTest)
   add_subdirectory(test)
 endif()
