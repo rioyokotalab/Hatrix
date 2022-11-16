@@ -476,6 +476,10 @@ int main(int argc, char ** argv) {
   // 1: H2
   const int64_t matrix_type = argc > 10 ? atol(argv[10]) : 1;
 
+  // Output H2-Matrix structure as JSON file
+  // Empty string: do not write JSON file
+  const std::string out_filename = argc > 11 ? std::string(argv[11]) : "";
+
   Hatrix::Context::init();
 
   std::string sampling_algo_name = "";
@@ -522,7 +526,10 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   double construct_error = A.construction_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
-  A.write_JSON(domain, "matrix.json");
+
+  if (out_filename.length() > 0) {
+    A.write_JSON(domain, out_filename);
+  }
 
   std::cout << "N=" << N
             << " leaf_size=" << leaf_size
@@ -545,6 +552,7 @@ int main(int argc, char ** argv) {
             << " sample_time=" << sample_time
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error
+            << " out_filename=" << out_filename
             << std::endl;
 
   Hatrix::Context::finalize();
