@@ -6,7 +6,7 @@ OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
 TEST_EXECUTABLES := scale svd triangular_matmul arithmetics matmul lu \
-	qr Matrix norms id cholesky
+	qr Matrix norms id cholesky lu_solve
 EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 	2x2_BlockDense_QR \
 	2x2_BLR_LU \

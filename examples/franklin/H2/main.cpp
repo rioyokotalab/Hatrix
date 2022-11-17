@@ -17,6 +17,7 @@
 
 #include "h2_construction.hpp"
 #include "h2_operations.hpp"
+#include "h2_factorize_tests.hpp"
 
 using namespace Hatrix;
 
@@ -59,16 +60,22 @@ int main(int argc, char* argv[]) {
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_construct - begin_construct).count();
-    A.print_structure();
 
     construct_max_rank = A.max_rank();
     construct_average_rank = A.average_rank();
+
+    A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
+
+    // auto A_test = dense_cholesky_test(A, opts);
+    // vector_permute_test(A_test, x);
+    // dense_factorize_and_solve_test(A, x, opts);
+    cholesky_fill_in_recompress_check(A, opts);
 
     auto begin_factor = std::chrono::system_clock::now();
     factorize(A, opts);
@@ -81,6 +88,7 @@ int main(int argc, char* argv[]) {
 
     auto begin_solve = std::chrono::system_clock::now();
     h2_solution = solve(A, x);
+
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_solve - begin_solve).count();

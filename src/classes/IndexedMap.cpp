@@ -49,6 +49,22 @@ template class RowMap<Matrix>;
 template class RowMap<std::vector<int64_t>>;
 
 template<class T>
+void RowColMap<T>::deep_copy(const RowColMap<T>& A) {
+  for (const auto& e : A.map) {
+    T copy(e.second);
+    this->insert(e.first, std::move(copy));
+  }
+}
+
+template<>
+void RowColMap<Hatrix::Matrix>::deep_copy(const RowColMap<Hatrix::Matrix>& A) {
+  for (const auto& e : A.map) {
+    Hatrix::Matrix copy(e.second, true);
+    this->insert(e.first, std::move(copy));
+  }
+}
+
+template<class T>
 T& RowColMap<T>::operator()(int64_t row, int64_t col) {
   return map.at({row, col});
 }
@@ -120,6 +136,22 @@ template class RowColMap<bool>;
 template class RowColMap<Hatrix::Matrix>;
 template class RowColMap<int64_t>;
 template class RowColMap<std::vector<int64_t>>;
+
+template<class T>
+void RowColLevelMap<T>::deep_copy(const RowColLevelMap<T>& A) {
+  for (const auto& e : A.map) {
+    T copy(e.second);
+    this->insert(e.first, std::move(copy));
+  }
+}
+
+template<>
+void RowColLevelMap<Hatrix::Matrix>::deep_copy(const RowColLevelMap<Hatrix::Matrix>& A) {
+  for (const auto& e : A.map) {
+    Hatrix::Matrix copy(e.second, true);
+    this->insert(e.first, std::move(copy));
+  }
+}
 
 template<class T>
 T& RowColLevelMap<T>::operator[](const std::tuple<int64_t, int64_t, int64_t>& key) {

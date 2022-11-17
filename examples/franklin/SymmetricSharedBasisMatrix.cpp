@@ -80,3 +80,14 @@ void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
 void SymmetricSharedBasisMatrix::print_structure() {
   actually_print_structure(max_level);
 }
+
+SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix(const SymmetricSharedBasisMatrix& A) :
+  min_level(A.min_level), max_level(A.max_level) {
+  ranks.deep_copy(A.ranks);
+  is_admissible.deep_copy(A.is_admissible);
+  S.deep_copy(A.S);
+  D.deep_copy(A.D);
+  U.deep_copy(A.U);
+}
+
+SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix() {}
