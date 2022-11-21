@@ -824,7 +824,8 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
       for (int64_t j = 0; j <= i; ++j) {
         if (exists_and_admissible(A, i, j, level)) {
           if (F.exists(i, j, level)) {
-            Matrix projected_fill_in = matmul(matmul(A.U(i, level), F(i, j, level), true),
+            Matrix projected_fill_in = matmul(matmul(A.U(i, level), F(i, j, level),
+                                                     true),
                                               A.U(j, level));
             A.S(i, j, level) += projected_fill_in;
           }

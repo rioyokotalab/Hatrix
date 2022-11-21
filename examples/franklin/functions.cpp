@@ -5,6 +5,28 @@
 #include "franklin/franklin.hpp"
 
 namespace Hatrix {
+  Matrix
+  make_complement(const Matrix& Q) {
+    Hatrix::Matrix Q_F(Q.rows, Q.rows);
+    Hatrix::Matrix Q_full, R;
+    std::tie(Q_full, R) = qr(Q,
+                             Hatrix::Lapack::QR_mode::Full,
+                             Hatrix::Lapack::QR_ret::OnlyQ);
+
+    for (int64_t i = 0; i < Q_F.rows; ++i) {
+      for (int64_t j = 0; j < Q_F.cols - Q.cols; ++j) {
+        Q_F(i, j) = Q_full(i, j + Q.cols);
+      }
+    }
+
+    for (int64_t i = 0; i < Q_F.rows; ++i) {
+      for (int64_t j = 0; j < Q.cols; ++j) {
+        Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+      }
+    }
+    return Q_F;
+  }
+
   void
   search_tree_for_nodes(const Cell& tree, const int64_t level_index, const int64_t level,
                         int64_t &pstart, int64_t &pend) {

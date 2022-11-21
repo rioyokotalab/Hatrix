@@ -12,6 +12,9 @@ namespace Hatrix {
   // double block_sin(const std::vector<double>& coords_row,
   //                  const std::vector<double>& coords_col);
 
+  Matrix
+  make_complement(const Matrix& Q);
+
   void
   search_tree_for_nodes(const Cell& tree,
                         const int64_t level_index,

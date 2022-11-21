@@ -110,7 +110,7 @@ int main (int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = -1;
+  int cores = 1;                // TODO: why does this not with multiple cores?
 
   Args opts(argc, argv);
 
@@ -281,11 +281,12 @@ int main (int argc, char **argv) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
 
-  factorize(A, opts);
-  solve(A, x, h2_solution);
-
   /* Registering the dtd_handle with PARSEC context */
   rc = parsec_context_add_taskpool( parsec, dtd_tp );
+
+  factorize(A, domain, opts);
+  solve(A, x, h2_solution);
+
   /* Cleaning the parsec handle */
   parsec_taskpool_free( dtd_tp );
 

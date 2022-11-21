@@ -42,7 +42,8 @@ static void coarsen_blocks(MPISymmSharedBasisMatrix& A, int64_t level) {
   }
 }
 
-static int64_t diagonal_admis_init(MPISymmSharedBasisMatrix& A, const Hatrix::Args& opts, int64_t level) {
+static int64_t diagonal_admis_init(MPISymmSharedBasisMatrix& A,
+                                   const Hatrix::Args& opts, int64_t level) {
   int64_t nblocks = pow(2, level); // pow since we are using diagonal based admis.
   if (level == 0) { return 0; }
   if (level == A.max_level) {
