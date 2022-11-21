@@ -205,7 +205,8 @@ class Domain {
                        const std::vector<int64_t>& bodies_idx,
                        const int64_t sample_size,
                        const int64_t sampling_algo,
-                       const int64_t grid_algo = 0) {
+                       const int64_t grid_algo = 0,
+                       const bool ELSES_GEOM = false) {
     const int64_t nbodies = bodies_idx.size();
     if (sample_size >= nbodies) {
       return bodies_idx;
@@ -317,9 +318,20 @@ class Domain {
             chosen[min_idx] = true;
           }
           sample_idx.reserve(anchor_npt);
+          std::vector<bool> is_chosen_particle(bodies_arr.size() / 4, false);
           for (int64_t i = 0; i < nbodies; i++) {
-            if (chosen[i]) {
+            // Check if atom from the same particle has been selected before
+            bool ELSES_cond = true;
+            if (ELSES_GEOM) {
+              const auto particle_number = (int64_t)bodies_arr[bodies_idx[i]].value / 4;
+              ELSES_cond = !is_chosen_particle[particle_number];
+            }
+            if (chosen[i] && ELSES_cond) {
               sample_idx.push_back(bodies_idx[i]);
+              if (ELSES_GEOM) {
+                const auto particle_number = (int64_t)bodies_arr[bodies_idx[i]].value / 4;
+                is_chosen_particle[particle_number] = true;
+              }
             }
           }
         }
@@ -504,7 +516,8 @@ class Domain {
 
   void build_sample_bodies(const int64_t sample_self_size,
                            const int64_t sample_far_size,
-                           const int64_t sampling_algo) {
+                           const int64_t sampling_algo,
+                           const bool ELSES_GEOM = false) {
     // Bottom-up pass to select cell's sample bodies
     for (int64_t level = tree_height; level > 0; level--) {
       const auto level_ncells = (int64_t)1 << level;
@@ -529,7 +542,7 @@ class Domain {
         }
         cell.sample_bodies =
             select_sample_bodies(ndim, bodies, initial_sample,
-                                 sample_self_size, sampling_algo, 0);
+                                 sample_self_size, sampling_algo, 0, ELSES_GEOM);
       }
     }
     // Top-down pass to select cell's farfield sample
@@ -658,7 +671,7 @@ class Domain {
         }
         cell.sample_farfield =
             select_sample_bodies(ndim, bodies, initial_sample,
-                                 sample_far_size, sampling_algo, 1);
+                                 sample_far_size, sampling_algo, 1, ELSES_GEOM);
       }
     }
   }
@@ -891,6 +904,106 @@ class Domain {
       }
     }
     file.close();
+  }
+
+  std::vector<int64_t> read_bodies_ELSES_sorted(const std::string& file_name) {
+    std::ifstream file;
+    file.open(file_name);
+    int64_t num_particles, nleaf_cells;
+    file >> num_particles >> nleaf_cells;
+    constexpr int64_t num_atoms_per_particle = 4;
+    ndim = 3;
+    N = num_particles * num_atoms_per_particle;
+
+    std::vector<int64_t> buckets(nleaf_cells, 0);
+    for(int64_t i = 0; i < num_particles; i++) {
+      double x, y, z;
+      int64_t particle_idx, bucket_idx;
+
+      file >> x >> y >> z >> particle_idx >> bucket_idx;
+      int64_t body_idx = particle_idx * num_atoms_per_particle;
+      for (int64_t k = 0; k < num_atoms_per_particle; k++) {
+        bodies.emplace_back(Body(x, y, z, (double)body_idx));
+        body_idx++;
+        buckets[bucket_idx - 1]++;
+      }
+    }
+    file.close();
+    return buckets;
+  }
+
+  void build_tree_from_kmeans_ordering(const int64_t leaf_size,
+                                       const std::vector<int64_t>& buckets) {
+    tree_height = (int64_t)std::log2((double)N / (double)leaf_size);
+    const int64_t nleaf_cells = (int64_t)1 << tree_height;
+    assert(nleaf_cells == buckets.size());
+
+    ncells = 2 * nleaf_cells - 1;
+    // Initialize empty cells
+    cells.resize(ncells);
+    // Build cell tree using bottom up traversal
+    int64_t count = 0;
+    for (int64_t level = tree_height; level >= 0; level--) {
+      const auto level_ncells = (int64_t)1 << level;
+      const auto level_offset = level_ncells - 1;
+      for (int64_t node = 0; node < level_ncells; node++) {
+        auto& cell = cells[level_offset + node];
+        cell.level = level;
+        cell.block_index = node;
+        if (level == tree_height) {
+          // Construct leaf node from kmeans buckets
+          cell.child = -1;
+          cell.nchilds = 0;
+          cell.body_offset = count;
+          cell.nbodies = buckets[node];
+          count += buckets[node];
+          std::cout << "Creating leaf cell-" << level_offset + node << ":\n"
+                    << "\tfrom buckets[" << node << "]=" << buckets[node] << "\n"
+                    << "\tbody_offset=" << cell.body_offset << "\n"
+                    << "\tnbodies=" << cell.nbodies << "\n";
+        }
+        else {
+          // Construct non-leaf nodes from adjacent lower nodes
+          const auto child1_idx = get_cell_idx((node << 1) + 0, level + 1);
+          const auto child2_idx = get_cell_idx((node << 1) + 1, level + 1);
+          auto& child1 = cells[child1_idx];
+          auto& child2 = cells[child2_idx];
+          cell.child = child1_idx;
+          cell.nchilds = 2;
+          cell.body_offset = child1.body_offset;
+          cell.nbodies = child1.nbodies + child2.nbodies;
+          // Set parent
+          child1.parent = level_offset + node;
+          child2.parent = level_offset + node;
+          std::cout << "Creating non-leaf cell-" << level_offset + node << ":\n"
+                    << "\tusing cell-" << child1_idx << " and cell-" << child2_idx << "\n"
+                    << "\tbody_offset=" << cell.body_offset << "\n"
+                    << "\tnbodies=" << cell.nbodies << "\n";
+        }
+        // Calculate cell center and radius
+        for (int64_t axis = 0; axis < ndim; axis++) {
+          const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
+          const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
+          const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
+          const auto diam = Xmax - Xmin;
+          cell.center[axis] = Xsum / (double)cell.nbodies;
+          cell.radius[axis] = diam / 2.;
+        }
+        std::cout << "\tcenter=(";
+        for (int64_t axis = 0; axis < ndim; axis++) {
+          if (axis > 0) std::cout << ",";
+          std::cout << cell.center[axis];
+        }
+        std::cout << ")\n";
+        std::cout << "\tradius=(";
+        for (int64_t axis = 0; axis < ndim; axis++) {
+          if (axis > 0) std::cout << ",";
+          std::cout << cell.radius[axis];
+        }
+        std::cout << ")\n";
+      }
+    }
+    cells[0].parent = -1; //  Root has no parent
   }
 
   void read_p2p_matrix_ELSES(const std::string& file_name) {
