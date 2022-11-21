@@ -476,9 +476,12 @@ int main(int argc, char ** argv) {
   // 1: H2
   const int64_t matrix_type = argc > 10 ? atol(argv[10]) : 1;
 
+  // Whether reading sorted ELSES geometry or no
+  const int64_t read_sorted_bodies = argc > 11 ? atol(argv[11]) : 0;
+
   // Output H2-Matrix structure as JSON file
   // Empty string: do not write JSON file
-  const std::string out_filename = argc > 11 ? std::string(argv[11]) : "";
+  const std::string out_filename = argc > 12 ? std::string(argv[12]) : "";
 
   Hatrix::Context::init();
 
@@ -507,14 +510,21 @@ int main(int argc, char ** argv) {
   std::string geom_name = file_name;
 
   Hatrix::Domain domain(0, 3);
-  domain.read_bodies_ELSES(file_name + ".xyz");
+  if (read_sorted_bodies == 1) {
+    const auto buckets = domain.read_bodies_ELSES_sorted(file_name + "_kmeans" +
+                                                         std::to_string(leaf_size) + ".xyz");
+    domain.build_tree_from_kmeans_ordering(leaf_size, buckets);
+  }
+  else {
+    domain.read_bodies_ELSES(file_name + ".xyz");
+    domain.build_tree(leaf_size);
+  }
+  domain.build_interactions(admis);
   domain.read_p2p_matrix_ELSES(file_name + ".dat");
   const int64_t N = domain.N;
 
-  domain.build_tree(leaf_size);
-  domain.build_interactions(admis);
   const auto start_sample = std::chrono::system_clock::now();
-  domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo);
+  domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo, true);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();
@@ -526,6 +536,7 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   double construct_error = A.construction_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
+  A.print_structure(A.height);
 
   if (out_filename.length() > 0) {
     A.write_JSON(domain, out_filename);
