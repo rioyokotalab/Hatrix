@@ -739,6 +739,7 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                       }
                       else {
                         int64_t D_j_block_split_index = 2;
+                        bool transA = false, transB = true;
 
                         parsec_dtd_insert_task(dtd_tp, task_partial_matmul, 0, PARSEC_DEV_CPU,
                           "partial_matmul_task",
@@ -763,6 +764,8 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                           sizeof(int64_t), &D_ij_col_rank, PARSEC_VALUE,
                           sizeof(int64_t), &D_ij_split_index, PARSEC_VALUE,
                           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key), PARSEC_INOUT | arena_D(i, j, level) | PARSEC_AFFINITY,
+                          sizeof(bool), &transA, PARSEC_VALUE,
+                          sizeof(bool), &transB, PARSEC_VALUE,
                           PARSEC_DTD_ARG_END);
                       }
                     }
