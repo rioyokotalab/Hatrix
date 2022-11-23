@@ -217,8 +217,7 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
   bool has_admis = false;
 
   for (int64_t i = 0; i < pow(2, level); ++i) {
-    if (!A.is_admissible.exists(row, i, level) ||
-        (A.is_admissible.exists(row, i, level) && A.is_admissible(row, i, level))) {
+    if (!A.is_admissible.exists(row, i, level) || exists_and_admissible(A, row, i, level)) {
       has_admis = true;
       break;
     }

@@ -665,7 +665,6 @@ update_col_transfer_basis(Hatrix::SymmetricSharedBasisMatrix& A,
     A.U.erase(parent_block, parent_level);
     A.U.insert(parent_block, parent_level, std::move(Utransfer_new));
   }
-
 }
 
 void

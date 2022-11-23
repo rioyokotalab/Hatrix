@@ -23,6 +23,22 @@ int NBCOL;                      // col block size of the randomized matrix.
 // temp data for storing actual basis temporarily during matrix construction.
 std::vector<double*> Uchild_data;
 
+static bool
+row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
+                          int64_t level) {
+  bool has_admis = false;
+
+  for (int64_t i = 0; i < pow(2, level); ++i) {
+    if (!A.is_admissible.exists(row, i, level) ||
+        (A.is_admissible.exists(row, i, level) && A.is_admissible(row, i, level))) {
+      has_admis = true;
+      break;
+    }
+  }
+
+  return has_admis;
+}
+
 static void
 dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci,
                     const Cell& Cj, const Domain& domain,
@@ -489,7 +505,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   descinit_(Utransfer.data(), &rank_total, &P, &MB, &NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &Utransfer_local_rows, &info);
 
-  // Matrix Ut_copy(A.ranks(0, child_level) + A.ranks(1, child_level), P);
   std::mt19937 gen(0);
   std::uniform_real_distribution<double> dist(0.0, 1.0);
   // Generation of the transfer matrices.
@@ -503,98 +518,108 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     int rank_c1 = A.ranks(c1, child_level);
     int rank_c2 = A.ranks(c2, child_level);
 
-    double ALPHA = 1.0;
-    double BETA = 0.0;
+    if (row_has_admissible_blocks(A, block, level) && A.max_level != 1) {
+      double ALPHA = 1.0;
+      double BETA = 0.0;
 
-    int IA = c1 * block_size_c1 + 1;
-    int JA = 1;
+      int IA = c1 * block_size_c1 + 1;
+      int JA = 1;
 
-    int IB = c1 * block_size_c1 + 1;
-    int JB = 1;
+      int IB = c1 * block_size_c1 + 1;
+      int JB = 1;
 
-    int IC = 1;
-    for (int i = 0; i < c1; ++i) {
-      IC += A.ranks(i, child_level);
+      int IC = 1;
+      for (int i = 0; i < c1; ++i) {
+        IC += A.ranks(i, child_level);
+      }
+      int JC = 1;
+
+      // multiply the child level full basis with the randomized matrix
+      // to project the child basis onto the randomized data for computing
+      // the nested basis.
+
+      // multiply the first child Ubig with the upper slice of AY.
+      pdgemm_(&TRANS, &NOTRANS,
+              &rank_c1, &P, &block_size_c1,
+              &ALPHA,
+              Uchild_mem.data(), &IA, &JA, Uchild.data(),
+              AY_MEM, &IB, &JB, AY,
+              &BETA,
+              Utransfer_mem.data(), &IC, &JC, Utransfer.data());
+
+      IA = c2 * block_size_c2 + 1;
+      IB = c2 * block_size_c2 + 1;
+      IC += rank_c1;
+
+      // Multiply the second child block with the lower slice of this part
+      // of the randomized matrix.
+      pdgemm_(&TRANS, &NOTRANS, &rank_c2, &P, &block_size_c2,
+              &ALPHA,
+              Uchild_mem.data(), &IA, &JA, Uchild.data(),
+              AY_MEM, &IB, &JB, AY,
+              &BETA,
+              Utransfer_mem.data(), &IC, &JC, Utransfer.data());
+
+      // pivoted QR on the transfer matrix.
+      int Utransfer_nrows = rank_c1 + rank_c2;
+      IA = 1;
+      for (int i = 0; i < block; ++i) {
+        int c1_i = i * 2;
+        int c2_i = i * 2 + 1;
+        IA += A.ranks(c1_i, child_level) + A.ranks(c2_i, child_level);
+      }
+
+      int qr_rank = pivoted_QR(Utransfer_mem.data(),
+                               Utransfer_nrows, P,
+                               Utransfer_local_rows, Utransfer_local_cols,
+                               IA, ONE,
+                               MB, NBCOL,
+                               Utransfer.data(), opts.accuracy);
+
+      // copy the transfer matrix into the RowLevel map for use with parsec.
+      int IMAP[1];
+      IMAP[0] = mpi_rank(block);
+
+      int NODE_CONTEXT;
+      Cblacs_get(BLACS_CONTEXT, 10, &NODE_CONTEXT);
+      Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
+
+      std::vector<int> U_block(DESC_LEN);
+      int U_nrows = 0, U_ncols = 0;
+      if (mpi_rank(block) == MPIRANK) {
+        U_nrows = Utransfer_nrows;
+        U_ncols = qr_rank;
+      }
+      Matrix U(U_nrows, U_ncols);
+
+      int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
+      Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
+      descset_(U_block.data(), &Utransfer_nrows, &qr_rank, &Utransfer_nrows, &qr_rank,
+               &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &Utransfer_nrows, &info);
+
+      IA = 1; for (int i = 0; i < c1; ++i) { IA += A.ranks(i, child_level); }
+      JA = 1;
+
+      // copy out the U block into its own dedicated storage.
+      pdgemr2d_(&Utransfer_nrows, &qr_rank,
+                Utransfer_mem.data(), &IA, &JA, Utransfer.data(),
+                &U, &ONE, &ONE, U_block.data(),
+                &BLACS_CONTEXT);
+
+      if (mpi_rank(block) == MPIRANK) {
+        A.U.insert(block, level, std::move(U));
+      }
+
+      A.ranks.insert(block, level, std::move(qr_rank));
+    } // if row_has_admissible_blocks
+    else {
+      int64_t rank = std::max(A.ranks(c1, child_level), A.ranks(c2, child_level));
+      if (mpi_rank(block) == MPIRANK) {
+        A.U.insert(block, level, generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
+                                                          rank));
+      }
+      A.ranks.insert(block, level, std::move(rank));
     }
-    int JC = 1;
-
-    // multiply the child level full basis with the randomized matrix
-    // to project the child basis onto the randomized data for computing
-    // the nested basis.
-
-    // multiply the first child Ubig with the upper slice of AY.
-    pdgemm_(&TRANS, &NOTRANS,
-            &rank_c1, &P, &block_size_c1,
-            &ALPHA,
-            Uchild_mem.data(), &IA, &JA, Uchild.data(),
-            AY_MEM, &IB, &JB, AY,
-            &BETA,
-            Utransfer_mem.data(), &IC, &JC, Utransfer.data());
-
-    IA = c2 * block_size_c2 + 1;
-    IB = c2 * block_size_c2 + 1;
-    IC += rank_c1;
-
-    // Multiply the second child block with the lower slice of this part
-    // of the randomized matrix.
-    pdgemm_(&TRANS, &NOTRANS, &rank_c2, &P, &block_size_c2,
-            &ALPHA,
-            Uchild_mem.data(), &IA, &JA, Uchild.data(),
-            AY_MEM, &IB, &JB, AY,
-            &BETA,
-            Utransfer_mem.data(), &IC, &JC, Utransfer.data());
-
-    // pivoted QR on the transfer matrix.
-    int Utransfer_nrows = rank_c1 + rank_c2;
-    IA = 1;
-    for (int i = 0; i < block; ++i) {
-      int c1_i = i * 2;
-      int c2_i = i * 2 + 1;
-      IA += A.ranks(c1_i, child_level) + A.ranks(c2_i, child_level);
-    }
-
-    int qr_rank = pivoted_QR(Utransfer_mem.data(),
-                             Utransfer_nrows, P,
-                             Utransfer_local_rows, Utransfer_local_cols,
-                             IA, ONE,
-                             MB, NBCOL,
-                             Utransfer.data(), opts.accuracy);
-
-    // copy the transfer matrix into the RowLevel map for use with parsec.
-    int IMAP[1];
-    IMAP[0] = mpi_rank(block);
-
-    int NODE_CONTEXT;
-    Cblacs_get(BLACS_CONTEXT, 10, &NODE_CONTEXT);
-    Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
-
-    std::vector<int> U_block(DESC_LEN);
-    int U_nrows = 0, U_ncols = 0;
-    if (mpi_rank(block) == MPIRANK) {
-      U_nrows = Utransfer_nrows;
-      U_ncols = qr_rank;
-    }
-    Matrix U(U_nrows, U_ncols);
-
-    int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
-    Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
-    descset_(U_block.data(), &Utransfer_nrows, &qr_rank, &Utransfer_nrows, &qr_rank,
-             &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &Utransfer_nrows, &info);
-
-    IA = 1; for (int i = 0; i < c1; ++i) { IA += A.ranks(i, child_level); }
-    JA = 1;
-
-    // copy out the U block into its own dedicated storage.
-    pdgemr2d_(&Utransfer_nrows, &qr_rank,
-              Utransfer_mem.data(), &IA, &JA, Utransfer.data(),
-              &U, &ONE, &ONE, U_block.data(),
-              &BLACS_CONTEXT);
-
-    if (mpi_rank(block) == MPIRANK) {
-      A.U.insert(block, level, std::move(U));
-    }
-
-    A.ranks.insert(block, level, std::move(qr_rank));
   }
 
   // compute dimensions for Ubig at this level.
@@ -852,7 +877,7 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A,
               &BLACS_CONTEXT);
   }
 
-  for (int level = A.max_level-1; level >= A.min_level; --level) {
+  for (int level = A.max_level-1; level >= A.min_level-1; --level) {
     // init scratch product memory space to 0.
     for (int i = 0; i < AY_local_rows * AY_local_cols; ++i) { AY_MEM[i] = 0; }
     std::tie(Uchild, Uchild_mem) = generate_transfer_matrices(A, level,
