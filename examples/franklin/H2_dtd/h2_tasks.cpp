@@ -136,6 +136,19 @@ task_partial_syrk(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                          &D_ij_split_index,
                          &_D_ij, &uplo, &unit_diag);
 
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_rows, D_i_block_cols, D_i_block_rows);
+  MatrixWrapper D_ij(_D_ij, D_ij_rows, D_ij_cols, D_ij_rows);
+
+  auto D_i_block_splits = split_dense(D_i_block,
+                                      D_i_block_rows - D_i_block_row_rank,
+                                      D_i_block_cols - D_i_block_col_rank);
+  auto D_ij_splits = split_dense(D_ij,
+                                 D_ij_rows - D_ij_row_rank,
+                                 D_ij_cols - D_ij_col_rank);
+
+  syrk(D_i_block_splits[D_i_block_split_index], D_ij_splits[D_ij_split_index],
+       uplo, unit_diag, -1.0, 1.0);
+
   return PARSEC_HOOK_RETURN_DONE;
 }
 
@@ -165,6 +178,25 @@ task_partial_matmul(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                          &D_ij_split_index,
                          &_D_ij,
                          &transA, &transB);
+
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_rows, D_i_block_cols, D_i_block_rows);
+  MatrixWrapper D_j_block(_D_j_block, D_j_block_rows, D_j_block_cols, D_j_block_rows);
+  MatrixWrapper D_ij(_D_ij, D_ij_rows, D_ij_cols, D_ij_rows);
+
+  auto D_i_block_splits = split_dense(D_i_block,
+                                      D_i_block_rows - D_i_block_row_rank,
+                                      D_i_block_cols - D_i_block_col_rank);
+  auto D_j_block_splits = split_dense(D_j_block,
+                                      D_j_block_rows - D_j_block_row_rank,
+                                      D_j_block_cols - D_j_block_col_rank);
+  auto D_ij_splits = split_dense(D_ij,
+                                 D_ij_rows - D_ij_row_rank,
+                                 D_ij_cols - D_ij_col_rank);
+
+  matmul(D_i_block_splits[D_i_block_split_index],
+         D_j_block_splits[D_j_block_split_index],
+         D_ij_splits[D_ij_split_index], transA, transB,
+         -1.0, 1.0);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
