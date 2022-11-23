@@ -30,28 +30,6 @@ exists_and_admissible(const Hatrix::SymmetricSharedBasisMatrix& A,
   return A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level);
 }
 
-static Matrix
-make_complement(const Matrix& Q) {
-  Hatrix::Matrix Q_F(Q.rows, Q.rows);
-  Hatrix::Matrix Q_full, R;
-  std::tie(Q_full, R) = qr(Q,
-                           Hatrix::Lapack::QR_mode::Full,
-                           Hatrix::Lapack::QR_ret::OnlyQ);
-
-  for (int64_t i = 0; i < Q_F.rows; ++i) {
-    for (int64_t j = 0; j < Q_F.cols - Q.cols; ++j) {
-      Q_F(i, j) = Q_full(i, j + Q.cols);
-    }
-  }
-
-  for (int64_t i = 0; i < Q_F.rows; ++i) {
-    for (int64_t j = 0; j < Q.cols; ++j) {
-      Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
-    }
-  }
-  return Q_F;
-}
-
 void
 factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
   Matrix& diagonal = A.D(block, block, level);

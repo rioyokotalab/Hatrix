@@ -119,15 +119,29 @@ task_partial_trsm(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
 parsec_hook_return_t
 task_partial_syrk(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_i_block_rows, D_i_block_cols, D_i_block_row_rank, D_i_block_col_rank;
-  int64_t D_ij_rows, D_ij_cols, D_ij_row_rank, D_ij_col_rank;
+  int64_t D_i_block_rows, D_i_block_cols, D_i_block_row_rank,
+    D_i_block_col_rank, D_i_block_split_index;
+  double *_D_i_block;
+  int64_t D_ij_rows, D_ij_cols, D_ij_row_rank, D_ij_col_rank,
+    D_ij_split_index;
+  double *_D_ij;
   Hatrix::Mode uplo;
   bool unit_diag;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_i_block_rows, &D_i_block_cols, &D_i_block_row_rank,
+                         &D_i_block_col_rank, &D_i_block_split_index,
+                         &_D_i_block,
+                         &D_ij_rows, &D_ij_cols, &D_ij_row_rank, &D_ij_col_rank,
+                         &D_ij_split_index,
+                         &_D_ij, &uplo, &unit_diag);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
 
 parsec_hook_return_t
 task_partial_matmul(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_j_block_rows, D_j_block_cols, D_j_block_row_rank,
+    D_j_block_col_rank, D_j_block_split_index;
   return PARSEC_HOOK_RETURN_DONE;
 }

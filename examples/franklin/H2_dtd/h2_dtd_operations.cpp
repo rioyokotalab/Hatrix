@@ -108,7 +108,6 @@ parsec_data_key_t data_key_2d(parsec_data_collection_t* dc, ...) {
 }
 
 uint32_t rank_of_1d(parsec_data_collection_t* desc, ...) {
-  h2_dc_t *dc = (h2_dc_t*)desc;
   int b = -1, level = -1;
 
   /* Get coordinates */
@@ -129,7 +128,6 @@ uint32_t rank_of_1d(parsec_data_collection_t* desc, ...) {
 
 // block cyclic distribution.
 uint32_t rank_of_2d(parsec_data_collection_t* desc, ...) {
-  h2_dc_t *dc = (h2_dc_t*)desc;
   int m = -1, n = -1, level = -1;
 
   va_list ap;
@@ -699,8 +697,10 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                           const int64_t level) {
   reduction_loop2(A, domain, block, level,
                   [&](int64_t i, int64_t j,
+
                       parsec_data_key_t D_i_block_key, int64_t D_i_block_rows, int64_t D_i_block_cols,
                       int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
+
                       parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
                       int64_t D_j_block_row_rank, int64_t D_j_block_col_rank) {
                     if (exists_and_inadmissible(A, i, j, level)) {
@@ -724,21 +724,46 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                           sizeof(int64_t), &D_i_block_cols, PARSEC_VALUE,
                           sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
                           sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
+                          sizeof(int64_t), &D_i_block_split_index, PARSEC_VALUE,
                           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key), PARSEC_INPUT | arena_D(i, block, level),
                           // D_ij
                           sizeof(int64_t), &D_ij_rows, PARSEC_VALUE,
                           sizeof(int64_t), &D_ij_cols, PARSEC_VALUE,
                           sizeof(int64_t), &D_ij_row_rank, PARSEC_VALUE,
                           sizeof(int64_t), &D_ij_col_rank, PARSEC_VALUE,
+                          sizeof(int64_t), &D_ij_split_index, PARSEC_VALUE,
                           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key), PARSEC_INOUT | arena_D(i, j, level) | PARSEC_AFFINITY,
                           sizeof(Hatrix::Mode), &uplo, PARSEC_VALUE,
                           sizeof(bool), &unit_diag, PARSEC_VALUE,
                           PARSEC_DTD_ARG_END);
                       }
                       else {
+                        int64_t D_j_block_split_index = 2;
+
                         parsec_dtd_insert_task(dtd_tp, task_partial_matmul, 0, PARSEC_DEV_CPU,
-                                               "partial_matmul_task",
-                                               PARSEC_DTD_ARG_END);
+                          "partial_matmul_task",
+                          // D_i_block
+                          sizeof(int64_t), &D_i_block_rows, PARSEC_VALUE,
+                          sizeof(int64_t), &D_i_block_cols, PARSEC_VALUE,
+                          sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
+                          sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
+                          sizeof(int64_t), &D_i_block_split_index, PARSEC_VALUE,
+                          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key), PARSEC_INPUT | arena_D(i, block, level),
+                          // D_j_block
+                          sizeof(int64_t), &D_j_block_rows, PARSEC_VALUE,
+                          sizeof(int64_t), &D_j_block_cols, PARSEC_VALUE,
+                          sizeof(int64_t), &D_j_block_row_rank, PARSEC_VALUE,
+                          sizeof(int64_t), &D_j_block_col_rank, PARSEC_VALUE,
+                          sizeof(int64_t), &D_j_block_split_index, PARSEC_VALUE,
+                          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_j_block_key), PARSEC_INPUT | arena_D(j, block, level),
+                          // D_ij
+                          sizeof(int64_t), &D_ij_rows, PARSEC_VALUE,
+                          sizeof(int64_t), &D_ij_cols, PARSEC_VALUE,
+                          sizeof(int64_t), &D_ij_row_rank, PARSEC_VALUE,
+                          sizeof(int64_t), &D_ij_col_rank, PARSEC_VALUE,
+                          sizeof(int64_t), &D_ij_split_index, PARSEC_VALUE,
+                          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key), PARSEC_INOUT | arena_D(i, j, level) | PARSEC_AFFINITY,
+                          PARSEC_DTD_ARG_END);
                       }
                     }
                   });

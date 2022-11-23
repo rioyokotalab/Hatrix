@@ -197,7 +197,7 @@ namespace Hatrix {
     orb_split(tree, 0, N, max_nleaf, 0, 0, 0);
   }
 
-  Cell::Cell() : start_index(-1), end_index(-1), radius(-1), level(-1) {}
+  Cell::Cell() : start_index(-1), end_index(-1), level(-1), radius(-1) {}
 
   Cell::Cell(std::vector<double> _center, int64_t pstart,
              int64_t pend, double _radius) :
