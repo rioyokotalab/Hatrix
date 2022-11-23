@@ -10,7 +10,7 @@
 using namespace Hatrix;
 
 h2_dc_t parsec_U, parsec_S, parsec_D;
-Hatrix::RowColLevelMap<int> arena_D;
+Hatrix::RowColLevelMap<int> arena_D, arena_S;
 Hatrix::RowColMap<int> arena_U;
 
 inline bool
@@ -713,10 +713,10 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                       int64_t D_i_block_split_index = 2;
                       int64_t D_ij_split_index = 3;
 
-                      Hatrix::Mode uplo = Hatrix::Lower;
-                      bool unit_diag = false;
 
                       if (i == j) {
+                        Hatrix::Mode uplo = Hatrix::Lower;
+                        bool unit_diag = false;
                         parsec_dtd_insert_task(dtd_tp, task_partial_syrk, 0, PARSEC_DEV_CPU,
                           "partial_syrk_task",
                           // D_i_block
@@ -770,6 +770,7 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                       }
                     }
                   });
+
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
 
@@ -814,7 +815,7 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
       }
 
       int U_ARENA;
-      int block_size = domain.cell_size(i, level), rank = A.ranks(i, level);
+      int block_size = get_dim(A, domain, i, level), rank = A.ranks(i, level);
 
       parsec_arena_datatype_t* bases_t = parsec_dtd_create_arena_datatype(parsec, &U_ARENA);
       parsec_add2arena_rect(bases_t, parsec_datatype_double_t, block_size, rank, block_size);
@@ -823,6 +824,12 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
 
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j <= i; ++j) {
+        int S_ARENA;
+        int row_size = A.ranks(i, level), col_size = A.ranks(j, level);
+        parsec_arena_datatype_t* bases_t = parsec_dtd_create_arena_datatype(parsec, &S_ARENA);
+        parsec_add2arena_rect(bases_t, parsec_datatype_double_t, row_size, col_size, row_size);
+        arena_S.insert(i, j, level, std::move(S_ARENA));
+
         if (exists_and_admissible(A, i, j, level) && mpi_rank(i, j) == MPIRANK) {     // S blocks.
           Matrix& S_ij = A.S(i, j, level);
           parsec_data_key_t S_data_key = parsec_S.super.data_key(&parsec_S.super, i, j, level);
@@ -830,8 +837,8 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
         }
 
         int D_ARENA;
-        int row_size = domain.cell_size(i, level), col_size = domain.cell_size(j, level);
-        parsec_arena_datatype_t* bases_t = parsec_dtd_create_arena_datatype(parsec, &D_ARENA);
+        row_size = get_dim(A, domain, i, level), col_size = get_dim(A, domain, j, level);
+        bases_t = parsec_dtd_create_arena_datatype(parsec, &D_ARENA);
         parsec_add2arena_rect(bases_t, parsec_datatype_double_t, row_size, col_size, row_size);
         arena_D.insert(i, j, level, std::move(D_ARENA));
 
