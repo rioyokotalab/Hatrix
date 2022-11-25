@@ -539,15 +539,16 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
             bool copy_dense;
             int D_unelim_split_index = ic1 * 2 + jc2;
 
+            int64_t D_c1c2_rows = get_dim(A, domain, c1, level);
+            int64_t D_c1c2_cols = get_dim(A, domain, c2, level);
+            int64_t D_c1c2_row_rank = A.ranks(c1, level);
+            int64_t D_c1c2_col_rank = A.ranks(c2, level);
+
             if (A.is_admissible.exists(c1, c2, level)) {
               if (!A.is_admissible(c1, c2, level)) {
                 // copy oo portion of the D blocks.
                 copy_dense = true;
                 parsec_data_key_t D_c1c2_key = parsec_D.super.data_key(&parsec_D.super, c1, c2, level);
-                int64_t D_c1c2_rows = get_dim(A, domain, c1, level);
-                int64_t D_c1c2_cols = get_dim(A, domain, c2, level);
-                int64_t D_c1c2_row_rank = A.ranks(c1, level);
-                int64_t D_c1c2_col_rank = A.ranks(c2, level);
 
                 parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
                   "copy_blocks_task",
@@ -567,6 +568,27 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               }
               else {
                 // copy full S blocks into the parent D block
+                copy_dense = false;
+                parsec_data_key_t  S_c1c2_key = parsec_S.super.data_key(&parsec_S.super, c1, c2, level);
+                int64_t S_c1c2_rows = A.ranks(c1, level);
+                int64_t S_c1c2_cols = A.ranks(c2, level);
+                int64_t MINUS_ONE = -1;
+
+                parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
+                  "copy_blocks_task",
+                  sizeof(bool), &copy_dense, PARSEC_VALUE,
+                  PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key), PARSEC_INOUT | arena_D(i, j, parent_level) | PARSEC_AFFINITY,
+                  sizeof(int64_t), &D_unelim_rows, PARSEC_VALUE,
+                  sizeof(int64_t), &D_unelim_cols, PARSEC_VALUE,
+                  sizeof(int64_t), &D_unelim_row_rank, PARSEC_VALUE,
+                  sizeof(int64_t), &D_unelim_col_rank, PARSEC_VALUE,
+                  PASSED_BY_REF, parsec_dtd_tile_of(&parsec_S.super, S_c1c2_key), PARSEC_INPUT | arena_S(c1, c2, level),
+                  sizeof(int64_t), &S_c1c2_rows, PARSEC_VALUE,
+                  sizeof(int64_t), &S_c1c2_cols, PARSEC_VALUE,
+                  sizeof(int64_t), &MINUS_ONE, PARSEC_VALUE,
+                  sizeof(int64_t), &MINUS_ONE, PARSEC_VALUE,
+                  sizeof(int), &D_unelim_split_index, PARSEC_VALUE,
+                  PARSEC_DTD_ARG_END);
               }
             }
           } // for ic1
@@ -576,6 +598,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
   }   // for i
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
 }
 
 void

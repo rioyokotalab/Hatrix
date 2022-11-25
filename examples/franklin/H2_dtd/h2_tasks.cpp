@@ -231,6 +231,12 @@ task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                                      D_c1c2_cols - D_c1c2_col_rank);
     D_unelim_splits[D_unelim_split_index] = D_c1c2_splits[3];
   }
+  else {
+    assert(D_c1c2_row_rank == -1);
+    assert(D_c1c2_col_rank == -1);
+
+    D_unelim_splits[D_unelim_split_index] = D_c1c2;
+  }
 
 
   return PARSEC_HOOK_RETURN_DONE;
