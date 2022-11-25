@@ -25,6 +25,12 @@ exists_and_admissible(const Hatrix::SymmetricSharedBasisMatrix& A,
   return A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level);
 }
 
+int64_t
+get_dim(const SymmetricSharedBasisMatrix& A, const Domain& domain, const int64_t block, const int64_t level) {
+  return level == A.max_level ? domain.cell_size(block, level) :
+    (A.ranks(block * 2, level+1) + A.ranks(block * 2 + 1, level + 1));
+}
+
 parsec_data_t*
 data_of_key(parsec_data_collection_t* desc, parsec_data_key_t key) {
   h2_dc_t* dc = (h2_dc_t*)desc;
@@ -512,7 +518,7 @@ matmul(SymmetricSharedBasisMatrix& A,
 
 // Copy blocks from the child level into level.
 void
-merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
+merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, int64_t level) {
   const int64_t parent_level = level - 1;
   const int64_t parent_nblocks = pow(2, parent_level);
 
@@ -520,16 +526,44 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
     for (int64_t j = 0; j <= i; ++j) {
       if (exists_and_inadmissible(A, i, j, parent_level)) {
         std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
+        int64_t D_unelim_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
+        int64_t D_unelim_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
+        parsec_data_key_t D_unelim_key = parsec_D.super.data_key(&parsec_D.super, i, j, parent_level);
 
-        int64_t c_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
-        int64_t c_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
+        int64_t D_unelim_row_rank = A.ranks(i_children[0], level);
+        int64_t D_unelim_col_rank = A.ranks(j_children[0], level);
 
         for (int ic1 = 0; ic1 < 2; ++ic1) {
           for (int jc2 = 0; jc2 < ((i == j) ? (ic1+1) : 2); ++jc2) {
             int64_t c1 = i_children[ic1], c2 = j_children[jc2];
+            bool copy_dense;
+            int D_c1c2_split_index = ic1 * 2 + jc2;
+
             if (A.is_admissible.exists(c1, c2, level)) {
               if (!A.is_admissible(c1, c2, level)) {
                 // copy oo portion of the D blocks.
+                copy_dense = true;
+                parsec_data_key_t D_c1c2_key = parsec_D.super.data_key(&parsec_D.super, c1, c2, level);
+                int64_t D_c1c2_rows = get_dim(A, domain, c1, level);
+                int64_t D_c1c2_cols = get_dim(A, domain, c2, level);
+                int64_t D_c1c2_row_rank = A.ranks(c1, level);
+                int64_t D_c1c2_col_rank = A.ranks(c2, level);
+
+                parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
+                  "copy_blocks_task",
+                  sizeof(bool), &copy_dense, PARSEC_VALUE,
+                  PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key), PARSEC_INOUT | arena_D(i, j, parent_level) | PARSEC_AFFINITY,
+                  sizeof(int64_t), &D_unelim_rows, PARSEC_VALUE,
+                  sizeof(int64_t), &D_unelim_cols, PARSEC_VALUE,
+                  sizeof(int64_t), &D_unelim_row_rank, PARSEC_VALUE,
+                  sizeof(int64_t), &D_unelim_col_rank, PARSEC_VALUE,
+                  PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_c1c2_key), PARSEC_INPUT | arena_D(c1, c2, level),
+                  sizeof(int64_t), &D_c1c2_rows, PARSEC_VALUE,
+                  sizeof(int64_t), &D_c1c2_cols, PARSEC_VALUE,
+                  sizeof(int64_t), &D_c1c2_row_rank, PARSEC_VALUE,
+                  sizeof(int64_t), &D_c1c2_col_rank, PARSEC_VALUE,
+                  sizeof(int), &D_c1c2_split_index, PARSEC_VALUE,
+                  PARSEC_DTD_ARG_END);
               }
               else {
                 // copy full S blocks into the parent D block
@@ -540,6 +574,8 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
       }   // if exists and inadmissible
     }   // for j
   }   // for i
+
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
 
 void
@@ -602,12 +638,6 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
-}
-
-int64_t
-get_dim(const SymmetricSharedBasisMatrix& A, const Domain& domain, const int64_t block, const int64_t level) {
-  return level == A.max_level ? domain.cell_size(block, level) :
-    (A.ranks(block * 2, level+1) + A.ranks(block * 2 + 1, level + 1));
 }
 
 void factorize_diagonal(SymmetricSharedBasisMatrix& A,
@@ -930,7 +960,7 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, F, r, t, opts);
     update_parsec_pointers(A, domain, level-1);
-    merge_unfactorized_blocks(A, level);
+    merge_unfactorized_blocks(A, domain, level);
   }
 
   h2_dc_destroy(parsec_U);

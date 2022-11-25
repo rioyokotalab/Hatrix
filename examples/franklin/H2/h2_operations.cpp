@@ -420,9 +420,9 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
     for (int j = 0; j <= i; ++j) {
       if (exists_and_inadmissible(A, i, j, parent_level)) {
         std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
-        const int64_t c_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
-        const int64_t c_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
-        Matrix D_unelim(c_rows, c_cols);
+        const int64_t D_unelim_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
+        const int64_t D_unelim_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
+        Matrix D_unelim(D_unelim_rows, D_unelim_cols);
         auto D_unelim_splits = split_dense(D_unelim,
                                            A.ranks(i_children[0], level),
                                            A.ranks(j_children[0], level));
@@ -434,10 +434,10 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
             if (A.is_admissible.exists(c1, c2, level)) {
               if (!A.is_admissible(c1, c2, level)) {
                 Matrix& D_c1c2 = A.D(c1, c2, level);
-                auto D_splits = split_dense(D_c1c2,
+                auto D_c1c2_splits = split_dense(D_c1c2,
                                             D_c1c2.rows - A.ranks(c1, level),
                                             D_c1c2.cols - A.ranks(c2, level));
-                D_unelim_splits[ic1 * 2 + jc2] = D_splits[3];
+                D_unelim_splits[ic1 * 2 + jc2] = D_c1c2_splits[3];
               }
               else {
                 D_unelim_splits[ic1 * 2 + jc2] = A.S(c1, c2, level);

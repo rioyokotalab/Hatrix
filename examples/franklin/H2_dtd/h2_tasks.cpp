@@ -200,3 +200,23 @@ task_partial_matmul(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   return PARSEC_HOOK_RETURN_DONE;
 }
+
+parsec_hook_return_t
+task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  bool copy_dense;
+  double *_D_unelim;
+  int64_t D_unelim_rows, D_unelim_cols, D_unelim_row_rank, D_unelim_col_rank;
+
+  double *_D_c1c2;
+  int64_t D_c1c2_rows, D_c1c2_cols, D_c1c2_row_rank, D_c1c2_col_rank;
+  int D_c1c2_split_index;
+
+  parsec_dtd_unpack_args(this_task, &copy_dense,
+                         &_D_unelim,
+                         &D_unelim_rows, &D_unelim_cols, &D_unelim_row_rank, &D_unelim_col_rank,
+                         &_D_c1c2,
+                         &D_c1c2_rows, &D_c1c2_cols, &D_c1c2_row_rank, &D_c1c2_col_rank,
+                         &D_c1c2_split_index);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
