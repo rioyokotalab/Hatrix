@@ -537,7 +537,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
           for (int jc2 = 0; jc2 < ((i == j) ? (ic1+1) : 2); ++jc2) {
             int64_t c1 = i_children[ic1], c2 = j_children[jc2];
             bool copy_dense;
-            int D_c1c2_split_index = ic1 * 2 + jc2;
+            int D_unelim_split_index = ic1 * 2 + jc2;
 
             if (A.is_admissible.exists(c1, c2, level)) {
               if (!A.is_admissible(c1, c2, level)) {
@@ -562,7 +562,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
                   sizeof(int64_t), &D_c1c2_cols, PARSEC_VALUE,
                   sizeof(int64_t), &D_c1c2_row_rank, PARSEC_VALUE,
                   sizeof(int64_t), &D_c1c2_col_rank, PARSEC_VALUE,
-                  sizeof(int), &D_c1c2_split_index, PARSEC_VALUE,
+                  sizeof(int), &D_unelim_split_index, PARSEC_VALUE,
                   PARSEC_DTD_ARG_END);
               }
               else {

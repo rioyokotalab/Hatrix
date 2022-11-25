@@ -209,14 +209,29 @@ task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   double *_D_c1c2;
   int64_t D_c1c2_rows, D_c1c2_cols, D_c1c2_row_rank, D_c1c2_col_rank;
-  int D_c1c2_split_index;
+  int D_unelim_split_index;
 
   parsec_dtd_unpack_args(this_task, &copy_dense,
                          &_D_unelim,
                          &D_unelim_rows, &D_unelim_cols, &D_unelim_row_rank, &D_unelim_col_rank,
                          &_D_c1c2,
                          &D_c1c2_rows, &D_c1c2_cols, &D_c1c2_row_rank, &D_c1c2_col_rank,
-                         &D_c1c2_split_index);
+                         &D_unelim_split_index);
+
+  MatrixWrapper D_unelim(_D_unelim, D_unelim_rows, D_unelim_cols, D_unelim_rows);
+  MatrixWrapper D_c1c2(_D_c1c2, D_c1c2_rows, D_c1c2_cols, D_c1c2_rows);
+
+  auto D_unelim_splits = split_dense(D_unelim,
+                                     D_unelim_row_rank,
+                                     D_unelim_col_rank);
+
+  if (copy_dense) {
+    auto D_c1c2_splits = split_dense(D_c1c2,
+                                     D_c1c2_rows - D_c1c2_row_rank,
+                                     D_c1c2_cols - D_c1c2_col_rank);
+    D_unelim_splits[D_unelim_split_index] = D_c1c2_splits[3];
+  }
+
 
   return PARSEC_HOOK_RETURN_DONE;
 }
