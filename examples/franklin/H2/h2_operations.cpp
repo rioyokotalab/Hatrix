@@ -420,7 +420,6 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
     for (int j = 0; j <= i; ++j) {
       if (exists_and_inadmissible(A, i, j, parent_level)) {
         std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
-
         const int64_t c_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
         const int64_t c_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
         Matrix D_unelim(c_rows, c_cols);
