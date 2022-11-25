@@ -413,7 +413,7 @@ void SymmetricH2::fill_JSON(const Domain& domain,
           for (int64_t i_child = 0; i_child < level_blocks[height]; i_child++) {
             std::vector<nlohmann::json> row(level_blocks[height]);
             int64_t j_pos = 0;
-            for (int64_t j_child = 0; j_child <= level_blocks[height]; j_child++) {
+            for (int64_t j_child = 0; j_child < level_blocks[height]; j_child++) {
               fill_JSON(domain, i_child, j_child, height, row[j_pos]);
               j_pos++;
             }
