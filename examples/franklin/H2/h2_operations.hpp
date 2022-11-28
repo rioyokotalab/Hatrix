@@ -27,16 +27,6 @@ compute_schurs_complement(Hatrix::SymmetricSharedBasisMatrix& A, int64_t block, 
 void
 merge_unfactorized_blocks(Hatrix::SymmetricSharedBasisMatrix& A, int64_t level);
 
-std::vector<Hatrix::Matrix>
-split_dense(const Hatrix::Matrix& dense, int64_t row_split, int64_t col_split);
-
-bool
-exists_and_inadmissible(const Hatrix::SymmetricSharedBasisMatrix& A,
-                        const int64_t i, const int64_t j, const int64_t level);
-bool
-exists_and_admissible(const Hatrix::SymmetricSharedBasisMatrix& A,
-                      const int64_t i, const int64_t j, const int64_t level);
-
 void factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts);
 Hatrix::Matrix solve(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x);
 

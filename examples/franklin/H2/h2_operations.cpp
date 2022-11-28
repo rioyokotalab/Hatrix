@@ -12,24 +12,6 @@ using namespace Hatrix;
 
 Hatrix::RowLevelMap US;
 
-std::vector<Matrix>
-split_dense(const Matrix& dense, int64_t row_split, int64_t col_split) {
-  return dense.split(std::vector<int64_t>(1, row_split),
-                     std::vector<int64_t>(1, col_split));
-}
-
-inline bool
-exists_and_inadmissible(const Hatrix::SymmetricSharedBasisMatrix& A,
-                        const int64_t i, const int64_t j, const int64_t level) {
-  return A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level);
-}
-
-inline bool
-exists_and_admissible(const Hatrix::SymmetricSharedBasisMatrix& A,
-                      const int64_t i, const int64_t j, const int64_t level) {
-  return A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level);
-}
-
 void
 factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
   Matrix& diagonal = A.D(block, block, level);

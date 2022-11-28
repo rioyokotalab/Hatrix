@@ -13,16 +13,16 @@ make -j H2_dtd
 
 for adm in 0.8; do
     nleaf=256
-    ndim=3
+    ndim=1
     max_rank=150
-    for N in 2048 4096 8192; do
-        ./bin/H2_main --N $N \
+    for N in 2048; do
+        ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
-                      --kind_of_geometry grid \
+                      --kind_of_geometry circular \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-13 \
+                      --accuracy 1e-12 \
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \

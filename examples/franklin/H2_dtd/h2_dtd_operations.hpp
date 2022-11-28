@@ -39,3 +39,37 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const H
 void
 solve(Hatrix::SymmetricSharedBasisMatrix& A,
       std::vector<Hatrix::Matrix>& x, std::vector<Hatrix::Matrix>& h2_solution);
+
+void
+multiply_complements(Hatrix::SymmetricSharedBasisMatrix& A,
+                     Hatrix::Domain& domain,
+                     const int64_t block, const int64_t level);
+
+void
+factorize_diagonal(Hatrix::SymmetricSharedBasisMatrix& A,
+                   const Hatrix::Domain& domain,
+                   const int64_t block,
+                   const int64_t level);
+
+void
+triangle_reduction(Hatrix::SymmetricSharedBasisMatrix& A,
+                   const Hatrix::Domain& domain,
+                   const int64_t block,
+                   const int64_t level);
+
+void
+compute_schurs_complement(Hatrix::SymmetricSharedBasisMatrix& A,
+                          const Hatrix::Domain& domain,
+                          const int64_t block,
+                          const int64_t level);
+void
+preallocate_blocks(Hatrix::SymmetricSharedBasisMatrix& A);
+
+void
+update_parsec_pointers(Hatrix::SymmetricSharedBasisMatrix& A,
+                       const Hatrix::Domain& domain, int64_t level);
+
+void
+merge_unfactorized_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
+                          const Hatrix::Domain& domain,
+                          int64_t level);

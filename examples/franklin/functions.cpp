@@ -5,6 +5,24 @@
 #include "franklin/franklin.hpp"
 
 namespace Hatrix {
+
+  std::vector<Hatrix::Matrix>
+  split_dense(const Hatrix::Matrix& dense, int64_t row_split, int64_t col_split) {
+    return dense.split(std::vector<int64_t>(1, row_split),
+                       std::vector<int64_t>(1, col_split));
+  }
+
+  bool
+  exists_and_inadmissible(const Hatrix::SymmetricSharedBasisMatrix& A,
+                          const int64_t i, const int64_t j, const int64_t level) {
+    return A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level);
+  }
+
+  bool
+  exists_and_admissible(const Hatrix::SymmetricSharedBasisMatrix& A,
+                        const int64_t i, const int64_t j, const int64_t level) {
+    return A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level);
+  }
   Matrix
   make_complement(const Matrix& Q) {
     Hatrix::Matrix Q_F(Q.rows, Q.rows);

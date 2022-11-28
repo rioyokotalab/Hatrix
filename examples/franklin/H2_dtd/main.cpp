@@ -19,6 +19,7 @@
 #include "globals.hpp"
 #include "h2_dtd_construction.hpp"
 #include "h2_dtd_operations.hpp"
+#include "h2_dtd_factorize_tests.hpp"
 
 using namespace Hatrix;
 
@@ -280,6 +281,8 @@ int main (int argc, char **argv) {
   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
+
+  auto A_test = dense_cholesky_test(A, domain, opts);
 
   /* Registering the dtd_handle with PARSEC context */
   rc = parsec_context_add_taskpool( parsec, dtd_tp );

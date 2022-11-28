@@ -13,18 +13,6 @@ h2_dc_t parsec_U, parsec_S, parsec_D;
 Hatrix::RowColLevelMap<int> arena_D, arena_S;
 Hatrix::RowColMap<int> arena_U;
 
-inline bool
-exists_and_inadmissible(const Hatrix::SymmetricSharedBasisMatrix& A,
-                        const int64_t i, const int64_t j, const int64_t level) {
-  return A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level);
-}
-
-inline bool
-exists_and_admissible(const Hatrix::SymmetricSharedBasisMatrix& A,
-                      const int64_t i, const int64_t j, const int64_t level) {
-  return A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level);
-}
-
 int64_t
 get_dim(const SymmetricSharedBasisMatrix& A, const Domain& domain, const int64_t block, const int64_t level) {
   return level == A.max_level ? domain.cell_size(block, level) :
@@ -375,8 +363,10 @@ matmul(SymmetricSharedBasisMatrix& A,
         Ub_array.push_back(Ub);
         int s = Ub_array.size();
 
-        MPI_Isend(&Ub_array[s-1](0,0), c1_block_size, MPI_DOUBLE, p_c1, c1, MPI_COMM_WORLD, &r1);
-        MPI_Isend(&Ub_array[s-1](c1_block_size, 0), c2_block_size, MPI_DOUBLE, p_c2, c2,
+        Matrix& Ub_ref = Ub_array[s-1];
+
+        MPI_Isend(&Ub_ref(0,0), c1_block_size, MPI_DOUBLE, p_c1, c1, MPI_COMM_WORLD, &r1);
+        MPI_Isend(&Ub_ref(c1_block_size, 0), c2_block_size, MPI_DOUBLE, p_c2, c2,
                   MPI_COMM_WORLD, &r2);
       }
     }
@@ -664,7 +654,7 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
 }
 
 void factorize_diagonal(SymmetricSharedBasisMatrix& A,
-                        Domain& domain,
+                        const Domain& domain,
                         const int64_t block,
                         const int64_t level) {
   int64_t D_nrows = get_dim(A, domain, block, level);
