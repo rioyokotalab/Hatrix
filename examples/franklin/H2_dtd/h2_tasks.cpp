@@ -5,13 +5,6 @@
 
 using namespace Hatrix;
 
-std::vector<Matrix>
-split_dense(const Matrix& dense, int64_t row_split, int64_t col_split) {
-  return dense.split(std::vector<int64_t>(1, row_split),
-                     std::vector<int64_t>(1, col_split));
-}
-
-
 // Really dumb wrapper over Matrix.
 class MatrixWrapper : public Hatrix::Matrix {
 public:

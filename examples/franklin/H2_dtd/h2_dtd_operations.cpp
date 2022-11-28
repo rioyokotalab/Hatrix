@@ -9,9 +9,9 @@
 
 using namespace Hatrix;
 
-h2_dc_t parsec_U, parsec_S, parsec_D;
-Hatrix::RowColLevelMap<int> arena_D, arena_S;
-Hatrix::RowColMap<int> arena_U;
+static h2_dc_t parsec_U, parsec_S, parsec_D;
+static Hatrix::RowColLevelMap<int> arena_D, arena_S;
+static Hatrix::RowColMap<int> arena_U;
 
 int64_t
 get_dim(const SymmetricSharedBasisMatrix& A, const Domain& domain, const int64_t block, const int64_t level) {
@@ -871,15 +871,17 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
     for (int i = 0; i < nblocks; ++i) {
       for (int j = 0; j <= i; ++j) {
         if (exists_and_inadmissible(A, i, j, level)) {
-          std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
+          if (mpi_rank(i, j) == MPIRANK) {
+            std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
 
-          const int64_t c_rows = A.ranks(i_children[0], child_level) +
-            A.ranks(i_children[1], child_level);
-          const int64_t c_cols = A.ranks(j_children[0], child_level) +
-            A.ranks(j_children[1], child_level);
-          Matrix D_unelim(c_rows, c_cols);
+            const int64_t c_rows = A.ranks(i_children[0], child_level) +
+              A.ranks(i_children[1], child_level);
+            const int64_t c_cols = A.ranks(j_children[0], child_level) +
+              A.ranks(j_children[1], child_level);
+            Matrix D_unelim(c_rows, c_cols);
 
-          A.D.insert(i, j, level, std::move(D_unelim));
+            A.D.insert(i, j, level, std::move(D_unelim));
+          }
         }
       }
     }
@@ -891,15 +893,17 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
 
   for (int i = 0; i < nblocks; ++i) {
     for (int j = 0; j <= i; ++j) {
-      std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
+      if (mpi_rank(i, j) == MPIRANK) {
+        std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
 
-      const int64_t c_rows = A.ranks(i_children[0], child_level) +
-        A.ranks(i_children[1], child_level);
-      const int64_t c_cols = A.ranks(j_children[0], child_level) +
-        A.ranks(j_children[1], child_level);
-      Matrix D_unelim(c_rows, c_cols);
+        const int64_t c_rows = A.ranks(i_children[0], child_level) +
+          A.ranks(i_children[1], child_level);
+        const int64_t c_cols = A.ranks(j_children[0], child_level) +
+          A.ranks(j_children[1], child_level);
+        Matrix D_unelim(c_rows, c_cols);
 
-      A.D.insert(i, j, level, std::move(D_unelim));
+        A.D.insert(i, j, level, std::move(D_unelim));
+      }
     }
   }
 }
@@ -955,6 +959,31 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
   }
 }
 
+void h2_dc_init_maps() {
+  h2_dc_init(parsec_U, data_key_1d, rank_of_1d);
+  h2_dc_init(parsec_S, data_key_2d, rank_of_2d);
+  h2_dc_init(parsec_D, data_key_2d, rank_of_2d);
+}
+
+void h2_dc_destroy_maps() {
+  h2_dc_destroy(parsec_U);
+  h2_dc_destroy(parsec_S);
+  h2_dc_destroy(parsec_D);
+}
+
+void h2_destroy_arenas(int64_t max_level, int64_t min_level) {
+  for (int64_t level = max_level; level >= min_level-1; --level) {
+    const int64_t nblocks = pow(2, level);
+    for (int64_t i = 0; i < nblocks; ++i) { //
+      parsec_dtd_destroy_arena_datatype(parsec, arena_U(i, level));
+      for (int64_t j = 0; j <= i; ++j) {
+        parsec_dtd_destroy_arena_datatype(parsec, arena_D(i, j, level));
+        parsec_dtd_destroy_arena_datatype(parsec, arena_S(i, j, level));
+      }
+    }
+  }
+}
+
 // This function is meant to be used with parsec. It will register the
 // data that has already been allocated by the matrix with parsec and
 // make it work with the runtime.
@@ -963,9 +992,7 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
   RowColLevelMap<Matrix> F;
   RowMap<Matrix> r, t;
 
-  h2_dc_init(parsec_U, data_key_1d, rank_of_1d);
-  h2_dc_init(parsec_S, data_key_2d, rank_of_2d);
-  h2_dc_init(parsec_D, data_key_2d, rank_of_2d);
+  h2_dc_init_maps();
 
   preallocate_blocks(A);
 
@@ -976,23 +1003,12 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
     merge_unfactorized_blocks(A, domain, level);
   }
 
-  h2_dc_destroy(parsec_U);
-  h2_dc_destroy(parsec_S);
-  h2_dc_destroy(parsec_D);
-
-  for (level = A.max_level; level >= A.min_level-1; --level) {
-    const int64_t nblocks = pow(2, level);
-    for (int64_t i = 0; i < nblocks; ++i) { //
-      parsec_dtd_destroy_arena_datatype(parsec, arena_U(i, level));
-      for (int64_t j = 0; j <= i; ++j) {
-        parsec_dtd_destroy_arena_datatype(parsec, arena_D(i, j, level));
-        parsec_dtd_destroy_arena_datatype(parsec, arena_S(i, j, level));
-      }
-    }
-  }
-
   int rc = parsec_dtd_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
+
+  h2_dc_destroy_maps();
+  h2_destroy_arenas(A.max_level, A.min_level);
+
 }
 
 void solve(SymmetricSharedBasisMatrix& A, std::vector<Matrix>& x, std::vector<Matrix>& h2_solution) {

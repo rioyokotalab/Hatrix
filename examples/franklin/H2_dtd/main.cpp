@@ -135,6 +135,9 @@ int main (int argc, char **argv) {
     exit(-1);
   }
 
+  rc = parsec_context_start( parsec );
+  PARSEC_CHECK_ERROR(rc, "parsec_context_start");
+
   /* Initializing parsec handle(collection of tasks) */
   dtd_tp = parsec_dtd_taskpool_new();
 
@@ -282,10 +285,12 @@ int main (int argc, char **argv) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
 
-  auto A_test = dense_cholesky_test(A, domain, opts);
+
 
   /* Registering the dtd_handle with PARSEC context */
   rc = parsec_context_add_taskpool( parsec, dtd_tp );
+
+  auto A_test = dense_cholesky_test(A, domain, opts);
 
   factorize(A, domain, opts);
   solve(A, x, h2_solution);

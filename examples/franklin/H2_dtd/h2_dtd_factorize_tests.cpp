@@ -321,6 +321,11 @@ dense_cholesky_test(const SymmetricSharedBasisMatrix& A, const Domain& domain, c
   SymmetricSharedBasisMatrix A_test(A);
   SymmetricSharedBasisMatrix expected(A_test);
 
+  h2_dc_init_maps();
+
+  preallocate_blocks(A_test);
+  update_parsec_pointers(A_test, domain, A.max_level);
+
   for (int64_t level = A.max_level; level >= A.min_level; --level) {
     int64_t nblocks = pow(2, level);
 
@@ -333,10 +338,12 @@ dense_cholesky_test(const SymmetricSharedBasisMatrix& A, const Domain& domain, c
       compute_schurs_complement(A_test, domain, block, level);
     }
 
+    int rc = parsec_dtd_taskpool_wait(dtd_tp);
+    PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
+
     compute_trailing_cholesky(A_test, level);
 
     enforce_lower_triangle(A_test, level);
-
     auto actual = compute_product(A_test, level);
 
     enforce_lower_triangle(actual, level);
@@ -345,8 +352,15 @@ dense_cholesky_test(const SymmetricSharedBasisMatrix& A, const Domain& domain, c
 
     std::cout << "level: " << level << " rel error: "<< rel_error << std::endl;
 
+    update_parsec_pointers(A_test, domain, level-1);
     merge_unfactorized_blocks(A_test, domain, level);
   }
+
+  int rc = parsec_dtd_taskpool_wait(dtd_tp);
+  PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
+
+  h2_dc_destroy_maps();
+  h2_destroy_arenas(A.max_level, A.min_level);
 
   return A_test;
 }

@@ -11,13 +11,6 @@
 
 using namespace Hatrix;
 
-inline bool
-exists_and_admissible(const Hatrix::SymmetricSharedBasisMatrix& A,
-                      const int64_t i, const int64_t j, const int64_t level) {
-  return A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level);
-}
-
-
 static void
 dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& Cj,
                     const Domain& domain, const Args& opts) {
