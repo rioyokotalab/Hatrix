@@ -93,7 +93,7 @@ reduction_loop1(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
 // 2. Schur's complements within the oc blocks and into oo
 template<typename T> void
 reduction_loop2(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
-  int64_t nblocks = pow(2, level);
+  const int64_t nblocks = pow(2, level);
 
   for (int64_t i = block; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {

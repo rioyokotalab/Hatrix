@@ -25,6 +25,10 @@ make_dense(SymmetricSharedBasisMatrix& A, const int64_t level) {
         }
       }
 
+      // if (exists_and_inadmissible(A, i, j, level)) {
+      //   std::cout << "norm<" <<  i << " " << j << " " << level <<  "> -> " << norm(A.D(i, j, level)) << std::endl;
+      // }
+
       if (i == j) {             // make strict upper triangle zero.
         Matrix& d = A.D(i, j, level);
         for (int ii = 0; ii < d.rows; ++ii) {
@@ -79,6 +83,37 @@ compute_product(SymmetricSharedBasisMatrix& A, int64_t level) {
                                         Djk.cols - A.ranks(k, level));
 
           matmul(Dik_splits[0], Djk_splits[0], actualij_splits[0], false, true, 1, 1);
+        }
+      }
+    }
+  }
+
+  // cc = co * co.T
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j <= i; ++j) {
+      for (int k = 0; k < j; ++k) {
+        if (exists_and_inadmissible(actual, i, j, level) &&
+            exists_and_inadmissible(A, i, k, level) &&
+            exists_and_inadmissible(A, j, k, level)) {
+          Matrix& actualij = actual.D(i, j, level);
+          Matrix& Dik = A.D(i, k, level);
+          Matrix& Djk = A.D(j, k, level);
+
+          auto actualij_splits = split_dense(actualij,
+                                        actualij.rows - actual.ranks(i, level),
+                                        actualij.cols - actual.ranks(j, level));
+          auto Dik_splits = split_dense(Dik,
+                                        Dik.rows - A.ranks(i, level),
+                                        Dik.cols - A.ranks(k, level));
+          auto Djk_splits = split_dense(Djk,
+                                        Djk.rows - A.ranks(j, level),
+                                        Djk.cols - A.ranks(k, level));
+
+          std::cout << "p -> i: " << i << " j: " << j
+                    << " a -> i: " << i << " k: " << k
+                    << " b -> j: " << j << " k: " << k << std::endl;
+
+          matmul(Dik_splits[1], Djk_splits[1], actualij_splits[0], false, true, 1, 1);
         }
       }
     }
@@ -218,17 +253,26 @@ check_error(SymmetricSharedBasisMatrix& actual, SymmetricSharedBasisMatrix& expe
 
 
         // cc
+        // std::cout << "i: " << i << " j: " << j << std::endl;
+        // (actual_ij_splits[0] - expected_ij_splits[0]).print();
         actual_norm += pow(norm(actual_ij_splits[0]), 2);
         expected_norm += pow(norm(expected_ij_splits[0]), 2);
 
         // oc
-        actual_norm += pow(norm(actual_ij_splits[2]), 2);
-        expected_norm += pow(norm(expected_ij_splits[2]), 2);
+        // actual_norm += pow(norm(actual_ij_splits[2]), 2);
+        // expected_norm += pow(norm(expected_ij_splits[2]), 2);
 
         // oo
-        actual_norm += pow(norm(actual_ij_splits[3]), 2);
-        expected_norm += pow(norm(expected_ij_splits[3]), 2);
+        // actual_norm += pow(norm(actual_ij_splits[3]), 2);
+        // expected_norm += pow(norm(expected_ij_splits[3]), 2);
       }
+
+      actual_norm = sqrt(actual_norm);
+      expected_norm = sqrt(expected_norm);
+      double err = abs(actual_norm - expected_norm) / expected_norm;
+
+      std::cout << "i : " << i << " j: " << j <<  " level: "
+                << level << " err: " << err  << std::endl;
     }
   }
 
@@ -334,7 +378,6 @@ dense_cholesky_test(const SymmetricSharedBasisMatrix& A, const Hatrix::Args& opt
     }
 
     compute_trailing_cholesky(A_test, level);
-
     enforce_lower_triangle(A_test, level);
 
     auto actual = compute_product(A_test, level);
@@ -342,6 +385,8 @@ dense_cholesky_test(const SymmetricSharedBasisMatrix& A, const Hatrix::Args& opt
     enforce_lower_triangle(actual, level);
     enforce_lower_triangle(expected, level);
     double rel_error = check_error(actual, expected, level);
+
+    std::cout << "level: " << rel_error << std::endl;
 
     merge_unfactorized_blocks(A_test, level);
   }

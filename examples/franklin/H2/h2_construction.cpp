@@ -117,7 +117,7 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
 
   A.ranks.insert(block, level, std::move(rank));
 
-  return std::move(Ui);
+  return Ui;
 }
 
 static void
@@ -208,7 +208,7 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
 
   A.ranks.insert(node, level, std::move(rank));
 
-  return std::move(Utransfer);
+  return Utransfer;
 }
 
 static bool
@@ -262,6 +262,10 @@ generate_transfer_matrices(const Domain& domain,
                                                     rand,
                                                     opts);
 
+      std::cout << "level: " << level
+                << " transfer orthogonal: "
+                << norm(matmul(Utransfer, Utransfer, true, false) - generate_identity_matrix(Utransfer.cols, Utransfer.cols))
+                << std::endl;
       auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, A.ranks(c1, child_level)),
                                               {});
 
@@ -270,6 +274,8 @@ generate_transfer_matrices(const Domain& domain,
 
       matmul(Ubig_c1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_c2, Utransfer_splits[1], Ubig_splits[1]);
+
+
 
       A.U.insert(node, level, std::move(Utransfer));
       Ubig_parent.insert(node, level, std::move(Ubig));
