@@ -158,14 +158,6 @@ reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
                                               D_block_j.rows - A.ranks(block, level),
                                               D_block_j.cols - A.ranks(j, level));
           body(i, j, D_i_block_splits, D_block_j_splits);
-          // if (exists_and_inadmissible(A, i, j, level)) {
-          //   Matrix& D_ij = A.D(i, j, level);
-          //   auto D_ij_splits = split_dense(D_ij,
-          //                                  D_ij.rows - A.ranks(i, level),
-          //                                  D_ij.cols - A.ranks(j, level));
-          //   matmul(D_i_block_splits[0], D_block_j_splits[1], D_ij_splits[1],
-          //          false, false, -1.0, 1.0);
-          // }
         }
       }
     }
@@ -190,7 +182,6 @@ reduction_loop5(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
                                               D_block_j.cols - A.ranks(j, level));
 
           body(i, j, D_i_block_splits, D_block_j_splits);
-
         }
       }
     }
@@ -500,12 +491,15 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   col_concat = concat(col_concat,
                       matmul(US(block, level), A.U(block, level), false, true), 0);
 
+  auto U_F = make_complement(A.U(block, level));
+
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_admissible(A, i, block, level)) {
       col_concat = concat(col_concat,
                           matmul(A.S(i, block, level), A.U(block, level), false, true), 0);
 
       if (F.exists(i, block, level)) {
+        // col_concat = concat(col_concat, matmul(F(i, block, level), U_F), 0);
         col_concat = concat(col_concat, F(i, block, level), 0);
       }
     }
@@ -549,12 +543,15 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   Matrix row_concat(block_size, 0);
   row_concat = concat(row_concat, matmul(A.U(block, level), US(block, level)), 1);
 
+  auto U_F = make_complement(A.U(block, level));
+
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_admissible(A, block, j, level)) {
       row_concat = concat(row_concat,
                           matmul(A.U(block, level), A.S(block, j, level)), 1);
 
       if (F.exists(block, j, level)) {
+        // row_concat = concat(row_concat, matmul(U_F, F(block, j, level), true), 1);
         row_concat = concat(row_concat, F(block, j, level), 1);
       }
     }
