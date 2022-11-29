@@ -746,6 +746,36 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
 }
 
 template<typename T> void
+reduction_loop1(SymmetricSharedBasisMatrix& A,
+                const Domain& domain,
+                int64_t block, int64_t level, T&& body) {
+  const int64_t nblocks = pow(2, level);
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (exists_and_inadmissible(A, i, block, level)) {
+      auto D_i_block_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
+      int64_t D_i_block_rows = get_dim(A, domain, i, level);
+      int64_t D_i_block_cols = get_dim(A, domain, block, level);
+      int64_t D_i_block_row_rank = A.ranks(i, level);
+      int64_t D_i_block_col_rank = A.ranks(block, level);
+
+      for (int64_t j = block+1; j <= i; ++j) {
+        if (exists_and_inadmissible(A, j, block, level)) {
+          auto D_j_block_key = parsec_D.super.data_key(&parsec_D.super, j, block, level);
+          int64_t D_j_block_rows = get_dim(A, domain, j, level);
+          int64_t D_j_block_cols = get_dim(A, domain, block, level);
+          int64_t D_j_block_row_rank = A.ranks(j, level);
+          int64_t D_j_block_col_rank = A.ranks(block, level);
+
+          body(i, j,
+               D_i_block_key, D_i_block_rows, D_i_block_cols, D_i_block_row_rank, D_i_block_col_rank,
+               D_j_block_key, D_j_block_rows, D_j_block_cols, D_j_block_row_rank, D_j_block_col_rank);
+        }
+      }
+    }
+  }
+}
+
+template<typename T> void
 reduction_loop2(SymmetricSharedBasisMatrix& A,
                 const Domain& domain,
                 int64_t block, int64_t level, T&& body) {
@@ -874,12 +904,28 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                           const Domain& domain,
                           const int64_t block,
                           const int64_t level) {
-  reduction_loop2(A, domain, block, level,
+  reduction_loop1(A, domain, block, level,
                   [&](int64_t i, int64_t j,
-
                       parsec_data_key_t D_i_block_key, int64_t D_i_block_rows, int64_t D_i_block_cols,
                       int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
+                      parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
+                      int64_t D_j_block_row_rank, int64_t D_j_block_col_rank) {
+                    if (i == j) {
+                      partial_syrk(A, domain, block, i, j, level,
+                                   D_i_block_key,
+                                   D_i_block_rows, D_i_block_cols,
+                                   D_i_block_row_rank, D_i_block_col_rank,
+                                   0, 0,
+                                   Hatrix::Lower, false);
+                    }
+                    else {
+                    }
+                  });
 
+  reduction_loop2(A, domain, block, level,
+                  [&](int64_t i, int64_t j,
+                      parsec_data_key_t D_i_block_key, int64_t D_i_block_rows, int64_t D_i_block_cols,
+                      int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
                       parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
                       int64_t D_j_block_row_rank, int64_t D_j_block_col_rank) {
                     if (i == j) {
