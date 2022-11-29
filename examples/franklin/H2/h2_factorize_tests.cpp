@@ -109,9 +109,9 @@ compute_product(SymmetricSharedBasisMatrix& A, int64_t level) {
                                         Djk.rows - A.ranks(j, level),
                                         Djk.cols - A.ranks(k, level));
 
-          std::cout << "p -> i: " << i << " j: " << j
-                    << " a -> i: " << i << " k: " << k
-                    << " b -> j: " << j << " k: " << k << std::endl;
+          // std::cout << "p -> i: " << i << " j: " << j
+          //           << " a -> i: " << i << " k: " << k
+          //           << " b -> j: " << j << " k: " << k << std::endl;
 
           matmul(Dik_splits[1], Djk_splits[1], actualij_splits[0], false, true, 1, 1);
         }
@@ -253,11 +253,13 @@ check_error(SymmetricSharedBasisMatrix& actual, SymmetricSharedBasisMatrix& expe
 
 
         // cc
-        // std::cout << "i: " << i << " j: " << j << std::endl;
-        // (actual_ij_splits[0] - expected_ij_splits[0]).print();
         actual_norm += pow(norm(actual_ij_splits[0]), 2);
         expected_norm += pow(norm(expected_ij_splits[0]), 2);
 
+        std::cout << "i : " << i << " j: " << j <<  " level: "
+                  << level << " err: " <<
+          (norm(actual_ij_splits[0]) - norm(expected_ij_splits[0])) / norm(expected_ij_splits[0])
+                  << std::endl;
         // oc
         // actual_norm += pow(norm(actual_ij_splits[2]), 2);
         // expected_norm += pow(norm(expected_ij_splits[2]), 2);
@@ -266,13 +268,6 @@ check_error(SymmetricSharedBasisMatrix& actual, SymmetricSharedBasisMatrix& expe
         // actual_norm += pow(norm(actual_ij_splits[3]), 2);
         // expected_norm += pow(norm(expected_ij_splits[3]), 2);
       }
-
-      actual_norm = sqrt(actual_norm);
-      expected_norm = sqrt(expected_norm);
-      double err = abs(actual_norm - expected_norm) / expected_norm;
-
-      std::cout << "i : " << i << " j: " << j <<  " level: "
-                << level << " err: " << err  << std::endl;
     }
   }
 

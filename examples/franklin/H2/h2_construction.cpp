@@ -261,11 +261,6 @@ generate_transfer_matrices(const Domain& domain,
                                                     dense,
                                                     rand,
                                                     opts);
-
-      std::cout << "level: " << level
-                << " transfer orthogonal: "
-                << norm(matmul(Utransfer, Utransfer, true, false) - generate_identity_matrix(Utransfer.cols, Utransfer.cols))
-                << std::endl;
       auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, A.ranks(c1, child_level)),
                                               {});
 
@@ -274,8 +269,6 @@ generate_transfer_matrices(const Domain& domain,
 
       matmul(Ubig_c1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_c2, Utransfer_splits[1], Ubig_splits[1]);
-
-
 
       A.U.insert(node, level, std::move(Utransfer));
       Ubig_parent.insert(node, level, std::move(Ubig));

@@ -157,14 +157,15 @@ reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
           auto D_block_j_splits = split_dense(D_block_j,
                                               D_block_j.rows - A.ranks(block, level),
                                               D_block_j.cols - A.ranks(j, level));
-          if (exists_and_inadmissible(A, i, j, level)) {
-            Matrix& D_ij = A.D(i, j, level);
-            auto D_ij_splits = split_dense(D_ij,
-                                           D_ij.rows - A.ranks(i, level),
-                                           D_ij.cols - A.ranks(j, level));
-            matmul(D_i_block_splits[0], D_block_j_splits[1], D_ij_splits[1],
-                   false, false, -1.0, 1.0);
-          }
+          body(i, j, D_i_block_splits, D_block_j_splits);
+          // if (exists_and_inadmissible(A, i, j, level)) {
+          //   Matrix& D_ij = A.D(i, j, level);
+          //   auto D_ij_splits = split_dense(D_ij,
+          //                                  D_ij.rows - A.ranks(i, level),
+          //                                  D_ij.cols - A.ranks(j, level));
+          //   matmul(D_i_block_splits[0], D_block_j_splits[1], D_ij_splits[1],
+          //          false, false, -1.0, 1.0);
+          // }
         }
       }
     }
@@ -390,9 +391,11 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
 
       auto fill_in_splits = split_dense(fill_in,
                                         A.U(i, level).rows - A.ranks(i, level),
-                                        A.U(j, level).cols - A.ranks(j, level));
-      matmul(D_i_block_splits[0], D_block_j_splits[2], fill_in_splits[1], false, true,
+                                        A.U(j, level).rows - A.ranks(j, level));
+      matmul(D_i_block_splits[0], D_block_j_splits[1], fill_in_splits[1], false, false,
              -1.0, 1.0);
+
+      F.insert(i, j, level, std::move(fill_in));
     }
   });
 
@@ -499,6 +502,9 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
 
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_admissible(A, i, block, level)) {
+      col_concat = concat(col_concat,
+                          matmul(A.S(i, block, level), A.U(block, level), false, true), 0);
+
       if (F.exists(i, block, level)) {
         col_concat = concat(col_concat, F(i, block, level), 0);
       }
@@ -545,8 +551,8 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
 
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_admissible(A, block, j, level)) {
-      // row_concat = concat(row_concat,
-      //                     matmul(A.U(block, level), A.S(block, j, level)), 1);
+      row_concat = concat(row_concat,
+                          matmul(A.U(block, level), A.S(block, j, level)), 1);
 
       if (F.exists(block, j, level)) {
         row_concat = concat(row_concat, F(block, j, level), 1);
