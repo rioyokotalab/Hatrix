@@ -680,44 +680,24 @@ void right_lower_triangle_reduce(SymmetricSharedBasisMatrix& A,
                                  const int64_t i,
                                  const int64_t block,
                                  const int64_t level,
-                                 const int64_t split_index) {
-
-}
-
-
-void triangle_reduction(SymmetricSharedBasisMatrix& A,
-                        const Domain& domain,
-                        const int64_t block,
-                        const int64_t level) {
-  int64_t nblocks = pow(2, level);
-  bool UNIT_DIAG, TRANS_A;
-  int SPLIT_INDEX;
-  Hatrix::Side side;
-  Hatrix::Mode uplo;
-  int64_t D_rows, D_cols, D_row_rank, D_col_rank;
-  int64_t O_rows, O_cols, O_row_rank, O_col_rank;
-
-  parsec_data_key_t diagonal_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
-
-  // trsm with oc along the 'block' column
-  for (int64_t i = block; i < nblocks; ++i) {
+                                 int64_t SPLIT_INDEX) {
     if (exists_and_inadmissible(A, i, block, level)) {
       parsec_data_key_t other_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
-      side = Hatrix::Right;
-      uplo = Hatrix::Lower;
-      UNIT_DIAG = false;
-      TRANS_A = true;
-      SPLIT_INDEX = 2;
+      Hatrix::Side side = Hatrix::Right;
+      Hatrix::Mode uplo = Hatrix::Lower;
+      bool UNIT_DIAG = false;
+      bool TRANS_A = true;
+      int64_t SPLIT_INDEX = 2;
 
-      D_rows = get_dim(A, domain, block, level);
-      D_cols = D_rows;
-      D_row_rank = A.ranks(block, level);
-      D_col_rank = A.ranks(block, level);
+      int64_t D_rows = get_dim(A, domain, block, level);
+      int64_t D_cols = D_rows;
+      int64_t D_row_rank = A.ranks(block, level);
+      int64_t D_col_rank = A.ranks(block, level);
 
-      O_rows = get_dim(A, domain, i, level);
-      O_cols = D_cols;
-      O_row_rank = A.ranks(i, level);
-      O_col_rank = A.ranks(block, level);
+      int64_t O_rows = get_dim(A, domain, i, level);
+      int64_t O_cols = D_cols;
+      int64_t O_row_rank = A.ranks(i, level);
+      int64_t O_col_rank = A.ranks(block, level);
 
       parsec_dtd_insert_task(dtd_tp, task_partial_trsm, 0, PARSEC_DEV_CPU,
         "partial_trsm_task",
@@ -738,14 +718,27 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
         sizeof(int), &SPLIT_INDEX, PARSEC_VALUE,
         PARSEC_DTD_ARG_END);
     }
+}
+
+
+void triangle_reduction(SymmetricSharedBasisMatrix& A,
+                        const Domain& domain,
+                        const int64_t block,
+                        const int64_t level) {
+  int64_t nblocks = pow(2, level);
+  parsec_data_key_t diagonal_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
+
+  // trsm with oc along the 'block' column
+  for (int64_t i = block; i < nblocks; ++i) {
+    right_lower_triangle_reduce(A, diagonal_key, domain, i, block, level, 2);
   }
 
   // TRSM with cc blocks along the 'block' column after the diagonal block.
   for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-
-    }
+    right_lower_triangle_reduce(A, diagonal_key, domain, i, block, level, 0);
   }
+
+  // TRSM with co blocks behing the diagonal on the 'block' row.
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }

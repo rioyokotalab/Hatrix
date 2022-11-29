@@ -21,19 +21,22 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   cholesky(diagonal_splits[0], Hatrix::Lower);
 }
 
-void right_lower_triangle_reduce(SymmetricSharedBasisMatrix& A,
-                                 const Matrix& Dcc,
-                                 const int64_t i,
-                                 const int64_t block,
-                                 const int64_t level,
-                                 const int64_t split_index) {
-  if (exists_and_inadmissible(A, i, block, level)) {
-    auto D_i_block_splits = split_dense(A.D(i, block, level),
-                                        A.D(i, block, level).rows - A.ranks(i, level),
-                                        A.D(i, block, level).cols - A.ranks(block, level));
+void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
+                             const Matrix& Dcc,
+                             const int64_t row,
+                             const int64_t col,
+                             const int64_t level,
+                             const int64_t split_index,
+                             Hatrix::Side side,
+                             Hatrix::Mode uplo,
+                             bool unit_diag,
+                             bool transA) {
+  if (exists_and_inadmissible(A, row, col, level)) {
+    auto D_i_block_splits = split_dense(A.D(row, col, level),
+                                        A.D(row, col, level).rows - A.ranks(row, level),
+                                        A.D(row, col, level).cols - A.ranks(col, level));
 
-    solve_triangular(Dcc, D_i_block_splits[split_index], Hatrix::Right, Hatrix::Lower,
-                     false, true, 1.0);
+    solve_triangular(Dcc, D_i_block_splits[split_index], side, uplo, unit_diag, transA, 1.0);
   }
 }
 
@@ -42,29 +45,22 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A, int64_t block, int64_t le
   auto diagonal_splits = split_dense(diagonal,
                                      diagonal.rows - A.ranks(block, level),
                                      diagonal.cols - A.ranks(block, level));
-  Matrix& Dcc = diagonal_splits[0];
+  const Matrix& Dcc = diagonal_splits[0];
+  const int64_t nblocks = pow(2, level);
 
-  int64_t nblocks = pow(2, level);
   // TRSM with oc blocks along the 'block' column.
   for (int64_t i = block; i < nblocks; ++i) {
-    right_lower_triangle_reduce(A, Dcc, i, block, level, 2);
+    partial_triangle_reduce(A, Dcc, i, block, level, 2, Hatrix::Right, Hatrix::Lower, false, true);
   }
 
   // TRSM with cc blocks along the 'block' column after the diagonal block.
   for (int64_t i = block+1; i < nblocks; ++i) {
-    right_lower_triangle_reduce(A, Dcc, i, block, level, 0);
+    partial_triangle_reduce(A, Dcc, i, block, level, 0, Hatrix::Right, Hatrix::Lower, false, true);
   }
 
   // TRSM with co blocks behind the diagonal on the 'block' row.
   for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_inadmissible(A, block, j, level)) {
-      auto D_block_j_splits = split_dense(A.D(block, j, level),
-                                          A.D(block, j, level).rows - A.ranks(block, level),
-                                          A.D(block, j, level).cols - A.ranks(j, level));
-
-      solve_triangular(Dcc, D_block_j_splits[1], Hatrix::Left, Hatrix::Lower,
-                       false, false, 1.0);
-    }
+    partial_triangle_reduce(A, Dcc, block, j, level, 1, Hatrix::Left, Hatrix::Lower, false, false);
   }
 }
 
