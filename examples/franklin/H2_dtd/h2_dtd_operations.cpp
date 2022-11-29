@@ -674,6 +674,16 @@ void factorize_diagonal(SymmetricSharedBasisMatrix& A,
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
 
+void right_lower_triangle_reduce(SymmetricSharedBasisMatrix& A,
+                                 parsec_data_key_t diagonal_key,
+                                 const Domain& domain,
+                                 const int64_t i,
+                                 const int64_t block,
+                                 const int64_t level,
+                                 const int64_t split_index) {
+
+}
+
 
 void triangle_reduction(SymmetricSharedBasisMatrix& A,
                         const Domain& domain,
@@ -687,11 +697,12 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
   int64_t D_rows, D_cols, D_row_rank, D_col_rank;
   int64_t O_rows, O_cols, O_row_rank, O_col_rank;
 
+  parsec_data_key_t diagonal_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
+
   // trsm with oc along the 'block' column
   for (int64_t i = block; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {
-      auto diagonal_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
-      auto other_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
+      parsec_data_key_t other_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
       side = Hatrix::Right;
       uplo = Hatrix::Lower;
       UNIT_DIAG = false;
@@ -726,6 +737,13 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
         sizeof(bool), &TRANS_A, PARSEC_VALUE,
         sizeof(int), &SPLIT_INDEX, PARSEC_VALUE,
         PARSEC_DTD_ARG_END);
+    }
+  }
+
+  // TRSM with cc blocks along the 'block' column after the diagonal block.
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (exists_and_inadmissible(A, i, block, level)) {
+
     }
   }
 
@@ -1008,9 +1026,9 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
 
   h2_dc_destroy_maps();
   h2_destroy_arenas(A.max_level, A.min_level);
-
 }
 
 void solve(SymmetricSharedBasisMatrix& A, std::vector<Matrix>& x, std::vector<Matrix>& h2_solution) {
+  std::vector<Matrix> b(x);
 
 }

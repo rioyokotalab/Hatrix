@@ -317,50 +317,8 @@ enforce_lower_triangle(SymmetricSharedBasisMatrix& A, int64_t level) {
 // Test function for partial factorization of each level. The matrix is first made dense
 // and then partially factorized.
 SymmetricSharedBasisMatrix
-dense_cholesky_test(const SymmetricSharedBasisMatrix& A, const Domain& domain, const Hatrix::Args& opts) {
+dense_cholesky_test(const SymmetricSharedBasisMatrix& A,
+                    const Domain& domain, const Hatrix::Args& opts) {
   SymmetricSharedBasisMatrix A_test(A);
-  SymmetricSharedBasisMatrix expected(A_test);
-
-  h2_dc_init_maps();
-
-  preallocate_blocks(A_test);
-  update_parsec_pointers(A_test, domain, A.max_level);
-
-  for (int64_t level = A.max_level; level >= A.min_level; --level) {
-    int64_t nblocks = pow(2, level);
-
-    make_dense(A_test, level);
-    expected.D.deep_copy(A_test.D);
-
-    for (int64_t block = 0; block < nblocks; ++block) {
-      factorize_diagonal(A_test, domain, block, level);
-      triangle_reduction(A_test, domain, block, level);
-      compute_schurs_complement(A_test, domain, block, level);
-    }
-
-    int rc = parsec_dtd_taskpool_wait(dtd_tp);
-    PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
-
-    compute_trailing_cholesky(A_test, level);
-
-    enforce_lower_triangle(A_test, level);
-    auto actual = compute_product(A_test, level);
-
-    enforce_lower_triangle(actual, level);
-    enforce_lower_triangle(expected, level);
-    double rel_error = check_error(actual, expected, level);
-
-    std::cout << "level: " << level << " rel error: "<< rel_error << std::endl;
-
-    update_parsec_pointers(A_test, domain, level-1);
-    merge_unfactorized_blocks(A_test, domain, level);
-  }
-
-  int rc = parsec_dtd_taskpool_wait(dtd_tp);
-  PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
-
-  h2_dc_destroy_maps();
-  h2_destroy_arenas(A.max_level, A.min_level);
-
   return A_test;
 }

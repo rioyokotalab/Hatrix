@@ -21,6 +21,22 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   cholesky(diagonal_splits[0], Hatrix::Lower);
 }
 
+void right_lower_triangle_reduce(SymmetricSharedBasisMatrix& A,
+                                 const Matrix& Dcc,
+                                 const int64_t i,
+                                 const int64_t block,
+                                 const int64_t level,
+                                 const int64_t split_index) {
+  if (exists_and_inadmissible(A, i, block, level)) {
+    auto D_i_block_splits = split_dense(A.D(i, block, level),
+                                        A.D(i, block, level).rows - A.ranks(i, level),
+                                        A.D(i, block, level).cols - A.ranks(block, level));
+
+    solve_triangular(Dcc, D_i_block_splits[split_index], Hatrix::Right, Hatrix::Lower,
+                     false, true, 1.0);
+  }
+}
+
 void triangle_reduction(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
   Matrix& diagonal = A.D(block, block, level);
   auto diagonal_splits = split_dense(diagonal,
@@ -31,26 +47,12 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A, int64_t block, int64_t le
   int64_t nblocks = pow(2, level);
   // TRSM with oc blocks along the 'block' column.
   for (int64_t i = block; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-      auto D_i_block_splits = split_dense(A.D(i, block, level),
-                                          A.D(i, block, level).rows - A.ranks(i, level),
-                                          A.D(i, block, level).cols - A.ranks(block, level));
-
-      solve_triangular(Dcc, D_i_block_splits[2], Hatrix::Right, Hatrix::Lower,
-                       false, true, 1.0);
-    }
+    right_lower_triangle_reduce(A, Dcc, i, block, level, 2);
   }
 
   // TRSM with cc blocks along the 'block' column after the diagonal block.
   for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-      auto D_i_block_splits = split_dense(A.D(i, block, level),
-                                          A.D(i, block, level).rows - A.ranks(i, level),
-                                          A.D(i, block, level).cols - A.ranks(block, level));
-
-      solve_triangular(Dcc, D_i_block_splits[0], Hatrix::Right, Hatrix::Lower,
-                       false, true, 1.0);
-    }
+    right_lower_triangle_reduce(A, Dcc, i, block, level, 0);
   }
 
   // TRSM with co blocks behind the diagonal on the 'block' row.
