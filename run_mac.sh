@@ -16,7 +16,7 @@ for adm in 0.8; do
     ndim=1
     max_rank=150
     for N in 2048 8192; do
-        ./bin/H2_main --N $N \
+        mpirun -n 1 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry circular \

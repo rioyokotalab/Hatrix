@@ -244,19 +244,14 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
   reduction_loop1(A, block, level,
                   [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
                       std::vector<Matrix>& D_j_block_splits) {
-                    if (exists_and_inadmissible(A, i, j, level)) {
-                      Matrix& D_ij = A.D(i, j, level);
-                      auto D_ij_splits = split_dense(D_ij,
-                                                     D_ij.rows - A.ranks(i, level),
-                                                     D_ij.cols - A.ranks(j, level));
-
-                      if (i == j) {
-                        syrk(D_i_block_splits[0], D_ij_splits[0], Hatrix::Lower, false, -1.0, 1.0);
-                      }
-                      else {
-                        matmul(D_i_block_splits[0], D_j_block_splits[0], D_ij_splits[0],
-                               false, true, -1.0, 1.0);
-                      }
+                    if (i == j) {
+                      partial_syrk(A, i, j, level, D_i_block_splits, 0, 0, Hatrix::Lower, false);
+                    }
+                    else {
+                      partial_matmul(A, i, j, level,
+                                     D_i_block_splits, 0,
+                                     D_j_block_splits, 0,
+                                     0, false, true);
                     }
                   });
 

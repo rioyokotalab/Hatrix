@@ -776,6 +776,47 @@ reduction_loop2(SymmetricSharedBasisMatrix& A,
   }
 }
 
+void partial_syrk(SymmetricSharedBasisMatrix& A,
+                  const Domain& domain,
+                  int64_t block,
+                  int64_t row,
+                  int64_t col,
+                  int64_t level,
+                  parsec_data_key_t D_i_block_key,
+                  int64_t D_i_block_rows, int64_t D_i_block_cols,
+                  int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
+                  int64_t D_i_block_split_index,
+                  int64_t D_ij_split_index,
+                  Hatrix::Mode uplo, bool unit_diag) {
+  if (exists_and_inadmissible(A, row, col, level)) {
+    auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, row, col, level);
+    int64_t D_ij_rows = get_dim(A, domain, row, level);
+    int64_t D_ij_cols = get_dim(A, domain, col, level);
+    int64_t D_ij_row_rank = A.ranks(row, level);
+    int64_t D_ij_col_rank = A.ranks(col, level);
+
+    parsec_dtd_insert_task(dtd_tp, task_partial_syrk, 0, PARSEC_DEV_CPU,
+      "partial_syrk_task",
+      // D_i_block
+      sizeof(int64_t), &D_i_block_rows, PARSEC_VALUE,
+      sizeof(int64_t), &D_i_block_cols, PARSEC_VALUE,
+      sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
+      sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
+      sizeof(int64_t), &D_i_block_split_index, PARSEC_VALUE,
+      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key), PARSEC_INPUT | arena_D(row, block, level),
+      // D_ij
+      sizeof(int64_t), &D_ij_rows, PARSEC_VALUE,
+      sizeof(int64_t), &D_ij_cols, PARSEC_VALUE,
+      sizeof(int64_t), &D_ij_row_rank, PARSEC_VALUE,
+      sizeof(int64_t), &D_ij_col_rank, PARSEC_VALUE,
+      sizeof(int64_t), &D_ij_split_index, PARSEC_VALUE,
+      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key), PARSEC_INOUT | arena_D(row, col, level) | PARSEC_AFFINITY,
+      sizeof(Hatrix::Mode), &uplo, PARSEC_VALUE,
+      sizeof(bool), &unit_diag, PARSEC_VALUE,
+      PARSEC_DTD_ARG_END);
+  }
+}
+
 void
 compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                           const Domain& domain,
@@ -789,7 +830,16 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
 
                       parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
                       int64_t D_j_block_row_rank, int64_t D_j_block_col_rank) {
-                    if (exists_and_inadmissible(A, i, j, level)) {
+                    if (i == j) {
+                      partial_syrk(A, domain, block, i, j, level,
+                                   D_i_block_key,
+                                   D_i_block_rows, D_i_block_cols,
+                                   D_i_block_row_rank, D_i_block_col_rank,
+                                   2,
+                                   3,
+                                   Hatrix::Lower, false);
+                    }
+                    else {
                       auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
                       int64_t D_ij_rows = get_dim(A, domain, i, level);
                       int64_t D_ij_cols = get_dim(A, domain, j, level);
@@ -797,34 +847,9 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                       int64_t D_ij_col_rank = A.ranks(j, level);
 
                       int64_t D_i_block_split_index = 2;
+                      int64_t D_j_block_split_index = 2;
                       int64_t D_ij_split_index = 3;
-
-                      if (i == j) {
-                        Hatrix::Mode uplo = Hatrix::Lower;
-                        bool unit_diag = false;
-                        parsec_dtd_insert_task(dtd_tp, task_partial_syrk, 0, PARSEC_DEV_CPU,
-                          "partial_syrk_task",
-                          // D_i_block
-                          sizeof(int64_t), &D_i_block_rows, PARSEC_VALUE,
-                          sizeof(int64_t), &D_i_block_cols, PARSEC_VALUE,
-                          sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
-                          sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
-                          sizeof(int64_t), &D_i_block_split_index, PARSEC_VALUE,
-                          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key), PARSEC_INPUT | arena_D(i, block, level),
-                          // D_ij
-                          sizeof(int64_t), &D_ij_rows, PARSEC_VALUE,
-                          sizeof(int64_t), &D_ij_cols, PARSEC_VALUE,
-                          sizeof(int64_t), &D_ij_row_rank, PARSEC_VALUE,
-                          sizeof(int64_t), &D_ij_col_rank, PARSEC_VALUE,
-                          sizeof(int64_t), &D_ij_split_index, PARSEC_VALUE,
-                          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key), PARSEC_INOUT | arena_D(i, j, level) | PARSEC_AFFINITY,
-                          sizeof(Hatrix::Mode), &uplo, PARSEC_VALUE,
-                          sizeof(bool), &unit_diag, PARSEC_VALUE,
-                          PARSEC_DTD_ARG_END);
-                      }
-                      else {
-                        int64_t D_j_block_split_index = 2;
-                        bool transA = false, transB = true;
+                      bool transA = false, transB = true;
 
                         parsec_dtd_insert_task(dtd_tp, task_partial_matmul, 0, PARSEC_DEV_CPU,
                           "partial_matmul_task",
@@ -853,7 +878,6 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                           sizeof(bool), &transB, PARSEC_VALUE,
                           PARSEC_DTD_ARG_END);
                       }
-                    }
                   });
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
