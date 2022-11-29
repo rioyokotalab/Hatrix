@@ -274,40 +274,26 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
                   [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
                       std::vector<Matrix>& D_j_block_splits) {
                     if (i < j) {  // update oc block in the true lower triangle
-                      if (exists_and_inadmissible(A, j, i, level)) {
-                        Matrix& D_ji = A.D(j, i, level);
-                        auto D_ji_splits = split_dense(D_ji,
-                                                       D_ji.rows - A.ranks(j, level),
-                                                       D_ji.cols - A.ranks(i, level));
-
-                        matmul(D_j_block_splits[2], D_i_block_splits[0], D_ji_splits[2], false, true,
-                               -1, 1);
-
-                      }
+                      partial_matmul(A, j, i, level,
+                                     D_j_block_splits, 2,
+                                     D_i_block_splits, 0,
+                                     2, false, true);
                     }
                     else {              // update co block in the transposed upper triangle
-                      if (exists_and_inadmissible(A, i, j, level)) {
-                        Matrix& D_ij = A.D(i, j, level);
-                        auto D_ij_splits = split_dense(D_ij,
-                                                       D_ij.rows - A.ranks(i, level),
-                                                       D_ij.cols - A.ranks(j, level));
-                        matmul(D_i_block_splits[0], D_j_block_splits[2], D_ij_splits[1],
-                               false, true, 1, 1);
-                      }
+                      partial_matmul(A, i, j, level,
+                                     D_i_block_splits, 0,
+                                     D_j_block_splits, 2,
+                                     1, false, true);
                     }
                   });
 
   reduction_loop4(A, block, level,
                   [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
                       std::vector<Matrix>& D_block_j_splits) {
-                    if (exists_and_inadmissible(A, i, j, level)) {
-                      Matrix& D_ij = A.D(i, j, level);
-                      auto D_ij_splits = split_dense(D_ij,
-                                                     D_ij.rows - A.ranks(i, level),
-                                                     D_ij.cols - A.ranks(j, level));
-                      matmul(D_i_block_splits[0], D_block_j_splits[1], D_ij_splits[1],
-                             false, false, -1.0, 1.0);
-                    }
+                    partial_matmul(A, i, j, level,
+                                   D_i_block_splits, 0,
+                                   D_block_j_splits, 1,
+                                   1, false, false);
                   });
 
 

@@ -919,6 +919,13 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                                    Hatrix::Lower, false);
                     }
                     else {
+                      partial_matmul(A, domain, block, i, j, level,
+                                     D_i_block_key, D_i_block_rows, D_i_block_cols,
+                                     D_i_block_row_rank, D_i_block_col_rank,
+                                     0,
+                                     D_j_block_key, D_j_block_rows, D_j_block_cols,
+                                     D_j_block_row_rank, D_j_block_col_rank,
+                                     0, 0, false, true);
                     }
                   });
 
@@ -947,6 +954,7 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                                      2, 3, false, true);
                     }
                   });
+
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
