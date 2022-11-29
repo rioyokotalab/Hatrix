@@ -74,8 +74,8 @@ int main(int argc, char* argv[]) {
 
     // auto A_test = dense_cholesky_test(A, opts);
     // vector_permute_test(A_test, x);
-    dense_factorize_and_solve_test(A, x, opts);
-    // cholesky_fill_in_recompress_check(A, opts);
+    // dense_factorize_and_solve_test(A, x, opts);
+    cholesky_fill_in_recompress_check(A, opts);
 
     auto begin_factor = std::chrono::system_clock::now();
     factorize(A, opts);

@@ -396,8 +396,9 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
     }
   });
 
-  reduction_loop5(A, block, level, [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
-                                       std::vector<Matrix>& D_block_j_splits) {
+  reduction_loop5(A, block, level,
+                  [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
+                      std::vector<Matrix>& D_block_j_splits) {
     if (exists_and_admissible(A, i, j, level)) {
       Matrix fill_in =
         F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,

@@ -526,7 +526,7 @@ dense_factorize_and_solve_test(const Hatrix::SymmetricSharedBasisMatrix& A,
     merge_unfactorized_blocks(A_copy, level);
   }
 
-  std::cout << "dense solve error: " << norm(product - b) / norm(b) << std::endl;
+  // std::cout << "dense solve error: " << norm(product - b) / norm(b) << std::endl;
 }
 
 void
@@ -549,7 +549,8 @@ check_fill_ins(Hatrix::SymmetricSharedBasisMatrix& A_pre,
         actual -= F(i, block, level);
       }
 
-      std::cout << "col fill in norm: " << norm(actual - expected) / norm(expected) << std::endl;
+      std::cout << "i-> " << i << " block-> " << block << " level-> " << level
+                <<  " col fill in norm: " << norm(actual - expected) / norm(expected) << std::endl;
     }
   }
 
@@ -565,7 +566,8 @@ check_fill_ins(Hatrix::SymmetricSharedBasisMatrix& A_pre,
         actual -= F(block, j, level);
       }
 
-      std::cout << "row fill in norm: " << norm(actual - expected) / norm(expected) << std::endl;
+      std::cout << "j-> " << j << " block-> " << block << " level-> " << level
+                << " row fill in norm: " << norm(actual - expected) / norm(expected) << std::endl;
     }
   }
 }
