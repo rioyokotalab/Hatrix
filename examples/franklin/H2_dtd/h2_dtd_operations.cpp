@@ -674,20 +674,19 @@ void factorize_diagonal(SymmetricSharedBasisMatrix& A,
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
 
-void right_lower_triangle_reduce(SymmetricSharedBasisMatrix& A,
+void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
                                  parsec_data_key_t diagonal_key,
                                  const Domain& domain,
                                  const int64_t i,
                                  const int64_t block,
                                  const int64_t level,
-                                 int64_t SPLIT_INDEX) {
+                                 int64_t SPLIT_INDEX,
+                                 Hatrix::Side side,
+                                 Hatrix::Mode uplo,
+                                 bool UNIT_DIAG,
+                                 bool TRANS_A) {
     if (exists_and_inadmissible(A, i, block, level)) {
       parsec_data_key_t other_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
-      Hatrix::Side side = Hatrix::Right;
-      Hatrix::Mode uplo = Hatrix::Lower;
-      bool UNIT_DIAG = false;
-      bool TRANS_A = true;
-      int64_t SPLIT_INDEX = 2;
 
       int64_t D_rows = get_dim(A, domain, block, level);
       int64_t D_cols = D_rows;
@@ -730,15 +729,18 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
 
   // trsm with oc along the 'block' column
   for (int64_t i = block; i < nblocks; ++i) {
-    right_lower_triangle_reduce(A, diagonal_key, domain, i, block, level, 2);
+    partial_triangle_reduce(A, diagonal_key, domain, i, block, level, 2, Hatrix::Right, Hatrix::Lower, false, true);
   }
 
   // TRSM with cc blocks along the 'block' column after the diagonal block.
   for (int64_t i = block+1; i < nblocks; ++i) {
-    right_lower_triangle_reduce(A, diagonal_key, domain, i, block, level, 0);
+    partial_triangle_reduce(A, diagonal_key, domain, i, block, level, 0, Hatrix::Right, Hatrix::Lower, false, true);
   }
 
   // TRSM with co blocks behing the diagonal on the 'block' row.
+  for (int64_t j = 0; j < block; ++j) {
+    partial_triangle_reduce(A, diagonal_key, domain, block, j, level, 1, Hatrix::Left, Hatrix::Lower, false, false);
+  }
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
@@ -796,7 +798,6 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
 
                       int64_t D_i_block_split_index = 2;
                       int64_t D_ij_split_index = 3;
-
 
                       if (i == j) {
                         Hatrix::Mode uplo = Hatrix::Lower;

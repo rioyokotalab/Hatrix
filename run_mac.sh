@@ -6,7 +6,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/Users/sameer/gitrepos/parsec/build/lib
 # Keep for this reason: https://github.com/open-mpi/ompi/issues/7393
 export TMPDIR=/tmp
 
-# export VECLIB_MAXIMUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
 
 make -j H2_main
 make -j H2_dtd
