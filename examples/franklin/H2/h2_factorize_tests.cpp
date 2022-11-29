@@ -526,7 +526,7 @@ dense_factorize_and_solve_test(const Hatrix::SymmetricSharedBasisMatrix& A,
     merge_unfactorized_blocks(A_copy, level);
   }
 
-  // std::cout << "dense solve error: " << norm(product - b) / norm(b) << std::endl;
+  std::cout << "dense solve error: " << norm(product - b) / norm(b) << std::endl;
 }
 
 void
