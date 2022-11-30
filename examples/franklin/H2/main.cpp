@@ -72,10 +72,10 @@ int main(int argc, char* argv[]) {
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
 
-    auto A_test = dense_cholesky_test(A, opts);
+    // auto A_test = dense_cholesky_test(A, opts);
     // vector_permute_test(A_test, x);
     // dense_factorize_and_solve_test(A, x, opts);
-    // cholesky_fill_in_recompress_check(A, opts);
+    cholesky_fill_in_recompress_check(A, opts);
 
     auto begin_factor = std::chrono::system_clock::now();
     factorize(A, opts);

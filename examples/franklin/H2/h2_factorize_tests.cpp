@@ -542,10 +542,11 @@ check_fill_ins(Hatrix::SymmetricSharedBasisMatrix& A_pre,
 
       if (F.exists(i, block, level)) {
         actual -= F(i, block, level);
+        std::cout << "i-> " << i << " block-> " << block << " level-> " << level
+                  <<  " col fill in norm: " << norm(actual - expected) / norm(expected) << std::endl;
       }
 
-      std::cout << "i-> " << i << " block-> " << block << " level-> " << level
-                <<  " col fill in norm: " << norm(actual - expected) / norm(expected) << std::endl;
+
     }
   }
 
@@ -559,10 +560,12 @@ check_fill_ins(Hatrix::SymmetricSharedBasisMatrix& A_pre,
 
       if (F.exists(block, j, level)) {
         actual -= F(block, j, level);
+
+        std::cout << "j-> " << j << " block-> " << block << " level-> " << level
+                  << " row fill in norm: " << norm(actual - expected) / norm(expected) << std::endl;
       }
 
-      std::cout << "j-> " << j << " block-> " << block << " level-> " << level
-                << " row fill in norm: " << norm(actual - expected) / norm(expected) << std::endl;
+
     }
   }
 }

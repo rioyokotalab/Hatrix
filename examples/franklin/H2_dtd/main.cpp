@@ -111,7 +111,7 @@ int main (int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = 1;                // TODO: why does this not with multiple cores?
+  int cores = -1;                // TODO: why does this not with multiple cores?
 
   Args opts(argc, argv);
 
@@ -286,14 +286,17 @@ int main (int argc, char **argv) {
   }
 
 
-
   /* Registering the dtd_handle with PARSEC context */
   rc = parsec_context_add_taskpool( parsec, dtd_tp );
 
-  auto A_test = dense_cholesky_test(A, domain, opts);
+  // auto A_test = dense_cholesky_test(A, domain, opts);
 
+
+  std::cout << "begin factor.\n";
   factorize(A, domain, opts);
   solve(A, x, h2_solution);
+
+  parsec_context_wait(parsec);
 
   /* Cleaning the parsec handle */
   parsec_taskpool_free( dtd_tp );

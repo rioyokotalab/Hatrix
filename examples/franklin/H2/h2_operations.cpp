@@ -68,7 +68,7 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A, int64_t block, int64_t le
 // 'block' column. This is not useful for diagonal strong admis.
 template<typename T> void
 reduction_loop1(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
-  int64_t nblocks = pow(2, level);
+  const int64_t nblocks = pow(2, level);
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {
       Matrix& D_i_block = A.D(i, block, level);
@@ -323,89 +323,161 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
 void
 compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
                  int64_t level, RowColLevelMap<Matrix>& F) {
-  reduction_loop1(A, block, level, [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
-                                       std::vector<Matrix>& D_j_block_splits) {
-    if (exists_and_admissible(A, i, j, level)) {
-      Matrix fill_in =
-        F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,
-                                                        A.U(j, level).rows);
+  int nblocks = pow(2, level);
 
-      auto fill_in_splits = split_dense(fill_in,
-                                        A.U(i, level).rows - A.ranks(i, level),
-                                        A.U(j, level).rows - A.ranks(j, level));
-      matmul(D_i_block_splits[0], D_j_block_splits[0], fill_in_splits[0], false, true,
-             -1.0, 1.0);
+  // b*b sized fill in
+  for (int i = block+1; i < nblocks; ++i) {
+    for (int j = block+1; j < i; ++j) {
+      if (exists_and_inadmissible(A, i, block, level) &&
+          exists_and_inadmissible(A, j, block, level)) {
+        if (exists_and_admissible(A, i, j, level)) {
+          Matrix fill_in = Matrix(A.U(i, level).rows, A.U(j, level).rows);
 
-      F.insert(i, j, level, std::move(fill_in));
+          auto fill_in_splits = split_dense(fill_in,
+                                            fill_in.rows - A.ranks(i, level),
+                                            fill_in.cols - A.ranks(j, level));
+        }
+      }
     }
-  });
+  }
 
-  reduction_loop2(A, block, level, [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
-                                       std::vector<Matrix>& D_j_block_splits) {
-    if (exists_and_admissible(A, i, j, level)) {
-      Matrix fill_in =
-        F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,
-                                                        A.U(j, level).rows);
+  // b * rank sized fill-in
+  for (int i = block+1; i < nblocks; ++i) {
+    for (int j = 0; j < block; ++j) {
+      if (exists_and_inadmissible(A, i, block, level) &&
+          exists_and_inadmissible(A, block, j, level))  {
+        if (exists_and_admissible(A, i, j, level)) {
+          Matrix fill_in(A.U(i, level).rows, A.ranks(j, level));
 
-      auto fill_in_splits = split_dense(fill_in,
-                                        A.U(i, level).rows - A.ranks(i, level),
-                                        A.U(j, level).rows - A.ranks(j, level));
-      matmul(D_i_block_splits[2], D_j_block_splits[2], fill_in_splits[3], false, true,
-             -1.0, 1.0);
+          auto D_i_block_splits = A.D(i, block, level).split(
+                                              {},
+                                              std::vector<int64_t>(1,
+                                                                   A.D(i, block, level).cols - A.ranks(block, level)));
 
-      F.insert(i, j, level, std::move(fill_in));
+          auto D_block_j_splits = split_dense(A.D(block, j, level),
+                                              A.D(block, j, level).rows - A.ranks(block, level),
+                                              A.D(block, j, level).cols - A.ranks(j, level));
+
+          matmul(D_i_block_splits[0], D_block_j_splits[1], fill_in, false, false, -1, 0);
+
+          Matrix projected_fill_in = matmul(fill_in, A.U(j, level), false, true);
+
+          if (F.exists(i, j, level)) {
+            F(i, j, level) += projected_fill_in;
+          }
+          else {
+            F.insert(i, j, level, std::move(projected_fill_in));
+          }
+        }
+      }
     }
-  });
+  }
 
-  reduction_loop3(A, block, level, [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
-                                       std::vector<Matrix>& D_j_block_splits) {
-    if (exists_and_admissible(A, i, j, level)) {
-      Matrix fill_in =
-        F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,
-                                                        A.U(j, level).rows);
-      auto fill_in_splits = split_dense(fill_in,
-                                        A.U(i, level).rows - A.ranks(i, level),
-                                        A.U(j, level).rows - A.ranks(j, level));
-      matmul(D_i_block_splits[2], D_j_block_splits[0], fill_in_splits[2], false, true,
-             -1.0, 1.0);
+  // rank * b sized fill-in
+  for (int i = 0; i < block; ++i) {
+    for (int j = block+1; j < nblocks; ++j) {
+      if (exists_and_admissible(A, i, j, level)) {
 
-      F.insert(i, j, level, std::move(fill_in));
+      }
     }
-  });
+  }
 
-  reduction_loop4(A, block, level, [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
-                                       std::vector<Matrix>& D_block_j_splits) {
-    if (exists_and_admissible(A, i, j, level)) {
-      Matrix fill_in =
-        F.exists(i, j, level) ? F(i, j, level) :
-        Matrix(A.U(i, level).rows, A.U(j, level).rows);
+  // rank * rank sized fill-in
+  for (int i = 0; i < block; ++i) {
+    for (int j = 0; j < block; ++j) {
+      if (exists_and_admissible(A, i, j, level)) {
 
-      auto fill_in_splits = split_dense(fill_in,
-                                        A.U(i, level).rows - A.ranks(i, level),
-                                        A.U(j, level).rows - A.ranks(j, level));
-      matmul(D_i_block_splits[0], D_block_j_splits[1], fill_in_splits[1], false, false,
-             -1.0, 1.0);
-
-      F.insert(i, j, level, std::move(fill_in));
+      }
     }
-  });
+  }
 
-  reduction_loop5(A, block, level,
-                  [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
-                      std::vector<Matrix>& D_block_j_splits) {
-    if (exists_and_admissible(A, i, j, level)) {
-      Matrix fill_in =
-        F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,
-                                                        A.U(j, level).rows);
+  // reduction_loop1(A, block, level,
+  //                 [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
+  //                     std::vector<Matrix>& D_j_block_splits) {
+  //   if (exists_and_admissible(A, i, j, level)) {
+  //     Matrix fill_in =
+  //       F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,
+  //                                                       A.U(j, level).rows);
 
-      auto fill_in_splits = split_dense(fill_in,
-                                        fill_in.rows - A.ranks(i, level),
-                                        fill_in.cols - A.ranks(j, level));
-      matmul(D_i_block_splits[2], D_block_j_splits[1], fill_in_splits[3],
-             false, false, -1.0, 1.0);
-      F.insert(i, j, level, std::move(fill_in));
-    }
-  });
+  //     auto fill_in_splits = split_dense(fill_in,
+  //                                       A.U(i, level).rows - A.ranks(i, level),
+  //                                       A.U(j, level).rows - A.ranks(j, level));
+  //     matmul(D_i_block_splits[0], D_j_block_splits[0], fill_in_splits[0], false, true,
+  //            -1.0, 1.0);
+
+  //     F.insert(i, j, level, std::move(fill_in));
+  //   }
+  // });
+
+  // reduction_loop2(A, block, level,
+  //                 [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
+  //                     std::vector<Matrix>& D_j_block_splits) {
+  //   if (exists_and_admissible(A, i, j, level)) {
+  //     Matrix fill_in =
+  //       F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,
+  //                                                       A.U(j, level).rows);
+
+  //     auto fill_in_splits = split_dense(fill_in,
+  //                                       A.U(i, level).rows - A.ranks(i, level),
+  //                                       A.U(j, level).rows - A.ranks(j, level));
+  //     matmul(D_i_block_splits[2], D_j_block_splits[2], fill_in_splits[3], false, true,
+  //            -1.0, 1.0);
+
+  //     F.insert(i, j, level, std::move(fill_in));
+  //   }
+  // });
+
+  // reduction_loop3(A, block, level,
+  //                 [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
+  //                     std::vector<Matrix>& D_j_block_splits) {
+  //   if (exists_and_admissible(A, i, j, level)) {
+  //     Matrix fill_in =
+  //       F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,
+  //                                                       A.U(j, level).rows);
+  //     auto fill_in_splits = split_dense(fill_in,
+  //                                       A.U(i, level).rows - A.ranks(i, level),
+  //                                       A.U(j, level).rows - A.ranks(j, level));
+  //     matmul(D_i_block_splits[2], D_j_block_splits[0], fill_in_splits[2], false, true,
+  //            -1.0, 1.0);
+
+  //     F.insert(i, j, level, std::move(fill_in));
+  //   }
+  // });
+
+  // reduction_loop4(A, block, level,
+  //                 [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
+  //                     std::vector<Matrix>& D_block_j_splits) {
+  //   if (exists_and_admissible(A, i, j, level)) {
+  //     Matrix fill_in =
+  //       F.exists(i, j, level) ? F(i, j, level) :
+  //       Matrix(A.U(i, level).rows, A.U(j, level).rows);
+
+  //     auto fill_in_splits = split_dense(fill_in,
+  //                                       A.U(i, level).rows - A.ranks(i, level),
+  //                                       A.U(j, level).rows - A.ranks(j, level));
+  //     matmul(D_i_block_splits[0], D_block_j_splits[1], fill_in_splits[1], false, false,
+  //            -1.0, 1.0);
+
+  //     F.insert(i, j, level, std::move(fill_in));
+  //   }
+  // });
+
+  // reduction_loop5(A, block, level,
+  //                 [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
+  //                     std::vector<Matrix>& D_block_j_splits) {
+  //   if (exists_and_admissible(A, i, j, level)) {
+  //     Matrix fill_in =
+  //       F.exists(i, j, level) ? F(i, j, level) : Matrix(A.U(i, level).rows,
+  //                                                       A.U(j, level).rows);
+
+  //     auto fill_in_splits = split_dense(fill_in,
+  //                                       fill_in.rows - A.ranks(i, level),
+  //                                       fill_in.cols - A.ranks(j, level));
+  //     matmul(D_i_block_splits[2], D_block_j_splits[1], fill_in_splits[3],
+  //            false, false, -1.0, 1.0);
+  //     F.insert(i, j, level, std::move(fill_in));
+  //   }
+  // });
 }
 
 void
@@ -490,16 +562,10 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   Matrix col_concat(0, block_size);
   col_concat = concat(col_concat,
                       matmul(US(block, level), A.U(block, level), false, true), 0);
-
-  auto U_F = make_complement(A.U(block, level));
-
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_admissible(A, i, block, level)) {
-      col_concat = concat(col_concat,
-                          matmul(A.S(i, block, level), A.U(block, level), false, true), 0);
 
       if (F.exists(i, block, level)) {
-        // col_concat = concat(col_concat, matmul(F(i, block, level), U_F), 0);
         col_concat = concat(col_concat, F(i, block, level), 0);
       }
     }
@@ -543,15 +609,12 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   Matrix row_concat(block_size, 0);
   row_concat = concat(row_concat, matmul(A.U(block, level), US(block, level)), 1);
 
-  auto U_F = make_complement(A.U(block, level));
-
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_admissible(A, block, j, level)) {
-      row_concat = concat(row_concat,
-                          matmul(A.U(block, level), A.S(block, j, level)), 1);
+      // row_concat = concat(row_concat,
+      //                     matmul(A.U(block, level), A.S(block, j, level)), 1);
 
       if (F.exists(block, j, level)) {
-        // row_concat = concat(row_concat, matmul(U_F, F(block, j, level), true), 1);
         row_concat = concat(row_concat, F(block, j, level), 1);
       }
     }
