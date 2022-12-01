@@ -115,31 +115,6 @@ reduction_loop2(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
   }
 }
 
-// 3. Schur's complements between cc and oc blocks. oc = oc - oc * cc.T
-// This only considers the blocks below the diagonal block.
-template<typename T> void
-reduction_loop3(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
-  int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-      Matrix& D_i_block = A.D(i, block, level);
-      auto D_i_block_splits = split_dense(D_i_block,
-                                          D_i_block.rows - A.ranks(i, level),
-                                          D_i_block.cols - A.ranks(block, level));
-      for (int64_t j = block+1; j < nblocks; ++j) {
-        if (exists_and_inadmissible(A, j, block, level)) {
-          Matrix& D_j_block = A.D(j, block, level);
-          auto D_j_block_splits = split_dense(D_j_block,
-                                              D_j_block.rows - A.ranks(j, level),
-                                              D_j_block.cols - A.ranks(block, level));
-
-          body(i, j, D_i_block_splits, D_j_block_splits);
-        }
-      }
-    }
-  }
-}
-
 // 4. Between cc and co blocks. The product is expressed as a transposed co block.
 template<typename T> void
 reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
@@ -244,6 +219,20 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
                                      D_i_block_splits, 0,
                                      D_j_block_splits, 0,
                                      0, false, true);
+
+                      // part of loop 3
+                      if (i < j) {  // update oc block in the true lower triangle
+                        partial_matmul(A, j, i, level,
+                                       D_j_block_splits, 2,
+                                       D_i_block_splits, 0,
+                                       2, false, true);
+                      }
+                      else {              // update co block in the transposed upper triangle
+                        partial_matmul(A, i, j, level,
+                                       D_i_block_splits, 0,
+                                       D_j_block_splits, 2,
+                                       1, false, true);
+                      }
                     }
                   });
 
@@ -251,7 +240,8 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
                   [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
                       std::vector<Matrix>& D_j_block_splits) {
                     if (i == j) {
-                      partial_syrk(A, i, j, level, D_i_block_splits, 2, 3, Hatrix::Lower, false);
+                      partial_syrk(A, i, j, level, D_i_block_splits, 2,
+                                   3, Hatrix::Lower, false);
                     }
                     else {
                       partial_matmul(A, i, j, level,
@@ -262,22 +252,6 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
                     }
                   });
 
-  reduction_loop3(A, block, level,
-                  [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
-                      std::vector<Matrix>& D_j_block_splits) {
-                    if (i < j) {  // update oc block in the true lower triangle
-                      partial_matmul(A, j, i, level,
-                                     D_j_block_splits, 2,
-                                     D_i_block_splits, 0,
-                                     2, false, true);
-                    }
-                    else {              // update co block in the transposed upper triangle
-                      partial_matmul(A, i, j, level,
-                                     D_i_block_splits, 0,
-                                     D_j_block_splits, 2,
-                                     1, false, true);
-                    }
-                  });
 
   reduction_loop4(A, block, level,
                   [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
@@ -289,8 +263,9 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
                   });
 
 
-  reduction_loop5(A, block, level, [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
-                                       std::vector<Matrix>& D_block_j_splits) {
+  reduction_loop5(A, block, level,
+                  [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
+                      std::vector<Matrix>& D_block_j_splits) {
     if (exists_and_inadmissible(A, i, j, level)) {
       Matrix& D_ij = A.D(i, j, level);
       auto D_ij_splits = split_dense(D_ij,

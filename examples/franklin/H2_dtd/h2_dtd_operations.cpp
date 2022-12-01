@@ -958,6 +958,14 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                     }
                   });
 
+  // reduction_loop3(A, domain, block, level,
+  //                 [&](int64_t i, int64_t j,
+  //                     parsec_data_key_t D_i_block_key, int64_t D_i_block_rows, int64_t D_i_block_cols,
+  //                     int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
+  //                     parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
+  //                     int64_t D_j_block_row_rank, int64_t D_j_block_col_rank) {
+  //                 });
+
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }

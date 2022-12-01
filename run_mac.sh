@@ -11,24 +11,13 @@ export TMPDIR=/tmp
 make -j H2_main
 make -j H2_dtd
 
-for adm in 0.9; do
+for adm in 0.8; do
     nleaf=512
-    ndim=2
+    ndim=3
     max_rank=110
-            ./bin/H2_main --N 4096 \
-                      --nleaf $nleaf \
-                      --kernel_func laplace \
-                      --kind_of_geometry grid \
-                      --ndim $ndim \
-                      --max_rank $max_rank \
-                      --accuracy 1e-8 \
-                      --admis $adm \
-                      --admis_kind geometry \
-                      --construct_algorithm miro \
-                      --add_diag 1e-8 \
-                      --use_nested_basis
 
-                    ./bin/H2_main --N 8192 \
+    for N in 8192; do
+        ./bin/H2_main --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -40,19 +29,5 @@ for adm in 0.9; do
                       --construct_algorithm miro \
                       --add_diag 1e-10 \
                       --use_nested_basis
-
-    # for N in 4096 8192; do
-    #     ./bin/H2_main --N $N \
-    #                   --nleaf $nleaf \
-    #                   --kernel_func laplace \
-    #                   --kind_of_geometry grid \
-    #                   --ndim $ndim \
-    #                   --max_rank $max_rank \
-    #                   --accuracy 1e-8 \
-    #                   --admis $adm \
-    #                   --admis_kind geometry \
-    #                   --construct_algorithm miro \
-    #                   --add_diag 1e-10 \
-    #                   --use_nested_basis
-    # done
+    done
 done
