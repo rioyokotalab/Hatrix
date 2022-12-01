@@ -336,6 +336,30 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
           auto fill_in_splits = split_dense(fill_in,
                                             fill_in.rows - A.ranks(i, level),
                                             fill_in.cols - A.ranks(j, level));
+
+          auto D_i_block_splits = split_dense(A.D(i, block, level),
+                                              A.D(i, block, level).rows - A.ranks(i, level),
+                                              A.D(i, block, level).cols - A.ranks(block, level));
+
+          auto D_j_block_splits = split_dense(A.D(j, block, level),
+                                              A.D(j, block, level).rows - A.ranks(j, level),
+                                              A.D(j, block, level).cols - A.ranks(block, level));
+
+          std::cout << "i: " << i << " j: " << j << std::endl;
+
+          matmul(D_i_block_splits[0], D_j_block_splits[0], fill_in_splits[0],
+                 false, true, -1, 1); // cc
+          matmul(D_i_block_splits[2], D_j_block_splits[0], fill_in_splits[2],
+                 false, true, -1, 1); // oc
+          matmul(D_i_block_splits[2], D_j_block_splits[2], fill_in_splits[3],
+                 false, true, -1, 1); // oo
+
+          if (F.exists(i, j, level)) {
+            F(i, j, level) += fill_in;
+          }
+          else {
+            F.insert(i, j, level, std::move(fill_in));
+          }
         }
       }
     }
@@ -385,8 +409,31 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
   // rank * rank sized fill-in
   for (int i = 0; i < block; ++i) {
     for (int j = 0; j < block; ++j) {
-      if (exists_and_admissible(A, i, j, level)) {
+      if (exists_and_inadmissible(A, block, i, level) &&
+          exists_and_inadmissible(A, block, j, level)) {
 
+        if (exists_and_admissible(A, i, j, level)) {
+          Matrix fill_in(A.ranks(i, level), A.ranks(j, level));
+
+          auto D_i_block_splits = split_dense(A.D(block, i,level),
+                                              A.D(block, i,level).rows - A.ranks(block, level),
+                                              A.D(block, i,level).cols - A.ranks(i, level));
+
+          auto D_block_j_splits = split_dense(A.D(block, j, level),
+                                              A.D(block, j, level).rows - A.ranks(block, level),
+                                              A.D(block, j, level).cols - A.ranks(j, level));
+
+          // matmul(D_i_block_splits[2], D_block_j_splits[1], fill_in, false, false, -1, 0);
+
+          // Matrix projected_fill_in = matmul(matmul(A.U(i, level), fill_in), A.U(j, level), false, true);
+
+          // if (F.exists(i, j, level)) {
+          //   F(i, j, level) += projected_fill_in;
+          // }
+          // else {
+          //   F.insert(i, j, level, std::move(projected_fill_in));
+          // }
+        }
       }
     }
   }
@@ -562,9 +609,9 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   Matrix col_concat(0, block_size);
   col_concat = concat(col_concat,
                       matmul(US(block, level), A.U(block, level), false, true), 0);
+
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_admissible(A, i, block, level)) {
-
       if (F.exists(i, block, level)) {
         col_concat = concat(col_concat, F(i, block, level), 0);
       }
@@ -589,7 +636,6 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   // update the transfer matrix on this row.
   A.U.erase(block, level);
   A.U.insert(block, level, std::move(Q));
-
 }
 
 void
@@ -724,6 +770,7 @@ update_col_transfer_basis(Hatrix::SymmetricSharedBasisMatrix& A,
       t.erase(c1);
     }
     else {
+      std::cout << "level: " << level << " block: " << block << std::endl;
       matmul(Utransfer_splits[1], t(c2), Utransfer_new_splits[1], false, true, 1, 0);
       Utransfer_new_splits[0] = Utransfer_splits[0];
       t.erase(c2);

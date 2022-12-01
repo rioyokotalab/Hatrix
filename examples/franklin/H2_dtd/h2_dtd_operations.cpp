@@ -729,17 +729,20 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
 
   // trsm with oc along the 'block' column
   for (int64_t i = block; i < nblocks; ++i) {
-    partial_triangle_reduce(A, diagonal_key, domain, i, block, level, 2, Hatrix::Right, Hatrix::Lower, false, true);
+    partial_triangle_reduce(A, diagonal_key, domain, i, block, level, 2,
+                            Hatrix::Right, Hatrix::Lower, false, true);
   }
 
   // TRSM with cc blocks along the 'block' column after the diagonal block.
   for (int64_t i = block+1; i < nblocks; ++i) {
-    partial_triangle_reduce(A, diagonal_key, domain, i, block, level, 0, Hatrix::Right, Hatrix::Lower, false, true);
+    partial_triangle_reduce(A, diagonal_key, domain, i, block, level, 0,
+                            Hatrix::Right, Hatrix::Lower, false, true);
   }
 
   // TRSM with co blocks behing the diagonal on the 'block' row.
   for (int64_t j = 0; j < block; ++j) {
-    partial_triangle_reduce(A, diagonal_key, domain, block, j, level, 1, Hatrix::Left, Hatrix::Lower, false, false);
+    partial_triangle_reduce(A, diagonal_key, domain, block, j, level, 1,
+                            Hatrix::Left, Hatrix::Lower, false, false);
   }
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);

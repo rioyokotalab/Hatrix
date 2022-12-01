@@ -12,21 +12,21 @@ make -j H2_main
 make -j H2_dtd
 
 for adm in 0.8; do
-    nleaf=128
+    nleaf=512
     ndim=2
-    max_rank=100
-    for N in 2048; do
+    max_rank=500
+    for N in 8192; do
         lldb -- ./bin/H2_main --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
-                      --kind_of_geometry circular \
+                      --kind_of_geometry grid \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-12 \
+                      --accuracy 1e-8 \
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \
-                      --add_diag 1e-9 \
+                      --add_diag 1e-10 \
                       --use_nested_basis
     done
 done
