@@ -105,8 +105,8 @@ reduction_loop2(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
         if (exists_and_inadmissible(A, j, block, level)) {
           Matrix& D_j_block = A.D(j, block, level);
           auto D_j_block_splits = split_dense(D_j_block,
-                                              D_j_block.rows - A.ranks(j, level),
-                                              D_j_block.cols - A.ranks(block, level));
+                                    D_j_block.rows - A.ranks(j, level),
+                                    D_j_block.cols - A.ranks(block, level));
 
           body(i, j, D_i_block_splits, D_j_block_splits);
         }
@@ -117,7 +117,8 @@ reduction_loop2(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
 
 // 4. Between cc and co blocks. The product is expressed as a transposed co block.
 template<typename T> void
-reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
+reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block,
+                int64_t level, T&& body) {
   int64_t nblocks = pow(2, level);
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {
@@ -130,8 +131,8 @@ reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
         if (exists_and_inadmissible(A, block, j, level)) {
           Matrix& D_block_j = A.D(block, j, level);
           auto D_block_j_splits = split_dense(D_block_j,
-                                              D_block_j.rows - A.ranks(block, level),
-                                              D_block_j.cols - A.ranks(j, level));
+                                           D_block_j.rows - A.ranks(block, level),
+                                           D_block_j.cols - A.ranks(j, level));
           body(i, j, D_i_block_splits, D_block_j_splits);
         }
       }
@@ -141,8 +142,9 @@ reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
 
 // 5. Between oc & co -> oo.
 template<typename T> void
-reduction_loop5(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
-  int64_t nblocks = pow(2, level);
+reduction_loop5(SymmetricSharedBasisMatrix& A,
+                const int64_t block, int64_t level, T&& body) {
+  const int64_t nblocks = pow(2, level);
   for (int64_t i = block; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {
       Matrix& D_i_block = A.D(i, block, level);
@@ -165,14 +167,15 @@ reduction_loop5(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
 
 // 6: Between co and oo blocks.
 template <typename T> void
-reduction_loop6(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
+reduction_loop6(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level,
+                T&& body) {
   for (int64_t i = 0; i < block; ++i) {
     if (exists_and_inadmissible(A, block, i, level)) {
-      Matrix& D_i_block = A.D(block, i, level);
-      auto D_i_block_splits = split_dense(D_i_block,
-                                          D_i_block.rows - A.ranks(block, level),
-                                          D_i_block.cols - A.ranks(i, level));
-      body(i, D_i_block_splits);
+      Matrix& D_block_i = A.D(block, i, level);
+      auto D_block_i_splits = split_dense(D_block_i,
+                                          D_block_i.rows - A.ranks(block, level),
+                                          D_block_i.cols - A.ranks(i, level));
+      body(i, D_block_i_splits);
     }
   }
 }
@@ -288,9 +291,9 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
 
   // 6. Between co and oo blocks.
   reduction_loop6(A, block, level,
-                  [&](int64_t i, std::vector<Matrix>& D_i_block_splits) {
+                  [&](int64_t i, std::vector<Matrix>& D_block_i_splits) {
                     partial_syrk(A, i, i, level,
-                                 D_i_block_splits, 1,
+                                 D_block_i_splits, 1,
                                  3, Hatrix::Lower, false);
                   });
 }
