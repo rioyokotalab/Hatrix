@@ -809,6 +809,12 @@ reduction_loop2(SymmetricSharedBasisMatrix& A,
   }
 }
 
+template<typename T> void
+reduction_loop4(SymmetricSharedBasisMatrix& A,
+                const Domain& domain,
+                int64_t block, int64_t level, T&& body) {
+}
+
 void partial_syrk(SymmetricSharedBasisMatrix& A,
                   const Domain& domain,
                   int64_t block,
@@ -929,6 +935,25 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                                      D_j_block_key, D_j_block_rows, D_j_block_cols,
                                      D_j_block_row_rank, D_j_block_col_rank,
                                      0, 0, false, true);
+
+                      if (i < j) {
+                        partial_matmul(A, domain, block, i, j, level,
+                                       D_i_block_key, D_i_block_rows, D_i_block_cols,
+                                       D_i_block_row_rank, D_i_block_col_rank,
+                                       2,
+                                       D_j_block_key, D_j_block_rows, D_j_block_cols,
+                                       D_j_block_row_rank, D_j_block_col_rank,
+                                       0, 2, false, true);
+                      }
+                      else {
+                        partial_matmul(A, domain, block, i, j, level,
+                                       D_i_block_key, D_i_block_rows, D_i_block_cols,
+                                       D_i_block_row_rank, D_i_block_col_rank,
+                                       0,
+                                       D_j_block_key, D_j_block_rows, D_j_block_cols,
+                                       D_j_block_row_rank, D_j_block_col_rank,
+                                       2, 1, false, true);
+                      }
                     }
                   });
 
@@ -958,13 +983,22 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                     }
                   });
 
-  // reduction_loop3(A, domain, block, level,
-  //                 [&](int64_t i, int64_t j,
-  //                     parsec_data_key_t D_i_block_key, int64_t D_i_block_rows, int64_t D_i_block_cols,
-  //                     int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
-  //                     parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
-  //                     int64_t D_j_block_row_rank, int64_t D_j_block_col_rank) {
-  //                 });
+  reduction_loop4(A, domain, block, level,
+                  [&](int64_t i, int64_t j,
+                      parsec_data_key_t D_i_block_key, int64_t D_i_block_rows, int64_t D_i_block_cols,
+                      int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
+                      parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
+                      int64_t D_j_block_row_rank, int64_t D_j_block_col_rank) {
+                    partial_matmul(A, domain, block, i, j, level,
+                                   D_i_block_key, D_i_block_rows, D_i_block_cols,
+                                   D_i_block_row_rank, D_i_block_col_rank,
+                                   0,
+                                   D_j_block_key, D_j_block_rows, D_j_block_cols,
+                                   D_j_block_row_rank, D_j_block_col_rank,
+                                   1,
+                                   1, false, true);
+                  });
+
 
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);

@@ -266,20 +266,16 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
   reduction_loop5(A, block, level,
                   [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
                       std::vector<Matrix>& D_block_j_splits) {
-    if (exists_and_inadmissible(A, i, j, level)) {
-      Matrix& D_ij = A.D(i, j, level);
-      auto D_ij_splits = split_dense(D_ij,
-                                     D_ij.rows - A.ranks(i, level),
-                                     D_ij.cols - A.ranks(j, level));
-
-      matmul(D_i_block_splits[2], D_block_j_splits[1], D_ij_splits[3],
-             false, false, -1.0, 1.0);
-    }
+                    partial_matmul(A, i, j, level,
+                                   D_i_block_splits, 2,
+                                   D_block_j_splits, 1,
+                                   3, false, false);
   });
 
   // 6. Between co and oo blocks.
   for (int64_t i = 0; i < block; ++i) {
-    if (exists_and_inadmissible(A, block, i, level) && exists_and_inadmissible(A, i, i, level)) {
+    if (exists_and_inadmissible(A, block, i, level) &&
+        exists_and_inadmissible(A, i, i, level)) {
       Matrix& A_i_block = A.D(block, i, level);
       auto A_i_block_splits = split_dense(A_i_block,
                                           A_i_block.rows - A.ranks(block, level),
