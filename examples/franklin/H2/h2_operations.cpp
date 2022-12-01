@@ -163,6 +163,20 @@ reduction_loop5(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
   }
 }
 
+// 6: Between co and oo blocks.
+template <typename T> void
+reduction_loop6(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
+  for (int64_t i = 0; i < block; ++i) {
+    if (exists_and_inadmissible(A, block, i, level)) {
+      Matrix& D_i_block = A.D(block, i, level);
+      auto D_i_block_splits = split_dense(D_i_block,
+                                          D_i_block.rows - A.ranks(block, level),
+                                          D_i_block.cols - A.ranks(i, level));
+      body(i, D_i_block_splits);
+    }
+  }
+}
+
 void
 partial_syrk(SymmetricSharedBasisMatrix& A,
              const int64_t row,
@@ -273,22 +287,12 @@ void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int
   });
 
   // 6. Between co and oo blocks.
-  for (int64_t i = 0; i < block; ++i) {
-    if (exists_and_inadmissible(A, block, i, level) &&
-        exists_and_inadmissible(A, i, i, level)) {
-      Matrix& A_i_block = A.D(block, i, level);
-      auto A_i_block_splits = split_dense(A_i_block,
-                                          A_i_block.rows - A.ranks(block, level),
-                                          A_i_block.cols - A.ranks(i, level));
-
-      Matrix& A_ii = A.D(i, i, level);
-      auto A_ii_splits = split_dense(A_ii,
-                                     A_ii.rows - A.ranks(i, level),
-                                     A_ii.cols - A.ranks(i, level));
-
-      syrk(A_i_block_splits[1], A_ii_splits[3], Hatrix::Lower, true, -1, 1);
-    }
-  }
+  reduction_loop6(A, block, level,
+                  [&](int64_t i, std::vector<Matrix>& D_i_block_splits) {
+                    partial_syrk(A, i, i, level,
+                                 D_i_block_splits, 1,
+                                 3, Hatrix::Lower, false);
+                  });
 }
 
 void
