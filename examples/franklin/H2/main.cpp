@@ -64,7 +64,9 @@ int main(int argc, char* argv[]) {
     construct_max_rank = A.max_rank();
     construct_average_rank = A.average_rank();
 
-    A.print_structure();
+    // std::cout << "max level: " << A.max_level << " min: " << A.min_level << std::endl;
+
+    // A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);

@@ -42,7 +42,7 @@ void
 update_row_cluster_basis(Hatrix::SymmetricSharedBasisMatrix& A,
                          const int64_t block,
                          const int64_t level,
-                         const Hatrix::RowColLevelMap<Hatrix::Matrix>& F,
+                         Hatrix::RowColLevelMap<Hatrix::Matrix>& F,
                          Hatrix::RowMap<Hatrix::Matrix>& r,
                          const Hatrix::Args& opts);
 
@@ -50,7 +50,7 @@ void
 update_col_cluster_basis(Hatrix::SymmetricSharedBasisMatrix& A,
                          const int64_t block,
                          const int64_t level,
-                         const Hatrix::RowColLevelMap<Hatrix::Matrix>& F,
+                         Hatrix::RowColLevelMap<Hatrix::Matrix>& F,
                          Hatrix::RowMap<Hatrix::Matrix>& t,
                          const Hatrix::Args& opts);
 

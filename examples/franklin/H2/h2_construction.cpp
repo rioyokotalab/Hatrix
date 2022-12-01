@@ -67,9 +67,7 @@ void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, co
     }
   }
 
-  A.min_level++;
-
-  // remove all blocks in the upper triangle
+  if (A.max_level != A.min_level) { A.min_level++; }
 }
 
 static Matrix
