@@ -6,7 +6,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/Users/sameer/gitrepos/parsec/build/lib
 # Keep for this reason: https://github.com/open-mpi/ompi/issues/7393
 export TMPDIR=/tmp
 
-# export VECLIB_MAXIMUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
 
 make -j H2_main
 make -j H2_dtd
@@ -17,7 +17,7 @@ for adm in 0.8; do
     max_rank=110
 
     for N in 4096; do
-        ./bin/H2_dtd --N $N \
+        mpirun -n 2 xterm -e lldb -- ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
