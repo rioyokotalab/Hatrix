@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
 
@@ -7,7 +9,7 @@ using namespace Hatrix;
 
 static void
 make_dense(SymmetricSharedBasisMatrix& A, const int64_t level) {
-  int64_t nblocks = pow(2, level);
+  int64_t nblocks = std::pow(2, level);
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j <= i; ++j) {
@@ -40,7 +42,7 @@ make_dense(SymmetricSharedBasisMatrix& A, const int64_t level) {
 static SymmetricSharedBasisMatrix
 compute_product(SymmetricSharedBasisMatrix& A, int64_t level) {
   SymmetricSharedBasisMatrix actual(A);
-  int64_t nblocks = pow(2, level);
+  int64_t nblocks = std::pow(2, level);
   // init to zero.
   for (int i = 0; i < nblocks; ++i) {
     for (int j = 0; j <= i; ++j) {
@@ -200,7 +202,7 @@ compute_product(SymmetricSharedBasisMatrix& A, int64_t level) {
 
 static double
 check_error(SymmetricSharedBasisMatrix& actual, SymmetricSharedBasisMatrix& expected, int64_t level) {
-  int64_t nblocks = pow(2, level);
+  int64_t nblocks = std::pow(2, level);
   double actual_norm = 0, expected_norm = 0;
 
   for (int i = 0; i < nblocks; ++i) {
@@ -218,16 +220,16 @@ check_error(SymmetricSharedBasisMatrix& actual, SymmetricSharedBasisMatrix& expe
 
 
         // cc
-        actual_norm += pow(norm(actual_ij_splits[0]), 2);
-        expected_norm += pow(norm(expected_ij_splits[0]), 2);
+        actual_norm += std::pow(norm(actual_ij_splits[0]), 2);
+        expected_norm += std::pow(norm(expected_ij_splits[0]), 2);
 
         // oc
-        actual_norm += pow(norm(actual_ij_splits[2]), 2);
-        expected_norm += pow(norm(expected_ij_splits[2]), 2);
+        actual_norm += std::pow(norm(actual_ij_splits[2]), 2);
+        expected_norm += std::pow(norm(expected_ij_splits[2]), 2);
 
         // oo
-        actual_norm += pow(norm(actual_ij_splits[3]), 2);
-        expected_norm += pow(norm(expected_ij_splits[3]), 2);
+        actual_norm += std::pow(norm(actual_ij_splits[3]), 2);
+        expected_norm += std::pow(norm(expected_ij_splits[3]), 2);
       }
     }
   }
@@ -241,7 +243,7 @@ check_error(SymmetricSharedBasisMatrix& actual, SymmetricSharedBasisMatrix& expe
 // compute the full factorization of the trailing blocks. Include the S blocks.
 static void
 compute_trailing_cholesky(SymmetricSharedBasisMatrix& A, int64_t level) {
-  int64_t nblocks = pow(2, level);
+  int64_t nblocks = std::pow(2, level);
   for (int64_t i = 0; i < nblocks; ++i) {
     Matrix& D = A.D(i, i, level);
     auto D_splits = split_dense(D,
@@ -301,7 +303,7 @@ compute_trailing_cholesky(SymmetricSharedBasisMatrix& A, int64_t level) {
 
 void
 enforce_lower_triangle(SymmetricSharedBasisMatrix& A, int64_t level) {
-  int nblocks = pow(2, level);
+  int nblocks = std::pow(2, level);
 
   for (int i = 0; i < nblocks; ++i) {
     Matrix& d = A.D(i, i, level);

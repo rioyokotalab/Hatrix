@@ -2,6 +2,7 @@
 #include <random>
 #include <algorithm>
 #include <set>
+#include <cmath>
 
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
@@ -50,7 +51,7 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci,
   if (i_level == j_level) {
     double distance = 0;
     for (int64_t k = 0; k < opts.ndim; ++k) {
-      distance += pow(Ci.center[k] - Cj.center[k], 2);
+      distance += std::pow(Ci.center[k] - Cj.center[k], 2);
     }
     distance = sqrt(distance);
 
@@ -81,7 +82,7 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
   dual_tree_traversal(A, domain.tree, domain.tree, domain, opts);
   A.min_level = 0;
   for (int64_t l = A.max_level; l > 0; --l) {
-    int64_t nblocks = pow(2, l);
+    int64_t nblocks = std::pow(2, l);
     bool all_dense = true;
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
@@ -189,7 +190,7 @@ void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Hatrix::Domain& domain,
                     const Hatrix::Args& opts) {
-  int64_t nblocks = pow(2, A.max_level);
+  int64_t nblocks = std::pow(2, A.max_level);
 
   // Generate the dense blocks at the leaf node.
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -459,7 +460,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
                            std::vector<double>& Uchild_mem,
                            const Hatrix::Domain& domain,
                            const Hatrix::Args& opts) {
-  int nblocks = pow(2, level);
+  int nblocks = std::pow(2, level);
   int child_level = level + 1;
 
   // generate randomzed admissible blocks for this level.
@@ -493,7 +494,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   // level of this H2-matrix.
   std::vector<int> Utransfer(9);
   int rank_total = 0;
-  int child_nblocks = pow(2, child_level);
+  int child_nblocks = std::pow(2, child_level);
   for (int i = 0; i < child_nblocks; ++i) {
     rank_total += A.ranks(i, child_level);
   }
@@ -845,7 +846,7 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A,
   generate_leaf_nodes(A, domain, opts);
 
   // temporary storage for actual basis matrices during construction.
-  int nblocks = pow(2, A.max_level);
+  int nblocks = std::pow(2, A.max_level);
   std::vector<int> Uchild;
   Uchild.resize(9);
   int max_rank = 0;

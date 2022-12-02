@@ -1254,6 +1254,11 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
     merge_unfactorized_blocks(A, domain, level);
   }
 
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
+
+
   int rc = parsec_dtd_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
 
