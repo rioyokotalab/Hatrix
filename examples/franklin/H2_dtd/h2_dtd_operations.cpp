@@ -722,6 +722,7 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
 
   // trsm with oc along the 'block' column
   for (int64_t i = block; i < nblocks; ++i) {
+    // TODO: Fuse this task with the one below since it is on the same block.
     partial_triangle_reduce(A, diagonal_key, domain, i, block, level, 2,
                             Hatrix::Right, Hatrix::Lower, false, true);
   }
@@ -896,7 +897,7 @@ void partial_syrk(SymmetricSharedBasisMatrix& A,
                   int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
                   int64_t D_i_block_split_index,
                   int64_t D_ij_split_index,
-                  Hatrix::Mode uplo, bool unit_diag) {
+                  Hatrix::Mode uplo, bool unit_diag, bool flip_row_index=false) {
   if (exists_and_inadmissible(A, row, col, level)) {
     auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, row, col, level);
     int64_t D_ij_rows = get_dim(A, domain, row, level);
@@ -912,7 +913,8 @@ void partial_syrk(SymmetricSharedBasisMatrix& A,
       sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
       sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
       sizeof(int64_t), &D_i_block_split_index, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key), PARSEC_INPUT | arena_D(row, block, level),
+      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
+                           PARSEC_INPUT | arena_D(flip_row_index ? block : row, flip_row_index ? row : block, level),
       // D_ij
       sizeof(int64_t), &D_ij_rows, PARSEC_VALUE,
       sizeof(int64_t), &D_ij_cols, PARSEC_VALUE,
@@ -1082,14 +1084,14 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                       parsec_data_key_t D_j_block_key, int64_t D_j_block_rows,
                       int64_t D_j_block_cols,
                       int64_t D_j_block_row_rank, int64_t D_j_block_col_rank) {
-                    // partial_matmul(A, domain, block, i, j, level,
-                    //                D_i_block_key, D_i_block_rows, D_i_block_cols,
-                    //                D_i_block_row_rank, D_i_block_col_rank,
-                    //                2,
-                    //                D_j_block_key, D_j_block_rows, D_j_block_cols,
-                    //                D_j_block_row_rank, D_j_block_col_rank,
-                    //                1,
-                    //                3, false, false);
+                    partial_matmul(A, domain, block, i, j, level,
+                                   D_i_block_key, D_i_block_rows, D_i_block_cols,
+                                   D_i_block_row_rank, D_i_block_col_rank,
+                                   2,
+                                   D_j_block_key, D_j_block_rows, D_j_block_cols,
+                                   D_j_block_row_rank, D_j_block_col_rank,
+                                   1,
+                                   3, false, false, true);
                   });
 
   reduction_loop6(A, domain, block, level,
@@ -1097,6 +1099,12 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                       parsec_data_key_t D_block_i_key, int64_t D_block_i_rows,
                       int64_t D_block_i_cols,
                       int64_t D_block_i_row_rank, int64_t D_block_i_col_rank) {
+                    partial_syrk(A, domain, block, i, i, level,
+                                 D_block_i_key, D_block_i_rows, D_block_i_cols,
+                                 D_block_i_row_rank, D_block_i_col_rank,
+                                 1,
+                                 3,
+                                 Hatrix::Lower, false, true);
                   });
 
 
@@ -1111,10 +1119,10 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    // multiply_complements(A, domain, block, level);
+    multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
-    // compute_schurs_complement(A, domain, block, level);
+    compute_schurs_complement(A, domain, block, level);
   }
 }
 
