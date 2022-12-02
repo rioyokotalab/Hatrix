@@ -1259,8 +1259,8 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
   h2_dc_init_maps();
 
   preallocate_blocks(A);
-
   update_parsec_pointers(A, domain, A.max_level);
+
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, F, r, t, opts);
     update_parsec_pointers(A, domain, level-1);
