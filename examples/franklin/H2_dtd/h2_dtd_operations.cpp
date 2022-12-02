@@ -731,6 +731,12 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
   for (int64_t i = block+1; i < nblocks; ++i) {
     partial_triangle_reduce(A, diagonal_key, domain, i, block, level, 0,
                             Hatrix::Right, Hatrix::Lower, false, true);
+
+    parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+
+    // TODO: work with george to remove this.
+    int rc = parsec_dtd_taskpool_wait(dtd_tp);
+    PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
   }
 
   // TRSM with co blocks behing the diagonal on the 'block' row.
@@ -1180,11 +1186,12 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
 
   // setup pointers to data for use with parsec.
   for (int64_t i = 0; i < nblocks; ++i) { // U
+    parsec_data_key_t U_data_key = parsec_U.super.data_key(&parsec_U.super, i, level);
     if (mpi_rank(i) == MPIRANK) {
       Matrix& U_i = A.U(i, level);
-      parsec_data_key_t U_data_key = parsec_U.super.data_key(&parsec_U.super, i, level);
       parsec_U.matrix_map[U_data_key] = std::addressof(U_i); // TODO: how to do this in a C++-way?
     }
+    parsec_U.mpi_ranks[U_data_key] = mpi_rank(i);
 
     int U_ARENA;
     int block_size = get_dim(A, domain, i, level), rank = A.ranks(i, level);
@@ -1201,22 +1208,24 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       parsec_arena_datatype_t* bases_t = parsec_dtd_create_arena_datatype(parsec, &S_ARENA);
       parsec_add2arena_rect(bases_t, parsec_datatype_double_t, row_size, col_size, row_size);
       arena_S.insert(i, j, level, std::move(S_ARENA));
+      parsec_data_key_t S_data_key = parsec_S.super.data_key(&parsec_S.super, i, j, level);
 
       if (exists_and_admissible(A, i, j, level) && mpi_rank(i, j) == MPIRANK) {     // S blocks.
         Matrix& S_ij = A.S(i, j, level);
-        parsec_data_key_t S_data_key = parsec_S.super.data_key(&parsec_S.super, i, j, level);
         parsec_S.matrix_map[S_data_key] = std::addressof(S_ij);
       }
+      parsec_S.mpi_ranks[S_data_key] = mpi_rank(i, j);
 
       int D_ARENA;
       row_size = get_dim(A, domain, i, level), col_size = get_dim(A, domain, j, level);
       bases_t = parsec_dtd_create_arena_datatype(parsec, &D_ARENA);
       parsec_add2arena_rect(bases_t, parsec_datatype_double_t, row_size, col_size, row_size);
       arena_D.insert(i, j, level, std::move(D_ARENA));
+      parsec_data_key_t D_data_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
+      parsec_D.mpi_ranks[D_data_key] = mpi_rank(i, j);
 
       if (exists_and_inadmissible(A, i, j, level) && (mpi_rank(i, j) == MPIRANK)) { // D blocks.
         Matrix& D_ij = A.D(i, j, level);
-        parsec_data_key_t D_data_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
         parsec_D.matrix_map[D_data_key] = std::addressof(D_ij);
       }
     }
