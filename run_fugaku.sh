@@ -13,8 +13,11 @@ source /vol0004/apps/oss/spack/share/spack/setup-env.sh
 source ~/.bashrc
 
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/hp190122/u01594/gitrepos/googletest/build/lib64/pkgconfig:/vol0003/hp190122/u01594/gitrepos/lorapo/stars-h-rio/build/installdir/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64/pkgconfig
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64
 
 make -j H2_main
+make -j H2_dtd
 
 for adm in 0.8; do
     ./bin/H2_main --N 512 \
@@ -30,4 +33,3 @@ for adm in 0.8; do
          --add_diag 1e-7 \
          --use_nested_basis
 done
-
