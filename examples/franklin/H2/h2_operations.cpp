@@ -224,7 +224,8 @@ void partial_matmul(SymmetricSharedBasisMatrix& A,
   }
 }
 
-void compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
+void
+compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
   reduction_loop1(A, block, level,
                   [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
                       std::vector<Matrix>& D_j_block_splits) {

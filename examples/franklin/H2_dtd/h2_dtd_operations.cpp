@@ -14,7 +14,8 @@ static Hatrix::RowColLevelMap<int> arena_D, arena_S;
 static Hatrix::RowColMap<int> arena_U;
 
 int64_t
-get_dim(const SymmetricSharedBasisMatrix& A, const Domain& domain, const int64_t block, const int64_t level) {
+get_dim(const SymmetricSharedBasisMatrix& A, const Domain& domain,
+        const int64_t block, const int64_t level) {
   return level == A.max_level ? domain.cell_size(block, level) :
     (A.ranks(block * 2, level+1) + A.ranks(block * 2 + 1, level + 1));
 }
@@ -935,7 +936,7 @@ partial_matmul(SymmetricSharedBasisMatrix& A,
                parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
                int64_t D_j_block_row_rank, int64_t D_j_block_col_rank,
                int64_t D_j_block_split_index, int64_t D_ij_split_index,
-               bool transA, bool transB) {
+               bool transA, bool transB, bool flip_col_index=false) {
   if (exists_and_inadmissible(A, row, col, level)) {
     auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, row, col, level);
     int64_t D_ij_rows = get_dim(A, domain, row, level);
@@ -958,7 +959,8 @@ partial_matmul(SymmetricSharedBasisMatrix& A,
       sizeof(int64_t), &D_j_block_row_rank, PARSEC_VALUE,
       sizeof(int64_t), &D_j_block_col_rank, PARSEC_VALUE,
       sizeof(int64_t), &D_j_block_split_index, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_j_block_key), PARSEC_INPUT | arena_D(col, block, level),
+      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_j_block_key),
+                           PARSEC_INPUT | arena_D(flip_col_index ? block : col, flip_col_index ? col : block, level),
       // D_ij
       sizeof(int64_t), &D_ij_rows, PARSEC_VALUE,
       sizeof(int64_t), &D_ij_cols, PARSEC_VALUE,
@@ -1056,14 +1058,14 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                       parsec_data_key_t D_block_j_key, int64_t D_block_j_rows,
                       int64_t D_block_j_cols,
                       int64_t D_block_j_row_rank, int64_t D_block_j_col_rank) {
-                    // partial_matmul(A, domain, block, i, j, level,
-                    //                D_i_block_key, D_i_block_rows, D_i_block_cols,
-                    //                D_i_block_row_rank, D_i_block_col_rank,
-                    //                0,
-                    //                D_block_j_key, D_block_j_rows, D_block_j_cols,
-                    //                D_block_j_row_rank, D_block_j_col_rank,
-                    //                1,
-                    //                1, false, false);
+                    partial_matmul(A, domain, block, i, j, level,
+                                   D_i_block_key, D_i_block_rows, D_i_block_cols,
+                                   D_i_block_row_rank, D_i_block_col_rank,
+                                   0,
+                                   D_block_j_key, D_block_j_rows, D_block_j_cols,
+                                   D_block_j_row_rank, D_block_j_col_rank,
+                                   1,
+                                   1, false, false, true);
                   });
 
 
