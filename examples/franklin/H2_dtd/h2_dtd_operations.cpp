@@ -707,7 +707,7 @@ void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
         sizeof(Hatrix::Mode), &uplo, PARSEC_VALUE,
         sizeof(bool), &UNIT_DIAG, PARSEC_VALUE,
         sizeof(bool), &TRANS_A, PARSEC_VALUE,
-        sizeof(int), &SPLIT_INDEX, PARSEC_VALUE,
+        sizeof(int64_t), &SPLIT_INDEX, PARSEC_VALUE,
         PARSEC_DTD_ARG_END);
     }
 }
@@ -738,7 +738,12 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
                             Hatrix::Left, Hatrix::Lower, false, false);
   }
 
+
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+
+  // TODO: work with george to remove this.
+  int rc = parsec_dtd_taskpool_wait(dtd_tp);
+  PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
 }
 
 template<typename T> void
@@ -1106,10 +1111,10 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    multiply_complements(A, domain, block, level);
+    // multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
-    compute_schurs_complement(A, domain, block, level);
+    // compute_schurs_complement(A, domain, block, level);
   }
 }
 

@@ -87,7 +87,7 @@ task_partial_trsm(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   Hatrix::Side side;
   Hatrix::Mode uplo;
   bool unit_diag, trans_A;
-  int split_index;
+  int64_t split_index;
 
   parsec_dtd_unpack_args(this_task,
                          &D_rows, &D_cols, &D_row_rank, &D_col_rank, &_diagonal,
