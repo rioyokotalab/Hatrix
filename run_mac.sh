@@ -11,13 +11,13 @@ export VECLIB_MAXIMUM_THREADS=1
 make -j H2_main
 make -j H2_dtd
 
-for adm in 0.9; do
+for adm in 0.8; do
     nleaf=512
     ndim=2
     max_rank=110
 
-    for N in 4096 8192 16384; do
-        ./bin/H2_main --N $N \
+    for N in 4096; do
+        mpirun -n 2 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
