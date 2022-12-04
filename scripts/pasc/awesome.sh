@@ -1,6 +1,6 @@
 #!/bin/sh -x
 
-#PJM -L "node=64"
+#PJM -L "node=16"
 #PJM -L "rscunit=rscunit_ft01"
 #PJM -L "rscgrp=small"
 #PJM -L "elapse=24:00:00"
@@ -9,7 +9,7 @@
 #PJM -L "issue_state=0"
 #PJM -L "ex_pipe_state=0"
 #PJM -L "eco_state=0"
-#PJM --mpi "proc=64"
+#PJM --mpi "proc=16"
 #PJM --mpi "max-proc-per-node=1"
 #PJM -s
 
@@ -26,7 +26,7 @@ export OMP_BIND=close
 export OMP_NUM_THREADS=1
 export XOS_MMM_L_PAGING_POLICY="demand:demand:demand"
 
-source /vol0004/apps/oss/spack/share/spack/setup-env.sh
+# source /vol0004/apps/oss/spack/share/spack/setup-env.sh
 
 source ~/.bashrc
 
@@ -41,8 +41,8 @@ for adm in 0.8; do
     ndim=2
     max_rank=110
 
-    for N in 262144; do
-        mpiexec -stdout out_64.log -stderr err_64.log ./bin/H2_dtd --N $N \
+    for N in 131072; do
+        mpiexec -stdout out_16.log -stderr err_16.log ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
