@@ -16,8 +16,8 @@ for adm in 0.8; do
     ndim=2
     max_rank=110
 
-    for N in 4096; do
-        mpirun -n 4 xterm -e lldb -o run -- ./bin/H2_dtd --N $N \
+    for N in 4096 8192; do
+        ./bin/H2_main --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
