@@ -508,6 +508,7 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   fill_in += matmul(A.U(block, level), matmul(US(block, level), A.U(block, level), false, true));
 
   Matrix col_concat_T = transpose(fill_in);
+
   Matrix Q,R;
   std::tie(Q, R) = pivoted_qr_nopiv_return(col_concat_T, A.ranks(block, level));
 
@@ -541,9 +542,6 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   // in order to incorporate it into the S block.
 
   // This is a temporary way to verify the cluster basis update.
-  // Matrix row_concat(block_size, 0);
-  // row_concat = concat(row_concat, matmul(A.U(block, level), US(block, level)), 1);
-
   Matrix fill_in(block_size, block_size);
 
   for (int64_t j = 0; j < block; ++j) {
@@ -556,8 +554,6 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   }
 
   fill_in += matmul(matmul(A.U(block, level), US(block, level)), A.U(block, level), false, true);
-
-  // row_concat = concat(row_concat, fill_in, 1);
 
   Matrix Q,R;
   std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
