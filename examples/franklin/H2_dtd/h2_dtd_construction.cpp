@@ -10,6 +10,12 @@
 #include "globals.hpp"
 #include "h2_dtd_construction.hpp"
 
+// #include "mkl.h"
+// #include "mkl_pblas.h"
+#ifndef MKL_INT
+#define MKL_INT int
+#endif
+
 using namespace Hatrix;
 
 
@@ -190,7 +196,7 @@ void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Hatrix::Domain& domain,
                     const Hatrix::Args& opts) {
-  int64_t nblocks = std::pow(2, A.max_level);
+  const int nblocks = std::pow(2, A.max_level);
 
   // Generate the dense blocks at the leaf node.
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -212,23 +218,22 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int info;
   int N = opts.N;
 
-  for (int64_t block = 0; block < nblocks; ++block) {
-    int block_size = domain.cell_size(block, A.max_level);
+  for (int block = 0; block < nblocks; ++block) {
+    const MKL_INT block_size = domain.cell_size(block, A.max_level);
 
-    for (int64_t j = 0; j < nblocks; ++j) {
-      if (A.is_admissible.exists(block, j, A.max_level) &&
-          !A.is_admissible(block, j, A.max_level)) { continue; }
+    for (int j = 0; j < nblocks; ++j) {
+      if (exists_and_inadmissible(A, block, j, A.max_level)) { continue; }
 
-      double ALPHA = 1.0;
-      double BETA = 1.0;
-      int IA = block_size * block + 1;
-      int JA = block_size * j + 1;
+      const double ALPHA = 1.0;
+      const double BETA = 1.0;
+      const MKL_INT IA = block_size * block + 1;
+      const MKL_INT JA = block_size * j + 1;
 
-      int IB = block_size * j + 1;
-      int JB = 1;
+      const MKL_INT IB = block_size * j + 1;
+      const MKL_INT JB = 1;
 
-      int IC = block_size * block + 1;
-      int JC = 1;
+      const MKL_INT IC = block_size * block + 1;
+      const MKL_INT JC = 1;
 
       pdgemm_(&NOTRANS, &NOTRANS, &block_size, &P, &block_size,
               &ALPHA,
@@ -282,7 +287,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       }
     }
 
-    std::vector<int> DIAGONAL_COUNTS(MPISIZE);
+    std::vector<int> DIAGONAL_COUNTS(MPISIZE, 0);
     MPI_Allgather((void*)&diagonals, 1, MPI_INT,
                   (void*)DIAGONAL_COUNTS.data(), 1, MPI_INT,
                   MPI_COMM_WORLD);
@@ -362,12 +367,13 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   comm_world_ranks[0] = 0;
   std::iota(comm_world_ranks.begin()+1, comm_world_ranks.end(), 1);
 
+  MPI_Group WORLD_GROUP, ROW_GROUP;
+
   // generate the S blocks using P2P communication
   for (int i = 0; i < nblocks; ++i) {
     int i_block_size = domain.cell_size(i, A.max_level);
     int i_proc = mpi_rank(i);
 
-    MPI_Group WORLD_GROUP, ROW_GROUP;
     MPI_Comm_group(MPI_COMM_WORLD, &WORLD_GROUP);
 
     std::set<int> bcast_ranks;
@@ -614,7 +620,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
       A.ranks.insert(block, level, std::move(qr_rank));
     } // if row_has_admissible_blocks
     else {
-      int64_t rank = std::max(A.ranks(c1, child_level), A.ranks(c2, child_level));
+      int rank = std::max(A.ranks(c1, child_level), A.ranks(c2, child_level));
       if (mpi_rank(block) == MPIRANK) {
         A.U.insert(block, level, generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
                                                           rank));
@@ -645,25 +651,25 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     int c1 = block * 2;
     int c2 = block * 2 + 1;
 
-    int block_size_c1 = domain.cell_size(c1, child_level);
+    const MKL_INT block_size_c1 = domain.cell_size(c1, child_level);
     int block_size_c2 = domain.cell_size(c2, child_level);
 
-    int rank_c1 = A.ranks(c1, child_level);
+    const MKL_INT rank_c1 = A.ranks(c1, child_level);
     int rank_c2 = A.ranks(c2, child_level);
 
-    int Utransfer_ncols = A.ranks(block, level);
+    const MKL_INT Utransfer_ncols = A.ranks(block, level);
 
-    double ALPHA = 1.0;
-    double BETA = 0.0;
+    const double ALPHA = 1.0;
+    const double BETA = 0.0;
 
-    int IA = block_size_c1 * c1 + 1;
-    int JA = 1;
+    MKL_INT IA = block_size_c1 * c1 + 1;
+    MKL_INT JA = 1;
 
-    int IB = 1; for (int i = 0; i < c1; ++i) { IB += A.ranks(i, child_level); }
-    int JB = 1;
+    MKL_INT IB = 1; for (int i = 0; i < c1; ++i) { IB += A.ranks(i, child_level); }
+    const MKL_INT JB = 1;
 
-    int IC = block * block_size + 1;
-    int JC = 1;
+    MKL_INT IC = block * block_size + 1;
+    MKL_INT JC = 1;
 
     // multiply Ubig c1  with the upper slice of the transfer matrix.
     pdgemm_(&NOTRANS, &NOTRANS,
@@ -826,8 +832,8 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A,
   descinit_(AY, &N, &P, &DENSE_NBROW, &NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &AY_local_rows, &info);
 
-  RAND_MEM = (double*)malloc(sizeof(double) *
-                             RAND_local_rows * RAND_local_cols);
+  RAND_MEM = (double*)calloc(RAND_local_rows * RAND_local_cols,
+                             sizeof(double));
   AY_MEM = (double*)calloc(AY_local_rows * AY_local_cols,
                            sizeof(double));
 
@@ -846,44 +852,44 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A,
   generate_leaf_nodes(A, domain, opts);
 
   // temporary storage for actual basis matrices during construction.
-  int nblocks = std::pow(2, A.max_level);
-  std::vector<int> Uchild;
-  Uchild.resize(9);
-  int max_rank = 0;
-  for (int i = 0; i < nblocks; ++i) {
-    max_rank = std::max<int>(max_rank, A.ranks(i, A.max_level));
-  }
-  int Uchild_NBCOL = ceil(max_rank / double(MPIGRID[1]));
-  int Uchild_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
-  int Uchild_local_cols = numroc_(&max_rank, &Uchild_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
+  // int nblocks = std::pow(2, A.max_level);
+  // std::vector<int> Uchild;
+  // Uchild.resize(9);
+  // int max_rank = 0;
+  // for (int i = 0; i < nblocks; ++i) {
+  //   max_rank = std::max<int>(max_rank, A.ranks(i, A.max_level));
+  // }
+  // int Uchild_NBCOL = ceil(max_rank / double(MPIGRID[1]));
+  // int Uchild_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
+  // int Uchild_local_cols = numroc_(&max_rank, &Uchild_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
 
-  std::vector<double> Uchild_mem(Uchild_local_rows * Uchild_local_cols);
+  // std::vector<double> Uchild_mem(Uchild_local_rows * Uchild_local_cols);
 
-  descinit_(Uchild.data(), &N, &max_rank, &DENSE_NBROW, &Uchild_NBCOL, &ZERO, &ZERO,
-            &BLACS_CONTEXT, &Uchild_local_rows, &info);
+  // descinit_(Uchild.data(), &N, &max_rank, &DENSE_NBROW, &Uchild_NBCOL, &ZERO, &ZERO,
+  //           &BLACS_CONTEXT, &Uchild_local_rows, &info);
 
-  // copy AY into Uchild for use in transfer matrix generation.
-  for (int block = 0; block < nblocks; ++block) {
-    int block_size = domain.cell_size(block, A.max_level);
-    int rank = A.ranks(block, A.max_level);
+  // // copy AY into Uchild for use in transfer matrix generation.
+  // for (int block = 0; block < nblocks; ++block) {
+  //   int block_size = domain.cell_size(block, A.max_level);
+  //   int rank = A.ranks(block, A.max_level);
 
-    int IA = block * block_size + 1;
-    int JA = 1;
-    int IB = block * block_size + 1;
-    int JB = 1;
+  //   int IA = block * block_size + 1;
+  //   int JA = 1;
+  //   int IB = block * block_size + 1;
+  //   int JB = 1;
 
-    pdgemr2d_(&block_size, &rank,
-              AY_MEM, &IA, &JA, AY,
-              Uchild_mem.data(), &IB, &JB, Uchild.data(),
-              &BLACS_CONTEXT);
-  }
+  //   pdgemr2d_(&block_size, &rank,
+  //             AY_MEM, &IA, &JA, AY,
+  //             Uchild_mem.data(), &IB, &JB, Uchild.data(),
+  //             &BLACS_CONTEXT);
+  // }
 
-  for (int level = A.max_level-1; level >= A.min_level-1; --level) {
-    // init scratch product memory space to 0.
-    for (int i = 0; i < AY_local_rows * AY_local_cols; ++i) { AY_MEM[i] = 0; }
-    std::tie(Uchild, Uchild_mem) = generate_transfer_matrices(A, level,
-                                                              Uchild, Uchild_mem, domain, opts);
-  }
+  // for (int level = A.max_level-1; level >= A.min_level-1; --level) {
+  //   // init scratch product memory space to 0.
+  //   for (int i = 0; i < AY_local_rows * AY_local_cols; ++i) { AY_MEM[i] = 0; }
+  //   std::tie(Uchild, Uchild_mem) = generate_transfer_matrices(A, level,
+  //                                                             Uchild, Uchild_mem, domain, opts);
+  // }
 
   free(RAND_MEM);
   free(AY_MEM);

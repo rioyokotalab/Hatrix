@@ -1199,6 +1199,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
     parsec_arena_datatype_t* bases_t = parsec_dtd_create_arena_datatype(parsec, &U_ARENA);
     parsec_add2arena_rect(bases_t, parsec_datatype_double_t, block_size, rank, block_size);
     arena_U.insert(i, level, std::move(U_ARENA));
+    bases_t = NULL;
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1209,6 +1210,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       parsec_add2arena_rect(bases_t, parsec_datatype_double_t, row_size, col_size, row_size);
       arena_S.insert(i, j, level, std::move(S_ARENA));
       parsec_data_key_t S_data_key = parsec_S.super.data_key(&parsec_S.super, i, j, level);
+      bases_t = NULL;
 
       if (exists_and_admissible(A, i, j, level) && mpi_rank(i, j) == MPIRANK) {     // S blocks.
         Matrix& S_ij = A.S(i, j, level);
@@ -1223,6 +1225,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       arena_D.insert(i, j, level, std::move(D_ARENA));
       parsec_data_key_t D_data_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
       parsec_D.mpi_ranks[D_data_key] = mpi_rank(i, j);
+      bases_t = NULL;
 
       if (exists_and_inadmissible(A, i, j, level) && (mpi_rank(i, j) == MPIRANK)) { // D blocks.
         Matrix& D_ij = A.D(i, j, level);

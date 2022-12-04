@@ -495,20 +495,20 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   const int64_t nblocks = pow(2, level);
   const int64_t block_size = A.D(block, block, level).cols;
 
-  Matrix col_concat(0, block_size);
-  col_concat = concat(col_concat,
-                      matmul(US(block, level), A.U(block, level), false, true), 0);
-
+  Matrix fill_in(block_size, block_size);
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_admissible(A, i, block, level)) {
       if (F.exists(i, block, level)) {
-        col_concat = concat(col_concat, F(i, block, level), 0);
+        fill_in += matmul(F(i, block, level), F(i, block, level), true, false);
         F.erase(i, block, level);
       }
     }
   }
 
-  Matrix col_concat_T = transpose(col_concat);
+  fill_in += matmul(A.U(block, level), matmul(US(block, level), A.U(block, level), false, true));
+
+  Matrix col_concat_T = transpose(fill_in);
+
   Matrix Q,R;
   std::tie(Q, R) = pivoted_qr_nopiv_return(col_concat_T, A.ranks(block, level));
 
@@ -542,20 +542,21 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   // in order to incorporate it into the S block.
 
   // This is a temporary way to verify the cluster basis update.
-  Matrix row_concat(block_size, 0);
-  row_concat = concat(row_concat, matmul(A.U(block, level), US(block, level)), 1);
+  Matrix fill_in(block_size, block_size);
 
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_admissible(A, block, j, level)) {
       if (F.exists(block, j, level)) {
-        row_concat = concat(row_concat, F(block, j, level), 1);
+        fill_in += matmul(F(block, j, level), F(block, j, level), false, true);
         F.erase(block, j, level);
       }
     }
   }
 
+  fill_in += matmul(matmul(A.U(block, level), US(block, level)), A.U(block, level), false, true);
+
   Matrix Q,R;
-  std::tie(Q, R) = pivoted_qr_nopiv_return(row_concat, A.ranks(block, level));
+  std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
 
   Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
   rq(R, Si, Vi);

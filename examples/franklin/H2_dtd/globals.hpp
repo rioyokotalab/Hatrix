@@ -45,7 +45,6 @@ extern "C" {
                double *	BETA,
                double *	C, int *IC, int *JC, int *DESCC);
 
-
   void pdgemv_(const char *TRANS, int *M, int *N, double *ALPHA,
                double *A, int *IA, int *JA, int *DESCA,
                double * X, int * IX, int *JX, int * DESCX,
