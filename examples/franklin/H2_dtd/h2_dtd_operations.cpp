@@ -272,6 +272,10 @@ matmul(SymmetricSharedBasisMatrix& A,
   int nblocks_per_proc = ceil(leaf_nblocks / double(MPISIZE));
   std::vector<Matrix> x_hat;
 
+  if (MPIRANK >= leaf_nblocks) {
+    return;
+  }
+
   // Apply V leaf basis nodes.
   for (int i = 0; i < nblocks_per_proc; i += 1) {
     int index = i * MPISIZE + MPIRANK;

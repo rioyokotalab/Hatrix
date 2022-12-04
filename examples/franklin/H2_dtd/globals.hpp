@@ -38,8 +38,9 @@ extern "C" {
                 const int *nb, const int *irsrc, const int *icsrc, const int *BLACS_CONTEXT,
                 const int *lld, int *info);
 
-  void pdgemm_(const char *TRANSA, const char *TRANSB, int *M, int *N, int *K,
-               double *ALPHA,
+  void pdgemm_(const char *TRANSA, const char *TRANSB,
+               const int *M, const int *N, const int *K,
+               const double *ALPHA,
                double *A, int *IA, int *JA, int *DESCA,
                double *B, int *IB, int *JB, int *DESCB,
                double *	BETA,
