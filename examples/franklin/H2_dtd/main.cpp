@@ -21,6 +21,8 @@
 #include "h2_dtd_operations.hpp"
 #include "h2_dtd_factorize_tests.hpp"
 
+#include "omp.h"
+
 #ifdef USE_MKL
 #include <mkl.h>
 #endif
@@ -122,6 +124,7 @@ int main (int argc, char **argv) {
   {
     int provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+    std::cout << "provided: " << provided << std::endl;
   }
   MPI_Comm_size(MPI_COMM_WORLD, &MPISIZE);
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
@@ -129,21 +132,6 @@ int main (int argc, char **argv) {
   N = opts.N;
   std::cout << "g[0] : " << MPIGRID[0] << " g[1]: " << MPIGRID[1] << std::endl;
 
-  /* Initializing parsec context */
-  int parsec_argc = argc - opts.num_args;
-
-  // TODO: pass the parsec args into this.
-  parsec = parsec_init( cores, NULL, NULL);
-  if( NULL == parsec ) {
-    printf("Cannot initialize PaRSEC\n");
-    exit(-1);
-  }
-
-  rc = parsec_context_start( parsec );
-  PARSEC_CHECK_ERROR(rc, "parsec_context_start");
-
-  /* Initializing parsec handle(collection of tasks) */
-  dtd_tp = parsec_dtd_taskpool_new();
 
   // Init domain decomposition for H2 matrix using DTT.
   auto start_domain = std::chrono::system_clock::now();
@@ -201,7 +189,6 @@ int main (int argc, char **argv) {
   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
   if(!MPIRANK) A.print_structure();
   construct_h2_matrix_dtd(A, domain, opts); // construct H2 matrix.
-  MPI_Barrier(MPI_COMM_WORLD);
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
@@ -287,53 +274,58 @@ int main (int argc, char **argv) {
   double b_check_norm = dist_norm2(b_check);
   double construction_error = diff_norm / b_check_norm;
 
+  // ---- BEGIN PARSEC ----
+
+    /* Initializing parsec context */
+  int parsec_argc = argc - opts.num_args;
+  parsec = parsec_init( cores, NULL, NULL);
+  if( NULL == parsec ) {
+    printf("Cannot initialize PaRSEC\n");
+    exit(-1);
+  }
+  rc = parsec_context_start( parsec );
+  PARSEC_CHECK_ERROR(rc, "parsec_context_start");
+  dtd_tp = parsec_dtd_taskpool_new();
+  rc = parsec_context_add_taskpool( parsec, dtd_tp );
+
   std::vector<Matrix> h2_solution;
   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
 
-
-  /* Registering the dtd_handle with PARSEC context */
-  rc = parsec_context_add_taskpool( parsec, dtd_tp );
-
-  // auto A_test = dense_cholesky_test(A, domain, opts);
+//   // auto A_test = dense_cholesky_test(A, domain, opts);
 
 #ifdef USE_MKL
   mkl_set_num_threads(1);
+  omp_set_num_threads(1);
 #endif
 
-
-  std::cout << "begin factor.\n";
   factorize(A, domain, opts);
-  solve(A, x, h2_solution);
+//   // solve(A, x, h2_solution);
 
   parsec_context_wait(parsec);
-
-  /* Cleaning the parsec handle */
   parsec_taskpool_free( dtd_tp );
-
-  /* Cleaning up parsec context */
   parsec_fini(&parsec);
-
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);
+
   MPI_Finalize();
 
-  Hatrix::Context::finalize();
+//   Hatrix::Context::finalize();
 
-  if (!MPIRANK) {
-    std::cout << "----------------------------\n";
-    std::cout << "N               : " << opts.N << std::endl;
-    std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-    std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-    std::cout << "ADMIS           : " << opts.admis << std::endl;
-    std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-    std::cout << "NPROCS          : " << MPISIZE << std::endl;
-    std::cout << "NLEAF           : " << opts.nleaf << "\n"
-              << "CONSTRUCT ERROR : " << construction_error << std::endl
-              << "Contruct(ms)    : " << construct_time << "\n";
-    std::cout << "----------------------------\n";
-  }
+//   if (!MPIRANK) {
+//     std::cout << "----------------------------\n";
+//     std::cout << "N               : " << opts.N << std::endl;
+//     std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+//     std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+//     std::cout << "ADMIS           : " << opts.admis << std::endl;
+//     std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+//     std::cout << "NPROCS          : " << MPISIZE << std::endl;
+//     std::cout << "NLEAF           : " << opts.nleaf << "\n"
+//               << "CONSTRUCT ERROR : " << construction_error << std::endl
+//               << "Contruct(ms)    : " << construct_time << "\n";
+//     std::cout << "----------------------------\n";
+//   }
 
   delete[] DENSE_MEM;
 
