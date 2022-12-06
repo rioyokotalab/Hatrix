@@ -8,11 +8,8 @@
 
 source ~/.bashrc
 
-rm -rf build
-mkdir build
-cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=$PWD -DCMAKE_BUILD_TYPE=Release
-make -j all
+module purge
+module load intel-mpi/2021.5 gcc/11.2.0 intel-mkl/2022.0.0 cmake/3.22.3
 
 export OMP_PLACES=cores
 
