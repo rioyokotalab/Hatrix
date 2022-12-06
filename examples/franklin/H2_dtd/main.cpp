@@ -21,6 +21,10 @@
 #include "h2_dtd_operations.hpp"
 #include "h2_dtd_factorize_tests.hpp"
 
+#ifdef USE_MKL
+#include <mkl.h>
+#endif
+
 using namespace Hatrix;
 
 static void
@@ -197,6 +201,7 @@ int main (int argc, char **argv) {
   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
   if(!MPIRANK) A.print_structure();
   construct_h2_matrix_dtd(A, domain, opts); // construct H2 matrix.
+  MPI_Barrier(MPI_COMM_WORLD);
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
@@ -292,6 +297,10 @@ int main (int argc, char **argv) {
   rc = parsec_context_add_taskpool( parsec, dtd_tp );
 
   // auto A_test = dense_cholesky_test(A, domain, opts);
+
+#ifdef USE_MKL
+  mkl_set_num_threads(1);
+#endif
 
 
   std::cout << "begin factor.\n";

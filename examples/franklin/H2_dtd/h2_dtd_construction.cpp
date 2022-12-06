@@ -235,228 +235,238 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       MKL_INT IC = block_size * block + 1;
       MKL_INT JC = 1;
 
+      std::cout << "calling pdgemm_: block-> " << block
+                << " j-> " << j << std::endl;
+
+
       pdgemm_(&NOTRANS, &NOTRANS, &block_size, &P, &block_size,
               &ALPHA,
               DENSE_MEM, &IA, &JA, DENSE.data(),
               RAND_MEM, &IB, &JB, RAND,
               &BETA,
               AY_MEM, &IC, &JC, AY);
+
+      break;
     }
+    break;
   }
 
-  // generate column bases from the randomized blocks.
-  for (int block = 0; block < nblocks; ++block) {
-    int block_size = domain.cell_size(block, A.max_level);
+  // return;
 
-    int IA = block_size * block + 1;
-    int JA = 1;
+  // // generate column bases from the randomized blocks.
+  // for (int block = 0; block < nblocks; ++block) {
+  //   int block_size = domain.cell_size(block, A.max_level);
 
-    // Length of ipiv should be LOCc(JA+N-1) = AY_local_col.
-    std::vector<int> IPIV(AY_local_cols);
-    // Length of TAU is LOCc(JA+MIN(M,N)-1) = AY_local_cols.
-    std::vector<double> TAU(AY_local_cols);
-    std::vector<double> WORK(1);
-    int info;
+  //   int IA = block_size * block + 1;
+  //   int JA = 1;
 
-    pdgeqpf_(&block_size, &P,
-             AY_MEM, &IA, &JA, AY,
-             IPIV.data(), TAU.data(), WORK.data(),
-             &MINUS_ONE, &info); // workspace query
+  //   // Length of ipiv should be LOCc(JA+N-1) = AY_local_col.
+  //   std::vector<int> IPIV(AY_local_cols);
+  //   // Length of TAU is LOCc(JA+MIN(M,N)-1) = AY_local_cols.
+  //   std::vector<double> TAU(AY_local_cols);
+  //   std::vector<double> WORK(1);
+  //   int info;
 
-    int LWORK = WORK[0];
+  //   pdgeqpf_(&block_size, &P,
+  //            AY_MEM, &IA, &JA, AY,
+  //            IPIV.data(), TAU.data(), WORK.data(),
+  //            &MINUS_ONE, &info); // workspace query
 
-    WORK.resize(LWORK);
-    pdgeqpf_(&block_size, &P,
-             AY_MEM, &IA, &JA, AY,
-             IPIV.data(), TAU.data(), WORK.data(),
-             &LWORK, &info);    // distributed pivoted QR
+  //   int LWORK = WORK[0];
 
-    std::vector<double> RANKVECTOR(AY_local_cols, 0);
-    int diagonals = 0;
-    for (int i = 0; i < P; ++i) {
-      int g_row = block * block_size + i + 1;
-      int g_col = i + 1;
-      int row_proc = indxg2p(g_row, DENSE_NBROW, 0, MPIGRID[0]);
-      int col_proc = indxg2p(g_col, NBCOL, 0, MPIGRID[1]);
+  //   WORK.resize(LWORK);
+  //   pdgeqpf_(&block_size, &P,
+  //            AY_MEM, &IA, &JA, AY,
+  //            IPIV.data(), TAU.data(), WORK.data(),
+  //            &LWORK, &info);    // distributed pivoted QR
 
-      if (row_proc == MYROW && col_proc == MYCOL) {
-        int lrow = indxg2l(g_row, DENSE_NBROW,  MPIGRID[0]) - 1;
-        int lcol = indxg2l(g_col, NBCOL, MPIGRID[1]) - 1;
+  //   std::vector<double> RANKVECTOR(AY_local_cols, 0);
+  //   int diagonals = 0;
+  //   for (int i = 0; i < P; ++i) {
+  //     int g_row = block * block_size + i + 1;
+  //     int g_col = i + 1;
+  //     int row_proc = indxg2p(g_row, DENSE_NBROW, 0, MPIGRID[0]);
+  //     int col_proc = indxg2p(g_col, NBCOL, 0, MPIGRID[1]);
 
-        RANKVECTOR[diagonals++] = abs(AY_MEM[lrow + lcol * AY_local_rows]);
-      }
-    }
+  //     if (row_proc == MYROW && col_proc == MYCOL) {
+  //       int lrow = indxg2l(g_row, DENSE_NBROW,  MPIGRID[0]) - 1;
+  //       int lcol = indxg2l(g_col, NBCOL, MPIGRID[1]) - 1;
 
-    std::vector<int> DIAGONAL_COUNTS(MPISIZE, 0);
-    MPI_Allgather((void*)&diagonals, 1, MPI_INT,
-                  (void*)DIAGONAL_COUNTS.data(), 1, MPI_INT,
-                  MPI_COMM_WORLD);
+  //       RANKVECTOR[diagonals++] = abs(AY_MEM[lrow + lcol * AY_local_rows]);
+  //     }
+  //   }
 
-    int total_count = 0;
-    std::vector<int> DIAGONAL_DISPLACEMENTS(MPISIZE+1, 0);
-    for (int i = 0; i < MPISIZE; ++i) {
-      total_count += DIAGONAL_COUNTS[i];
-      DIAGONAL_DISPLACEMENTS[i+1] = total_count;
-    }
+  //   std::vector<int> DIAGONAL_COUNTS(MPISIZE, 0);
+  //   MPI_Allgather((void*)&diagonals, 1, MPI_INT,
+  //                 (void*)DIAGONAL_COUNTS.data(), 1, MPI_INT,
+  //                 MPI_COMM_WORLD);
 
-    std::vector<double> GATHER_RANKVECTOR(total_count);
-    MPI_Allgatherv((void*)RANKVECTOR.data(), DIAGONAL_COUNTS[MPIRANK], MPI_DOUBLE,
-                   (void*)GATHER_RANKVECTOR.data(), DIAGONAL_COUNTS.data(),
-                   DIAGONAL_DISPLACEMENTS.data(), MPI_DOUBLE,
-                   MPI_COMM_WORLD);
+  //   int total_count = 0;
+  //   std::vector<int> DIAGONAL_DISPLACEMENTS(MPISIZE+1, 0);
+  //   for (int i = 0; i < MPISIZE; ++i) {
+  //     total_count += DIAGONAL_COUNTS[i];
+  //     DIAGONAL_DISPLACEMENTS[i+1] = total_count;
+  //   }
 
-    std::sort(GATHER_RANKVECTOR.begin(), GATHER_RANKVECTOR.end(),
-              std::greater<double>());
+  //   std::vector<double> GATHER_RANKVECTOR(total_count);
+  //   MPI_Allgatherv((void*)RANKVECTOR.data(), DIAGONAL_COUNTS[MPIRANK], MPI_DOUBLE,
+  //                  (void*)GATHER_RANKVECTOR.data(), DIAGONAL_COUNTS.data(),
+  //                  DIAGONAL_DISPLACEMENTS.data(), MPI_DOUBLE,
+  //                  MPI_COMM_WORLD);
 
-    int rank=0;
-    for (double eig : GATHER_RANKVECTOR) {
-      if (eig <= opts.accuracy) { break; }
-      rank++;
-    }
+  //   std::sort(GATHER_RANKVECTOR.begin(), GATHER_RANKVECTOR.end(),
+  //             std::greater<double>());
 
-    // obtain orthogonal factors
-    pdorgqr_(&block_size, &P, &P,
-             AY_MEM, &IA, &JA, AY,
-             TAU.data(), WORK.data(),
-             &MINUS_ONE, &info); // workspace query
+  //   int rank=0;
+  //   for (double eig : GATHER_RANKVECTOR) {
+  //     if (eig <= opts.accuracy) { break; }
+  //     rank++;
+  //   }
 
-    LWORK = WORK[0];
-    WORK.resize(LWORK);
-    pdorgqr_(&block_size, &P, &P,
-             AY_MEM, &IA, &JA, AY,
-             TAU.data(), WORK.data(),
-             &LWORK, &info); // compute Q factors
+  //   // obtain orthogonal factors
+  //   pdorgqr_(&block_size, &P, &P,
+  //            AY_MEM, &IA, &JA, AY,
+  //            TAU.data(), WORK.data(),
+  //            &MINUS_ONE, &info); // workspace query
 
-    // copy the computed orthogonal factors into U blocks.
-    int IMAP[1];                // workspace for mapping the grid to processes.
-    IMAP[0] = mpi_rank(block);
-    int NODE_CONTEXT;
+  //   LWORK = WORK[0];
+  //   WORK.resize(LWORK);
+  //   pdorgqr_(&block_size, &P, &P,
+  //            AY_MEM, &IA, &JA, AY,
+  //            TAU.data(), WORK.data(),
+  //            &LWORK, &info); // compute Q factors
 
-    Cblacs_get(BLACS_CONTEXT, 10, &NODE_CONTEXT);
-    Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
+  //   // copy the computed orthogonal factors into U blocks.
+  //   int IMAP[1];                // workspace for mapping the grid to processes.
+  //   IMAP[0] = mpi_rank(block);
+  //   int NODE_CONTEXT;
 
-    int U_block[9];
-    int U_nrows = 0, U_ncols = 0;
-    if (mpi_rank(block) == MPIRANK) {
-      U_nrows = block_size;
-      U_ncols = rank;
-    }
-    Matrix U(U_nrows, U_ncols);
+  //   // Cblacs_get(BLACS_CONTEXT, 10, &NODE_CONTEXT);
+  //   Cblacs_get(-1, 0, &NODE_CONTEXT);
+  //   Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
 
-    int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
-    Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
-    descset_(U_block, &block_size, &rank, &block_size, &rank,
-              &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &block_size, &info);
+  //   int U_block[9];
+  //   int U_nrows = 0, U_ncols = 0;
+  //   if (mpi_rank(block) == MPIRANK) {
+  //     U_nrows = block_size;
+  //     U_ncols = rank;
+  //   }
+  //   Matrix U(U_nrows, U_ncols);
 
-    // copy out the U block into its own dedicated storage.
-    pdgemr2d_(&block_size, &rank,
-              AY_MEM, &IA, &JA, AY,
-              &U, &ONE, &ONE, U_block,
-              &BLACS_CONTEXT);
+  //   int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
+  //   Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
+  //   descset_(U_block, &block_size, &rank, &block_size, &rank,
+  //             &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &block_size, &info);
 
-    if (mpi_rank(block) == MPIRANK) {
-      A.U.insert(block, A.max_level,
-                 std::move(U));
-    }
+  //   // copy out the U block into its own dedicated storage.
+  //   pdgemr2d_(&block_size, &rank,
+  //             AY_MEM, &IA, &JA, AY,
+  //             &U, &ONE, &ONE, U_block,
+  //             &BLACS_CONTEXT);
 
-    // ranks are stored in all processes.
-    A.ranks.insert(block, A.max_level, std::move(rank));
-  }
+  //   if (mpi_rank(block) == MPIRANK) {
+  //     A.U.insert(block, A.max_level,
+  //                std::move(U));
+  //   }
 
-  std::vector<int> comm_world_ranks(MPISIZE);
-  comm_world_ranks[0] = 0;
-  std::iota(comm_world_ranks.begin()+1, comm_world_ranks.end(), 1);
+  //   // ranks are stored in all processes.
+  //   A.ranks.insert(block, A.max_level, std::move(rank));
+  // }
 
-  MPI_Group WORLD_GROUP, ROW_GROUP;
+  // std::vector<int> comm_world_ranks(MPISIZE);
+  // comm_world_ranks[0] = 0;
+  // std::iota(comm_world_ranks.begin()+1, comm_world_ranks.end(), 1);
 
-  // generate the S blocks using P2P communication
-  for (int i = 0; i < nblocks; ++i) {
-    int i_block_size = domain.cell_size(i, A.max_level);
-    int i_proc = mpi_rank(i);
+  // MPI_Group WORLD_GROUP, ROW_GROUP;
 
-    MPI_Comm_group(MPI_COMM_WORLD, &WORLD_GROUP);
+  // // generate the S blocks using P2P communication
+  // for (int i = 0; i < nblocks; ++i) {
+  //   int i_block_size = domain.cell_size(i, A.max_level);
+  //   int i_proc = mpi_rank(i);
 
-    std::set<int> bcast_ranks;
-    bcast_ranks.insert(i_proc);
+  //   MPI_Comm_group(MPI_COMM_WORLD, &WORLD_GROUP);
 
-    for (int j = 0; j < i; ++j) {
-      int j_block_size = domain.cell_size(j, A.max_level);
-      int j_proc = mpi_rank(j);
-      int dest_proc = mpi_rank(i, j);
+  //   std::set<int> bcast_ranks;
+  //   bcast_ranks.insert(i_proc);
 
-      if (A.is_admissible.exists(i, j, A.max_level) &&
-          A.is_admissible(i, j, A.max_level)) {
-        bcast_ranks.insert(dest_proc);
-      }
-    }
+  //   for (int j = 0; j < i; ++j) {
+  //     int j_block_size = domain.cell_size(j, A.max_level);
+  //     int j_proc = mpi_rank(j);
+  //     int dest_proc = mpi_rank(i, j);
 
-    int Ui_nrows = i_block_size;
-    int Ui_ncols = A.ranks(i, A.max_level);
-    Matrix Ui(Ui_nrows, Ui_ncols);
+  //     if (A.is_admissible.exists(i, j, A.max_level) &&
+  //         A.is_admissible(i, j, A.max_level)) {
+  //       bcast_ranks.insert(dest_proc);
+  //     }
+  //   }
 
-    {
-      std::vector<int> bcast_ranks_vector(bcast_ranks.begin(),
-                                          bcast_ranks.end());
-      MPI_Group_incl(WORLD_GROUP, bcast_ranks_vector.size(),
-                     bcast_ranks_vector.data(), &ROW_GROUP);
+  //   int Ui_nrows = i_block_size;
+  //   int Ui_ncols = A.ranks(i, A.max_level);
+  //   Matrix Ui(Ui_nrows, Ui_ncols);
 
-
-      MPI_Comm MPI_S_ROW_COMM;
-      MPI_Comm_create_group(MPI_COMM_WORLD, ROW_GROUP, 0,
-                            &MPI_S_ROW_COMM);
-
-      std::vector<int> row_comm_ranks(comm_world_ranks.size());
-      MPI_Group_translate_ranks(WORLD_GROUP, comm_world_ranks.size(),
-                                comm_world_ranks.data(),
-                                ROW_GROUP, row_comm_ranks.data());
-
-      // perform Bcast of the U block on row i along the processes
-      // that posses an 'S' block.
-      if (mpi_rank(i) == MPIRANK) {
-        // copy into Ui if this is the rank on which it exists.
-        Ui = A.U(i, A.max_level) ;
-      }
-
-      if (MPI_COMM_NULL != MPI_S_ROW_COMM) {
-        MPI_Bcast(&Ui, Ui_nrows * Ui_ncols, MPI_DOUBLE,
-                  row_comm_ranks[i_proc], MPI_S_ROW_COMM);
-      }
-    }
+  //   {
+  //     std::vector<int> bcast_ranks_vector(bcast_ranks.begin(),
+  //                                         bcast_ranks.end());
+  //     MPI_Group_incl(WORLD_GROUP, bcast_ranks_vector.size(),
+  //                    bcast_ranks_vector.data(), &ROW_GROUP);
 
 
-    for (int j = 0; j < i; ++j) {
-      int j_block_size = domain.cell_size(j, A.max_level);
-      int j_proc = mpi_rank(j);
-      int dest_proc = mpi_rank(i, j);
+  //     MPI_Comm MPI_S_ROW_COMM;
+  //     MPI_Comm_create_group(MPI_COMM_WORLD, ROW_GROUP, 0,
+  //                           &MPI_S_ROW_COMM);
 
-      if (A.is_admissible.exists(i, j, A.max_level) &&
-          A.is_admissible(i, j, A.max_level)) {
-        int Uj_nrows = domain.cell_size(j, A.max_level);
-        int Uj_ncols = A.ranks(j, A.max_level);
-        MPI_Request request;
+  //     std::vector<int> row_comm_ranks(comm_world_ranks.size());
+  //     MPI_Group_translate_ranks(WORLD_GROUP, comm_world_ranks.size(),
+  //                               comm_world_ranks.data(),
+  //                               ROW_GROUP, row_comm_ranks.data());
 
-        if (j_proc == MPIRANK) {
-          MPI_Isend(&A.U(j, A.max_level), Uj_nrows * Uj_ncols, MPI_DOUBLE, dest_proc,
-                    j, MPI_COMM_WORLD, &request);
-        }
+  //     // perform Bcast of the U block on row i along the processes
+  //     // that posses an 'S' block.
+  //     if (mpi_rank(i) == MPIRANK) {
+  //       // copy into Ui if this is the rank on which it exists.
+  //       Ui = A.U(i, A.max_level) ;
+  //     }
 
-        if (dest_proc == MPIRANK) {
-          Matrix Uj(Uj_nrows, Uj_ncols);
-          MPI_Status status;
+  //     if (MPI_COMM_NULL != MPI_S_ROW_COMM) {
+  //       MPI_Bcast(&Ui, Ui_nrows * Ui_ncols, MPI_DOUBLE,
+  //                 row_comm_ranks[i_proc], MPI_S_ROW_COMM);
+  //     }
+  //   }
 
-          MPI_Irecv(&Uj, Uj_nrows * Uj_ncols, MPI_DOUBLE, j_proc, j,
-                    MPI_COMM_WORLD, &request);
-          MPI_Wait(&request, &status);
 
-          Matrix Aij = generate_p2p_interactions(domain,
-                                                 i, j, A.max_level, opts.kernel);
+  //   for (int j = 0; j < i; ++j) {
+  //     int j_block_size = domain.cell_size(j, A.max_level);
+  //     int j_proc = mpi_rank(j);
+  //     int dest_proc = mpi_rank(i, j);
 
-          Matrix S_block = matmul(matmul(Ui, Aij, true, false), Uj);
-          A.S.insert(i, j, A.max_level, std::move(S_block));
-        }
-      }
-    }
-  }
+  //     if (A.is_admissible.exists(i, j, A.max_level) &&
+  //         A.is_admissible(i, j, A.max_level)) {
+  //       int Uj_nrows = domain.cell_size(j, A.max_level);
+  //       int Uj_ncols = A.ranks(j, A.max_level);
+  //       MPI_Request request;
+
+  //       if (j_proc == MPIRANK) {
+  //         MPI_Isend(&A.U(j, A.max_level), Uj_nrows * Uj_ncols, MPI_DOUBLE, dest_proc,
+  //                   j, MPI_COMM_WORLD, &request);
+  //       }
+
+  //       if (dest_proc == MPIRANK) {
+  //         Matrix Uj(Uj_nrows, Uj_ncols);
+  //         MPI_Status status;
+
+  //         MPI_Irecv(&Uj, Uj_nrows * Uj_ncols, MPI_DOUBLE, j_proc, j,
+  //                   MPI_COMM_WORLD, &request);
+  //         MPI_Wait(&request, &status);
+
+  //         Matrix Aij = generate_p2p_interactions(domain,
+  //                                                i, j, A.max_level, opts.kernel);
+
+  //         Matrix S_block = matmul(matmul(Ui, Aij, true, false), Uj);
+  //         A.S.insert(i, j, A.max_level, std::move(S_block));
+  //       }
+  //     }
+  //   }
+  // }
 }
 
 std::tuple<std::vector<int>, std::vector<double>>
@@ -588,7 +598,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
       IMAP[0] = mpi_rank(block);
 
       int NODE_CONTEXT;
-      Cblacs_get(BLACS_CONTEXT, 10, &NODE_CONTEXT);
+      // Cblacs_get(BLACS_CONTEXT, 10, &NODE_CONTEXT);
+      Cblacs_get(-1, 0, &NODE_CONTEXT);
       Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
 
       std::vector<int> U_block(DESC_LEN);
@@ -774,7 +785,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
         IMAP[0] = mpi_rank(i, j);
 
         int NODE_CONTEXT;
-        Cblacs_get(BLACS_CONTEXT, 10, &NODE_CONTEXT);
+        Cblacs_get(-1, 0, &NODE_CONTEXT);
+        // Cblacs_get(BLACS_CONTEXT, 10, &NODE_CONTEXT);
         Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
 
         std::vector<int> DESCS(DESC_LEN);
@@ -852,44 +864,44 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A,
   generate_leaf_nodes(A, domain, opts);
 
   // temporary storage for actual basis matrices during construction.
-  int nblocks = std::pow(2, A.max_level);
-  std::vector<int> Uchild;
-  Uchild.resize(9);
-  int max_rank = 0;
-  for (int i = 0; i < nblocks; ++i) {
-    max_rank = std::max<int>(max_rank, A.ranks(i, A.max_level));
-  }
-  int Uchild_NBCOL = ceil(max_rank / double(MPIGRID[1]));
-  int Uchild_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
-  int Uchild_local_cols = numroc_(&max_rank, &Uchild_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
+  // int nblocks = std::pow(2, A.max_level);
+  // std::vector<int> Uchild;
+  // Uchild.resize(9);
+  // int max_rank = 0;
+  // for (int i = 0; i < nblocks; ++i) {
+  //   max_rank = std::max<int>(max_rank, A.ranks(i, A.max_level));
+  // }
+  // int Uchild_NBCOL = ceil(max_rank / double(MPIGRID[1]));
+  // int Uchild_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
+  // int Uchild_local_cols = numroc_(&max_rank, &Uchild_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
 
-  std::vector<double> Uchild_mem(Uchild_local_rows * Uchild_local_cols);
+  // std::vector<double> Uchild_mem(Uchild_local_rows * Uchild_local_cols);
 
-  descinit_(Uchild.data(), &N, &max_rank, &DENSE_NBROW, &Uchild_NBCOL, &ZERO, &ZERO,
-            &BLACS_CONTEXT, &Uchild_local_rows, &info);
+  // descinit_(Uchild.data(), &N, &max_rank, &DENSE_NBROW, &Uchild_NBCOL, &ZERO, &ZERO,
+  //           &BLACS_CONTEXT, &Uchild_local_rows, &info);
 
-  // copy AY into Uchild for use in transfer matrix generation.
-  for (int block = 0; block < nblocks; ++block) {
-    int block_size = domain.cell_size(block, A.max_level);
-    int rank = A.ranks(block, A.max_level);
+  // // copy AY into Uchild for use in transfer matrix generation.
+  // for (int block = 0; block < nblocks; ++block) {
+  //   int block_size = domain.cell_size(block, A.max_level);
+  //   int rank = A.ranks(block, A.max_level);
 
-    int IA = block * block_size + 1;
-    int JA = 1;
-    int IB = block * block_size + 1;
-    int JB = 1;
+  //   int IA = block * block_size + 1;
+  //   int JA = 1;
+  //   int IB = block * block_size + 1;
+  //   int JB = 1;
 
-    pdgemr2d_(&block_size, &rank,
-              AY_MEM, &IA, &JA, AY,
-              Uchild_mem.data(), &IB, &JB, Uchild.data(),
-              &BLACS_CONTEXT);
-  }
+  //   pdgemr2d_(&block_size, &rank,
+  //             AY_MEM, &IA, &JA, AY,
+  //             Uchild_mem.data(), &IB, &JB, Uchild.data(),
+  //             &BLACS_CONTEXT);
+  // }
 
-  for (int level = A.max_level-1; level >= A.min_level-1; --level) {
-    // init scratch product memory space to 0.
-    for (int i = 0; i < AY_local_rows * AY_local_cols; ++i) { AY_MEM[i] = 0; }
-    std::tie(Uchild, Uchild_mem) = generate_transfer_matrices(A, level,
-                                                              Uchild, Uchild_mem, domain, opts);
-  }
+  // for (int level = A.max_level-1; level >= A.min_level-1; --level) {
+  //   // init scratch product memory space to 0.
+  //   for (int i = 0; i < AY_local_rows * AY_local_cols; ++i) { AY_MEM[i] = 0; }
+  //   std::tie(Uchild, Uchild_mem) = generate_transfer_matrices(A, level,
+  //                                                             Uchild, Uchild_mem, domain, opts);
+  // }
 
   free(RAND_MEM);
   free(AY_MEM);

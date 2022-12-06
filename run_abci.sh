@@ -11,17 +11,33 @@ source ~/.bashrc
 module purge
 module load intel-mpi/2021.5 gcc/11.2.0 intel-mkl/2022.0.0 cmake/3.22.3
 
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/acb10922qh/gitrepos/parsec/build/lib64/pkgconfig:/home/acb10922qh/gitrepos/googletest/build/lib64/pkgconfig
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/lib64
+
 export OMP_PLACES=cores
 
-for N in 1024 2048 4096 8192 16384 32768 65536 131072; do
-    for cores in 1 4 8 12 16 20; do
-        export OMP_NUM_THREADS=$cores
-        for matrix_type in 1; do
-            for admis in 0; do
-                for rank in 5 10 20 40 70 80; do
-                    ./examples/UMV_H2_far_dense $N $rank 128 $admis 1 diagonal_admis 0 $matrix_type
-                done
-            done
-        done
+make -j H2_dtd
+
+
+for adm in 0.8; do
+    nleaf=512
+    ndim=2
+    max_rank=110
+
+    for N in 4096; do
+	    echo "running"
+            # mpirun -n 2 -genv I_MPI_DEBUG=10  xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
+                mpirun -n 4 valgrind --leak-check=full ./bin/H2_dtd --N $N \
+                      --nleaf $nleaf \
+                      --kernel_func laplace \
+                      --kind_of_geometry grid \
+                      --ndim $ndim \
+                      --max_rank $max_rank \
+                      --accuracy 1e-8 \
+                      --admis $adm \
+                      --admis_kind geometry \
+                      --construct_algorithm miro \
+                      --add_diag 1e-10 \
+                      --use_nested_basis
     done
 done
