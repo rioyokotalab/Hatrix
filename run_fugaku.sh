@@ -8,7 +8,7 @@
 #PJM -x PJM_LLIO_GFSCACHE=/vol0003
 #PJM -s
 
-source /vol0004/apps/oss/spack/share/spack/setup-env.sh
+# source /vol0004/apps/oss/spack/share/spack/setup-env.sh
 
 source ~/.bashrc
 
@@ -16,7 +16,7 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/hp190122/u01594/gitrepos/googletes
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64
 
-make -j H2_main
+# make -j H2_main
 make -j H2_dtd
 
 

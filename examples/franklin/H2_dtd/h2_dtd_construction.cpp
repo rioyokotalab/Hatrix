@@ -219,7 +219,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int N = opts.N;
 
   for (int block = 0; block < nblocks; ++block) {
-    const MKL_INT block_size = domain.cell_size(block, A.max_level);
+    MKL_INT block_size = domain.cell_size(block, A.max_level);
 
     for (int j = 0; j < nblocks; ++j) {
       if (exists_and_inadmissible(A, block, j, A.max_level)) { continue; }
@@ -651,22 +651,22 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     int c1 = block * 2;
     int c2 = block * 2 + 1;
 
-     MKL_INT block_size_c1 = domain.cell_size(c1, child_level);
+    MKL_INT block_size_c1 = domain.cell_size(c1, child_level);
     int block_size_c2 = domain.cell_size(c2, child_level);
 
-     MKL_INT rank_c1 = A.ranks(c1, child_level);
+    MKL_INT rank_c1 = A.ranks(c1, child_level);
     int rank_c2 = A.ranks(c2, child_level);
 
-     MKL_INT Utransfer_ncols = A.ranks(block, level);
+    MKL_INT Utransfer_ncols = A.ranks(block, level);
 
-     double ALPHA = 1.0;
-     double BETA = 0.0;
+    double ALPHA = 1.0;
+    double BETA = 0.0;
 
     MKL_INT IA = block_size_c1 * c1 + 1;
     MKL_INT JA = 1;
 
     MKL_INT IB = 1; for (int i = 0; i < c1; ++i) { IB += A.ranks(i, child_level); }
-     MKL_INT JB = 1;
+    MKL_INT JB = 1;
 
     MKL_INT IC = block * block_size + 1;
     MKL_INT JC = 1;
