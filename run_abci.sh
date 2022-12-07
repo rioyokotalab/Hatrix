@@ -25,10 +25,10 @@ for adm in 0.8; do
     max_rank=110
 
                         # mpirun -n 4 ./bin/H2_dtd --N $N \
-    for N in 4096; do
+    for N in 131072; do
 	echo "running"
         # mpirun -n 4 -genv I_MPI_DEBUG=10  xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
-            mpirun -n 4 ./bin/H2_dtd --N $N \
+            ./bin/H2_dtd --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \
                --kind_of_geometry grid \

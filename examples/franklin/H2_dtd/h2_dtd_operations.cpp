@@ -523,7 +523,8 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
         std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
         int64_t D_unelim_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
         int64_t D_unelim_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
-        parsec_data_key_t D_unelim_key = parsec_D.super.data_key(&parsec_D.super, i, j, parent_level);
+        parsec_data_key_t D_unelim_key =
+          parsec_D.super.data_key(&parsec_D.super, i, j, parent_level);
 
         int64_t D_unelim_row_rank = A.ranks(i_children[0], level);
         int64_t D_unelim_col_rank = A.ranks(j_children[0], level);
@@ -543,12 +544,14 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               if (!A.is_admissible(c1, c2, level)) {
                 // copy oo portion of the D blocks.
                 copy_dense = true;
-                parsec_data_key_t D_c1c2_key = parsec_D.super.data_key(&parsec_D.super, c1, c2, level);
+                parsec_data_key_t D_c1c2_key =
+                  parsec_D.super.data_key(&parsec_D.super, c1, c2, level);
 
                 parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
                   "copy_blocks_task",
                   sizeof(bool), &copy_dense, PARSEC_VALUE,
-                  PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key), PARSEC_INOUT | arena_D(i, j, parent_level) | PARSEC_AFFINITY,
+                  PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key),
+                                       PARSEC_INOUT | arena_D(i, j, parent_level) | PARSEC_AFFINITY,
                   sizeof(int64_t), &D_unelim_rows, PARSEC_VALUE,
                   sizeof(int64_t), &D_unelim_cols, PARSEC_VALUE,
                   sizeof(int64_t), &D_unelim_row_rank, PARSEC_VALUE,
@@ -613,6 +616,26 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
   parsec_dtd_insert_task(dtd_tp, task_multiply_full_complement, 0, PARSEC_DEV_CPU,
     "multiply_full_complement_task",
     sizeof(bool), &left, PARSEC_VALUE,
+    PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
+                         PARSEC_INOUT | arena_D(block, block, level) | PARSEC_AFFINITY,
+    sizeof(int64_t), &D_nrows, PARSEC_VALUE,
+    sizeof(int64_t), &D_ncols, PARSEC_VALUE,
+    PASSED_BY_REF, U_tile, PARSEC_INPUT | arena_U(block, level),
+    sizeof(int64_t), &U_nrows, PARSEC_VALUE,
+    sizeof(int64_t), &U_ncols, PARSEC_VALUE,
+    PARSEC_DTD_ARG_END);
+
+
+  for (int64_t j = 0; j < block; ++j) {
+    parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement, 0, PARSEC_DEV_CPU,
+                           "multiply_complement_left_task",
+                           PARSEC_DTD_ARG_END);
+  }
+
+  left = false;
+  parsec_dtd_insert_task(dtd_tp, task_multiply_full_complement, 0, PARSEC_DEV_CPU,
+    "multiply_full_complement_task",
+    sizeof(bool), &left, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key), PARSEC_INOUT | arena_D(block, block, level) | PARSEC_AFFINITY,
     sizeof(int64_t), &D_nrows, PARSEC_VALUE,
     sizeof(int64_t), &D_ncols, PARSEC_VALUE,
@@ -622,30 +645,11 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
     PARSEC_DTD_ARG_END);
 
 
-  // for (int64_t j = 0; j < block; ++j) {
-  //   parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement, 0, PARSEC_DEV_CPU,
-  //                          "multiply_complement_left_task",
-  //                          PARSEC_DTD_ARG_END);
-  // }
-
-  // left = false;
-  // parsec_dtd_insert_task(dtd_tp, task_multiply_full_complement, 0, PARSEC_DEV_CPU,
-  //   "multiply_full_complement_task",
-  //   sizeof(bool), &left, PARSEC_VALUE,
-  //   PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key), PARSEC_INOUT | arena_D(block, block, level) | PARSEC_AFFINITY,
-  //   sizeof(int64_t), &D_nrows, PARSEC_VALUE,
-  //   sizeof(int64_t), &D_ncols, PARSEC_VALUE,
-  //   PASSED_BY_REF, U_tile, PARSEC_INPUT | arena_U(block, level),
-  //   sizeof(int64_t), &U_nrows, PARSEC_VALUE,
-  //   sizeof(int64_t), &U_ncols, PARSEC_VALUE,
-  //   PARSEC_DTD_ARG_END);
-
-
-  // for (int64_t i = block+1; i < nblocks; ++i) {
-  //   parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement, 0, PARSEC_DEV_CPU,
-  //                          "multiply_complement_left_task",
-  //                          PARSEC_DTD_ARG_END);
-  // }
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement, 0, PARSEC_DEV_CPU,
+                           "multiply_complement_left_task",
+                           PARSEC_DTD_ARG_END);
+  }
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
@@ -1130,9 +1134,9 @@ factorize_level(SymmetricSharedBasisMatrix& A,
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
     multiply_complements(A, domain, block, level);
-    // factorize_diagonal(A, domain, block, level);
-    // triangle_reduction(A, domain, block, level);
-    // compute_schurs_complement(A, domain, block, level);
+    factorize_diagonal(A, domain, block, level);
+    triangle_reduction(A, domain, block, level);
+    compute_schurs_complement(A, domain, block, level);
   }
 }
 
@@ -1277,22 +1281,21 @@ void factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatr
   preallocate_blocks(A);
   update_parsec_pointers(A, domain, A.max_level);
 
-  for (level = A.max_level; level >= A.max_level; --level) {
+  for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, F, r, t, opts);
-    // update_parsec_pointers(A, domain, level-1);
-    // merge_unfactorized_blocks(A, domain, level);
+    update_parsec_pointers(A, domain, level-1);
+    merge_unfactorized_blocks(A, domain, level);
   }
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
 
-
   int rc = parsec_dtd_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
 
-  // h2_dc_destroy_maps();
-  // h2_destroy_arenas(A.max_level, A.min_level);
+  h2_dc_destroy_maps();
+  h2_destroy_arenas(A.max_level, A.min_level);
 }
 
 void solve(SymmetricSharedBasisMatrix& A, std::vector<Matrix>& x, std::vector<Matrix>& h2_solution) {

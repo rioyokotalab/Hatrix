@@ -117,7 +117,7 @@ int main (int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = 1;                // TODO: why does this not with multiple cores?
+  int cores = 40;                // TODO: why does this not with multiple cores?
 
   Args opts(argc, argv);
 
@@ -300,32 +300,40 @@ int main (int argc, char **argv) {
   omp_set_num_threads(1);
 #endif
 
+
+  auto start_factorize = std::chrono::system_clock::now();
   factorize(A, domain, opts);
+  auto stop_factorize = std::chrono::system_clock::now();
+  double factorize_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_factorize - start_factorize).count();
 //   // solve(A, x, h2_solution);
 
   parsec_context_wait(parsec);
   parsec_taskpool_free( dtd_tp );
   parsec_fini(&parsec);
+
+
+  Hatrix::Context::finalize();
+
+  if (!MPIRANK) {
+    std::cout << "----------------------------\n";
+    std::cout << "N               : " << opts.N << std::endl;
+    std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+    std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+    std::cout << "ADMIS           : " << opts.admis << std::endl;
+    std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+    std::cout << "NPROCS          : " << MPISIZE << std::endl;
+    std::cout << "NLEAF           : " << opts.nleaf << "\n"
+              << "CONSTRUCT ERROR : " << construction_error << std::endl
+              << "Contruct(ms)    : " << construct_time << std::endl
+              << "Factorize (ms)  : " << factorize_time
+              << "\n";
+    std::cout << "----------------------------\n";
+  }
+
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);
-
   MPI_Finalize();
-
-//   Hatrix::Context::finalize();
-
-//   if (!MPIRANK) {
-//     std::cout << "----------------------------\n";
-//     std::cout << "N               : " << opts.N << std::endl;
-//     std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-//     std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-//     std::cout << "ADMIS           : " << opts.admis << std::endl;
-//     std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-//     std::cout << "NPROCS          : " << MPISIZE << std::endl;
-//     std::cout << "NLEAF           : " << opts.nleaf << "\n"
-//               << "CONSTRUCT ERROR : " << construction_error << std::endl
-//               << "Contruct(ms)    : " << construct_time << "\n";
-//     std::cout << "----------------------------\n";
-//   }
 
   delete[] DENSE_MEM;
 
