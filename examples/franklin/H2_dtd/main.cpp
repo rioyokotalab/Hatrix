@@ -117,7 +117,7 @@ int main (int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = 40;                // TODO: why does this not with multiple cores?
+  int cores = 32;                // TODO: why does this not with multiple cores?
 
   Args opts(argc, argv);
 
@@ -151,6 +151,7 @@ int main (int argc, char **argv) {
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
 
+  std::cout << "before construction.\n";
   int64_t construct_max_rank;
   SymmetricSharedBasisMatrix A;
 
@@ -168,13 +169,15 @@ int main (int argc, char **argv) {
 
   descinit_(DENSE.data(), &N, &N, &DENSE_NBROW, &DENSE_NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
-  DENSE_MEM = new double[DENSE_local_rows * DENSE_local_cols];
+  DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
+
+  std::cout << "begin generation. nums: " << DENSE_local_rows <<  " " << DENSE_local_cols << std::endl;
 
   // generate the distributed P2P matrix.
 #pragma omp parallel for
-  for (int i = 0; i < DENSE_local_rows; ++i) {
+  for (int64_t i = 0; i < DENSE_local_rows; ++i) {
 #pragma omp parallel for
-    for (int j = 0; j < DENSE_local_cols; ++j) {
+    for (int64_t j = 0; j < DENSE_local_cols; ++j) {
       int g_row = indxl2g(i + 1, DENSE_NBROW, MYROW, ZERO, MPIGRID[0]) - 1;
       int g_col = indxl2g(j + 1, DENSE_NBCOL, MYCOL, ZERO, MPIGRID[1]) - 1;
 
@@ -283,10 +286,12 @@ int main (int argc, char **argv) {
     printf("Cannot initialize PaRSEC\n");
     exit(-1);
   }
-  rc = parsec_context_start( parsec );
-  PARSEC_CHECK_ERROR(rc, "parsec_context_start");
+
   dtd_tp = parsec_dtd_taskpool_new();
   rc = parsec_context_add_taskpool( parsec, dtd_tp );
+
+  rc = parsec_context_start( parsec );
+  PARSEC_CHECK_ERROR(rc, "parsec_context_start");
 
   std::vector<Matrix> h2_solution;
   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
@@ -300,9 +305,10 @@ int main (int argc, char **argv) {
   omp_set_num_threads(1);
 #endif
 
+  std::cout << "factor begin:\n";
 
   auto start_factorize = std::chrono::system_clock::now();
-  factorize(A, domain, opts);
+  auto fp_ops = factorize(A, domain, opts);
   auto stop_factorize = std::chrono::system_clock::now();
   double factorize_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factorize - start_factorize).count();
@@ -311,7 +317,6 @@ int main (int argc, char **argv) {
   parsec_context_wait(parsec);
   parsec_taskpool_free( dtd_tp );
   parsec_fini(&parsec);
-
 
   Hatrix::Context::finalize();
 
@@ -326,9 +331,15 @@ int main (int argc, char **argv) {
     std::cout << "NLEAF           : " << opts.nleaf << "\n"
               << "CONSTRUCT ERROR : " << construction_error << std::endl
               << "Contruct(ms)    : " << construct_time << std::endl
-              << "Factorize (ms)  : " << factorize_time
+              << "Factorize (ms)  : " << factorize_time << std::endl
+              << "PAPI FP OPS     : " << fp_ops
               << "\n";
     std::cout << "----------------------------\n";
+    // std::cout << "RESULT: " << opts.N << "," << opts.accuracy << "," << opts.max_rank
+    //           << "," << opts.admis << "," << construct_max_rank << "," << opts.nleaf
+    //           << "," << MPISIZE
+    //           << "," << construction_error <<  "," << construct_time  << "," << factorize_time
+    //           << "," << fp_ops << std::endl;
   }
 
   Cblacs_gridexit(BLACS_CONTEXT);

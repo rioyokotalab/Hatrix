@@ -2,6 +2,7 @@
 
 #include "parsec.h"
 
+
 #include <vector>
 
 extern "C" {
@@ -76,8 +77,8 @@ extern "C" {
                    const int* desca, double* work);
 
 
-  // scalapack copying routines
-  // https://netlib.org/scalapack/slug/node164.html
+//   // scalapack copying routines
+//   // https://netlib.org/scalapack/slug/node164.html
 }
 
 // translate global indices to local indices. INDXGLOB is the global index for the

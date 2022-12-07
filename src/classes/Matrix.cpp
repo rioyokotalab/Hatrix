@@ -33,7 +33,8 @@ Matrix::~Matrix() {
   }
 }
 
-Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
+Matrix::Matrix(const Matrix& A) :
+  rows(A.rows), cols(A.cols) {
   if (A.is_view) {
     is_view = true;
     stride = A.stride;

@@ -92,7 +92,8 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
     bool all_dense = true;
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
-        if (A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) {
+        if ((A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) ||
+            !A.is_admissible.exists(i, j, l)) {
           all_dense = false;
         }
       }
@@ -836,9 +837,11 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A,
   descinit_(AY, &N, &P, &DENSE_NBROW, &NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &AY_local_rows, &info);
 
-  RAND_MEM = (double*)calloc(RAND_local_rows * RAND_local_cols,
+  // std::cout << "rand alloc.\n";
+  RAND_MEM = (double*)calloc(int64_t(RAND_local_rows) * int64_t(RAND_local_cols),
                              sizeof(double));
-  AY_MEM = (double*)calloc(AY_local_rows * AY_local_cols,
+  // std::cout << "ay alloc.\n";
+  AY_MEM = (double*)calloc(int64_t(AY_local_rows) * int64_t(AY_local_cols),
                            sizeof(double));
 
   // seed with the rank to prevent the same sequence on every proc.
@@ -846,9 +849,9 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A,
   std::uniform_real_distribution<double> dist(0.0, 1.0);
 
 #pragma omp parallel for
-  for (int i = 0; i < RAND_local_rows; ++i) {
+  for (int64_t i = 0; i < RAND_local_rows; ++i) {
 #pragma omp parallel for
-    for (int j = 0; j < RAND_local_cols; ++j) {
+    for (int64_t j = 0; j < RAND_local_cols; ++j) {
       RAND_MEM[i + j * RAND_local_rows] = dist(gen);
     }
   }

@@ -353,7 +353,8 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
           auto D_i_block_splits = A.D(i, block, level).split(
                                               {},
                                               std::vector<int64_t>(1,
-                                                                   A.D(i, block, level).cols - A.ranks(block, level)));
+                                                                   A.D(i, block, level).cols -
+                                                                   A.ranks(block, level)));
 
           auto D_block_j_splits = split_dense(A.D(block, j, level),
                                               A.D(block, j, level).rows - A.ranks(block, level),
@@ -370,15 +371,6 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
             F.insert(i, j, level, std::move(projected_fill_in));
           }
         }
-      }
-    }
-  }
-
-  // rank * b sized fill-in
-  for (int i = 0; i < block; ++i) {
-    for (int j = block+1; j < nblocks; ++j) {
-      if (exists_and_admissible(A, i, j, level)) {
-
       }
     }
   }
@@ -771,8 +763,11 @@ factorize_level(SymmetricSharedBasisMatrix& A,
   } // for (int block = 0; block < nblocks; ++block)
 }
 
-void
+long long int
 factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
+  Hatrix::profiling::PAPI papi;
+  papi.add_fp_ops(0);
+  papi.start();
   RowColLevelMap<Matrix> F;
   int64_t level;
 
@@ -886,11 +881,15 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
           syrk(A.D(i, d, level), A.D(i, j, level), Hatrix::Lower, false, -1.0, 1.0);
         }
         else {
-          matmul(A.D(i, d, level), A.D(j, d, level), A.D(i, j, level), false, true, -1.0, 1.0);
+          matmul(A.D(i, d, level), A.D(j, d, level),
+                 A.D(i, j, level), false, true, -1.0, 1.0);
         }
       }
     }
   }
+
+  auto fp_ops = papi.fp_ops();
+  return fp_ops;
 }
 
 void

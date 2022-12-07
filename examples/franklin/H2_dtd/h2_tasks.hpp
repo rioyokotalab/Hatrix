@@ -29,3 +29,9 @@ task_partial_matmul(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
 task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_nb_nb_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_nb_rank_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task);

@@ -1,4 +1,4 @@
-include $(TOPSRCDIR)/make.abci.inc
+include $(TOPSRCDIR)/make.macos.inc
 
 OBJECTS := $(subst .cpp,.o,$(SOURCES))
 

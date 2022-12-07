@@ -27,7 +27,7 @@ compute_schurs_complement(Hatrix::SymmetricSharedBasisMatrix& A, int64_t block, 
 void
 merge_unfactorized_blocks(Hatrix::SymmetricSharedBasisMatrix& A, int64_t level);
 
-void factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts);
+long long int factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts);
 Hatrix::Matrix solve(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x);
 
 int64_t

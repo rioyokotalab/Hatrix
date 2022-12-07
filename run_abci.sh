@@ -9,26 +9,31 @@
 source ~/.bashrc
 
 module purge
-module load intel-mpi/2021.5 gcc/11.2.0 intel-mkl/2022.0.0 cmake/3.22.3
+module load intel-mpi/2021.5 gcc intel-mkl/2022.0.0 cmake/3.22.3
 
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/acb10922qh/gitrepos/parsec/build/lib64/pkgconfig:/home/acb10922qh/gitrepos/googletest/build/lib64/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/lib64
 
+# put in bash_profile for remote MPI processes.
+# ulimit -c unlimited             # does not pass to remote child processes.
+
 export OMP_PLACES=cores
+export OMP_NUM_THREADS=1
 
 make -j H2_dtd
 
 
 for adm in 0.8; do
-    nleaf=512
-    ndim=2
-    max_rank=110
+    nleaf=1024
+    ndim=3
+    max_rank=250
 
-                        # mpirun -n 4 ./bin/H2_dtd --N $N \
-    for N in 131072; do
+    for N in 32768 65536 131072; do
 	echo "running"
         # mpirun -n 4 -genv I_MPI_DEBUG=10  xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
-            ./bin/H2_dtd --N $N \
+            # mpirun -n 1  -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
+            # mpirun -n 1 -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
+            mpirun -n 1 ./bin/H2_dtd --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \
                --kind_of_geometry grid \

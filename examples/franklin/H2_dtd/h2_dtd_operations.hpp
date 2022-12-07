@@ -38,7 +38,7 @@ matmul(Hatrix::SymmetricSharedBasisMatrix& A,
        std::vector<Hatrix::Matrix>& x,
        std::vector<Hatrix::Matrix>& b);
 
-void
+long long int
 factorize(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::Args& opts);
 
 void
