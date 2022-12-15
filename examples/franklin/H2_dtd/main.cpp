@@ -311,8 +311,9 @@ int main (int argc, char **argv) {
   auto fp_ops = factorize(A, domain, opts);
   auto stop_factorize = std::chrono::system_clock::now();
   double factorize_time = std::chrono::duration_cast<
-    std::chrono::milliseconds>(stop_factorize - start_factorize).count();
-//   // solve(A, x, h2_solution);
+    std::chrono::milliseconds>(stop_factorize -
+                               start_factorize).count();
+  solve(A, x, h2_solution);
 
   parsec_context_wait(parsec);
   parsec_taskpool_free( dtd_tp );

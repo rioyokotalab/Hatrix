@@ -289,7 +289,8 @@ matmul(SymmetricSharedBasisMatrix& A,
   // Apply V leaf basis nodes.
   for (int i = 0; i < nblocks_per_proc; i += 1) {
     int index = i * MPISIZE + MPIRANK;
-    x_hat.push_back(matmul(A.U(index, A.max_level), x[i], true, false, 1.0));
+    x_hat.push_back(matmul(A.U(index, A.max_level), x[i],
+                           true, false, 1.0));
   }
 
   // Apply V transfer nodes.
@@ -328,13 +329,14 @@ matmul(SymmetricSharedBasisMatrix& A,
         MPI_Status status;
         MPI_Irecv(&x_temp(0, 0), x_hat_c1_nrows, MPI_DOUBLE, proc_c1,
                   c1, MPI_COMM_WORLD, &c1_request);
-        MPI_Irecv(&x_temp(x_hat_c1_nrows, 0), x_hat_c2_nrows, MPI_DOUBLE, proc_c2,
-                  c2, MPI_COMM_WORLD, &c2_request);
+        MPI_Irecv(&x_temp(x_hat_c1_nrows, 0), x_hat_c2_nrows,
+                  MPI_DOUBLE, proc_c2, c2, MPI_COMM_WORLD, &c2_request);
 
         MPI_Wait(&c1_request, &status);
         MPI_Wait(&c2_request, &status);
 
-        x_hat.push_back(matmul(A.U(block, level), x_temp, true, false, 1.0));
+        x_hat.push_back(matmul(A.U(block, level), x_temp,
+                               true, false, 1.0));
       }
     }
     x_hat_offset += ceil(pow(2, child_level) / double(MPISIZE));
@@ -385,15 +387,16 @@ matmul(SymmetricSharedBasisMatrix& A,
 
       if (p_block == MPIRANK) {
         MPI_Request r1, r2;
-        Matrix Ub = matmul(A.U(block, level), b_hat[b_hat_offset + index]);
+        Matrix Ub =
+          matmul(A.U(block, level), b_hat[b_hat_offset + index]);
         Ub_array[Ub_index] = Ub;
 
         Matrix& Ub_ref = Ub_array[Ub_index];
 
-        MPI_Isend(&Ub_ref(0,0), c1_block_size, MPI_DOUBLE, p_c1, c1, MPI_COMM_WORLD, &r1);
-        MPI_Isend(&Ub_ref(c1_block_size, 0), c2_block_size, MPI_DOUBLE, p_c2, c2,
-                  MPI_COMM_WORLD, &r2);
-
+        MPI_Isend(&Ub_ref(0,0), c1_block_size, MPI_DOUBLE,
+                  p_c1, c1, MPI_COMM_WORLD, &r1);
+        MPI_Isend(&Ub_ref(c1_block_size, 0), c2_block_size, MPI_DOUBLE,
+                  p_c2, c2, MPI_COMM_WORLD, &r2);
         Ub_index++;
       }
     }
@@ -413,7 +416,8 @@ matmul(SymmetricSharedBasisMatrix& A,
         Matrix b_hat_c1(c1_block_size, 1);
         MPI_Status status;
 
-        MPI_Recv(&b_hat_c1, c1_block_size, MPI_DOUBLE, p_block, c1, MPI_COMM_WORLD, &status);
+        MPI_Recv(&b_hat_c1, c1_block_size, MPI_DOUBLE,
+                 p_block, c1, MPI_COMM_WORLD, &status);
         b_hat.push_back(b_hat_c1);
       }
 
@@ -421,7 +425,8 @@ matmul(SymmetricSharedBasisMatrix& A,
         Matrix b_hat_c2(c2_block_size, 1);
         MPI_Status status;
 
-        MPI_Recv(&b_hat_c2, c2_block_size, MPI_DOUBLE, p_block, c2, MPI_COMM_WORLD, &status);
+        MPI_Recv(&b_hat_c2, c2_block_size, MPI_DOUBLE,
+                 p_block, c2, MPI_COMM_WORLD, &status);
         b_hat.push_back(b_hat_c2);
       }
     }
@@ -430,7 +435,8 @@ matmul(SymmetricSharedBasisMatrix& A,
     if (nblocks_per_proc == 0 && MPIRANK < pow(2, level)) {
       nblocks_per_proc = 1;
     }
-    multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset + nblocks_per_proc, child_level);
+    multiply_S(A, x_hat, b_hat, x_hat_offset,
+               b_hat_offset + nblocks_per_proc, child_level);
 
     b_hat_offset += nblocks_per_proc;
   }
@@ -1461,8 +1467,52 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   return fp_ops;
 }
 
-void solve(SymmetricSharedBasisMatrix& A, std::vector<Matrix>& x,
-           std::vector<Matrix>& h2_solution) {
-  std::vector<Matrix> b(x);
+void
+solve_forward_level(SymmetricSharedBasisMatrix& A,
+                    std::vector<Matrix>& x_level,
+                    int64_t level) {
+  int64_t nblocks = pow(2, level);
 
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t block_index = block / MPISIZE;
+    if (mpi_rank(block) == MPIRANK) {
+      Matrix U_F = make_complement(A.U(block_index, level));
+      Matrix prod = matmul(U_F, x_level[block_index]);
+      x_level[block_index] = prod;
+    }
+  }
+}
+
+std::vector<Matrix>
+permute_forward_and_copy(SymmetricSharedBasisMatrix& A,
+                         std::vector<Matrix>& x_level,
+                         int64_t level) {
+
+}
+
+void
+solve(SymmetricSharedBasisMatrix& A, std::vector<Matrix>& b,
+           std::vector<Matrix>& h2_solution) {
+  std::vector<Matrix> x(b);
+  int64_t level;
+
+  std::vector<Matrix> x_level(x);
+
+  for (level = A.max_level; level >= A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
+
+    // partial forward solve.
+    solve_forward_level(A, x_level, level);
+
+    // permute and copy.
+    x_level = permute_forward_and_copy(A, x_level, level);
+  }
+
+  // forward of the last blocks
+
+  // backward of the last blocks
+
+  for (; level <= A.max_level; ++level) {
+    int64_t nblocks = pow(2, level);
+  }
 }
