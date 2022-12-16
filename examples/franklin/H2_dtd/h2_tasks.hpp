@@ -22,6 +22,9 @@ parsec_hook_return_t
 task_partial_trsm(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
+task_partial_trsm_self_block(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
 task_partial_syrk(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t

@@ -69,12 +69,39 @@ task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task)
                               D_nrows - rank_nrows);
 
   cholesky(D_splits[0], Hatrix::Lower);
+  solve_triangular(D_splits[0], D_splits[2], Hatrix::Right, Hatrix::Lower,
+                   false, true, 1.0);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
 
 parsec_hook_return_t
 task_multiply_partial_complement(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_partial_trsm_self_block(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_rows, D_cols, D_row_rank, D_col_rank;
+  double *_diagonal;
+  Hatrix::Side side;
+  Hatrix::Mode uplo;
+  bool unit_diag, trans_A;
+  int64_t split_index;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_rows, &D_cols, &D_row_rank, &D_col_rank, &_diagonal,
+                         &side, &uplo, &unit_diag, &trans_A, &split_index);
+
+  MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
+
+  auto diagonal_splits = split_dense(diagonal,
+                                     D_rows - D_row_rank,
+                                     D_cols - D_col_rank);
+
+  solve_triangular(diagonal_splits[0], diagonal_splits[split_index], side, uplo,
+                   unit_diag, trans_A, 1.0);
+
   return PARSEC_HOOK_RETURN_DONE;
 }
 

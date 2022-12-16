@@ -113,7 +113,7 @@ dist_norm2(std::vector<Matrix>& x) {
 }
 
 
-int main (int argc, char **argv) {
+int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
@@ -171,7 +171,8 @@ int main (int argc, char **argv) {
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
   DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
 
-  std::cout << "begin generation. nums: " << DENSE_local_rows <<  " " << DENSE_local_cols << std::endl;
+  std::cout << "begin generation. nums: " << DENSE_local_rows <<  " "
+            << DENSE_local_cols << std::endl;
 
   // generate the distributed P2P matrix.
 #pragma omp parallel for
@@ -313,7 +314,7 @@ int main (int argc, char **argv) {
   double factorize_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factorize -
                                start_factorize).count();
-  solve(A, x, h2_solution);
+  // solve(A, x, h2_solution);
 
   parsec_context_wait(parsec);
   parsec_taskpool_free( dtd_tp );
