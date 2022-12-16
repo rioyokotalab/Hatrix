@@ -1210,11 +1210,11 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    // multiply_complements(A, domain, block, level);
+    multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
-    // compute_schurs_complement(A, domain, block, level);
-    // compute_fill_ins(A, domain, block, level);
+    compute_schurs_complement(A, domain, block, level);
+    compute_fill_ins(A, domain, block, level);
   }
 }
 
