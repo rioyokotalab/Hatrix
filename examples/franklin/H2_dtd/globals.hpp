@@ -54,6 +54,11 @@ extern "C" {
                double *BETA, double *Y, int *IY, int *JY, int *DESCY,
                int *INCY);
 
+  // Unpivoted QR. A is replaced with elementary reflectors of A.
+  void pdgeqrf_(const int* m, const int* n,
+                double* a, const int* ia, const int* ja, const int* desca,
+                double* tau, double* work, const int* lwork, int* info);
+
   // Pivoted QR. A is replaced with elementary reflectors of A.
   void	pdgeqpf_(const int* m, const int* n, double* a, const int* ia,
                  const int* ja, const int* desca, int* ipiv, double* tau,
@@ -71,10 +76,32 @@ extern "C" {
                  double *b, const int *ib, const int *jb, const int *descb,
                  const int *ictxt);
 
+  // Copy triangular matrix A to B. Works across MPI contexts.
+  void pdtrmr2d_(const char *uplo, const char *diag, const int *m, const int *n,
+               const double *a, const int *ia, const int *ja, const int *desca,
+               double *b, const int *ib, const int *jb, const int *descb,
+               const int *ictxt);
+
   // frobenius norm
   double pdlange_(const char* norm, const int* m, const int* n,
                    const double* a, const int* ia, const int* ja,
                    const int* desca, double* work);
+
+  // cholesky
+  void pdpotrf_(const char* uplo, const int* n, double* a,
+                const int* ia, const int* ja, const int* desca,
+                int* info);
+
+  void pdtrsm_(const char *side, const char *uplo, const char *transa, const char *diag,
+               const int *m, const int *n, const double *alpha,
+               const double *a, const int *ia, const int *ja, const int *desca,
+               double *b, const int *ib, const int *jb, const int *descb );
+
+  void pdgesvd_(const char* jobu, const char* jobvt,
+                const int* m, const int* n, const double* a, const int* ia, const int* ja,
+                const int* desca, double* s, double* u, const int* iu, const int* ju,
+                const int* descu, double* vt, const int* ivt, const int* jvt,
+                const int* descvt, double* work, const int* lwork, int* info);
 
 
 //   // scalapack copying routines

@@ -7,7 +7,7 @@
 namespace Hatrix {
   typedef struct SymmetricSharedBasisMatrix {
     int64_t min_level, max_level;
-    ColLevelMap U;
+    ColLevelMap U, US;
     RowColLevelMap<Matrix> D, S;
     RowColLevelMap<bool> is_admissible;
     RowColMap<int64_t> ranks;

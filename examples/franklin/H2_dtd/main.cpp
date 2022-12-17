@@ -112,12 +112,50 @@ dist_norm2(std::vector<Matrix>& x) {
   return sqrt(sum_squares);
 }
 
+static std::vector<Matrix>
+cholesky_solve(SymmetricSharedBasisMatrix& A,
+               Args& opts,
+               std::vector<double>& X_mem, std::vector<int>& DESCX) {
+  std::vector<Matrix> dense_solution;
+  for (int64_t block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
+    dense_solution.push_back(Matrix(opts.nleaf, 1));
+  }
+
+  const char UPLO = 'L';
+  int IA = 1, JA = 1;
+  int info;
+
+  pdpotrf_(&UPLO, &N, DENSE_MEM, &IA, &JA, DENSE.data(), &info);
+
+  const char SIDE = 'L';
+  const char DIAG = 'N';
+  const double ALPHA = 1.0;
+  int IB = 1;
+  int JB = 1;
+
+  // x_mem = L^(-1) * x_mem
+  pdtrsm_(&SIDE, &UPLO, &NOTRANS, &DIAG,
+          &N, &ONE, &ALPHA,
+          DENSE_MEM, &IA, &JA, DENSE.data(),
+          X_mem.data(), &IB, &JB, DESCX.data());
+
+  // x_mem = L.T^(-1) * x_mem
+  pdtrsm_(&SIDE, &UPLO, &TRANS, &DIAG,
+          &N, &ONE, &ALPHA,
+          DENSE_MEM, &IA, &JA, DENSE.data(),
+          X_mem.data(), &IB, &JB, DESCX.data());
+
+  redistribute_scalapack2vector(dense_solution, X_mem, A, opts);
+
+  return dense_solution;
+}
+
 
 int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = 2;                // TODO: why does this not with multiple cores?
+  int cores = -1;                // TODO: why does this not with multiple cores?
 
   Args opts(argc, argv);
 
@@ -221,14 +259,14 @@ int main(int argc, char **argv) {
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
 
   std::mt19937 gen(MPIRANK);
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
+  std::uniform_real_distribution<double> dist(10, 1000);
   for (int block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
     int numel = domain.cell_size(block, A.max_level);
     int index = block / MPISIZE;
 
     for (int i = 0; i < numel; ++i) {
       int g_row = block * numel + i + 1;
-      double value = dist(gen) * 1000;
+      double value = dist(gen);
 
       int l_row = indxg2l(g_row, DENSE_NBROW, MPIGRID[0]) - 1;
       int l_col = 0;
@@ -280,7 +318,7 @@ int main(int argc, char **argv) {
 
   // ---- BEGIN PARSEC ----
 
-    /* Initializing parsec context */
+  /* Initializing parsec context */
   int parsec_argc = argc - opts.num_args;
   parsec = parsec_init( cores, NULL, NULL);
   if( NULL == parsec ) {
@@ -303,8 +341,10 @@ int main(int argc, char **argv) {
 
 #ifdef USE_MKL
   mkl_set_num_threads(1);
-  omp_set_num_threads(1);
 #endif
+  int max_threads = omp_get_max_threads();
+
+  omp_set_num_threads(1);
 
   std::cout << "factor begin:\n";
 
@@ -318,7 +358,21 @@ int main(int argc, char **argv) {
   parsec_context_wait(parsec);
   parsec_taskpool_free( dtd_tp );
 
-  solve(A, x, h2_solution, domain);
+  omp_set_num_threads(max_threads);
+
+  solve(A, x, h2_solution, domain); // h2_solution = H2_A^(-1) * x
+
+  descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
+            &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
+  auto dense_solution = cholesky_solve(A, opts, X_mem, DESCX);             // dense_solution = dense_A^(-1) * x_mem
+
+  std::vector<Matrix> solve_diff;
+  for (int i = 0; i < x.size(); ++i) {
+    solve_diff.push_back(h2_solution[i] - dense_solution[i]);
+  }
+
+  double solve_diff_norm = dist_norm2(solve_diff);
+  double solve_error = solve_diff_norm / opts.N;
 
   parsec_fini(&parsec);
 
@@ -335,6 +389,7 @@ int main(int argc, char **argv) {
     std::cout << "NPROCS          : " << MPISIZE << std::endl;
     std::cout << "NLEAF           : " << opts.nleaf << "\n"
               << "CONSTRUCT ERROR : " << construction_error << std::endl
+              << "SOLVE ERROR     : " << solve_error << std::endl
               << "Contruct(ms)    : " << construct_time << std::endl
               << "Factorize (ms)  : " << factorize_time << std::endl
               << "PAPI FP OPS     : " << fp_ops

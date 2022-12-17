@@ -105,17 +105,114 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
     }
   }
 
-  A.min_level++;
+  if (A.max_level != A.min_level) { A.min_level++; }
+
+  // make this BLR2
+  for (int level = A.max_level - 1; level >= A.min_level; --level) {
+    int nblocks = pow(2, level);
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        if (A.is_admissible.exists(i, j, level)) {
+          A.is_admissible.erase(i, j, level);
+        }
+      }
+    }
+  }
+
+  // remove stuff from max_level and put it in level 1
+  int nblocks = pow(2, A.max_level);
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      if (!A.is_admissible.exists(i, j, A.max_level)) {
+        A.is_admissible.insert(i, j, A.max_level, true);
+      }
+    }
+  }
+
+  // set max_level-1 to fully dense so that you can merge blocks into this level.
+  nblocks = pow(2, A.max_level - 1);
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      A.is_admissible.insert(i, j, A.max_level-1, false);
+    }
+  }
+
+  A.min_level = A.max_level;
 }
+
+void
+generate_US_block(SymmetricSharedBasisMatrix& A,
+                  double *ROOT_MEM, int *ROOT,
+                  std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
+                  int IA, int JA, int block_size, int block, int level) {
+
+  // Copy the upper triangular slice of AY_MEM into R_TEMP_MEM that corresponds
+  // to the R block after application of pdgeqpf.
+
+  char uplo = 'U';              // upper triangle
+  char diag = 'N';              // copy the diagonal
+  pdtrmr2d_(&uplo, &diag, &block_size, &P,
+            ROOT_MEM, &IA, &JA, ROOT,
+            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+            &BLACS_CONTEXT);
+
+  std::vector<double> TAU(AY_local_cols);
+  std::vector<double> WORK(1);
+  int info;
+
+  pdgeqrf_(&block_size, &P,
+           R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+           TAU.data(), WORK.data(), &MINUS_ONE, &info); // workspace query
+  int LWORK = WORK[0];
+  WORK.resize(LWORK);
+
+  pdgeqrf_(&block_size, &P,
+           R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+           TAU.data(), WORK.data(), &LWORK, &info); // obtain R on the upper right triangle.
+
+  int IMAP[1];
+  IMAP[0] = mpi_rank(block);
+
+  int NODE_CONTEXT;
+  Cblacs_get(-1, 0, &NODE_CONTEXT);
+  Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
+
+  int S_block[9];
+  int S_nrows = 0, S_ncols = 0;
+  int rank = A.ranks(block, level);
+  if (mpi_rank(block) == MPIRANK) {
+    S_nrows = rank;
+    S_ncols = rank;
+  }
+
+  Matrix US(S_nrows, S_ncols);
+  int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
+  Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
+  descset_(S_block, &rank, &rank, &rank, &rank,
+           &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &rank, &info);
+
+  pdtrmr2d_(&uplo, &diag, &rank, &rank,
+            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+            &US, &ONE, &ONE, S_block,
+            &BLACS_CONTEXT);
+
+  if (mpi_rank(block) == MPIRANK) {
+    A.US.insert(block, level, std::move(US));
+  }
+}
+
 
 Matrix Ut_r;
 // perform distributed pivoted QR on A and return the rank subject to accuracy
 // on all processes.
 int
-pivoted_QR(double* A, int M, int N,
+pivoted_QR(SymmetricSharedBasisMatrix& H2_A,
+           double* A, int M, int N,
            int local_rows_A, int local_cols_A,
            int IA, int JA, int MB, int NB,
-           int* DESCA, double accuracy) {
+           int* DESCA, double accuracy,
+           std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
+           int64_t block, int64_t level) {
   std::vector<int> IPIV(local_cols_A);
   std::vector<double> TAU(local_cols_A);
   std::vector<double> WORK(1);
@@ -176,6 +273,13 @@ pivoted_QR(double* A, int M, int N,
     if (eig <= accuracy) { break; }
     rank++;
   }
+
+  int mov_rank = rank;
+  H2_A.ranks.insert(block, level, std::move(mov_rank));
+
+  generate_US_block(H2_A, A, DESCA,
+                    R_TEMP_MEM, R_TEMP,
+                    IA, JA, M, block, level);
 
   // obtain orthogonal factors
   pdorgqr_(&M, &min_MN, &min_MN,
@@ -242,14 +346,17 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
               RAND_MEM, &IB, &JB, RAND,
               &BETA,
               AY_MEM, &IC, &JC, AY);
-
     }
   }
+
+  std::vector<double> R_TEMP_MEM(int64_t(AY_local_rows) * int64_t(AY_local_cols));
+  std::vector<int> R_TEMP(9);
+  descinit_(R_TEMP.data(), &N, &P, &DENSE_NBROW, &NBCOL, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &AY_local_rows, &info);
 
   // generate column bases from the randomized blocks.
   for (int block = 0; block < nblocks; ++block) {
     int block_size = domain.cell_size(block, A.max_level);
-
     int IA = block_size * block + 1;
     int JA = 1;
 
@@ -315,6 +422,10 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       if (eig <= opts.accuracy) { break; }
       rank++;
     }
+    // ranks are stored in all processes.
+    A.ranks.insert(block, A.max_level, std::move(rank));
+
+    generate_US_block(A, AY_MEM, AY, R_TEMP_MEM, R_TEMP, IA, JA, block_size, block, A.max_level);
 
     // obtain orthogonal factors
     pdorgqr_(&block_size, &P, &P,
@@ -361,10 +472,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       A.U.insert(block, A.max_level,
                  std::move(U));
     }
-
-    // ranks are stored in all processes.
-    A.ranks.insert(block, A.max_level, std::move(rank));
-  }
+  } // for (int block = 0; block < nblocks; ++block)
 
   std::vector<int> comm_world_ranks(MPISIZE);
   comm_world_ranks[0] = 0;
@@ -459,7 +567,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
         }
       }
     }
-  }
+  } // for (int i = 0; i < nblocks; ++i)
 }
 
 std::tuple<std::vector<int>, std::vector<double>>
@@ -510,9 +618,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   int MB = rank_total / child_nblocks;
   int Utransfer_local_rows = numroc_(&rank_total, &MB, &MYROW, &ZERO, &MPIGRID[0]);
   int Utransfer_local_cols = numroc_(&P, &NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
-  std::vector<double> Utransfer_mem(Utransfer_local_rows * Utransfer_local_cols);
+  std::vector<double> Utransfer_mem(int64_t(Utransfer_local_rows) * int64_t(Utransfer_local_cols));
 
   descinit_(Utransfer.data(), &rank_total, &P, &MB, &NBCOL, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &Utransfer_local_rows, &info);
+
+  std::vector<double> R_TEMP_MEM(int64_t(Utransfer_local_rows) * int64_t(Utransfer_local_cols));
+  std::vector<int> R_TEMP(9);
+  descinit_(R_TEMP.data(), &rank_total, &P, &MB, &NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &Utransfer_local_rows, &info);
 
   std::mt19937 gen(0);
@@ -579,12 +692,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
         IA += A.ranks(c1_i, child_level) + A.ranks(c2_i, child_level);
       }
 
-      int qr_rank = pivoted_QR(Utransfer_mem.data(),
+      int qr_rank = pivoted_QR(A, Utransfer_mem.data(),
                                Utransfer_nrows, P,
                                Utransfer_local_rows, Utransfer_local_cols,
                                IA, ONE,
                                MB, NBCOL,
-                               Utransfer.data(), opts.accuracy);
+                               Utransfer.data(), opts.accuracy,
+                               R_TEMP_MEM, R_TEMP, block, level);
 
       // copy the transfer matrix into the RowLevel map for use with parsec.
       int IMAP[1];
@@ -620,14 +734,15 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
       if (mpi_rank(block) == MPIRANK) {
         A.U.insert(block, level, std::move(U));
       }
-
-      A.ranks.insert(block, level, std::move(qr_rank));
     } // if row_has_admissible_blocks
     else {
       int rank = std::max(A.ranks(c1, child_level), A.ranks(c2, child_level));
       if (mpi_rank(block) == MPIRANK) {
-        A.U.insert(block, level, generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
-                                                          rank));
+        A.U.insert(block, level,
+                   generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
+                                            rank));
+        A.US.insert(block, level,
+                    generate_identity_matrix(rank, rank));
       }
       A.ranks.insert(block, level, std::move(rank));
     }
