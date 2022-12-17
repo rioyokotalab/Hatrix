@@ -76,6 +76,16 @@ extern "C" {
                    const double* a, const int* ia, const int* ja,
                    const int* desca, double* work);
 
+  // cholesky
+  void pdpotrf_(const char* uplo, const int* n, double* a,
+                const int* ia, const int* ja, const int* desca,
+                int* info);
+
+  void pdtrsm_(const char *side, const char *uplo, const char *transa, const char *diag,
+               const int *m, const int *n, const double *alpha,
+               const double *a, const int *ia, const int *ja, const int *desca,
+               double *b, const int *ib, const int *jb, const int *descb );
+
 
 //   // scalapack copying routines
 //   // https://netlib.org/scalapack/slug/node164.html

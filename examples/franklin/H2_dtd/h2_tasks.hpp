@@ -13,16 +13,19 @@ parsec_hook_return_t
 task_multiply_full_complement(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
-task_multiply_partial_complement(parsec_execution_stream_t* es, parsec_task_t* this_task);
+task_multiply_partial_complement_left(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_multiply_partial_complement_right(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
 task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
-task_partial_trsm(parsec_execution_stream_t* es, parsec_task_t* this_task);
+task_trsm_co(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
-task_partial_trsm_self_block(parsec_execution_stream_t* es, parsec_task_t* this_task);
+task_trsm_cc_oc(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
 task_partial_syrk(parsec_execution_stream_t* es, parsec_task_t* this_task);
@@ -38,3 +41,15 @@ task_nb_nb_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
 task_nb_rank_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_cholesky_full(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_solve_triangular_full(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_syrk_full(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_matmul_full(parsec_execution_stream_t* es, parsec_task_t* this_task);

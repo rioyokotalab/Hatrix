@@ -105,7 +105,7 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
     }
   }
 
-  A.min_level++;
+  if (A.max_level != A.min_level) { A.min_level++; }
 }
 
 Matrix Ut_r;

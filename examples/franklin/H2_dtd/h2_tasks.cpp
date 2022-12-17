@@ -32,13 +32,88 @@ public:
 };
 
 parsec_hook_return_t
+task_cholesky_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_nrows, D_ncols;
+  double *_D;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_nrows, &D_ncols,
+                         &_D);
+
+  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+
+  cholesky(D, Hatrix::Lower);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_solve_triangular_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_dd_nrows, D_dd_ncols;
+  double *_D_dd;
+  int64_t D_id_nrows, D_id_ncols;
+  double *_D_id;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_dd_nrows, &D_dd_ncols, &_D_dd,
+                         &D_id_nrows, &D_id_ncols, &_D_id);
+
+  MatrixWrapper D_dd(_D_dd, D_dd_nrows, D_dd_ncols, D_dd_nrows);
+  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
+
+  solve_triangular(D_dd, D_id, Hatrix::Right, Hatrix::Lower, false, true, 1.0);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_syrk_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_id_nrows, D_id_ncols;
+  double *_D_id;
+  int64_t D_ij_nrows, D_ij_ncols;
+  double *_D_ij;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_id_nrows, &D_id_ncols, &_D_id,
+                         &D_ij_nrows, &D_ij_ncols, &_D_ij);
+
+  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
+  MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
+
+  syrk(D_id, D_ij, Hatrix::Lower, false, -1.0, 1.0);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_matmul_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_id_nrows, D_id_ncols;
+  double *_D_id;
+  int64_t D_jd_nrows, D_jd_ncols;
+  double *_D_jd;
+  int64_t D_ij_nrows, D_ij_ncols;
+  double *_D_ij;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_id_nrows, &D_id_ncols, &_D_id,
+                         &D_jd_nrows, &D_jd_ncols, &_D_jd,
+                         &D_ij_nrows, &D_ij_ncols, &_D_ij);
+
+  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
+  MatrixWrapper D_jd(_D_jd, D_jd_nrows, D_jd_ncols, D_jd_nrows);
+  MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
+
+  matmul(D_id, D_jd, D_ij, false, true, -1.0, 1.0);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
 task_multiply_full_complement(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  bool left;
   int64_t D_nrows, D_ncols, U_nrows, U_ncols;
   double *_D, *_U;
 
   parsec_dtd_unpack_args(this_task,
-                         &left,
                          &_D,
                          &D_nrows, &D_ncols,
                          &_U,
@@ -48,7 +123,7 @@ task_multiply_full_complement(parsec_execution_stream_t* es, parsec_task_t* this
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
   Matrix UF = make_complement(U);
-  Matrix product = left ? matmul(UF, D, true) : matmul(D, UF);
+  Matrix product = matmul(matmul(UF, D, true), UF);
 
   D.copy_mem(product);
 
@@ -76,50 +151,59 @@ task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task)
 }
 
 parsec_hook_return_t
-task_multiply_partial_complement(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
-task_partial_trsm_self_block(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_rows, D_cols, D_row_rank, D_col_rank;
-  double *_diagonal;
-  Hatrix::Side side;
-  Hatrix::Mode uplo;
-  bool unit_diag, trans_A;
-  int64_t split_index;
+task_multiply_partial_complement_left(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_nrows, D_ncols, D_col_rank;
+  double *_D;
+  int64_t U_nrows, U_ncols;
+  double *_U;
 
   parsec_dtd_unpack_args(this_task,
-                         &D_rows, &D_cols, &D_row_rank, &D_col_rank, &_diagonal,
-                         &side, &uplo, &unit_diag, &trans_A, &split_index);
+                         &D_nrows, &D_ncols, &D_col_rank, &_D,
+                         &U_nrows, &U_ncols, &_U);
 
-  MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
+  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
-  auto diagonal_splits = split_dense(diagonal,
-                                     D_rows - D_row_rank,
-                                     D_cols - D_col_rank);
+  Matrix U_F = make_complement(U);
 
-  solve_triangular(diagonal_splits[0], diagonal_splits[split_index], side, uplo,
-                   unit_diag, trans_A, 1.0);
+  auto D_splits = D.split({},
+                          std::vector<int64_t>(1, D_ncols - D_col_rank));
+  D_splits[1] = matmul(U_F, D_splits[1], true);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
 
+parsec_hook_return_t
+task_multiply_partial_complement_right(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_nrows, D_ncols, D_row_rank;
+  double *_D;
+  int64_t U_nrows, U_ncols;
+  double *_U;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_nrows, &D_ncols, &D_row_rank, &_D,
+                         &U_nrows, &U_ncols, &_U);
+
+  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
+
+  Matrix U_F = make_complement(U);
+  auto D_splits = D.split(std::vector<int64_t>(1, D_nrows - D_row_rank), {});
+
+  D_splits[1] = matmul(D_splits[1], U_F);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
 
 parsec_hook_return_t
-task_partial_trsm(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+task_trsm_co(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t D_rows, D_cols, D_row_rank, D_col_rank;
   int64_t O_rows, O_cols, O_row_rank, O_col_rank;
   double *_diagonal, *_other;
-  Hatrix::Side side;
-  Hatrix::Mode uplo;
-  bool unit_diag, trans_A;
-  int64_t split_index;
 
   parsec_dtd_unpack_args(this_task,
                          &D_rows, &D_cols, &D_row_rank, &D_col_rank, &_diagonal,
-                         &O_rows, &O_cols, &O_row_rank, &O_col_rank, &_other,
-                         &side, &uplo, &unit_diag, &trans_A, &split_index);
+                         &O_rows, &O_cols, &O_row_rank, &O_col_rank, &_other);
 
   MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
   MatrixWrapper other(_other, O_rows, O_cols, O_rows);
@@ -131,8 +215,36 @@ task_partial_trsm(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                                   O_rows - O_row_rank,
                                   O_cols - O_col_rank);
 
-  solve_triangular(diagonal_splits[0], other_splits[split_index], side, uplo,
-                   unit_diag, trans_A, 1.0);
+  solve_triangular(diagonal_splits[0], other_splits[1], Hatrix::Left, Hatrix::Lower,
+                   false, false, 1.0);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_trsm_cc_oc(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_rows, D_cols, D_row_rank, D_col_rank;
+  int64_t O_rows, O_cols, O_row_rank, O_col_rank;
+  double *_diagonal, *_other;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_rows, &D_cols, &D_row_rank, &D_col_rank, &_diagonal,
+                         &O_rows, &O_cols, &O_row_rank, &O_col_rank, &_other);
+
+  MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
+  MatrixWrapper other(_other, O_rows, O_cols, O_rows);
+
+  auto diagonal_splits = split_dense(diagonal,
+                                     D_rows - D_row_rank,
+                                     D_cols - D_col_rank);
+  auto other_splits = split_dense(other,
+                                  O_rows - O_row_rank,
+                                  O_cols - O_col_rank);
+
+  solve_triangular(diagonal_splits[0], other_splits[0], Hatrix::Right, Hatrix::Lower,
+                   false, true, 1.0);
+  solve_triangular(diagonal_splits[0], other_splits[2], Hatrix::Right, Hatrix::Lower,
+                   false, true, 1.0);
 
   return PARSEC_HOOK_RETURN_DONE;
 }

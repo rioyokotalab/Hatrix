@@ -987,18 +987,18 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     // apply the tranpose of the oc block that is actually in the lower triangle.
     for (int64_t icol = 0; icol < block; ++icol) {
       if (exists_and_inadmissible(A, block, icol, level)) {
-        const Matrix& D_icol_block = A.D(block, icol, level);
-        const int64_t row_split = D_icol_block.rows - A.ranks(block, level);
-        const int64_t col_split = D_icol_block.cols - A.ranks(icol, level);
+        const Matrix& D_block_icol = A.D(block, icol, level);
+        const int64_t row_split = D_block_icol.rows - A.ranks(block, level);
+        const int64_t col_split = D_block_icol.cols - A.ranks(icol, level);
 
-        auto D_icol_block_splits = split_dense(D_icol_block, row_split, col_split);
+        auto D_block_icol_splits = split_dense(D_block_icol, row_split, col_split);
 
         Matrix x_block(x_level_split[block], true), x_icol(x_level_split[icol], true);
         auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split),
                                             {});
         auto x_icol_splits = x_icol.split(std::vector<int64_t>(1, col_split),
                                           {});
-        matmul(D_icol_block_splits[2], x_block_splits[1], x_icol_splits[0],
+        matmul(D_block_icol_splits[2], x_block_splits[1], x_icol_splits[0],
                true, false, -1.0, 1.0);
         x_level_split[icol] = x_icol;
       }
@@ -1148,6 +1148,7 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
     for (int64_t i = 0; i < x_level.rows; ++i) {
       x(level_offset + i, 0) = x_level(i, 0);
     }
+
 
     level_offset = permute_forward(A, x, level, level_offset);
   }
