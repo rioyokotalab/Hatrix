@@ -230,6 +230,8 @@ task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   double *_D_c1c2;
   int64_t D_c1c2_rows, D_c1c2_cols, D_c1c2_row_rank, D_c1c2_col_rank;
   int D_unelim_split_index;
+  // sleep(0.1);
+
 
   parsec_dtd_unpack_args(this_task, &copy_dense,
                          &_D_unelim,

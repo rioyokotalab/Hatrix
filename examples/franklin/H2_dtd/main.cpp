@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = 32;                // TODO: why does this not with multiple cores?
+  int cores = 2;                // TODO: why does this not with multiple cores?
 
   Args opts(argc, argv);
 
