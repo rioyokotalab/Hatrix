@@ -2,7 +2,7 @@ BLAS_INCLUDE = -DMKL_LP64 -m64 -I${MKLROOT}/include -DUSE_MKL
 BLAS_LIB     = ${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a \
              -Wl,--start-group ${MKLROOT}/lib/intel64/libmkl_intel_lp64.a \
              ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a \
-             ${MKLROOT}/lib/intel64/libmkl_blacs_openmpi_lp64.a -Wl,--end-group -lgomp
+             ${MKLROOT}/lib/intel64/libmkl_blacs_openmpi_lp64.a -Wl,--end-group -lgomp \
              -lpthread -lm -ldl
 PAPI_INCLUDE = -DHATRIX_ENABLE_PAPI $(shell pkg-config --cflags papi)
 PAPI_LIBS    = $(shell pkg-config --libs papi)
