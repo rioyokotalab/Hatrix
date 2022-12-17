@@ -1524,6 +1524,7 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
 void
 solve_forward_level(SymmetricSharedBasisMatrix& A,
                     std::vector<Matrix>& x_level,
+                    const Hatrix::Domain& domain,
                     int64_t level) {
   int64_t nblocks = pow(2, level);
 
@@ -1534,6 +1535,23 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
       Matrix prod = matmul(U_F, x_level[block_index]);
       x_level[block_index] = prod;
     }
+
+    // forward substitution with the CC and OC blocks on the diagonal dense block.
+
+    // send the diagonal block to the
+    if (mpi_rank(block, block) == MPIRANK) {
+      MPI_Request block_request;
+      MPI_Isend(&A.D(block, block, level), A.D(block, block, level).numel(), MPI_DOUBLE,
+                mpi_rank(block), block, MPI_COMM_WORLD, &block_request);
+    }
+
+    if (mpi_rank(block) == MPIRANK) {
+      MPI_Status block_status;
+      Matrix D_copy(get_dim(A, domain, block, level), get_dim(A, domain, block, level));
+
+      MPI_Recv(&D_copy, D_copy.numel(), MPI_DOUBLE,
+               mpi_rank(block, block), block, MPI_COMM_WORLD, &block_status);
+    }
   }
 }
 
@@ -1542,11 +1560,14 @@ permute_forward_and_copy(SymmetricSharedBasisMatrix& A,
                          std::vector<Matrix>& x_level,
                          int64_t level) {
 
+  return x_level;
 }
 
 void
-solve(SymmetricSharedBasisMatrix& A, std::vector<Matrix>& b,
-           std::vector<Matrix>& h2_solution) {
+solve(SymmetricSharedBasisMatrix& A,
+      std::vector<Matrix>& b,
+      std::vector<Matrix>& h2_solution,
+      const Hatrix::Domain& domain) {
   std::vector<Matrix> x(b);
   int64_t level;
 
@@ -1556,7 +1577,7 @@ solve(SymmetricSharedBasisMatrix& A, std::vector<Matrix>& b,
     int64_t nblocks = pow(2, level);
 
     // partial forward solve.
-    solve_forward_level(A, x_level, level);
+    solve_forward_level(A, x_level, domain, level);
 
     // permute and copy.
     x_level = permute_forward_and_copy(A, x_level, level);

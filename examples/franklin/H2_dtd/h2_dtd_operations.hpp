@@ -43,7 +43,9 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const H
 
 void
 solve(Hatrix::SymmetricSharedBasisMatrix& A,
-      std::vector<Hatrix::Matrix>& x, std::vector<Hatrix::Matrix>& h2_solution);
+      std::vector<Hatrix::Matrix>& x,
+      std::vector<Hatrix::Matrix>& h2_solution,
+      const Hatrix::Domain& domain);
 
 void
 multiply_complements(Hatrix::SymmetricSharedBasisMatrix& A,

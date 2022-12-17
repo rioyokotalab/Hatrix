@@ -299,7 +299,7 @@ int main(int argc, char **argv) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
 
-//   // auto A_test = dense_cholesky_test(A, domain, opts);
+  // auto A_test = dense_cholesky_test(A, domain, opts);
 
 #ifdef USE_MKL
   mkl_set_num_threads(1);
@@ -314,11 +314,14 @@ int main(int argc, char **argv) {
   double factorize_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factorize -
                                start_factorize).count();
-  // solve(A, x, h2_solution);
 
   parsec_context_wait(parsec);
   parsec_taskpool_free( dtd_tp );
+
+  solve(A, x, h2_solution, domain);
+
   parsec_fini(&parsec);
+
 
   Hatrix::Context::finalize();
 
