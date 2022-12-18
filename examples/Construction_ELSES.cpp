@@ -448,7 +448,7 @@ void SymmetricH2::write_JSON(const Domain& domain,
 
 int main(int argc, char ** argv) {
   const std::string file_name = argc > 1 ? std::string(argv[1]) : "";
-  const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
+  int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-8;
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
   const double admis = argc > 5 ? atof(argv[5]) : 3;
@@ -511,9 +511,10 @@ int main(int argc, char ** argv) {
 
   Hatrix::Domain domain(0, 3);
   if (read_sorted_bodies == 1) {
-    const auto buckets = domain.read_bodies_ELSES_sorted(file_name + "_kmeans" +
-                                                         std::to_string(leaf_size) + ".xyz");
+    geom_name = file_name + "_" + std::to_string(leaf_size);
+    const auto buckets = domain.read_bodies_ELSES_sorted(geom_name + ".xyz");
     domain.build_tree_from_kmeans_ordering(leaf_size, buckets);
+    leaf_size = *(std::max_element(buckets.begin(), buckets.end()));
   }
   else {
     domain.read_bodies_ELSES(file_name + ".xyz");
@@ -536,7 +537,7 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   double construct_error = A.construction_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
-  A.print_structure(A.height);
+  // A.print_structure(A.height);
 
   if (out_filename.length() > 0) {
     A.write_JSON(domain, out_filename);
