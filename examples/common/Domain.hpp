@@ -956,10 +956,10 @@ class Domain {
           cell.body_offset = count;
           cell.nbodies = buckets[node];
           count += buckets[node];
-          std::cout << "Creating leaf cell-" << level_offset + node << ":\n"
-                    << "\tfrom buckets[" << node << "]=" << buckets[node] << "\n"
-                    << "\tbody_offset=" << cell.body_offset << "\n"
-                    << "\tnbodies=" << cell.nbodies << "\n";
+          // std::cout << "Creating leaf cell-" << level_offset + node << ":\n"
+          //           << "\tfrom buckets[" << node << "]=" << buckets[node] << "\n"
+          //           << "\tbody_offset=" << cell.body_offset << "\n"
+          //           << "\tnbodies=" << cell.nbodies << "\n";
         }
         else {
           // Construct non-leaf nodes from adjacent lower nodes
@@ -974,10 +974,10 @@ class Domain {
           // Set parent
           child1.parent = level_offset + node;
           child2.parent = level_offset + node;
-          std::cout << "Creating non-leaf cell-" << level_offset + node << ":\n"
-                    << "\tusing cell-" << child1_idx << " and cell-" << child2_idx << "\n"
-                    << "\tbody_offset=" << cell.body_offset << "\n"
-                    << "\tnbodies=" << cell.nbodies << "\n";
+          // std::cout << "Creating non-leaf cell-" << level_offset + node << ":\n"
+          //           << "\tusing cell-" << child1_idx << " and cell-" << child2_idx << "\n"
+          //           << "\tbody_offset=" << cell.body_offset << "\n"
+          //           << "\tnbodies=" << cell.nbodies << "\n";
         }
         // Calculate cell center and radius
         for (int64_t axis = 0; axis < ndim; axis++) {
@@ -988,18 +988,18 @@ class Domain {
           cell.center[axis] = Xsum / (double)cell.nbodies;
           cell.radius[axis] = diam / 2.;
         }
-        std::cout << "\tcenter=(";
-        for (int64_t axis = 0; axis < ndim; axis++) {
-          if (axis > 0) std::cout << ",";
-          std::cout << cell.center[axis];
-        }
-        std::cout << ")\n";
-        std::cout << "\tradius=(";
-        for (int64_t axis = 0; axis < ndim; axis++) {
-          if (axis > 0) std::cout << ",";
-          std::cout << cell.radius[axis];
-        }
-        std::cout << ")\n";
+        // std::cout << "\tcenter=(";
+        // for (int64_t axis = 0; axis < ndim; axis++) {
+        //   if (axis > 0) std::cout << ",";
+        //   std::cout << cell.center[axis];
+        // }
+        // std::cout << ")\n";
+        // std::cout << "\tradius=(";
+        // for (int64_t axis = 0; axis < ndim; axis++) {
+        //   if (axis > 0) std::cout << ",";
+        //   std::cout << cell.radius[axis];
+        // }
+        // std::cout << ")\n";
       }
     }
     cells[0].parent = -1; //  Root has no parent
