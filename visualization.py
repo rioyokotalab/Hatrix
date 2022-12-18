@@ -123,7 +123,7 @@ def plot_lowrank(node, gs_node):
     ax.bar(np.arange(len(slog)), slog-ylow, width=1, color=yrpink)
 
 
-def plot_lowrank_patches(node, gs_node, dim, has_color=True):
+def plot_lowrank_patches(node, gs_node, dim, has_color=False):
     level = node['level']
     ax = plt.subplot(gs_node)
     ax.set(xticks=[], yticks=[])
@@ -150,9 +150,9 @@ def plot_lowrank_patches(node, gs_node, dim, has_color=True):
         facecolor=color
     )
     # Add the patch to the Axes
-    ax.add_patch(U)
+    # ax.add_patch(U)
     ax.add_patch(S)
-    ax.add_patch(V)
+    # ax.add_patch(V)
 
 
 def plot_lowrank_shared_patches(node, gs_node, dim, has_color=True):
@@ -201,7 +201,7 @@ def plot_dense(node, gs_node):
     ax.bar(np.arange(len(slog)), slog-ylow, width=1, color=yrblue)
 
 
-def plot_dense_patch(node, gs_node, has_color=True, ul=None):
+def plot_dense_patch(node, gs_node, has_color=False, ul=None):
     ax = plt.subplot(gs_node)
     ax.set(xticks=[], yticks=[])
     color = yrblue if has_color else "grey"
