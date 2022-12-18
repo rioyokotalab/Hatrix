@@ -52,6 +52,8 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A,
                               Lapack::QR_ret qr_ret,
                               bool pivoted=false);
 
+std::vector<double> get_singular_values(Matrix& A);
+
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
