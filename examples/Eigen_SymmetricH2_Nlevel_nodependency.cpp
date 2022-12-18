@@ -20,7 +20,7 @@
 #include "Domain.hpp"
 #include "functions.hpp"
 
-constexpr double EPS = 1e-13;
+constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
 /*
@@ -613,6 +613,7 @@ void SymmetricH2::factorize_level(const int64_t level) {
   const int64_t nblocks = level_blocks[level];
   // Skeleton (o) and Redundancy (c) decomposition
   // Multiply with (U_F)^T from left
+  #pragma omp parallel for
   for (int64_t i = 0; i < nblocks; i++) {
     Matrix U_F = prepend_complement_basis(U(i, level));
     for (int64_t j = 0; j < nblocks; j++) {
@@ -621,6 +622,7 @@ void SymmetricH2::factorize_level(const int64_t level) {
       }
     }
   }
+  #pragma omp parallel for
   // Multiply with U_F from right
   for (int64_t j = 0; j < nblocks; j++) {
     Matrix U_F = prepend_complement_basis(U(j, level));
@@ -630,6 +632,7 @@ void SymmetricH2::factorize_level(const int64_t level) {
       }
     }
   }
+  #pragma omp parallel for
   for (int64_t block = 0; block < nblocks; block++) {
     // The diagonal block is split along the row and column.
     int64_t diag_row_split = D(block, block, level).rows - U(block, level).cols;
@@ -1001,7 +1004,7 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   double construct_error = A.construction_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
-  A.print_structure(A.height);
+  // A.print_structure(A.height);
 
   std::cout << "N=" << N
             << " leaf_size=" << leaf_size
