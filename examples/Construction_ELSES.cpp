@@ -401,10 +401,16 @@ void SymmetricH2::fill_JSON(const Domain& domain,
     if (is_admissible(i, j, level)) {
       json["type"] = "LowRank";
       json["rank"] = U(i, level).cols;
+      const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+      Matrix Dij = generate_p2p_matrix(domain, i, j, node_level);
+      json["svalues"] = get_singular_values(Dij);
     }
     else {
       if (level == height) {
         json["type"] = "Dense";
+        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+        Matrix Dij = generate_p2p_matrix(domain, i, j, node_level);
+        json["svalues"] = get_singular_values(Dij);
       }
       else {
         json["type"] = "Hierarchical";

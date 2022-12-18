@@ -327,6 +327,14 @@ error_pivoted_qr_max_rank(const Matrix& A, double error, int64_t max_rank) {
   return std::make_tuple(std::move(Q), std::move(pivots), rank);
 }
 
+std::vector<double> get_singular_values(Matrix& A) {
+  std::vector<double> Sdiag(A.min_dim());
+  std::vector<double> work(A.max_dim());
+  LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'N', 'N', A.rows, A.cols, &A, A.stride,
+                 Sdiag.data(), work.data(), A.stride, work.data(), A.stride, work.data());
+  return Sdiag;
+}
+
 void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
   // check dimensions
   assert(U.rows == A.rows);
