@@ -906,6 +906,21 @@ class Domain {
     file.close();
   }
 
+  void read_atoms_ELSES(const std::string& file_name) {
+    std::ifstream file;
+    file.open(file_name);
+    file >> N;
+    ndim = 3;
+
+    for(int64_t i = 0; i < N; i++) {
+      int64_t idx;
+      double x, y, z;
+      file >> idx >> x >> y >> z;
+      bodies.emplace_back(Body(x, y, z, (double)idx - 1));
+    }
+    file.close();
+  }
+
   std::vector<int64_t> read_bodies_ELSES_sorted(const std::string& file_name) {
     std::ifstream file;
     file.open(file_name);
