@@ -52,6 +52,7 @@ else()
     LDL_SymmetricH2_Nlevel_nodependency
     Eigen_SymmetricH2_Nlevel_nodependency
     Construction_ELSES
+    Eigen_ELSES
   )
 endif()
 
