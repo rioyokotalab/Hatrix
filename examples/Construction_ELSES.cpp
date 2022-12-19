@@ -543,7 +543,9 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   double construct_error = A.construction_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
-  // A.print_structure(A.height);
+  if (N < 1000) {
+    A.print_structure(A.height);
+  }
 
   if (out_filename.length() > 0) {
     A.write_JSON(domain, out_filename);
