@@ -106,7 +106,7 @@ def plot_lowrank(node, gs_node):
     slog = np.log10(svalues[0:count])
 
     ax = plt.subplot(gs_node)
-    ax.text(0.5*count, 0.5, f"{count}", {'fontsize': 'x-small'})
+    ax.text(0.5*count, 0.5, f"{count}", size=16)
     # ax.text(
     #     0.5, 0.5,
     #     "{}\n({}, {})".format(
@@ -184,7 +184,7 @@ def plot_dense(node, gs_node):
     slog = np.log10(svalues[0:count])
 
     ax = plt.subplot(gs_node)
-    ax.text(0.5*count, 0.5, f"{count}", {'fontsize': 'x-small'})
+    ax.text(0.5*count, 0.5, f"{count}", size=16)
     # ax.text(
     #     0.5, 0.5,
     #     "{}\n({}, {})".format(
