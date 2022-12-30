@@ -53,6 +53,7 @@ else()
     Eigen_SymmetricH2_Nlevel_nodependency
     Construction_ELSES
     Eigen_ELSES
+    Eigen_ELSES_nodependency
   )
 endif()
 
