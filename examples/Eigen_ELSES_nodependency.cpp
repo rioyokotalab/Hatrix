@@ -229,22 +229,21 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
         }
       }
     }
-    // ID compress
+    // SVD to get column basis
+    Matrix Ui_temp, Si, Vi;
+    int64_t rank;
+    std::tie(Ui_temp, Si, Vi, rank) = error_svd(block_row, ID_tolerance, use_rel_acc, true);
+    // Truncate to max_rank if exceeded
+    if (max_rank > 0 && rank > max_rank) {
+      rank = max_rank;
+      Ui_temp.shrink(Ui_temp.rows, rank);
+      Si.shrink(rank, rank);
+    }
+    // ID to get skeleton rows
+    Matrix UxS = matmul(Ui_temp, Si);
     Matrix Ui;
     std::vector<int64_t> ipiv_row;
-    std::tie(Ui, ipiv_row) = error_id_row(block_row, ID_tolerance, use_rel_acc);
-    int64_t rank = Ui.cols;
-    if (max_rank > 0 && rank > max_rank) {
-      // Truncate to max_rank
-      Ui.shrink(Ui.rows, max_rank);
-      rank = max_rank;
-    }
-    // Convert ipiv to node skeleton rows to be used by parent
-    std::vector<int64_t> skel_rows;
-    skel_rows.reserve(rank);
-    for (int64_t k = 0; k < rank; k++) {
-      skel_rows.push_back(skeleton[ipiv_row[k]]);
-    }
+    std::tie(Ui, ipiv_row) = truncated_id_row(UxS, rank);
     // Multiply U with child R
     if (level < height) {
       const auto& child1 = domain.cells[cell.child];
@@ -261,6 +260,13 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     Matrix Q(Ui.rows, Ui.cols);
     Matrix R(Ui.cols, Ui.cols);
     qr(Ui, Q, R);
+    // Convert ipiv to node skeleton rows to be used by parent
+    std::vector<int64_t> skel_rows;
+    skel_rows.reserve(rank);
+    for (int64_t k = 0; k < rank; k++) {
+      skel_rows.push_back(skeleton[ipiv_row[k]]);
+    }
+    // Insert
     U.insert(i, level, std::move(Q));
     R_row.insert(i, level, std::move(R));
     skeleton_rows.insert(i, level, std::move(skel_rows));
@@ -973,7 +979,7 @@ int main(int argc, char ** argv) {
             << " sample_self_size=" << sample_self_size
             << " sample_far_size=" << sample_far_size
             << " sample_farfield_max_size=" << domain.get_max_farfield_size()
-            << " compress_alg=" << "ID"
+            << " compress_alg=" << "SVD+ID+QR"
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
