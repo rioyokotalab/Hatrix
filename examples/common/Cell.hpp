@@ -22,6 +22,7 @@ class Cell {
   std::vector<int64_t> near_list;        // Index of cells in near interaction list
   std::vector<int64_t> far_list;         // Index of cells in far interaction list
   std::vector<int64_t> sample_bodies;    // Index of sample bodies representing this cell
+  std::vector<int64_t> sample_nearfield; // Index of sample bodies representing the nearfield
   std::vector<int64_t> sample_farfield;  // Index of sample bodies representing the farfield
 
   Cell() : body_offset(-1), nbodies(0), child(-1),
