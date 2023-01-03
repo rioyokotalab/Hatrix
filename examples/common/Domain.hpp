@@ -453,7 +453,6 @@ class Domain {
 
   void build_interactions(const double theta) {
     dual_tree_traversal(cells[0], cells[0], theta);
-    sort_interaction_lists();
   }
 
   /*
@@ -511,10 +510,19 @@ class Domain {
         }
       }
     }
-    sort_interaction_lists();
   }
 
   void build_sample_bodies(const int64_t sample_self_size,
+                           const int64_t sample_far_size,
+                           const int64_t sampling_algo,
+                           const bool ELSES_GEOM = false) {
+    const auto sample_near_size = sample_far_size;
+    build_sample_bodies(sample_self_size, sample_near_size, sample_far_size,
+                        sampling_algo, ELSES_GEOM);
+  }
+
+  void build_sample_bodies(const int64_t sample_self_size,
+                           const int64_t sample_near_size,
                            const int64_t sample_far_size,
                            const int64_t sampling_algo,
                            const bool ELSES_GEOM = false) {
@@ -543,6 +551,29 @@ class Domain {
         cell.sample_bodies =
             select_sample_bodies(ndim, bodies, initial_sample,
                                  sample_self_size, sampling_algo, 0, ELSES_GEOM);
+      }
+    }
+    // Bottom-upp pass to select cell's nearfield sample
+    for (int64_t level = tree_height; level > 0; level--) {
+      const auto level_ncells = (int64_t)1 << level;
+      const auto level_offset = level_ncells - 1;
+      for (int64_t node = 0; node < level_ncells; node++) {
+        auto& cell = cells[level_offset + node];
+        int64_t near_nbodies = 0;
+        for (const auto near_idx: cell.near_list) {
+          near_nbodies += cells[near_idx].sample_bodies.size();
+        }
+        std::vector<int64_t> initial_sample;
+        initial_sample.reserve(near_nbodies);
+        for (const auto near_idx: cell.near_list) {
+          const auto& near_cell = cells[near_idx];
+          initial_sample.insert(initial_sample.end(),
+                                near_cell.sample_bodies.begin(),
+                                near_cell.sample_bodies.end());
+        }
+        cell.sample_nearfield =
+            select_sample_bodies(ndim, bodies, initial_sample,
+                                 sample_near_size, sampling_algo, 1, ELSES_GEOM);
       }
     }
     // Top-down pass to select cell's farfield sample
@@ -971,10 +1002,7 @@ class Domain {
           cell.body_offset = count;
           cell.nbodies = buckets[node];
           count += buckets[node];
-          // std::cout << "Creating leaf cell-" << level_offset + node << ":\n"
-          //           << "\tfrom buckets[" << node << "]=" << buckets[node] << "\n"
-          //           << "\tbody_offset=" << cell.body_offset << "\n"
-          //           << "\tnbodies=" << cell.nbodies << "\n";
+
         }
         else {
           // Construct non-leaf nodes from adjacent lower nodes
@@ -989,10 +1017,7 @@ class Domain {
           // Set parent
           child1.parent = level_offset + node;
           child2.parent = level_offset + node;
-          // std::cout << "Creating non-leaf cell-" << level_offset + node << ":\n"
-          //           << "\tusing cell-" << child1_idx << " and cell-" << child2_idx << "\n"
-          //           << "\tbody_offset=" << cell.body_offset << "\n"
-          //           << "\tnbodies=" << cell.nbodies << "\n";
+
         }
         // Calculate cell center and radius
         for (int64_t axis = 0; axis < ndim; axis++) {
@@ -1003,18 +1028,6 @@ class Domain {
           cell.center[axis] = Xsum / (double)cell.nbodies;
           cell.radius[axis] = diam / 2.;
         }
-        // std::cout << "\tcenter=(";
-        // for (int64_t axis = 0; axis < ndim; axis++) {
-        //   if (axis > 0) std::cout << ",";
-        //   std::cout << cell.center[axis];
-        // }
-        // std::cout << ")\n";
-        // std::cout << "\tradius=(";
-        // for (int64_t axis = 0; axis < ndim; axis++) {
-        //   if (axis > 0) std::cout << ",";
-        //   std::cout << cell.radius[axis];
-        // }
-        // std::cout << ")\n";
       }
     }
     cells[0].parent = -1; //  Root has no parent
