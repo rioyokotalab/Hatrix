@@ -625,6 +625,27 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
   return std::make_tuple(std::move(interp), std::move(c_pivots), rank);
 }
 
+void id_row(Matrix& U, std::vector<int64_t>& ipiv) {
+  Matrix A(U);
+  std::vector<int> arows(A.min_dim());
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, arows.data());
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasUpper, CblasNoTrans, CblasNonUnit,
+              A.rows, A.cols, 1., &A, A.stride, &U, U.stride);
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasNoTrans, CblasUnit,
+              A.rows, A.cols, 1., &A, A.stride, &U, U.stride);
+  // Convert arows to ipiv_row
+  ipiv.resize(U.rows);
+  for (int64_t k = 0; k < ipiv.size(); k++) {
+    ipiv[k] = k;
+  }
+  for (int64_t j = 0; j < U.cols; j++) {
+    int64_t p = arows[j] - 1;
+    if (p != j) {
+      std::swap(ipiv[j], ipiv[p]);
+    }
+  }
+}
+
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
   Matrix interp(A.rows, rank), pivots(A.cols, 1);
   std::vector<double> tau(std::min(A.rows, A.cols));
