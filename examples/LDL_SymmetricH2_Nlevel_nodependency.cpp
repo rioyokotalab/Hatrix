@@ -489,8 +489,8 @@ void SymmetricH2::factorize_level(const int64_t level) {
     }
     // Schur complement
     Matrix Doc(diagonal_splits[2], true);  // Deep-copy of view
-    column_scale(Doc, Dcc);
-    matmul(Doc, diagonal_splits[2], diagonal_splits[3], false, true, -1.0, 1.0);
+    column_scale(Doc, Dcc); // LD
+    matmul(Doc, diagonal_splits[2], diagonal_splits[3], false, true, -1.0, 1.0); // LDL^T
   }
 }
 
@@ -605,7 +605,7 @@ void SymmetricH2::factorize(const Domain& domain) {
     generate_far_coupling_matrices(domain, level);
     factorize_level(level);
     permute_and_merge(level);
-  } // for (; level > 0; level--)
+  }
 
   // Factorize remaining root level
   ldl(D(0, 0, level));
@@ -755,20 +755,20 @@ void SymmetricH2::solve_backward_level(Matrix& x_level, const int64_t level) con
 
     Matrix x_node(x_level_split[node], true);
     auto x_node_splits = x_node.split(vec{diag_row_split}, vec{});
-    for (int64_t j = 0; j < num_nodes; j++) {
-      if (j != node && is_admissible.exists(j, node, level) && !is_admissible(j, node, level)) {
-        const int64_t row_split = D(j, node, level).rows - U(j, level).cols;
-        Matrix x_j(x_level_split[j], true);  // Deep-copy of view
-        auto x_j_splits = x_j.split(vec{row_split}, vec{});
-        auto D_splits = D(j, node, level).split(vec{row_split}, vec{diag_col_split});
+    for (int64_t i = 0; i < num_nodes; i++) {
+      if (i != node && is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) {
+        const int64_t row_split = D(i, node, level).rows - U(i, level).cols;
+        Matrix x_i(x_level_split[i], true);  // Deep-copy of view
+        auto x_i_splits = x_i.split(vec{row_split}, vec{});
+        auto D_splits = D(i, node, level).split(vec{row_split}, vec{diag_col_split});
         // co block = (oc)^T block
-        matmul(D_splits[2], x_j_splits[1], x_node_splits[0], true, false, -1.0, 1.0);
-        if (j > node) {
+        matmul(D_splits[2], x_i_splits[1], x_node_splits[0], true, false, -1.0, 1.0);
+        if (i > node) {
           // (cc)^T block
-          matmul(D_splits[0], x_j_splits[0], x_node_splits[0], true, false, -1.0, 1.0);
+          matmul(D_splits[0], x_i_splits[0], x_node_splits[0], true, false, -1.0, 1.0);
         }
 
-        x_level_split[j] = x_j;
+        x_level_split[i] = x_i;
       }
     }
     // Solve backward with diagonal L^T
