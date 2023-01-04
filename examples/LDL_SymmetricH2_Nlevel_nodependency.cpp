@@ -60,9 +60,6 @@ class SymmetricH2 {
 
   int64_t get_block_size(const Domain& domain, const int64_t node, const int64_t level) const;
   bool row_has_admissible_blocks(const int64_t row, const int64_t level) const;
-  Matrix get_skeleton(const Matrix& A,
-                      const std::vector<int64_t>& skel_rows,
-                      const std::vector<int64_t>& skel_cols) const;
 
   void generate_row_cluster_basis(const Domain& domain, const int64_t level,
                                   const bool include_fill_in);
@@ -153,18 +150,6 @@ bool SymmetricH2::row_has_admissible_blocks(const int64_t row, const int64_t lev
   return has_admis;
 }
 
-Matrix SymmetricH2::get_skeleton(const Matrix& A,
-                                 const std::vector<int64_t>& skel_rows,
-                                 const std::vector<int64_t>& skel_cols) const {
-  Matrix out(skel_rows.size(), skel_cols.size());
-  for (int64_t i = 0; i < out.rows; i++) {
-    for (int64_t j = 0; j < out.cols; j++) {
-      out(i, j) = A(skel_rows[i], skel_cols[j]);
-    }
-  }
-  return out;
-}
-
 void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
                                              const int64_t level,
                                              const bool include_fill_in) {
@@ -192,24 +177,25 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     }
     const int64_t skeleton_size = skeleton.size();
     const int64_t near_size = cell.sample_nearfield.size();
-    Matrix block_row(skeleton_size, 0);
+    Matrix skeleton_dn(skeleton_size, 0);
+    Matrix skeleton_lr(skeleton_size, 0);
     double norm_dn = 0.;
+    double norm_lr = 0.;
+    // Fill-in (dense) part
     if (include_fill_in && near_size > 0) {
-      // Sample of nearfield blocks
+      // Use sample of nearfield blocks within the same level
       Matrix nearblocks = generate_p2p_matrix(domain, skeleton, cell.sample_nearfield);
-      Matrix F = matmul(nearblocks, nearblocks, false, true);
-      norm_dn = Hatrix::norm(F);
-      block_row = concat(block_row, F, 1);
+      skeleton_dn = concat(skeleton_dn, matmul(nearblocks, nearblocks, false, true), 1);
+      norm_dn = Hatrix::norm(skeleton_dn);
     }
-    // Append low-rank part
+    // Low-rank part
     if (lr_exists) {
-      Matrix farblocks = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
-      if (use_rel_acc && include_fill_in && (near_size > 0)) {
-        const double norm_lr = Hatrix::norm(farblocks);
-        Hatrix::scale(block_row, norm_lr / norm_dn);
-      }
-      block_row = concat(block_row, farblocks, 1);
+      skeleton_lr = concat(skeleton_lr, generate_p2p_matrix(domain, skeleton, cell.sample_farfield), 1);
+      norm_lr = Hatrix::norm(skeleton_lr);
     }
+    const double scale = (norm_dn == 0. || norm_lr == 0.) ? 1. : norm_lr / norm_dn;
+    Hatrix::scale(skeleton_dn, scale);
+    Matrix skeleton_row = concat(skeleton_dn, skeleton_lr, 1);
 
     Matrix Ui;
     int64_t rank;
@@ -217,7 +203,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
 #ifdef SVD_ID_COMPRESSION
     // SVD followed by ID
     Matrix Ui_temp, Si, Vi;
-    std::tie(Ui_temp, Si, Vi, rank) = error_svd(block_row, accuracy, use_rel_acc, true);
+    std::tie(Ui_temp, Si, Vi, rank) = error_svd(skeleton_row, accuracy, use_rel_acc, true);
     // Truncate to max_rank if exceeded
     if (max_rank > 0 && rank > max_rank) {
       rank = max_rank;
@@ -229,7 +215,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     std::tie(Ui, ipiv_row) = truncated_id_row(Ui_temp, rank);
 #else
     // ID-based LR compression
-    std::tie(Ui, ipiv_row) = error_id_row(block_row, ID_tolerance, use_rel_acc);
+    std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, ID_tolerance, use_rel_acc);
     rank = Ui.cols;
     // Truncate to max_rank if exceeded
     if (max_rank > 0 && rank > max_rank) {
