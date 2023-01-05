@@ -702,7 +702,7 @@ void SymmetricH2::solve_forward_level(Matrix& x_level, const int64_t level) cons
         auto D_splits = D(i, node, level).split(vec{row_split}, vec{diag_col_split});
         if (i > node) {
           // cc block
-          matmul(D_splits[0], x_node_splits[0], x_i_splits[0], false, false, -1.0, -1.0);
+          matmul(D_splits[0], x_node_splits[0], x_i_splits[0], false, false, -1.0, 1.0);
         }
         // oc block
         matmul(D_splits[2], x_node_splits[0], x_i_splits[1], false, false, -1.0, 1.0);
