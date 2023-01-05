@@ -49,6 +49,7 @@ else()
     Eigen_SymmetricH2_Nlevel
     UMV_H2_Nlevel
     Construction_SymmetricH2_Nlevel_with_sampling
+    ULV_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency
     Eigen_SymmetricH2_Nlevel_nodependency
     Construction_ELSES
