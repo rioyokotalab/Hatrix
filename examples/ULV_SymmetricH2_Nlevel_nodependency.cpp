@@ -462,62 +462,67 @@ void SymmetricH2::factorize_level(const int64_t level) {
         D(i, k, level) = matmul(UF_i, matmul(D(i, k, level), UF_k), true, false);
       }
     }
-    // Diagonal factorization
-    int64_t diag_row_split = D(k, k, level).rows - U(k, level).cols;
-    int64_t diag_col_split = D(k, k, level).cols - U(k, level).cols;
-    auto diagonal_splits = D(k, k, level).split(vec{diag_row_split}, vec{diag_col_split});
-    Matrix& Dcc = diagonal_splits[0];
-    cholesky(Dcc, Hatrix::Lower);  // Factorization
-    // Lower elimination
+    // Factorization
+    const int64_t diag_row_split = D(k, k, level).rows - U(k, level).cols;
+    const int64_t diag_col_split = D(k, k, level).cols - U(k, level).cols;
+    auto Dkk_splits = D(k, k, level).split(vec{diag_row_split}, vec{diag_col_split});
+    Matrix& Dkk_cc = Dkk_splits[0];
+    Matrix& Dkk_oc = Dkk_splits[2];
+    Matrix& Dkk_oo = Dkk_splits[3];
+    cholesky(Dkk_cc, Hatrix::Lower);
+    // Lower Elimination
     for (int64_t i = 0; i < num_nodes; i++) {
       if (is_admissible.exists(i, k, level) && !is_admissible(i, k, level)) {
-        auto D_splits = D(i, k, level).split(vec{D(i, k, level).rows - U(i, level).cols},
-                                             vec{diag_col_split});
-        solve_triangular(Dcc, D_splits[2], Hatrix::Right, Hatrix::Lower, false, true);
+        auto Dik_splits = D(i, k, level).split(vec{D(i, k, level).rows - U(i, level).cols},
+                                               vec{diag_col_split});
+        Matrix& Dik_cc = Dik_splits[0];
+        Matrix& Dik_oc = Dik_splits[2];
+        solve_triangular(Dkk_cc, Dik_oc, Hatrix::Right, Hatrix::Lower, false, true);
         if (i > k) {
-          solve_triangular(Dcc, D_splits[0], Hatrix::Right, Hatrix::Lower, false, true);
+          solve_triangular(Dkk_cc, Dik_cc, Hatrix::Right, Hatrix::Lower, false, true);
         }
       }
     }
     // Schur Complement
-    Matrix& Doc = diagonal_splits[2];
-    Matrix& Doo = diagonal_splits[3];
-    matmul(Doc, Doc, Doo, false, true, -1.0, 1.0);
+    matmul(Dkk_oc, Dkk_oc, Dkk_oo, false, true, -1, 1);
   }
 }
 
 void SymmetricH2::permute_and_merge(const int64_t level) {
-  if (level == 0) return;
-
-  // Merge oo parts as parent level inadmissible block
+  auto Dchild_oo = [this](const int64_t ic, const int64_t jc, const int64_t child_level) {
+    if (is_admissible.exists(ic, jc, child_level) && is_admissible(ic, jc, child_level)) {
+      // Admissible block, use S block
+      return S(ic, jc, child_level);
+    }
+    else {
+      // Inadmissible block, use oo part of dense block
+      Matrix& Dchild = D(ic, jc, child_level);
+      Matrix& Ui = U(ic, child_level);
+      Matrix& Uj = U(jc, child_level);
+      auto Dchild_splits = Dchild.split(vec{Dchild.rows - Ui.cols},
+                                        vec{Dchild.cols - Uj.cols});
+      return Dchild_splits[3];
+    }
+  };
+  // Merge oo parts of children as parent level near coupling matrices
   if (matrix_type == BLR2_MATRIX) {
     const int64_t num_nodes = level_blocks[level];
     int64_t nrows = 0;
-    std::vector<int64_t> row_splits;
+    std::vector<int64_t> parent_row_splits;
     for (int64_t i = 0; i < num_nodes; i++) {
       nrows += U(i, level).cols;
       if (i < (num_nodes - 1)) {
-        row_splits.push_back(nrows);
+        parent_row_splits.push_back(nrows);
       }
     }
-    Matrix parent_D(nrows, nrows);
-    auto D_splits = parent_D.split(row_splits, row_splits);
-    for (int64_t i = 0; i < num_nodes; i++) {
-      for (int64_t j = 0; j < num_nodes; j++) {
-        if (is_admissible(i, j, level)) {
-          // Admissible block, use S block
-          D_splits[i * num_nodes + j] = S(i, j, level);
-        }
-        else {
-          // Inadmissible block, use oo part of dense block
-          const int64_t row_split = D(i, j, level).rows - U(i, level).cols;
-          const int64_t col_split = D(i, j, level).cols - U(j, level).cols;
-          auto Dij_splits = D(i, j, level).split(vec{row_split}, vec{col_split});
-          D_splits[i * num_nodes + j] = Dij_splits[3]; // Dij_oo
-        }
+    Matrix Dij(nrows, nrows);
+    auto Dij_splits = Dij.split(parent_row_splits, parent_row_splits);
+    for (int64_t ic = 0; ic < num_nodes; ic++) {
+      for (int64_t jc = 0; jc < num_nodes; jc++) {
+        Dij_splits[ic * num_nodes + jc] = Dchild_oo(ic, jc, level);
       }
     }
-    D.insert(0, 0, 0, std::move(parent_D));
+    D.insert(0, 0, 0, std::move(Dij));
   }
   else {
     const auto parent_level = level - 1;
@@ -531,70 +536,14 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
           const auto j_c2 = j * 2 + 1;
           const auto nrows = U(i_c1, level).cols + U(i_c2, level).cols;
           const auto ncols = U(j_c1, level).cols + U(j_c2, level).cols;
-          Matrix parent_D(nrows, ncols);
-          auto D_splits = parent_D.split(vec{U(i_c1, level).cols},
-                                         vec{U(j_c1, level).cols});
-          // Top left: oo part of (i_c1, j_c1, level)
-          if (is_admissible.exists(i_c1, j_c1, level) && is_admissible(i_c1, j_c1, level)) {
-            // Admissible block, use S block
-            D_splits[0] = S(i_c1, j_c1, level);
-          }
-          else {
-            // Inadmissible block, use oo part of dense block
-            Matrix& Dij = D(i_c1, j_c1, level);
-            Matrix& Ui = U(i_c1, level);
-            Matrix& Uj = U(j_c1, level);
-            const int64_t row_split = Dij.rows - Ui.cols;
-            const int64_t col_split = Dij.cols - Uj.cols;
-            auto Dij_splits = Dij.split(vec{row_split}, vec{col_split});
-            D_splits[0] = Dij_splits[3];
-          }
-          // Top right: oo part of (i_c1, j_c2, level)
-          if (is_admissible.exists(i_c1, j_c2, level) && is_admissible(i_c1, j_c2, level)) {
-            // Admissible block, use S block
-            D_splits[1] = S(i_c1, j_c2, level);
-          }
-          else {
-            // Inadmissible block, use oo part of dense block
-            Matrix& Dij = D(i_c1, j_c2, level);
-            Matrix& Ui = U(i_c1, level);
-            Matrix& Uj = U(j_c2, level);
-            const int64_t row_split = Dij.rows - Ui.cols;
-            const int64_t col_split = Dij.cols - Uj.cols;
-            auto Dij_splits = Dij.split(vec{row_split}, vec{col_split});
-            D_splits[1] = Dij_splits[3];
-          }
-          // Bottom left: oo part of (i_c2, j_c1, level)
-          if (is_admissible.exists(i_c2, j_c1, level) && is_admissible(i_c2, j_c1, level)) {
-            // Admissible block, use S block
-            D_splits[2] = S(i_c2, j_c1, level);
-          }
-          else {
-            // Inadmissible block, use oo part of dense block
-            Matrix& Dij = D(i_c2, j_c1, level);
-            Matrix& Ui = U(i_c2, level);
-            Matrix& Uj = U(j_c1, level);
-            const int64_t row_split = Dij.rows - Ui.cols;
-            const int64_t col_split = Dij.cols - Uj.cols;
-            auto Dij_splits = Dij.split(vec{row_split}, vec{col_split});
-            D_splits[2] = Dij_splits[3];
-          }
-          // Bottom right: oo part of (i_c2, j_c2, level)
-          if (is_admissible.exists(i_c2, j_c2, level) && is_admissible(i_c2, j_c2, level)) {
-            // Admissible block, use S block
-            D_splits[3] = S(i_c2, j_c2, level);
-          }
-          else {
-            // Inadmissible block, use oo part of dense block
-            Matrix& Dij = D(i_c2, j_c2, level);
-            Matrix& Ui = U(i_c2, level);
-            Matrix& Uj = U(j_c2, level);
-            const int64_t row_split = Dij.rows - Ui.cols;
-            const int64_t col_split = Dij.cols - Uj.cols;
-            auto Dij_splits = Dij.split(vec{row_split}, vec{col_split});
-            D_splits[3] = Dij_splits[3];
-          }
-          D.insert(i, j, parent_level, std::move(parent_D));
+          Matrix Dij(nrows, ncols);
+          auto Dij_splits = Dij.split(vec{U(i_c1, level).cols},
+                                      vec{U(j_c1, level).cols});
+          Dij_splits[0] = Dchild_oo(i_c1, j_c1, level);  // Dij_cc
+          Dij_splits[1] = Dchild_oo(i_c1, j_c2, level);  // Dij_co
+          Dij_splits[2] = Dchild_oo(i_c2, j_c1, level);  // Dij_oc
+          Dij_splits[3] = Dchild_oo(i_c2, j_c2, level);  // Dij_oo
+          D.insert(i, j, parent_level, std::move(Dij));
         }
       }
     }
