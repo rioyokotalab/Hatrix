@@ -61,7 +61,8 @@ public:
 
   void erase_all();
 };
-template<typename T> using ColMap  = RowMap<T>;
+template<typename T> using ColMap   = RowMap<T>;
+template<typename T> using LevelMap = RowMap<T>;
 using RankMap = RowMap<std::vector<int64_t>>;
 
 template <class T>
