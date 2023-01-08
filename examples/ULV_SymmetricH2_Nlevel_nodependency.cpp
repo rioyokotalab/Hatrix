@@ -165,13 +165,23 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       skeleton = cell.get_bodies();
     }
     else {
-      // Non-leaf level: gather children's multipoles
-      const auto& child1 = domain.cells[cell.child];
-      const auto& child2 = domain.cells[cell.child + 1];
-      const auto& child1_multipoles = multipoles(child1.block_index, child1.level);
-      const auto& child2_multipoles = multipoles(child2.block_index, child2.level);
-      skeleton.insert(skeleton.end(), child1_multipoles.begin(), child1_multipoles.end());
-      skeleton.insert(skeleton.end(), child2_multipoles.begin(), child2_multipoles.end());
+      if (matrix_type == BLR2_MATRIX) {
+        // BLR2 Root: Gather multipoles of all leaf level nodes
+        const auto nleaf_nodes = level_blocks[height];
+        for (int64_t child = 0; child < nleaf_nodes; child++) {
+          const auto& child_multipoles = multipoles(child, height);
+          skeleton.insert(skeleton.end(), child_multipoles.begin(), child_multipoles.end());
+        }
+      }
+      else {
+        // H2 Non-Leaf: Gather children's multipoles
+        const auto& child1 = domain.cells[cell.child];
+        const auto& child2 = domain.cells[cell.child + 1];
+        const auto& child1_multipoles = multipoles(child1.block_index, child1.level);
+        const auto& child2_multipoles = multipoles(child2.block_index, child2.level);
+        skeleton.insert(skeleton.end(), child1_multipoles.begin(), child1_multipoles.end());
+        skeleton.insert(skeleton.end(), child2_multipoles.begin(), child2_multipoles.end());
+      }
     }
     const int64_t skeleton_size = skeleton.size();
     const int64_t near_size = include_fill_in ?
@@ -633,19 +643,41 @@ void SymmetricH2::solve_backward(const int64_t level, RowLevelMap& X,
 
 void SymmetricH2::permute_rhs(const char fwbk, const int64_t level,
                               RowLevelMap& Xo, RowLevelMap& X) const {
-  const auto parent_level = level - 1;
-  const auto parent_num_nodes = level_blocks[parent_level];
-  for (int64_t node = 0; node < parent_num_nodes; node++) {
-    const auto c1 = 2 * node + 0;
-    const auto c2 = 2 * node + 1;
-    auto X_node_splits = X(node, parent_level).split(vec{Xo(c1, level).rows}, vec{});
-    if (fwbk == 'F' || fwbk == 'f') {
-      X_node_splits[0] = Xo(c1, level);
-      X_node_splits[1] = Xo(c2, level);
+  if (matrix_type == BLR2_MATRIX) {
+    const auto nchilds = level_blocks[height];
+    std::vector<int64_t> X_split_indices;
+    int64_t count = 0;
+    for (int64_t c = 0; c < nchilds; c++) {
+      count += Xo(c, height).rows;
+      if (c < (nchilds - 1)) {
+        X_split_indices.push_back(count);
+      }
     }
-    else if (fwbk == 'B' || fwbk == 'b') {
-      Xo(c1, level) = X_node_splits[0];
-      Xo(c2, level) = X_node_splits[1];
+    auto X_node_splits = X(0, 0).split(X_split_indices, vec{});
+    for (int64_t c = 0; c < nchilds; c++) {
+      if (fwbk == 'F' || fwbk == 'f') {
+        X_node_splits[c] = Xo(c, height);
+      }
+      else if (fwbk == 'B' || fwbk == 'b') {
+        Xo(c, height) =  X_node_splits[c];
+      }
+    }
+  }
+  else {
+    const auto parent_level = level - 1;
+    const auto parent_num_nodes = level_blocks[parent_level];
+    for (int64_t node = 0; node < parent_num_nodes; node++) {
+      const auto c1 = 2 * node + 0;
+      const auto c2 = 2 * node + 1;
+      auto X_node_splits = X(node, parent_level).split(vec{Xo(c1, level).rows}, vec{});
+      if (fwbk == 'F' || fwbk == 'f') {
+        X_node_splits[0] = Xo(c1, level);
+        X_node_splits[1] = Xo(c2, level);
+      }
+      else if (fwbk == 'B' || fwbk == 'b') {
+        Xo(c1, level) = X_node_splits[0];
+        Xo(c2, level) = X_node_splits[1];
+      }
     }
   }
 }
@@ -654,7 +686,6 @@ void SymmetricH2::solve(Matrix& b) const {
   RowLevelMap X, Xc, Xo, B;
   std::vector<int64_t> B_split_indices;
 
-  // TODO Handle BLR2 case?
   // Allocate RHS
   for (int64_t level = height; level >= 0; level--) {
     const auto num_nodes = level_blocks[level];
