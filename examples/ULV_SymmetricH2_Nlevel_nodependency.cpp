@@ -199,24 +199,20 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       Hatrix::scale(skeleton_dn, scale);
       Matrix skeleton_row = concat(skeleton_dn, skeleton_lr, 1);
 
-      Matrix Utemp, Ui, Si, Vi;
+      Matrix Ui, Si, Vi;
       int64_t rank;
       std::vector<int64_t> ipiv_row;
       // SVD followed by ID
-      std::tie(Utemp, Si, Vi, rank) = error_svd(skeleton_row, accuracy, use_rel_acc, true);
+      std::tie(Ui, Si, Vi, rank) = error_svd(skeleton_row, accuracy, use_rel_acc, true);
       // Truncate to max_rank if exceeded
       if (max_rank > 0 && rank > max_rank) {
         rank = max_rank;
-        Utemp.shrink(Utemp.rows, rank);
+        Ui.shrink(Ui.rows, rank);
         Si.shrink(rank, rank);
       }
-      if (include_fill_in) {
-        printf("U(%d, %d): ske_len(%d), near_size(%d), far_size(%d), rank(%d)\n",
-               (int)i, (int)level, (int)skeleton_size, (int)near_size, (int)far_size, (int)rank);
-      }
       // ID to get skeleton rows
-      column_scale(Utemp, Si);
-      std::tie(Ui, ipiv_row) = truncated_id_row(Utemp, rank);
+      column_scale(Ui, Si);
+      id_row(Ui, ipiv_row);
       // Multiply U with child R
       if (level < height) {
         const auto& child1 = domain.cells[cell.child];
