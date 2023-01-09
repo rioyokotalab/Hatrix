@@ -23,6 +23,8 @@
 constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
+// #define USE_SVD_COMPRESSION
+
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
  * where every cell has two children. However, we can enforce BLR2 structure by a simple workaround
@@ -57,7 +59,7 @@ class SymmetricH2 {
   int64_t N, leaf_size;
   double accuracy;
   bool use_rel_acc;
-  double ID_tolerance;
+  double err_tol;
   int64_t max_rank;
   double admis;
   int64_t matrix_type;
@@ -85,7 +87,7 @@ class SymmetricH2 {
               const int64_t N, const int64_t leaf_size,
               const double accuracy, const bool use_rel_acc,
               const int64_t max_rank, const double admis,
-              const int64_t matrix_type, const bool build_basis);
+              const int64_t matrix_type, const bool include_fill_in);
 
   int64_t get_basis_min_rank() const;
   int64_t get_basis_max_rank() const;
@@ -198,20 +200,31 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       Hatrix::scale(skeleton_dn, scale);
       Matrix skeleton_row = concat(skeleton_dn, skeleton_lr, 1);
 
-      Matrix Ui, Si, Vi;
+      Matrix Ui;
       int64_t rank;
       std::vector<int64_t> ipiv_row;
-      // SVD followed by ID
-      std::tie(Ui, Si, Vi, rank) = error_svd(skeleton_row, ID_tolerance, use_rel_acc, true);
+#ifdef USE_SVD_COMPRESSION
+      Matrix Stemp, Vtemp;
+      std::tie(Ui, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
       // Truncate to max_rank if exceeded
       if (max_rank > 0 && rank > max_rank) {
         rank = max_rank;
         Ui.shrink(Ui.rows, rank);
-        Si.shrink(rank, rank);
+        Stemp.shrink(rank, rank);
       }
       // ID to get skeleton rows
-      column_scale(Ui, Si);
+      column_scale(Ui, Stemp);
       id_row(Ui, ipiv_row);
+#else
+      // ID Compression
+      std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
+      rank = Ui.cols;
+      // Truncate to max_rank if exceeded
+      if (max_rank > 0 && rank > max_rank) {
+        rank = max_rank;
+        Ui.shrink(Ui.rows, rank);
+      }
+#endif
       // Multiply U with child R
       if (level < height) {
         const auto& child1 = domain.cells[cell.child];
@@ -313,20 +326,17 @@ SymmetricH2::SymmetricH2(const Domain& domain,
                          const int64_t N, const int64_t leaf_size,
                          const double accuracy, const bool use_rel_acc,
                          const int64_t max_rank, const double admis,
-                         const int64_t matrix_type,
-                         const bool build_basis)
+                         const int64_t matrix_type, const bool include_fill_in)
     : N(N), leaf_size(leaf_size), accuracy(accuracy),
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
-  // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
+  // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  ID_tolerance = accuracy * 1e-2;
+  err_tol = accuracy * 1e-2;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
-  if (build_basis) {
-    for (int64_t level = height; level > 0; level--) {
-      generate_row_cluster_basis(domain, level, false);
-      generate_far_coupling_matrices(domain, level);
-    }
+  for (int64_t level = height; level >= 0; level--) {
+    generate_row_cluster_basis(domain, level, include_fill_in);
+    generate_far_coupling_matrices(domain, level);
   }
 }
 
@@ -561,8 +571,6 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
 
 void SymmetricH2::factorize(const Domain& domain) {
   for (int64_t level = height; level >= 0; level--) {
-    generate_row_cluster_basis(domain, level, true);
-    generate_far_coupling_matrices(domain, level);
     factorize_level(level);
     permute_and_merge(level);
   }
@@ -576,26 +584,25 @@ SymmetricH2::inertia(const Domain& domain,
   SymmetricH2 A_shifted(*this);
   // Shift leaf level diagonal blocks
   int64_t leaf_num_nodes = level_blocks[height];
-  for(int64_t k = 0; k < leaf_num_nodes; k++) {
-    shift_diag(A_shifted.D(k, k, height), -lambda);
+  for(int64_t node = 0; node < leaf_num_nodes; node++) {
+    shift_diag(A_shifted.D(node, node, height), -lambda);
   }
   // LDL Factorize
   A_shifted.factorize(domain);
-  // // Gather values in D
+  // Gather values in D
   Matrix D_lambda(0, 0);
   for(int64_t level = height; level >= 0; level--) {
     int64_t num_nodes = level_blocks[level];
-    for(int64_t k = 0; k < num_nodes; k++) {
+    for(int64_t node = 0; node < num_nodes; node++) {
+      Matrix& D_node = A_shifted.D(node, node, level);
       if(level == 0) {
-        D_lambda = concat(D_lambda, diag(A_shifted.D(k, k, level)), 0);
+        D_lambda = concat(D_lambda, diag(D_node), 0);
       }
       else {
-        int64_t rank = A_shifted.U(k, level).cols;
-        int64_t row_split = A_shifted.D(k, k, level).rows - rank;
-        int64_t col_split = A_shifted.D(k, k, level).cols - rank;
-        auto D_splits = A_shifted.D(k, k, level).split(vec{row_split},
-                                                       vec{col_split});
-        D_lambda = concat(D_lambda, diag(D_splits[0]), 0);
+        auto D_node_splits = D_node.split(vec{Uc(node, level).cols},
+                                          vec{Uc(node, level).cols});
+        Matrix& D_node_cc = D_node_splits[0];
+        D_lambda = concat(D_lambda, diag(D_node_cc), 0);
       }
     }
   }
@@ -758,7 +765,7 @@ int main(int argc, char ** argv) {
                              (stop_sample - start_sample).count();
 
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
+  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
@@ -791,7 +798,7 @@ int main(int argc, char ** argv) {
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
 
-  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
+  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
   bool s = false;
   auto b = 10 * (1. / Hatrix::PV);
   auto a = -b;
