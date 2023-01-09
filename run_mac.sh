@@ -13,9 +13,9 @@ ulimit -c unlimited
 make -j H2_main
 make -j H2_dtd
 
-for adm in 0.7; do
+for adm in 0.8; do
     nleaf=256
-    ndim=2
+    ndim=3
     max_rank=200
 
     for N in 8192; do

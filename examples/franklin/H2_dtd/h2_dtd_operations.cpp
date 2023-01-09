@@ -1267,7 +1267,7 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
     compute_schurs_complement(A, domain, block, level);
-    // compute_fill_ins(A, domain, block, level);
+    compute_fill_ins(A, domain, block, level);
   }
 }
 
@@ -1497,7 +1497,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
   }
 
 
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
 
 void h2_dc_init_maps() {
