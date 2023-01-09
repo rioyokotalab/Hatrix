@@ -348,7 +348,7 @@ int64_t SymmetricH2::get_basis_min_rank() const {
   for (int64_t level = height; level > 0; level--) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
-      if (U.exists(node, level)) {
+      if (U.exists(node, level) && U(node, level).cols > 0) {
         rank_min = std::min(rank_min, U(node, level).cols);
       }
     }
@@ -361,7 +361,7 @@ int64_t SymmetricH2::get_basis_max_rank() const {
   for (int64_t level = height; level > 0; level--) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
-      if (U.exists(node, level)) {
+      if (U.exists(node, level) && U(node, level).cols > 0) {
         rank_max = std::max(rank_max, U(node, level).cols);
       }
     }
@@ -765,6 +765,29 @@ double SymmetricH2::solve_error(const Matrix& x, const Matrix& ref) const {
   return std::sqrt(diff_norm / (use_rel_acc ? ref_norm : 1.));
 }
 
+Matrix body_neutral_charge(const Domain& domain,
+                           const double cmax, const int64_t seed) {
+  if (seed > 0)
+    srand(seed);
+
+  const auto nbodies = domain.N;
+  Matrix X(nbodies, 1);
+  double avg = 0.;
+  double cmax2 = cmax * 2;
+  for (int64_t i = 0; i < nbodies; i++) {
+    double c = ((double)rand() / RAND_MAX) * cmax2 - cmax;
+    X(i, 0) = c;
+    avg = avg + c;
+  }
+  avg = avg / nbodies;
+
+  if (avg != 0.)
+    for (int64_t i = 0; i < nbodies; i++)
+      X(i, 0) -= avg;
+  return X;
+}
+
+
 } // namespace Hatrix
 
 int main(int argc, char ** argv) {
@@ -925,7 +948,7 @@ int main(int argc, char ** argv) {
                              (stop_factor - start_factor).count();
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-  Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
+  Hatrix::Matrix x = Hatrix::body_neutral_charge(domain, 1, 0);
   Hatrix::Matrix b = Hatrix::matmul(Adense, x);
   const auto solve_start = std::chrono::system_clock::now();
   M.solve(b);
