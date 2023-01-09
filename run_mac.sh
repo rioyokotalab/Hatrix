@@ -33,7 +33,7 @@ for adm in 0.8; do
         #               --use_nested_basis
 
 
-        ./bin/H2_dtd --N $N \
+        lldb -- ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \

@@ -1214,7 +1214,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
 
   parsec_data_key_t fill_in_key =
     parsec_temp_fill_in.super.data_key(&parsec_temp_fill_in.super,
-                                       block, block, level);
+                                       block, level);
   if (mpi_rank(block) == MPIRANK) { // fill-in addition happens where the bases is present.
     Matrix fill_in(block_size, block_size);
     temp_fill_in.insert(block, level, std::move(fill_in));
@@ -1226,6 +1226,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   parsec_temp_fill_in.mpi_ranks[fill_in_key] =
     mpi_rank(block);
 
+
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_admissible(A, block, j, level)) {
       if (F.exists(block, j, level)) {
@@ -1233,6 +1234,9 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
         int64_t F_block_j_ncols = get_dim(A, domain, j, level);
         parsec_data_key_t F_block_j_key =
           parsec_F.super.data_key(&parsec_F.super, block, j, level);
+        parsec_data_key_t fill_in_key =
+          parsec_temp_fill_in.super.data_key(&parsec_temp_fill_in.super,
+                                             block, level);
 
         parsec_dtd_insert_task(dtd_tp, task_fill_in_addition, 0, PARSEC_DEV_CPU,
           "fill_in_addition_task",
@@ -1533,7 +1537,7 @@ void h2_dc_init_maps() {
   h2_dc_init(parsec_S, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_D, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_F, data_key_2d, rank_of_2d);
-  h2_dc_init(parsec_temp_fill_in, data_key_2d, rank_of_2d);
+  h2_dc_init(parsec_temp_fill_in, data_key_1d, rank_of_1d);
 }
 
 void

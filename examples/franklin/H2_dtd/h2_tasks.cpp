@@ -461,12 +461,18 @@ task_nb_rank_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 parsec_hook_return_t
 task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t F_block_j_nrows,  F_block_j_ncols;
+  double *_F_block_j;
   int64_t block_size;
-  double *_F_block_j, *_fill_in;
+  double *_fill_in;
 
   parsec_dtd_unpack_args(this_task,
                          &F_block_j_nrows, &F_block_j_ncols, &_F_block_j,
                          &block_size, &_fill_in);
+
+  MatrixWrapper F_block_j(_F_block_j, F_block_j_nrows, F_block_j_ncols, F_block_j_ncols);
+  MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
+
+  fill_in += matmul(F_block_j, F_block_j, false, true);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
