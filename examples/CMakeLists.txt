@@ -52,6 +52,7 @@ else()
     ULV_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency
     Eigen_SymmetricH2_Nlevel_nodependency
+    Eigen_SymmetricH2_Nlevel_nodependency_comp_fill_in
     Construction_ELSES
     LDL_ELSES_nodependency
     Eigen_ELSES
