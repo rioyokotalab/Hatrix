@@ -1211,10 +1211,10 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
                          const int64_t level,
                          const Hatrix::Args& opts) {
   int64_t block_size = get_dim(A, domain, block, level);
-
   parsec_data_key_t fill_in_key =
     parsec_temp_fill_in.super.data_key(&parsec_temp_fill_in.super,
                                        block, level);
+
   if (mpi_rank(block) == MPIRANK) { // fill-in addition happens where the bases is present.
     Matrix fill_in(block_size, block_size);
     temp_fill_in.insert(block, level, std::move(fill_in));
@@ -1222,10 +1222,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
     parsec_temp_fill_in.matrix_map[fill_in_key] =
       std::addressof(fill_in_ref);
   }
-
-  parsec_temp_fill_in.mpi_ranks[fill_in_key] =
-    mpi_rank(block);
-
+  parsec_temp_fill_in.mpi_ranks[fill_in_key] = mpi_rank(block);
 
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_admissible(A, block, j, level)) {
@@ -1234,9 +1231,6 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
         int64_t F_block_j_ncols = get_dim(A, domain, j, level);
         parsec_data_key_t F_block_j_key =
           parsec_F.super.data_key(&parsec_F.super, block, j, level);
-        parsec_data_key_t fill_in_key =
-          parsec_temp_fill_in.super.data_key(&parsec_temp_fill_in.super,
-                                             block, level);
 
         parsec_dtd_insert_task(dtd_tp, task_fill_in_addition, 0, PARSEC_DEV_CPU,
           "fill_in_addition_task",
@@ -1245,7 +1239,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_block_j_key),
                                PARSEC_INPUT | D_ARENA,
           sizeof(int64_t), &block_size, PARSEC_VALUE,
-          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, fill_in_key),
+          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in.super, fill_in_key),
                                PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
           PARSEC_DTD_ARG_END);
       }
