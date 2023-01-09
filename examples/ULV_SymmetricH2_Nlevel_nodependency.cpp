@@ -591,9 +591,8 @@ void SymmetricH2::solve_forward(const int64_t level, const RowLevelMap& X,
                                                             vec{Uc(node, level).cols});
       const Matrix& D_node_cc = D_node_splits[0];
       const Matrix& D_node_oc = D_node_splits[2];
-      if (use_c) {
-        solve_triangular(D_node_cc, Xc(node, level), Hatrix::Left, Hatrix::Lower, false, false);
-      }
+      solve_triangular(D_node_cc, Xc(node, level), Hatrix::Left, Hatrix::Lower, false, false);
+
       for (int64_t i = 0; i < num_nodes; i++) {
         if (is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) {
           const auto D_i_splits = D(i, node, level).split(vec{Uc(i, level).cols},
