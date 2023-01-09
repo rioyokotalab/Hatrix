@@ -1215,7 +1215,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   parsec_data_key_t fill_in_key =
     parsec_temp_fill_in.super.data_key(&parsec_temp_fill_in.super,
                                        block, block, level);
-  if (mpi_rank(block) == MPIRANK) {
+  if (mpi_rank(block) == MPIRANK) { // fill-in addition happens where the bases is present.
     Matrix fill_in(block_size, block_size);
     temp_fill_in.insert(block, level, std::move(fill_in));
     Matrix& fill_in_ref = temp_fill_in(block, level);
@@ -1225,6 +1225,28 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
 
   parsec_temp_fill_in.mpi_ranks[fill_in_key] =
     mpi_rank(block);
+
+  for (int64_t j = 0; j < block; ++j) {
+    if (exists_and_admissible(A, block, j, level)) {
+      if (F.exists(block, j, level)) {
+        int64_t F_block_j_nrows = get_dim(A, domain, block, level);
+        int64_t F_block_j_ncols = get_dim(A, domain, j, level);
+        parsec_data_key_t F_block_j_key =
+          parsec_F.super.data_key(&parsec_F.super, block, j, level);
+
+        parsec_dtd_insert_task(dtd_tp, task_fill_in_addition, 0, PARSEC_DEV_CPU,
+          "fill_in_addition_task",
+          sizeof(int64_t), &F_block_j_nrows, PARSEC_VALUE,
+          sizeof(int64_t), &F_block_j_ncols, PARSEC_VALUE,
+          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_block_j_key),
+                               PARSEC_INPUT | D_ARENA,
+          sizeof(int64_t), &block_size, PARSEC_VALUE,
+          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, fill_in_key),
+                               PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+          PARSEC_DTD_ARG_END);
+      }
+    }
+  }
 }
 
 void
@@ -1385,6 +1407,12 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
               parsec_F.matrix_map[F_ij_key] = std::addressof(F_ij_ref);
             }
           }
+          else {
+            // dummy fill-in in case it does not belong to this MPI rank.
+            Matrix fill_in;
+            F.insert(i, j, level, std::move(fill_in));
+          }
+
           parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i, j);
 
           int64_t D_i_block_rows = get_dim(A, domain, i, level);

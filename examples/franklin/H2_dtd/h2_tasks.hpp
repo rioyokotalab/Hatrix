@@ -53,3 +53,6 @@ task_syrk_full(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
 task_matmul_full(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task);
