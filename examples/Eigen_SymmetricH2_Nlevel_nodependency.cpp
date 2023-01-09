@@ -594,13 +594,13 @@ SymmetricH2::inertia(const Domain& domain,
   for(int64_t level = height; level >= 0; level--) {
     int64_t num_nodes = level_blocks[level];
     for(int64_t node = 0; node < num_nodes; node++) {
-      Matrix& D_node = A_shifted.D(node, node, level);
+      const Matrix& D_node = A_shifted.D(node, node, level);
+      const auto c_size = A_shifted.Uc(node, level).cols;
       if(level == 0) {
         D_lambda = concat(D_lambda, diag(D_node), 0);
       }
       else {
-        auto D_node_splits = D_node.split(vec{Uc(node, level).cols},
-                                          vec{Uc(node, level).cols});
+        auto D_node_splits = D_node.split(vec{c_size}, vec{c_size});
         Matrix& D_node_cc = D_node_splits[0];
         D_lambda = concat(D_lambda, diag(D_node_cc), 0);
       }
