@@ -43,7 +43,7 @@ class SymmetricH2 {
   int64_t N, leaf_size;
   double accuracy;
   bool use_rel_acc;
-  double ID_tolerance;
+  double err_tol;
   int64_t max_rank;
   double admis;
   int64_t matrix_type;
@@ -78,7 +78,7 @@ class SymmetricH2 {
               const int64_t N, const int64_t leaf_size,
               const double accuracy, const bool use_rel_acc,
               const int64_t max_rank, const double admis,
-              const int64_t matrix_type, const bool build_basis);
+              const int64_t matrix_type, const bool include_fill_in);
 
   int64_t get_basis_min_rank() const;
   int64_t get_basis_max_rank() const;
@@ -191,7 +191,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       int64_t rank;
       std::vector<int64_t> ipiv_row;
       // SVD followed by ID
-      std::tie(Ui, Si, Vi, rank) = error_svd(skeleton_row, accuracy, use_rel_acc, true);
+      std::tie(Ui, Si, Vi, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
       // Truncate to max_rank if exceeded
       if (max_rank > 0 && rank > max_rank) {
         rank = max_rank;
@@ -302,20 +302,17 @@ SymmetricH2::SymmetricH2(const Domain& domain,
                          const int64_t N, const int64_t leaf_size,
                          const double accuracy, const bool use_rel_acc,
                          const int64_t max_rank, const double admis,
-                         const int64_t matrix_type,
-                         const bool build_basis)
+                         const int64_t matrix_type, const bool include_fill_in)
     : N(N), leaf_size(leaf_size), accuracy(accuracy),
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
-  // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
+  // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  ID_tolerance = accuracy * 1e-1;
+  err_tol = accuracy;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
-  if (build_basis) {
-    for (int64_t level = height; level > 0; level--) {
-      generate_row_cluster_basis(domain, level, false);
-      generate_far_coupling_matrices(domain, level);
-    }
+  for (int64_t level = height; level >= 0; level--) {
+    generate_row_cluster_basis(domain, level, include_fill_in);
+    generate_far_coupling_matrices(domain, level);
   }
 }
 
@@ -546,8 +543,6 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
 
 void SymmetricH2::factorize(const Domain& domain) {
   for (int64_t level = height; level >= 0; level--) {
-    generate_row_cluster_basis(domain, level, true);
-    generate_far_coupling_matrices(domain, level);
     factorize_level(level);
     permute_and_merge(level);
   }
@@ -861,7 +856,7 @@ int main(int argc, char ** argv) {
                              (stop_sample - start_sample).count();
 
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
+  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
@@ -891,12 +886,16 @@ int main(int argc, char ** argv) {
             << " construct_error=" << std::scientific << construct_error
             << std::defaultfloat << std::endl;
 
-  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
+  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
   const auto start_factor = std::chrono::system_clock::now();
   M.factorize(domain);
   const auto stop_factor = std::chrono::system_clock::now();
   const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_factor - start_factor).count();
+  std::cout << "factor_min_rank=" << M.get_basis_min_rank()
+            << " factor_max_rank=" << M.get_basis_max_rank()
+            << " factor_time=" << factor_time
+            << std::endl;
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   Hatrix::Matrix x = Hatrix::body_neutral_charge(domain, 1, 0);
@@ -907,11 +906,7 @@ int main(int argc, char ** argv) {
   const double solve_time = std::chrono::duration_cast<std::chrono::milliseconds>
                             (solve_stop - solve_start).count();
   const auto solve_error = M.solve_error(b, x);
-
-  std::cout << "factor_min_rank=" << M.get_basis_min_rank()
-            << " factor_max_rank=" << M.get_basis_max_rank()
-            << " factor_time=" << factor_time
-            << " solve_time=" << solve_time
+  std::cout << "solve_time=" << solve_time
             << " solve_error=" << std::scientific << solve_error
             << std::defaultfloat << std::endl;
 
