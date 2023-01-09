@@ -2093,10 +2093,38 @@ solve(SymmetricSharedBasisMatrix& A,
   // forward of the last blocks
   std::vector<Matrix>& x_last = x_levels[x_levels_index];
   for (int64_t i = 0; i < last_nodes; ++i) {
-    for (int64_t j = 0; j < i; ++j) {
+    for (int64_t j = 0; j < i; ++j) { // off-diagonals
+      int dense_block_tag = i * last_nodes + j;
+      if (mpi_rank(i, j) == MPIRANK) {
+        MPI_Request request;
+        MPI_Isend(&A.D(i, j, level), A.D(i, j, level).numel(), MPI_DOUBLE,
+                  mpi_rank(i), dense_block_tag, MPI_COMM_WORLD, &request);
+      }
 
+      if (mpi_rank(j) == MPIRANK) {
+        MPI_Request request;
+        MPI_Isend(&x_last[j], x_last[j].numel(), MPI_DOUBLE,
+                  mpi_rank(i), j, MPI_COMM_WORLD, &request);
+      }
+
+      if (mpi_rank(i) == MPIRANK) {
+        MPI_Status status;
+        int64_t D_ij_nrows = get_dim(A, domain, i, level);
+        int64_t D_ij_ncols = get_dim(A, domain, j, level);
+
+        Matrix D_ij(D_ij_nrows, D_ij_ncols);
+        MPI_Recv(&D_ij, D_ij.numel(), MPI_DOUBLE,
+                 mpi_rank(i, j), dense_block_tag, MPI_COMM_WORLD, &status);
+
+        Matrix x_last_j(D_ij_ncols, 1);
+        MPI_Recv(&x_last_j, x_last_j.numel(), MPI_DOUBLE,
+                 mpi_rank(j), j, MPI_COMM_WORLD, &status);
+
+        matmul(D_ij, x_last_j, x_last[i], false, false, -1, 1);
+      }
     }
 
+    // diagonal block
     if (mpi_rank(i, i) == MPIRANK) {
       Matrix& D_ii = A.D(i, i, level);
       MPI_Request request;
@@ -2121,7 +2149,34 @@ solve(SymmetricSharedBasisMatrix& A,
   // backward of the last blocks
   for (int64_t j = last_nodes - 1; j >= 0; --j) {
     for (int64_t i = last_nodes - 1; i > j; --i) {
+      int dense_block_tag = i * last_nodes + j;
+      if (mpi_rank(i, j) == MPIRANK) {
+        MPI_Request request;
+        MPI_Isend(&A.D(i, j, level), A.D(i, j, level).numel(), MPI_DOUBLE,
+                  mpi_rank(j), dense_block_tag, MPI_COMM_WORLD, &request);
+      }
 
+      if (mpi_rank(i) == MPIRANK) {
+        MPI_Request request;
+        MPI_Isend(&x_last[i], x_last[i].numel(), MPI_DOUBLE,
+                  mpi_rank(j), i, MPI_COMM_WORLD, &request);
+      }
+
+      if (mpi_rank(j) == MPIRANK) {
+        MPI_Status status;
+        int64_t D_ij_nrows = get_dim(A, domain, i, level);
+        int64_t D_ij_ncols = get_dim(A, domain, j, level);
+
+        Matrix D_ij(D_ij_nrows, D_ij_ncols);
+        MPI_Recv(&D_ij, D_ij.numel(), MPI_DOUBLE,
+                 mpi_rank(i, j), dense_block_tag, MPI_COMM_WORLD, &status);
+
+        Matrix x_last_i(D_ij_nrows, 1);
+        MPI_Recv(&x_last_i, x_last_i.numel(), MPI_DOUBLE,
+                 mpi_rank(i), i, MPI_COMM_WORLD, &status);
+
+        matmul(D_ij, x_last_i, x_last[j], true, false, -1.0, 1.0);
+      }
     }
 
     if (mpi_rank(j, j) == MPIRANK) {
