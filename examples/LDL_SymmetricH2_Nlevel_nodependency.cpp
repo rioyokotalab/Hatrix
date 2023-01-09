@@ -56,10 +56,6 @@ class SymmetricH2 {
 
  private:
   void initialize_geometry_admissibility(const Domain& domain);
-
-  int64_t get_block_size(const Domain& domain, const int64_t node, const int64_t level) const;
-  bool row_has_admissible_blocks(const int64_t row, const int64_t level) const;
-
   void generate_row_cluster_basis(const Domain& domain, const int64_t level,
                                   const bool include_fill_in);
   void generate_near_coupling_matrices(const Domain& domain);
@@ -133,24 +129,6 @@ void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
       }
     }
   }
-}
-
-int64_t SymmetricH2::get_block_size(const Domain& domain, const int64_t node, const int64_t level) const {
-  const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
-  const auto idx = domain.get_cell_idx(node, node_level);
-  return domain.cells[idx].nbodies;
-}
-
-bool SymmetricH2::row_has_admissible_blocks(const int64_t row, const int64_t level) const {
-  bool has_admis = false;
-  for (int64_t j = 0; j < level_blocks[level]; j++) {
-    if ((!is_admissible.exists(row, j, level)) || // part of upper level admissible block
-        (is_admissible.exists(row, j, level) && is_admissible(row, j, level))) {
-      has_admis = true;
-      break;
-    }
-  }
-  return has_admis;
 }
 
 void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
