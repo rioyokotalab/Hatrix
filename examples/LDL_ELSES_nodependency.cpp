@@ -40,12 +40,6 @@ using vec = std::vector<int64_t>;
  */
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 
-void shift_diag(Hatrix::Matrix& A, const double shift) {
-  for(int64_t i = 0; i < A.min_dim(); i++) {
-    A(i, i) += shift;
-  }
-}
-
 namespace Hatrix {
 
 class SymmetricH2 {
@@ -104,7 +98,6 @@ class SymmetricH2 {
   double low_rank_block_ratio() const;
   void write_JSON(const Domain& domain, const std::string filename) const;
 
-  void shift_diag(const double shift);
   void factorize(const Domain& domain);
   void solve(Matrix& b) const;
   double solve_error(const Matrix& x, const Matrix& ref) const;
@@ -215,17 +208,17 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       int64_t rank;
       std::vector<int64_t> ipiv_row;
 #ifdef USE_SVD_COMPRESSION
-      Matrix Stemp, Vtemp;
-      std::tie(Ui, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
+      Matrix Utemp, Stemp, Vtemp;
+      std::tie(Utemp, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
       // Truncate to max_rank if exceeded
       if (max_rank > 0 && rank > max_rank) {
         rank = max_rank;
-        Ui.shrink(Ui.rows, rank);
+        Utemp.shrink(Utemp.rows, rank);
         Stemp.shrink(rank, rank);
       }
       // ID to get skeleton rows
-      column_scale(Ui, Stemp);
-      id_row(Ui, ipiv_row);
+      column_scale(Utemp, Stemp);
+      std::tie(Ui, ipiv_row) = truncated_id_row(Utemp, rank);
 #else
       // ID Compression
       std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
@@ -243,10 +236,14 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
         const auto& child1_skeleton = multipoles(child1.block_index, child1.level);
         const auto& child2_skeleton = multipoles(child2.block_index, child2.level);
         auto Ui_splits = Ui.split(vec{(int64_t)child1_skeleton.size()}, vec{});
-        triangular_matmul(R_row(child1.block_index, child1.level), Ui_splits[0],
-                          Hatrix::Left, Hatrix::Upper, false, false, 1);
-        triangular_matmul(R_row(child2.block_index, child2.level), Ui_splits[1],
-                          Hatrix::Left, Hatrix::Upper, false, false, 1);
+        if (U(child1.block_index, child1.level).cols > 0) {
+          triangular_matmul(R_row(child1.block_index, child1.level), Ui_splits[0],
+                            Hatrix::Left, Hatrix::Upper, false, false, 1);
+        }
+        if (U(child2.block_index, child2.level).cols > 0) {
+          triangular_matmul(R_row(child2.block_index, child2.level), Ui_splits[1],
+                            Hatrix::Left, Hatrix::Upper, false, false, 1);
+        }
       }
       // Orthogonalize basis with QR
       Matrix Q(skeleton_size, skeleton_size);
@@ -342,7 +339,7 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  err_tol = accuracy;
+  err_tol = accuracy * 1e-1;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
   for (int64_t level = height; level >= 0; level--) {
@@ -530,16 +527,6 @@ void SymmetricH2::write_JSON(const Domain& domain,
   fill_JSON(domain, 0, 0, 0, json);
   std::ofstream out_file(filename);
   out_file << json << std::endl;
-}
-
-void SymmetricH2::shift_diag(const double shift) {
-  const auto num_nodes = level_blocks[height];
-  for (int64_t node = 0; node < num_nodes; node++) {
-    Matrix& D_node = D(node, node, height);
-    for (int64_t i = 0; i < D_node.rows; i++) {
-      D_node(i, i) += shift;
-    }
-  }
 }
 
 void SymmetricH2::factorize_level(const int64_t level) {
@@ -880,9 +867,6 @@ int main(int argc, char ** argv) {
   // Whether reading sorted ELSES geometry or no
   const int64_t read_sorted_bodies = argc > 12 ? atol(argv[12]) : 0;
 
-  // Shift diagonals
-  const double shift = argc > 13 ? atol(argv[13]) : 0;
-
   Hatrix::Context::init();
 
   std::string sampling_algo_name = "";
@@ -937,12 +921,9 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   double construct_error = A.construction_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
-  if (N < 1000) {
-    A.print_structure(A.height);
-  }
+  A.print_structure(A.height);
 
   std::cout << "N=" << N
-            << " diag_shift=" << shift
             << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
             << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
@@ -965,20 +946,23 @@ int main(int argc, char ** argv) {
             << " construct_error=" << std::scientific << construct_error
             << std::defaultfloat << std::endl;
 
+  const auto build_basis_start = std::chrono::system_clock::now();
   Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
-  M.shift_diag(shift);
+  const auto build_basis_stop = std::chrono::system_clock::now();
+  const double build_basis_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                  (build_basis_stop - build_basis_start).count();
   const auto start_factor = std::chrono::system_clock::now();
   M.factorize(domain);
   const auto stop_factor = std::chrono::system_clock::now();
   const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_factor - start_factor).count();
-  std::cout << "factor_min_rank=" << M.get_basis_min_rank()
+  std::cout << "build_basis_time=" << build_basis_time
+            << " factor_min_rank=" << M.get_basis_min_rank()
             << " factor_max_rank=" << M.get_basis_max_rank()
             << " factor_time=" << factor_time
             << std::endl;
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-  shift_diag(Adense, shift);
   Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
   Hatrix::Matrix b = Hatrix::matmul(Adense, x);
   const auto solve_start = std::chrono::system_clock::now();
