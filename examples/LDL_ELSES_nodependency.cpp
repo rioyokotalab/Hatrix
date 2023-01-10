@@ -236,14 +236,10 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
         const auto& child1_skeleton = multipoles(child1.block_index, child1.level);
         const auto& child2_skeleton = multipoles(child2.block_index, child2.level);
         auto Ui_splits = Ui.split(vec{(int64_t)child1_skeleton.size()}, vec{});
-        if (U(child1.block_index, child1.level).cols > 0) {
-          triangular_matmul(R_row(child1.block_index, child1.level), Ui_splits[0],
-                            Hatrix::Left, Hatrix::Upper, false, false, 1);
-        }
-        if (U(child2.block_index, child2.level).cols > 0) {
-          triangular_matmul(R_row(child2.block_index, child2.level), Ui_splits[1],
-                            Hatrix::Left, Hatrix::Upper, false, false, 1);
-        }
+        triangular_matmul(R_row(child1.block_index, child1.level), Ui_splits[0],
+                          Hatrix::Left, Hatrix::Upper, false, false, 1);
+        triangular_matmul(R_row(child2.block_index, child2.level), Ui_splits[1],
+                          Hatrix::Left, Hatrix::Upper, false, false, 1);
       }
       // Orthogonalize basis with QR
       Matrix Q(skeleton_size, skeleton_size);
