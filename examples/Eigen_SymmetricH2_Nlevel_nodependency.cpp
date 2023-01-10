@@ -204,17 +204,17 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       int64_t rank;
       std::vector<int64_t> ipiv_row;
 #ifdef USE_SVD_COMPRESSION
-      Matrix Stemp, Vtemp;
-      std::tie(Ui, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
+      Matrix Utemp, Stemp, Vtemp;
+      std::tie(Utemp, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
       // Truncate to max_rank if exceeded
       if (max_rank > 0 && rank > max_rank) {
         rank = max_rank;
-        Ui.shrink(Ui.rows, rank);
+        Utemp.shrink(Utemp.rows, rank);
         Stemp.shrink(rank, rank);
       }
       // ID to get skeleton rows
-      column_scale(Ui, Stemp);
-      id_row(Ui, ipiv_row);
+      column_scale(Utemp, Stemp);
+      std::tie(Ui, ipiv_row) = truncated_id_row(Utemp, rank);
 #else
       // ID Compression
       std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
