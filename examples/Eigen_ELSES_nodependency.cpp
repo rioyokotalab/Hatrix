@@ -25,7 +25,7 @@
 constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
-// #define USE_SVD_COMPRESSION
+#define USE_SVD_COMPRESSION
 
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
@@ -217,17 +217,17 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       int64_t rank;
       std::vector<int64_t> ipiv_row;
 #ifdef USE_SVD_COMPRESSION
-      Matrix Stemp, Vtemp;
-      std::tie(Ui, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
+      Matrix Utemp, Stemp, Vtemp;
+      std::tie(Utemp, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
       // Truncate to max_rank if exceeded
       if (max_rank > 0 && rank > max_rank) {
         rank = max_rank;
-        Ui.shrink(Ui.rows, rank);
+        Utemp.shrink(Utemp.rows, rank);
         Stemp.shrink(rank, rank);
       }
       // ID to get skeleton rows
-      column_scale(Ui, Stemp);
-      id_row(Ui, ipiv_row);
+      column_scale(Utemp, Stemp);
+      std::tie(Ui, ipiv_row) = truncated_id_row(Utemp, rank);
 #else
       // ID Compression
       std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
@@ -344,7 +344,7 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  err_tol = accuracy * 1e-1;
+  err_tol = accuracy * 1e-2;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
   for (int64_t level = height; level >= 0; level--) {
@@ -838,9 +838,20 @@ int main(int argc, char ** argv) {
             << std::defaultfloat << std::endl;
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
+  const auto dense_eig_start = std::chrono::system_clock::now();
   auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
-
+  const auto dense_eig_stop = std::chrono::system_clock::now();
+  const double dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                (dense_eig_stop - dense_eig_start).count();
+  const auto build_basis_start = std::chrono::system_clock::now();
   Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
+  const auto build_basis_stop = std::chrono::system_clock::now();
+  const double build_basis_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                  (build_basis_stop - build_basis_start).count();
+  std::cout << "dense_eig_time=" << dense_eig_time
+            << " build_basis_time=" << build_basis_time
+            << std::endl;
+
   bool s = false;
   auto b = Hatrix::norm(Adense);
   auto a = -b;

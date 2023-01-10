@@ -309,7 +309,7 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  err_tol = accuracy;
+  err_tol = accuracy * 1e-1;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
   for (int64_t level = height; level >= 0; level--) {
@@ -912,13 +912,18 @@ int main(int argc, char ** argv) {
             << " construct_error=" << std::scientific << construct_error
             << std::defaultfloat << std::endl;
 
+  const auto build_basis_start = std::chrono::system_clock::now();
   Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
+  const auto build_basis_stop = std::chrono::system_clock::now();
+  const double build_basis_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                  (build_basis_stop - build_basis_start).count();
   const auto start_factor = std::chrono::system_clock::now();
   M.factorize(domain);
   const auto stop_factor = std::chrono::system_clock::now();
   const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_factor - start_factor).count();
-  std::cout << "factor_min_rank=" << M.get_basis_min_rank()
+  std::cout << "build_basis_time=" << build_basis_time
+            << " factor_min_rank=" << M.get_basis_min_rank()
             << " factor_max_rank=" << M.get_basis_max_rank()
             << " factor_time=" << factor_time
             << std::endl;

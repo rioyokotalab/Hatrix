@@ -23,7 +23,7 @@
 constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
-// #define USE_SVD_COMPRESSION
+#define USE_SVD_COMPRESSION
 
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
@@ -796,9 +796,20 @@ int main(int argc, char ** argv) {
             << std::defaultfloat << std::endl;
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
+  const auto dense_eig_start = std::chrono::system_clock::now();
   auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
-
+  const auto dense_eig_stop = std::chrono::system_clock::now();
+  const double dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                (dense_eig_stop - dense_eig_start).count();
+  const auto build_basis_start = std::chrono::system_clock::now();
   Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
+  const auto build_basis_stop = std::chrono::system_clock::now();
+  const double build_basis_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                  (build_basis_stop - build_basis_start).count();
+  std::cout << "dense_eig_time=" << dense_eig_time
+            << " build_basis_time=" << build_basis_time
+            << std::endl;
+
   bool s = false;
   auto b = 10 * (1. / Hatrix::PV);
   auto a = -b;
