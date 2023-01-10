@@ -349,27 +349,6 @@ class Domain {
   }
 
  private:
-  static int comp_bodies_s0(const void *a, const void *b) {
-    const Body* body_a = static_cast<const Body*>(a);
-    const Body* body_b = static_cast<const Body*>(b);
-    double diff = (body_a->X)[0] - (body_b->X)[0];
-    return diff < 0. ? -1 : (int)(diff > 0.);
-  }
-
-  static int comp_bodies_s1(const void *a, const void *b) {
-    const Body* body_a = static_cast<const Body*>(a);
-    const Body* body_b = static_cast<const Body*>(b);
-    double diff = (body_a->X)[1] - (body_b->X)[1];
-    return diff < 0. ? -1 : (int)(diff > 0.);
-  }
-
-  static int comp_bodies_s2(const void *a, const void *b) {
-    const Body* body_a = static_cast<const Body*>(a);
-    const Body* body_b = static_cast<const Body*>(b);
-    double diff = (body_a->X)[2] - (body_b->X)[2];
-    return diff < 0. ? -1 : (int)(diff > 0.);
-  }
-
   void orthogonal_recursive_bisection(
       const int64_t left, const int64_t right, const int64_t leaf_size,
       const int64_t level, const int64_t block_index) {
@@ -387,8 +366,8 @@ class Domain {
       const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
       const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
       const auto diam = Xmax - Xmin;
-      cell.center[axis] = (Xmin + Xmax) / 2.;  // Midpoint
-      cell.radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
+      cell.center[axis] = Xsum / (double)cell.nbodies;  // Centroid
+      cell.radius[axis] = diam / 2.;
 
       if (cell.radius[axis] > radius_max) {
         radius_max = cell.radius[axis];
@@ -403,16 +382,10 @@ class Domain {
     }
 
     // Sort bodies based on axis with largest radius
-    // std::sort(bodies.begin() + left, bodies.begin() + right,
-    //           [sort_axis](const Body& lhs, const Body& rhs) {
-    //             return lhs.X[sort_axis] < rhs.X[sort_axis];
-    //           });
-    if (sort_axis == 0)
-      qsort(bodies.data() + cell.body_offset, cell.nbodies, sizeof(Body), comp_bodies_s0);
-    if (sort_axis == 1)
-      qsort(bodies.data() + cell.body_offset, cell.nbodies, sizeof(Body), comp_bodies_s1);
-    if (sort_axis == 2)
-      qsort(bodies.data() + cell.body_offset, cell.nbodies, sizeof(Body), comp_bodies_s2);
+    std::sort(bodies.begin() + left, bodies.begin() + right,
+              [sort_axis](const Body& lhs, const Body& rhs) {
+                return lhs.X[sort_axis] < rhs.X[sort_axis];
+              });
     // Split into two equal parts
     const auto mid = (left + right) / 2;
     cell.child = get_cell_idx(block_index << 1, level + 1);
