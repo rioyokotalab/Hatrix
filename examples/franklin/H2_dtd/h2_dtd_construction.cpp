@@ -194,7 +194,8 @@ pivoted_QR(double* A, int M, int N,
 }
 
 void
-generate_US_block(std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
+generate_US_block(SymmetricSharedBasisMatrix& A,
+                  std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
                   int IA, int JA, int block_size, int block, int level) {
 
   // Copy the upper triangular slice of AY_MEM into R_TEMP_MEM that corresponds
@@ -220,6 +221,32 @@ generate_US_block(std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
   pdgeqrf_(&block_size, &P,
            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
            TAU.data(), WORK.data(), &LWORK, &info); // obtain R on the upper right triangle.
+
+  int IMAP[1];
+  IMAP[0] = mpi_rank(block);
+
+  int NODE_CONTEXT;
+  Cblacs_get(-1, 0, &NODE_CONTEXT);
+  Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
+
+  int S_block[9];
+  int S_nrows = 0, S_ncols = 0;
+  int rank = A.ranks(block, level);
+  if (mpi_rank(block) == MPIRANK) {
+    S_nrows = rank;
+    S_ncols = rank;
+  }
+
+  Matrix US(S_nrows, S_ncols);
+  int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
+  Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
+  descset_(S_block, &rank, &rank, &rank, &rank,
+           &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &rank, &info);
+
+  pdtrmr2d_(&uplo, &diag, &rank, &rank,
+            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+            &US, &ONE, &ONE, S_block,
+            &BLACS_CONTEXT);
 }
 
 void
@@ -305,8 +332,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
              IPIV.data(), TAU.data(), WORK.data(),
              &LWORK, &info);    // distributed pivoted QR
 
-    generate_US_block(R_TEMP_MEM, R_TEMP, IA, JA, block_size, block, A.max_level);
-
     std::vector<double> RANKVECTOR(AY_local_cols, 0);
     int diagonals = 0;
     for (int i = 0; i < P; ++i) {
@@ -349,6 +374,10 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       if (eig <= opts.accuracy) { break; }
       rank++;
     }
+    // ranks are stored in all processes.
+    A.ranks.insert(block, A.max_level, std::move(rank));
+
+    generate_US_block(A, R_TEMP_MEM, R_TEMP, IA, JA, block_size, block, A.max_level);
 
     // obtain orthogonal factors
     pdorgqr_(&block_size, &P, &P,
@@ -395,9 +424,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       A.U.insert(block, A.max_level,
                  std::move(U));
     }
-
-    // ranks are stored in all processes.
-    A.ranks.insert(block, A.max_level, std::move(rank));
   }
 
   std::vector<int> comm_world_ranks(MPISIZE);
