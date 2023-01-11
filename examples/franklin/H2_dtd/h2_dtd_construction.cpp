@@ -112,10 +112,13 @@ Matrix Ut_r;
 // perform distributed pivoted QR on A and return the rank subject to accuracy
 // on all processes.
 int
-pivoted_QR(double* A, int M, int N,
+pivoted_QR(SymmetricSharedBasisMatrix& H2_A,
+           double* A, int M, int N,
            int local_rows_A, int local_cols_A,
            int IA, int JA, int MB, int NB,
-           int* DESCA, double accuracy) {
+           int* DESCA, double accuracy,
+           std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
+           int64_t block, int64_t level) {
   std::vector<int> IPIV(local_cols_A);
   std::vector<double> TAU(local_cols_A);
   std::vector<double> WORK(1);
@@ -176,6 +179,9 @@ pivoted_QR(double* A, int M, int N,
     if (eig <= accuracy) { break; }
     rank++;
   }
+
+  int mov_rank = rank;
+  H2_A.ranks.insert(block, level, std::move(mov_rank));
 
   // obtain orthogonal factors
   pdorgqr_(&M, &min_MN, &min_MN,
@@ -247,6 +253,10 @@ generate_US_block(SymmetricSharedBasisMatrix& A,
             R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
             &US, &ONE, &ONE, S_block,
             &BLACS_CONTEXT);
+
+  if (mpi_rank(block) == MPIRANK) {
+    A.US.insert(block, level, std::move(US));
+  }
 }
 
 void
@@ -424,7 +434,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       A.U.insert(block, A.max_level,
                  std::move(U));
     }
-  }
+  } // for (int block = 0; block < nblocks; ++block)
 
   std::vector<int> comm_world_ranks(MPISIZE);
   comm_world_ranks[0] = 0;
@@ -519,7 +529,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
         }
       }
     }
-  }
+  } // for (int i = 0; i < nblocks; ++i)
 }
 
 std::tuple<std::vector<int>, std::vector<double>>
@@ -570,9 +580,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   int MB = rank_total / child_nblocks;
   int Utransfer_local_rows = numroc_(&rank_total, &MB, &MYROW, &ZERO, &MPIGRID[0]);
   int Utransfer_local_cols = numroc_(&P, &NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
-  std::vector<double> Utransfer_mem(Utransfer_local_rows * Utransfer_local_cols);
+  std::vector<double> Utransfer_mem(int64_t(Utransfer_local_rows) * int64_t(Utransfer_local_cols));
 
   descinit_(Utransfer.data(), &rank_total, &P, &MB, &NBCOL, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &Utransfer_local_rows, &info);
+
+  std::vector<double> R_TEMP_MEM(int64_t(Utransfer_local_rows) * int64_t(Utransfer_local_cols));
+  std::vector<int> R_TEMP(9);
+  descinit_(R_TEMP.data(), &rank_total, &P, &MB, &NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &Utransfer_local_rows, &info);
 
   std::mt19937 gen(0);
@@ -639,12 +654,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
         IA += A.ranks(c1_i, child_level) + A.ranks(c2_i, child_level);
       }
 
-      int qr_rank = pivoted_QR(Utransfer_mem.data(),
+      int qr_rank = pivoted_QR(A, Utransfer_mem.data(),
                                Utransfer_nrows, P,
                                Utransfer_local_rows, Utransfer_local_cols,
                                IA, ONE,
                                MB, NBCOL,
-                               Utransfer.data(), opts.accuracy);
+                               Utransfer.data(), opts.accuracy,
+                               R_TEMP_MEM, R_TEMP, block, level);
 
       // copy the transfer matrix into the RowLevel map for use with parsec.
       int IMAP[1];
@@ -680,8 +696,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
       if (mpi_rank(block) == MPIRANK) {
         A.U.insert(block, level, std::move(U));
       }
-
-      A.ranks.insert(block, level, std::move(qr_rank));
     } // if row_has_admissible_blocks
     else {
       int rank = std::max(A.ranks(c1, child_level), A.ranks(c2, child_level));
