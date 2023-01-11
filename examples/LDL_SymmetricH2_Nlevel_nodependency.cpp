@@ -56,6 +56,8 @@ class SymmetricH2 {
 
  private:
   void initialize_geometry_admissibility(const Domain& domain);
+  std::vector<int64_t> get_skeleton(const Domain& domain,
+                                    const int64_t node, const int64_t level) const;
   void generate_row_cluster_basis(const Domain& domain, const int64_t level,
                                   const bool include_fill_in);
   void generate_near_coupling_matrices(const Domain& domain);
@@ -131,6 +133,38 @@ void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
   }
 }
 
+std::vector<int64_t> SymmetricH2::get_skeleton(const Domain& domain,
+                                               const int64_t node, const int64_t level) const {
+  const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
+  const auto idx = domain.get_cell_idx(node, node_level);
+  const auto& cell = domain.cells[idx];
+  std::vector<int64_t> skeleton;
+  if (level == height) {
+    // Leaf level: use all bodies
+    skeleton = cell.get_bodies();
+  }
+  else {
+    if (matrix_type == BLR2_MATRIX) {
+      // BLR2 Root: Gather multipoles of all leaf level nodes
+      const auto nleaf_nodes = level_blocks[height];
+      for (int64_t child = 0; child < nleaf_nodes; child++) {
+        const auto& child_multipoles = multipoles(child, height);
+        skeleton.insert(skeleton.end(), child_multipoles.begin(), child_multipoles.end());
+      }
+    }
+    else {
+      // H2 Non-Leaf: Gather children's multipoles
+      const auto& child1 = domain.cells[cell.child];
+      const auto& child2 = domain.cells[cell.child + 1];
+      const auto& child1_multipoles = multipoles(child1.block_index, child1.level);
+      const auto& child2_multipoles = multipoles(child2.block_index, child2.level);
+      skeleton.insert(skeleton.end(), child1_multipoles.begin(), child1_multipoles.end());
+      skeleton.insert(skeleton.end(), child2_multipoles.begin(), child2_multipoles.end());
+    }
+  }
+  return skeleton;
+}
+
 void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
                                              const int64_t level,
                                              const bool include_fill_in) {
@@ -139,35 +173,10 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
     const auto idx = domain.get_cell_idx(i, node_level);
     const auto& cell = domain.cells[idx];
-    std::vector<int64_t> skeleton;
-    if (level == height) {
-      // Leaf level: use all bodies
-      skeleton = cell.get_bodies();
-    }
-    else {
-      if (matrix_type == BLR2_MATRIX) {
-        // BLR2 Root: Gather multipoles of all leaf level nodes
-        const auto nleaf_nodes = level_blocks[height];
-        for (int64_t child = 0; child < nleaf_nodes; child++) {
-          const auto& child_multipoles = multipoles(child, height);
-          skeleton.insert(skeleton.end(), child_multipoles.begin(), child_multipoles.end());
-        }
-      }
-      else {
-        // H2 Non-Leaf: Gather children's multipoles
-        const auto& child1 = domain.cells[cell.child];
-        const auto& child2 = domain.cells[cell.child + 1];
-        const auto& child1_multipoles = multipoles(child1.block_index, child1.level);
-        const auto& child2_multipoles = multipoles(child2.block_index, child2.level);
-        skeleton.insert(skeleton.end(), child1_multipoles.begin(), child1_multipoles.end());
-        skeleton.insert(skeleton.end(), child2_multipoles.begin(), child2_multipoles.end());
-      }
-    }
+    const auto skeleton = get_skeleton(domain, i, level);
     const int64_t skeleton_size = skeleton.size();
-    const int64_t near_size = include_fill_in ?
-                              cell.sample_nearfield.size() : 0;
-    const int64_t far_size  = (!include_fill_in && cell.far_list.size() == 0) ?
-                              0 : cell.sample_farfield.size();
+    const int64_t near_size = include_fill_in ? cell.sample_nearfield.size() : 0;
+    const int64_t far_size  = cell.sample_farfield.size();
     if (near_size + far_size > 0) {
       Matrix skeleton_dn(skeleton_size, 0);
       Matrix skeleton_lr(skeleton_size, 0);
@@ -309,7 +318,7 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  err_tol = accuracy * 1e-1;
+  err_tol = accuracy;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
   for (int64_t level = height; level >= 0; level--) {
@@ -560,10 +569,10 @@ void SymmetricH2::solve_forward(const int64_t level, const RowLevelMap& X,
                                 RowLevelMap& Xc, RowLevelMap& Xo) const {
   const auto num_nodes = level_blocks[level];
   for (int64_t node = 0; node < num_nodes; node++) {
-    const auto use_c = (Uc(node, level).cols > 0);
+    const auto use_node_c = (Uc(node, level).cols > 0);
     // Left Multiplication with (U_F)^T
     matmul(U(node, level) , X(node, level), Xo(node, level), true, false, 1, 1);
-    if (use_c) {
+    if (use_node_c) {
       matmul(Uc(node, level), X(node, level), Xc(node, level), true, false, 1, 1);
       // Solve with diagonal block cc
       const auto D_node_splits = D(node, node, level).split(vec{Uc(node, level).cols},
@@ -574,11 +583,12 @@ void SymmetricH2::solve_forward(const int64_t level, const RowLevelMap& X,
 
       for (int64_t i = 0; i < num_nodes; i++) {
         if (is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) {
+          const auto use_i_c = (Uc(i, level).cols > 0);
           const auto D_i_splits = D(i, node, level).split(vec{Uc(i, level).cols},
                                                           vec{Uc(node, level).cols});
           const Matrix& D_i_cc = D_i_splits[0];
           const Matrix& D_i_oc = D_i_splits[2];
-          if (i > node) {
+          if (i > node && use_i_c) {
             matmul(D_i_cc, Xc(node, level), Xc(i, level), false, false, -1, 1);
           }
           matmul(D_i_oc, Xc(node, level), Xo(i, level), false, false, -1, 1);
@@ -607,16 +617,17 @@ void SymmetricH2::solve_backward(const int64_t level, RowLevelMap& X,
                                  RowLevelMap& Xc, const RowLevelMap& Xo) const {
   const auto num_nodes = level_blocks[level];
   for (int64_t node = num_nodes-1; node >= 0; node--) {
-    const auto use_c = (Uc(node, level).cols > 0);
-    if (use_c) {
+    const auto use_node_c = (Uc(node, level).cols > 0);
+    if (use_node_c) {
       for (int64_t i = 0; i < num_nodes; i++) {
         if (is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) {
+          const auto use_i_c = (Uc(i, level).cols > 0);
           const auto D_i_splits = D(i, node, level).split(vec{Uc(i, level).cols},
                                                           vec{Uc(node, level).cols});
           const Matrix& D_i_cc = D_i_splits[0];
           const Matrix& D_i_oc = D_i_splits[2];
           matmul(D_i_oc, Xo(i, level), Xc(node, level), true, false, -1, 1);
-          if (i > node) {
+          if (i > node && use_i_c) {
             matmul(D_i_cc, Xc(i, level), Xc(node, level), true, false, -1, 1);
           }
         }
