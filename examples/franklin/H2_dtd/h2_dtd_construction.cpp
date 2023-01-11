@@ -108,6 +108,68 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
   if (A.max_level != A.min_level) { A.min_level++; }
 }
 
+void
+generate_US_block(SymmetricSharedBasisMatrix& A,
+                  double *ROOT_MEM, int *ROOT,
+                  std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
+                  int IA, int JA, int block_size, int block, int level) {
+
+  // Copy the upper triangular slice of AY_MEM into R_TEMP_MEM that corresponds
+  // to the R block after application of pdgeqpf.
+
+  char uplo = 'U';              // upper triangle
+  char diag = 'N';              // copy the diagonal
+  pdtrmr2d_(&uplo, &diag, &block_size, &P,
+            ROOT_MEM, &IA, &JA, ROOT,
+            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+            &BLACS_CONTEXT);
+
+  std::vector<double> TAU(AY_local_cols);
+  std::vector<double> WORK(1);
+  int info;
+
+  pdgeqrf_(&block_size, &P,
+           R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+           TAU.data(), WORK.data(), &MINUS_ONE, &info); // workspace query
+  int LWORK = WORK[0];
+  WORK.resize(LWORK);
+
+  pdgeqrf_(&block_size, &P,
+           R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+           TAU.data(), WORK.data(), &LWORK, &info); // obtain R on the upper right triangle.
+
+  int IMAP[1];
+  IMAP[0] = mpi_rank(block);
+
+  int NODE_CONTEXT;
+  Cblacs_get(-1, 0, &NODE_CONTEXT);
+  Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
+
+  int S_block[9];
+  int S_nrows = 0, S_ncols = 0;
+  int rank = A.ranks(block, level);
+  if (mpi_rank(block) == MPIRANK) {
+    S_nrows = rank;
+    S_ncols = rank;
+  }
+
+  Matrix US(S_nrows, S_ncols);
+  int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
+  Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
+  descset_(S_block, &rank, &rank, &rank, &rank,
+           &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &rank, &info);
+
+  pdtrmr2d_(&uplo, &diag, &rank, &rank,
+            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+            &US, &ONE, &ONE, S_block,
+            &BLACS_CONTEXT);
+
+  if (mpi_rank(block) == MPIRANK) {
+    A.US.insert(block, level, std::move(US));
+  }
+}
+
+
 Matrix Ut_r;
 // perform distributed pivoted QR on A and return the rank subject to accuracy
 // on all processes.
@@ -183,6 +245,10 @@ pivoted_QR(SymmetricSharedBasisMatrix& H2_A,
   int mov_rank = rank;
   H2_A.ranks.insert(block, level, std::move(mov_rank));
 
+  generate_US_block(H2_A, A, DESCA,
+                    R_TEMP_MEM, R_TEMP,
+                    IA, JA, M, block, level);
+
   // obtain orthogonal factors
   pdorgqr_(&M, &min_MN, &min_MN,
            A, &IA, &JA, DESCA,
@@ -197,66 +263,6 @@ pivoted_QR(SymmetricSharedBasisMatrix& H2_A,
            &LWORK, &info); // compute Q factors
 
   return rank;
-}
-
-void
-generate_US_block(SymmetricSharedBasisMatrix& A,
-                  std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
-                  int IA, int JA, int block_size, int block, int level) {
-
-  // Copy the upper triangular slice of AY_MEM into R_TEMP_MEM that corresponds
-  // to the R block after application of pdgeqpf.
-
-  char uplo = 'U';              // upper triangle
-  char diag = 'N';              // copy the diagonal
-  pdtrmr2d_(&uplo, &diag, &block_size, &P,
-            AY_MEM, &IA, &JA, AY,
-            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
-            &BLACS_CONTEXT);
-
-  std::vector<double> TAU(AY_local_cols);
-  std::vector<double> WORK(1);
-  int info;
-
-  pdgeqrf_(&block_size, &P,
-           R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
-           TAU.data(), WORK.data(), &MINUS_ONE, &info); // workspace query
-  int LWORK = WORK[0];
-  WORK.resize(LWORK);
-
-  pdgeqrf_(&block_size, &P,
-           R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
-           TAU.data(), WORK.data(), &LWORK, &info); // obtain R on the upper right triangle.
-
-  int IMAP[1];
-  IMAP[0] = mpi_rank(block);
-
-  int NODE_CONTEXT;
-  Cblacs_get(-1, 0, &NODE_CONTEXT);
-  Cblacs_gridmap(&NODE_CONTEXT, IMAP, ONE, ONE, ONE);
-
-  int S_block[9];
-  int S_nrows = 0, S_ncols = 0;
-  int rank = A.ranks(block, level);
-  if (mpi_rank(block) == MPIRANK) {
-    S_nrows = rank;
-    S_ncols = rank;
-  }
-
-  Matrix US(S_nrows, S_ncols);
-  int LOCAL_NROWS, LOCAL_NCOLS, LOCAL_ROW, LOCAL_COL;
-  Cblacs_gridinfo(NODE_CONTEXT, &LOCAL_NROWS, &LOCAL_NCOLS, &LOCAL_ROW, &LOCAL_COL);
-  descset_(S_block, &rank, &rank, &rank, &rank,
-           &LOCAL_ROW, &LOCAL_COL, &NODE_CONTEXT, &rank, &info);
-
-  pdtrmr2d_(&uplo, &diag, &rank, &rank,
-            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
-            &US, &ONE, &ONE, S_block,
-            &BLACS_CONTEXT);
-
-  if (mpi_rank(block) == MPIRANK) {
-    A.US.insert(block, level, std::move(US));
-  }
 }
 
 void
@@ -387,7 +393,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     // ranks are stored in all processes.
     A.ranks.insert(block, A.max_level, std::move(rank));
 
-    generate_US_block(A, R_TEMP_MEM, R_TEMP, IA, JA, block_size, block, A.max_level);
+    generate_US_block(A, AY_MEM, AY, R_TEMP_MEM, R_TEMP, IA, JA, block_size, block, A.max_level);
 
     // obtain orthogonal factors
     pdorgqr_(&block_size, &P, &P,
