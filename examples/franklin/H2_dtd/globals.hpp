@@ -54,6 +54,11 @@ extern "C" {
                double *BETA, double *Y, int *IY, int *JY, int *DESCY,
                int *INCY);
 
+  // Unpivoted QR. A is replaced with elementary reflectors of A.
+  void pdgeqrf_(const int* m, const int* n,
+                double* a, const int* ia, const int* ja, const int* desca,
+                double* tau, double* work, const int* lwork, int* info);
+
   // Pivoted QR. A is replaced with elementary reflectors of A.
   void	pdgeqpf_(const int* m, const int* n, double* a, const int* ia,
                  const int* ja, const int* desca, int* ipiv, double* tau,

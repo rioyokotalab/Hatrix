@@ -207,6 +207,19 @@ generate_US_block(std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
             R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
             &BLACS_CONTEXT);
 
+  std::vector<double> TAU(AY_local_cols);
+  std::vector<double> WORK(1);
+  int info;
+
+  pdgeqrf_(&block_size, &P,
+           R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+           TAU.data(), WORK.data(), &MINUS_ONE, &info); // workspace query
+  int LWORK = WORK[0];
+  WORK.resize(LWORK);
+
+  pdgeqrf_(&block_size, &P,
+           R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+           TAU.data(), WORK.data(), &LWORK, &info); // obtain R on the upper right triangle.
 }
 
 void
@@ -258,7 +271,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
               RAND_MEM, &IB, &JB, RAND,
               &BETA,
               AY_MEM, &IC, &JC, AY);
-
     }
   }
 
