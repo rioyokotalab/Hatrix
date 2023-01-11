@@ -194,6 +194,11 @@ pivoted_QR(double* A, int M, int N,
 }
 
 void
+generate_US_block(int IA, int JA, int block_size, int block, int level) {
+
+}
+
+void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Hatrix::Domain& domain,
                     const Hatrix::Args& opts) {
@@ -246,10 +251,14 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
   }
 
+  std::vector<double> R_TEMP_MEM(int64_t(AY_local_rows) * int64_t(AY_local_cols));
+  std::vector<int> R_TEMP(9);
+  descinit_(R_TEMP.data(), &N, &P, &DENSE_NBROW, &NBCOL, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &AY_local_rows, &info);
+
   // generate column bases from the randomized blocks.
   for (int block = 0; block < nblocks; ++block) {
     int block_size = domain.cell_size(block, A.max_level);
-
     int IA = block_size * block + 1;
     int JA = 1;
 
@@ -272,6 +281,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
              AY_MEM, &IA, &JA, AY,
              IPIV.data(), TAU.data(), WORK.data(),
              &LWORK, &info);    // distributed pivoted QR
+
+    generate_US_block(IA, JA, block_size, block, A.max_level);
 
     std::vector<double> RANKVECTOR(AY_local_cols, 0);
     int diagonals = 0;

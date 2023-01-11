@@ -458,6 +458,30 @@ task_nb_rank_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   return PARSEC_HOOK_RETURN_DONE;
 }
 
+void
+parsec_dtd_unpack_refs(parsec_task_t *this_task, ...)
+{
+    parsec_dtd_task_t *current_task = (parsec_dtd_task_t *)this_task;
+    parsec_dtd_task_param_t *current_param = GET_HEAD_OF_PARAM_LIST(current_task);
+    int i = 0;
+    void *tmp_val;
+    void **tmp_ref;
+    va_list arguments;
+
+    va_start(arguments, this_task);
+    while( current_param != NULL) {
+      if((current_param->op_type & PARSEC_GET_OP_TYPE) == PARSEC_INPUT ||
+         (current_param->op_type & PARSEC_GET_OP_TYPE) == PARSEC_INOUT ||
+         (current_param->op_type & PARSEC_GET_OP_TYPE) == PARSEC_OUTPUT ) {
+        tmp_ref = va_arg(arguments, void**);
+        *tmp_ref = this_task->data[i].data_in;
+        i++;
+      }
+      current_param = current_param->next;
+    }
+    va_end(arguments);
+}
+
 parsec_hook_return_t
 task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t F_block_j_nrows,  F_block_j_ncols;
@@ -473,6 +497,13 @@ task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
 
   fill_in += matmul(F_block_j, F_block_j, false, true);
+
+  // parsec_data_copy_t* _F_block_j_tile, *_fill_in_tile;
+  // parsec_dtd_unpack_refs(this_task, &_F_block_j_tile, &_fill_in_tile);
+
+  // PARSEC_OBJ_RELEASE(_F_block_j_tile->data_copy->original); // release the parsec reference.
+
+  // TODO: free the F(block, j) fill in with a custom desctructor..
 
   return PARSEC_HOOK_RETURN_DONE;
 }

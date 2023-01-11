@@ -34,7 +34,6 @@ parsec_data_t*
 data_of_key(parsec_data_collection_t* desc, parsec_data_key_t key) {
   h2_dc_t* dc = (h2_dc_t*)desc;
   parsec_data_t* data = NULL;
-
   if (dc->data_map.count(key) != 0) {
     data = dc->data_map[key];
   }
@@ -1242,6 +1241,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in.super, fill_in_key),
                                PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
           PARSEC_DTD_ARG_END);
+
       }
     }
   }

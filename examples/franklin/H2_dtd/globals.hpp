@@ -86,6 +86,12 @@ extern "C" {
                const double *a, const int *ia, const int *ja, const int *desca,
                double *b, const int *ib, const int *jb, const int *descb );
 
+  void pdgesvd_(const char* jobu, const char* jobvt,
+                const int* m, const int* n, const double* a, const int* ia, const int* ja,
+                const int* desca, double* s, double* u, const int* iu, const int* ju,
+                const int* descu, double* vt, const int* ivt, const int* jvt,
+                const int* descvt, double* work, const int* lwork, int* info);
+
 
 //   // scalapack copying routines
 //   // https://netlib.org/scalapack/slug/node164.html
