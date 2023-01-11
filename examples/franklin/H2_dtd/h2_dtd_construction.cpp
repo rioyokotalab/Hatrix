@@ -194,7 +194,18 @@ pivoted_QR(double* A, int M, int N,
 }
 
 void
-generate_US_block(int IA, int JA, int block_size, int block, int level) {
+generate_US_block(std::vector<double>& R_TEMP_MEM, std::vector<int>& R_TEMP,
+                  int IA, int JA, int block_size, int block, int level) {
+
+  // Copy the upper triangular slice of AY_MEM into R_TEMP_MEM that corresponds
+  // to the R block after application of pdgeqpf.
+
+  char uplo = 'U';              // upper triangle
+  char diag = 'N';              // copy the diagonal
+  pdtrmr2d_(&uplo, &diag, &block_size, &P,
+            AY_MEM, &IA, &JA, AY,
+            R_TEMP_MEM.data(), &IA, &JA, R_TEMP.data(),
+            &BLACS_CONTEXT);
 
 }
 
@@ -282,7 +293,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
              IPIV.data(), TAU.data(), WORK.data(),
              &LWORK, &info);    // distributed pivoted QR
 
-    generate_US_block(IA, JA, block_size, block, A.max_level);
+    generate_US_block(R_TEMP_MEM, R_TEMP, IA, JA, block_size, block, A.max_level);
 
     std::vector<double> RANKVECTOR(AY_local_cols, 0);
     int diagonals = 0;

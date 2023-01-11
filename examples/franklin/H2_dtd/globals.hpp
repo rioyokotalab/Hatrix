@@ -71,6 +71,12 @@ extern "C" {
                  double *b, const int *ib, const int *jb, const int *descb,
                  const int *ictxt);
 
+  // Copy triangular matrix A to B. Works across MPI contexts.
+  void pdtrmr2d_(const char *uplo, const char *diag, const int *m, const int *n,
+               const double *a, const int *ia, const int *ja, const int *desca,
+               double *b, const int *ib, const int *jb, const int *descb,
+               const int *ictxt);
+
   // frobenius norm
   double pdlange_(const char* norm, const int* m, const int* n,
                    const double* a, const int* ia, const int* ja,
