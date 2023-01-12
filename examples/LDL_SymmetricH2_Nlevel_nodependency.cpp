@@ -890,12 +890,11 @@ int main(int argc, char ** argv) {
   // For anchor-net method: size of grid
   int64_t sample_far_size = argc > 13 ? atol(argv[13]) :
                             (ndim == 1 ? 10 * leaf_size + 10: sample_self_size + 5);
-  const int64_t print_header = argc > 14 ? atol(argv[14]) : 1;
+  const int64_t print_csv_header = argc > 14 ? atol(argv[14]) : 1;
 
   // ELSES Input Files
   const std::string file_name = argc > 15 ? std::string(argv[15]) : "";
   const int64_t read_sorted_bodies = argc > 16 ? atol(argv[16]) : 0;
-  
 
   Hatrix::Context::init();
 
@@ -1062,7 +1061,7 @@ int main(int argc, char ** argv) {
 #endif
 
 #ifdef OUTPUT_CSV
-  if (print_header == 1) {
+  if (print_csv_header == 1) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
