@@ -507,3 +507,26 @@ task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   return PARSEC_HOOK_RETURN_DONE;
 }
+
+parsec_hook_return_t
+task_fill_in_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t block_size;
+  double *_fill_in;
+  int64_t rank;
+  double *_US;
+  int64_t U_nrows, U_ncols;
+  double *_U;
+
+  parsec_dtd_unpack_args(this_task,
+                         &block_size, &_fill_in,
+                         &rank, &_US,
+                         &U_nrows, &U_ncols, &_U);
+
+  MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
+  MatrixWrapper US(_US, rank, rank, rank);
+  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
+
+  fill_in += matmul(matmul(U, US), U, false, true);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}

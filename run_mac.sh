@@ -14,12 +14,12 @@ make -j H2_main
 make -j H2_dtd
 
 for adm in 0.8; do
-    nleaf=128
+    nleaf=256
     ndim=3
-    max_rank=100
+    max_rank=150
 
-    for N in 4096; do
-        ./bin/H2_dtd --N $N \
+    for N in 4096 8192; do
+        ./bin/H2_main --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \

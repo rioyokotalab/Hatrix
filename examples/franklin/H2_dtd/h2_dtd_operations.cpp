@@ -9,7 +9,7 @@
 
 using namespace Hatrix;
 
-static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F, parsec_temp_fill_in;
+static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F, parsec_temp_fill_in, parsec_US;
 static int U_ARENA, D_ARENA, S_ARENA;
 
 static RowColLevelMap<Matrix> F;
@@ -1245,6 +1245,16 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
       }
     }
   }
+
+  int64_t rank = A.ranks(block, level);
+
+  // parsec_dtd_insert_task(dtd_tp, task_fill_in_QR, 0, PARSEC_DEV_CPU,
+  //                        "fill_in_QR_task",
+  //                        sizeof(int64_t), &block_size, PARSEC_VALUE,
+  //                        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in.super, fill_in_key),
+  //                        PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+  //                        sizeof(int64_t), &rank, PARSEC_VALUE,
+  //                        PARSEC_DTD_ARG_END);
 }
 
 void
@@ -1346,12 +1356,18 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
   // setup pointers to data for use with parsec.
   for (int64_t i = 0; i < nblocks; ++i) { // U
     parsec_data_key_t U_data_key = parsec_U.super.data_key(&parsec_U.super, i, level);
+    parsec_data_key_t US_data_key = parsec_US.super.data_key(&parsec_US.super, i, level);
+
     if (mpi_rank(i) == MPIRANK) {
       Matrix& U_i = A.U(i, level);
       parsec_U.matrix_map[U_data_key] = std::addressof(U_i);
-      // TODO: how to do this in a C++-way?
+
+
+      Matrix& US_i = A.US(i, level);
+      parsec_US.matrix_map[US_data_key] = std::addressof(US_i);
     }
     parsec_U.mpi_ranks[U_data_key] = mpi_rank(i);
+    parsec_US.mpi_ranks[US_data_key] = mpi_rank(i);
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1532,6 +1548,7 @@ void h2_dc_init_maps() {
   h2_dc_init(parsec_D, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_F, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_temp_fill_in, data_key_1d, rank_of_1d);
+  h2_dc_init(parsec_US, data_key_1d, rank_of_1d);
 }
 
 void
@@ -1541,6 +1558,7 @@ h2_dc_destroy_maps() {
   h2_dc_destroy(parsec_D);
   h2_dc_destroy(parsec_F);
   h2_dc_destroy(parsec_temp_fill_in);
+  h2_dc_destroy(parsec_US);
 }
 
 void
@@ -1692,6 +1710,7 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
 
   std::cout << "submit tasks.\n";
 
