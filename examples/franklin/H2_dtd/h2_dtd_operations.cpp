@@ -1362,7 +1362,6 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       Matrix& U_i = A.U(i, level);
       parsec_U.matrix_map[U_data_key] = std::addressof(U_i);
 
-
       Matrix& US_i = A.US(i, level);
       parsec_US.matrix_map[US_data_key] = std::addressof(US_i);
     }

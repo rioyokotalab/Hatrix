@@ -106,6 +106,38 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
   }
 
   if (A.max_level != A.min_level) { A.min_level++; }
+
+  // make this BLR2
+  for (int level = A.max_level - 1; level >= A.min_level; --level) {
+    int nblocks = pow(2, level);
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = 0; j < nblocks; ++j) {
+        if (A.is_admissible.exists(i, j, level)) {
+          A.is_admissible.erase(i, j, level);
+        }
+      }
+    }
+  }
+
+  // remove stuff from max_level and put it in level 1
+  int nblocks = pow(2, A.max_level);
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      if (!A.is_admissible.exists(i, j, A.max_level)) {
+        A.is_admissible.insert(i, j, A.max_level, true);
+      }
+    }
+  }
+
+  // set max_level-1 to fully dense so that you can merge blocks into this level.
+  nblocks = pow(2, A.max_level - 1);
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < nblocks; ++j) {
+      A.is_admissible.insert(i, j, A.max_level-1, false);
+    }
+  }
+
+  A.min_level = A.max_level;
 }
 
 void
@@ -706,8 +738,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     else {
       int rank = std::max(A.ranks(c1, child_level), A.ranks(c2, child_level));
       if (mpi_rank(block) == MPIRANK) {
-        A.U.insert(block, level, generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
-                                                          rank));
+        A.U.insert(block, level,
+                   generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
+                                            rank));
+        A.US.insert(block, level,
+                    generate_identity_matrix(rank, rank));
       }
       A.ranks.insert(block, level, std::move(rank));
     }
