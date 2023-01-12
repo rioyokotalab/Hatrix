@@ -540,7 +540,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
     if (exists_and_admissible(A, block, j, level)) {
       if (F.exists(block, j, level)) {
         fill_in += matmul(F(block, j, level), F(block, j, level), false, true);
-        F.erase(block, j, level);
+        // F.erase(block, j, level);
       }
     }
   }
@@ -802,6 +802,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
                                                      true),
                                               A.U(j, level));
             A.S(i, j, level) += projected_fill_in;
+            F.erase(i, j, level);
           }
         }
       }
