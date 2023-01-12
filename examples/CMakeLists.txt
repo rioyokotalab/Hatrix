@@ -51,6 +51,7 @@ else()
     Construction_SymmetricH2_Nlevel_with_sampling
     ULV_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency
+    LDL_SymmetricH2_Nlevel_nodependency_directschur
     Eigen_SymmetricH2_Nlevel_nodependency
     Eigen_SymmetricH2_Nlevel_nodependency_comp_fill_in
     Construction_ELSES
