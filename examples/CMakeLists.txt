@@ -53,7 +53,7 @@ else()
     LDL_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency_directschur
     Eigen_SymmetricH2_Nlevel_nodependency
-    Eigen_SymmetricH2_Nlevel_nodependency_comp_fill_in
+    Eigen_SymmetricH2_Nlevel_nodependency_directschur
     Construction_ELSES
     Eigen_ELSES
   )

@@ -15,6 +15,9 @@
 #include <fstream>
 #include <chrono>
 #include <stdexcept>
+#include <cstdio>
+
+#include "nlohmann/json.hpp"
 
 #include "Hatrix/Hatrix.h"
 #include "Domain.hpp"
@@ -23,7 +26,7 @@
 constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
-#define USE_SVD_COMPRESSION
+// #define OUTPUT_CSV
 
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
@@ -73,14 +76,21 @@ class SymmetricH2 {
 
  private:
   void initialize_geometry_admissibility(const Domain& domain);
+  int64_t get_block_size(const Domain& domain, const int64_t node, const int64_t level) const;
+  std::vector<int64_t> get_skeleton(const Domain& domain,
+                                    const int64_t node, const int64_t level) const;
   void generate_row_cluster_basis(const Domain& domain, const int64_t level,
                                   const bool include_fill_in);
   void generate_near_coupling_matrices(const Domain& domain);
   void generate_far_coupling_matrices(const Domain& domain, const int64_t level);
-
   Matrix get_Ubig(const int64_t node, const int64_t level) const;
+  void fill_JSON(const Domain& domain,
+                 const int64_t i, const int64_t j,
+                 const int64_t level, nlohmann::json& json) const;
 
-  void compute_fill_in(const int64_t level);
+  Matrix get_dense_skeleton(const Domain& domain,
+                            const int64_t i, const int64_t j, const int64_t level) const;
+  void compute_fill_in(const Domain& domain, const int64_t level);
   void factorize_level(const int64_t level);
   void permute_and_merge(const int64_t level);
 
@@ -97,6 +107,7 @@ class SymmetricH2 {
   void print_structure(const int64_t level) const;
   void print_ranks() const;
   double low_rank_block_ratio() const;
+  void write_JSON(const Domain& domain, const std::string filename) const;
 
   void factorize(const Domain& domain);
   std::tuple<int64_t, int64_t> inertia(const Domain& domain,
@@ -144,6 +155,44 @@ void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
   }
 }
 
+int64_t SymmetricH2::get_block_size(const Domain& domain, const int64_t node, const int64_t level) const {
+  const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+  const auto idx = domain.get_cell_idx(node, node_level);
+  return domain.cells[idx].nbodies;
+}
+
+std::vector<int64_t> SymmetricH2::get_skeleton(const Domain& domain,
+                                               const int64_t node, const int64_t level) const {
+  const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
+  const auto idx = domain.get_cell_idx(node, node_level);
+  const auto& cell = domain.cells[idx];
+  std::vector<int64_t> skeleton;
+  if (level == height) {
+    // Leaf level: use all bodies
+    skeleton = cell.get_bodies();
+  }
+  else {
+    if (matrix_type == BLR2_MATRIX) {
+      // BLR2 Root: Gather multipoles of all leaf level nodes
+      const auto nleaf_nodes = level_blocks[height];
+      for (int64_t child = 0; child < nleaf_nodes; child++) {
+        const auto& child_multipoles = multipoles(child, height);
+        skeleton.insert(skeleton.end(), child_multipoles.begin(), child_multipoles.end());
+      }
+    }
+    else {
+      // H2 Non-Leaf: Gather children's multipoles
+      const auto& child1 = domain.cells[cell.child];
+      const auto& child2 = domain.cells[cell.child + 1];
+      const auto& child1_multipoles = multipoles(child1.block_index, child1.level);
+      const auto& child2_multipoles = multipoles(child2.block_index, child2.level);
+      skeleton.insert(skeleton.end(), child1_multipoles.begin(), child1_multipoles.end());
+      skeleton.insert(skeleton.end(), child2_multipoles.begin(), child2_multipoles.end());
+    }
+  }
+  return skeleton;
+}
+
 void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
                                              const int64_t level,
                                              const bool include_fill_in) {
@@ -152,80 +201,42 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
     const auto idx = domain.get_cell_idx(i, node_level);
     const auto& cell = domain.cells[idx];
-    std::vector<int64_t> skeleton;
-    if (level == height) {
-      // Leaf level: use all bodies
-      skeleton = cell.get_bodies();
-    }
-    else {
-      if (matrix_type == BLR2_MATRIX) {
-        // BLR2 Root: Gather multipoles of all leaf level nodes
-        const auto nleaf_nodes = level_blocks[height];
-        for (int64_t child = 0; child < nleaf_nodes; child++) {
-          const auto& child_multipoles = multipoles(child, height);
-          skeleton.insert(skeleton.end(), child_multipoles.begin(), child_multipoles.end());
-        }
-      }
-      else {
-        // H2 Non-Leaf: Gather children's multipoles
-        const auto& child1 = domain.cells[cell.child];
-        const auto& child2 = domain.cells[cell.child + 1];
-        const auto& child1_multipoles = multipoles(child1.block_index, child1.level);
-        const auto& child2_multipoles = multipoles(child2.block_index, child2.level);
-        skeleton.insert(skeleton.end(), child1_multipoles.begin(), child1_multipoles.end());
-        skeleton.insert(skeleton.end(), child2_multipoles.begin(), child2_multipoles.end());
-      }
-    }
+    const auto skeleton = get_skeleton(domain, i, level);
     const int64_t skeleton_size = skeleton.size();
-    const int64_t near_size = include_fill_in ?
-                              cell.sample_nearfield.size() : 0;
-    const int64_t far_size  = (!include_fill_in && cell.far_list.size() == 0) ?
-                              0 : cell.sample_farfield.size();
+    const int64_t near_size = include_fill_in ? cell.sample_nearfield.size() : 0;
+    const int64_t far_size  = cell.sample_farfield.size();
     if (near_size + far_size > 0) {
       Matrix skeleton_dn(skeleton_size, 0);
       Matrix skeleton_lr(skeleton_size, 0);
       // Fill-in (dense) part
       if (near_size > 0) {
         // Concat fill-ins
-        Matrix dn_work(skeleton_size, skeleton_size);
         for (int64_t j = 0; j <num_nodes; j++) {
           if (F.exists(i, j, level)) {
-            matmul(F(i, j, level), F(i, j, level), dn_work, false, true, 1, 1);
+            skeleton_dn = concat(skeleton_dn, F(i, j, level), 1);
           }
         }
-        skeleton_dn = concat(skeleton_dn, dn_work, 1);
       }
       // Low-rank part
       if (far_size > 0) {
         skeleton_lr = concat(skeleton_lr, generate_p2p_matrix(domain, skeleton, cell.sample_farfield), 1);
       }
-      Matrix skeleton_row = concat(skeleton_dn, skeleton_lr, 1);
+      Matrix skeleton_row = concat(skeleton_lr, skeleton_dn, 1);
 
-      Matrix Ui;
+      Matrix Ui, Si, Vi;
       int64_t rank;
       std::vector<int64_t> ipiv_row;
-#ifdef USE_SVD_COMPRESSION
-      Matrix Stemp, Vtemp;
-      std::tie(Ui, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
+      // SVD followed by ID
+      std::tie(Ui, Si, Vi, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
       // Truncate to max_rank if exceeded
       if (max_rank > 0 && rank > max_rank) {
         rank = max_rank;
         Ui.shrink(Ui.rows, rank);
-        Stemp.shrink(rank, rank);
+        Si.shrink(rank, rank);
       }
       // ID to get skeleton rows
-      column_scale(Ui, Stemp);
+      column_scale(Ui, Si);
       id_row(Ui, ipiv_row);
-#else
-      // ID Compression
-      std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
-      rank = Ui.cols;
-      // Truncate to max_rank if exceeded
-      if (max_rank > 0 && rank > max_rank) {
-        rank = max_rank;
-        Ui.shrink(Ui.rows, rank);
-      }
-#endif
       // Multiply U with child R
       if (level < height) {
         const auto& child1 = domain.cells[cell.child];
@@ -332,7 +343,7 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  err_tol = accuracy * 1e-2;
+  err_tol = accuracy;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
   if (build_basis) {
@@ -464,10 +475,77 @@ double SymmetricH2::low_rank_block_ratio() const {
   return low_rank / total;
 }
 
-void SymmetricH2::compute_fill_in(const int64_t level) {
+void SymmetricH2::fill_JSON(const Domain& domain,
+                            const int64_t i, const int64_t j,
+                            const int64_t level,
+                            nlohmann::json& json) const {
+  json["abs_pos"] = {i, j};
+  json["level"] = level;
+  json["dim"] = {get_block_size(domain, i, level), get_block_size(domain, j, level)};
+  if (is_admissible.exists(i, j, level)) {
+    if (is_admissible(i, j, level)) {
+      json["type"] = "LowRank";
+      json["rank"] = U(i, level).cols;
+      const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+      Matrix Dij = generate_p2p_matrix(domain, i, j, node_level);
+      json["svalues"] = get_singular_values(Dij);
+    }
+    else {
+      if (level == height) {
+        json["type"] = "Dense";
+        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+        Matrix Dij = generate_p2p_matrix(domain, i, j, node_level);
+        json["svalues"] = get_singular_values(Dij);
+      }
+      else {
+        json["type"] = "Hierarchical";
+        json["children"] = {};
+        if (matrix_type == BLR2_MATRIX) {
+          for (int64_t i_child = 0; i_child < level_blocks[height]; i_child++) {
+            std::vector<nlohmann::json> row(level_blocks[height]);
+            int64_t j_pos = 0;
+            for (int64_t j_child = 0; j_child < level_blocks[height]; j_child++) {
+              fill_JSON(domain, i_child, j_child, height, row[j_pos]);
+              j_pos++;
+            }
+            json["children"].push_back(row);
+          }
+        }
+        else {
+          for (int64_t i_child = 2 * i; i_child <= (2 * i + 1); i_child++) {
+            std::vector<nlohmann::json> row(2);
+            int64_t j_pos = 0;
+            for (int64_t j_child = 2 * j; j_child <= (2 * j + 1); j_child++) {
+              fill_JSON(domain, i_child, j_child, level + 1, row[j_pos]);
+              j_pos++;
+            }
+            json["children"].push_back(row);
+          }
+        }
+      }
+    }
+  }
+}
+
+void SymmetricH2::write_JSON(const Domain& domain,
+                             const std::string filename) const {
+  nlohmann::json json;
+  fill_JSON(domain, 0, 0, 0, json);
+  std::ofstream out_file(filename);
+  out_file << json << std::endl;
+}
+
+Matrix SymmetricH2::get_dense_skeleton(const Domain& domain,
+                                       const int64_t i, const int64_t j, const int64_t level) const {
+  const auto skeleton_i = get_skeleton(domain, i, level);
+  const auto skeleton_j = get_skeleton(domain, j, level);
+  return generate_p2p_matrix(domain, skeleton_i, skeleton_j);
+}
+
+void SymmetricH2::compute_fill_in(const Domain& domain, const int64_t level) {
   const int64_t num_nodes = level_blocks[level];
   for (int64_t k = 0; k < num_nodes; k++) {
-    Matrix Dkk = D(k, k, level);
+    Matrix Dkk = get_dense_skeleton(domain, k, k, level);
     Matrix Qkk(Dkk.rows, Dkk.rows);
     Matrix Rkk(Dkk.rows, Dkk.cols);
     qr(Dkk, Qkk, Rkk);
@@ -476,8 +554,8 @@ void SymmetricH2::compute_fill_in(const int64_t level) {
         if (i != k && j != k &&
             is_admissible.exists(i, k, level) && !is_admissible(i, k, level) &&
             is_admissible.exists(k, j, level) && !is_admissible(k, j, level)) {
-          Matrix& Dik = D(i, k, level);
-          Matrix& Dkj = D(k, j, level);
+          Matrix Dik = get_dense_skeleton(domain, i, k, level);
+          Matrix Dkj = get_dense_skeleton(domain, k, j, level);
           // Compute fill_in = Dik * inv(Dkk) * Dkj
           Matrix C = matmul(Qkk, Dkj, true, false, 1); // C = Q^T x Dkj
           solve_triangular(Rkk, C, Hatrix::Left, Hatrix::Upper, false, false); // C = inv(Rkk) x C
@@ -606,7 +684,7 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
 
 void SymmetricH2::factorize(const Domain& domain) {
   for (int64_t level = height; level >= 0; level--) {
-    compute_fill_in(level);
+    compute_fill_in(domain, level);
     generate_row_cluster_basis(domain, level, true);
     generate_far_coupling_matrices(domain, level);
     factorize_level(level);
@@ -632,13 +710,13 @@ SymmetricH2::inertia(const Domain& domain,
   for(int64_t level = height; level >= 0; level--) {
     int64_t num_nodes = level_blocks[level];
     for(int64_t node = 0; node < num_nodes; node++) {
-      Matrix& D_node = A_shifted.D(node, node, level);
+      const Matrix& D_node = A_shifted.D(node, node, level);
+      const auto c_size = A_shifted.Uc(node, level).cols;
       if(level == 0) {
         D_lambda = concat(D_lambda, diag(D_node), 0);
       }
       else {
-        auto D_node_splits = D_node.split(vec{A_shifted.Uc(node, level).cols},
-                                          vec{A_shifted.Uc(node, level).cols});
+        auto D_node_splits = D_node.split(vec{c_size}, vec{c_size});
         Matrix& D_node_cc = D_node_splits[0];
         D_lambda = concat(D_lambda, diag(D_node_cc), 0);
       }
@@ -667,7 +745,7 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain,
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
       break;
     }
-    if(factor_max_rank >= shift_max_rank) {
+    if(factor_max_rank > shift_max_rank) {
       shift_max_rank = factor_max_rank;
       max_rank_shift = mid;
     }
@@ -680,59 +758,59 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain,
 } // namespace Hatrix
 
 int main(int argc, char ** argv) {
-  const int64_t N = argc > 1 ? atol(argv[1]) : 256;
-  const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
+  int64_t N = argc > 1 ? atol(argv[1]) : 256;
+  int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-8;
-  const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
-  const double admis = argc > 5 ? atof(argv[5]) : 3;
+  // Use relative or absolute error threshold for LRA
+  const bool use_rel_acc = argc > 4 ? (atol(argv[4]) == 1) : false;
+  const int64_t max_rank = argc > 5 ? atol(argv[5]) : 30;
+  const double admis = argc > 6 ? atof(argv[6]) : 3;
+
+  // Specify compressed representation
+  // 0: BLR2
+  // 1: H2
+  const int64_t matrix_type = argc > 7 ? atol(argv[7]) : 1;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
-  const int64_t kernel_type = argc > 6 ? atol(argv[6]) : 0;
+  // 2: ELSES Dense Matrix
+  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
   // 1: Unit Cubical
   // 2: StarsH Uniform Grid
-  const int64_t geom_type = argc > 7 ? atol(argv[7]) : 0;
-  const int64_t ndim  = argc > 8 ? atol(argv[8]) : 1;
+  // 3: ELSES Geometry (ndim = 3)
+  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
+  int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
 
   // Specify sampling technique
   // 0: Choose bodies with equally spaced indices
   // 1: Choose bodies random indices
   // 2: Farthest Point Sampling
   // 3: Anchor Net method
-  const int64_t sampling_algo = argc > 9 ? atol(argv[9]) : 3;
+  const int64_t sampling_algo = argc > 11 ? atol(argv[11]) : 3;
   // Specify maximum number of sample points that represents a cluster
   // For anchor-net method: size of grid
-  int64_t sample_self_size = argc > 10 ? atol(argv[10]) :
+  int64_t sample_self_size = argc > 12 ? atol(argv[12]) :
                              (ndim == 1 ? 10 * leaf_size : 30);
-  // Specify maximum number of sample points that represents a cluster's near-field
-  // For anchor-net method: size of grid
-  int64_t sample_near_size = argc > 11 ? atol(argv[11]) :
-                            (ndim == 1 ? 10 * leaf_size + 10: sample_self_size + 5);
   // Specify maximum number of sample points that represents a cluster's far-field
   // For anchor-net method: size of grid
-  int64_t sample_far_size = argc > 12 ? atol(argv[12]) :
+  int64_t sample_far_size = argc > 13 ? atol(argv[13]) :
                             (ndim == 1 ? 10 * leaf_size + 10: sample_self_size + 5);
-
-  // Use relative or absolute error threshold
-  const bool use_rel_acc = argc > 13 ? (atol(argv[13]) == 1) : false;
-
-  // Specify compressed representation
-  // 0: BLR2
-  // 1: H2
-  const int64_t matrix_type = argc > 14 ? atol(argv[14]) : 1;
-
   // Eigenvalue computation parameters
-  const double ev_tol = argc > 15 ? atof(argv[15]) : 1.e-3;
-  int64_t m_begin = argc > 16 ? atol(argv[16]) : 1;
-  int64_t m_end = argc > 17 ? atol(argv[17]) : m_begin;
+  const double ev_tol = argc > 14 ? atof(argv[14]) : 1.e-3;
+  int64_t m_begin = argc > 15 ? atol(argv[15]) : 1;
+  int64_t m_end = argc > 16 ? atol(argv[16]) : m_begin;
+  const int64_t print_csv_header = argc > 17 ? atol(argv[17]) : 1;
+  // ELSES Input Files
+  const std::string file_name = argc > 18 ? std::string(argv[18]) : "";
+  const int64_t read_sorted_bodies = argc > 19 ? atol(argv[19]) : 0;
 
   Hatrix::Context::init();
 
-  Hatrix::set_kernel_constants(1e-3 / (double)N, 1.);
+  Hatrix::set_kernel_constants(1.e-3 / (double)N, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
     case 0: {
@@ -743,6 +821,11 @@ int main(int argc, char ** argv) {
     case 1: {
       Hatrix::set_kernel_function(Hatrix::yukawa_kernel);
       kernel_name = "yukawa";
+      break;
+    }
+    case 2: {
+      Hatrix::set_kernel_function(Hatrix::ELSES_dense_input);
+      kernel_name = "ELSES-kernel";
       break;
     }
     default: {
@@ -767,6 +850,11 @@ int main(int argc, char ** argv) {
     case 2: {
       domain.initialize_starsh_uniform_grid();
       geom_name += "starsh_uniform_grid";
+      break;
+    }
+    case 3: {
+      domain.ndim = 3;
+      geom_name = file_name;
       break;
     }
     default: {
@@ -794,10 +882,29 @@ int main(int argc, char ** argv) {
     }
   }
 
-  domain.build_tree(leaf_size);
+  // Pre-processing step for ELSES geometry
+  if (geom_type == 3) {
+    assert(file_name.length() > 0);
+    if (read_sorted_bodies == 1) {
+      geom_name = file_name + "_" + std::to_string(leaf_size);
+      const auto buckets = domain.read_bodies_ELSES_sorted(geom_name + ".xyz");
+      domain.build_tree_from_kmeans_ordering(leaf_size, buckets);
+      leaf_size = *(std::max_element(buckets.begin(), buckets.end()));
+    }
+    else {
+      domain.read_bodies_ELSES(file_name + ".xyz");
+      domain.build_tree(leaf_size);
+    }
+    N = domain.N;
+    domain.read_p2p_matrix_ELSES(file_name + ".dat");
+  }
+  else {
+    domain.build_tree(leaf_size);
+  }
   domain.build_interactions(admis);
+
   const auto start_sample = std::chrono::system_clock::now();
-  domain.build_sample_bodies(sample_self_size, sample_near_size, sample_far_size, sampling_algo);
+  domain.build_sample_bodies(sample_self_size, sample_far_size, sample_far_size, sampling_algo, geom_type == 3);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();
@@ -807,37 +914,46 @@ int main(int argc, char ** argv) {
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
-  double construct_error = A.construction_error(domain);
-  double lr_ratio = A.low_rank_block_ratio();
-  A.print_structure(A.height);
 
+#ifndef OUTPUT_CSV
   std::cout << "N=" << N
             << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
             << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
             << " max_rank=" << max_rank
+            << " LRA=" << "SVD_ID_QR"
             << " admis=" << admis << std::setw(3)
+            << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
+            << " kernel=" << kernel_name
+            << " geometry=" << geom_name
             << " sampling_algo=" << sampling_algo_name
             << " sample_self_size=" << sample_self_size
             << " sample_far_size=" << sample_far_size
             << " sample_farfield_max_size=" << domain.get_max_farfield_size()
-            << " compress_alg=" << "ID"
-            << " kernel=" << kernel_name
-            << " geometry=" << geom_name
-            << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
+            << " sample_time=" << sample_time
             << " height=" << A.height
-            << " LR%=" << lr_ratio * 100 << "%"
+            << " lr_ratio=" << A.low_rank_block_ratio() * 100 << "%"
             << " construct_min_rank=" << A.get_basis_min_rank()
             << " construct_max_rank=" << A.get_basis_max_rank()
-            << " sample_time=" << sample_time
             << " construct_time=" << construct_time
-            << " construct_error=" << std::scientific << construct_error
+            << " construct_error=" << std::scientific << A.construction_error(domain)
             << std::defaultfloat << std::endl;
+#endif
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
+  const auto dense_eig_start = std::chrono::system_clock::now();
   auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
+  const auto dense_eig_stop = std::chrono::system_clock::now();
+  const double dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                (dense_eig_stop - dense_eig_start).count();
 
   Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
+
+#ifndef OUTPUT_CSV
+  std::cout << "dense_eig_time=" << dense_eig_time
+            << std::endl;
+#endif
+
   bool s = false;
   auto b = 10 * (1. / Hatrix::PV);
   auto a = -b;
@@ -862,21 +978,33 @@ int main(int argc, char ** argv) {
     m_end--;
     std::shuffle(random_m.begin(), random_m.end(), g);
   }
+#ifdef OUTPUT_CSV
+  if (print_csv_header == 1) {
+    // Print CSV header
+    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
+              << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
+              << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
+              << ",dense_eig_time"
+              << ",m,ev_tol,h2_eig_time,ldl_max_rank,max_rank_shift,lapack_eigv,h2_eigv,eig_abs_err,success"
+              << std::endl;
+  }
+#endif
   for (int64_t k = m_begin; k <= m_end; k++) {
     const int64_t m = rand_m ? random_m[k] : k;
     double h2_mth_eigv, max_rank_shift;
     int64_t factor_max_rank;
-    const auto eig_start = std::chrono::system_clock::now();
+    const auto h2_eig_start = std::chrono::system_clock::now();
     std::tie(h2_mth_eigv, factor_max_rank, max_rank_shift) =
         M.get_mth_eigenvalue(domain, m, ev_tol, a, b);
-    const auto eig_stop = std::chrono::system_clock::now();
-    const double eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                            (eig_stop - eig_start).count();
+    const auto h2_eig_stop = std::chrono::system_clock::now();
+    const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                               (h2_eig_stop - h2_eig_start).count();
     double eig_abs_err = std::abs(h2_mth_eigv - lapack_eigv[m - 1]);
     bool success = (eig_abs_err < (0.5 * ev_tol));
+#ifndef OUTPUT_CSV
     std::cout << "m=" << m
               << " ev_tol=" << ev_tol
-              << " eig_time=" << eig_time
+              << " h2_eig_time=" << h2_eig_time
               << " factor_max_rank=" << factor_max_rank
               << " max_rank_shift=" << max_rank_shift
               << " lapack_eigv=" << std::setprecision(10) << lapack_eigv[m - 1]
@@ -884,6 +1012,40 @@ int main(int argc, char ** argv) {
               << " eig_abs_err=" << std::scientific << eig_abs_err << std::defaultfloat
               << " success=" << (success ? "TRUE" : "FALSE")
               << std::endl;
+#else
+    std::cout << N
+              << "," << leaf_size
+              << "," << accuracy
+              << "," << (use_rel_acc ? "rel_err" : "abs_err")
+              << "," << max_rank
+              << "," << "SVD_ID_QR"
+              << "," << admis
+              << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
+              << "," << kernel_name
+              << "," << geom_name
+              << "," << sampling_algo_name
+              << "," << sample_self_size
+              << "," << sample_far_size
+              << "," << domain.get_max_farfield_size()
+              << "," << sample_time
+              << "," << A.height
+              << "," << A.low_rank_block_ratio()
+              << "," << A.get_basis_min_rank()
+              << "," << A.get_basis_max_rank()
+              << "," << construct_time
+              << "," << std::scientific << A.construction_error(domain) << std::defaultfloat
+              << "," << dense_eig_time
+              << "," << m
+              << "," << ev_tol
+              << "," << h2_eig_time
+              << "," << factor_max_rank
+              << "," << max_rank_shift
+              << "," << lapack_eigv[m - 1]
+              << "," << h2_mth_eigv
+              << "," << std::scientific << eig_abs_err << std::defaultfloat
+              << "," << (success ? "TRUE" : "FALSE")
+              << std::endl;
+#endif
   }
 
   Hatrix::Context::finalize();
