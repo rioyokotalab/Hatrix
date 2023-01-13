@@ -1752,7 +1752,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
   for (int64_t block = 0; block < nblocks; ++block) {
     int64_t block_index = block / MPISIZE;
     if (mpi_rank(block) == MPIRANK) {
-      Matrix U_F = make_complement(A.U(block_index, level));
+      Matrix U_F = make_complement(A.U(block, level));
       Matrix prod = matmul(U_F, x_level[block_index]);
       x_level[block_index] = prod;
     }
@@ -1790,6 +1790,8 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
     // apply the oc blocks that are actually in the upper triangular matrix.
     for (int64_t irow = 0; irow < block; ++irow) {
       if (exists_and_inadmissible(A, block, irow, level)) {
+        int64_t irow_index = irow / MPISIZE;
+        int64_t block_index = block / MPISIZE;
         if (mpi_rank(block, irow) == MPIRANK) {
           MPI_Request request;
           MPI_Isend(&A.D(block, irow, level), A.D(block, irow, level).numel(), MPI_DOUBLE,
@@ -1798,7 +1800,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
 
         if (mpi_rank(block) == MPIRANK) {
           MPI_Request request;
-          MPI_Isend(&x_level[block], x_level[block].numel(), MPI_DOUBLE,
+          MPI_Isend(&x_level[block_index], x_level[block_index].numel(), MPI_DOUBLE,
                     mpi_rank(irow), block, MPI_COMM_WORLD, &request);
         }
 
@@ -1824,7 +1826,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
                                                  row_split,
                                                  col_split);
 
-          Matrix& x_irow = x_level[irow];
+          Matrix& x_irow = x_level[irow_index];
 
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split), {});
           auto x_irow_splits = x_irow.split(std::vector<int64_t>(1, col_split), {});
@@ -1838,6 +1840,9 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
     // forward substitute with (cc;oc) blocks below the diagonal
     for (int64_t irow = block+1; irow < nblocks; ++irow) {
       if (exists_and_inadmissible(A, irow, block, level)) {
+        int64_t irow_index = irow / MPISIZE;
+        int64_t block_index = block / MPISIZE;
+
         if (mpi_rank(irow, block) == MPIRANK) {
           MPI_Request request;
           MPI_Isend(&A.D(irow, block, level), A.D(irow, block, level).numel(), MPI_DOUBLE,
@@ -1868,7 +1873,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
                                                  std::vector<int64_t>(1, col_split));
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, col_split), {});
 
-          matmul(lower_splits[0], x_block_splits[0], x_level[irow],
+          matmul(lower_splits[0], x_block_splits[0], x_level[irow_index],
                  false, false, -1.0, 1.0);
         }
       }
@@ -2045,6 +2050,9 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
     // apply cc and oc blocks (transposed) to the respective slice of the vector.
     for (int64_t icol = nblocks-1; icol > block; --icol) {
       if (exists_and_inadmissible(A, icol, block, level)) {
+        int64_t icol_index = icol / MPISIZE;
+        int64_t block_index = block / MPISIZE;
+
         if (mpi_rank(icol, block) == MPIRANK) {
           MPI_Request request;
           MPI_Isend(&A.D(icol, block, level), A.D(icol, block, level).numel(), MPI_DOUBLE,
@@ -2053,7 +2061,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
 
         if (mpi_rank(icol) == MPIRANK) {
           MPI_Request request;
-          MPI_Isend(&x_level[icol], x_level[icol].numel(), MPI_DOUBLE,
+          MPI_Isend(&x_level[icol_index], x_level[icol_index].numel(), MPI_DOUBLE,
                     mpi_rank(block), icol, MPI_COMM_WORLD, &request);
         }
 
@@ -2073,7 +2081,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
 
           auto D_icol_block_splits = D_icol_block.split({},
                                                         std::vector<int64_t>(1, col_split));
-          auto x_block_splits = x_level[block].split(std::vector<int64_t>(1,
+          auto x_block_splits = x_level[block_index].split(std::vector<int64_t>(1,
                                                                           col_split),
                                                      {});
           matmul(D_icol_block_splits[0], x_icol, x_block_splits[0],
@@ -2116,7 +2124,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
     }
 
     if (mpi_rank(block) == MPIRANK) {
-      Matrix V_F = make_complement(A.U(block_index, level));
+      Matrix V_F = make_complement(A.U(block, level));
       Matrix prod = matmul(V_F, x_level[block_index], true);
       x_level[block_index] = prod;
     }
