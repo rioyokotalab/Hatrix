@@ -61,9 +61,7 @@ task_solve_triangular_full(parsec_execution_stream_t* es, parsec_task_t* this_ta
   MatrixWrapper D_dd(_D_dd, D_dd_nrows, D_dd_ncols, D_dd_nrows);
   MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
 
-  std::cout << "triangle solve\n";
-
-  solve_triangular(D_dd, D_id, Hatrix::Right, Hatrix::Lower, false, true, 1.0);
+  // solve_triangular(D_dd, D_id, Hatrix::Right, Hatrix::Lower, false, true, 1.0);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -105,7 +103,7 @@ task_matmul_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   MatrixWrapper D_jd(_D_jd, D_jd_nrows, D_jd_ncols, D_jd_nrows);
   MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
 
-  matmul(D_id, D_jd, D_ij, false, true, -1.0, 1.0);
+  // matmul(D_id, D_jd, D_ij, false, true, -1.0, 1.0);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
