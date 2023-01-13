@@ -699,14 +699,14 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain,
     const auto mid = (left + right) / 2;
     int64_t value, factor_min_rank, factor_max_rank;
     std::tie(value, factor_min_rank, factor_max_rank) = (*this).inertia(domain, mid, singular);
-    if(singular) {
-      std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
-      break;
-    }
     if(factor_max_rank >= shift_max_rank) {
       shift_min_rank = factor_min_rank;
       shift_max_rank = factor_max_rank;
       max_rank_shift = mid;
+    }
+    if(singular) {
+      std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
+      break;
     }
     if(value >= m) right = mid;
     else left = mid;
