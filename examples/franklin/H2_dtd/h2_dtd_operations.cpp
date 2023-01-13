@@ -2010,6 +2010,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
     // apply the tranpose of the oc block that is actually in the lower triangle.
     for (int64_t icol = 0; icol < block; ++icol) {
       if (exists_and_inadmissible(A, block, icol, level)) {
+        int64_t icol_index = icol / MPISIZE;
         if (mpi_rank(block, icol) == MPIRANK) {
           MPI_Request request;
           MPI_Isend(&A.D(block, icol, level), A.D(block, icol, level).numel(), MPI_DOUBLE,
@@ -2018,7 +2019,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
 
         if (mpi_rank(block) == MPIRANK) {
           MPI_Request request;
-          MPI_Isend(&x_level[block], x_level[block].numel(), MPI_DOUBLE,
+          MPI_Isend(&x_level[block_index], x_level[block_index].numel(), MPI_DOUBLE,
                     mpi_rank(icol), block, MPI_COMM_WORLD, &request);
         }
 
@@ -2040,7 +2041,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
           auto D_block_icol_splits = split_dense(D_block_icol, row_split, col_split);
           auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split),
                                               {});
-          auto x_icol_splits = x_level[icol].split(std::vector<int64_t>(1, col_split),
+          auto x_icol_splits = x_level[icol_index].split(std::vector<int64_t>(1, col_split),
                                                    {});
           matmul(D_block_icol_splits[2], x_block_splits[1], x_icol_splits[0],
                  true, false, -1.0, 1.0);
