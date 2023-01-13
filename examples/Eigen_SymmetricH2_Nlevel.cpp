@@ -1423,7 +1423,8 @@ int main(int argc, char ** argv) {
     }
   }
   // Pre-processing step for ELSES geometry
-  if (geom_type == 3) {
+  const bool is_non_synthetic = (geom_type == 3);
+  if (is_non_synthetic) {
     if (read_sorted_bodies == 1) {
       geom_name = file_name + "_" + std::to_string(leaf_size);
       const auto buckets = domain.read_bodies_ELSES_sorted(geom_name + ".xyz");
@@ -1495,7 +1496,8 @@ int main(int argc, char ** argv) {
 #endif
 
   bool s = false;
-  auto b = 10 * (1. / Hatrix::PV);
+  auto b = is_non_synthetic ?
+           Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : 10 * (1. / Hatrix::PV);
   auto a = -b;
   int64_t v_a, v_b, temp1, temp2;
   std::tie(v_a, temp1, temp2) = A.inertia(a, s);
