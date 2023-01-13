@@ -631,8 +631,8 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
     }   // for j
   }   // for i
 
-  // parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
-  // parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
 }
 
 void
@@ -706,8 +706,8 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
     }
   }
 
-  // parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
-  // parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
 
 void factorize_diagonal(SymmetricSharedBasisMatrix& A,
@@ -1302,14 +1302,14 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
-    update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
 
     multiply_complements(A, domain, block, level);
-    factorize_diagonal(A, domain, block, level);
-    triangle_reduction(A, domain, block, level);
-    compute_schurs_complement(A, domain, block, level);
-    compute_fill_ins(A, domain, block, level);
+    // factorize_diagonal(A, domain, block, level);
+    // triangle_reduction(A, domain, block, level);
+    // compute_schurs_complement(A, domain, block, level);
+    // compute_fill_ins(A, domain, block, level);
   }
 }
 
@@ -1703,6 +1703,8 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   preallocate_blocks(A);
   update_parsec_pointers(A, domain, A.max_level);
 
+  std::cout << "task submit begin\n";
+
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, opts);
     add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
@@ -1712,7 +1714,7 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
     merge_unfactorized_blocks(A, domain, level);
   }
 
-  final_dense_factorize(A, domain, opts, level);
+  // final_dense_factorize(A, domain, opts, level);
 
   int rc = parsec_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
@@ -1720,10 +1722,10 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
 
-  std::cout << "submit tasks.\n";
+  std::cout << "task submit end.\n";
 
   rc = parsec_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
