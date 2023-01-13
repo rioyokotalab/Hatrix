@@ -45,17 +45,15 @@ else()
     LDL_strong_1level
     LDL_strong_Nlevel
     Construction_H2_Nlevel
-    LDL_SymmetricH2_Nlevel
-    Eigen_SymmetricH2_Nlevel
     UMV_H2_Nlevel
     Construction_SymmetricH2_Nlevel_with_sampling
+    LDL_SymmetricH2_Nlevel
     ULV_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency_directschur
+    Eigen_SymmetricH2_Nlevel
     Eigen_SymmetricH2_Nlevel_nodependency
     Eigen_SymmetricH2_Nlevel_nodependency_directschur
-    Construction_ELSES
-    Eigen_ELSES
   )
 endif()
 

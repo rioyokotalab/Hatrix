@@ -700,7 +700,7 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain,
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
       break;
     }
-    if(factor_max_rank > shift_max_rank) {
+    if(factor_max_rank >= shift_max_rank) {
       shift_max_rank = factor_max_rank;
       max_rank_shift = mid;
     }
@@ -869,6 +869,10 @@ int main(int argc, char ** argv) {
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
+  const auto construct_min_rank = A.get_basis_min_rank();
+  const auto construct_max_rank = A.get_basis_max_rank();
+  const auto construct_error = A.construction_error(domain);
+  const auto lr_ratio = A.low_rank_block_ratio();
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -887,12 +891,12 @@ int main(int argc, char ** argv) {
             << " sample_farfield_max_size=" << domain.get_max_farfield_size()
             << " sample_time=" << sample_time
             << " height=" << A.height
-            << " lr_ratio=" << A.low_rank_block_ratio() * 100 << "%"
-            << " construct_min_rank=" << A.get_basis_min_rank()
-            << " construct_max_rank=" << A.get_basis_max_rank()
+            << " lr_ratio=" << lr_ratio * 100 << "%"
+            << " construct_min_rank=" << construct_min_rank
+            << " construct_max_rank=" << construct_max_rank
             << " construct_time=" << construct_time
-            << " construct_error=" << std::scientific << A.construction_error(domain)
-            << std::defaultfloat << std::endl;
+            << " construct_error=" << std::scientific << construct_error << std::defaultfloat
+            << std::endl;
 #endif
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
@@ -988,11 +992,11 @@ int main(int argc, char ** argv) {
               << "," << domain.get_max_farfield_size()
               << "," << sample_time
               << "," << A.height
-              << "," << A.low_rank_block_ratio()
-              << "," << A.get_basis_min_rank()
-              << "," << A.get_basis_max_rank()
+              << "," << lr_ratio
+              << "," << construct_min_rank
+              << "," << construct_max_rank
               << "," << construct_time
-              << "," << std::scientific << A.construction_error(domain) << std::defaultfloat
+              << "," << std::scientific << construct_error << std::defaultfloat
               << "," << dense_eig_time
               << "," << build_basis_time
               << "," << m
