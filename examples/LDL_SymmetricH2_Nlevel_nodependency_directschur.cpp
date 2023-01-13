@@ -1047,6 +1047,10 @@ int main(int argc, char ** argv) {
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
+  const auto construct_min_rank = A.get_basis_min_rank();
+  const auto construct_max_rank = A.get_basis_max_rank();
+  const auto construct_error = A.construction_error(domain);
+  const auto lr_ratio = A.low_rank_block_ratio();
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -1065,11 +1069,11 @@ int main(int argc, char ** argv) {
             << " sample_farfield_max_size=" << domain.get_max_farfield_size()
             << " sample_time=" << sample_time
             << " height=" << A.height
-            << " lr_ratio=" << A.low_rank_block_ratio() * 100 << "%"
-            << " construct_min_rank=" << A.get_basis_min_rank()
-            << " construct_max_rank=" << A.get_basis_max_rank()
+            << " lr_ratio=" << lr_ratio * 100 << "%"
+            << " construct_min_rank=" << construct_min_rank
+            << " construct_max_rank=" << construct_max_rank
             << " construct_time=" << construct_time
-            << " construct_error=" << std::scientific << A.construction_error(domain)
+            << " construct_error=" << std::scientific << construct_error << std::defaultfloat
             << std::defaultfloat << std::endl;
 #endif
 
@@ -1083,10 +1087,12 @@ int main(int argc, char ** argv) {
   const auto stop_factor = std::chrono::system_clock::now();
   const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_factor - start_factor).count();
+  const auto factor_min_rank = M.get_basis_min_rank();
+  const auto factor_max_rank = M.get_basis_max_rank();
 #ifndef OUTPUT_CSV
   std::cout << "build_basis_time=" << build_basis_time
-            << " factor_min_rank=" << M.get_basis_min_rank()
-            << " factor_max_rank=" << M.get_basis_max_rank()
+            << " factor_min_rank=" << factor_min_rank
+            << " factor_max_rank=" << factor_max_rank
             << " factor_time=" << factor_time
             << std::endl;
 #endif
@@ -1132,14 +1138,14 @@ int main(int argc, char ** argv) {
             << "," << domain.get_max_farfield_size()
             << "," << sample_time
             << "," << A.height
-            << "," << A.low_rank_block_ratio()
-            << "," << A.get_basis_min_rank()
-            << "," << A.get_basis_max_rank()
+            << "," << lr_ratio
+            << "," << construct_min_rank
+            << "," << construct_max_rank
             << "," << construct_time
-            << "," << std::scientific << A.construction_error(domain) << std::defaultfloat
+            << "," << std::scientific << construct_error << std::defaultfloat
             << "," << build_basis_time
-            << "," << M.get_basis_min_rank()
-            << "," << M.get_basis_max_rank()
+            << "," << factor_min_rank
+            << "," << factor_max_rank
             << "," << factor_time
             << "," << solve_time
             << "," << std::scientific << solve_error << std::defaultfloat

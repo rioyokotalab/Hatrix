@@ -745,7 +745,7 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain,
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
       break;
     }
-    if(factor_max_rank > shift_max_rank) {
+    if(factor_max_rank >= shift_max_rank) {
       shift_max_rank = factor_max_rank;
       max_rank_shift = mid;
     }
@@ -914,6 +914,10 @@ int main(int argc, char ** argv) {
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
+  const auto construct_min_rank = A.get_basis_min_rank();
+  const auto construct_max_rank = A.get_basis_max_rank();
+  const auto construct_error = A.construction_error(domain);
+  const auto lr_ratio = A.low_rank_block_ratio();
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -932,12 +936,12 @@ int main(int argc, char ** argv) {
             << " sample_farfield_max_size=" << domain.get_max_farfield_size()
             << " sample_time=" << sample_time
             << " height=" << A.height
-            << " lr_ratio=" << A.low_rank_block_ratio() * 100 << "%"
-            << " construct_min_rank=" << A.get_basis_min_rank()
-            << " construct_max_rank=" << A.get_basis_max_rank()
+            << " lr_ratio=" << lr_ratio * 100 << "%"
+            << " construct_min_rank=" << construct_min_rank
+            << " construct_max_rank=" << construct_max_rank
             << " construct_time=" << construct_time
-            << " construct_error=" << std::scientific << A.construction_error(domain)
-            << std::defaultfloat << std::endl;
+            << " construct_error=" << std::scientific << construct_error << std::defaultfloat
+            << std::endl;
 #endif
 
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
@@ -948,9 +952,10 @@ int main(int argc, char ** argv) {
                                 (dense_eig_stop - dense_eig_start).count();
 
   Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
-
+  const double build_basis_time = 0;  // Basis is constructed during factorization instead
 #ifndef OUTPUT_CSV
   std::cout << "dense_eig_time=" << dense_eig_time
+            << " build_basis_time=" << build_basis_time
             << std::endl;
 #endif
 
@@ -984,7 +989,7 @@ int main(int argc, char ** argv) {
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
-              << ",dense_eig_time"
+              << ",dense_eig_time,build_basis_time"
               << ",m,ev_tol,h2_eig_time,ldl_max_rank,max_rank_shift,lapack_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
@@ -1029,12 +1034,13 @@ int main(int argc, char ** argv) {
               << "," << domain.get_max_farfield_size()
               << "," << sample_time
               << "," << A.height
-              << "," << A.low_rank_block_ratio()
-              << "," << A.get_basis_min_rank()
-              << "," << A.get_basis_max_rank()
+              << "," << lr_ratio
+              << "," << construct_min_rank
+              << "," << construct_max_rank
               << "," << construct_time
-              << "," << std::scientific << A.construction_error(domain) << std::defaultfloat
+              << "," << std::scientific << construct_error << std::defaultfloat
               << "," << dense_eig_time
+              << "," << build_basis_time
               << "," << m
               << "," << ev_tol
               << "," << h2_eig_time
