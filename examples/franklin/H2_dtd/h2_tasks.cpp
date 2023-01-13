@@ -61,7 +61,7 @@ task_solve_triangular_full(parsec_execution_stream_t* es, parsec_task_t* this_ta
   MatrixWrapper D_dd(_D_dd, D_dd_nrows, D_dd_ncols, D_dd_nrows);
   MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
 
-  // solve_triangular(D_dd, D_id, Hatrix::Right, Hatrix::Lower, false, true, 1.0);
+  solve_triangular(D_dd, D_id, Hatrix::Right, Hatrix::Lower, false, true, 1.0);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
