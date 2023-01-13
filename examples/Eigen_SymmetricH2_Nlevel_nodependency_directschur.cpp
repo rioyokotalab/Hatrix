@@ -26,7 +26,9 @@
 constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
+#define USE_SVD_COMPRESSION
 // #define OUTPUT_CSV
+
 
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
@@ -223,20 +225,32 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       }
       Matrix skeleton_row = concat(skeleton_lr, skeleton_dn, 1);
 
-      Matrix Ui, Si, Vi;
+      Matrix Ui;
       int64_t rank;
       std::vector<int64_t> ipiv_row;
+#ifdef USE_SVD_COMPRESSION
       // SVD followed by ID
-      std::tie(Ui, Si, Vi, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
+      Matrix Utemp, Stemp, Vtemp;
+      std::tie(Utemp, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
+      // Truncate to max_rank if exceeded
+      if (max_rank > 0 && rank > max_rank) {
+        rank = max_rank;
+        Utemp.shrink(Utemp.rows, rank);
+        Stemp.shrink(rank, rank);
+      }
+      // ID to get skeleton rows
+      column_scale(Utemp, Stemp);
+      std::tie(Ui, ipiv_row) = truncated_id_row(Utemp, rank);
+#else
+      // ID Only
+      std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
+      rank = Ui.cols;
       // Truncate to max_rank if exceeded
       if (max_rank > 0 && rank > max_rank) {
         rank = max_rank;
         Ui.shrink(Ui.rows, rank);
-        Si.shrink(rank, rank);
       }
-      // ID to get skeleton rows
-      column_scale(Ui, Si);
-      id_row(Ui, ipiv_row);
+#endif
       // Multiply U with child R
       if (level < height) {
         const auto& child1 = domain.cells[cell.child];
@@ -931,7 +945,12 @@ int main(int argc, char ** argv) {
             << " accuracy=" << accuracy
             << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
             << " max_rank=" << max_rank
-            << " LRA=" << "SVD_ID_QR"
+            << " LRA="
+#ifdef USE_SVD_COMPRESSION
+            << "SVD+ID+QR"
+#else
+            << "ID+QR"
+#endif
             << " admis=" << admis << std::setw(3)
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << " kernel=" << kernel_name
@@ -1035,7 +1054,12 @@ int main(int argc, char ** argv) {
               << "," << accuracy
               << "," << (use_rel_acc ? "rel_err" : "abs_err")
               << "," << max_rank
-              << "," << "SVD_ID_QR"
+              << ","
+#ifdef USE_SVD_COMPRESSION
+              << "SVD+ID+QR"
+#else
+              << "ID+QR"
+#endif
               << "," << admis
               << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
               << "," << kernel_name
