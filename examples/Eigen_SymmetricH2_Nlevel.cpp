@@ -128,8 +128,8 @@ class SymmetricH2 {
   void write_JSON(const Domain& domain, const std::string filename) const;
 
   void factorize();
-  std::tuple<int64_t, int64_t> inertia(const double lambda, bool &singular) const;
-  std::tuple<double, int64_t, double>
+  std::tuple<int64_t, int64_t, int64_t> inertia(const double lambda, bool &singular) const;
+  std::tuple<double, int64_t, int64_t, double>
   get_mth_eigenvalue(const int64_t m, const double ev_tol,
                      double left, double right) const;
 };
@@ -1261,7 +1261,7 @@ void SymmetricH2::factorize() {
   ldl(D(0, 0, level));
 }
 
-std::tuple<int64_t, int64_t>
+std::tuple<int64_t, int64_t, int64_t>
 SymmetricH2::inertia(const double lambda, bool &singular) const {
   SymmetricH2 A_shifted(*this);
   // Shift leaf level diagonal blocks
@@ -1295,31 +1295,35 @@ SymmetricH2::inertia(const double lambda, bool &singular) const {
     negative_elements_count += (D_lambda(i, 0) < 0 ? 1 : 0);
     if(std::isnan(D_lambda(i, 0)) || std::abs(D_lambda(i, 0)) < EPS) singular = true;
   }
-  return {negative_elements_count, A_shifted.get_basis_max_rank()};
+  const auto ldl_min_rank = A_shifted.get_basis_min_rank();
+  const auto ldl_max_rank = A_shifted.get_basis_max_rank();
+  return {negative_elements_count, ldl_min_rank, ldl_max_rank};
 }
 
-std::tuple<double, int64_t, double>
+std::tuple<double, int64_t, int64_t, double>
 SymmetricH2::get_mth_eigenvalue(const int64_t m, const double ev_tol,
                                 double left, double right) const {
+  int64_t shift_min_rank = get_basis_min_rank();
   int64_t shift_max_rank = get_basis_max_rank();
   double max_rank_shift = -1;
   bool singular = false;
   while((right - left) >= ev_tol) {
     const auto mid = (left + right) / 2;
-    int64_t value, factor_max_rank;
-    std::tie(value, factor_max_rank) = (*this).inertia(mid, singular);
+    int64_t value, factor_min_rank, factor_max_rank;
+    std::tie(value, factor_min_rank, factor_max_rank) = (*this).inertia(mid, singular);
     if(singular) {
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
       break;
     }
     if(factor_max_rank >= shift_max_rank) {
+      shift_min_rank = factor_min_rank;
       shift_max_rank = factor_max_rank;
       max_rank_shift = mid;
     }
     if(value >= m) right = mid;
     else left = mid;
   }
-  return {(left + right) / 2, shift_max_rank, max_rank_shift};
+  return {(left + right) / 2, shift_min_rank, shift_max_rank, max_rank_shift};
 }
 
 } // namespace Hatrix
@@ -1493,9 +1497,9 @@ int main(int argc, char ** argv) {
   bool s = false;
   auto b = 10 * (1. / Hatrix::PV);
   auto a = -b;
-  int64_t v_a, v_b, _;
-  std::tie(v_a, _) = A.inertia(a, s);
-  std::tie(v_b, _) = A.inertia(b, s);
+  int64_t v_a, v_b, temp1, temp2;
+  std::tie(v_a, temp1, temp2) = A.inertia(a, s);
+  std::tie(v_b, temp1, temp2) = A.inertia(b, s);
   if(v_a != 0 || v_b != N) {
     std::cerr << "Warning: starting interval does not contain the whole spectrum" << std::endl
               << "at N=" << N << ",leaf_size=" << leaf_size << ",accuracy=" << accuracy
@@ -1520,16 +1524,16 @@ int main(int argc, char ** argv) {
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry,random_matrix_size"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
               << ",dense_eig_time"
-              << ",m,ev_tol,h2_eig_time,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,ev_tol,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
   for (int64_t k = m_begin; k <= m_end; k++) {
     const int64_t m = rand_m ? random_m[k] : k;
     double h2_mth_eigv, max_rank_shift;
-    int64_t factor_max_rank;
+    int64_t ldl_min_rank, ldl_max_rank;
     const auto h2_eig_start = std::chrono::system_clock::now();
-    std::tie(h2_mth_eigv, factor_max_rank, max_rank_shift) =
+    std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
         A.get_mth_eigenvalue(m, ev_tol, a, b);
     const auto h2_eig_stop = std::chrono::system_clock::now();
     const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
@@ -1541,7 +1545,8 @@ int main(int argc, char ** argv) {
     std::cout << "m=" << m
               << " ev_tol=" << ev_tol
               << " h2_eig_time=" << h2_eig_time
-              << " factor_max_rank=" << factor_max_rank
+              << " ldl_min_rank=" << ldl_min_rank
+              << " ldl_max_rank=" << ldl_max_rank
               << " max_rank_shift=" << max_rank_shift
               << " dense_eigv=" << dense_mth_eigv
               << " h2_eigv=" << h2_mth_eigv
@@ -1575,7 +1580,8 @@ int main(int argc, char ** argv) {
               << "," << m
               << "," << ev_tol
               << "," << h2_eig_time
-              << "," << factor_max_rank
+              << "," << ldl_min_rank
+              << "," << ldl_max_rank
               << "," << max_rank_shift
               << "," << dense_mth_eigv
               << "," << h2_mth_eigv
