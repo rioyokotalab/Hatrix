@@ -1851,7 +1851,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
 
         if (mpi_rank(block) == MPIRANK) {
           MPI_Request request;
-          MPI_Isend(&x_level[block], x_level[block].numel(), MPI_DOUBLE,
+          MPI_Isend(&x_level[block_index], x_level[block_index].numel(), MPI_DOUBLE,
                     mpi_rank(irow), block, MPI_COMM_WORLD, &request);
         }
 
@@ -1906,6 +1906,7 @@ permute_forward_and_copy(SymmetricSharedBasisMatrix& A,
     int64_t block_index = block / MPISIZE;
     int64_t rank = A.ranks(block, level);
     int64_t parent_block = block / 2;
+    int64_t parent_block_index = parent_block / MPISIZE;
 
     if (mpi_rank(block) == MPIRANK) {
       int64_t c_size = get_dim(A, domain, block, level) - rank;
@@ -1931,7 +1932,7 @@ permute_forward_and_copy(SymmetricSharedBasisMatrix& A,
 
     if (mpi_rank(parent_block) == MPIRANK) {
       MPI_Status status;
-      Matrix& x_rank = x_ranks[parent_block];
+      Matrix& x_rank = x_ranks[parent_block_index];
 
       MPI_Recv(&x_rank(0, 0), rank, MPI_DOUBLE,
                mpi_rank(block), block, MPI_COMM_WORLD, &status);
@@ -2161,6 +2162,8 @@ solve(SymmetricSharedBasisMatrix& A,
   for (int64_t i = 0; i < last_nodes; ++i) {
     for (int64_t j = 0; j < i; ++j) { // off-diagonals
       int dense_block_tag = i * last_nodes + j;
+      int64_t i_index = i / MPISIZE;
+      int64_t j_index = j / MPISIZE;
       if (mpi_rank(i, j) == MPIRANK) {
         MPI_Request request;
         MPI_Isend(&A.D(i, j, level), A.D(i, j, level).numel(), MPI_DOUBLE,
@@ -2169,7 +2172,7 @@ solve(SymmetricSharedBasisMatrix& A,
 
       if (mpi_rank(j) == MPIRANK) {
         MPI_Request request;
-        MPI_Isend(&x_last[j], x_last[j].numel(), MPI_DOUBLE,
+        MPI_Isend(&x_last[j_index], x_last[j_index].numel(), MPI_DOUBLE,
                   mpi_rank(i), j, MPI_COMM_WORLD, &request);
       }
 
@@ -2186,7 +2189,7 @@ solve(SymmetricSharedBasisMatrix& A,
         MPI_Recv(&x_last_j, x_last_j.numel(), MPI_DOUBLE,
                  mpi_rank(j), j, MPI_COMM_WORLD, &status);
 
-        matmul(D_ij, x_last_j, x_last[i], false, false, -1, 1);
+        matmul(D_ij, x_last_j, x_last[i_index], false, false, -1, 1);
       }
     }
 
@@ -2215,6 +2218,8 @@ solve(SymmetricSharedBasisMatrix& A,
   // backward of the last blocks
   for (int64_t j = last_nodes - 1; j >= 0; --j) {
     for (int64_t i = last_nodes - 1; i > j; --i) {
+      int64_t i_index = i / MPISIZE;
+      int64_t j_index = j / MPISIZE;
       int dense_block_tag = i * last_nodes + j;
       if (mpi_rank(i, j) == MPIRANK) {
         MPI_Request request;
@@ -2224,7 +2229,7 @@ solve(SymmetricSharedBasisMatrix& A,
 
       if (mpi_rank(i) == MPIRANK) {
         MPI_Request request;
-        MPI_Isend(&x_last[i], x_last[i].numel(), MPI_DOUBLE,
+        MPI_Isend(&x_last[i_index], x_last[i_index].numel(), MPI_DOUBLE,
                   mpi_rank(j), i, MPI_COMM_WORLD, &request);
       }
 
@@ -2241,7 +2246,7 @@ solve(SymmetricSharedBasisMatrix& A,
         MPI_Recv(&x_last_i, x_last_i.numel(), MPI_DOUBLE,
                  mpi_rank(i), i, MPI_COMM_WORLD, &status);
 
-        matmul(D_ij, x_last_i, x_last[j], true, false, -1.0, 1.0);
+        matmul(D_ij, x_last_i, x_last[j_index], true, false, -1.0, 1.0);
       }
     }
 
