@@ -28,7 +28,7 @@ for adm in 0.8; do
     ndim=3
     max_rank=150
 
-    for N in 4096; do
+    for N in 4096 4096; do
         # mpirun -n 4 -genv I_MPI_DEBUG=10  xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
             # mpirun -n 1  -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
             # mpirun -n 1 -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
