@@ -26,7 +26,7 @@
 constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
-#define OUTPUT_CSV
+// #define OUTPUT_CSV
 
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
