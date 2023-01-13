@@ -631,10 +631,10 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
     }   // for j
   }   // for i
 
-  if (MPISIZE > 1) {
-    parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
-    parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
-  }
+  // if (MPISIZE > 1) {
+  //   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  //   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
+  // }
 }
 
 void
@@ -708,10 +708,10 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
     }
   }
 
-  if (MPISIZE > 1) {
-    parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
-    parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
-  }
+  // if (MPISIZE > 1) {
+  //   parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
+  //   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  // }
 }
 
 void factorize_diagonal(SymmetricSharedBasisMatrix& A,
@@ -825,6 +825,9 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
   for (int64_t j = 0; j < block; ++j) {
     triangle_reduce_co(A, domain, block, j, level);
   }
+
+  // auto D_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
+  // parsec_dtd_data_flush(dtd_tp, parsec_dtd_tile_of(&parsec_D.super, D_key));
 
   // parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 }
@@ -1153,7 +1156,6 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                                      2, 3, false, true);
                     }
                   });
-  // parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
 
   // reduction_loop4(A, domain, block, level,
   //                 [&](int64_t i, int64_t j,
@@ -1191,22 +1193,6 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
   //                                  1,
   //                                  3, false, false, true);
   //                 });
-
-  // reduction_loop6(A, domain, block, level,
-  //                 [&](int64_t i,
-  //                     parsec_data_key_t D_block_i_key, int64_t D_block_i_rows,
-  //                     int64_t D_block_i_cols,
-  //                     int64_t D_block_i_row_rank, int64_t D_block_i_col_rank) {
-  //                   partial_syrk(A, domain, block, i, i, level,
-  //                                D_block_i_key, D_block_i_rows, D_block_i_cols,
-  //                                D_block_i_row_rank, D_block_i_col_rank,
-  //                                1,
-  //                                3,
-  //                                Hatrix::Lower, false, true);
-  //                 });
-
-
-
 }
 
 void
@@ -1314,7 +1300,7 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
-    compute_schurs_complement(A, domain, block, level);
+    // compute_schurs_complement(A, domain, block, level);
     // compute_fill_ins(A, domain, block, level);
   }
 }
@@ -1504,6 +1490,11 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
               Matrix& F_ij_ref = F(i, j, level);
               parsec_F.matrix_map[F_ij_key] = std::addressof(F_ij_ref);
             }
+            else {
+              // dummy fill-in in case it does not belong to this MPI rank.
+              Matrix fill_in;
+              F.insert(i, j, level, std::move(fill_in));
+            }
           }
           parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i, j);
 
@@ -1523,31 +1514,31 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
           int64_t U_j_cols = A.ranks(j, level);
           auto U_j_key = parsec_U.super.data_key(&parsec_U.super, j, level);
 
-          parsec_dtd_insert_task(dtd_tp, task_nb_rank_fill_in, 0, PARSEC_DEV_CPU,
-            "nb_rank_fill_in_task",
-            sizeof(int64_t), &D_i_block_rows, PARSEC_VALUE,
-            sizeof(int64_t), &D_i_block_cols, PARSEC_VALUE,
-            sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
-            sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
-                                 PARSEC_INPUT | D_ARENA,
-            sizeof(int64_t), &D_block_j_rows, PARSEC_VALUE,
-            sizeof(int64_t), &D_block_j_cols, PARSEC_VALUE,
-            sizeof(int64_t), &D_block_j_row_rank, PARSEC_VALUE,
-            sizeof(int64_t), &D_block_j_col_rank, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_block_j_key),
-                                 PARSEC_INPUT | D_ARENA,
-            sizeof(int64_t), &U_j_rows, PARSEC_VALUE,
-            sizeof(int64_t), &U_j_cols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_j_key),
-                                 PARSEC_INPUT | U_ARENA,
-            sizeof(int64_t), &F_ij_rows, PARSEC_VALUE,
-            sizeof(int64_t), &F_ij_cols, PARSEC_VALUE,
-            sizeof(int64_t), &F_ij_row_rank, PARSEC_VALUE,
-            sizeof(int64_t), &F_ij_col_rank, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_ij_key),
-                                 PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
-            PARSEC_DTD_ARG_END);
+          // parsec_dtd_insert_task(dtd_tp, task_nb_rank_fill_in, 0, PARSEC_DEV_CPU,
+          //   "nb_rank_fill_in_task",
+          //   sizeof(int64_t), &D_i_block_rows, PARSEC_VALUE,
+          //   sizeof(int64_t), &D_i_block_cols, PARSEC_VALUE,
+          //   sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
+          //   sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
+          //   PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
+          //                        PARSEC_INPUT | D_ARENA,
+          //   sizeof(int64_t), &D_block_j_rows, PARSEC_VALUE,
+          //   sizeof(int64_t), &D_block_j_cols, PARSEC_VALUE,
+          //   sizeof(int64_t), &D_block_j_row_rank, PARSEC_VALUE,
+          //   sizeof(int64_t), &D_block_j_col_rank, PARSEC_VALUE,
+          //   PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_block_j_key),
+          //                        PARSEC_INPUT | D_ARENA,
+          //   sizeof(int64_t), &U_j_rows, PARSEC_VALUE,
+          //   sizeof(int64_t), &U_j_cols, PARSEC_VALUE,
+          //   PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_j_key),
+          //                        PARSEC_INPUT | U_ARENA,
+          //   sizeof(int64_t), &F_ij_rows, PARSEC_VALUE,
+          //   sizeof(int64_t), &F_ij_cols, PARSEC_VALUE,
+          //   sizeof(int64_t), &F_ij_row_rank, PARSEC_VALUE,
+          //   sizeof(int64_t), &F_ij_col_rank, PARSEC_VALUE,
+          //   PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_ij_key),
+          //                        PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+          //   PARSEC_DTD_ARG_END);
 
           // parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
         }
@@ -1555,8 +1546,11 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
     }
   }
 
-
-  // parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  if (MPISIZE > 1) {
+    // parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
+    // parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+    // parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
+  }
 }
 
 void h2_dc_init_maps() {
@@ -1718,22 +1712,20 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
 
     update_parsec_pointers(A, domain, level-1);
     merge_unfactorized_blocks(A, domain, level);
+    std::cout << "rank: " << MPIRANK << " level: " << level << std::endl;
   }
 
   // final_dense_factorize(A, domain, opts, level);
 
-  int rc = parsec_taskpool_wait(dtd_tp);
-  PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
-  // parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
   // parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
 
-  std::cout << "task submit end.\n";
-
-  rc = parsec_taskpool_wait(dtd_tp);
+  std::cout << "waiting for tasks.\n";
+  int rc = parsec_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
 
   std::cout << "finish tasks.\n";

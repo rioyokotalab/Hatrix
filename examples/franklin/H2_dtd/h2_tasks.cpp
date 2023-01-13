@@ -455,6 +455,8 @@ task_nb_rank_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   F_ij += projected_fill_in;
 
+  // std::cout << "done NB RANK fill in task.\n";
+
   return PARSEC_HOOK_RETURN_DONE;
 }
 
