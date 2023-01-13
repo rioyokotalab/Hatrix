@@ -758,10 +758,11 @@ int main(int argc, char ** argv) {
   const double ev_tol = argc > 14 ? atof(argv[14]) : 1.e-3;
   int64_t m_begin = argc > 15 ? atol(argv[15]) : 1;
   int64_t m_end = argc > 16 ? atol(argv[16]) : m_begin;
-  const int64_t print_csv_header = argc > 17 ? atol(argv[17]) : 1;
+  const bool compute_eig_acc = argc > 17 ? (atol(argv[17]) == 1) : false;
+  const int64_t print_csv_header = argc > 18 ? atol(argv[18]) : 1;
   // ELSES Input Files
-  const std::string file_name = argc > 18 ? std::string(argv[18]) : "";
-  const int64_t read_sorted_bodies = argc > 19 ? atol(argv[19]) : 0;
+  const std::string file_name = argc > 19 ? std::string(argv[19]) : "";
+  const int64_t read_sorted_bodies = argc > 20 ? atol(argv[20]) : 0;
 
   Hatrix::Context::init();
 
@@ -899,13 +900,16 @@ int main(int argc, char ** argv) {
             << std::endl;
 #endif
 
-  Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-  const auto dense_eig_start = std::chrono::system_clock::now();
-  auto lapack_eigv = Hatrix::get_eigenvalues(Adense);
-  const auto dense_eig_stop = std::chrono::system_clock::now();
-  const double dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                (dense_eig_stop - dense_eig_start).count();
-
+  std::vector<double> dense_eigv;
+  double dense_eig_time = 0;
+  if (compute_eig_acc) {
+    Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
+    const auto dense_eig_start = std::chrono::system_clock::now();
+    dense_eigv = Hatrix::get_eigenvalues(Adense);
+    const auto dense_eig_stop = std::chrono::system_clock::now();
+    dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                     (dense_eig_stop - dense_eig_start).count();
+  }
   const auto build_basis_start = std::chrono::system_clock::now();
   Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
   const auto build_basis_stop = std::chrono::system_clock::now();
@@ -948,7 +952,7 @@ int main(int argc, char ** argv) {
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
               << ",dense_eig_time,build_basis_time"
-              << ",m,ev_tol,h2_eig_time,ldl_max_rank,max_rank_shift,lapack_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,ev_tol,h2_eig_time,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
@@ -962,16 +966,17 @@ int main(int argc, char ** argv) {
     const auto h2_eig_stop = std::chrono::system_clock::now();
     const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                (h2_eig_stop - h2_eig_start).count();
-    double eig_abs_err = std::abs(h2_mth_eigv - lapack_eigv[m - 1]);
-    bool success = (eig_abs_err < (0.5 * ev_tol));
+    const double dense_mth_eigv = compute_eig_acc ? dense_eigv[m - 1] : -1;
+    const double eig_abs_err = compute_eig_acc ? std::abs(h2_mth_eigv - dense_mth_eigv) : -1;
+    const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
 #ifndef OUTPUT_CSV
     std::cout << "m=" << m
               << " ev_tol=" << ev_tol
               << " h2_eig_time=" << h2_eig_time
               << " factor_max_rank=" << factor_max_rank
               << " max_rank_shift=" << max_rank_shift
-              << " lapack_eigv=" << std::setprecision(10) << lapack_eigv[m - 1]
-              << " h2_eigv=" << std::setprecision(10) << h2_mth_eigv
+              << " dense_eigv=" << dense_mth_eigv
+              << " h2_eigv=" << h2_mth_eigv
               << " eig_abs_err=" << std::scientific << eig_abs_err << std::defaultfloat
               << " success=" << (success ? "TRUE" : "FALSE")
               << std::endl;
@@ -1004,7 +1009,7 @@ int main(int argc, char ** argv) {
               << "," << h2_eig_time
               << "," << factor_max_rank
               << "," << max_rank_shift
-              << "," << lapack_eigv[m - 1]
+              << "," << dense_mth_eigv
               << "," << h2_mth_eigv
               << "," << std::scientific << eig_abs_err << std::defaultfloat
               << "," << (success ? "TRUE" : "FALSE")
