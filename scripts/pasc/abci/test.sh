@@ -1,10 +1,10 @@
 #!/bin/bash
 #$ -cwd
-#$ -l rt_F=4
-#$ -l h_rt=12:00:00
-#$ -N first_test
-#$ -o first_test_out.log
-#$ -e first_test_err.log
+#$ -l rt_F=16
+#$ -l h_rt=1:00:00
+#$ -N larger
+#$ -o larger_out.log
+#$ -e larger_err.log
 
 source ~/.bashrc
 
@@ -16,5 +16,28 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/l
 
 export OMP_PLACES=cores
 
+make clean
 make -j H2_dtd
 # mpirun -n $procs -ppn 2 -f $SGE_JOB_HOSTLIST
+
+for adm in 0.8; do
+    nleaf=512
+    ndim=3
+    max_rank=100
+
+    for N in 65536 131072; do
+
+        mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST ./bin/H2_dtd --N $N \
+               --nleaf $nleaf \
+               --kernel_func laplace \
+               --kind_of_geometry grid \
+               --ndim $ndim \
+               --max_rank $max_rank \
+               --accuracy 1e-8 \
+               --admis $adm \
+               --admis_kind geometry \
+               --construct_algorithm miro \
+               --add_diag 1e-10 \
+               --use_nested_basis
+    done
+done

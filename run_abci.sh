@@ -18,22 +18,23 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/l
 # ulimit -c unlimited             # does not pass to remote child processes.
 
 export OMP_PLACES=cores
-export OMP_NUM_THREADS=1
+# export OMP_NUM_THREADS=1
 
 make -j H2_dtd
 
 
 for adm in 0.8; do
-    nleaf=1024
+    nleaf=256
     ndim=3
-    max_rank=250
+    max_rank=150
 
-    for N in 32768 65536 131072; do
-	echo "running"
+    for N in 4096; do
         # mpirun -n 4 -genv I_MPI_DEBUG=10  xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
             # mpirun -n 1  -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
             # mpirun -n 1 -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
-            mpirun -n 1 ./bin/H2_dtd --N $N \
+
+        # mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 ./bin/H2_dtd --N $N \
+            mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \
                --kind_of_geometry grid \

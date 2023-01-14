@@ -162,14 +162,14 @@ int main(int argc, char **argv) {
   {
     int provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
-    std::cout << "provided: " << provided << std::endl;
   }
   MPI_Comm_size(MPI_COMM_WORLD, &MPISIZE);
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
   MPI_Dims_create(MPISIZE, 2, MPIGRID);
   N = opts.N;
-  std::cout << "g[0] : " << MPIGRID[0] << " g[1]: " << MPIGRID[1] << std::endl;
-
+  if (!MPIRANK) {
+    std::cout << "MPIGRID g[0] : " << MPIGRID[0] << " g[1]: " << MPIGRID[1] << std::endl;
+  }
 
   // Init domain decomposition for H2 matrix using DTT.
   auto start_domain = std::chrono::system_clock::now();
@@ -189,7 +189,6 @@ int main(int argc, char **argv) {
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
 
-  std::cout << "before construction.\n";
   int64_t construct_max_rank;
   SymmetricSharedBasisMatrix A;
 
@@ -209,8 +208,8 @@ int main(int argc, char **argv) {
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
   DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
 
-  std::cout << "begin generation. nums: " << DENSE_local_rows <<  " "
-            << DENSE_local_cols << std::endl;
+  // std::cout << "begin generation. nums: " << DENSE_local_rows <<  " "
+  //           << DENSE_local_cols << std::endl;
 
   // generate the distributed P2P matrix.
 #pragma omp parallel for
@@ -226,7 +225,9 @@ int main(int argc, char **argv) {
     }
   }
 
-  std::cout << "begin construction.\n";
+  if (!MPIRANK) {
+    std::cout << "begin construction.\n";
+  }
 
   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
   if(!MPIRANK) A.print_structure();
@@ -346,7 +347,9 @@ int main(int argc, char **argv) {
 
   omp_set_num_threads(1);
 
+  if (!MPIRANK) {
   std::cout << "factor begin:\n";
+  }
 
   auto start_factorize = std::chrono::system_clock::now();
   auto fp_ops = factorize(A, domain, opts);
@@ -354,6 +357,10 @@ int main(int argc, char **argv) {
   double factorize_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factorize -
                                start_factorize).count();
+
+  if (!MPIRANK) {
+  std::cout << "factor end\n";
+  }
 
   parsec_context_wait(parsec);
   parsec_taskpool_free( dtd_tp );
@@ -392,7 +399,8 @@ int main(int argc, char **argv) {
               << "SOLVE ERROR     : " << solve_error << std::endl
               << "Contruct(ms)    : " << construct_time << std::endl
               << "Factorize (ms)  : " << factorize_time << std::endl
-              << "PAPI FP OPS     : " << fp_ops
+              << "PAPI FP OPS     : " << fp_ops << std::endl
+              << "CORES           : " << cores << std::endl
               << "\n";
     std::cout << "----------------------------\n";
     // std::cout << "RESULT: " << opts.N << "," << opts.accuracy << "," << opts.max_rank
