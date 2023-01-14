@@ -36,20 +36,21 @@ for adm in 0.8; do
     for N in 8192; do
 
         mpirun -n 2 \
-                                       ./bin/H2_dtd --N $N \
-                                       --nleaf $nleaf \
-    --kernel_func laplace \
-    --kind_of_geometry grid \
-    --ndim $ndim \
-    --max_rank $max_rank \
-    --accuracy 1e-8 \
-    --admis $adm \
-    --admis_kind geometry \
-    --construct_algorithm miro \
-    --add_diag 1e-10 \
-    --use_nested_basis
+               ./bin/H2_dtd --N $N \
+               --nleaf $nleaf \
+               --kernel_func laplace \
+               --kind_of_geometry grid \
+               --ndim $ndim \
+               --max_rank $max_rank \
+               --accuracy 1e-8 \
+               --admis $adm \
+               --admis_kind geometry \
+               --construct_algorithm miro \
+               --add_diag 1e-10 \
+               --use_nested_basis
     done
 done
 
 gprof -s bin/H2_dtd gmon.out-*
-gprof -q bin/H2_dtd gmon.sum > out.gprof
+gprof -q bin/H2_dtd gmon.sum > call_graph.out
+gprof bin/H2_dtd gmon.sum > gprof_out.out

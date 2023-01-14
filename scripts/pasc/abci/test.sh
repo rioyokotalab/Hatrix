@@ -15,14 +15,15 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/acb10922qh/gitrepos/parsec/build/l
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/lib64
 
 export OMP_PLACES=cores
+export VT_CONFIG=/home/acb10922qh/gitrepos/Hatrix/
 
 make clean
 make -j H2_dtd
 # mpirun -n $procs -ppn 2 -f $SGE_JOB_HOSTLIST
                    # -gtool "vtune -collect hpc-performance -r vtune-mpi:all" \
                        # -trace -trace-pt2pt \
-rm gmon.out-*
-export GMON_OUT_PREFIX=gmon.out-
+# rm gmon.out-*
+# export GMON_OUT_PREFIX=gmon.out-
 
 for adm in 0.8; do
     ndim=3
@@ -30,6 +31,7 @@ for adm in 0.8; do
     for nleaf in 1024 ; do
     	for N in 131072; do
             mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST -l \
+                   -trace -tracept2pt \
                    ./bin/H2_dtd --N $N \
                	   --nleaf $nleaf \
                	   --kernel_func laplace \
@@ -46,5 +48,5 @@ for adm in 0.8; do
     done
 done
 
-gprof -s bin/H2_dtd gmon.out-*
-gprof -q bin/H2_dtd gmon.sum > NEW.gprof
+# gprof -s bin/H2_dtd gmon.out-*
+# gprof -q bin/H2_dtd gmon.sum > NEW.gprof
