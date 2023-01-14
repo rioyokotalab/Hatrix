@@ -1260,7 +1260,30 @@ update_row_S_blocks(SymmetricSharedBasisMatrix& A,
                     const Hatrix::Domain& domain,
                     const int64_t block,
                     const int64_t level) {
+  // update the S blocks with the new projected basis.
+  for (int64_t j = 0; j < block; ++j) {
+    if (exists_and_admissible(A, block, j, level)) {
+      int64_t S_nrows = A.ranks(block, level);
+      int64_t S_ncols = A.ranks(j, level);
+      parsec_data_key_t S_key = parsec_S.super.data_key(&parsec_S.super,
+                                                        block, j, level);
 
+      int64_t r_nrows = A.ranks(block, level);
+      parsec_data_key_t r_key = parsec_r.super.data_key(&parsec_r.super,
+                                                        block, level);
+
+      parsec_dtd_insert_task(dtd_tp, task_project_S, 0, PARSEC_DEV_CPU,
+        "project_S_task",
+        sizeof(int64_t), &S_nrows, PARSEC_VALUE,
+        sizeof(int64_t), &S_ncols, PARSEC_VALUE,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_S.super, S_key),
+                             PARSEC_INOUT | S_ARENA | PARSEC_AFFINITY,
+        sizeof(int64_t), &r_nrows, PARSEC_VALUE,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_r.super, r_key),
+                             PARSEC_INPUT | S_ARENA,
+        PARSEC_DTD_ARG_END);
+    }
+  }
 }
 
 void

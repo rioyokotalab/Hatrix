@@ -537,9 +537,34 @@ task_fill_in_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   Matrix Q,R;
   std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, rank);
 
+  Matrix r_row = matmul(Q, U, true, false);
+  r.copy_mem(r_row);
+  U.copy_mem(Q);
+
   Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
   rq(R, Si, Vi);
   US.copy_mem(Si);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_project_S(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t S_nrows, S_ncols;
+  double *_S;
+  int64_t r_nrows;
+  double *_r;
+
+  parsec_dtd_unpack_args(this_task,
+                         &S_nrows, &S_ncols, &_S,
+                         &r_nrows, &_r);
+
+  MatrixWrapper S(_S, S_nrows, S_ncols, S_nrows);
+  MatrixWrapper r(_r, r_nrows, r_nrows, r_nrows);
+
+  Matrix rS = matmul(r, S);
+
+  S.copy_mem(rS);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
