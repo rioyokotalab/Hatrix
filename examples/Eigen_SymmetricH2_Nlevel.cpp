@@ -1112,10 +1112,10 @@ void SymmetricH2::factorize() {
         throw std::logic_error("Cluster bases not found at U(" + std::to_string(i) +
                                "," + std::to_string(level) + ")");
       }
-      if (U(i, level).rows <= U(i, level).cols) {
-        throw std::domain_error("Full rank cluster bases found at U(" + std::to_string(i) +
-                                "," + std::to_string(level) + ")");
-      }
+      // if (U(i, level).rows <= U(i, level).cols) {
+      //   throw std::domain_error("Full rank cluster bases found at U(" + std::to_string(i) +
+      //                           "," + std::to_string(level) + ")");
+      // }
     }
 
     factorize_level(level, num_nodes, F, r);
