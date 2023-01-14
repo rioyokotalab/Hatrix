@@ -1509,16 +1509,32 @@ int main(int argc, char ** argv) {
     a *= 2;
     b *= 2;
   }
-
-  std::mt19937 g(N);
-  std::vector<int64_t> random_m(N, 0);
-  for (int64_t i = 0; i < N; i++) {
-    random_m[i] = i + 1;
+  // Determine which eigenvalue(s) to approximate
+  std::vector<int64_t> target_m;
+  if (m_begin <= 0) {
+    const auto num = m_end;
+    if (m_begin == 0) {
+      std::mt19937 g(N);
+      std::vector<int64_t> random_m(N, 0);
+      for (int64_t i = 0; i < N; i++) {
+        random_m[i] = i + 1;
+      }
+      std::shuffle(random_m.begin(), random_m.end(), g);
+      for (int64_t i = 0; i < num; i++) {
+        target_m.push_back(random_m[i]);
+      }
+    }
+    if (m_begin == -1) {
+      const auto linspace = Hatrix::equally_spaced_vector(num, 1, N, true);
+      for (int64_t i = 0; i < num; i++) {
+        target_m.push_back((int64_t)linspace[i]);
+      }
+    }
   }
-  bool rand_m = (m_begin == 0);
-  if (rand_m) {
-    m_end--;
-    std::shuffle(random_m.begin(), random_m.end(), g);
+  else {
+    for (int64_t m = m_begin; m <= m_end; m++) {
+      target_m.push_back(m);
+    }
   }
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
@@ -1530,8 +1546,8 @@ int main(int argc, char ** argv) {
               << std::endl;
   }
 #endif
-  for (int64_t k = m_begin; k <= m_end; k++) {
-    const int64_t m = rand_m ? random_m[k] : k;
+  for (int64_t k = 0; k < target_m.size(); k++) {
+    const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;
     int64_t ldl_min_rank, ldl_max_rank;
     const auto h2_eig_start = std::chrono::system_clock::now();
