@@ -1,10 +1,10 @@
 #!/bin/bash
 #$ -cwd
-#$ -l rt_F=16
+#$ -l rt_F=64
 #$ -l h_rt=2:00:00
-#$ -N NEW
-#$ -o NEW_out.log
-#$ -e NEW_err.log
+#$ -N NEW64
+#$ -o NEW64_out.log
+#$ -e NEW64_err.log
 
 source ~/.bashrc
 
@@ -27,8 +27,8 @@ for adm in 0.8; do
     ndim=3
     max_rank=50
     for nleaf in 1024 ; do
-    	for N in 131072; do
-            mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST -l \
+    	for N in 524288; do
+            mpirun -n 64 -ppn 1 -f $SGE_JOB_HOSTLIST -l \
                    -trace -trace-pt2pt \
                    ./bin/H2_dtd --N $N \
                	   --nleaf $nleaf \
