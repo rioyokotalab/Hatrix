@@ -1331,9 +1331,19 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
       int64_t F_i_block_ncols = get_dim(A, domain, block, level);
       parsec_data_key_t F_i_block_key =
         parsec_F.super.data_key(&parsec_F.super, i, block, level);
+
+      parsec_dtd_insert_task(dtd_tp, task_fill_in_cols_addition, 0, PARSEC_DEV_CPU,
+        "fill_in_cols_addition_task",
+        sizeof(int64_t), &F_i_block_nrows, PARSEC_VALUE,
+        sizeof(int64_t), &F_i_block_ncols, PARSEC_VALUE,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_i_block_key),
+                             PARSEC_INPUT | D_ARENA,
+        sizeof(int64_t), &block_size, PARSEC_VALUE,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_cols.super, fill_in_key),
+                             PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+        PARSEC_DTD_ARG_END);
     }
   }
-
 }
 
 void
