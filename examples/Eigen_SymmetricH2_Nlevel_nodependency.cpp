@@ -992,7 +992,7 @@ int main(int argc, char ** argv) {
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
               << ",dense_eig_time,build_basis_time"
-              << ",m,ev_tol,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,a0,b0,ev_tol,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
@@ -1011,6 +1011,8 @@ int main(int argc, char ** argv) {
     const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
 #ifndef OUTPUT_CSV
     std::cout << "m=" << m
+              << " a0=" << a
+              << " b0=" << b
               << " ev_tol=" << ev_tol
               << " h2_eig_time=" << h2_eig_time
               << " ldl_min_rank=" << ldl_min_rank
@@ -1051,6 +1053,8 @@ int main(int argc, char ** argv) {
               << "," << dense_eig_time
               << "," << build_basis_time
               << "," << m
+              << "," << a
+              << "," << b
               << "," << ev_tol
               << "," << h2_eig_time
               << "," << ldl_min_rank
