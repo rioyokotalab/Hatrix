@@ -371,7 +371,8 @@ int main(int argc, char **argv) {
 
   descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
-  auto dense_solution = cholesky_solve(A, opts, X_mem, DESCX);             // dense_solution = dense_A^(-1) * x_mem
+  auto dense_solution = cholesky_solve(A, opts, X_mem, DESCX);
+  // dense_solution = dense_A^(-1) * x_mem
 
   std::vector<Matrix> solve_diff;
   for (int i = 0; i < x.size(); ++i) {
@@ -387,22 +388,22 @@ int main(int argc, char **argv) {
   Hatrix::Context::finalize();
 
   if (!MPIRANK) {
-    // std::cout << "----------------------------\n";
-    // std::cout << "N               : " << opts.N << std::endl;
-    // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-    // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-    // std::cout << "ADMIS           : " << opts.admis << std::endl;
-    // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-    // std::cout << "NPROCS          : " << MPISIZE << std::endl;
-    // std::cout << "NLEAF           : " << opts.nleaf << "\n"
-    //           << "CONSTRUCT ERROR : " << construction_error << std::endl
-    //           << "SOLVE ERROR     : " << solve_error << std::endl
-    //           << "Contruct(ms)    : " << construct_time << std::endl
-    //           << "Factorize (ms)  : " << factorize_time << std::endl
-    //           << "PAPI FP OPS     : " << fp_ops << std::endl
-    //           << "CORES           : " << cores << std::endl
-    //           << "\n";
-    // std::cout << "----------------------------\n";
+    std::cout << "----------------------------\n";
+    std::cout << "N               : " << opts.N << std::endl;
+    std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+    std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+    std::cout << "ADMIS           : " << opts.admis << std::endl;
+    std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+    std::cout << "NPROCS          : " << MPISIZE << std::endl;
+    std::cout << "NLEAF           : " << opts.nleaf << "\n"
+              << "CONSTRUCT ERROR : " << construction_error << std::endl
+              << "SOLVE ERROR     : " << solve_error << std::endl
+              << "Contruct(ms)    : " << construct_time << std::endl
+              << "Factorize (ms)  : " << factorize_time << std::endl
+              << "PAPI FP OPS     : " << fp_ops << std::endl
+              << "CORES           : " << cores << std::endl
+              << "\n";
+    std::cout << "----------------------------\n";
     std::cout << "RESULT: "
               << opts.N << ","
               << opts.accuracy << ","

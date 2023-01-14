@@ -1302,7 +1302,7 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const Hatrix::Args& opts) {
   update_row_cluster_basis(A, domain, block, level, opts);
   update_row_S_blocks(A, domain, block, level);
-  update_row_transfer_bases(A, domain, block, level);
+  // update_row_transfer_bases(A, domain, block, level);
 }
 
 void
@@ -1422,7 +1422,7 @@ update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const Hatrix::Args& opts) {
   update_col_cluster_basis(A, domain, block, level, opts);
   update_col_S_blocks(A, domain, block, level);
-  update_col_transfer_bases(A, domain, block, level);
+  // update_col_transfer_bases(A, domain, block, level);
 }
 
 void
@@ -1879,7 +1879,7 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, opts);
     add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
-    propagate_fill_ins_to_upper_level(A, opts, level);
+    // propagate_fill_ins_to_upper_level(A, opts, level);
 
     update_parsec_pointers(A, domain, level-1);
     merge_unfactorized_blocks(A, domain, level);

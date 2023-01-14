@@ -29,7 +29,7 @@ for adm in 0.8; do
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \
-                      --add_diag 1e-9 \
+                      --add_diag 1e-8 \
                       --use_nested_basis
     done
 done
