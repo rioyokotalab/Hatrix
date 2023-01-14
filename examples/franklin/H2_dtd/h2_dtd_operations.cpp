@@ -1361,17 +1361,17 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
     "fill_in_cols_QR_task",
     sizeof(int64_t), &block_size, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_cols.super, fill_in_key),
-                         PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                         PARSEC_INPUT | D_ARENA,
     sizeof(int64_t), &rank, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_US.super, US_key),
-                         PARSEC_INPUT | S_ARENA,
+                         PARSEC_INOUT | S_ARENA,
     sizeof(int64_t), &U_nrows, PARSEC_VALUE,
     sizeof(int64_t), &U_ncols, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-                         PARSEC_INPUT | U_ARENA,
+                         PARSEC_INOUT | U_ARENA | PARSEC_AFFINITY,
     sizeof(int64_t), &t_nrows, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_t.super, t_key),
-                         PARSEC_INPUT | S_ARENA,
+                         PARSEC_INOUT | S_ARENA,
     PARSEC_DTD_ARG_END);
 }
 
@@ -1380,6 +1380,30 @@ update_col_S_blocks(SymmetricSharedBasisMatrix& A,
                     const Hatrix::Domain& domain,
                     const int64_t block,
                     const int64_t level) {
+  const int64_t nblocks = pow(2, level);
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (exists_and_admissible(A, i, block, level)) {
+      int64_t S_nrows = A.ranks(i, level);
+      int64_t S_ncols = A.ranks(block, level);
+      parsec_data_key_t S_key = parsec_S.super.data_key(&parsec_S.super,
+                                                        i, block, level);
+
+      int64_t t_nrows = A.ranks(i, level);
+      parsec_data_key_t t_key = parsec_t.super.data_key(&parsec_t.super,
+                                                        i, level);
+
+      parsec_dtd_insert_task(dtd_tp, task_project_S_left, 0, PARSEC_DEV_CPU,
+        "project_S_left_task",
+        sizeof(int64_t), &S_nrows, PARSEC_VALUE,
+        sizeof(int64_t), &S_ncols, PARSEC_VALUE,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_S.super, S_key),
+                             PARSEC_INOUT | S_ARENA | PARSEC_AFFINITY,
+        sizeof(int64_t), &t_nrows, PARSEC_VALUE,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_t.super, t_key),
+                             PARSEC_INPUT | S_ARENA,
+        PARSEC_DTD_ARG_END);
+    }
+  }
 }
 
 void
@@ -1429,6 +1453,10 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
         Matrix r_i(rank, rank);
 
         r.insert(i, level, std::move(r_i));
+
+        Matrix t_i(rank, rank);
+
+        t.insert(i, level, std::move(t_i));
       }
     }
   }
@@ -1487,6 +1515,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
     parsec_data_key_t U_data_key = parsec_U.super.data_key(&parsec_U.super, i, level);
     parsec_data_key_t US_data_key = parsec_US.super.data_key(&parsec_US.super, i, level);
     parsec_data_key_t r_data_key = parsec_r.super.data_key(&parsec_r.super, i, level);
+    parsec_data_key_t t_data_key = parsec_t.super.data_key(&parsec_t.super, i, level);
 
     if (mpi_rank(i) == MPIRANK) {
       Matrix& U_i = A.U(i, level);
@@ -1497,10 +1526,14 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
 
       Matrix& r_i = r(i, level);
       parsec_r.matrix_map[r_data_key] = std::addressof(r_i);
+
+      Matrix& t_i = t(i, level);
+      parsec_t.matrix_map[t_data_key] = std::addressof(t_i);
     }
     parsec_U.mpi_ranks[U_data_key] = mpi_rank(i);
     parsec_US.mpi_ranks[US_data_key] = mpi_rank(i);
     parsec_r.mpi_ranks[r_data_key] = mpi_rank(i);
+    parsec_t.mpi_ranks[t_data_key] = mpi_rank(i);
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1669,8 +1702,6 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_ij_key),
                                  PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
             PARSEC_DTD_ARG_END);
-
-          // parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
         }
       }
     }
