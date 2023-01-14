@@ -1687,7 +1687,6 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
                         opts.max_rank * 2, opts.max_rank * 2,
                         opts.max_rank * 2);
 
-
   h2_dc_init_maps();
 
   preallocate_blocks(A);
@@ -1719,6 +1718,7 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   parsec_dtd_destroy_arena_datatype(parsec, U_ARENA);
   parsec_dtd_destroy_arena_datatype(parsec, D_ARENA);
   parsec_dtd_destroy_arena_datatype(parsec, S_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, FINAL_DENSE_ARENA);
 
   auto fp_ops = papi.fp_ops();
 

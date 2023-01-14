@@ -16,7 +16,7 @@ make -j H2_dtd
 for adm in 0.8; do
     nleaf=256
     ndim=3
-    max_rank=150
+    max_rank=50
 
     for N in 4096; do
         ./bin/H2_dtd --N $N \
@@ -25,7 +25,7 @@ for adm in 0.8; do
                       --kind_of_geometry grid \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-11 \
+                      --accuracy 1e-8 \
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \
