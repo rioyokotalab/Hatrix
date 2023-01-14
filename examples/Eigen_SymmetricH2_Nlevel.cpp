@@ -26,7 +26,7 @@
 constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
-// #define OUTPUT_CSV
+#define OUTPUT_CSV
 
 // Comment the following line to use SVD instead of pivoted QR for low-rank compression
 // #define USE_QR_COMPRESSION
