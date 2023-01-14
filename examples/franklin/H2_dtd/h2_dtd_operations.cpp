@@ -1653,11 +1653,11 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
               Matrix& F_ij_ref = F(i, j, level);
               parsec_F.matrix_map[F_ij_key] = std::addressof(F_ij_ref);
             }
-            else {
-              // dummy fill-in in case it does not belong to this MPI rank.
-              Matrix fill_in;
-              F.insert(i, j, level, std::move(fill_in));
-            }
+          }
+          else {
+            // dummy fill-in in case it does not belong to this MPI rank.
+            Matrix fill_in;
+            F.insert(i, j, level, std::move(fill_in));
           }
           parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i, j);
 
@@ -1895,6 +1895,8 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   parsec_dtd_data_flush_all(dtd_tp, &parsec_temp_fill_in_rows.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_temp_fill_in_cols.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_r.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_t.super);
 
   int rc = parsec_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");

@@ -33,8 +33,8 @@ for adm in 0.8; do
             # mpirun -n 1  -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
             # mpirun -n 1 -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
 
-        # mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 ./bin/H2_dtd --N $N \
-            mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
+            # mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
+        mpirun -n 2 -genv I_MPI_BIND_NUMA=0,1 ./bin/H2_dtd --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \
                --kind_of_geometry grid \

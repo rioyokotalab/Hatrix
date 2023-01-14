@@ -1,10 +1,10 @@
 #!/bin/bash
 #$ -cwd
 #$ -l rt_F=16
-#$ -l h_rt=1:00:00
-#$ -N larger
-#$ -o larger_out.log
-#$ -e larger_err.log
+#$ -l h_rt=2:00:00
+#$ -N NEW
+#$ -o NEW_out.log
+#$ -e NEW_err.log
 
 source ~/.bashrc
 
@@ -21,23 +21,22 @@ make -j H2_dtd
 # mpirun -n $procs -ppn 2 -f $SGE_JOB_HOSTLIST
 
 for adm in 0.8; do
-    nleaf=512
-    ndim=3
-    max_rank=100
-
-    for N in 65536 131072; do
-
-        mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST ./bin/H2_dtd --N $N \
-               --nleaf $nleaf \
-               --kernel_func laplace \
-               --kind_of_geometry grid \
-               --ndim $ndim \
-               --max_rank $max_rank \
-               --accuracy 1e-8 \
-               --admis $adm \
-               --admis_kind geometry \
-               --construct_algorithm miro \
-               --add_diag 1e-10 \
-               --use_nested_basis
-    done
+    	ndim=3
+    	max_rank=50
+	for nleaf in 1024 2048; do
+    		for N in 131072; do
+        		mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST ./bin/H2_dtd --N $N \
+               			--nleaf $nleaf \
+               			--kernel_func laplace \
+               			--kind_of_geometry grid \
+               			--ndim $ndim \
+               			--max_rank $max_rank \
+               			--accuracy 1e-8 \
+               			--admis $adm \
+               			--admis_kind geometry \
+               			--construct_algorithm miro \
+               			--add_diag 1e-8 \
+               			--use_nested_basis
+    		done
+	done
 done
