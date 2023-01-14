@@ -29,7 +29,6 @@ for adm in 0.8; do
     for nleaf in 1024 ; do
     	for N in 524288; do
             mpirun -n 64 -ppn 1 -f $SGE_JOB_HOSTLIST -l \
-                   -trace -trace-pt2pt \
                    ./bin/H2_dtd --N $N \
                	   --nleaf $nleaf \
                	   --kernel_func laplace \
