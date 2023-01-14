@@ -518,15 +518,19 @@ task_fill_in_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   double *_US;
   int64_t U_nrows, U_ncols;
   double *_U;
+  int64_t r_nrows;
+  double *_r;
 
   parsec_dtd_unpack_args(this_task,
                          &block_size, &_fill_in,
                          &rank, &_US,
-                         &U_nrows, &U_ncols, &_U);
+                         &U_nrows, &U_ncols, &_U,
+                         &r_nrows, &_r);
 
   MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
   MatrixWrapper US(_US, rank, rank, rank);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
+  MatrixWrapper r(_r, r_nrows, r_nrows, r_nrows);
 
   fill_in += matmul(matmul(U, US), U, false, true);
 
@@ -535,7 +539,6 @@ task_fill_in_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
   rq(R, Si, Vi);
-
   US.copy_mem(Si);
 
   return PARSEC_HOOK_RETURN_DONE;

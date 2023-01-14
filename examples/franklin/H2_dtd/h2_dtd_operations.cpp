@@ -9,11 +9,12 @@
 
 using namespace Hatrix;
 
-static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F, parsec_temp_fill_in, parsec_US;
+static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F,
+  parsec_temp_fill_in, parsec_US, parsec_r;
 static int U_ARENA, D_ARENA, S_ARENA, FINAL_DENSE_ARENA;
 
 static RowColLevelMap<Matrix> F;
-static RowMap<Matrix> r, t;
+static RowColMap<Matrix> r, t;
 // store temporary fill-ins.
 static RowColMap<Matrix> temp_fill_in;
 
@@ -1231,6 +1232,10 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   parsec_data_key_t U_key = parsec_U.super.data_key(&parsec_U.super,
                                                     block, level);
 
+  int64_t r_nrows = A.ranks(block, level);
+  parsec_data_key_t r_key = parsec_r.super.data_key(&parsec_r.super,
+                                                    block, level);
+
   parsec_dtd_insert_task(dtd_tp, task_fill_in_QR, 0, PARSEC_DEV_CPU,
     "fill_in_QR_task",
     sizeof(int64_t), &block_size, PARSEC_VALUE,
@@ -1243,7 +1248,11 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
     sizeof(int64_t), &U_ncols, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
                          PARSEC_INPUT | U_ARENA,
+    sizeof(int64_t), &r_nrows, PARSEC_VALUE,
+    PASSED_BY_REF, parsec_dtd_tile_of(&parsec_r.super, r_key),
+                         PARSEC_INPUT | S_ARENA,
     PARSEC_DTD_ARG_END);
+
 }
 
 void
@@ -1292,10 +1301,23 @@ factorize_level(SymmetricSharedBasisMatrix& A,
 
 void
 preallocate_blocks(SymmetricSharedBasisMatrix& A) {
+  // data structure r for storing the projection of the bases for a level.
+  for (int level = A.max_level; level >= A.min_level-1; --level) {
+    for (int64_t i = 0; i < pow(2, level); ++i) {
+      if (mpi_rank(i) == MPIRANK) {
+        int64_t rank = A.ranks(i, level);
+        Matrix r_i(rank, rank);
+
+        r.insert(i, level, std::move(r_i));
+      }
+    }
+  }
+
   for (int level = A.max_level - 1; level >= A.min_level; --level) {
     int nblocks = pow(2, level);
     int child_level = level + 1;
 
+    // D blocks for holding merged blocks on level.
     for (int i = 0; i < nblocks; ++i) {
       for (int j = 0; j <= i; ++j) {
         if (exists_and_inadmissible(A, i, j, level)) {
@@ -1344,6 +1366,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
   for (int64_t i = 0; i < nblocks; ++i) { // U
     parsec_data_key_t U_data_key = parsec_U.super.data_key(&parsec_U.super, i, level);
     parsec_data_key_t US_data_key = parsec_US.super.data_key(&parsec_US.super, i, level);
+    parsec_data_key_t r_data_key = parsec_r.super.data_key(&parsec_r.super, i, level);
 
     if (mpi_rank(i) == MPIRANK) {
       Matrix& U_i = A.U(i, level);
@@ -1351,9 +1374,13 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
 
       Matrix& US_i = A.US(i, level);
       parsec_US.matrix_map[US_data_key] = std::addressof(US_i);
+
+      Matrix& r_i = r(i, level);
+      parsec_r.matrix_map[r_data_key] = std::addressof(r_i);
     }
     parsec_U.mpi_ranks[U_data_key] = mpi_rank(i);
     parsec_US.mpi_ranks[US_data_key] = mpi_rank(i);
+    parsec_r.mpi_ranks[r_data_key] = mpi_rank(i);
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1537,6 +1564,7 @@ void h2_dc_init_maps() {
   h2_dc_init(parsec_F, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_temp_fill_in, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_US, data_key_1d, rank_of_1d);
+  h2_dc_init(parsec_r, data_key_1d, rank_of_1d);
 }
 
 void
@@ -1547,6 +1575,7 @@ h2_dc_destroy_maps() {
   h2_dc_destroy(parsec_F);
   h2_dc_destroy(parsec_temp_fill_in);
   h2_dc_destroy(parsec_US);
+  h2_dc_destroy(parsec_r);
 }
 
 void
