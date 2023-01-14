@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = 39;                // TODO: why does this not with multiple cores?
+  int cores = 39;
 
   Args opts(argc, argv);
 
@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
   }
 
   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
-  if(!MPIRANK) A.print_structure();
+  // if(!MPIRANK) A.print_structure();
   construct_h2_matrix_dtd(A, domain, opts); // construct H2 matrix.
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
