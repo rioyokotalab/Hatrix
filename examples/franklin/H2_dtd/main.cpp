@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = -1;                // TODO: why does this not with multiple cores?
+  int cores = 39;                // TODO: why does this not with multiple cores?
 
   Args opts(argc, argv);
 
@@ -387,27 +387,37 @@ int main(int argc, char **argv) {
   Hatrix::Context::finalize();
 
   if (!MPIRANK) {
-    std::cout << "----------------------------\n";
-    std::cout << "N               : " << opts.N << std::endl;
-    std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-    std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-    std::cout << "ADMIS           : " << opts.admis << std::endl;
-    std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-    std::cout << "NPROCS          : " << MPISIZE << std::endl;
-    std::cout << "NLEAF           : " << opts.nleaf << "\n"
-              << "CONSTRUCT ERROR : " << construction_error << std::endl
-              << "SOLVE ERROR     : " << solve_error << std::endl
-              << "Contruct(ms)    : " << construct_time << std::endl
-              << "Factorize (ms)  : " << factorize_time << std::endl
-              << "PAPI FP OPS     : " << fp_ops << std::endl
-              << "CORES           : " << cores << std::endl
-              << "\n";
-    std::cout << "----------------------------\n";
-    // std::cout << "RESULT: " << opts.N << "," << opts.accuracy << "," << opts.max_rank
-    //           << "," << opts.admis << "," << construct_max_rank << "," << opts.nleaf
-    //           << "," << MPISIZE
-    //           << "," << construction_error <<  "," << construct_time  << "," << factorize_time
-    //           << "," << fp_ops << std::endl;
+    // std::cout << "----------------------------\n";
+    // std::cout << "N               : " << opts.N << std::endl;
+    // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+    // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+    // std::cout << "ADMIS           : " << opts.admis << std::endl;
+    // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+    // std::cout << "NPROCS          : " << MPISIZE << std::endl;
+    // std::cout << "NLEAF           : " << opts.nleaf << "\n"
+    //           << "CONSTRUCT ERROR : " << construction_error << std::endl
+    //           << "SOLVE ERROR     : " << solve_error << std::endl
+    //           << "Contruct(ms)    : " << construct_time << std::endl
+    //           << "Factorize (ms)  : " << factorize_time << std::endl
+    //           << "PAPI FP OPS     : " << fp_ops << std::endl
+    //           << "CORES           : " << cores << std::endl
+    //           << "\n";
+    // std::cout << "----------------------------\n";
+    std::cout << "RESULT: "
+              << opts.N << ","
+              << opts.accuracy << ","
+              << opts.max_rank << ","
+              << opts.admis << ","
+              << construct_max_rank << ","
+              << MPISIZE << ","
+              << opts.nleaf << ","
+              << construction_error <<  ","
+              << solve_error << ","
+              << construct_time  << ","
+              << factorize_time << ","
+              << fp_ops << ","
+              << cores
+              << std::endl;
   }
 
   Cblacs_gridexit(BLACS_CONTEXT);
