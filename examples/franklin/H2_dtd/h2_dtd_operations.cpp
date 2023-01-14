@@ -10,13 +10,14 @@
 using namespace Hatrix;
 
 static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F,
-  parsec_temp_fill_in_rows, parsec_US, parsec_r;
+  parsec_temp_fill_in_rows, parsec_temp_fill_in_cols,
+  parsec_US, parsec_r;
 static int U_ARENA, D_ARENA, S_ARENA, FINAL_DENSE_ARENA;
 
 static RowColLevelMap<Matrix> F;
 static RowColMap<Matrix> r, t;
 // store temporary fill-ins.
-static RowColMap<Matrix> temp_fill_in_rows;
+static RowColMap<Matrix> temp_fill_in_rows, temp_fill_in_cols;
 
 void
 compute_fill_ins(SymmetricSharedBasisMatrix& A,
@@ -1310,6 +1311,28 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
                          const int64_t block,
                          const int64_t level,
                          const Hatrix::Args& opts) {
+  const int64_t nblocks = pow(2, level);
+  const int64_t block_size = get_dim(A, domain, block, level);
+  parsec_data_key_t fill_in_key =
+    parsec_temp_fill_in_cols.super.data_key(&parsec_temp_fill_in_cols.super,
+                                            block, level);
+
+  if (mpi_rank(block) == MPIRANK) {
+    Matrix fill_in(block_size, block_size);
+    temp_fill_in_cols.insert(block, level, std::move(fill_in));
+    Matrix& fill_in_ref = temp_fill_in_cols(block, level);
+    parsec_temp_fill_in_cols.matrix_map[fill_in_key] = std::addressof(fill_in_ref);
+  }
+  parsec_temp_fill_in_cols.mpi_ranks[fill_in_key] = mpi_rank(block);
+
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (exists_and_admissible(A, i, block, level) && F.exists(i, block, level)) {
+      int64_t F_i_block_nrows = get_dim(A, domain, i, level);
+      int64_t F_i_block_ncols = get_dim(A, domain, block, level);
+      parsec_data_key_t F_i_block_key =
+        parsec_F.super.data_key(&parsec_F.super, i, block, level);
+    }
+  }
 
 }
 
@@ -1621,6 +1644,7 @@ void h2_dc_init_maps() {
   h2_dc_init(parsec_D, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_F, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d);
+  h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_US, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_r, data_key_1d, rank_of_1d);
 }
@@ -1632,6 +1656,7 @@ h2_dc_destroy_maps() {
   h2_dc_destroy(parsec_D);
   h2_dc_destroy(parsec_F);
   h2_dc_destroy(parsec_temp_fill_in_rows);
+  h2_dc_destroy(parsec_temp_fill_in_cols);
   h2_dc_destroy(parsec_US);
   h2_dc_destroy(parsec_r);
 }
@@ -1796,6 +1821,7 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_temp_fill_in_rows.super);
+  parsec_dtd_data_flush_all(dtd_tp, &parsec_temp_fill_in_cols.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
 
   int rc = parsec_taskpool_wait(dtd_tp);
