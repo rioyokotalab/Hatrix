@@ -11,7 +11,7 @@ using namespace Hatrix;
 
 static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F,
   parsec_temp_fill_in_rows, parsec_temp_fill_in_cols,
-  parsec_US, parsec_r;
+  parsec_US, parsec_r, parsec_t;
 static int U_ARENA, D_ARENA, S_ARENA, FINAL_DENSE_ARENA;
 
 static RowColLevelMap<Matrix> F;
@@ -1344,6 +1344,35 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
         PARSEC_DTD_ARG_END);
     }
   }
+
+  int64_t rank = A.ranks(block, level);
+  parsec_data_key_t US_key = parsec_US.super.data_key(&parsec_US.super,
+                                                      block, level);
+  int64_t U_nrows = get_dim(A, domain, block, level);
+  int64_t U_ncols = A.ranks(block, level);
+  parsec_data_key_t U_key = parsec_U.super.data_key(&parsec_U.super,
+                                                    block, level);
+
+  int64_t t_nrows = A.ranks(block, level);
+  parsec_data_key_t t_key = parsec_t.super.data_key(&parsec_t.super,
+                                                    block, level);
+
+  parsec_dtd_insert_task(dtd_tp, task_fill_in_cols_QR, 0, PARSEC_DEV_CPU,
+    "fill_in_cols_QR_task",
+    sizeof(int64_t), &block_size, PARSEC_VALUE,
+    PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_cols.super, fill_in_key),
+                         PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+    sizeof(int64_t), &rank, PARSEC_VALUE,
+    PASSED_BY_REF, parsec_dtd_tile_of(&parsec_US.super, US_key),
+                         PARSEC_INPUT | S_ARENA,
+    sizeof(int64_t), &U_nrows, PARSEC_VALUE,
+    sizeof(int64_t), &U_ncols, PARSEC_VALUE,
+    PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
+                         PARSEC_INPUT | U_ARENA,
+    sizeof(int64_t), &t_nrows, PARSEC_VALUE,
+    PASSED_BY_REF, parsec_dtd_tile_of(&parsec_t.super, t_key),
+                         PARSEC_INPUT | S_ARENA,
+    PARSEC_DTD_ARG_END);
 }
 
 void
@@ -1657,6 +1686,7 @@ void h2_dc_init_maps() {
   h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_US, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_r, data_key_1d, rank_of_1d);
+  h2_dc_init(parsec_t, data_key_1d, rank_of_1d);
 }
 
 void
@@ -1669,6 +1699,7 @@ h2_dc_destroy_maps() {
   h2_dc_destroy(parsec_temp_fill_in_cols);
   h2_dc_destroy(parsec_US);
   h2_dc_destroy(parsec_r);
+  h2_dc_destroy(parsec_t);
 }
 
 void

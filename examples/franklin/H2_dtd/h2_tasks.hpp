@@ -65,3 +65,6 @@ task_project_S(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
 task_fill_in_cols_addition(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_fill_in_cols_QR(parsec_execution_stream_t* es, parsec_task_t* this_task);
