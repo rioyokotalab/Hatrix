@@ -18,12 +18,12 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 make -j H2_dtd
 
 for adm in 0.8; do
-    nleaf=256
+    nleaf=1024
     ndim=3
-    max_rank=200
+    max_rank=50
 
-    for N in 4096; do
-        mpirun -n 1 valgrind --leak-check=full ./bin/H2_dtd --N $N \
+    for N in 65536; do
+        mpirun -n 1 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -34,6 +34,9 @@ for adm in 0.8; do
                       --admis_kind geometry \
                       --construct_algorithm miro \
                       --add_diag 1e-9 \
-                      --use_nested_basis
+                      --use_nested_basis \
+                      -- \
+                      --mca profile_filename demo_parsec_profile \
+                      --mca mca_pins task_profiler
     done
 done
