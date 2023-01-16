@@ -647,13 +647,11 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
       update_row_cluster_bases(node, level, F, r);
       // Project admissible blocks accordingly
       // Current level: update coupling matrix
-      #pragma omp parallel for
       for (int j = 0; j < num_nodes; ++j) {
         if (is_admissible.exists(node, j, level) && is_admissible(node, j, level)) {
           S(node, j, level) = matmul(r(node), S(node, j, level));
         }
       }
-      #pragma omp parallel for
       for (int i = 0; i < num_nodes; ++i) {
         if (is_admissible.exists(i, node, level) && is_admissible(i, node, level)) {
           S(i, node, level) = matmul(S(i, node, level), r(node), false, true);
@@ -703,7 +701,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     // Multiplication with U_F
     Matrix U_F = prepend_complement_basis(U(node, level));
     // Multiply to dense blocks along the row in current level
-    #pragma omp parallel for
     for (int j = 0; j < num_nodes; ++j) {
       if (is_admissible.exists(node, j, level) && !is_admissible(node, j, level)) {
         if (j < node) {
@@ -718,7 +715,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
       }
     }
     // Multiply to dense blocks along the column in current level
-    #pragma omp parallel for
     for (int i = 0; i < num_nodes; ++i) {
       if (is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) {
         if (i < node) {
@@ -741,7 +737,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     ldl(Dcc);
 
     // TRSM with cc blocks on the column
-    #pragma omp parallel for
     for (int64_t i = node+1; i < num_nodes; ++i) {
       if (is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) {
         int64_t lower_row_split = D(i, node, level).rows -
@@ -752,7 +747,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
       }
     }
     // TRSM with oc blocks on the column
-    #pragma omp parallel for
     for (int64_t i = 0; i < num_nodes; ++i) {
       if (is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) {
         int64_t lower_row_split = D(i, node, level).rows -
@@ -766,7 +760,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     }
 
     // TRSM with cc blocks on the row
-    #pragma omp parallel for
     for (int64_t j = node + 1; j < num_nodes; ++j) {
       if (is_admissible.exists(node, j, level) && !is_admissible(node, j, level)) {
         int64_t right_col_split = D(node, j, level).cols -
@@ -777,7 +770,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
       }
     }
     // TRSM with co blocks on this row
-    #pragma omp parallel for
     for (int64_t j = 0; j < num_nodes; ++j) {
       if (is_admissible.exists(node, j, level) && !is_admissible(node, j, level)) {
         int64_t right_col_split = D(node, j, level).cols -
@@ -792,7 +784,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
 
     // Schur's complement into dense block
     // cc x cc -> cc
-    #pragma omp parallel for collapse(2)
     for (int64_t i = node+1; i < num_nodes; ++i) {
       for (int64_t j = node+1; j < num_nodes; ++j) {
         if ((is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) &&
@@ -820,7 +811,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     }
     // Schur's complement into dense block
     // cc x co -> co
-    #pragma omp parallel for collapse(2)
     for (int64_t i = node+1; i < num_nodes; ++i) {
       for (int64_t j = 0; j < num_nodes; ++j) {
         if ((is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) &&
@@ -848,7 +838,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     }
     // Schur's complement into dense block
     // oc x cc -> oc
-    #pragma omp parallel for collapse(2)
     for (int64_t i = 0; i < num_nodes; ++i) {
       for (int64_t j = node+1; j < num_nodes; ++j) {
         if ((is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) &&
@@ -876,7 +865,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     }
     // Schur's complement into dense block
     // oc x co -> oo
-    #pragma omp parallel for collapse(2)
     for (int64_t i = 0; i < num_nodes; ++i) {
       for (int64_t j = 0; j < num_nodes; ++j) {
         if ((is_admissible.exists(i, node, level) && !is_admissible(i, node, level)) &&
@@ -1126,7 +1114,6 @@ void SymmetricH2::factorize() {
 
     // Update coupling matrices of admissible blocks in the current level
     // To add fill-in contributions
-    #pragma omp parallel for collapse(2)
     for (int64_t i = 0; i < num_nodes; ++i) {
       for (int64_t j = 0; j < num_nodes; ++j) {
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
