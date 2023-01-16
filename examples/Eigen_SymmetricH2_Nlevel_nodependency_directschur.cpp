@@ -43,14 +43,6 @@ using vec = std::vector<int64_t>;
  */
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 
-Hatrix::Matrix diag(const Hatrix::Matrix& A) {
-  Hatrix::Matrix diag(A.min_dim(), 1);
-  for(int64_t i = 0; i < A.min_dim(); i++) {
-    diag(i, 0) = A(i, i);
-  }
-  return diag;
-}
-
 void shift_diag(Hatrix::Matrix& A, const double shift) {
   for(int64_t i = 0; i < A.min_dim(); i++) {
     A(i, i) += shift;
@@ -719,27 +711,30 @@ SymmetricH2::inertia(const Domain& domain,
   }
   // LDL Factorize
   A_shifted.factorize(domain);
-  // Gather values in D
-  Matrix D_lambda(0, 0);
+  // Count negative entries in D
+  int64_t negative_elements_count = 0;
   for(int64_t level = height; level >= 0; level--) {
     int64_t num_nodes = level_blocks[level];
     for(int64_t node = 0; node < num_nodes; node++) {
-      const Matrix& D_node = A_shifted.D(node, node, level);
-      const auto c_size = A_shifted.Uc(node, level).cols;
       if(level == 0) {
-        D_lambda = concat(D_lambda, diag(D_node), 0);
+        const Matrix& D_lambda = A_shifted.D(node, node, level);
+        for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
+          negative_elements_count += (D_lambda(i, i) < 0 ? 1 : 0);
+          if(std::isnan(D_lambda(i, i)) || std::abs(D_lambda(i, i)) < EPS) singular = true;
+        }
       }
       else {
-        auto D_node_splits = D_node.split(vec{c_size}, vec{c_size});
-        Matrix& D_node_cc = D_node_splits[0];
-        D_lambda = concat(D_lambda, diag(D_node_cc), 0);
+        const Matrix& D_node = A_shifted.D(node, node, level);
+        const auto rank = A_shifted.U(node, level).cols;
+        const auto D_node_splits = D_node.split(vec{D_node.rows - rank},
+                                                vec{D_node.cols - rank});
+        const Matrix& D_lambda = D_node_splits[0];
+        for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
+          negative_elements_count += (D_lambda(i, i) < 0 ? 1 : 0);
+          if(std::isnan(D_lambda(i, i)) || std::abs(D_lambda(i, i)) < EPS) singular = true;
+        }
       }
     }
-  }
-  int64_t negative_elements_count = 0;
-  for(int64_t i = 0; i < D_lambda.rows; i++) {
-    negative_elements_count += (D_lambda(i, 0) < 0 ? 1 : 0);
-    if(std::isnan(D_lambda(i, 0)) || std::abs(D_lambda(i, 0)) < EPS) singular = true;
   }
   const auto ldl_min_rank = A_shifted.get_basis_min_rank();
   const auto ldl_max_rank = A_shifted.get_basis_max_rank();
