@@ -366,7 +366,7 @@ int main(int argc, char **argv) {
                                start_factorize).count();
 
   if (!MPIRANK) {
-  std::cout << "factor end\n";
+    std::cout << "factor end\n";
   }
 
   parsec_context_wait(parsec);
@@ -374,12 +374,34 @@ int main(int argc, char **argv) {
 
   omp_set_num_threads(max_threads);
 
+  if (!MPIRANK) {
+    std::cout << "H2 solve begin\n";
+  }
+
   solve(A, x, h2_solution, domain); // h2_solution = H2_A^(-1) * x
 
+  if (!MPIRANK) {
+    std::cout << "H2 solve end\n";
+  }
+
+  if (!MPIRANK) {
+    std::cout << "dense solve begin\n";
+  }
+
+  auto start_dense_solve = std::chrono::system_clock::now();
   descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
   auto dense_solution = cholesky_solve(A, opts, X_mem, DESCX);
+  auto stop_dense_solve = std::chrono::system_clock::now();
+  double dense_solve_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_dense_solve -
+                               start_dense_solve).count();
+
   // dense_solution = dense_A^(-1) * x_mem
+
+  if (!MPIRANK) {
+    std::cout << "dense solve end time: " << dense_solve_time << std::endl;
+  }
 
   std::vector<Matrix> solve_diff;
   for (int i = 0; i < x.size(); ++i) {
