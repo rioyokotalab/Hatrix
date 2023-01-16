@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
-  Matrix b, h2_solution;
+  Matrix b, h2_solution, x_regen;
   double construct_time, matvec_time, factor_time, solve_time;
   int64_t construct_max_rank, construct_average_rank,
     post_factor_max_rank, post_factor_average_rank;
@@ -64,6 +64,8 @@ int main(int argc, char* argv[]) {
 
     construct_max_rank = A.max_rank();
     construct_average_rank = A.average_rank();
+
+    SymmetricSharedBasisMatrix A_orig(A); // save unfactorized for verification.
 
     // std::cout << "max level: " << A.max_level << " min: " << A.min_level << std::endl;
 
@@ -91,6 +93,7 @@ int main(int argc, char* argv[]) {
 
     auto begin_solve = std::chrono::system_clock::now();
     h2_solution = solve(A, x);
+    x_regen = matmul(A_orig, h2_solution);
 
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
@@ -100,6 +103,9 @@ int main(int argc, char* argv[]) {
     std::cerr << "Not implemented for non-symmetric matrices." << std::endl;
     abort();
   }
+
+  // ||x - A * (A^-1 * x)|| / ||b||
+  double h2_solve_error = Hatrix::norm(x - x_regen) / Hatrix::norm(x);
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
@@ -114,10 +120,6 @@ int main(int argc, char* argv[]) {
   //           << "," << solve_time << "," << solve_error << "," << matvec_error
   //           << "," << fp_ops << std::endl;
 
-
-
-
-
   std::cout << "----------------------------\n";
   std::cout << "N               : " << opts.N << std::endl;
   std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
@@ -129,7 +131,8 @@ int main(int argc, char* argv[]) {
             << "Contruct(ms)    : " << construct_time << "\n"
             << "Factor(ms)      : " << factor_time << "\n"
             << "Solve(ms)       : " << solve_time << "\n"
-            << "Solve error     : " << solve_error << "\n"
+            << "D. solve error  : " << solve_error << "\n"
+            << "H2 solve error  : " << h2_solve_error << "\n"
             << "Construct error : " << matvec_error << std::endl;
   std::cout << "----------------------------\n";
 
