@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = 39;
+  int cores = -1;
 
   Args opts(argc, argv);
 
@@ -168,7 +168,10 @@ int main(int argc, char **argv) {
   MPI_Dims_create(MPISIZE, 2, MPIGRID);
   N = opts.N;
   if (!MPIRANK) {
-    std::cout << "MPIGRID g[0] : " << MPIGRID[0] << " g[1]: " << MPIGRID[1] << std::endl;
+    std::cout << "MPIGRID g[0] : " << MPIGRID[0]
+              << " g[1]: " << MPIGRID[1]
+              << " num args: " << opts.num_args
+              << std::endl;
   }
 
   // Init domain decomposition for H2 matrix using DTT.
@@ -321,7 +324,8 @@ int main(int argc, char **argv) {
 
   /* Initializing parsec context */
   int parsec_argc = argc - opts.num_args;
-  parsec = parsec_init( cores, NULL, NULL);
+  char ** parsec_argv = argv + opts.num_args;
+  parsec = parsec_init( cores, &parsec_argc, &parsec_argv);
   if( NULL == parsec ) {
     printf("Cannot initialize PaRSEC\n");
     exit(-1);
