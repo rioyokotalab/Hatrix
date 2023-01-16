@@ -104,15 +104,15 @@ int main(int argc, char* argv[]) {
     abort();
   }
 
-  // ||x - A * (A^-1 * x)|| / ||b||
-  double h2_solve_error = Hatrix::norm(x - x_regen) / Hatrix::norm(x);
+  // ||x - A * (A^-1 * x)|| / ||x||
+  double solve_error = (Hatrix::norm(x - x_regen) / Hatrix::norm(x)) * opts.add_diag;
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
-  Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
+  // Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
   double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
-  double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
+  // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
 
   // std::cout << "RESULT: " << opts.N << "," << opts.accuracy << "," << opts.max_rank
   //           << "," << opts.admis << "," << construct_max_rank << "," << opts.nleaf
@@ -131,8 +131,7 @@ int main(int argc, char* argv[]) {
             << "Contruct(ms)    : " << construct_time << "\n"
             << "Factor(ms)      : " << factor_time << "\n"
             << "Solve(ms)       : " << solve_time << "\n"
-            << "D. solve error  : " << solve_error << "\n"
-            << "H2 solve error  : " << h2_solve_error << "\n"
+            << "Solve error     : " << solve_error << "\n"
             << "Construct error : " << matvec_error << std::endl;
   std::cout << "----------------------------\n";
 

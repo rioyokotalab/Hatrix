@@ -244,13 +244,16 @@ int main(int argc, char **argv) {
 
   construct_max_rank = A.max_rank(); // get max rank of H2 matrix post construct.
 
+  SymmetricSharedBasisMatrix A_copy(A);
+
   // Allocate the vectors as a vector of Matrix objects of the form H2_A * x = b,
   // and dense_A * x = b_check.
-  std::vector<Matrix> x, b, b_check;
+  std::vector<Matrix> x, b, b_check, x_regen;
   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
     x.push_back(Matrix(opts.nleaf, 1));
     b.push_back(Matrix(opts.nleaf, 1));
     b_check.push_back(Matrix(opts.nleaf, 1));
+    x_regen.push_back(Matrix(opts.nleaf, 1));
   }
 
   // scalapack data structures for x and b.
@@ -379,6 +382,7 @@ int main(int argc, char **argv) {
   }
 
   solve(A, x, h2_solution, domain); // h2_solution = H2_A^(-1) * x
+  matmul(A_copy, domain, h2_solution, x_regen);
 
   if (!MPIRANK) {
     std::cout << "H2 solve end\n";
@@ -388,28 +392,38 @@ int main(int argc, char **argv) {
     std::cout << "dense solve begin\n";
   }
 
-  auto start_dense_solve = std::chrono::system_clock::now();
-  descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
-            &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
-  auto dense_solution = cholesky_solve(A, opts, X_mem, DESCX);
-  auto stop_dense_solve = std::chrono::system_clock::now();
-  double dense_solve_time = std::chrono::duration_cast<
-    std::chrono::milliseconds>(stop_dense_solve -
-                               start_dense_solve).count();
+  // auto start_dense_solve = std::chrono::system_clock::now();
+  // descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
+  //           &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
+  // auto dense_solution = cholesky_solve(A, opts, X_mem, DESCX);
+  // auto stop_dense_solve = std::chrono::system_clock::now();
+  // double dense_solve_time = std::chrono::duration_cast<
+  //   std::chrono::milliseconds>(stop_dense_solve -
+  //                              start_dense_solve).count();
 
   // dense_solution = dense_A^(-1) * x_mem
 
-  if (!MPIRANK) {
-    std::cout << "dense solve end time: " << dense_solve_time << std::endl;
-  }
+  // if (!MPIRANK) {
+  //   std::cout << "dense solve end time: " << dense_solve_time << std::endl;
+  // }
 
-  std::vector<Matrix> solve_diff;
+  // std::vector<Matrix> solve_diff;
+  // for (int i = 0; i < x.size(); ++i) {
+  //   solve_diff.push_back(h2_solution[i] - dense_solution[i]);
+  // }
+
+  // double solve_diff_norm = dist_norm2(solve_diff);
+  // double solve_error = solve_diff_norm / opts.N;
+
+  // ||x - A * (A^-1 * x)|| / ||x||
+
+  std::vector<Matrix> h2_solve_diff;
   for (int i = 0; i < x.size(); ++i) {
-    solve_diff.push_back(h2_solution[i] - dense_solution[i]);
+    h2_solve_diff.push_back(x_regen[i] - x[i]);
   }
 
-  double solve_diff_norm = dist_norm2(solve_diff);
-  double solve_error = solve_diff_norm / opts.N;
+  double solve_h2_diff_norm = dist_norm2(h2_solve_diff);
+  double solve_error = (solve_h2_diff_norm / dist_norm2(x)) * opts.add_diag;
 
   parsec_fini(&parsec);
 
@@ -426,7 +440,7 @@ int main(int argc, char **argv) {
     std::cout << "NPROCS          : " << MPISIZE << std::endl;
     std::cout << "NLEAF           : " << opts.nleaf << "\n"
               << "CONSTRUCT ERROR : " << construction_error << std::endl
-              << "SOLVE ERROR     : " << solve_error << std::endl
+              << "H2 SOLVE ERROR  : " << solve_error << std::endl
               << "Contruct(ms)    : " << construct_time << std::endl
               << "Factorize (ms)  : " << factorize_time << std::endl
               << "PAPI FP OPS     : " << fp_ops << std::endl
