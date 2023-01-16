@@ -213,6 +213,9 @@ int main(int argc, char **argv) {
 
   // std::cout << "begin generation. nums: " << DENSE_local_rows <<  " "
   //           << DENSE_local_cols << std::endl;
+  if (!MPIRANK) {
+    std::cout << "begin data init.\n";
+  }
 
   // generate the distributed P2P matrix.
 #pragma omp parallel for
@@ -323,8 +326,8 @@ int main(int argc, char **argv) {
   // ---- BEGIN PARSEC ----
 
   /* Initializing parsec context */
-  int parsec_argc = argc - opts.num_args;
-  char ** parsec_argv = argv + opts.num_args;
+  int parsec_argc = argc - 24;
+  char ** parsec_argv = argv + 24;
   parsec = parsec_init( cores, &parsec_argc, &parsec_argv);
   if( NULL == parsec ) {
     printf("Cannot initialize PaRSEC\n");

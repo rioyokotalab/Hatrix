@@ -18,11 +18,11 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 make -j H2_dtd
 
 for adm in 0.8; do
-    nleaf=1024
+    nleaf=512
     ndim=3
     max_rank=50
 
-    for N in 65536; do
+    for N in 8192; do
         mpirun --mca opal_warn_on_missing_libcuda 0 -n 1 \
                ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
@@ -36,8 +36,8 @@ for adm in 0.8; do
                       --construct_algorithm miro \
                       --add_diag 1e-9 \
                       --use_nested_basis \
-                      -- \
-                      --mca profile_filename demo_parsec_profile \
-                      --mca mca_pins task_profiler
+                      -- help
+                      # --mca profile_filename demo_parsec_profile \
+                      # --mca mca_pins task_profiler
     done
 done
