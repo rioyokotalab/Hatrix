@@ -26,7 +26,7 @@ yrgreen = '#539600'
 plot_singular_values = False
 tolerance = 1e-6
 eps = 1e-16
-
+max_rank_fontsize = 128
 
 def read_xml(in_file):
     tree = ET.parse(in_file)
@@ -97,7 +97,8 @@ def plot_hierarchical(node, gs_node, color=False):
 
 
 def plot_lowrank(node, gs_node):
-    dim = node['dim']
+    level = node['level']
+    rank = node['rank']
     svalues = [x+eps for x in node['svalues']]
     count = 0
     for sv in svalues:
@@ -105,8 +106,15 @@ def plot_lowrank(node, gs_node):
             count += 1
     slog = np.log10(svalues[0:count])
 
+    local_dim = node['dim'][0];
+    global_dim = (2**level) * local_dim
+    local_fontsize = (local_dim / global_dim) * max_rank_fontsize
+
     ax = plt.subplot(gs_node)
-    ax.text(0.5*count, 0.5, f"{count}", size=16)
+    ax.text(
+        0.5*count, 0.5, f"{rank}", size=local_fontsize,
+        horizontalalignment='center', verticalalignment='bottom'
+    )
     # ax.text(
     #     0.5, 0.5,
     #     "{}\n({}, {})".format(
@@ -175,7 +183,7 @@ def plot_lowrank_shared_patches(node, gs_node, dim, has_color=True):
 
 
 def plot_dense(node, gs_node):
-    dim = node['dim']
+    level = node['level']
     svalues = [x+eps for x in node['svalues']]
     count = 0
     for sv in svalues:
@@ -183,8 +191,15 @@ def plot_dense(node, gs_node):
             count += 1
     slog = np.log10(svalues[0:count])
 
+    local_dim = node['dim'][0];
+    global_dim = (2**level) * local_dim
+    local_fontsize = (local_dim / global_dim) * max_rank_fontsize
+
     ax = plt.subplot(gs_node)
-    ax.text(0.5*count, 0.5, f"{count}", size=16)
+    ax.text(
+        0.5*count, 0.5, f"{count}", size=local_fontsize,
+        horizontalalignment='center', verticalalignment='bottom'
+    )
     # ax.text(
     #     0.5, 0.5,
     #     "{}\n({}, {})".format(
