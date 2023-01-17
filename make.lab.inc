@@ -8,8 +8,8 @@ PAPI_INCLUDE = -DHATRIX_ENABLE_PAPI $(shell pkg-config --cflags papi)
 PAPI_LIBS    = $(shell pkg-config --libs papi)
 CXXFLAGS     = -std=c++11 -O3 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
                $(shell pkg-config --cflags gtest gtest_main) $(PAPI_INCLUDE)
-CXX          = g++
-MPICXX       = mpicxx
+CXX          = g++ -g
+MPICXX       = mpicxx -g
 LDFLAGS      = $(shell pkg-config --libs gtest_main gtest) $(BLAS_LIB) $(PAPI_LIBS) -lgfortran
 PARSEC_INCLUDE = $(shell pkg-config --cflags parsec)
 PARSEC_LIB     = $(shell pkg-config --libs parsec)

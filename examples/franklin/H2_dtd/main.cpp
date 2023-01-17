@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = -1;
+  int cores = 14;
 
   Args opts(argc, argv);
 

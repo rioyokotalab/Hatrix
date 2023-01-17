@@ -22,9 +22,9 @@ for adm in 0.8; do
     ndim=3
     max_rank=50
 
-    for N in 8192; do
-        mpirun --mca opal_warn_on_missing_libcuda 0 -n 1 \
-               ./bin/H2_dtd --N $N \
+    for N in 32768; do
+        mpirun --mca opal_warn_on_missing_libcuda 0 \
+               -n 1 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -35,9 +35,6 @@ for adm in 0.8; do
                       --admis_kind geometry \
                       --construct_algorithm miro \
                       --add_diag 1e-9 \
-                      --use_nested_basis \
-                      -- help
-                      # --mca profile_filename demo_parsec_profile \
-                      # --mca mca_pins task_profiler
+                      --use_nested_basis
     done
 done
