@@ -95,6 +95,7 @@ class RowColMap {
 };
 
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol
+// TODO make RowLevelMap templated for extensibility
 using RowLevelMap = RowColMap<Matrix>;
 using ColLevelMap = RowColMap<Matrix>;
 
