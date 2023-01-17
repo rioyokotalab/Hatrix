@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = 14;
+  int cores = -1;
 
   Args opts(argc, argv);
 
@@ -388,9 +388,9 @@ int main(int argc, char **argv) {
     std::cout << "H2 solve end\n";
   }
 
-  if (!MPIRANK) {
-    std::cout << "dense solve begin\n";
-  }
+  // if (!MPIRANK) {
+  //   std::cout << "dense solve begin\n";
+  // }
 
   // auto start_dense_solve = std::chrono::system_clock::now();
   // descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
@@ -431,22 +431,22 @@ int main(int argc, char **argv) {
   Hatrix::Context::finalize();
 
   if (!MPIRANK) {
-    std::cout << "----------------------------\n";
-    std::cout << "N               : " << opts.N << std::endl;
-    std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-    std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-    std::cout << "ADMIS           : " << opts.admis << std::endl;
-    std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-    std::cout << "NPROCS          : " << MPISIZE << std::endl;
-    std::cout << "NLEAF           : " << opts.nleaf << "\n"
-              << "CONSTRUCT ERROR : " << construction_error << std::endl
-              << "H2 SOLVE ERROR  : " << solve_error << std::endl
-              << "Contruct(ms)    : " << construct_time << std::endl
-              << "Factorize (ms)  : " << factorize_time << std::endl
-              << "PAPI FP OPS     : " << fp_ops << std::endl
-              << "CORES           : " << cores << std::endl
-              << "\n";
-    std::cout << "----------------------------\n";
+    // std::cout << "----------------------------\n";
+    // std::cout << "N               : " << opts.N << std::endl;
+    // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+    // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+    // std::cout << "ADMIS           : " << opts.admis << std::endl;
+    // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+    // std::cout << "NPROCS          : " << MPISIZE << std::endl;
+    // std::cout << "NLEAF           : " << opts.nleaf << "\n"
+    //           << "CONSTRUCT ERROR : " << construction_error << std::endl
+    //           << "H2 SOLVE ERROR  : " << solve_error << std::endl
+    //           << "Contruct(ms)    : " << construct_time << std::endl
+    //           << "Factorize (ms)  : " << factorize_time << std::endl
+    //           << "PAPI FP OPS     : " << fp_ops << std::endl
+    //           << "CORES           : " << cores << std::endl
+    //           << "\n";
+    // std::cout << "----------------------------\n";
     std::cout << "RESULT: "
               << opts.N << ","
               << opts.accuracy << ","
