@@ -1,7 +1,7 @@
 #!/bin/bash
 #YBATCH -r epyc-7502_8
 #SBATCH -N 1
-#SBATCH -J VALGRIND
+#SBATCH -J PAPI
 #SBATCH --time=72:00:00
 
 source ~/.bashrc
@@ -23,11 +23,12 @@ make -j H2_dtd
 
 for adm in 0.8; do
     ndim=3
-    N=16384
+    N=65536
 
-    for max_rank in 50; do
-        for nleaf in 512; do
+    for max_rank in 50 100 150; do
+        for nleaf in 512 1024 2048 4096 8192; do
             rm test_profile_output-0.prof
+            rm test_profile_output-0.prof.h5
 
             mpirun --mca opal_warn_on_missing_libcuda 0 \
                    -n 1 ./bin/H2_dtd --N $N \
@@ -43,7 +44,10 @@ for adm in 0.8; do
                    --add_diag 1e-9 \
                    --use_nested_basis
 
-            profile2h5 test_profile_output-0.prof
+            file_name=${N}_${nleaf}_${max_rank}_task_profile.prof
+
+            mv test_profile_output-0.prof $file_name
+            profile2h5 $file_name
             # python hdf_read.py
             # rm -rf test_profile_output-0*
         done
