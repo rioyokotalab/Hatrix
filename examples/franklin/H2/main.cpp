@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
 
     // std::cout << "max level: " << A.max_level << " min: " << A.min_level << std::endl;
 
-    A.print_structure();
+    // A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);

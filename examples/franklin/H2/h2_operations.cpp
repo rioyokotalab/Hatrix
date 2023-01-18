@@ -6,7 +6,9 @@
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
 
+#include "h2_construction.hpp"
 #include "h2_operations.hpp"
+
 
 using namespace Hatrix;
 
@@ -570,13 +572,12 @@ void
 multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                      const int64_t level) {
   int64_t nblocks = pow(2, level);
-  // capture the pre-matrix for verification of factorization.
   auto U_F = make_complement(A.U(block, level));
 
   // left multiply with the complement along the (symmetric) row.
   A.D(block, block, level) = matmul(U_F, A.D(block, block, level), true);
-  for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_inadmissible(A, block, j, level)) {
+  for (int64_t j : near_neighbours(block, level)) {
+    if (j < block) {
       auto D_splits =
         A.D(block, j, level).split({},
                                    std::vector<int64_t>(1,
@@ -588,8 +589,8 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
 
   // right multiply with the transpose of the complement
   A.D(block, block, level) = matmul(A.D(block, block, level), U_F);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i > block) {
       auto D_splits =
         A.D(i, block, level).split(std::vector<int64_t>(1, A.D(i, block, level).rows -
                                                         A.ranks(i, level)),
@@ -605,8 +606,8 @@ update_row_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
                     int64_t block, int64_t level,
                     const Hatrix::RowMap<Hatrix::Matrix>& r) {
   // update the S blocks with the new projected basis.
-  for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_admissible(A, block, j, level)) {
+  for (int64_t j : far_neighbours(block, level)) {
+    if (j < block) {
       A.S(block, j, level) = matmul(r(block), A.S(block, j, level));
     }
   }
@@ -618,8 +619,8 @@ update_col_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
                     const Hatrix::RowMap<Hatrix::Matrix>& t) {
   int64_t nblocks = pow(2, level);
   // update the S blocks in this column.
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_admissible(A, i, block, level)) {
+  for (int64_t i : far_neighbours(block, level)) {
+    if (i > block) {
       A.S(i, block, level) = matmul(A.S(i, block, level), t(block), false, true);
     }
   }
