@@ -203,7 +203,8 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       if (near_size > 0) {
         // Use sample of nearfield blocks within the same level
         Matrix nearblocks = generate_p2p_matrix(domain, skeleton, cell.sample_nearfield);
-        skeleton_dn = concat(skeleton_dn, matmul(nearblocks, nearblocks, false, true), 1);
+        // skeleton_dn = concat(skeleton_dn, matmul(nearblocks, nearblocks, false, true), 1);
+        skeleton_dn = concat(skeleton_dn, nearblocks, 1);  // Concat nearblocks instead of its gram matrix
         norm_dn = Hatrix::norm(skeleton_dn);
       }
       // Low-rank part
