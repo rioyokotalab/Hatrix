@@ -337,6 +337,8 @@ int main(int argc, char **argv) {
     exit(-1);
   }
 
+  parsec_profiling_start();
+
   dtd_tp = parsec_dtd_taskpool_new();
   rc = parsec_context_add_taskpool( parsec, dtd_tp );
 

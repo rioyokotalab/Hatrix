@@ -17,15 +17,18 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64::/home/sameer.deshmukh/gitrepos/papi/src/lib
 
 # :/mnt/nfs/packages/x86_64/intel/2022/mpi/2021.6.0/lib/release
+# mpirun --mca opal_warn_on_missing_libcuda 0 \
 
 make -j H2_dtd
 
 for adm in 0.8; do
     ndim=3
-    N=65536
+    N=16384
 
-    for max_rank in 50 100 150 200; do
-        for nleaf in 512 1024 2048 4096 8192; do
+    for max_rank in 50; do
+        for nleaf in 512; do
+            rm test_profile_output-0.prof
+
             mpirun --mca opal_warn_on_missing_libcuda 0 \
                    -n 1 ./bin/H2_dtd --N $N \
                    --nleaf $nleaf \
@@ -41,9 +44,8 @@ for adm in 0.8; do
                    --use_nested_basis
 
             profile2h5 test_profile_output-0.prof
-            python hdf_read.py
-            rm -rf test_profile_output-0*
+            # python hdf_read.py
+            # rm -rf test_profile_output-0*
         done
-
     done
 done
