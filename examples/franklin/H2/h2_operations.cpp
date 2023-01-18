@@ -475,7 +475,7 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   int64_t rank;
   // std::tie(Q, R) = pivoted_qr_nopiv_return(col_concat_T, A.ranks(block, level));
   std::tie(Q, R, rank) = error_pivoted_qr(col_concat_T,
-                                          opts.accuracy * 1e-1,
+                                          opts.qr_accuracy,
                                           false, false);
 
   Q.shrink(A.U(block,level).rows, A.ranks(block, level));
@@ -530,7 +530,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   Matrix Q,R;
   int64_t rank;
   std::tie(Q, R, rank) = error_pivoted_qr(fill_in,
-                                          opts.accuracy * 1e-1,
+                                          opts.qr_accuracy,
                                           false, false);
 
   Q.shrink(A.U(block,level).rows, A.ranks(block, level));

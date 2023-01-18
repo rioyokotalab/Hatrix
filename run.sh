@@ -24,21 +24,21 @@ make -j H2_main
 for adm in 0.8; do
     ndim=3
     nleaf=512
-    max_rank=50
+    max_rank=40
 
     for N in 8192 16384 32768 65536 131072; do
-
         ./bin/H2_main --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-10 \
+                      --accuracy 1e-8 \
+                      --qr_accuracy 1e-6 \
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \
-                      --add_diag 1e-9 \
+                      --add_diag 1e-8 \
                       --use_nested_basis
 
         # file_name=${N}_${nleaf}_${max_rank}_task_profile.prof

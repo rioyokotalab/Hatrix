@@ -20,6 +20,7 @@ namespace Hatrix {
     int64_t max_rank;
     double admis;               // admissibility value
     double accuracy;            // desired construction accuracy
+    double qr_accuracy;         // cut off accuracy for QR factorization
     double add_diag;
     ADMIS_KIND admis_kind;      // whether this is diagonal or geometry based admis
     CONSTRUCT_ALGORITHM construct_algorithm;
