@@ -636,6 +636,7 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
       update_row_cluster_bases(node, level, F, r);
       // Project admissible blocks accordingly
       // Current level: update coupling matrix
+      #pragma omp parallel for
       for (int64_t j: far_neighbors(node, level)) {
         S(node, j, level) = matmul(r(node), S(node, j, level), false, false);
         S(j, node, level) = matmul(S(j, node, level), r(node), false, true );
@@ -684,6 +685,7 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     // Multiplication with U_F
     Matrix U_F = prepend_complement_basis(U(node, level));
     // Multiply to dense blocks along the row in current level
+    #pragma omp parallel for
     for (int64_t j: near_neighbors(node, level)) {
       if (j < node) {
         // Do not touch the eliminated part (cc and oc)
@@ -696,6 +698,7 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
       }
     }
     // Multiply to dense blocks along the column in current level
+    #pragma omp parallel for
     for (int64_t i: near_neighbors(node, level)) {
       if (i < node) {
         // Do not touch the eliminated part (cc and co)
@@ -717,6 +720,7 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     ldl(D_node_cc);
 
     // Lower elimination
+    #pragma omp parallel for
     for (int64_t i: near_neighbors(node, level)) {
       const int64_t lower_row_split =
           D(i, node, level).rows - (i <= node || level == height ?
@@ -734,6 +738,7 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     }
 
     // Right elimination
+    #pragma omp parallel for
     for (int64_t j: near_neighbors(node, level)) {
       const int64_t right_col_split =
           D(node, j, level).cols - (j <= node || level == height ?
@@ -751,6 +756,7 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
     }
 
     // Schur's complement into inadmissible block
+    #pragma omp parallel for collapse(2)
     for (int64_t i: near_neighbors(node, level)) {
       for (int64_t j: near_neighbors(node, level)) {
         if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
@@ -911,12 +917,12 @@ void SymmetricH2::factorize() {
 
     // Update coupling matrices of admissible blocks in the current level
     // To add fill-in contributions
+    #pragma omp parallel for
     for (int64_t i = 0; i < num_nodes; ++i) {
       for (int64_t j: far_neighbors(i, level)) {
         if (F.exists(i, j, level)) {
-          Matrix projected_fill_in = matmul(matmul(U(i, level), F(i, j, level), true),
-                                            U(j, level));
-          S(i, j, level) += projected_fill_in;
+          S(i, j, level) += matmul(matmul(U(i, level), F(i, j, level), true),
+                                   U(j, level));
         }
       }
     }
