@@ -1,3 +1,4 @@
+#include "Hatrix/Hatrix.h"
 #include "globals.hpp"
 
 parsec_context_t *parsec = NULL;

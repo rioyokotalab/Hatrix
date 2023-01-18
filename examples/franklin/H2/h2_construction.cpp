@@ -11,11 +11,15 @@
 
 using namespace Hatrix;
 
+Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;  // This is actually RowLevelMap
+
 static void
 dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& Cj,
                     const Domain& domain, const Args& opts) {
   int64_t i_level = Ci.level;
   int64_t j_level = Cj.level;
+  far_neighbours.insert(Ci.level_index, i_level, std::vector<int64_t>());
+  near_neighbours.insert(Ci.level_index, i_level, std::vector<int64_t>());
 
   bool well_separated = false;
   if (i_level == j_level) {
@@ -32,6 +36,13 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
 
     bool val = well_separated;
     A.is_admissible.insert(Ci.level_index, Cj.level_index, i_level, std::move(val));
+
+    if (well_separated) {
+      far_neighbors(Ci.level_index, i_level).push_back(Cj.level_index);
+    }
+    else {
+      near_neighbors(Ci.level_index, i_level).push_back(Cj.level_index);
+    }
   }
 
   if (i_level <= j_level && Ci.cells.size() > 0 && !well_separated) {
