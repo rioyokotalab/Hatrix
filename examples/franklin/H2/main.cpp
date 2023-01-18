@@ -122,6 +122,7 @@ int main(int argc, char* argv[]) {
 
   std::cout << "----------------------------\n";
   std::cout << "N               : " << opts.N << std::endl;
+  std::cout << "NDIM            : " << opts.ndim << std::endl;
   std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
   std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
   std::cout << "ADMIS           : " << opts.admis << std::endl;

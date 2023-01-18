@@ -71,15 +71,15 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A, int64_t block, int64_t le
 template<typename T> void
 reduction_loop1(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
   const int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i >= block+1) {
       Matrix& D_i_block = A.D(i, block, level);
       auto D_i_block_splits = split_dense(D_i_block,
                                           D_i_block.rows - A.ranks(i, level),
                                           D_i_block.cols - A.ranks(block, level));
 
-      for (int64_t j = block+1; j <= i; ++j) {
-        if (exists_and_inadmissible(A, j, block, level)) {
+      for (int64_t j : near_neighbours(block, level)) {
+        if (j >= block+1) {
           Matrix& D_j_block = A.D(j, block, level);
           auto D_j_block_splits = split_dense(D_j_block,
                                               D_j_block.rows - A.ranks(j, level),
@@ -96,19 +96,19 @@ reduction_loop1(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
 template<typename T> void
 reduction_loop2(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
   const int64_t nblocks = pow(2, level);
-
-  for (int64_t i = block; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i >= block) {
       Matrix& D_i_block = A.D(i, block, level);
       auto D_i_block_splits = split_dense(D_i_block,
                                           D_i_block.rows - A.ranks(i, level),
                                           D_i_block.cols - A.ranks(block, level));
-      for (int64_t j = block; j <= i; ++j) {
-        if (exists_and_inadmissible(A, j, block, level)) {
+
+      for (int64_t j : near_neighbours(block, level)) {
+        if (j >= block && j <= i) {
           Matrix& D_j_block = A.D(j, block, level);
           auto D_j_block_splits = split_dense(D_j_block,
-                                    D_j_block.rows - A.ranks(j, level),
-                                    D_j_block.cols - A.ranks(block, level));
+                                              D_j_block.rows - A.ranks(j, level),
+                                              D_j_block.cols - A.ranks(block, level));
 
           body(i, j, D_i_block_splits, D_j_block_splits);
         }
@@ -122,15 +122,15 @@ template<typename T> void
 reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block,
                 int64_t level, T&& body) {
   int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i >= block+1) {
       Matrix& D_i_block = A.D(i, block, level);
       auto D_i_block_splits = split_dense(D_i_block,
                                           D_i_block.rows - A.ranks(i, level),
                                           D_i_block.cols - A.ranks(block, level));
 
-      for (int64_t j = 0; j <= block; ++j) {
-        if (exists_and_inadmissible(A, block, j, level)) {
+      for (int64_t j : near_neighbours(block, level)) {
+        if (j <= block) {
           Matrix& D_block_j = A.D(block, j, level);
           auto D_block_j_splits = split_dense(D_block_j,
                                            D_block_j.rows - A.ranks(block, level),
@@ -147,14 +147,14 @@ template<typename T> void
 reduction_loop5(SymmetricSharedBasisMatrix& A,
                 const int64_t block, int64_t level, T&& body) {
   const int64_t nblocks = pow(2, level);
-  for (int64_t i = block; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i >= block) {
       Matrix& D_i_block = A.D(i, block, level);
       auto D_i_block_splits = split_dense(D_i_block,
                                           D_i_block.rows - A.ranks(i, level),
                                           D_i_block.cols - A.ranks(block, level));
-      for (int64_t j = 0; j < block; ++j) {
-        if (exists_and_inadmissible(A, block, j, level)) {
+      for (int64_t j : near_neighbours(block, level)) {
+        if (j < block) {
           Matrix& D_block_j = A.D(block, j, level);
           auto D_block_j_splits = split_dense(D_block_j,
                                               D_block_j.rows - A.ranks(block, level),
@@ -171,8 +171,8 @@ reduction_loop5(SymmetricSharedBasisMatrix& A,
 template <typename T> void
 reduction_loop6(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level,
                 T&& body) {
-  for (int64_t i = 0; i < block; ++i) {
-    if (exists_and_inadmissible(A, block, i, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i < block) {
       Matrix& D_block_i = A.D(block, i, level);
       auto D_block_i_splits = split_dense(D_block_i,
                                           D_block_i.rows - A.ranks(block, level),
