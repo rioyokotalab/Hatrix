@@ -19,37 +19,33 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 # :/mnt/nfs/packages/x86_64/intel/2022/mpi/2021.6.0/lib/release
 # mpirun --mca opal_warn_on_missing_libcuda 0 \
 
-make -j H2_dtd
+make -j H2_main
 
 for adm in 0.8; do
     ndim=3
-    N=65536
+    nleaf=512
+    max_rank=50
 
-    for max_rank in 50 100 150; do
-        for nleaf in 512 1024 2048 4096 8192; do
-            rm test_profile_output-0.prof
-            rm test_profile_output-0.prof.h5
+    for N in 8192 16384 32768 65536; do
 
-            mpirun --mca opal_warn_on_missing_libcuda 0 \
-                   -n 1 ./bin/H2_dtd --N $N \
-                   --nleaf $nleaf \
-                   --kernel_func laplace \
-                   --kind_of_geometry grid \
-                   --ndim $ndim \
-                   --max_rank $max_rank \
-                   --accuracy 1e-11 \
-                   --admis $adm \
-                   --admis_kind geometry \
-                   --construct_algorithm miro \
-                   --add_diag 1e-9 \
-                   --use_nested_basis
+        ./bin/H2_main --N $N \
+                      --nleaf $nleaf \
+                      --kernel_func laplace \
+                      --kind_of_geometry grid \
+                      --ndim $ndim \
+                      --max_rank $max_rank \
+                      --accuracy 1e-11 \
+                      --admis $adm \
+                      --admis_kind geometry \
+                      --construct_algorithm miro \
+                      --add_diag 1e-9 \
+                      --use_nested_basis
 
-            file_name=${N}_${nleaf}_${max_rank}_task_profile.prof
+        # file_name=${N}_${nleaf}_${max_rank}_task_profile.prof
 
-            mv test_profile_output-0.prof $file_name
-            profile2h5 $file_name
-            # python hdf_read.py
-            # rm -rf test_profile_output-0*
-        done
+        # mv test_profile_output-0.prof $file_name
+        # profile2h5 $file_name
+        # python hdf_read.py
+        # rm -rf test_profile_output-0*
     done
 done
