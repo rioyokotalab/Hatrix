@@ -84,7 +84,9 @@ class SymmetricH2 {
 
   Matrix get_dense_skeleton(const Domain& domain,
                             const int64_t i, const int64_t j, const int64_t level) const;
-  void compute_fill_in(const Domain& domain, const int64_t level);
+  void compute_fill_in_cholesky(const Domain& domain, const int64_t level, const double diag_shift);
+  void compute_fill_in_qr(const Domain& domain, const int64_t level, const double diag_shift);
+  void compute_fill_in_svd(const Domain& domain, const int64_t level, const double diag_shift);
   void factorize_level(const int64_t level);
   void permute_and_merge(const int64_t level);
 
@@ -103,7 +105,7 @@ class SymmetricH2 {
   double low_rank_block_ratio() const;
   void write_JSON(const Domain& domain, const std::string filename) const;
 
-  void factorize(const Domain& domain);
+  void factorize(const Domain& domain, const double diag_shift = 0);
   std::tuple<int64_t, int64_t, int64_t> inertia(const Domain& domain,
                                                 const double lambda, bool &singular) const;
   std::tuple<double, int64_t, int64_t, double>
@@ -202,6 +204,8 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     if (near_size + far_size > 0) {
       Matrix skeleton_dn(skeleton_size, 0);
       Matrix skeleton_lr(skeleton_size, 0);
+      double norm_dn = 0.;
+      double norm_lr = 0.;
       // Fill-in (dense) part
       if (near_size > 0) {
         // Concat fill-ins
@@ -210,11 +214,15 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
             skeleton_dn = concat(skeleton_dn, F(i, j, level), 1);
           }
         }
+        norm_dn = Hatrix::norm(skeleton_dn);
       }
       // Low-rank part
       if (far_size > 0) {
         skeleton_lr = concat(skeleton_lr, generate_p2p_matrix(domain, skeleton, cell.sample_farfield), 1);
+        norm_lr = Hatrix::norm(skeleton_lr);
       }
+      const double scale = (norm_dn == 0. || norm_lr == 0.) ? 1. : norm_lr / norm_dn;
+      Hatrix::scale(skeleton_dn, scale);
       Matrix skeleton_row = concat(skeleton_lr, skeleton_dn, 1);
 
       Matrix Ui;
@@ -548,10 +556,42 @@ Matrix SymmetricH2::get_dense_skeleton(const Domain& domain,
   return generate_p2p_matrix(domain, skeleton_i, skeleton_j);
 }
 
-void SymmetricH2::compute_fill_in(const Domain& domain, const int64_t level) {
+void SymmetricH2::compute_fill_in_cholesky(const Domain& domain, const int64_t level, const double diag_shift) {
   const int64_t num_nodes = level_blocks[level];
   for (int64_t k = 0; k < num_nodes; k++) {
     Matrix Dkk = get_dense_skeleton(domain, k, k, level);
+    shift_diag(Dkk, diag_shift);
+    cholesky(Dkk, Hatrix::Lower);
+    for (int64_t i = 0; i < num_nodes; i++) {
+      for (int64_t j = 0; j < num_nodes; j++) {
+        if (i != k && j != k &&
+            is_admissible.exists(i, k, level) && !is_admissible(i, k, level) &&
+            is_admissible.exists(k, j, level) && !is_admissible(k, j, level)) {
+          Matrix Dik = get_dense_skeleton(domain, i, k, level);
+          Matrix Dkj = get_dense_skeleton(domain, k, j, level);
+          // Compute fill_in = Dik * inv(Dkk) * Dkj
+          solve_triangular(Dkk, Dik, Hatrix::Right, Hatrix::Lower, false, true ); // Dik*L^-T
+          solve_triangular(Dkk, Dkj, Hatrix::Left,  Hatrix::Lower, false, false); // L^-1*Dkj
+          Matrix fill_in = matmul(Dik, Dkj, false, false, -1);
+          if (F.exists(i, j, level)) {
+            assert(F(i, j, level).rows == fill_in.rows);
+            assert(F(i, j, level).cols == fill_in.cols);
+            F(i, j, level) += fill_in;
+          }
+          else {
+            F.insert(i, j, level, std::move(fill_in));
+          }
+        }
+      }
+    }
+  }
+}
+
+void SymmetricH2::compute_fill_in_qr(const Domain& domain, const int64_t level, const double diag_shift) {
+  const int64_t num_nodes = level_blocks[level];
+  for (int64_t k = 0; k < num_nodes; k++) {
+    Matrix Dkk = get_dense_skeleton(domain, k, k, level);
+    shift_diag(Dkk, diag_shift);
     Matrix Qkk(Dkk.rows, Dkk.rows);
     Matrix Rkk(Dkk.rows, Dkk.cols);
     qr(Dkk, Qkk, Rkk);
@@ -563,9 +603,9 @@ void SymmetricH2::compute_fill_in(const Domain& domain, const int64_t level) {
           Matrix Dik = get_dense_skeleton(domain, i, k, level);
           Matrix Dkj = get_dense_skeleton(domain, k, j, level);
           // Compute fill_in = Dik * inv(Dkk) * Dkj
-          Matrix C = matmul(Qkk, Dkj, true, false, 1); // C = Q^T x Dkj
-          solve_triangular(Rkk, C, Hatrix::Left, Hatrix::Upper, false, false); // C = inv(Rkk) x C
-          Matrix fill_in = matmul(Dik, C);
+          solve_triangular(Rkk, Dik, Hatrix::Right, Hatrix::Upper, false, false); // Dik x inv(Rkk)
+          Dkj = matmul(Qkk, Dkj, true, false); // inv(Qkk) * Dkj
+          Matrix fill_in = matmul(Dik, Dkj, false, false, -1);
           if (F.exists(i, j, level)) {
             assert(F(i, j, level).rows == fill_in.rows);
             assert(F(i, j, level).cols == fill_in.cols);
@@ -688,9 +728,9 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
   }
 }
 
-void SymmetricH2::factorize(const Domain& domain) {
+void SymmetricH2::factorize(const Domain& domain, const double diag_shift) {
   for (int64_t level = height; level >= 0; level--) {
-    compute_fill_in(domain, level);
+    compute_fill_in_qr(domain, level, diag_shift);
     generate_row_cluster_basis(domain, level, true);
     generate_far_coupling_matrices(domain, level);
     factorize_level(level);
@@ -710,7 +750,7 @@ SymmetricH2::inertia(const Domain& domain,
     shift_diag(A_shifted.D(node, node, height), -lambda);
   }
   // LDL Factorize
-  A_shifted.factorize(domain);
+  A_shifted.factorize(domain, -lambda);
   // Count negative entries in D
   int64_t negative_elements_count = 0;
   for(int64_t level = height; level >= 0; level--) {
