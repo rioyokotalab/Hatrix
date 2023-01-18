@@ -26,7 +26,7 @@ for adm in 0.8; do
     nleaf=512
     max_rank=50
 
-    for N in 8192 16384 32768 65536; do
+    for N in 8192 16384 32768 65536 131072; do
 
         ./bin/H2_main --N $N \
                       --nleaf $nleaf \
@@ -34,7 +34,7 @@ for adm in 0.8; do
                       --kind_of_geometry grid \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-11 \
+                      --accuracy 1e-10 \
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \

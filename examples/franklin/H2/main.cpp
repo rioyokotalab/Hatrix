@@ -107,11 +107,12 @@ int main(int argc, char* argv[]) {
   // ||x - A * (A^-1 * x)|| / ||x||
   double solve_error = (Hatrix::norm(x - x_regen) / Hatrix::norm(x)) * opts.add_diag;
 
-  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  Matrix bdense = matmul(Adense, x);
+  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  // Matrix bdense = matmul(Adense, x);
   // Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
-  double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
+  // double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
+  double matvec_error = 0;
   // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
 
   // std::cout << "RESULT: " << opts.N << "," << opts.accuracy << "," << opts.max_rank

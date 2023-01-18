@@ -458,8 +458,6 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   const int64_t block_size = A.D(block, block, level).cols;
 
   Matrix fill_in(block_size, block_size);
-  // for (int64_t i = block+1; i < nblocks; ++i) {
-  //   if (exists_and_admissible(A, i, block, level)) {
   for (int64_t i : far_neighbours(block, level)) {
     if (i >= block+1) {
       if (F.exists(i, block, level)) {
@@ -474,7 +472,14 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   Matrix col_concat_T = transpose(fill_in);
 
   Matrix Q,R;
-  std::tie(Q, R) = pivoted_qr_nopiv_return(col_concat_T, A.ranks(block, level));
+  int64_t rank;
+  // std::tie(Q, R) = pivoted_qr_nopiv_return(col_concat_T, A.ranks(block, level));
+  std::tie(Q, R, rank) = error_pivoted_qr(col_concat_T,
+                                          opts.accuracy * 1e-1,
+                                          false, false);
+
+  Q.shrink(A.U(block,level).rows, A.ranks(block, level));
+  R.shrink(A.ranks(block, level), A.ranks(block, level));
 
   Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
   rq(R, Si, Vi);
@@ -512,15 +517,24 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
     if (j < block) {
       if (F.exists(block, j, level)) {
         fill_in += matmul(F(block, j, level), F(block, j, level), false, true);
-        // F.erase(block, j, level);
+        F.erase(block, j, level);
       }
     }
   }
 
   fill_in += matmul(matmul(A.U(block, level), US(block, level)), A.U(block, level), false, true);
 
+  // Matrix Q(A.U(block, level)), R(A.U(block, level).cols, A.U(block, level).cols);
+  // std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
+
   Matrix Q,R;
-  std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
+  int64_t rank;
+  std::tie(Q, R, rank) = error_pivoted_qr(fill_in,
+                                          opts.accuracy * 1e-1,
+                                          false, false);
+
+  Q.shrink(A.U(block,level).rows, A.ranks(block, level));
+  R.shrink(A.ranks(block, level), A.ranks(block, level));
 
   Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
   rq(R, Si, Vi);
@@ -603,7 +617,7 @@ update_col_transfer_basis(Hatrix::SymmetricSharedBasisMatrix& A,
   // update the transfer matrices one level higher
   const int64_t parent_level = level - 1;
   const int64_t parent_block = block / 2;
-  if (parent_level > 0)) {
+  if (parent_level > 0) {
     const int64_t c1 = parent_block * 2;
     const int64_t c2 = parent_block * 2 + 1;
 
@@ -684,7 +698,6 @@ update_row_cluster_basis_and_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
   }
 
   if (found_row_fill_in) {    // update row cluster bases
-    // recompress fill-ins on this row so that they dont generate further fill-ins.
     update_row_cluster_basis(A, block, level, F, r, opts);
     update_row_S_blocks(A, block, level, r);
     update_row_transfer_basis(A, block, level, r);
@@ -742,17 +755,17 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   RowColLevelMap<Matrix> F;
   int64_t level;
 
-  // for (int level = A.max_level; level >= A.min_level; --level) {
-  //   int nblocks = pow(2, level);
+  for (int level = A.max_level; level >= A.min_level; --level) {
+    int nblocks = pow(2, level);
 
-  //   for (int i = 0; i < nblocks; ++i) {
-  //     for (int j = i + 1; j < nblocks; ++j) {
-  //       if (A.is_admissible.exists(i, j, level)) {
-  //         A.is_admissible.erase(i, j, level);
-  //       }
-  //     }
-  //   }
-  // }
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = i + 1; j < nblocks; ++j) {
+        if (A.is_admissible.exists(i, j, level)) {
+          A.is_admissible.erase(i, j, level);
+        }
+      }
+    }
+  }
 
   for (level = A.max_level; level >= A.min_level; --level) {
     int64_t nblocks = pow(2, level);
