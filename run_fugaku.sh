@@ -1,5 +1,5 @@
 #!/bin/bash
-#PJM -L "node=1"
+#PJM -L "node=16"
 #PJM -L "rscgrp=small"
 #PJM -L "elapse=10:00:00"
 #PJM --llio cn-cache-size=1Gi
@@ -17,17 +17,18 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/vol0003/hp190122/u01594/gitrepos/parsec
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64
 
 # make -j H2_main
+make clean
 make -j H2_dtd
 
 
 for adm in 0.8; do
-    nleaf=512
-    ndim=2
-    max_rank=110
+    nleaf=1024
+    ndim=3
+    max_rank=50
 
-    for N in 4096; do
-	    echo "running"
-        mpirun -n 1 ./bin/H2_dtd --N $N \
+    for N in 131072 262144 524288; do
+	echo "running"
+        mpiexec -stdout out_16.log -stderr err_16.log ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
