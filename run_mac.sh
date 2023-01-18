@@ -18,7 +18,7 @@ for adm in 0.8; do
     ndim=3
     max_rank=40
 
-    for N in 4096 8192 16384; do
+    for N in 4096 8192 16384 32768; do
         ./bin/H2_main --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \

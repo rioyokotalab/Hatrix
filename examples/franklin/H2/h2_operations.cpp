@@ -376,38 +376,6 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
       }
     }
   }
-
-  // rank * rank sized fill-in
-  for (int i = 0; i < block; ++i) {
-    for (int j = 0; j < block; ++j) {
-      if (exists_and_inadmissible(A, block, i, level) &&
-          exists_and_inadmissible(A, block, j, level)) {
-
-        if (exists_and_admissible(A, i, j, level)) {
-          Matrix fill_in(A.ranks(i, level), A.ranks(j, level));
-
-          auto D_i_block_splits = split_dense(A.D(block, i,level),
-                                              A.D(block, i,level).rows - A.ranks(block, level),
-                                              A.D(block, i,level).cols - A.ranks(i, level));
-
-          auto D_block_j_splits = split_dense(A.D(block, j, level),
-                                              A.D(block, j, level).rows - A.ranks(block, level),
-                                              A.D(block, j, level).cols - A.ranks(j, level));
-
-          // matmul(D_i_block_splits[2], D_block_j_splits[1], fill_in, false, false, -1, 0);
-
-          // Matrix projected_fill_in = matmul(matmul(A.U(i, level), fill_in), A.U(j, level), false, true);
-
-          // if (F.exists(i, j, level)) {
-          //   F(i, j, level) += projected_fill_in;
-          // }
-          // else {
-          //   F.insert(i, j, level, std::move(projected_fill_in));
-          // }
-        }
-      }
-    }
-  }
 }
 
 void
@@ -462,7 +430,7 @@ col_has_admissible_blocks(SymmetricSharedBasisMatrix& A, const int64_t block,
       break;
     }
   }
- return has_admis;
+  return has_admis;
 }
 
 static bool
@@ -490,8 +458,10 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   const int64_t block_size = A.D(block, block, level).cols;
 
   Matrix fill_in(block_size, block_size);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_admissible(A, i, block, level)) {
+  // for (int64_t i = block+1; i < nblocks; ++i) {
+  //   if (exists_and_admissible(A, i, block, level)) {
+  for (int64_t i : far_neighbours(block, level)) {
+    if (i >= block+1) {
       if (F.exists(i, block, level)) {
         fill_in += matmul(F(i, block, level), F(i, block, level), true, false);
         F.erase(i, block, level);
@@ -538,8 +508,8 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   // This is a temporary way to verify the cluster basis update.
   Matrix fill_in(block_size, block_size);
 
-  for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_admissible(A, block, j, level)) {
+  for (int64_t j : far_neighbours(block, level)) {
+    if (j < block) {
       if (F.exists(block, j, level)) {
         fill_in += matmul(F(block, j, level), F(block, j, level), false, true);
         // F.erase(block, j, level);
@@ -633,7 +603,7 @@ update_col_transfer_basis(Hatrix::SymmetricSharedBasisMatrix& A,
   // update the transfer matrices one level higher
   const int64_t parent_level = level - 1;
   const int64_t parent_block = block / 2;
-  if (parent_level > 0 && col_has_admissible_blocks(A, parent_block, parent_level)) {
+  if (parent_level > 0)) {
     const int64_t c1 = parent_block * 2;
     const int64_t c2 = parent_block * 2 + 1;
 
@@ -669,7 +639,7 @@ update_row_transfer_basis(Hatrix::SymmetricSharedBasisMatrix& A,
   // update the transfer matrices one level higher.
   const int64_t parent_block = block / 2;
   const int64_t parent_level = level - 1;
-  if (parent_level > 0 && row_has_admissible_blocks(A, parent_block, parent_level)) {
+  if (parent_level > 0) {
     const int64_t c1 = parent_block * 2;
     const int64_t c2 = parent_block * 2 + 1;
 
@@ -772,17 +742,17 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   RowColLevelMap<Matrix> F;
   int64_t level;
 
-  for (int level = A.max_level; level >= A.min_level; --level) {
-    int nblocks = pow(2, level);
+  // for (int level = A.max_level; level >= A.min_level; --level) {
+  //   int nblocks = pow(2, level);
 
-    for (int i = 0; i < nblocks; ++i) {
-      for (int j = i + 1; j < nblocks; ++j) {
-        if (A.is_admissible.exists(i, j, level)) {
-          A.is_admissible.erase(i, j, level);
-        }
-      }
-    }
-  }
+  //   for (int i = 0; i < nblocks; ++i) {
+  //     for (int j = i + 1; j < nblocks; ++j) {
+  //       if (A.is_admissible.exists(i, j, level)) {
+  //         A.is_admissible.erase(i, j, level);
+  //       }
+  //     }
+  //   }
+  // }
 
   for (level = A.max_level; level >= A.min_level; --level) {
     int64_t nblocks = pow(2, level);
@@ -796,15 +766,13 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
     // Update coupling matrices of each admissible block to add fill in contributions.
     for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j <= i; ++j) {
-        if (exists_and_admissible(A, i, j, level)) {
-          if (F.exists(i, j, level)) {
-            Matrix projected_fill_in = matmul(matmul(A.U(i, level), F(i, j, level),
-                                                     true),
-                                              A.U(j, level));
-            A.S(i, j, level) += projected_fill_in;
-            F.erase(i, j, level);
-          }
+      for (int64_t j : far_neighbours(i, level)) {
+        if (F.exists(i, j, level)) {
+          Matrix projected_fill_in = matmul(matmul(A.U(i, level), F(i, j, level),
+                                                   true),
+                                            A.U(j, level));
+          A.S(i, j, level) += projected_fill_in;
+          F.erase(i, j, level);
         }
       }
     }
