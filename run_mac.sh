@@ -15,7 +15,7 @@ make -j H2_dtd
 
 for adm in 0.8; do
     nleaf=512
-    ndim=2
+    ndim=3
     max_rank=40
 
     for N in 4096 8192 16384; do
