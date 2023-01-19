@@ -27,8 +27,8 @@ for adm in 0.8; do
 
     for kind_of_recompression in 0 1 2 3; do
         for ndim in 2 3; do
-            for N in 8192; do
-                ./bin/H2_main --N $N \
+            for N in 8192 16384 32768 65536 131072; do
+                ./bin/H2_main --N $N \n
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \
