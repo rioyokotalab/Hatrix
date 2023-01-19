@@ -122,10 +122,10 @@ task_multiply_full_complement(parsec_execution_stream_t* es, parsec_task_t* this
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
-  Matrix UF = make_complement(U);
-  Matrix product = matmul(matmul(UF, D, true), UF);
+  // Matrix UF = make_complement(U);
+  // Matrix product = matmul(matmul(UF, D, true), UF);
 
-  D.copy_mem(product);
+  // D.copy_mem(product);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -164,11 +164,11 @@ task_multiply_partial_complement_left(parsec_execution_stream_t* es, parsec_task
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
-  Matrix U_F = make_complement(U);
+  // Matrix U_F = make_complement(U);
 
-  auto D_splits = D.split({},
-                          std::vector<int64_t>(1, D_ncols - D_col_rank));
-  D_splits[1] = matmul(U_F, D_splits[1], true);
+  // auto D_splits = D.split({},
+  //                         std::vector<int64_t>(1, D_ncols - D_col_rank));
+  // D_splits[1] = matmul(U_F, D_splits[1], true);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -187,10 +187,10 @@ task_multiply_partial_complement_right(parsec_execution_stream_t* es, parsec_tas
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
-  Matrix U_F = make_complement(U);
-  auto D_splits = D.split(std::vector<int64_t>(1, D_nrows - D_row_rank), {});
+  // Matrix U_F = make_complement(U);
+  // auto D_splits = D.split(std::vector<int64_t>(1, D_nrows - D_row_rank), {});
 
-  D_splits[1] = matmul(D_splits[1], U_F);
+  // D_splits[1] = matmul(D_splits[1], U_F);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
