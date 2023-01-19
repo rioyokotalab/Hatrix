@@ -530,18 +530,18 @@ task_fill_in_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
   MatrixWrapper r(_r, r_nrows, r_nrows, r_nrows);
 
-  // fill_in += matmul(matmul(U, US), U, false, true);
+  fill_in += matmul(matmul(U, US), U, false, true);
 
-  // Matrix Q,R;
-  // std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, rank);
+  Matrix Q,R;
+  std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, rank);
 
-  // Matrix r_row = matmul(Q, U, true, false);
-  // r.copy_mem(r_row);
-  // U.copy_mem(Q);
+  Matrix r_row = matmul(Q, U, true, false);
+  r.copy_mem(r_row);
+  U.copy_mem(Q);
 
-  // Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
-  // rq(R, Si, Vi);
-  // US.copy_mem(Si);
+  Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
+  rq(R, Si, Vi);
+  US.copy_mem(Si);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -627,19 +627,19 @@ task_fill_in_cols_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
   MatrixWrapper t(_t, t_nrows, t_nrows, t_nrows);
 
-  // fill_in_cols += matmul(U, matmul(US, U, false, true));
-  // Matrix fill_in_cols_T = transpose(fill_in_cols);
+  fill_in_cols += matmul(U, matmul(US, U, false, true));
+  Matrix fill_in_cols_T = transpose(fill_in_cols);
 
-  // Matrix Q, R;
-  // std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in_cols_T, rank);
+  Matrix Q, R;
+  std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in_cols_T, rank);
 
-  // Matrix t_row = matmul(Q, U, true, false);
-  // t.copy_mem(t_row);
-  // U.copy_mem(Q);
+  Matrix t_row = matmul(Q, U, true, false);
+  t.copy_mem(t_row);
+  U.copy_mem(Q);
 
-  // Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
-  // rq(R, Si, Vi);
-  // US.copy_mem(Si);
+  Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
+  rq(R, Si, Vi);
+  US.copy_mem(Si);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
