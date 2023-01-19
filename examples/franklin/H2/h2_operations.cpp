@@ -418,35 +418,6 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
   }
 }
 
-static bool
-col_has_admissible_blocks(SymmetricSharedBasisMatrix& A, const int64_t block,
-                          const int64_t level) {
-  bool has_admis = false;
-  const int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; i++) {
-    if (!A.is_admissible.exists(i, block, level) || // part of upper level admissible block
-        exists_and_admissible(A, i, block, level)) {
-      has_admis = true;
-      break;
-    }
-  }
-  return has_admis;
-}
-
-static bool
-row_has_admissible_blocks(SymmetricSharedBasisMatrix& A, const int64_t block,
-                          const int64_t level) {
-  bool has_admis = false;
-  for (int64_t j = 0; j < block; j++) {
-    if (!A.is_admissible.exists(block, j, level) || // part of upper level admissible block
-        exists_and_admissible(A, block, j, level)) {
-      has_admis = true;
-      break;
-    }
-  }
-  return has_admis;
-}
-
 void
 update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
                          const int64_t block,
@@ -468,33 +439,48 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   }
 
   fill_in += matmul(A.U(block, level), matmul(US(block, level), A.U(block, level), false, true));
+  // fill_in = concat(fill_in, matmul(A.U(block, level), US(block, level)), 1);
 
   Matrix col_concat_T = transpose(fill_in);
   Matrix Q,R;
+  Matrix Si, Vi;
 
   switch(opts.kind_of_recompression) {
-  case 0:
+  case 0:                       // accuracy truncated
     int64_t rank;
     std::tie(Q, R, rank) = error_pivoted_qr(col_concat_T,
-                                            opts.qr_accuracy,
+                                            opts.qr_accuracy * 1e-1,
                                             false, false);
 
     Q.shrink(A.U(block,level).rows, A.ranks(block, level));
     R.shrink(A.ranks(block, level), A.ranks(block, level));
+
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
     break;
-  case 1:
+  case 1:                       // lapack constant rank QR
     std::tie(Q, R) = pivoted_qr_nopiv_return(col_concat_T, A.ranks(block, level));
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
     break;
-  case 2:
+  case 2:                       // constant rank
+    std::tie(Q, R) = truncated_pivoted_qr(col_concat_T, A.ranks(block, level));
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
     break;
-  case 3:
+  case 3:                       // fixed rank svd
+    double err;
+    std::tie(Q, Si, Vi, err) = truncated_svd(col_concat_T, A.ranks(block, level));
     break;
   default:
     throw std::runtime_error("wrong option for kind_of_recompression");
   }
-
-  Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
-  rq(R, Si, Vi);
 
   US.erase(block, level);
   US.insert(block, level, std::move(Si));
@@ -536,31 +522,47 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
 
   fill_in += matmul(matmul(A.U(block, level), US(block, level)), A.U(block, level), false, true);
 
+  // fill_in = concat(fill_in, matmul(A.U(block, level), US(block, level)), 0);
+
   Matrix Q,R;
+  Matrix Si, Vi;
 
   switch(opts.kind_of_recompression) {
   case 0:                       // accuracy truncated
     int64_t rank;
     std::tie(Q, R, rank) = error_pivoted_qr(fill_in,
-                                            opts.qr_accuracy,
+                                            opts.qr_accuracy * 1e-1,
                                             false, false);
 
     Q.shrink(A.U(block,level).rows, A.ranks(block, level));
     R.shrink(A.ranks(block, level), A.ranks(block, level));
+
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
     break;
   case 1:                       // lapack constant rank QR
     std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
     break;
   case 2:                       // constant rank
+    std::tie(Q, R) = truncated_pivoted_qr(fill_in, A.ranks(block, level));
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
     break;
   case 3:                       // fixed rank svd
+    double err;
+    std::tie(Q, Si, Vi, err) = truncated_svd(fill_in, A.ranks(block, level));
     break;
   default:
     throw std::runtime_error("wrong option for kind_of_recompression");
   }
-
-  Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
-  rq(R, Si, Vi);
 
   US.erase(block, level);
   US.insert(block, level, std::move(Si));
@@ -578,7 +580,6 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
 void
 multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                      const int64_t level) {
-  int64_t nblocks = pow(2, level);
   auto U_F = make_complement(A.U(block, level));
 
   // left multiply with the complement along the (symmetric) row.

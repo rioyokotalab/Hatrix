@@ -131,25 +131,25 @@ int main(int argc, char* argv[]) {
             << matvec_error << ","
             << fp_ops << std::endl;
 
-  std::cout << "----------------------------\n";
-  std::cout << "N               : " << opts.N << std::endl;
-  std::cout << "NDIM            : " << opts.ndim << std::endl;
-  std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-  std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
-  std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
-  std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-  std::cout << "ADMIS           : " << opts.admis << std::endl;
-  std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-  std::cout << "NLEAF           : " << opts.nleaf << "\n"
-            << "Domain(ms)      : " << domain_time << "\n"
-            << "Contruct(ms)    : " << construct_time << "\n"
-            << "Factor(ms)      : " << factor_time << "\n"
-            << "Solve(ms)       : " << solve_time << "\n"
-            << "Solve error     : " << solve_error << "\n"
-            << "Construct error : " << matvec_error << "\n"
-            << "PAPI_FP_OPS     : " << fp_ops << "\n"
-            << std::endl;
-  std::cout << "----------------------------\n";
+  // std::cout << "----------------------------\n";
+  // std::cout << "N               : " << opts.N << std::endl;
+  // std::cout << "NDIM            : " << opts.ndim << std::endl;
+  // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+  // std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
+  // std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
+  // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+  // std::cout << "ADMIS           : " << opts.admis << std::endl;
+  // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+  // std::cout << "NLEAF           : " << opts.nleaf << "\n"
+  //           << "Domain(ms)      : " << domain_time << "\n"
+  //           << "Contruct(ms)    : " << construct_time << "\n"
+  //           << "Factor(ms)      : " << factor_time << "\n"
+  //           << "Solve(ms)       : " << solve_time << "\n"
+  //           << "Solve error     : " << solve_error << "\n"
+  //           << "Construct error : " << matvec_error << "\n"
+  //           << "PAPI_FP_OPS     : " << fp_ops << "\n"
+  //           << std::endl;
+  // std::cout << "----------------------------\n";
 
 
 
