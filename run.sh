@@ -22,16 +22,16 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 make -j H2_main
 
 for adm in 0.8; do
-    nleaf=512
+    nleaf=1024
     max_rank=30
 
     for kind_of_recompression in 0 1 2 3; do
         for ndim in 2 3; do
             for N in 8192 16384 32768 65536 131072; do
-                ./bin/H2_main --N $N \n
+                ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
-                              --kind_of_geometry grid \
+                              --kind_of_geometry circular \
                               --ndim $ndim \
                               --max_rank $max_rank \
                               --accuracy 1e-8 \

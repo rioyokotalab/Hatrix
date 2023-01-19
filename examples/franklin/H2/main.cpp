@@ -129,7 +129,8 @@ int main(int argc, char* argv[]) {
             << solve_time << ","
             << solve_error << ","
             << matvec_error << ","
-            << fp_ops << std::endl;
+            << fp_ops << ","
+	    << opts.kind_of_geometry << std::endl;
 
   // std::cout << "----------------------------\n";
   // std::cout << "N               : " << opts.N << std::endl;
