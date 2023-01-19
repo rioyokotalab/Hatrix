@@ -21,6 +21,8 @@ namespace Hatrix {
     double admis;               // admissibility value
     double accuracy;            // desired construction accuracy
     double qr_accuracy;         // cut off accuracy for QR factorization
+    // 0 - accuracy truncated, 1 - lapack constant rank QR, 2 - constant rank no pivot, 3 - fixed rank svd
+    int kind_of_recompression;
     double add_diag;
     ADMIS_KIND admis_kind;      // whether this is diagonal or geometry based admis
     CONSTRUCT_ALGORITHM construct_algorithm;

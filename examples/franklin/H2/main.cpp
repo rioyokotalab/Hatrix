@@ -115,16 +115,28 @@ int main(int argc, char* argv[]) {
   double matvec_error = 0;
   // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
 
-  // std::cout << "RESULT: " << opts.N << "," << opts.accuracy << "," << opts.max_rank
-  //           << "," << opts.admis << "," << construct_max_rank << "," << opts.nleaf
-  //           <<  "," << domain_time <<  "," << construct_time  << "," << factor_time
-  //           << "," << solve_time << "," << solve_error << "," << matvec_error
-  //           << "," << fp_ops << std::endl;
+  std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
+            << opts.accuracy << ","
+            << opts.qr_accuracy << ","
+            << opts.kind_of_recompression << ","
+            << opts.max_rank << ","
+            << opts.admis << ","
+            << construct_max_rank << ","
+            << opts.nleaf <<  ","
+            << domain_time <<  ","
+            << construct_time  << ","
+            << factor_time << ","
+            << solve_time << ","
+            << solve_error << ","
+            << matvec_error << ","
+            << fp_ops << std::endl;
 
   std::cout << "----------------------------\n";
   std::cout << "N               : " << opts.N << std::endl;
   std::cout << "NDIM            : " << opts.ndim << std::endl;
   std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+  std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
+  std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
   std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
   std::cout << "ADMIS           : " << opts.admis << std::endl;
   std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
@@ -134,7 +146,9 @@ int main(int argc, char* argv[]) {
             << "Factor(ms)      : " << factor_time << "\n"
             << "Solve(ms)       : " << solve_time << "\n"
             << "Solve error     : " << solve_error << "\n"
-            << "Construct error : " << matvec_error << std::endl;
+            << "Construct error : " << matvec_error << "\n"
+            << "PAPI_FP_OPS     : " << fp_ops << "\n"
+            << std::endl;
   std::cout << "----------------------------\n";
 
 

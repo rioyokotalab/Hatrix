@@ -525,16 +525,30 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   fill_in += matmul(matmul(A.U(block, level), US(block, level)), A.U(block, level), false, true);
 
   // Matrix Q(A.U(block, level)), R(A.U(block, level).cols, A.U(block, level).cols);
-  // std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
+
 
   Matrix Q,R;
-  int64_t rank;
-  std::tie(Q, R, rank) = error_pivoted_qr(fill_in,
-                                          opts.qr_accuracy,
-                                          false, false);
 
-  Q.shrink(A.U(block,level).rows, A.ranks(block, level));
-  R.shrink(A.ranks(block, level), A.ranks(block, level));
+  switch(opts.kind_of_recompression) {
+  case 0:                       // accuracy truncated
+    int64_t rank;
+    std::tie(Q, R, rank) = error_pivoted_qr(fill_in,
+                                            opts.qr_accuracy,
+                                            false, false);
+
+    Q.shrink(A.U(block,level).rows, A.ranks(block, level));
+    R.shrink(A.ranks(block, level), A.ranks(block, level));
+    break;
+  case 1:                       // lapack constant rank QR
+    std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
+    break;
+  case 2:                       // constant rank
+    break;
+  case 3:                       // fixed rank svd
+    break;
+  default:
+    throw std::runtime_error("wrong option for kind_of_recompression");
+  }
 
   Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
   rq(R, Si, Vi);
