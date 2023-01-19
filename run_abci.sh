@@ -29,13 +29,12 @@ make -j H2_dtd VERBOSE=1
 # export GMON_OUT_PREFIX=gmon.out-
 
 for adm in 0.8; do
-    nleaf=256
+    nleaf=128
     ndim=3
-    max_rank=150
+    max_rank=50
 
-    for N in 8192; do
-
-        mpirun -n 2 \
+    for N in 4096; do
+        mpirun -n 2  \
                ./bin/H2_dtd --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \
@@ -51,6 +50,6 @@ for adm in 0.8; do
     done
 done
 
-gprof -s bin/H2_dtd gmon.out-*
-gprof -q bin/H2_dtd gmon.sum > call_graph.out
-gprof bin/H2_dtd gmon.sum > gprof_out.out
+# gprof -s bin/H2_dtd gmon.out-*
+# gprof -q bin/H2_dtd gmon.sum > call_graph.out
+# gprof bin/H2_dtd gmon.sum > gprof_out.out
