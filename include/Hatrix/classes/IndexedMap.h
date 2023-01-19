@@ -98,8 +98,16 @@ class RowColMap {
 };
 
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol
-using RowLevelMap = RowColMap<Matrix>;
-using ColLevelMap = RowColMap<Matrix>;
+//TODO
+//template <typename DT = double>
+//using RowLevelMap = RowColMap<Matrix<DT>>;
+//template <typename DT = double>
+//using ColLevelMap = RowColMap<Matrix<DT>>;
+// Rewrote in order to be able to use default values
+template <typename DT = double>
+class RowLevelMap : public RowColMap<Matrix<DT>> {};
+template <typename DT = double>
+class ColLevelMap : public RowColMap<Matrix<DT>> {};
 
 template <class T>
 class RowColLevelMap {

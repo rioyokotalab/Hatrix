@@ -45,7 +45,7 @@ void RowMap<T>::erase_all() {
 }
 
 
-template class RowMap<Matrix>;
+template class RowMap<Matrix<double>>;
 template class RowMap<std::vector<int64_t>>;
 
 template<class T>
@@ -56,10 +56,13 @@ void RowColMap<T>::deep_copy(const RowColMap<T>& A) {
   }
 }
 
+// TODO extend/change template specialization
 template<>
-void RowColMap<Hatrix::Matrix>::deep_copy(const RowColMap<Hatrix::Matrix>& A) {
+void RowColMap<Hatrix::Matrix<double>>::deep_copy(const RowColMap<Hatrix::Matrix<double>>& A) {
   for (const auto& e : A.map) {
-    Hatrix::Matrix copy(e.second, true);
+    //TODO remove Test
+    RowLevelMap Test;
+    Hatrix::Matrix<double> copy(e.second, true);
     this->insert(e.first, std::move(copy));
   }
 }
@@ -133,7 +136,7 @@ void RowColMap<T>::erase_all() {
 
 // explicit instatiation
 template class RowColMap<bool>;
-template class RowColMap<Hatrix::Matrix>;
+template class RowColMap<Hatrix::Matrix<double>>;
 template class RowColMap<int64_t>;
 template class RowColMap<std::vector<int64_t>>;
 
@@ -145,10 +148,12 @@ void RowColLevelMap<T>::deep_copy(const RowColLevelMap<T>& A) {
   }
 }
 
+
+//TODO change/extend template speciialization
 template<>
-void RowColLevelMap<Hatrix::Matrix>::deep_copy(const RowColLevelMap<Hatrix::Matrix>& A) {
+void RowColLevelMap<Hatrix::Matrix<double>>::deep_copy(const RowColLevelMap<Hatrix::Matrix<double>>& A) {
   for (const auto& e : A.map) {
-    Hatrix::Matrix copy(e.second, true);
+    Hatrix::Matrix<double> copy(e.second, true);
     this->insert(e.first, std::move(copy));
   }
 }
@@ -211,7 +216,7 @@ bool RowColLevelMap<T>::exists(int64_t row, int64_t col, int64_t level) const {
 
 // explicit instatiation
 template class RowColLevelMap<bool>;
-template class RowColLevelMap<Matrix>;
+template class RowColLevelMap<Matrix<double>>;
 
 
 }  // namespace Hatrix

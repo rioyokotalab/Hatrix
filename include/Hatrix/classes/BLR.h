@@ -3,12 +3,13 @@
 
 namespace Hatrix {
 
+template <typename DT>
 class BLR {
  public:
   RowColMap<bool> is_admissible;
-  RowColMap<Matrix> D, S;
-  RowMap<Matrix> U;
-  ColMap<Matrix> V;
+  RowColMap<Matrix<DT>> D, S;
+  RowMap<DT> U;
+  ColMap<DT> V;
 };
 
 }  // namespace Hatrix

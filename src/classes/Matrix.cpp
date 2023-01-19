@@ -15,7 +15,8 @@
 
 namespace Hatrix {
 
-Matrix::Matrix() {
+template <typename DT>
+Matrix<DT>::Matrix() {
   rows = -1;
   cols = -1;
   stride = -1;
@@ -23,7 +24,8 @@ Matrix::Matrix() {
   is_view = false;
 }
 
-Matrix::~Matrix() {
+template <typename DT>
+Matrix<DT>::~Matrix() {
   if (data_ptr != nullptr && !is_view) {
     delete[] data_ptr;
   }
@@ -33,7 +35,8 @@ Matrix::~Matrix() {
   }
 }
 
-Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
+template <typename DT>
+Matrix<DT>::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
   if (A.is_view) {
     is_view = true;
     stride = A.stride;
@@ -61,7 +64,8 @@ Matrix::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
 }
 
 // Copy constructor if you want to explicitly make a copy.
-Matrix::Matrix(const Matrix& A, bool copy)
+template <typename DT>
+Matrix<DT>::Matrix(const Matrix<DT>& A, bool copy)
     : rows(A.rows),
       cols(A.cols) {
   if (A.is_view && !copy) {
@@ -101,7 +105,8 @@ Matrix::Matrix(const Matrix& A, bool copy)
   // object in the calling code. In the assignment we are performing
   // a copy of the view and keeping the A still valid. Ideally both
   // should do the same thing(?)
-Matrix::Matrix(Matrix&& A) {
+template <typename DT>
+Matrix<DT>::Matrix(Matrix<DT>&& A) {
   std::swap(rows, A.rows);
   std::swap(cols, A.cols);
   std::swap(stride, A.stride);
@@ -111,7 +116,8 @@ Matrix::Matrix(Matrix&& A) {
 }
 
 // Move assignment constructor.
-Matrix& Matrix::operator=(Matrix&& A) {
+template <typename DT>
+Matrix<DT>& Matrix<DT>::operator=(Matrix<DT>&& A) {
   // Need to perform a manual copy (vs. swapping) since A might be
   // being assigned to a view.
   if (is_view) {
@@ -136,7 +142,8 @@ Matrix& Matrix::operator=(Matrix&& A) {
 
 
 // Copy assignment operator.
-Matrix& Matrix::operator=(const Matrix& A) {
+template <typename DT>
+Matrix<DT>& Matrix<DT>::operator=(const Matrix<DT>& A) {
   // Manual copy. We dont simply assign the data pointer since we want to
   // the ability to work with Matrix objects that might be views of an
   // underlying parent Matrix object.
@@ -150,8 +157,8 @@ Matrix& Matrix::operator=(const Matrix& A) {
   return *this;
 }
 
-
-Matrix::Matrix(int64_t rows, int64_t cols)
+template <typename DT>
+Matrix<DT>::Matrix(int64_t rows, int64_t cols)
     : rows(rows),
       cols(cols),
       stride(rows) {
@@ -168,27 +175,20 @@ Matrix::Matrix(int64_t rows, int64_t cols)
   }
 }
 
-const Matrix& Matrix::operator=(const double a) {
+template <typename DT>
+const Matrix<DT>& Matrix<DT>::operator=(const double a) {
   for (int64_t i = 0; i < rows; ++i)
     for (int64_t j = 0; j < cols; ++j) (*this)(i, j) = a;
   return *this;
 }
 
-double* Matrix::operator&() { return data_ptr; }
-const double* Matrix::operator&() const { return data_ptr; }
+template <typename DT>
+DT* Matrix<DT>::operator&() { return data_ptr; }
+template <typename DT>
+const DT* Matrix<DT>::operator&() const { return data_ptr; }
 
-double& Matrix::operator()(int64_t i, int64_t j) {
-  if (i >= rows || i < 0) {
-    throw std::invalid_argument("Matrix#operator() -> expected i < rows && i > 0, but got i= " +
-                                std::to_string(i) + " rows= " + std::to_string(rows));
-  }
-  if (j >= cols || j < 0) {
-    throw std::invalid_argument("Matrix#operator() -> expected j > cols && j > 0, but got j=" +
-                                std::to_string(j) + " cols= " + std::to_string(cols));
-  }
-  return data_ptr[i + j * stride];
-}
-const double& Matrix::operator()(int64_t i, int64_t j) const {
+template <typename DT>
+DT& Matrix<DT>::operator()(int64_t i, int64_t j) {
   if (i >= rows || i < 0) {
     throw std::invalid_argument("Matrix#operator() -> expected i < rows && i > 0, but got i= " +
                                 std::to_string(i) + " rows= " + std::to_string(rows));
@@ -200,7 +200,21 @@ const double& Matrix::operator()(int64_t i, int64_t j) const {
   return data_ptr[i + j * stride];
 }
 
-void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
+template <typename DT>
+const DT& Matrix<DT>::operator()(int64_t i, int64_t j) const {
+  if (i >= rows || i < 0) {
+    throw std::invalid_argument("Matrix#operator() -> expected i < rows && i > 0, but got i= " +
+                                std::to_string(i) + " rows= " + std::to_string(rows));
+  }
+  if (j >= cols || j < 0) {
+    throw std::invalid_argument("Matrix#operator() -> expected j > cols && j > 0, but got j=" +
+                                std::to_string(j) + " cols= " + std::to_string(cols));
+  }
+  return data_ptr[i + j * stride];
+}
+
+template <typename DT>
+void Matrix<DT>::shrink(int64_t new_rows, int64_t new_cols) {
   assert(new_rows <= rows);
   assert(new_cols <= cols);
   // Only need to reorganize if the number of rows (leading dim) is reduced
@@ -216,7 +230,8 @@ void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
   stride = rows;
 }
 
-std::vector<Matrix> Matrix::split(int64_t n_row_splits, int64_t n_col_splits,
+template <typename DT>
+std::vector<Matrix<DT>> Matrix<DT>::split(int64_t n_row_splits, int64_t n_col_splits,
                                   bool copy) const {
   int64_t row_split_size = rows / n_row_splits;
   std::vector<int64_t> row_split_indices;
@@ -231,10 +246,11 @@ std::vector<Matrix> Matrix::split(int64_t n_row_splits, int64_t n_col_splits,
   return split(row_split_indices, col_split_indices, copy);
 }
 
-std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices,
+template <typename DT>
+std::vector<Matrix<DT>> Matrix<DT>::split(const std::vector<int64_t>& _row_split_indices,
                                   const std::vector<int64_t>& _col_split_indices,
                                   bool copy) const {
-  std::vector<Matrix> parts;
+  std::vector<Matrix<DT>> parts;
   std::vector<int64_t> row_split_indices(_row_split_indices),
     col_split_indices(_col_split_indices);
 
@@ -259,10 +275,10 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
       int64_t col_end =
           col_iter == col_split_indices.end() ? cols : *col_iter++;
       int64_t n_cols = col_end - col_start;
-      Matrix part_of_this;
+      Matrix<DT> part_of_this;
       if (copy) {
-        part_of_this = Matrix(n_rows, n_cols);
-        double* part_start = &data_ptr[col_start * stride + row_start];
+        part_of_this = Matrix<DT>(n_rows, n_cols);
+        DT* part_start = &data_ptr[col_start * stride + row_start];
         for (int64_t j = 0; j < part_of_this.cols; j++) {
           for (int64_t i = 0; i < part_of_this.rows; i++) {
             part_of_this(i, j) = part_start[j * stride + i];
@@ -284,11 +300,15 @@ std::vector<Matrix> Matrix::split(const std::vector<int64_t>& _row_split_indices
   return parts;
 }
 
-int64_t Matrix::min_dim() const { return std::min(rows, cols); }
-int64_t Matrix::max_dim() const { return std::max(rows, cols); }
-int64_t Matrix::numel() const { return rows * cols; }
+template <typename DT>
+int64_t Matrix<DT>::min_dim() const { return std::min(rows, cols); }
+template <typename DT>
+int64_t Matrix<DT>::max_dim() const { return std::max(rows, cols); }
+template <typename DT>
+int64_t Matrix<DT>::numel() const { return rows * cols; }
 
-void Matrix::print() const {
+template <typename DT>
+void Matrix<DT>::print() const {
   if (rows == 0 || cols == 0) { return; }
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
@@ -304,11 +324,13 @@ void Matrix::print() const {
   std::cout << "\n";
 }
 
-void Matrix::print_meta() const {
+template <typename DT>
+void Matrix<DT>::print_meta() const {
   std::cout << "rows=" << rows << " cols=" << cols << " stride=" << stride << std::endl;
 }
 
-void Matrix::read_file(std::string in_file) {
+template <typename DT>
+void Matrix<DT>::read_file(std::string in_file) {
   std::ifstream file(in_file, std::ios::in);
 
   file >> rows >> cols;
@@ -335,7 +357,8 @@ void Matrix::read_file(std::string in_file) {
   file.close();
 }
 
-void Matrix::out_file(std::string out_file) const {
+template <typename DT>
+void Matrix<DT>::out_file(std::string out_file) const {
   std::ofstream file;
   file.open(out_file, std::ios::out | std::ios::trunc);
 
@@ -349,15 +372,17 @@ void Matrix::out_file(std::string out_file) const {
   file.close();
 }
 
-size_t Matrix::memory_used() const { return rows * cols * sizeof(double); }
+template <typename DT>
+size_t Matrix<DT>::memory_used() const { return rows * cols * sizeof(DT); }
 
-Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
-  Matrix out(nblocks, nblocks);
+template <typename DT>
+Matrix<DT> Matrix<DT>::block_ranks(int64_t nblocks, double accuracy) const {
+  Matrix<DT> out(nblocks, nblocks);
 
   auto this_splits = (*this).split(nblocks, nblocks);
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
-      Matrix Utemp, Stemp, Vtemp;
+      Matrix<DT> Utemp, Stemp, Vtemp;
       int64_t rank;
       std::tie(Utemp, Stemp, Vtemp, rank) = Hatrix::error_svd(this_splits[i * nblocks + j], accuracy);
       out(i, j) = rank;
@@ -367,8 +392,9 @@ Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
   return out;
 }
 
-Matrix Matrix::swap_rows(const std::vector<int64_t>& row_indices) {
-  Matrix out(rows, cols);
+template <typename DT>
+Matrix<DT> Matrix<DT>::swap_rows(const std::vector<int64_t>& row_indices) {
+  Matrix<DT> out(rows, cols);
 
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {
@@ -379,8 +405,9 @@ Matrix Matrix::swap_rows(const std::vector<int64_t>& row_indices) {
   return out;
 }
 
-Matrix Matrix::swap_cols(const std::vector<int64_t>& col_indices) {
-  Matrix out(rows, cols);
+template <typename DT>
+Matrix<DT> Matrix<DT>::swap_cols(const std::vector<int64_t>& col_indices) {
+  Matrix<DT> out(rows, cols);
 
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {
@@ -391,11 +418,14 @@ Matrix Matrix::swap_cols(const std::vector<int64_t>& col_indices) {
   return out;
 }
 
-void Matrix::destructive_resize(const int64_t nrows, const int64_t ncols) {
+template <typename DT>
+void Matrix<DT>::destructive_resize(const int64_t nrows, const int64_t ncols) {
   rows = nrows;
   cols = ncols;
   stride = nrows;
   is_view = false;
   data_ptr = new double[rows * cols];
 }
+
+template class Matrix<double>;
 }  // namespace Hatrix

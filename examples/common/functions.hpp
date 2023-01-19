@@ -52,7 +52,8 @@ double yukawa_kernel(const Body& source, const Body& target) {
   return out;
 }
 
-Matrix generate_p2p_matrix(const Domain& domain,
+template <typename DT = double>
+Matrix<DT> generate_p2p_matrix(const Domain& domain,
                            const std::vector<int64_t>& source,
                            const std::vector<int64_t>& target,
                            const int64_t source_offset = 0,
@@ -69,7 +70,8 @@ Matrix generate_p2p_matrix(const Domain& domain,
   return out;
 }
 
-Matrix generate_p2p_matrix(const Domain& domain,
+template <typename DT = double>
+Matrix<DT> generate_p2p_matrix(const Domain& domain,
                            const int64_t row, const int64_t col,
                            const int64_t level) {
   const auto source_idx = domain.get_cell_idx(row, level);
@@ -80,10 +82,12 @@ Matrix generate_p2p_matrix(const Domain& domain,
   return generate_p2p_matrix(domain, source.get_bodies(), target.get_bodies());
 }
 
-Matrix generate_p2p_matrix(const Domain& domain) {
+template <typename DT = double>
+Matrix<DT> generate_p2p_matrix(const Domain& domain) {
   return generate_p2p_matrix(domain, 0, 0, 0);
 }
 
+//TODO this assumes double per default for now
 // Source: https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c
 int64_t adaptive_anchor_grid_size(const Domain& domain,
                                   kernel_func_t kernel_function,
@@ -183,9 +187,10 @@ int64_t adaptive_anchor_grid_size(const Domain& domain,
   return r;
 }
 
-Matrix prepend_complement_basis(const Matrix &Q) {
-  Matrix Q_F(Q.rows, Q.rows);
-  Matrix Q_full, R;
+template <typename DT>
+Matrix<DT> prepend_complement_basis(const Matrix<DT> &Q) {
+  Matrix<DT> Q_F(Q.rows, Q.rows);
+  Matrix<DT> Q_full, R;
   std::tie(Q_full, R) =
       qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
 

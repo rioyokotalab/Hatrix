@@ -32,7 +32,8 @@ TEST_P(ScaleTests, ScalingPart) {
   std::tie(m, n, alpha) = GetParam();
   Hatrix::Context::init();
   Hatrix::Matrix A_big = Hatrix::generate_random_matrix(2*m, 2*n);
-  std::vector<Hatrix::Matrix> A_split = A_big.split(2, 2);
+  //TODO is there a way around this?
+  std::vector<Hatrix::Matrix<>> A_split = A_big.split(2, 2);
   Hatrix::Matrix A_copy(A_split[0], true);
 
   Hatrix::scale(A_split[0], alpha);

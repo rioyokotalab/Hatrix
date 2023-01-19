@@ -10,7 +10,27 @@
 
 namespace Hatrix {
 
-Matrix& operator+=(Matrix& A, const Matrix& B) {
+template Matrix<double>& operator+=(Matrix<double>& A, const Matrix<double>& B);
+template Matrix<double> operator+(const Matrix<double>& A, const Matrix<double>& B);
+
+template Matrix<double>& operator-=(Matrix<double>& A, const Matrix<double>& B);
+template Matrix<double> operator-(const Matrix<double>& A, const Matrix<double>& B);
+
+template Matrix<double> operator*(const Matrix<double>& A, const Matrix<double>& B);
+template Matrix<double>& operator*=(Matrix<double>& A, double alpha);
+template Matrix<double> operator*(const Matrix<double>& A, double alpha);
+template Matrix<double> operator*(double alpha, const Matrix<double>& A);
+
+template Matrix<double>& operator/=(Matrix<double>& A, double alpha);
+
+template Matrix<double> abs(const Matrix<double>& A);
+template Matrix<double> transpose(const Matrix<double>& A);
+template Matrix<double> lower_tri(const Matrix<double>& A, bool diag=false);
+template Matrix<double> upper_tri(const Matrix<double>& A, bool diag=false);
+
+
+template <typename DT>
+Matrix<DT>& operator+=(Matrix<DT>& A, const Matrix<DT>& B) {
   assert(A.rows == B.rows);
   assert(A.cols == B.cols);
   for (int64_t j = 0; j < A.cols; ++j)
@@ -19,13 +39,15 @@ Matrix& operator+=(Matrix& A, const Matrix& B) {
   return A;
 }
 
-Matrix operator+(const Matrix& A, const Matrix& B) {
-  Matrix C(A, true);
+template <typename DT>
+Matrix<DT> operator+(const Matrix<DT>& A, const Matrix<DT>& B) {
+  Matrix<DT> C(A, true);
   C += B;
   return C;
 }
 
-Matrix& operator-=(Matrix& A, const Matrix& B) {
+template <typename DT>
+Matrix<DT>& operator-=(Matrix<DT>& A, const Matrix<DT>& B) {
   assert(A.rows == B.rows);
   assert(A.cols == B.cols);
   for (int64_t j = 0; j < A.cols; ++j)
@@ -34,56 +56,65 @@ Matrix& operator-=(Matrix& A, const Matrix& B) {
   return A;
 }
 
-Matrix operator-(const Matrix& A, const Matrix& B) {
-  Matrix C(A, true);
+template <typename DT>
+Matrix<DT> operator-(const Matrix<DT>& A, const Matrix<DT>& B) {
+  Matrix<DT> C(A, true);
   C -= B;
   return C;
 }
 
-Matrix operator*(const Matrix& A, const Matrix& B) {
+template <typename DT>
+Matrix<DT> operator*(const Matrix<DT>& A, const Matrix<DT>& B) {
   return Hatrix::matmul(A, B, false, false, 1);
 }
 
-Matrix& operator*=(Matrix& A, double alpha) {
+template <typename DT>
+Matrix<DT>& operator*=(Matrix<DT>& A, double alpha) {
   Hatrix::scale(A, alpha);
   return A;
 }
 
-Matrix& operator/=(Matrix& A, double alpha) {
+template <typename DT>
+Matrix<DT>& operator/=(Matrix<DT>& A, double alpha) {
   Hatrix::scale(A, 1/alpha);
   return A;
 }
 
-Matrix operator*(const Matrix& A, double alpha) {
-  Matrix C(A, true);
+template <typename DT>
+Matrix<DT> operator*(const Matrix<DT>& A, double alpha) {
+  Matrix<DT> C(A, true);
   C *= alpha;
   return C;
 }
 
-Matrix operator*(double alpha, const Matrix& A) {
-  Matrix C(A, true);
+template <typename DT>
+Matrix<DT> operator*(double alpha, const Matrix<DT>& A) {
+  Matrix<DT> C(A, true);
   C *= alpha;
   return C;
 }
 
-Matrix abs(const Matrix& A) {
-  Matrix A_abs(A.rows, A.cols);
+template <typename DT>
+Matrix<DT> abs(const Matrix<DT>& A) {
+  Matrix<DT> A_abs(A.rows, A.cols);
   for (int64_t j = 0; j < A.cols; ++j)
     for (int64_t i = 0; i < A.rows; ++i) A_abs(i, j) = std::abs(A(i, j));
 
   return A_abs;
 }
 
-Matrix transpose(const Matrix& A) {
-  Matrix A_trans(A.cols, A.rows);
+template <typename DT>
+Matrix<DT> transpose(const Matrix<DT>& A) {
+  Matrix<DT> A_trans(A.cols, A.rows);
   for (int64_t i = 0; i < A_trans.rows; i++)
     for (int64_t j = 0; j < A_trans.cols; j++) A_trans(i, j) = A(j, i);
 
   return A_trans;
 }
 
-Matrix lower_tri(const Matrix& A, bool diag) {
-  Matrix A_lower(A.rows, A.cols);
+template <typename DT>
+Matrix<DT> lower_tri(const Matrix<DT>& A, bool diag) {
+  Matrix<DT> A_lower(A.rows, A.cols);
   for(int64_t i = 0; i < A.rows; i++) {
     for(int64_t j = 0; j < std::min(i+1, A.cols); j++) {
       A_lower(i, j) = (i == j && diag ? 1. : A(i, j));
@@ -93,8 +124,9 @@ Matrix lower_tri(const Matrix& A, bool diag) {
   return A_lower;
 }
 
-Matrix upper_tri(const Matrix& A, bool diag) {
-  Matrix A_upper(A.rows, A.cols);
+template <typename DT>
+Matrix<DT> upper_tri(const Matrix<DT>& A, bool diag) {
+  Matrix<DT> A_upper(A.rows, A.cols);
   for(int64_t i = 0; i < A.rows; i++) {
     for(int64_t j = i; j < A.cols; j++) {
       A_upper(i, j) = (i == j && diag ? 1. : A(i, j));

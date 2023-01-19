@@ -44,6 +44,7 @@ enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
 
 namespace Hatrix {
 
+template <typename DT = double>
 class H2 {
  public:
   int64_t N, leaf_size;
@@ -52,12 +53,12 @@ class H2 {
   double admis;
   int64_t matrix_type;
   int64_t height;
-  RowLevelMap U;
-  ColLevelMap V;
-  RowColLevelMap<Matrix> D, S;
+  RowLevelMap<DT> U;
+  ColLevelMap<DT> V;
+  RowColLevelMap<Matrix<DT>> D, S;
   RowColLevelMap<bool> is_admissible;
-  RowLevelMap US_row;
-  ColLevelMap SV_col;
+  RowLevelMap<DT> US_row;
+  ColLevelMap<DT> SV_col;
   std::vector<int64_t> level_blocks;
 
  private:
@@ -68,51 +69,51 @@ class H2 {
   bool row_has_admissible_blocks(const int64_t row, const int64_t level) const;
   bool col_has_admissible_blocks(const int64_t col, const int64_t level) const;
 
-  std::tuple<Matrix, Matrix, Matrix, int64_t> svd_like_compression(Matrix& A) const;
+  std::tuple<Matrix<DT>, Matrix<DT>, Matrix<DT>, int64_t> svd_like_compression(Matrix<DT>& A) const;
 
-  Matrix generate_block_row(const Domain& domain, const Matrix& rand,
+  Matrix<DT> generate_block_row(const Domain& domain, const Matrix<DT>& rand,
                             const int64_t node, const int64_t level) const;
-  Matrix generate_block_col(const Domain& domain, const Matrix& rand,
+  Matrix<DT> generate_block_col(const Domain& domain, const Matrix<DT>& rand,
                             const int64_t node, const int64_t level) const;
-  std::tuple<Matrix, Matrix>
-  generate_row_cluster_basis(const Domain& domain, const Matrix& rand,
+  std::tuple<Matrix<DT>, Matrix<DT>>
+  generate_row_cluster_basis(const Domain& domain, const Matrix<DT>& rand,
                              const int64_t node, const int64_t level) const;
-  std::tuple<Matrix, Matrix>
-  generate_col_cluster_basis(const Domain& domain, const Matrix& rand,
+  std::tuple<Matrix<DT>, Matrix<DT>>
+  generate_col_cluster_basis(const Domain& domain, const Matrix<DT>& rand,
                              const int64_t node, const int64_t level) const;
-  void generate_leaf_nodes(const Domain& domain, const Matrix& rand);
+  void generate_leaf_nodes(const Domain& domain, const Matrix<DT>& rand);
 
-  std::tuple<Matrix, Matrix>
-  generate_U_transfer_matrix(const Domain& domain, const Matrix& rand,
-                             const Matrix& Ubig_child1, const Matrix& Ubig_child2,
+  std::tuple<Matrix<DT>, Matrix<DT>>
+  generate_U_transfer_matrix(const Domain& domain, const Matrix<DT>& rand,
+                             const Matrix<DT>& Ubig_child1, const Matrix<DT>& Ubig_child2,
                              const int64_t node, const int64_t level) const;
-  std::tuple<Matrix, Matrix>
-  generate_V_transfer_matrix(const Domain& domain, const Matrix& rand,
-                             const Matrix& Vbig_child1, const Matrix& Vbig_child2,
+  std::tuple<Matrix<DT>, Matrix<DT>>
+  generate_V_transfer_matrix(const Domain& domain, const Matrix<DT>& rand,
+                             const Matrix<DT>& Vbig_child1, const Matrix<DT>& Vbig_child2,
                              const int64_t node, const int64_t level) const;
-  std::tuple<RowLevelMap, ColLevelMap>
-  generate_transfer_matrices(const Domain& domain, const Matrix& rand, const int64_t level,
-                             RowLevelMap& Uchild, ColLevelMap& Vchild);
+  std::tuple<RowLevelMap<DT>, ColLevelMap<DT>>
+  generate_transfer_matrices(const Domain& domain, const Matrix<DT>& rand, const int64_t level,
+                             RowLevelMap<DT>& Uchild, ColLevelMap<DT>& Vchild);
 
-  Matrix get_Ubig(const int64_t node, const int64_t level) const;
-  Matrix get_Vbig(const int64_t node, const int64_t level) const;
+  Matrix<DT> get_Ubig(const int64_t node, const int64_t level) const;
+  Matrix<DT> get_Vbig(const int64_t node, const int64_t level) const;
 
   void update_row_cluster_bases(const int64_t row, const int64_t level,
-                                const RowColLevelMap<Matrix>& F,
-                                RowMap<Matrix>& r);
+                                const RowColLevelMap<Matrix<DT>>& F,
+                                RowMap<Matrix<DT>>& r);
   void update_col_cluster_bases(const int64_t col, const int64_t level,
-                                const RowColLevelMap<Matrix>& F,
-                                RowMap<Matrix>& t);
+                                const RowColLevelMap<Matrix<DT>>& F,
+                                RowMap<Matrix<DT>>& t);
   void factorize_level(const int64_t level, const int64_t nblocks,
-                       RowColLevelMap<Matrix>& F,
-                       RowMap<Matrix>& r, RowMap<Matrix>& t);
-  int64_t permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) const;
-  int64_t permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) const;
-  void solve_forward_level(Matrix& x_level, const int64_t level) const;
-  void solve_backward_level(Matrix& x_level, const int64_t level) const;
+                       RowColLevelMap<Matrix<DT>>& F,
+                       RowMap<Matrix<DT>>& r, RowMap<Matrix<DT>>& t);
+  int64_t permute_forward(Matrix<DT>& x, const int64_t level, int64_t rank_offset) const;
+  int64_t permute_backward(Matrix<DT>& x, const int64_t level, int64_t rank_offset) const;
+  void solve_forward_level(Matrix<DT>& x_level, const int64_t level) const;
+  void solve_backward_level(Matrix<DT>& x_level, const int64_t level) const;
 
  public:
-  H2(const Domain& domain, const Matrix& rand,
+  H2(const Domain& domain, const Matrix<DT>& rand,
      const int64_t N, const int64_t leaf_size,
      const double accuracy, const int64_t max_rank,
      const double admis, const int64_t matrix_type);
@@ -125,10 +126,11 @@ class H2 {
   double low_rank_block_ratio() const;
 
   void factorize();
-  Matrix solve(const Matrix& b) const;
+  Matrix<DT> solve(const Matrix<DT>& b) const;
 };
 
-void H2::initialize_geometry_admissibility(const Domain& domain) {
+template <typename DT>
+void H2<DT>::initialize_geometry_admissibility(const Domain& domain) {
   if (matrix_type == H2_MATRIX) {
     height = domain.tree_height;
     level_blocks.assign(height + 1, 0);
@@ -166,7 +168,8 @@ void H2::initialize_geometry_admissibility(const Domain& domain) {
   }
 }
 
-int64_t H2::find_all_dense_row() const {
+template <typename DT>
+int64_t H2<DT>::find_all_dense_row() const {
   const int64_t nblocks = level_blocks[height];
   for (int64_t i = 0; i < nblocks; i++) {
     bool all_dense_row = true;
@@ -183,13 +186,15 @@ int64_t H2::find_all_dense_row() const {
   return -1;
 }
 
-int64_t H2::get_block_size(const Domain& domain, const int64_t node, const int64_t level) const {
+template <typename DT>
+int64_t H2<DT>::get_block_size(const Domain& domain, const int64_t node, const int64_t level) const {
   const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
   const auto idx = domain.get_cell_idx(node, node_level);
   return domain.cells[idx].nbodies;
 }
 
-bool H2::row_has_admissible_blocks(const int64_t row, const int64_t level) const {
+template <typename DT>
+bool H2<DT>::row_has_admissible_blocks(const int64_t row, const int64_t level) const {
   bool has_admis = false;
   for (int64_t j = 0; j < level_blocks[level]; j++) {
     if ((!is_admissible.exists(row, j, level)) || // part of upper level admissible block
@@ -201,7 +206,8 @@ bool H2::row_has_admissible_blocks(const int64_t row, const int64_t level) const
   return has_admis;
 }
 
-bool H2::col_has_admissible_blocks(const int64_t col, const int64_t level) const {
+template <typename DT>
+bool H2<DT>::col_has_admissible_blocks(const int64_t col, const int64_t level) const {
   bool has_admis = false;
   for (int64_t i = 0; i < level_blocks[level]; i++) {
     if ((!is_admissible.exists(i, col, level)) || // part of upper level admissible block
@@ -213,14 +219,15 @@ bool H2::col_has_admissible_blocks(const int64_t col, const int64_t level) const
   return has_admis;
 }
 
-std::tuple<Matrix, Matrix, Matrix, int64_t> H2::svd_like_compression(Matrix& A) const {
-  Matrix Ui, Si, Vi;
+template <typename DT>
+std::tuple<Matrix<DT>, Matrix<DT>, Matrix<DT>, int64_t> H2<DT>::svd_like_compression(Matrix<DT>& A) const {
+  Matrix<DT> Ui, Si, Vi;
   int64_t rank;
 #ifdef USE_QR_COMPRESSION
-  Matrix R;
+  Matrix<DT> R;
   std::tie(Ui, R, rank) = error_pivoted_qr(A, accuracy, false, false);
-  Si = Matrix(R.rows, R.rows);
-  Vi = Matrix(R.rows, R.cols);
+  Si = Matrix<DT>(R.rows, R.rows);
+  Vi = Matrix<DT>(R.rows, R.cols);
   rq(R, Si, Vi);
 #else
   std::tie(Ui, Si, Vi, rank) = error_svd(A, accuracy, false, false);
@@ -232,17 +239,18 @@ std::tuple<Matrix, Matrix, Matrix, int64_t> H2::svd_like_compression(Matrix& A) 
   return std::make_tuple(std::move(Ui), std::move(Si), std::move(Vi), std::move(rank));
 }
 
-Matrix H2::generate_block_row(const Domain& domain, const Matrix& rand,
+template <typename DT>
+Matrix<DT> H2<DT>::generate_block_row(const Domain& domain, const Matrix<DT>& rand,
                               const int64_t node, const int64_t level) const {
   const int64_t nblocks = level_blocks[level];
   const int64_t block_size = get_block_size(domain, node, level);
   const bool sample = (rand.cols > 0);
-  std::vector<Matrix> rand_splits;
+  std::vector<Matrix<DT>> rand_splits;
   if (sample) {
     rand_splits = rand.split(nblocks, 1);
   }
 
-  Matrix block_row(block_size, sample ? rand.cols : 0);
+  Matrix<DT> block_row(block_size, sample ? rand.cols : 0);
   const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
   for (int64_t j = 0; j < nblocks; j++) {
     if ((!is_admissible.exists(node, j, level)) || // part of upper level admissible block
@@ -260,17 +268,18 @@ Matrix H2::generate_block_row(const Domain& domain, const Matrix& rand,
   return block_row;
 }
 
-Matrix H2::generate_block_col(const Domain& domain, const Matrix& rand,
+template <typename DT>
+Matrix<DT> H2<DT>::generate_block_col(const Domain& domain, const Matrix<DT>& rand,
                               const int64_t node, const int64_t level) const {
   const int64_t nblocks = level_blocks[level];
   const int64_t block_size = get_block_size(domain, node, level);
   const bool sample = (rand.cols > 0);
-  std::vector<Matrix> rand_splits;
+  std::vector<Matrix<DT>> rand_splits;
   if (sample) {
     rand_splits = rand.split(nblocks, 1);
   }
 
-  Matrix block_column(sample ? rand.cols : 0, block_size);
+  Matrix<DT> block_column(sample ? rand.cols : 0, block_size);
   const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
   for (int64_t i = 0; i < nblocks; i++) {
     if ((!is_admissible.exists(i, node, level)) || // part of upper level admissible block
@@ -289,33 +298,36 @@ Matrix H2::generate_block_col(const Domain& domain, const Matrix& rand,
   return block_column;
 }
 
-std::tuple<Matrix, Matrix>
-H2::generate_row_cluster_basis(const Domain& domain, const Matrix& rand,
+template <typename DT>
+std::tuple<Matrix<DT>, Matrix<DT>>
+H2<DT>::generate_row_cluster_basis(const Domain& domain, const Matrix<DT>& rand,
                                const int64_t node, const int64_t level) const {
-  Matrix block_row = generate_block_row(domain, rand, node, level);
-  Matrix Ui, Si, Vi_T;
+  Matrix<DT> block_row = generate_block_row(domain, rand, node, level);
+  Matrix<DT> Ui, Si, Vi_T;
   int64_t rank;
   std::tie(Ui, Si, Vi_T, rank) = svd_like_compression(block_row);
 
-  Matrix UxS = matmul(Ui, Si);
+  Matrix<DT> UxS = matmul(Ui, Si);
   Ui.shrink(Ui.rows, rank);
   return std::make_tuple(std::move(Ui), std::move(UxS));
 }
 
-std::tuple<Matrix, Matrix>
-H2::generate_col_cluster_basis(const Domain& domain, const Matrix& rand,
+template <typename DT>
+std::tuple<Matrix<DT>, Matrix<DT>>
+H2<DT>::generate_col_cluster_basis(const Domain& domain, const Matrix<DT>& rand,
                                const int64_t node, const int64_t level) const {
-  Matrix block_column_T = transpose(generate_block_col(domain, rand, node, level));
-  Matrix Vj, Sj_T, Uj_T;
+  Matrix<DT> block_column_T = transpose(generate_block_col(domain, rand, node, level));
+  Matrix<DT> Vj, Sj_T, Uj_T;
   int64_t rank;
   std::tie(Vj, Sj_T, Uj_T, rank) = svd_like_compression(block_column_T);
 
-  Matrix SxV_T = matmul(Sj_T, Vj, true, true);
+  Matrix<DT> SxV_T = matmul(Sj_T, Vj, true, true);
   Vj.shrink(Vj.rows, rank);
   return std::make_tuple(std::move(Vj), std::move(SxV_T));
 }
 
-void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
+template <typename DT>
+void H2<DT>::generate_leaf_nodes(const Domain& domain, const Matrix<DT>& rand) {
   const int64_t nblocks = level_blocks[height];
   const auto leaf_level = matrix_type == BLR2_MATRIX ? domain.tree_height : height;
   // Generate inadmissible leaf blocks
@@ -330,7 +342,7 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
   // Generate leaf level U
   for (int64_t i = 0; i < nblocks; i++) {
     if (row_has_admissible_blocks(i, height)) {
-      Matrix Ui, UxS;
+      Matrix<DT> Ui, UxS;
       std::tie(Ui, UxS) =
           generate_row_cluster_basis(domain, rand, i, height);
       U.insert(i, height, std::move(Ui));
@@ -340,7 +352,7 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
   // Generate leaf level V
   for (int64_t j = 0; j < nblocks; j++) {
     if (col_has_admissible_blocks(j, height)) {
-      Matrix Vj, SxV;
+      Matrix<DT> Vj, SxV;
       std::tie(Vj, SxV) =
           generate_col_cluster_basis(domain, rand, j, height);
       V.insert(j, height, std::move(Vj));
@@ -351,7 +363,7 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
   for (int64_t i = 0; i < nblocks; i++) {
     for (int64_t j = 0; j < nblocks; j++) {
       if (is_admissible.exists(i, j, height) && is_admissible(i, j, height)) {
-        Matrix dense = generate_p2p_matrix(domain, i, j, leaf_level);
+        Matrix<DT> dense = generate_p2p_matrix(domain, i, j, leaf_level);
         S.insert(i, j, height,
                  matmul(matmul(U(i, height), dense, true, false),
                         V(j, height)));
@@ -360,57 +372,60 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
   }
 }
 
-std::tuple<Matrix, Matrix>
-H2::generate_U_transfer_matrix(const Domain& domain, const Matrix& rand,
-                               const Matrix& Ubig_child1, const Matrix& Ubig_child2,
+template <typename DT>
+std::tuple<Matrix<DT>, Matrix<DT>>
+H2<DT>::generate_U_transfer_matrix(const Domain& domain, const Matrix<DT>& rand,
+                               const Matrix<DT>& Ubig_child1, const Matrix<DT>& Ubig_child2,
                                const int64_t node, const int64_t level) const {
-  Matrix block_row = generate_block_row(domain, rand, node, level);
+  Matrix<DT> block_row = generate_block_row(domain, rand, node, level);
   auto block_row_splits = block_row.split(2, 1);
 
-  Matrix temp(Ubig_child1.cols + Ubig_child2.cols, block_row.cols);
+  Matrix<DT> temp(Ubig_child1.cols + Ubig_child2.cols, block_row.cols);
   auto temp_splits = temp.split(vec{Ubig_child1.cols}, vec{});
 
   matmul(Ubig_child1, block_row_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Ubig_child2, block_row_splits[1], temp_splits[1], true, false, 1, 0);
 
-  Matrix Ui, Si, Vi;
+  Matrix<DT> Ui, Si, Vi;
   int64_t rank;
   std::tie(Ui, Si, Vi, rank) = svd_like_compression(temp);
 
-  Matrix UxS = matmul(Ui, Si);
+  Matrix<DT> UxS = matmul(Ui, Si);
   Ui.shrink(Ui.rows, rank);
   return std::make_tuple(std::move(Ui), std::move(UxS));
 }
 
-std::tuple<Matrix, Matrix>
-H2::generate_V_transfer_matrix(const Domain& domain, const Matrix& rand,
-                               const Matrix& Vbig_child1, const Matrix& Vbig_child2,
+template <typename DT>
+std::tuple<Matrix<DT>, Matrix<DT>>
+H2<DT>::generate_V_transfer_matrix(const Domain& domain, const Matrix<DT>& rand,
+                               const Matrix<DT>& Vbig_child1, const Matrix<DT>& Vbig_child2,
                                const int64_t node, const int64_t level) const {
-  Matrix block_column_T = transpose(generate_block_col(domain, rand, node, level));
+  Matrix<DT> block_column_T = transpose(generate_block_col(domain, rand, node, level));
   auto block_column_T_splits = block_column_T.split(2, 1);
 
-  Matrix temp(Vbig_child1.cols + Vbig_child2.cols, block_column_T.cols);
+  Matrix<DT> temp(Vbig_child1.cols + Vbig_child2.cols, block_column_T.cols);
   auto temp_splits = temp.split(vec{Vbig_child1.cols}, vec{});
 
   matmul(Vbig_child1, block_column_T_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Vbig_child2, block_column_T_splits[1], temp_splits[1], true, false, 1, 0);
 
-  Matrix Vj, Sj_T, Uj_T;
+  Matrix<DT> Vj, Sj_T, Uj_T;
   int64_t rank;
   std::tie(Vj, Sj_T, Uj_T, rank) = svd_like_compression(temp);
 
-  Matrix SxV_T = matmul(Sj_T, Vj, true, true);
+  Matrix<DT> SxV_T = matmul(Sj_T, Vj, true, true);
   Vj.shrink(Vj.rows, rank);
   return std::make_tuple(std::move(Vj), std::move(SxV_T));
 }
 
-std::tuple<RowLevelMap, ColLevelMap>
-H2::generate_transfer_matrices(const Domain& domain, const Matrix& rand, const int64_t level,
-                               RowLevelMap& Uchild, ColLevelMap& Vchild) {
+template <typename DT>
+std::tuple<RowLevelMap<DT>, ColLevelMap<DT>>
+H2<DT>::generate_transfer_matrices(const Domain& domain, const Matrix<DT>& rand, const int64_t level,
+                               RowLevelMap<DT>& Uchild, ColLevelMap<DT>& Vchild) {
   // Generate the actual bases for the upper level and pass it to this
   // function again for generating transfer matrices at successive levels.
-  RowLevelMap Ubig_parent;
-  ColLevelMap Vbig_parent;
+  RowLevelMap<DT> Ubig_parent;
+  ColLevelMap<DT> Vbig_parent;
 
   const int64_t nblocks = level_blocks[level];
   for (int64_t node = 0; node < nblocks; node++) {
@@ -421,9 +436,9 @@ H2::generate_transfer_matrices(const Domain& domain, const Matrix& rand, const i
 
     if (level > 0 && row_has_admissible_blocks(node, level)) {
       // Generate row cluster transfer matrix.
-      const Matrix& Ubig_child1 = Uchild(child1, child_level);
-      const Matrix& Ubig_child2 = Uchild(child2, child_level);
-      Matrix Utransfer, UxS;
+      const Matrix<DT>& Ubig_child1 = Uchild(child1, child_level);
+      const Matrix<DT>& Ubig_child2 = Uchild(child2, child_level);
+      Matrix<DT> Utransfer, UxS;
       std::tie(Utransfer, UxS) =
           generate_U_transfer_matrix(domain, rand, Ubig_child1, Ubig_child2, node, level);
       U.insert(node, level, std::move(Utransfer));
@@ -431,7 +446,7 @@ H2::generate_transfer_matrices(const Domain& domain, const Matrix& rand, const i
 
       // Generate the full bases to pass onto the parent.
       auto Utransfer_splits = U(node, level).split(vec{Ubig_child1.cols}, vec{});
-      Matrix Ubig(block_size, U(node, level).cols);
+      Matrix<DT> Ubig(block_size, U(node, level).cols);
       auto Ubig_splits = Ubig.split(vec{Ubig_child1.rows}, vec{});
 
       matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
@@ -440,9 +455,9 @@ H2::generate_transfer_matrices(const Domain& domain, const Matrix& rand, const i
     }
     if (level > 0 && col_has_admissible_blocks(node, level)) {
       // Generate column cluster transfer Matrix.
-      const Matrix& Vbig_child1 = Vchild(child1, child_level);
-      const Matrix& Vbig_child2 = Vchild(child2, child_level);
-      Matrix Vtransfer, SxV;
+      const Matrix<DT>& Vbig_child1 = Vchild(child1, child_level);
+      const Matrix<DT>& Vbig_child2 = Vchild(child2, child_level);
+      Matrix<DT> Vtransfer, SxV;
       std::tie(Vtransfer, SxV) =
           generate_V_transfer_matrix(domain, rand, Vbig_child1, Vbig_child2, node, level);
       V.insert(node, level, std::move(Vtransfer));
@@ -450,7 +465,7 @@ H2::generate_transfer_matrices(const Domain& domain, const Matrix& rand, const i
 
       // Generate the full bases to pass onto the parent.
       auto Vtransfer_splits = V(node, level).split(vec{Vbig_child1.cols}, vec{});
-      Matrix Vbig(block_size, V(node, level).cols);
+      Matrix<DT> Vbig(block_size, V(node, level).cols);
       auto Vbig_splits = Vbig.split(vec{Vbig_child1.rows}, vec{});
 
       matmul(Vbig_child1, Vtransfer_splits[0], Vbig_splits[0]);
@@ -462,7 +477,7 @@ H2::generate_transfer_matrices(const Domain& domain, const Matrix& rand, const i
   for (int64_t i = 0; i < nblocks; i++) {
     for (int64_t j = 0; j < nblocks; j++) {
       if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-        Matrix D = generate_p2p_matrix(domain, i, j, level);
+        Matrix<DT> D = generate_p2p_matrix(domain, i, j, level);
 
         S.insert(i, j, level, matmul(matmul(Ubig_parent(i, level), D, true, false),
                                      Vbig_parent(j, level)));
@@ -472,18 +487,19 @@ H2::generate_transfer_matrices(const Domain& domain, const Matrix& rand, const i
   return {Ubig_parent, Vbig_parent};
 }
 
-Matrix H2::get_Ubig(const int64_t node, const int64_t level) const {
+template <typename DT>
+Matrix<DT> H2<DT>::get_Ubig(const int64_t node, const int64_t level) const {
   if (level == height) {
     return U(node, level);
   }
 
   const int64_t child1 = node * 2;
   const int64_t child2 = node * 2 + 1;
-  const Matrix Ubig_child1 = get_Ubig(child1, level + 1);
-  const Matrix Ubig_child2 = get_Ubig(child2, level + 1);
+  const Matrix<DT> Ubig_child1 = get_Ubig(child1, level + 1);
+  const Matrix<DT> Ubig_child2 = get_Ubig(child2, level + 1);
 
   const int64_t block_size = Ubig_child1.rows + Ubig_child2.rows;
-  Matrix Ubig(block_size, U(node, level).cols);
+  Matrix<DT> Ubig(block_size, U(node, level).cols);
   auto Ubig_splits = Ubig.split(vec{Ubig_child1.rows}, vec{});
   auto U_splits = U(node, level).split(vec{Ubig_child1.cols}, vec{});
 
@@ -492,18 +508,19 @@ Matrix H2::get_Ubig(const int64_t node, const int64_t level) const {
   return Ubig;
 }
 
-Matrix H2::get_Vbig(const int64_t node, const int64_t level) const {
+template <typename DT>
+Matrix<DT> H2<DT>::get_Vbig(const int64_t node, const int64_t level) const {
   if (level == height) {
     return V(node, level);
   }
 
   const int64_t child1 = node * 2;
   const int64_t child2 = node * 2 + 1;
-  const Matrix Vbig_child1 = get_Vbig(child1, level + 1);
-  const Matrix Vbig_child2 = get_Vbig(child2, level + 1);
+  const Matrix<DT> Vbig_child1 = get_Vbig(child1, level + 1);
+  const Matrix<DT> Vbig_child2 = get_Vbig(child2, level + 1);
 
   const int64_t block_size = Vbig_child1.rows + Vbig_child2.rows;
-  Matrix Vbig(block_size, V(node, level).cols);
+  Matrix<DT> Vbig(block_size, V(node, level).cols);
   auto Vbig_splits = Vbig.split(vec{Vbig_child1.rows}, vec{});
   auto V_splits = V(node, level).split(vec{Vbig_child1.cols}, vec{});
 
@@ -512,7 +529,8 @@ Matrix H2::get_Vbig(const int64_t node, const int64_t level) const {
   return Vbig;
 }
 
-H2::H2(const Domain& domain, const Matrix& rand,
+template <typename DT>
+H2<DT>::H2(const Domain& domain, const Matrix<DT>& rand,
        const int64_t N, const int64_t leaf_size,
        const double accuracy, const int64_t max_rank,
        const double admis, const int64_t matrix_type)
@@ -520,15 +538,16 @@ H2::H2(const Domain& domain, const Matrix& rand,
       admis(admis), matrix_type(matrix_type) {
   initialize_geometry_admissibility(domain);
   generate_leaf_nodes(domain, rand);
-  RowLevelMap Uchild = U;
-  ColLevelMap Vchild = V;
+  RowLevelMap<DT> Uchild = U;
+  ColLevelMap<DT> Vchild = V;
 
   for (int64_t level = height - 1; level > 0; level--) {
     std::tie(Uchild, Vchild) = generate_transfer_matrices(domain, rand, level, Uchild, Vchild);
   }
 }
 
-int64_t H2::get_basis_min_rank() const {
+template <typename DT>
+int64_t H2<DT>::get_basis_min_rank() const {
   int64_t rank_min = N;
   for (int64_t level = height; level > 0; level--) {
     const int64_t nblocks = level_blocks[level];
@@ -544,7 +563,8 @@ int64_t H2::get_basis_min_rank() const {
   return rank_min;
 }
 
-int64_t H2::get_basis_max_rank() const {
+template <typename DT>
+int64_t H2<DT>::get_basis_max_rank() const {
   int64_t rank_max = -N;
   for (int64_t level = height; level > 0; level--) {
     const int64_t nblocks = level_blocks[level];
@@ -560,15 +580,16 @@ int64_t H2::get_basis_max_rank() const {
   return rank_max;
 }
 
-double H2::construction_absolute_error(const Domain& domain) const {
+template <typename DT>
+double H2<DT>::construction_absolute_error(const Domain& domain) const {
   double error = 0;
   // Inadmissible blocks (only at leaf level)
   for (int64_t i = 0; i < level_blocks[height]; i++) {
     for (int64_t j = 0; j < level_blocks[height]; j++) {
       if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
         const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : height;
-        const Matrix actual = Hatrix::generate_p2p_matrix(domain, i, j, node_level);
-        const Matrix expected = D(i, j, height);
+        const Matrix<DT> actual = Hatrix::generate_p2p_matrix(domain, i, j, node_level);
+        const Matrix<DT> expected = D(i, j, height);
         error += pow(norm(actual - expected), 2);
       }
     }
@@ -578,11 +599,11 @@ double H2::construction_absolute_error(const Domain& domain) const {
     for (int64_t i = 0; i < level_blocks[level]; i++) {
       for (int64_t j = 0; j < level_blocks[level]; j++) {
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-          const Matrix Ubig = get_Ubig(i, level);
-          const Matrix Vbig = get_Vbig(j, level);
-          const Matrix expected_matrix = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
+          const Matrix<DT> Ubig = get_Ubig(i, level);
+          const Matrix<DT> Vbig = get_Vbig(j, level);
+          const Matrix<DT> expected_matrix = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
           const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
-          const Matrix actual_matrix =
+          const Matrix<DT> actual_matrix =
               Hatrix::generate_p2p_matrix(domain, i, j, node_level);
           error += pow(norm(expected_matrix - actual_matrix), 2);
         }
@@ -592,7 +613,8 @@ double H2::construction_absolute_error(const Domain& domain) const {
   return std::sqrt(error);
 }
 
-void H2::print_structure(const int64_t level) const {
+template <typename DT>
+void H2<DT>::print_structure(const int64_t level) const {
   if (level == 0) { return; }
   const int64_t nblocks = level_blocks[level];
   std::cout << "LEVEL: " << level << " NBLOCKS: " << nblocks << std::endl;
@@ -615,7 +637,8 @@ void H2::print_structure(const int64_t level) const {
   print_structure(level - 1);
 }
 
-void H2::print_ranks() const {
+template <typename DT>
+void H2<DT>::print_ranks() const {
   for(int64_t level = height; level > 0; level--) {
     const int64_t nblocks = level_blocks[level];
     for(int64_t node = 0; node < nblocks; node++) {
@@ -636,7 +659,8 @@ void H2::print_ranks() const {
   }
 }
 
-double H2::low_rank_block_ratio() const {
+template <typename DT>
+double H2<DT>::low_rank_block_ratio() const {
   double total = 0, low_rank = 0;
   const int64_t nblocks = level_blocks[height];
   for (int64_t i = 0; i < nblocks; i++) {
@@ -651,12 +675,13 @@ double H2::low_rank_block_ratio() const {
   return low_rank / total;
 }
 
-void H2::update_row_cluster_bases(const int64_t row, const int64_t level,
-                                  const RowColLevelMap<Matrix>& F,
-                                  RowMap<Matrix>& r) {
+template <typename DT>
+void H2<DT>::update_row_cluster_bases(const int64_t row, const int64_t level,
+                                  const RowColLevelMap<Matrix<DT>>& F,
+                                  RowMap<Matrix<DT>>& r) {
   const int64_t nblocks = level_blocks[level];
   const int64_t block_size = D(row, row, level).rows;
-  Matrix block_row(block_size, 0);
+  Matrix<DT> block_row(block_size, 0);
 
   // TODO implement a more accurate variant from MiaoMiaoMa2019_UMV paper (Algorithm 1)
   // instead of using a pre-computed UxS from construction phase
@@ -669,13 +694,13 @@ void H2::update_row_cluster_bases(const int64_t row, const int64_t level,
     }
   }
 
-  Matrix Ui, Si, Vi;
+  Matrix<DT> Ui, Si, Vi;
   int64_t rank;
   std::tie(Ui, Si, Vi, rank) = svd_like_compression(block_row);
-  Matrix US = matmul(Ui, Si);
+  Matrix<DT> US = matmul(Ui, Si);
   Ui.shrink(Ui.rows, rank);
 
-  Matrix r_row = matmul(Ui, U(row, level), true, false);
+  Matrix<DT> r_row = matmul(Ui, U(row, level), true, false);
   if (r.exists(row)) {
     r.erase(row);
   }
@@ -688,12 +713,13 @@ void H2::update_row_cluster_bases(const int64_t row, const int64_t level,
   US_row.insert(row, level, std::move(US));
 }
 
-void H2::update_col_cluster_bases(const int64_t col, const int64_t level,
-                                  const RowColLevelMap<Matrix>& F,
-                                  RowMap<Matrix>& t) {
+template <typename DT>
+void H2<DT>::update_col_cluster_bases(const int64_t col, const int64_t level,
+                                  const RowColLevelMap<Matrix<DT>>& F,
+                                  RowMap<Matrix<DT>>& t) {
   const int64_t nblocks = level_blocks[level];
   const int64_t block_size = D(col, col, level).cols;
-  Matrix block_column(0, block_size);
+  Matrix<DT> block_column(0, block_size);
 
   // TODO implement a more accurate variant from MiaoMiaoMa2019_UMV paper (Algorithm 1)
   // instead of using a pre-computed SxV from construction phase
@@ -706,14 +732,14 @@ void H2::update_col_cluster_bases(const int64_t col, const int64_t level,
     }
   }
 
-  Matrix Ui, Si, Vi;
+  Matrix<DT> Ui, Si, Vi;
   int64_t rank;
-  Matrix block_column_T = transpose(block_column);
+  Matrix<DT> block_column_T = transpose(block_column);
   std::tie(Vi, Si, Ui, rank) = svd_like_compression(block_column_T);
-  Matrix SV = matmul(Si, Vi, true, true);
+  Matrix<DT> SV = matmul(Si, Vi, true, true);
   Vi.shrink(Vi.rows, rank);
 
-  Matrix t_col = matmul(Vi, V(col, level), true, false);
+  Matrix<DT> t_col = matmul(Vi, V(col, level), true, false);
   if (t.exists(col)) {
     t.erase(col);
   }
@@ -726,9 +752,10 @@ void H2::update_col_cluster_bases(const int64_t col, const int64_t level,
   SV_col.insert(col, level, std::move(SV));
 }
 
-void H2::factorize_level(const int64_t level, const int64_t nblocks,
-                         RowColLevelMap<Matrix>& F,
-                         RowMap<Matrix>& r, RowMap<Matrix>& t) {
+template <typename DT>
+void H2<DT>::factorize_level(const int64_t level, const int64_t nblocks,
+                         RowColLevelMap<Matrix<DT>>& F,
+                         RowMap<Matrix<DT>>& r, RowMap<Matrix<DT>>& t) {
   const int64_t parent_level = level - 1;
   for (int64_t block = 0; block < nblocks; block++) {
     const int64_t parent_node = block / 2;
@@ -762,10 +789,10 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
       if (parent_level > 0 && row_has_admissible_blocks(parent_node, parent_level)) {
         const int64_t c1 = parent_node * 2;
         const int64_t c2 = parent_node * 2 + 1;
-        Matrix& Utransfer = U(parent_node, parent_level);
-        Matrix& US = US_row(parent_node, parent_level);
-        Matrix Utransfer_new(U(c1, level).cols + U(c2, level).cols, Utransfer.cols);
-        Matrix US_new(U(c1, level).cols + U(c2, level).cols, US.cols);
+        Matrix<DT>& Utransfer = U(parent_node, parent_level);
+        Matrix<DT>& US = US_row(parent_node, parent_level);
+        Matrix<DT> Utransfer_new(U(c1, level).cols + U(c2, level).cols, Utransfer.cols);
+        Matrix<DT> US_new(U(c1, level).cols + U(c2, level).cols, US.cols);
 
         auto Utransfer_new_splits = Utransfer_new.split(vec{U(c1, level).cols}, vec{});
         auto US_new_splits = US_new.split(vec{U(c1, level).cols}, vec{});
@@ -811,10 +838,10 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
       if (parent_level > 0 && col_has_admissible_blocks(parent_node, parent_level)) {
         const int64_t c1 = parent_node * 2;
         const int64_t c2 = parent_node * 2 + 1;
-        Matrix& Vtransfer = V(parent_node, parent_level);
-        Matrix& SV = SV_col(parent_node, parent_level);
-        Matrix Vtransfer_new(V(c1, level).cols + V(c2, level).cols, Vtransfer.cols);
-        Matrix SV_new(SV.rows, V(c1, level).cols + V(c2, level).cols);
+        Matrix<DT>& Vtransfer = V(parent_node, parent_level);
+        Matrix<DT>& SV = SV_col(parent_node, parent_level);
+        Matrix<DT> Vtransfer_new(V(c1, level).cols + V(c2, level).cols, Vtransfer.cols);
+        Matrix<DT> SV_new(SV.rows, V(c1, level).cols + V(c2, level).cols);
 
         auto Vtransfer_new_splits = Vtransfer_new.split(vec{V(c1, level).cols}, vec{});
         auto SV_new_splits = SV_new.split(vec{}, vec{V(c1, level).cols});
@@ -848,7 +875,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
     }
 
     // Multiplication with U_F and V_F
-    Matrix U_F = prepend_complement_basis(U(block, level));
+    Matrix<DT> U_F = prepend_complement_basis(U(block, level));
     // Multiply (U_F)^T to dense blocks along the row in current level
     for (int j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
@@ -863,7 +890,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
         }
       }
     }
-    Matrix V_F = prepend_complement_basis(V(block, level));
+    Matrix<DT> V_F = prepend_complement_basis(V(block, level));
     // Multiply V_F to dense blocks along the column in current level
     for (int i = 0; i < nblocks; ++i) {
       if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
@@ -884,7 +911,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
     int64_t diag_col_split = D(block, block, level).cols - V(block, level).cols;
     assert(diag_row_split == diag_col_split);
     auto diagonal_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
-    Matrix& Dcc = diagonal_splits[0];
+    Matrix<DT>& Dcc = diagonal_splits[0];
     lu(Dcc);
 
     // TRSM with cc blocks on the column
@@ -1050,7 +1077,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
             // Create b*b fill-in block
             int64_t nrows = D(i, block, level).rows;
             int64_t ncols = D(block, j, level).cols;
-            Matrix fill_in(nrows, ncols);
+            Matrix<DT> fill_in(nrows, ncols);
             auto fill_in_splits = fill_in.split(vec{nrows - lower_row_rank},
                                                 vec{ncols - right_col_rank});
             // Fill cc part
@@ -1098,7 +1125,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
             // Create b*rank fill-in block
             int64_t nrows = D(i, block, level).rows;
             int64_t ncols = right_col_rank;
-            Matrix fill_in(nrows, ncols);
+            Matrix<DT> fill_in(nrows, ncols);
             auto fill_in_splits = fill_in.split(vec{nrows - lower_row_rank},
                                                 vec{});
             // Fill co part
@@ -1111,7 +1138,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
             // b*rank fill-in always has a form of Aik*Vk_c * inv(Akk_cc) x (Uk_c)^T*Akj*Vj_o
             // Convert to b*b block by applying (Vj_o)^T from right
             // Which is safe from bases update since j has been eliminated before (j < k)
-            Matrix projected_fill_in = matmul(fill_in, V(j, level), false, true);
+            Matrix<DT> projected_fill_in = matmul(fill_in, V(j, level), false, true);
 
             // Save or accumulate with existing fill-in
             if (!F.exists(i, j, level)) {
@@ -1145,7 +1172,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
             // Create rank*b fill-in block
             int64_t nrows = lower_row_rank;
             int64_t ncols = D(block, j, level).cols;
-            Matrix fill_in(nrows, ncols);
+            Matrix<DT> fill_in(nrows, ncols);
             auto fill_in_splits = fill_in.split(vec{},
                                                 vec{ncols - right_col_rank});
             // Fill oc part
@@ -1158,7 +1185,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
             // rank*b fill-in always has a form of (Ui_o)^T*Aik*Vk_c * inv(Akk_cc) * (Uk_c)^T*A_kj
             // Convert to b*b block by applying Ui_o from left
             // Which is safe from bases update since i has been eliminated before (i < k)
-            Matrix projected_fill_in = matmul(U(i, level), fill_in);
+            Matrix<DT> projected_fill_in = matmul(U(i, level), fill_in);
 
             // Save or accumulate with existing fill-in
             if (!F.exists(i, j, level)) {
@@ -1191,7 +1218,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
             // Create rank*rank fill-in block
             int64_t nrows = lower_row_rank;
             int64_t ncols = right_col_rank;
-            Matrix fill_in(nrows, ncols);
+            Matrix<DT> fill_in(nrows, ncols);
             // Fill oo part
             matmul(lower_splits[2], right_splits[1], fill_in,
                    false, false, -1.0, 1.0);
@@ -1199,7 +1226,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
             // rank*rank fill-in always has a form of (Ui_o)^T*Aik*Vk_c * inv(Akk_cc) * (Uk_c)^T*A_kj*Vj_o
             // Convert to b*b block by applying Ui_o from left and (Vj_o)^T from right
             // Which is safe from bases update since i and j have been eliminated before (i,j < k)
-            Matrix projected_fill_in = matmul(matmul(U(i, level), fill_in),
+            Matrix<DT> projected_fill_in = matmul(matmul(U(i, level), fill_in),
                                               V(j, level), false, true);
 
             // Save or accumulate with existing fill-in
@@ -1218,12 +1245,13 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
   } // for (int block = 0; block < nblocks; ++block)
 }
 
-void H2::factorize() {
+template <typename DT>
+void H2<DT>::factorize() {
   int64_t level = height;
-  RowColLevelMap<Matrix> F;
+  RowColLevelMap<Matrix<DT>> F;
 
   for (; level > 0; --level) {
-    RowMap<Matrix> r, t;
+    RowMap<Matrix<DT>> r, t;
     const int64_t nblocks = level_blocks[level];
     // Make sure all cluster bases exist and none of them is full-rank
     for (int64_t i = 0; i < nblocks; ++i) {
@@ -1255,7 +1283,7 @@ void H2::factorize() {
       for (int64_t j = 0; j < nblocks; ++j) {
         if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
           if (F.exists(i, j, level)) {
-            Matrix projected_fill_in = matmul(matmul(U(i, level), F(i, j, level), true),
+            Matrix<DT> projected_fill_in = matmul(matmul(U(i, level), F(i, j, level), true),
                                               V(j, level));
             S(i, j, level) += projected_fill_in;
           }
@@ -1279,7 +1307,7 @@ void H2::factorize() {
                 F.exists(i2, j1, level) || F.exists(i2, j2, level)) {
               int64_t nrows = U(i1, level).cols + U(i2, level).cols;
               int64_t ncols = V(j1, level).cols + V(j2, level).cols;
-              Matrix fill_in(nrows, ncols);
+              Matrix<DT> fill_in(nrows, ncols);
               auto fill_in_splits = fill_in.split(vec{U(i1, level).cols},
                                                   vec{V(j1, level).cols});
               if (F.exists(i1, j1, level)) {
@@ -1313,7 +1341,7 @@ void H2::factorize() {
           int64_t rank_c1 = U(c1, level).cols;
           int64_t rank_c2 = U(c2, level).cols;
           int64_t rank_parent = std::max(rank_c1, rank_c2);
-          Matrix Utransfer =
+          Matrix<DT> Utransfer =
               generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
 
           if (r.exists(c1)) r.erase(c1);
@@ -1327,7 +1355,7 @@ void H2::factorize() {
           int64_t rank_c1 = V(c1, level).cols;
           int64_t rank_c2 = V(c2, level).cols;
           int64_t rank_parent = std::max(rank_c1, rank_c2);
-          Matrix Vtransfer =
+          Matrix<DT> Vtransfer =
               generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
 
           if (t.exists(c1)) t.erase(c1);
@@ -1373,7 +1401,7 @@ void H2::factorize() {
               }
             }
           }
-          Matrix D_unelim(nrows, ncols);
+          Matrix<DT> D_unelim(nrows, ncols);
           auto D_unelim_splits = D_unelim.split(row_split, col_split);
 
           for (int64_t ic1 = 0; ic1 < i_children.size(); ++ic1) {
@@ -1405,8 +1433,9 @@ void H2::factorize() {
 }
 
 // Permute the vector forward and return the offset at which the new vector begins.
-int64_t H2::permute_forward(Matrix& x, const int64_t level, int64_t rank_offset) const {
-  Matrix copy(x);
+template <typename DT>
+int64_t H2<DT>::permute_forward(Matrix<DT>& x, const int64_t level, int64_t rank_offset) const {
+  Matrix<DT> copy(x);
   const int64_t nblocks = level_blocks[level];
   const int64_t c_offset = rank_offset;
   for (int64_t block = 0; block < nblocks; ++block) {
@@ -1436,8 +1465,9 @@ int64_t H2::permute_forward(Matrix& x, const int64_t level, int64_t rank_offset)
 }
 
 // Permute the vector backward and return the offset at which the new vector begins
-int64_t H2::permute_backward(Matrix& x, const int64_t level, int64_t rank_offset) const {
-  Matrix copy(x);
+template <typename DT>
+int64_t H2<DT>::permute_backward(Matrix<DT>& x, const int64_t level, int64_t rank_offset) const {
+  Matrix<DT> copy(x);
   const int64_t nblocks = level_blocks[level];
   int64_t c_offset = rank_offset;
   for (int64_t block = 0; block < nblocks; ++block) {
@@ -1465,7 +1495,8 @@ int64_t H2::permute_backward(Matrix& x, const int64_t level, int64_t rank_offset
   return c_offset;
 }
 
-void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
+template <typename DT>
+void H2<DT>::solve_forward_level(Matrix<DT>& x_level, const int64_t level) const {
   const int64_t nblocks = level_blocks[level];
   std::vector<int64_t> row_offsets;
   int64_t nrows = 0;
@@ -1481,8 +1512,8 @@ void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
     assert(diag_row_split == diag_col_split); // Row bases rank = column bases rank
 
     // Multiply with (U_F)^T
-    Matrix U_F = prepend_complement_basis(U(block, level));
-    Matrix x_block = matmul(U_F, x_level_split[block], true);
+    Matrix<DT> U_F = prepend_complement_basis(U(block, level));
+    Matrix<DT> x_block = matmul(U_F, x_level_split[block], true);
     auto x_block_splits = x_block.split(vec{diag_col_split}, vec{});
     // Solve forward with diagonal L
     auto L_block_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
@@ -1503,7 +1534,7 @@ void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
         const int64_t top_col_split = diag_col_split;
         auto top_splits = D(irow, block, level).split(vec{top_row_split}, vec{top_col_split});
 
-        Matrix x_irow(x_level_split[irow], true);  // Deep-copy of view
+        Matrix<DT> x_irow(x_level_split[irow], true);  // Deep-copy of view
         auto x_irow_splits = x_irow.split(vec{top_row_split}, vec{});
         matmul(top_splits[2], x_block_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
         x_level_split[irow] = x_irow;
@@ -1514,7 +1545,8 @@ void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
   }
 }
 
-void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
+template <typename DT>
+void H2<DT>::solve_backward_level(Matrix<DT>& x_level, const int64_t level) const {
   const int64_t nblocks = level_blocks[level];
   std::vector<int64_t> col_offsets;
   int64_t nrows = 0;
@@ -1529,7 +1561,7 @@ void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
     const int64_t diag_col_split = D(block, block, level).cols - V(block, level).cols;
     assert(diag_row_split == diag_col_split); // Row bases rank = column bases rank
 
-    Matrix x_block(x_level_split[block], true);
+    Matrix<DT> x_block(x_level_split[block], true);
     auto x_block_splits = x_block.split(vec{diag_row_split}, vec{});
     // Backward substitution with co blocks in the left of diagonal
     for (int64_t jcol = block-1; jcol >= 0; --jcol) {
@@ -1538,7 +1570,7 @@ void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
         const int64_t left_col_split = D(block, jcol, level).cols - V(jcol, level).cols;
         auto left_splits = D(block, jcol, level).split(vec{left_row_split}, vec{left_col_split});
 
-        Matrix x_jcol(x_level_split[jcol], true);  // Deep-copy of view
+        Matrix<DT> x_jcol(x_level_split[jcol], true);  // Deep-copy of view
         auto x_jcol_splits = x_jcol.split(vec{left_col_split}, vec{});
         matmul(left_splits[1], x_jcol_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
       }
@@ -1555,15 +1587,16 @@ void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
     matmul(U_block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
     solve_triangular(U_block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
     // Multiply with V_F
-    Matrix V_F = prepend_complement_basis(V(block, level));
+    Matrix<DT> V_F = prepend_complement_basis(V(block, level));
     x_block = matmul(V_F, x_block);
     // Write x_block
     x_level_split[block] = x_block;
   }
 }
 
-Matrix H2::solve(const Matrix& b) const {
-  Matrix x(b);
+template <typename DT>
+Matrix<DT> H2<DT>::solve(const Matrix<DT>& b) const {
+  Matrix<DT> x(b);
   int64_t level = height;
   int64_t rhs_offset = 0;
 
@@ -1575,7 +1608,7 @@ Matrix H2::solve(const Matrix& b) const {
       nrows += D(i, i, level).rows;
     }
 
-    Matrix x_level(nrows, 1);
+    Matrix<DT> x_level(nrows, 1);
     for (int64_t i = 0; i < x_level.rows; ++i) {
       x_level(i, 0) = x(rhs_offset + i, 0);
     }
@@ -1604,7 +1637,7 @@ Matrix H2::solve(const Matrix& b) const {
     for (int64_t i = 0; i < nblocks; ++i) {
       nrows += D(i, i, level).cols;
     }
-    Matrix x_level(nrows, 1);
+    Matrix<DT> x_level(nrows, 1);
 
     rhs_offset = permute_backward(x, level, rhs_offset);
 

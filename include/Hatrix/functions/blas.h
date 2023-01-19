@@ -3,14 +3,18 @@
 #include "Hatrix/functions/math_common.h"
 
 namespace Hatrix {
-void array_copy(const double* from, double* to, int64_t size);
+
+template <typename DT>
+void array_copy(const DT* from, DT* to, int64_t size);
 
 // Perform a matrix multiplication C = beta * C + alpha * A * B.
 // Optionally transpose A and B.
-void matmul(const Matrix& A, const Matrix& B, Matrix& C, bool transA = false,
+template <typename DT>
+void matmul(const Matrix<DT>& A, const Matrix<DT>& B, Matrix<DT>& C, bool transA = false,
             bool transB = false, double alpha = 1.0, double beta = 1.0);
 
-Matrix matmul(const Matrix& A, const Matrix& B, bool transA = false,
+template <typename DT>
+Matrix<DT> matmul(const Matrix<DT>& A, const Matrix<DT>& B, bool transA = false,
               bool transB = false, double alpha = 1.0);
 
 // If transA is false:
@@ -18,34 +22,42 @@ Matrix matmul(const Matrix& A, const Matrix& B, bool transA = false,
 // if transA is true:
 //   C = alpha * A' * A + beta * C
 // A has to be symmetric.
-void syrk(const Matrix& A, Matrix& C, Mode uplo, bool transA, double alpha,
+template <typename DT>
+void syrk(const Matrix<DT>& A, Matrix<DT>& C, Mode uplo, bool transA, double alpha,
             double beta);
 
 
 // Compute matrix product with one triangular matrix. A is the triangular matrix here.
 // B = alpha * op(A) * B
 // op(A) is one of op(A) = A, or op(A) = A'
-void triangular_matmul(const Matrix& A, Matrix& B, Side side, Mode uplo,
+template <typename DT>
+void triangular_matmul(const Matrix<DT>& A, Matrix<DT>& B, Side side, Mode uplo,
                        bool transA, bool diag, double alpha = 1.0);
 
-Matrix triangular_matmul_out(const Matrix& A, const Matrix& B, Side side, Mode uplo,
+template <typename DT>
+Matrix<DT> triangular_matmul_out(const Matrix<DT>& A, const Matrix<DT>& B, Side side, Mode uplo,
 			     bool transA, bool diag, double alpha = 1.0);
 
-void solve_triangular(const Matrix& A, Matrix& B, Side side, Mode uplo,
+template <typename DT>
+void solve_triangular(const Matrix<DT>& A, Matrix<DT>& B, Side side, Mode uplo,
                       bool unit_diag, bool transA = false, double alpha = 1.0);
 
 // Solve D*X = alpha*B or X*D = alpha*B
 // Ignore non-diagonal elements of D
-void solve_diagonal(const Matrix& D, Matrix& B, Side side, double alpha = 1.0);
+template <typename DT>
+void solve_diagonal(const Matrix<DT>& D, Matrix<DT>& B, Side side, double alpha = 1.0);
 
-void scale(Matrix& A, double alpha);
+template <typename DT>
+void scale(Matrix<DT>& A, double alpha);
 
 // Scale the rows of A using diagonal elements of D, i.e. perform A = D*A
 // Ignore non-diagonal elements of D
-void row_scale(Matrix& A, const Matrix& D);
+template <typename DT>
+void row_scale(Matrix<DT>& A, const Matrix<DT>& D);
 
 // Scale the columns of A using diagonal elements of D, i.e. perform A = A*D
 // Ignore non-diagonal elements of D
-void column_scale(Matrix& A, const Matrix& D);
+template <typename DT>
+void column_scale(Matrix<DT>& A, const Matrix<DT>& D);
 
 }  // namespace Hatrix

@@ -6,6 +6,7 @@
 
 namespace Hatrix {
 
+template <typename DT = double>
 class Matrix {
  public:
   int64_t rows = 0;
@@ -21,7 +22,7 @@ class Matrix {
   // data_ptr is a pointer to the memory within data. This is done
   // for easily tracking the location to an offset of data if this Matrix
   // is a view of another matrix.
-  double* data_ptr = nullptr;
+  DT* data_ptr = nullptr;
 
  public:
   Matrix();
@@ -47,11 +48,11 @@ class Matrix {
 
   const Matrix& operator=(const double a);
 
-  double* operator&();
-  const double* operator&() const;
+  DT* operator&();
+  const DT* operator&() const;
 
-  double& operator()(int64_t i, int64_t j);
-  const double& operator()(int64_t i, int64_t j) const;
+  DT& operator()(int64_t i, int64_t j);
+  const DT& operator()(int64_t i, int64_t j) const;
 
   // WARNING: does not deallocate the extra data!
   void shrink(int64_t rows, int64_t cols);

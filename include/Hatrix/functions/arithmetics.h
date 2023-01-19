@@ -3,22 +3,35 @@
 
 namespace Hatrix {
 
-Matrix& operator+=(Matrix& A, const Matrix& B);
-Matrix operator+(const Matrix& A, const Matrix& B);
+template <typename DT>
+Matrix<DT>& operator+=(Matrix<DT>& A, const Matrix<DT>& B);
+template <typename DT>
+Matrix<DT> operator+(const Matrix<DT>& A, const Matrix<DT>& B);
 
-Matrix& operator-=(Matrix& A, const Matrix& B);
-Matrix operator-(const Matrix& A, const Matrix& B);
+template <typename DT>
+Matrix<DT>& operator-=(Matrix<DT>& A, const Matrix<DT>& B);
+template <typename DT>
+Matrix<DT> operator-(const Matrix<DT>& A, const Matrix<DT>& B);
 
-Matrix operator*(const Matrix& A, const Matrix& B);
-Matrix& operator*=(Matrix& A, double alpha);
-Matrix operator*(const Matrix& A, double alpha);
-Matrix operator*(double alpha, const Matrix& A);
+template <typename DT>
+Matrix<DT> operator*(const Matrix<DT>& A, const Matrix<DT>& B);
+template <typename DT>
+Matrix<DT>& operator*=(Matrix<DT>& A, double alpha);
+template <typename DT>
+Matrix<DT> operator*(const Matrix<DT>& A, double alpha);
+template <typename DT>
+Matrix<DT> operator*(double alpha, const Matrix<DT>& A);
 
-Matrix& operator/=(Matrix& A, double alpha);
+template <typename DT>
+Matrix<DT>& operator/=(Matrix<DT>& A, double alpha);
 
-Matrix abs(const Matrix& A);
-Matrix transpose(const Matrix& A);
-Matrix lower_tri(const Matrix& A, bool diag=false);
-Matrix upper_tri(const Matrix& A, bool diag=false);
+template <typename DT>
+Matrix<DT> abs(const Matrix<DT>& A);
+template <typename DT>
+Matrix<DT> transpose(const Matrix<DT>& A);
+template <typename DT>
+Matrix<DT> lower_tri(const Matrix<DT>& A, bool diag=false);
+template <typename DT>
+Matrix<DT> upper_tri(const Matrix<DT>& A, bool diag=false);
 
 }  // namespace Hatrix

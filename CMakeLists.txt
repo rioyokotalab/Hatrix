@@ -40,7 +40,9 @@ add_library(Hatrix
   src/util/matrix_generators.cpp
   src/util/helpers.cpp
 )
-target_compile_features(Hatrix PUBLIC cxx_std_11)
+
+# default template parameters without <> or only valid in C++17
+target_compile_features(Hatrix PUBLIC cxx_std_17)
 
 # Adding this here because it finds openMP and does not work without a CXX.
 include(host_specific_settings)
