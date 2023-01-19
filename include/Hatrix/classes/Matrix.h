@@ -30,7 +30,7 @@ class Matrix {
   ~Matrix();
 
   Matrix(const Matrix& A);
-
+  //TODO why is this not done with overloading?
   // Copy constructor for Matrix. Create a view object by default. The reason
   // why this is done is mainly to accomodate std::vector#push_back or #emplace_back
   // style functions which call the default copy constructor after they call the
@@ -46,7 +46,7 @@ class Matrix {
 
   Matrix(int64_t rows, int64_t cols);
 
-  const Matrix& operator=(const double a);
+  const Matrix& operator=(const DT a);
 
   DT* operator&();
   const DT* operator&() const;

@@ -36,7 +36,7 @@ Matrix<DT>::~Matrix() {
 }
 
 template <typename DT>
-Matrix<DT>::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
+Matrix<DT>::Matrix(const Matrix<DT>& A) : rows(A.rows), cols(A.cols) {
   if (A.is_view) {
     is_view = true;
     stride = A.stride;
@@ -44,7 +44,7 @@ Matrix<DT>::Matrix(const Matrix& A) : rows(A.rows), cols(A.cols) {
   }
   else {
     try {
-      data_ptr = new double[rows * cols]();
+      data_ptr = new DT[rows * cols]();
     }
     catch (std::bad_alloc& e) {
       std::cout << "Matrix(const Matrix& A, bool copy) -> "
@@ -75,7 +75,7 @@ Matrix<DT>::Matrix(const Matrix<DT>& A, bool copy)
   }
   else {
     try {
-      data_ptr = new double[rows * cols]();
+      data_ptr = new DT[rows * cols]();
     }
     catch (std::bad_alloc& e) {
       std::cout << "Matrix(const Matrix& A, bool copy) -> "
@@ -167,7 +167,7 @@ Matrix<DT>::Matrix(int64_t rows, int64_t cols)
       data_ptr = nullptr;
     }
     else {
-      data_ptr = new double[rows * cols]();
+      data_ptr = new DT[rows * cols]();
     }
   }
   catch (std::bad_alloc& e) {
@@ -176,7 +176,7 @@ Matrix<DT>::Matrix(int64_t rows, int64_t cols)
 }
 
 template <typename DT>
-const Matrix<DT>& Matrix<DT>::operator=(const double a) {
+const Matrix<DT>& Matrix<DT>::operator=(const DT a) {
   for (int64_t i = 0; i < rows; ++i)
     for (int64_t j = 0; j < cols; ++j) (*this)(i, j) = a;
   return *this;
@@ -340,7 +340,7 @@ void Matrix<DT>::read_file(std::string in_file) {
       delete[] data_ptr;
     }
 
-    data_ptr = new double[rows * cols];
+    data_ptr = new DT[rows * cols];
   }
   catch (std::bad_alloc& e) {
     std::cout << "Matrix#read_file(string in_file) -> Cannot allocate memory.\n";
@@ -348,6 +348,7 @@ void Matrix<DT>::read_file(std::string in_file) {
 
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {
+      // We read double values here and rely on implicit conversion
       int64_t irow, jcol; double value;
       file >> irow >> jcol >> value;
       (*this)(irow, jcol) = value;
@@ -424,8 +425,11 @@ void Matrix<DT>::destructive_resize(const int64_t nrows, const int64_t ncols) {
   cols = ncols;
   stride = nrows;
   is_view = false;
-  data_ptr = new double[rows * cols];
+  data_ptr = new DT[rows * cols];
 }
 
+// explicit instantiation (these are the only available data-types)
+template class Matrix<float>;
 template class Matrix<double>;
+
 }  // namespace Hatrix
