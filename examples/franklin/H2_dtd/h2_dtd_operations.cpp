@@ -1882,10 +1882,10 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
     // propagate_fill_ins_to_upper_level(A, opts, level);
 
     update_parsec_pointers(A, domain, level-1);
-    // merge_unfactorized_blocks(A, domain, level);
+    merge_unfactorized_blocks(A, domain, level);
   }
 
-  final_dense_factorize(A, domain, opts, level);
+  // final_dense_factorize(A, domain, opts, level);
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
