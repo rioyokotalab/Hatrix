@@ -26,7 +26,7 @@ export OMP_PLACES=cores
 # mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
 make -j H2_dtd VERBOSE=1
 
-export GMON_OUT_PREFIX=gmon.out-
+# export GMON_OUT_PREFIX=gmon.out-
 
 for adm in 0.8; do
     nleaf=256
