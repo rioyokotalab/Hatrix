@@ -130,14 +130,14 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
   // }
 
   // set max_level-1 to fully dense so that you can merge blocks into this level.
-  int nblocks = pow(2, A.max_level - 1);
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      A.is_admissible.insert(i, j, A.max_level-1, false);
-    }
-  }
+  // int nblocks = pow(2, A.max_level - 1);
+  // for (int i = 0; i < nblocks; ++i) {
+  //   for (int j = 0; j < nblocks; ++j) {
+  //     A.is_admissible.insert(i, j, A.max_level-1, false);
+  //   }
+  // }
 
-  A.min_level = A.max_level;
+  // A.min_level = A.max_level;
 }
 
 void
