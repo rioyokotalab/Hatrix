@@ -16,14 +16,14 @@ Matrix<DT> operator-(const Matrix<DT>& A, const Matrix<DT>& B);
 template <typename DT>
 Matrix<DT> operator*(const Matrix<DT>& A, const Matrix<DT>& B);
 template <typename DT>
-Matrix<DT>& operator*=(Matrix<DT>& A, double alpha);
+Matrix<DT>& operator*=(Matrix<DT>& A, DT alpha);
 template <typename DT>
-Matrix<DT> operator*(const Matrix<DT>& A, double alpha);
+Matrix<DT> operator*(const Matrix<DT>& A, DT alpha);
 template <typename DT>
-Matrix<DT> operator*(double alpha, const Matrix<DT>& A);
+Matrix<DT> operator*(DT alpha, const Matrix<DT>& A);
 
 template <typename DT>
-Matrix<DT>& operator/=(Matrix<DT>& A, double alpha);
+Matrix<DT>& operator/=(Matrix<DT>& A, DT alpha);
 
 template <typename DT>
 Matrix<DT> abs(const Matrix<DT>& A);

@@ -10,25 +10,6 @@
 
 namespace Hatrix {
 
-template Matrix<double>& operator+=(Matrix<double>& A, const Matrix<double>& B);
-template Matrix<double> operator+(const Matrix<double>& A, const Matrix<double>& B);
-
-template Matrix<double>& operator-=(Matrix<double>& A, const Matrix<double>& B);
-template Matrix<double> operator-(const Matrix<double>& A, const Matrix<double>& B);
-
-template Matrix<double> operator*(const Matrix<double>& A, const Matrix<double>& B);
-template Matrix<double>& operator*=(Matrix<double>& A, double alpha);
-template Matrix<double> operator*(const Matrix<double>& A, double alpha);
-template Matrix<double> operator*(double alpha, const Matrix<double>& A);
-
-template Matrix<double>& operator/=(Matrix<double>& A, double alpha);
-
-template Matrix<double> abs(const Matrix<double>& A);
-template Matrix<double> transpose(const Matrix<double>& A);
-template Matrix<double> lower_tri(const Matrix<double>& A, bool diag=false);
-template Matrix<double> upper_tri(const Matrix<double>& A, bool diag=false);
-
-
 template <typename DT>
 Matrix<DT>& operator+=(Matrix<DT>& A, const Matrix<DT>& B) {
   assert(A.rows == B.rows);
@@ -69,26 +50,26 @@ Matrix<DT> operator*(const Matrix<DT>& A, const Matrix<DT>& B) {
 }
 
 template <typename DT>
-Matrix<DT>& operator*=(Matrix<DT>& A, double alpha) {
+Matrix<DT>& operator*=(Matrix<DT>& A, DT alpha) {
   Hatrix::scale(A, alpha);
   return A;
 }
 
 template <typename DT>
-Matrix<DT>& operator/=(Matrix<DT>& A, double alpha) {
+Matrix<DT>& operator/=(Matrix<DT>& A, DT alpha) {
   Hatrix::scale(A, 1/alpha);
   return A;
 }
 
 template <typename DT>
-Matrix<DT> operator*(const Matrix<DT>& A, double alpha) {
+Matrix<DT> operator*(const Matrix<DT>& A, DT alpha) {
   Matrix<DT> C(A, true);
   C *= alpha;
   return C;
 }
 
 template <typename DT>
-Matrix<DT> operator*(double alpha, const Matrix<DT>& A) {
+Matrix<DT> operator*(DT alpha, const Matrix<DT>& A) {
   Matrix<DT> C(A, true);
   C *= alpha;
   return C;
@@ -135,5 +116,39 @@ Matrix<DT> upper_tri(const Matrix<DT>& A, bool diag) {
   return A_upper;
 }
 
+// explicit instantiation (these are the only available data-types)
+template Matrix<float>& operator+=(Matrix<float>& A, const Matrix<float>& B);
+template Matrix<float> operator+(const Matrix<float>& A, const Matrix<float>& B);
+template Matrix<double>& operator+=(Matrix<double>& A, const Matrix<double>& B);
+template Matrix<double> operator+(const Matrix<double>& A, const Matrix<double>& B);
+
+template Matrix<float>& operator-=(Matrix<float>& A, const Matrix<float>& B);
+template Matrix<float> operator-(const Matrix<float>& A, const Matrix<float>& B);
+template Matrix<double>& operator-=(Matrix<double>& A, const Matrix<double>& B);
+template Matrix<double> operator-(const Matrix<double>& A, const Matrix<double>& B);
+
+template Matrix<float> operator*(const Matrix<float>& A, const Matrix<float>& B);
+template Matrix<float>& operator*=(Matrix<float>& A, float alpha);
+template Matrix<float> operator*(const Matrix<float>& A, float alpha);
+template Matrix<float> operator*(float alpha, const Matrix<float>& A);
+template Matrix<double> operator*(const Matrix<double>& A, const Matrix<double>& B);
+template Matrix<double>& operator*=(Matrix<double>& A, double alpha);
+template Matrix<double> operator*(const Matrix<double>& A, double alpha);
+template Matrix<double> operator*(double alpha, const Matrix<double>& A);
+
+template Matrix<float>& operator/=(Matrix<float>& A, float alpha);
+template Matrix<double>& operator/=(Matrix<double>& A, double alpha);
+
+template Matrix<float> abs(const Matrix<float>& A);
+template Matrix<double> abs(const Matrix<double>& A);
+
+template Matrix<float> transpose(const Matrix<float>& A);
+template Matrix<double> transpose(const Matrix<double>& A);
+
+template Matrix<float> lower_tri(const Matrix<float>& A, bool diag);
+template Matrix<double> lower_tri(const Matrix<double>& A, bool diag);
+
+template Matrix<float> upper_tri(const Matrix<float>& A, bool diag);
+template Matrix<double> upper_tri(const Matrix<double>& A, bool diag);
 
 }  // namespace Hatrix
