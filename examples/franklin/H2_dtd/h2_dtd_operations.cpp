@@ -561,15 +561,16 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
         int64_t D_unelim_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
         int64_t D_unelim_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
 
-        if (!MPIRANK)
-          std::cout << "D unelim rows: " << D_unelim_rows << " cols: " << D_unelim_cols << std::endl;
-
+        // if (!MPIRANK) {
+        //   std::cout << "CURRENT UNELIM BLOCK: i: " << i << " j: " << j << " pl: " << parent_level << std::endl;
+        //   std::cout << "D unelim rows: " << D_unelim_rows << " cols: " << D_unelim_cols << std::endl;
+        // }
         int64_t D_unelim_row_rank = A.ranks(i_children[0], level);
         int64_t D_unelim_col_rank = A.ranks(j_children[0], level);
 
-        if (!MPIRANK)
-          std::cout << "D unelim rows rank: " << D_unelim_row_rank
-                    << " cols rank: " << D_unelim_col_rank << std::endl;
+        // if (!MPIRANK)
+        //   std::cout << "D unelim rows rank: " << D_unelim_row_rank
+        //             << " cols rank: " << D_unelim_col_rank << std::endl;
 
         for (int ic1 = 0; ic1 < 2; ++ic1) {
           for (int jc2 = 0; jc2 < ((i == j) ? (ic1+1) : 2); ++jc2) {
@@ -590,17 +591,24 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               parsec_data_key_t D_c1c2_key =
                 parsec_D.super.data_key(&parsec_D.super, c1, c2, level);
 
+              // if (!MPIRANK) {
+              //   std::cout << "D BLOCK DIMS: rows -> " << D_c1c2_rows << " cols -> " << D_c1c2_cols << std::endl;
+              // }
+
+              int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
+              int read_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+
               parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
                 "copy_blocks_task",
                 sizeof(bool), &copy_dense, PARSEC_VALUE,
                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key),
-                                     PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                                     PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
                 sizeof(int64_t), &D_unelim_rows, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_cols, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_row_rank, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_col_rank, PARSEC_VALUE,
                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_c1c2_key),
-                                     PARSEC_INPUT | D_ARENA,
+                                     PARSEC_INPUT | read_arena,
                 sizeof(int64_t), &D_c1c2_rows, PARSEC_VALUE,
                 sizeof(int64_t), &D_c1c2_cols, PARSEC_VALUE,
                 sizeof(int64_t), &D_c1c2_row_rank, PARSEC_VALUE,
@@ -619,11 +627,19 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               int64_t S_c1c2_cols = A.ranks(c2, level);
               int64_t MINUS_ONE = -1;
 
+              if (!MPIRANK) {
+                std::cout << "S BLOCK DIMS: rows -> " << S_c1c2_rows << " cols -> " << S_c1c2_cols << std::endl;
+                std::cout << "U UNELIM DIMS: rows ->  " << D_unelim_rows
+                          << " cols -> " << D_unelim_cols << std::endl;
+              }
+
+              int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
+
               parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
                 "copy_blocks_task",
                 sizeof(bool), &copy_dense, PARSEC_VALUE,
                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key),
-                                     PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                                     PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
                 sizeof(int64_t), &D_unelim_rows, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_cols, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_row_rank, PARSEC_VALUE,
@@ -1465,14 +1481,14 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
-    update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
 
-    multiply_complements(A, domain, block, level);
-    factorize_diagonal(A, domain, block, level);
-    triangle_reduction(A, domain, block, level);
-    compute_schurs_complement(A, domain, block, level);
-    compute_fill_ins(A, domain, block, level);
+    // multiply_complements(A, domain, block, level);
+    // factorize_diagonal(A, domain, block, level);
+    // triangle_reduction(A, domain, block, level);
+    // compute_schurs_complement(A, domain, block, level);
+    // compute_fill_ins(A, domain, block, level);
   }
 }
 
@@ -1533,6 +1549,8 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
           A.ranks(j_children[1], child_level);
         Matrix D_unelim(c_rows, c_cols);
 
+        std::cout << "ALLOCATE FINAL i: " << i << " j: " << j << " level: " << level << std::endl;
+        D_unelim.print_meta();
         A.D.insert(i, j, level, std::move(D_unelim));
       }
     }
@@ -1585,6 +1603,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       parsec_D.mpi_ranks[D_data_key] = mpi_rank(i, j);
 
       if (exists_and_inadmissible(A, i, j, level) && (mpi_rank(i, j) == MPIRANK)) { // D blocks.
+        // std::cout << "MATRIX MAP: i: " << i << " j: " << j << " lvl: " << level << std::endl;
         Matrix& D_ij = A.D(i, j, level);
         parsec_D.matrix_map[D_data_key] = std::addressof(D_ij);
       }
@@ -1911,11 +1930,17 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
 
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, opts);
-    add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
+    // add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
     // propagate_fill_ins_to_upper_level(A, opts, level);
 
     update_parsec_pointers(A, domain, level-1);
     merge_unfactorized_blocks(A, domain, level);
+
+  //     parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
+
+  // int rc = parsec_taskpool_wait(dtd_tp);
+  // PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
   }
 
   final_dense_factorize(A, domain, opts, level);
