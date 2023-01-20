@@ -199,7 +199,7 @@ namespace Hatrix {
             "--N (-n)                                    : Number of points to consider (%lld).\n"
             "--nleaf (-l)                                : Max. number of points in a leaf node (%lld).\n"
             "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
-            "--kind_of_geometry (-g) [sphere|grid|       \n"
+            "--kind_of_geometry (-g) [circular|grid|       \n"
             " 3d_col_fild]                               : Kind of geometry of the points (%s). \n"
             "                                              If specifying 3d_col_file you must specify a geometry \n"
             "                                              file with fields <x y z cluster_num> using. \n"
