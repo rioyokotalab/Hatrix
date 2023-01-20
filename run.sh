@@ -19,35 +19,57 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 # :/mnt/nfs/packages/x86_64/intel/2022/mpi/2021.6.0/lib/release
 # mpirun --mca opal_warn_on_missing_libcuda 0 \
 
-make -j H2_main
+make -j H2_dtd
 
-for adm in 0.8; do
-    nleaf=1024
+for adm in 2; do
+    nleaf=512
     max_rank=30
 
-    for kind_of_recompression in 0 1 2 3; do
-        for ndim in 2 3; do
-            for N in 8192 16384 32768 65536 131072; do
-                ./bin/H2_main --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func laplace \
-                              --kind_of_geometry circular \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy 1e-8 \
-                              --qr_accuracy 1e-6 \
-                              --kind_of_recompression $kind_of_recompression \
-                              --admis $adm \
-                              --admis_kind geometry \
-                              --construct_algorithm miro \
-                              --add_diag 1e-8 \
-                              --use_nested_basis
+    for ndim in 1; do
+        for N in 16384; do
+            mpirun --mca opal_warn_on_missing_libcuda 0 -n 1 \
+                   ./bin/H2_dtd --N $N \
+                          --nleaf $nleaf \
+                          --kernel_func laplace \
+                          --kind_of_geometry circular \
+                          --ndim $ndim \
+                          --max_rank $max_rank \
+                          --accuracy 1e-8 \
+                          --qr_accuracy 1e-6 \
+                          --kind_of_recompression 0 \
+                          --admis $adm \
+                          --admis_kind geometry \
+                          --construct_algorithm miro \
+                          --add_diag 1e-8 \
+                          --use_nested_basis
 
 
-            done
         done
     done
 done
+
+    # for kind_of_recompression in 0 1 2 3; do
+    #     for ndim in 2 3; do
+    #         for N in 8192 16384 32768 65536 131072; do
+    #             ./bin/H2_main --N $N \
+    #                           --nleaf $nleaf \
+    #                           --kernel_func laplace \
+    #                           --kind_of_geometry circular \
+    #                           --ndim $ndim \
+    #                           --max_rank $max_rank \
+    #                           --accuracy 1e-8 \
+    #                           --qr_accuracy 1e-6 \
+    #                           --kind_of_recompression $kind_of_recompression \
+    #                           --admis $adm \
+    #                           --admis_kind geometry \
+    #                           --construct_algorithm miro \
+    #                           --add_diag 1e-8 \
+    #                           --use_nested_basis
+
+
+    #         done
+    #     done
+    # done
 
 # file_name=${N}_${nleaf}_${max_rank}_task_profile.prof
 

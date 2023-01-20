@@ -331,7 +331,7 @@ int main(int argc, char **argv) {
   /* Initializing parsec context */
   int parsec_argc = argc - 24;
   char ** parsec_argv = argv + 24;
-  parsec = parsec_init( cores, &parsec_argc, &parsec_argv);
+  parsec = parsec_init( cores, NULL, NULL);
   if( NULL == parsec ) {
     printf("Cannot initialize PaRSEC\n");
     exit(-1);
