@@ -772,10 +772,11 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
           const auto D_j_splits  = D_j.split(vec{diag_row_split}, vec{right_c_size});
           auto D_ij_splits = D(i, j, level).split(vec{lower_c_size}, vec{right_c_size});
 
+          const Matrix& D_j_cc = D_j_splits[0];
+          const Matrix& D_j_co = D_j_splits[1];
           if (i > node && j > node) {
             // cc x cc -> cc
             Matrix D_i_cc(D_i_splits[0], true);  // Deep-copy
-            const Matrix& D_j_cc = D_j_splits[0];
             Matrix& D_ij_cc = D_ij_splits[0];
             column_scale(D_i_cc, D_node_cc);  // LD
             matmul(D_i_cc, D_j_cc, D_ij_cc, false, false, -1, 1);  // LDL^T
@@ -783,7 +784,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
           if (i > node) {
             // cc x co -> co
             Matrix D_i_cc(D_i_splits[0], true);  // Deep-copy
-            const Matrix& D_j_co = D_j_splits[1];
             Matrix& D_ij_co = D_ij_splits[1];
             column_scale(D_i_cc, D_node_cc);  // LD
             matmul(D_i_cc, D_j_co, D_ij_co, false, false, -1, 1);  // LDL^T
@@ -791,7 +791,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
           if (j > node) {
             // oc x cc -> oc
             Matrix D_i_oc(D_i_splits[2], true);  // Deep-copy
-            const Matrix& D_j_cc = D_j_splits[0];
             Matrix& D_ij_oc = D_ij_splits[2];
             column_scale(D_i_oc, D_node_cc);  // LD
             matmul(D_i_oc, D_j_cc, D_ij_oc, false, false, -1, 1);  // LDL^T
@@ -799,7 +798,6 @@ void SymmetricH2::factorize_level(const int64_t level, const int64_t num_nodes,
           {
             // oc x co -> oo
             Matrix D_i_oc(D_i_splits[2], true);  // Deep-copy
-            const Matrix& D_j_co = D_j_splits[1];
             Matrix& D_ij_oo = D_ij_splits[3];
             column_scale(D_i_oc, D_node_cc);  // LD
             matmul(D_i_oc, D_j_co, D_ij_oo, false, false, -1, 1);  // LDL^T
