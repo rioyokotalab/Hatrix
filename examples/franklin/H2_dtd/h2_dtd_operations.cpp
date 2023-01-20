@@ -545,6 +545,9 @@ matmul(SymmetricSharedBasisMatrix& A,
   }
 }
 
+std::vector<int> MERGE_ARENAS;
+parsec_arena_datatype_t* merge_arena_t;
+
 // Copy blocks from the child level into level.
 void
 merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, int64_t level) {
@@ -558,8 +561,15 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
         int64_t D_unelim_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
         int64_t D_unelim_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
 
+        if (!MPIRANK)
+          std::cout << "D unelim rows: " << D_unelim_rows << " cols: " << D_unelim_cols << std::endl;
+
         int64_t D_unelim_row_rank = A.ranks(i_children[0], level);
         int64_t D_unelim_col_rank = A.ranks(j_children[0], level);
+
+        if (!MPIRANK)
+          std::cout << "D unelim rows rank: " << D_unelim_row_rank
+                    << " cols rank: " << D_unelim_col_rank << std::endl;
 
         for (int ic1 = 0; ic1 < 2; ++ic1) {
           for (int jc2 = 0; jc2 < ((i == j) ? (ic1+1) : 2); ++jc2) {

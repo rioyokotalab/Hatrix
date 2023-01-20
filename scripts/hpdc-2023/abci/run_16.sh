@@ -23,11 +23,11 @@ make -j H2_dtd
 # rm gmon.out-*
 # export GMON_OUT_PREFIX=gmon.out-
 
-for adm in 2; do
-    ndim=1
+for adm in 7; do
+    ndim=2
 
     for nleaf in 512; do
-        for max_rank in 25; do
+        for max_rank in 25 50; do
     	    for N in 131072; do
                 mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST \
                        ./bin/H2_dtd --N $N \

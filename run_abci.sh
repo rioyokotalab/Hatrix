@@ -29,7 +29,7 @@ make -j H2_dtd
 # export GMON_OUT_PREFIX=gmon.out-
 
 for adm in 4; do
-    nleaf=128
+    nleaf=512
     ndim=2
     max_rank=50
 
@@ -45,7 +45,7 @@ for adm in 4; do
                --admis $adm \
                --admis_kind geometry \
                --construct_algorithm miro \
-               --add_diag 1e-10 \
+               --add_diag 1e-8 \
                --use_nested_basis
     done
 done
