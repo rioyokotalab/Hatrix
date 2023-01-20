@@ -24,17 +24,17 @@ export OMP_PLACES=cores
 # mpirun -n 1 -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
 
 # mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
-make -j H2_dtd VERBOSE=1
+make -j H2_dtd
 
 # export GMON_OUT_PREFIX=gmon.out-
 
-for adm in 0.8; do
+for adm in 4; do
     nleaf=128
-    ndim=3
+    ndim=2
     max_rank=50
 
-    for N in 4096; do
-        mpirun -n 2  \
+    for N in 32768; do
+        mpirun -n 4  \
                ./bin/H2_dtd --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \

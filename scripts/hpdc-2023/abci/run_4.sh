@@ -1,10 +1,10 @@
 #!/bin/bash
 #$ -cwd
-#$ -l rt_F=16
+#$ -l rt_F=4
 #$ -l h_rt=2:00:00
-#$ -N HSS_p16
-#$ -o HSS_p16_out.log
-#$ -e HSS_p16_err.log
+#$ -N HSS_P4
+#$ -o HSS_P4_out.log
+#$ -e HSS_P4_err.log
 
 source ~/.bashrc
 
@@ -23,13 +23,13 @@ make -j H2_dtd
 # rm gmon.out-*
 # export GMON_OUT_PREFIX=gmon.out-
 
-for adm in 2; do
-    ndim=1
+for adm in 5; do
+    ndim=2
 
     for nleaf in 512; do
-        for max_rank in 25; do
-    	    for N in 131072; do
-                mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST \
+        for max_rank in 25 50; do
+    	    for N in 32768; do
+                mpirun -n 4 -ppn 1 -f $SGE_JOB_HOSTLIST \
                        ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \
@@ -46,6 +46,3 @@ for adm in 2; do
         done
     done
 done
-
-# gprof -s bin/H2_dtd gmon.out-*
-# gprof -q bin/H2_dtd gmon.sum > NEW.gprof
