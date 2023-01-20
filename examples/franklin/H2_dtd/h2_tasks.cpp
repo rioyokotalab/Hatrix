@@ -146,6 +146,7 @@ task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task)
   cholesky(D_splits[0], Hatrix::Lower);
   solve_triangular(D_splits[0], D_splits[2], Hatrix::Right, Hatrix::Lower,
                    false, true, 1.0);
+  syrk(D_splits[2], D_splits[3], Hatrix::Lower, false, -1, 1);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
