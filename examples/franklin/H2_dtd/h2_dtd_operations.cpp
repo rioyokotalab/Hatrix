@@ -810,12 +810,12 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
 
   // TRSM with cc and oc blocks along the 'block' column after the diagonal block.
   for (int64_t i = block+1; i < nblocks; ++i) {
-    // triangle_reduce_cc_oc(A, domain, i, block, level);
+    triangle_reduce_cc_oc(A, domain, i, block, level);
   }
 
   // TRSM with co blocks behind the diagonal on the 'block' row.
   for (int64_t j = 0; j < block; ++j) {
-    // triangle_reduce_co(A, domain, block, j, level);
+    triangle_reduce_co(A, domain, block, j, level);
   }
 }
 
@@ -1905,10 +1905,10 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
     // propagate_fill_ins_to_upper_level(A, opts, level);
 
     update_parsec_pointers(A, domain, level-1);
-    // merge_unfactorized_blocks(A, domain, level);
+    merge_unfactorized_blocks(A, domain, level);
   }
 
-  // final_dense_factorize(A, domain, opts, level);
+  final_dense_factorize(A, domain, opts, level);
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);

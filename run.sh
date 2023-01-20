@@ -26,9 +26,9 @@ for adm in 2; do
     max_rank=30
 
     for ndim in 1; do
-        for N in 16384; do
-            mpirun --mca opal_warn_on_missing_libcuda 0 -n 1 \
-                   ./bin/H2_dtd --N $N \
+        for N in 8192; do
+            mpirun --mca opal_warn_on_missing_libcuda 0 -n 4 \
+                   xterm -e gdb --args ./bin/H2_dtd --N $N \
                           --nleaf $nleaf \
                           --kernel_func laplace \
                           --kind_of_geometry circular \
