@@ -1300,9 +1300,20 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const int64_t block,
                                       const int64_t level,
                                       const Hatrix::Args& opts) {
-  update_row_cluster_basis(A, domain, block, level, opts);
-  update_row_S_blocks(A, domain, block, level);
-  // update_row_transfer_bases(A, domain, block, level);
+
+  bool found_row_fill_in = false;
+  for (int64_t j = 0; j < block; ++j) {
+    if (F.exists(block, j, level)) {
+      found_row_fill_in = true;
+      break;
+    }
+  }
+
+  if (found_row_fill_in) {
+    update_row_cluster_basis(A, domain, block, level, opts);
+    update_row_S_blocks(A, domain, block, level);
+    // update_row_transfer_bases(A, domain, block, level);
+  }
 }
 
 void
@@ -1420,9 +1431,21 @@ update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const int64_t block,
                                       const int64_t level,
                                       const Hatrix::Args& opts) {
-  update_col_cluster_basis(A, domain, block, level, opts);
-  update_col_S_blocks(A, domain, block, level);
-  // update_col_transfer_bases(A, domain, block, level);
+  bool found_col_fill_in = false;
+  int64_t nblocks = pow(2, level);
+
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (F.exists(i, block, level)) {
+      found_col_fill_in = true;
+      break;
+    }
+  }
+
+  if (found_col_fill_in) {
+    update_col_cluster_basis(A, domain, block, level, opts);
+    update_col_S_blocks(A, domain, block, level);
+    // update_col_transfer_bases(A, domain, block, level);
+  }
 }
 
 void
