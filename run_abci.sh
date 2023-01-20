@@ -29,12 +29,12 @@ make -j H2_dtd
 # export GMON_OUT_PREFIX=gmon.out-
 
 for adm in 4; do
-    nleaf=512
+    nleaf=256
     ndim=2
     max_rank=50
 
-    for N in 32768; do
-        mpirun -n 4  \
+    for N in 4096; do
+        mpirun -n 1 gdb --args  \
                ./bin/H2_dtd --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \

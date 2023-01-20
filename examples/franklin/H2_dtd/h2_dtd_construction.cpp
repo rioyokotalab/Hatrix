@@ -309,7 +309,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     for (int64_t j = 0; j <= i; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           !A.is_admissible(i, j, A.max_level)) {
-        if (mpi_rank(i, j) == MPIRANK) {
+        if (mpi_rank(i) == MPIRANK) {
           // regenerate the dense block to avoid communication.
           Matrix Aij = generate_p2p_interactions(domain,
                                                  i, j, A.max_level,
