@@ -1,7 +1,7 @@
 #!/bin/bash
 #$ -cwd
 #$ -l rt_F=1
-#$ -l h_rt=4:00:00
+#$ -l h_rt=5:00:00
 #$ -N HSS_P1
 #$ -o HSS_P1_out.log
 #$ -e HSS_P1_err.log
@@ -28,7 +28,7 @@ for adm in 5; do
 
     for nleaf in 512; do
         for max_rank in 25; do
-    	    for N in 32768 65536 131072; do
+    	    for N in 16384 32768 65536 131072; do
                 mpirun -n 1 -ppn 1 -f $SGE_JOB_HOSTLIST ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \
