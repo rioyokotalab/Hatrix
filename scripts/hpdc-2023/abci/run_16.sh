@@ -2,9 +2,9 @@
 #$ -cwd
 #$ -l rt_F=16
 #$ -l h_rt=2:00:00
-#$ -N NEW
-#$ -o NEW_out.log
-#$ -e NEW_err.log
+#$ -N NO_PQR
+#$ -o NO_PQR_out.log
+#$ -e NO_PQR_err.log
 
 source ~/.bashrc
 
@@ -15,7 +15,7 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/acb10922qh/gitrepos/parsec/build/l
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/lib64
 
 export OMP_PLACES=cores
-export VT_CONFIG=/home/acb10922qh/gitrepos/Hatrix/vt_config.conf
+# export VT_CONFIG=/home/acb10922qh/gitrepos/Hatrix/vt_config.conf
 
 # make clean
 make -j H2_dtd
@@ -25,24 +25,25 @@ make -j H2_dtd
 
 for adm in 0.8; do
     ndim=3
-    max_rank=50
-    for nleaf in 1024 ; do
-    	for N in 131072; do
-            mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST -l \
-                   -trace -trace-pt2pt \
-                   ./bin/H2_dtd --N $N \
-               	   --nleaf $nleaf \
-               	   --kernel_func laplace \
-               	   --kind_of_geometry grid \
-               	   --ndim $ndim \
-               	   --max_rank $max_rank \
-               	   --accuracy 1e-8 \
-               	   --admis $adm \
-               	   --admis_kind geometry \
-               	   --construct_algorithm miro \
-               	   --add_diag 1e-8 \
-               	   --use_nested_basis
-    	done
+
+    for nleaf in 512; do
+        for max_rank in 25; do
+    	    for N in 131072; do
+                mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST \
+                       ./bin/H2_dtd --N $N \
+               	       --nleaf $nleaf \
+               	       --kernel_func laplace \
+               	       --kind_of_geometry grid \
+               	       --ndim $ndim \
+               	       --max_rank $max_rank \
+               	       --accuracy 1e-8 \
+               	       --admis $adm \
+               	       --admis_kind geometry \
+               	       --construct_algorithm miro \
+               	       --add_diag 1e-8 \
+               	       --use_nested_basis
+    	    done
+        done
     done
 done
 
