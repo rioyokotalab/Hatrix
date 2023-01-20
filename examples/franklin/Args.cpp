@@ -18,6 +18,8 @@ namespace Hatrix {
     {"admis_kind",          required_argument, 0, 'm'},
     {"construct_algorithm", required_argument, 0, 'c'},
     {"add_diag",            required_argument, 0, 'z'},
+    {"qr_accuracy",         required_argument, 0, 'q'},
+    {"kind_of_recompression", required_argument, 0, 's'},
     {"use_nested_basis",    no_argument,       0, 'b'},
     {"verbose",             no_argument,       0, 'v'},
     {"help",                no_argument,       0, 'h'},
@@ -62,6 +64,8 @@ namespace Hatrix {
       max_rank(2),
       admis(0),
       accuracy(1),
+      qr_accuracy(1e-2),
+      kind_of_recompression(1),
       add_diag(1e-4),
       admis_kind(DIAGONAL),
       construct_algorithm(MIRO),
@@ -140,6 +144,9 @@ namespace Hatrix {
       case 'f':
         geometry_file = std::string(optarg);
         break;
+      case 's':
+        kind_of_recompression = std::stol(optarg);
+        break;
       case 'c':
         if (!strcmp(optarg, "miro")) {
           construct_algorithm = MIRO;
@@ -152,6 +159,9 @@ namespace Hatrix {
                                       std::string(optarg) +
                                       " for --construct-algorithm (-c).");
         }
+        break;
+      case 'q':
+        qr_accuracy = std::stod(optarg);
         break;
       case 'z':
         add_diag = std::stod(optarg);
@@ -189,7 +199,7 @@ namespace Hatrix {
             "--N (-n)                                    : Number of points to consider (%lld).\n"
             "--nleaf (-l)                                : Max. number of points in a leaf node (%lld).\n"
             "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
-            "--kind_of_geometry (-g) [sphere|grid|       \n"
+            "--kind_of_geometry (-g) [circular|grid|       \n"
             " 3d_col_fild]                               : Kind of geometry of the points (%s). \n"
             "                                              If specifying 3d_col_file you must specify a geometry \n"
             "                                              file with fields <x y z cluster_num> using. \n"
@@ -198,6 +208,8 @@ namespace Hatrix {
             "--ndim (-d)                                 : Number of dimensions of the geometry (%lld).\n"
             "--max_rank (-r)                             : Maximum rank (%lld).\n"
             "--accuracy (-e)                             : Desired accuracy for construction. > 0 for constant rank construction. (%lf).\n"
+            "--qr_accuracy (-q)                          : Desired accuracy for QR. (%lf).\n"
+            "--kind_of_recompression (-s)                : Recompression scheme (0,1,2,3) (%lld). \n"
             "--admis (-a)                                : Admissibility constant (%lf).\n"
             "--admis_kind (-m) [diagonal|geometry]       : Whether geometry-based or diagonal-based admis (%s).\n"
             "--construct_algorithm (-c) [miro|id_random] : Construction algorithm to use (%s).\n"
@@ -214,6 +226,8 @@ namespace Hatrix {
             ndim,
             max_rank,
             accuracy,
+            qr_accuracy,
+            kind_of_recompression,
             admis,
             admis_kind_to_string(admis_kind).c_str(),
             construct_algorithm_to_string(construct_algorithm).c_str(),

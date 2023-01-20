@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
 
     // std::cout << "max level: " << A.max_level << " min: " << A.min_level << std::endl;
 
-    A.print_structure();
+    // A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);
@@ -107,33 +107,50 @@ int main(int argc, char* argv[]) {
   // ||x - A * (A^-1 * x)|| / ||x||
   double solve_error = (Hatrix::norm(x - x_regen) / Hatrix::norm(x)) * opts.add_diag;
 
-  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  Matrix bdense = matmul(Adense, x);
+  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  // Matrix bdense = matmul(Adense, x);
   // Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
-  double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
+  // double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
+  double matvec_error = 0;
   // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
 
-  // std::cout << "RESULT: " << opts.N << "," << opts.accuracy << "," << opts.max_rank
-  //           << "," << opts.admis << "," << construct_max_rank << "," << opts.nleaf
-  //           <<  "," << domain_time <<  "," << construct_time  << "," << factor_time
-  //           << "," << solve_time << "," << solve_error << "," << matvec_error
-  //           << "," << fp_ops << std::endl;
+  std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
+            << opts.accuracy << ","
+            << opts.qr_accuracy << ","
+            << opts.kind_of_recompression << ","
+            << opts.max_rank << ","
+            << opts.admis << ","
+            << construct_max_rank << ","
+            << opts.nleaf <<  ","
+            << domain_time <<  ","
+            << construct_time  << ","
+            << factor_time << ","
+            << solve_time << ","
+            << solve_error << ","
+            << matvec_error << ","
+            << fp_ops << ","
+	    << opts.kind_of_geometry << std::endl;
 
-  std::cout << "----------------------------\n";
-  std::cout << "N               : " << opts.N << std::endl;
-  std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-  std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-  std::cout << "ADMIS           : " << opts.admis << std::endl;
-  std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-  std::cout << "NLEAF           : " << opts.nleaf << "\n"
-            << "Domain(ms)      : " << domain_time << "\n"
-            << "Contruct(ms)    : " << construct_time << "\n"
-            << "Factor(ms)      : " << factor_time << "\n"
-            << "Solve(ms)       : " << solve_time << "\n"
-            << "Solve error     : " << solve_error << "\n"
-            << "Construct error : " << matvec_error << std::endl;
-  std::cout << "----------------------------\n";
+  // std::cout << "----------------------------\n";
+  // std::cout << "N               : " << opts.N << std::endl;
+  // std::cout << "NDIM            : " << opts.ndim << std::endl;
+  // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+  // std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
+  // std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
+  // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+  // std::cout << "ADMIS           : " << opts.admis << std::endl;
+  // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+  // std::cout << "NLEAF           : " << opts.nleaf << "\n"
+  //           << "Domain(ms)      : " << domain_time << "\n"
+  //           << "Contruct(ms)    : " << construct_time << "\n"
+  //           << "Factor(ms)      : " << factor_time << "\n"
+  //           << "Solve(ms)       : " << solve_time << "\n"
+  //           << "Solve error     : " << solve_error << "\n"
+  //           << "Construct error : " << matvec_error << "\n"
+  //           << "PAPI_FP_OPS     : " << fp_ops << "\n"
+  //           << std::endl;
+  // std::cout << "----------------------------\n";
 
 
 
