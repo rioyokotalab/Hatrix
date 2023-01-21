@@ -363,12 +363,16 @@ int main(int argc, char **argv) {
   std::cout << "factor begin:\n";
   }
 
+  factorize_setup(A, domain, opts);
+
   auto start_factorize = std::chrono::system_clock::now();
   auto fp_ops = factorize(A, domain, opts);
   auto stop_factorize = std::chrono::system_clock::now();
   double factorize_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factorize -
                                start_factorize).count();
+
+  factorize_teardown();
 
   if (!MPIRANK) {
     std::cout << "factor end\n";

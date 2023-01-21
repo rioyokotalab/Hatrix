@@ -18,11 +18,11 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 make -j H2_dtd
 
 for adm in 7; do
-    nleaf=4096
+    nleaf=512
 
-    for max_rank in 4000; do
+    for max_rank in 25; do
         for ndim in 2; do
-            for N in 32768; do
+            for N in 8192; do
                 mpirun --mca opal_warn_on_missing_libcuda 0 -n 1 \
                        ./bin/H2_dtd --N $N \
                        --nleaf $nleaf \

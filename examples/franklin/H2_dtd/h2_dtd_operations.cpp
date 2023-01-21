@@ -1900,18 +1900,9 @@ propagate_fill_ins_to_upper_level(SymmetricSharedBasisMatrix& A,
 
 }
 
-
-// This function is meant to be used with parsec. It will register the
-// data that has already been allocated by the matrix with parsec and
-// make it work with the runtime.
-long long int
-factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::Args& opts) {
-  Hatrix::profiling::PAPI papi;
-  papi.add_fp_ops(0);
-  papi.start();
-
-  int64_t level;
-
+void
+factorize_setup(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                const Hatrix::Args& opts) {
   parsec_arena_datatype_t* u_arena_t = parsec_dtd_create_arena_datatype(parsec, &U_ARENA);
   parsec_add2arena_rect(u_arena_t, parsec_datatype_double_t, opts.nleaf, opts.max_rank, opts.nleaf);
 
@@ -1939,12 +1930,38 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   preallocate_blocks(A);
   update_parsec_pointers(A, domain, A.max_level);
 
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
+    update_parsec_pointers(A, domain, level-1);
+  }
+}
+
+void factorize_teardown() {
+  h2_dc_destroy_maps();
+  parsec_dtd_destroy_arena_datatype(parsec, U_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, D_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, S_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, FINAL_DENSE_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, U_NON_LEAF_ARENA);
+
+}
+
+
+// This function is meant to be used with parsec. It will register the
+// data that has already been allocated by the matrix with parsec and
+// make it work with the runtime.
+long long int
+factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::Args& opts) {
+  // Hatrix::profiling::PAPI papi;
+  // papi.add_fp_ops(0);
+  // papi.start();
+
+  int64_t level;
+
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, opts);
-    // add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
-    // propagate_fill_ins_to_upper_level(A, opts, level);
+    add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
+    propagate_fill_ins_to_upper_level(A, opts, level);
 
-    update_parsec_pointers(A, domain, level-1);
     merge_unfactorized_blocks(A, domain, level);
   }
 
@@ -1964,16 +1981,9 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   int rc = parsec_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
 
-  h2_dc_destroy_maps();
-  parsec_dtd_destroy_arena_datatype(parsec, U_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, D_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, S_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, FINAL_DENSE_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, U_NON_LEAF_ARENA);
+  // auto fp_ops = papi.fp_ops();
 
-  auto fp_ops = papi.fp_ops();
-
-  return fp_ops;
+  return 0;
 }
 
 void
