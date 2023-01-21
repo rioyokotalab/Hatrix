@@ -28,7 +28,7 @@ for adm in 5; do
 
     for nleaf in 512; do
         for max_rank in 25; do
-    	    for N in 16384 32768 65536 131072; do
+    	    for N in 8192; do
                 mpirun -n 1 -ppn 1 -f $SGE_JOB_HOSTLIST ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \
