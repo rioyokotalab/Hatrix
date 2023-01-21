@@ -20,6 +20,9 @@ std::vector<int> DENSE;
 int DENSE_NBROW, DENSE_NBCOL;
 int DENSE_local_rows, DENSE_local_cols;
 
+// storage for near and far blocks at each level.
+Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;  // This is actually RowLevelMap
+
 int
 indxg2l(int INDXGLOB, int NB, int NPROCS) {
   return NB * ((INDXGLOB - 1) / ( NB * NPROCS)) + (INDXGLOB - 1) % NB + 1;

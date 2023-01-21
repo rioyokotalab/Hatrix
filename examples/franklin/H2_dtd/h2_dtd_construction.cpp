@@ -107,6 +107,27 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
 
   if (A.max_level != A.min_level) { A.min_level++; }
 
+  // populate near and far lists. comment out when doing H2.
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      far_neighbours.insert(i, level, std::vector<int64_t>());
+      near_neighbours.insert(i, level, std::vector<int64_t>());
+      for (int64_t j = 0; j <= i; ++j) {
+        if (A.is_admissible.exists(i, j, level)) {
+          if (A.is_admissible(i, j, level)) {
+            far_neighbours(i, level).push_back(j);
+          }
+          else {
+            near_neighbours(i, level).push_back(j);
+          }
+        }
+      }
+    }
+  }
+
+
   // make this BLR2
   // for (int level = A.max_level - 1; level >= A.min_level; --level) {
   //   int nblocks = pow(2, level);

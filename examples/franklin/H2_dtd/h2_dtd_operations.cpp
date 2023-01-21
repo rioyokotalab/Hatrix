@@ -1959,8 +1959,8 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
 
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, opts);
-    add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
-    propagate_fill_ins_to_upper_level(A, opts, level);
+    // add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
+    // propagate_fill_ins_to_upper_level(A, opts, level);
 
     merge_unfactorized_blocks(A, domain, level);
   }
