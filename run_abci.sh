@@ -34,7 +34,7 @@ for adm in 4; do
     max_rank=50
 
     for N in 4096; do
-        mpirun -n 1 gdb --args  \
+        mpirun -n 1  \
                ./bin/H2_dtd --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \

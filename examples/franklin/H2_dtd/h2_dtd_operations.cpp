@@ -561,16 +561,8 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
         int64_t D_unelim_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
         int64_t D_unelim_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
 
-        // if (!MPIRANK) {
-        //   std::cout << "CURRENT UNELIM BLOCK: i: " << i << " j: " << j << " pl: " << parent_level << std::endl;
-        //   std::cout << "D unelim rows: " << D_unelim_rows << " cols: " << D_unelim_cols << std::endl;
-        // }
         int64_t D_unelim_row_rank = A.ranks(i_children[0], level);
         int64_t D_unelim_col_rank = A.ranks(j_children[0], level);
-
-        // if (!MPIRANK)
-        //   std::cout << "D unelim rows rank: " << D_unelim_row_rank
-        //             << " cols rank: " << D_unelim_col_rank << std::endl;
 
         for (int ic1 = 0; ic1 < 2; ++ic1) {
           for (int jc2 = 0; jc2 < ((i == j) ? (ic1+1) : 2); ++jc2) {
@@ -598,7 +590,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
               int read_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
-              parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
+              parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 90, PARSEC_DEV_CPU,
                 "copy_blocks_task",
                 sizeof(bool), &copy_dense, PARSEC_VALUE,
                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key),
@@ -635,7 +627,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
 
               int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
 
-              parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
+              parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 80, PARSEC_DEV_CPU,
                 "copy_blocks_task",
                 sizeof(bool), &copy_dense, PARSEC_VALUE,
                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key),
@@ -680,7 +672,7 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
   int u_arena_type = A.max_level == level ? U_ARENA : U_NON_LEAF_ARENA;
   int d_arena_type = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
-  parsec_dtd_insert_task(dtd_tp, task_multiply_full_complement, 0, PARSEC_DEV_CPU,
+  parsec_dtd_insert_task(dtd_tp, task_multiply_full_complement, 100, PARSEC_DEV_CPU,
     "multiply_full_complement_task",
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
                          PARSEC_INOUT | d_arena_type | PARSEC_AFFINITY,
@@ -750,7 +742,7 @@ void factorize_diagonal(SymmetricSharedBasisMatrix& A,
 
   int write_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
-  parsec_dtd_insert_task(dtd_tp, task_factorize_diagonal, 0, PARSEC_DEV_CPU,
+  parsec_dtd_insert_task(dtd_tp, task_factorize_diagonal, 90, PARSEC_DEV_CPU,
     "factorize_diagonal_task",
     sizeof(int64_t), &D_nrows, PARSEC_VALUE,
     sizeof(int64_t), &rank_nrows, PARSEC_VALUE,
