@@ -373,7 +373,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
   std::vector<double> R_TEMP_MEM(int64_t(AY_local_rows) * int64_t(AY_local_cols));
   std::vector<int> R_TEMP(9);
-  descinit_(R_TEMP.data(), &N, &P, &DENSE_NBROW, &NBCOL, &ZERO, &ZERO,
+  descset_(R_TEMP.data(), &N, &P, &DENSE_NBROW, &NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &AY_local_rows, &info);
 
   // generate column bases from the randomized blocks.

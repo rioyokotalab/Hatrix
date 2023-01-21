@@ -31,11 +31,11 @@ for adm in 5; do
                	       --kind_of_geometry grid \
                	       --ndim $ndim \
                	       --max_rank $max_rank \
-               	       --accuracy 1e-8 \
+               	       --accuracy 1e-12 \
                	       --admis $adm \
                	       --admis_kind geometry \
                	       --construct_algorithm miro \
-               	       --add_diag 1e-8 \
+               	       --add_diag 1e-9 \
                	       --use_nested_basis
     	    done
         done
