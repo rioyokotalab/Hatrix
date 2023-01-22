@@ -33,12 +33,12 @@ export XOS_MMM_L_PAGING_POLICY="demand:demand:demand"
 # make clean
 make -j H2_dtd
 
-for adm in 10; do
+for adm in 7; do
     ndim=2
 
-    for nleaf in 512; do
+    for nleaf in 256; do
         for max_rank in 25; do
-    	    for N in 262144; do
+    	    for N in 524288; do
                 mpiexec -stdout out_256.log -stderr err_256.log ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \
