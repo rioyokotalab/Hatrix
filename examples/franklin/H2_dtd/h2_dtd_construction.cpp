@@ -107,37 +107,59 @@ init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
 
   if (A.max_level != A.min_level) { A.min_level++; }
 
-  // make this BLR2
-  for (int level = A.max_level - 1; level >= A.min_level; --level) {
-    int nblocks = pow(2, level);
-    for (int i = 0; i < nblocks; ++i) {
-      for (int j = 0; j < nblocks; ++j) {
+  // populate near and far lists. comment out when doing H2.
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      far_neighbours.insert(i, level, std::vector<int64_t>());
+      near_neighbours.insert(i, level, std::vector<int64_t>());
+      for (int64_t j = 0; j <= i; ++j) {
         if (A.is_admissible.exists(i, j, level)) {
-          A.is_admissible.erase(i, j, level);
+          if (A.is_admissible(i, j, level)) {
+            far_neighbours(i, level).push_back(j);
+          }
+          else {
+            near_neighbours(i, level).push_back(j);
+          }
         }
       }
     }
   }
 
-  // remove stuff from max_level and put it in level 1
-  int nblocks = pow(2, A.max_level);
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      if (!A.is_admissible.exists(i, j, A.max_level)) {
-        A.is_admissible.insert(i, j, A.max_level, true);
-      }
-    }
-  }
+
+  // make this BLR2
+  // for (int level = A.max_level - 1; level >= A.min_level; --level) {
+  //   int nblocks = pow(2, level);
+  //   for (int i = 0; i < nblocks; ++i) {
+  //     for (int j = 0; j < nblocks; ++j) {
+  //       if (A.is_admissible.exists(i, j, level)) {
+  //         A.is_admissible.erase(i, j, level);
+  //       }
+  //     }
+  //   }
+  // }
+
+  // // remove stuff from max_level and put it in level 1
+  // int nblocks = pow(2, A.max_level);
+  // for (int i = 0; i < nblocks; ++i) {
+  //   for (int j = 0; j < nblocks; ++j) {
+  //     if (!A.is_admissible.exists(i, j, A.max_level)) {
+  //       A.is_admissible.insert(i, j, A.max_level, true);
+  //     }
+  //   }
+  // }
+
 
   // set max_level-1 to fully dense so that you can merge blocks into this level.
-  nblocks = pow(2, A.max_level - 1);
-  for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      A.is_admissible.insert(i, j, A.max_level-1, false);
-    }
-  }
+  // int nblocks = pow(2, A.max_level - 1);
+  // for (int i = 0; i < nblocks; ++i) {
+  //   for (int j = 0; j < nblocks; ++j) {
+  //     A.is_admissible.insert(i, j, A.max_level-1, false);
+  //   }
+  // }
 
-  A.min_level = A.max_level;
+  // A.min_level = A.max_level;
 }
 
 void
@@ -308,7 +330,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     for (int64_t j = 0; j <= i; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           !A.is_admissible(i, j, A.max_level)) {
-        if (mpi_rank(i, j) == MPIRANK) {
+        if (mpi_rank(i) == MPIRANK) {
           // regenerate the dense block to avoid communication.
           Matrix Aij = generate_p2p_interactions(domain,
                                                  i, j, A.max_level,
@@ -351,7 +373,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
   std::vector<double> R_TEMP_MEM(int64_t(AY_local_rows) * int64_t(AY_local_cols));
   std::vector<int> R_TEMP(9);
-  descinit_(R_TEMP.data(), &N, &P, &DENSE_NBROW, &NBCOL, &ZERO, &ZERO,
+  descset_(R_TEMP.data(), &N, &P, &DENSE_NBROW, &NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &AY_local_rows, &info);
 
   // generate column bases from the randomized blocks.

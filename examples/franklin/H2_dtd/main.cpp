@@ -237,7 +237,7 @@ int main(int argc, char **argv) {
   }
 
   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
-  // if(!MPIRANK) A.print_structure();
+  if(!MPIRANK) A.print_structure();
   construct_h2_matrix_dtd(A, domain, opts); // construct H2 matrix.
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
@@ -332,7 +332,7 @@ int main(int argc, char **argv) {
   /* Initializing parsec context */
   int parsec_argc = argc - 24;
   char ** parsec_argv = argv + 24;
-  parsec = parsec_init( cores, &parsec_argc, &parsec_argv);
+  parsec = parsec_init( cores, NULL, NULL);
   if( NULL == parsec ) {
     printf("Cannot initialize PaRSEC\n");
     exit(-1);
@@ -364,12 +364,16 @@ int main(int argc, char **argv) {
   std::cout << "factor begin:\n";
   }
 
+  factorize_setup(A, domain, opts);
+
   auto start_factorize = std::chrono::system_clock::now();
   auto fp_ops = factorize(A, domain, opts);
   auto stop_factorize = std::chrono::system_clock::now();
   double factorize_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factorize -
                                start_factorize).count();
+
+  factorize_teardown();
 
   if (!MPIRANK) {
     std::cout << "factor end\n";

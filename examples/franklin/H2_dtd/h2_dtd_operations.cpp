@@ -12,7 +12,7 @@ using namespace Hatrix;
 static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F,
   parsec_temp_fill_in_rows, parsec_temp_fill_in_cols,
   parsec_US, parsec_r, parsec_t;
-static int U_ARENA, D_ARENA, S_ARENA, FINAL_DENSE_ARENA;
+static int U_ARENA, D_ARENA, S_ARENA, FINAL_DENSE_ARENA, U_NON_LEAF_ARENA;
 
 static RowColLevelMap<Matrix> F;
 static RowColMap<Matrix> r, t;
@@ -545,6 +545,9 @@ matmul(SymmetricSharedBasisMatrix& A,
   }
 }
 
+std::vector<int> MERGE_ARENAS;
+parsec_arena_datatype_t* merge_arena_t;
+
 // Copy blocks from the child level into level.
 void
 merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, int64_t level) {
@@ -576,21 +579,28 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               // copy oo portion of the D blocks.
               copy_dense = true;
               parsec_data_key_t D_unelim_key =
-                parsec_D.super.data_key(&parsec_D.super, i, j, parent_level);
+                parsec_D.super.data_key(&parsec_D.super, i, parent_level);
               parsec_data_key_t D_c1c2_key =
-                parsec_D.super.data_key(&parsec_D.super, c1, c2, level);
+                parsec_D.super.data_key(&parsec_D.super, c1, level);
 
-              parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
+              // if (!MPIRANK) {
+              //   std::cout << "D BLOCK DIMS: rows -> " << D_c1c2_rows << " cols -> " << D_c1c2_cols << std::endl;
+              // }
+
+              int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
+              int read_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+
+              parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 90, PARSEC_DEV_CPU,
                 "copy_blocks_task",
                 sizeof(bool), &copy_dense, PARSEC_VALUE,
                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key),
-                                     PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                                     PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
                 sizeof(int64_t), &D_unelim_rows, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_cols, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_row_rank, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_col_rank, PARSEC_VALUE,
                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_c1c2_key),
-                                     PARSEC_INPUT | D_ARENA,
+                                     PARSEC_INPUT | read_arena,
                 sizeof(int64_t), &D_c1c2_rows, PARSEC_VALUE,
                 sizeof(int64_t), &D_c1c2_cols, PARSEC_VALUE,
                 sizeof(int64_t), &D_c1c2_row_rank, PARSEC_VALUE,
@@ -602,18 +612,26 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               // copy full S blocks into the parent D block
               copy_dense = false;
               parsec_data_key_t D_unelim_key =
-                parsec_D.super.data_key(&parsec_D.super, i, j, parent_level);
+                parsec_D.super.data_key(&parsec_D.super, i, parent_level);
               parsec_data_key_t  S_c1c2_key =
                 parsec_S.super.data_key(&parsec_S.super, c1, c2, level);
               int64_t S_c1c2_rows = A.ranks(c1, level);
               int64_t S_c1c2_cols = A.ranks(c2, level);
               int64_t MINUS_ONE = -1;
 
-              parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 0, PARSEC_DEV_CPU,
+              // if (!MPIRANK) {
+              //   std::cout << "S BLOCK DIMS: rows -> " << S_c1c2_rows << " cols -> " << S_c1c2_cols << std::endl;
+              //   std::cout << "U UNELIM DIMS: rows ->  " << D_unelim_rows
+              //             << " cols -> " << D_unelim_cols << std::endl;
+              // }
+
+              int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
+
+              parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 80, PARSEC_DEV_CPU,
                 "copy_blocks_task",
                 sizeof(bool), &copy_dense, PARSEC_VALUE,
                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_unelim_key),
-                                     PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                                     PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
                 sizeof(int64_t), &D_unelim_rows, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_cols, PARSEC_VALUE,
                 sizeof(int64_t), &D_unelim_row_rank, PARSEC_VALUE,
@@ -641,69 +659,77 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
   int64_t nblocks = pow(2, level);
 
   parsec_data_key_t U_key = parsec_U.super.data_key(&parsec_U.super, block, level);
-  parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
+  parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, block, level);
 
   int64_t D_nrows = get_dim(A, domain, block, level), U_nrows = get_dim(A, domain, block, level);
   int64_t D_ncols = get_dim(A, domain, block, level), U_ncols = A.ranks(block, level);
 
-  parsec_dtd_insert_task(dtd_tp, task_multiply_full_complement, 0, PARSEC_DEV_CPU,
+  // if (!MPIRANK) {
+  //   std::cout << "D_nrows: " << D_nrows << " D_ncols: " << D_ncols <<
+  //     " U_nrows: " << U_nrows << " U_ncols: " << U_ncols << std::endl;
+  // }
+
+  int u_arena_type = A.max_level == level ? U_ARENA : U_NON_LEAF_ARENA;
+  int d_arena_type = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+
+  parsec_dtd_insert_task(dtd_tp, task_multiply_full_complement, 100, PARSEC_DEV_CPU,
     "multiply_full_complement_task",
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
-                         PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                         PARSEC_INOUT | d_arena_type | PARSEC_AFFINITY,
     sizeof(int64_t), &D_nrows, PARSEC_VALUE,
     sizeof(int64_t), &D_ncols, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-                         PARSEC_INPUT | U_ARENA,
+                         PARSEC_INPUT | u_arena_type,
     sizeof(int64_t), &U_nrows, PARSEC_VALUE,
     sizeof(int64_t), &U_ncols, PARSEC_VALUE,
     PARSEC_DTD_ARG_END);
 
 
-  for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_inadmissible(A, block, j, level)) {
-      int64_t D_nrows = get_dim(A, domain, block, level);
-      int64_t D_ncols = get_dim(A, domain, j, level);
-      int64_t D_col_rank = A.ranks(j, level);
+  // for (int64_t j = 0; j < block; ++j) {
+  //   if (exists_and_inadmissible(A, block, j, level)) {
+  //     int64_t D_nrows = get_dim(A, domain, block, level);
+  //     int64_t D_ncols = get_dim(A, domain, j, level);
+  //     int64_t D_col_rank = A.ranks(j, level);
 
-      parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
+  //     parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
 
-      parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement_left, 0, PARSEC_DEV_CPU,
-      "multiply_complement_partial_left_task",
-      sizeof(int64_t), &D_nrows, PARSEC_VALUE,
-      sizeof(int64_t), &D_ncols, PARSEC_VALUE,
-      sizeof(int64_t), &D_col_rank, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
-                             PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
-      sizeof(int64_t), &U_nrows, PARSEC_VALUE,
-      sizeof(int64_t), &U_ncols, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-                             PARSEC_INPUT | U_ARENA,
-      PARSEC_DTD_ARG_END);
-    }
-  }
+  //     parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement_left, 0, PARSEC_DEV_CPU,
+  //     "multiply_complement_partial_left_task",
+  //     sizeof(int64_t), &D_nrows, PARSEC_VALUE,
+  //     sizeof(int64_t), &D_ncols, PARSEC_VALUE,
+  //     sizeof(int64_t), &D_col_rank, PARSEC_VALUE,
+  //     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
+  //                            PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+  //     sizeof(int64_t), &U_nrows, PARSEC_VALUE,
+  //     sizeof(int64_t), &U_ncols, PARSEC_VALUE,
+  //     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
+  //                            PARSEC_INPUT | U_ARENA,
+  //     PARSEC_DTD_ARG_END);
+  //   }
+  // }
 
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-      int64_t D_nrows = get_dim(A, domain, i, level);
-      int64_t D_ncols = get_dim(A, domain, block, level);
-      int64_t D_row_rank = A.ranks(i, level);
+  // for (int64_t i = block+1; i < nblocks; ++i) {
+  //   if (exists_and_inadmissible(A, i, block, level)) {
+  //     int64_t D_nrows = get_dim(A, domain, i, level);
+  //     int64_t D_ncols = get_dim(A, domain, block, level);
+  //     int64_t D_row_rank = A.ranks(i, level);
 
-      parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
+  //     parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
 
-      parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement_right, 0, PARSEC_DEV_CPU,
-        "multiply_complement_partial_right_task",
-        sizeof(int64_t), &D_nrows, PARSEC_VALUE,
-        sizeof(int64_t), &D_ncols, PARSEC_VALUE,
-        sizeof(int64_t), &D_row_rank, PARSEC_VALUE,
-        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
-                             PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
-        sizeof(int64_t), &U_nrows, PARSEC_VALUE,
-        sizeof(int64_t), &U_ncols, PARSEC_VALUE,
-        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-                             PARSEC_INPUT | U_ARENA,
-        PARSEC_DTD_ARG_END);
-    }
-  }
+  //     parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement_right, 0, PARSEC_DEV_CPU,
+  //       "multiply_complement_partial_right_task",
+  //       sizeof(int64_t), &D_nrows, PARSEC_VALUE,
+  //       sizeof(int64_t), &D_ncols, PARSEC_VALUE,
+  //       sizeof(int64_t), &D_row_rank, PARSEC_VALUE,
+  //       PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
+  //                            PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+  //       sizeof(int64_t), &U_nrows, PARSEC_VALUE,
+  //       sizeof(int64_t), &U_ncols, PARSEC_VALUE,
+  //       PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
+  //                            PARSEC_INPUT | U_ARENA,
+  //       PARSEC_DTD_ARG_END);
+  //   }
+  // }
 }
 
 void factorize_diagonal(SymmetricSharedBasisMatrix& A,
@@ -712,14 +738,16 @@ void factorize_diagonal(SymmetricSharedBasisMatrix& A,
                         const int64_t level) {
   int64_t D_nrows = get_dim(A, domain, block, level);
   int64_t rank_nrows = A.ranks(block, level);
-  auto D_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
+  auto D_key = parsec_D.super.data_key(&parsec_D.super, block, level);
 
-  parsec_dtd_insert_task(dtd_tp, task_factorize_diagonal, 0, PARSEC_DEV_CPU,
+  int write_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+
+  parsec_dtd_insert_task(dtd_tp, task_factorize_diagonal, 90, PARSEC_DEV_CPU,
     "factorize_diagonal_task",
     sizeof(int64_t), &D_nrows, PARSEC_VALUE,
     sizeof(int64_t), &rank_nrows, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
-                         PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                         PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
     PARSEC_DTD_ARG_END);
 }
 
@@ -744,6 +772,9 @@ void triangle_reduce_cc_oc(SymmetricSharedBasisMatrix& A,
       int64_t O_row_rank = A.ranks(i, level);
       int64_t O_col_rank = A.ranks(block, level);
 
+      int read_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+      int write_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+
       parsec_dtd_insert_task(dtd_tp, task_trsm_cc_oc, 0, PARSEC_DEV_CPU,
         "trsm_cc_oc_task",
         sizeof(int64_t), &D_rows, PARSEC_VALUE,
@@ -751,13 +782,13 @@ void triangle_reduce_cc_oc(SymmetricSharedBasisMatrix& A,
         sizeof(int64_t), &D_row_rank, PARSEC_VALUE,
         sizeof(int64_t), &D_col_rank, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, diagonal_key),
-                             PARSEC_INPUT | D_ARENA,
+                             PARSEC_INPUT | read_arena,
         sizeof(int64_t), &O_rows, PARSEC_VALUE,
         sizeof(int64_t), &O_cols, PARSEC_VALUE,
         sizeof(int64_t), &O_row_rank, PARSEC_VALUE,
         sizeof(int64_t), &O_col_rank, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, other_key),
-                             PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                             PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
         PARSEC_DTD_ARG_END);
     }
 }
@@ -783,6 +814,9 @@ void triangle_reduce_co(SymmetricSharedBasisMatrix& A,
     int64_t O_row_rank = A.ranks(i, level);
     int64_t O_col_rank = A.ranks(block, level);
 
+    int read_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+    int write_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+
     parsec_dtd_insert_task(dtd_tp, task_trsm_co, 0, PARSEC_DEV_CPU,
       "trsm_co_task",
       sizeof(int64_t), &D_rows, PARSEC_VALUE,
@@ -790,13 +824,13 @@ void triangle_reduce_co(SymmetricSharedBasisMatrix& A,
       sizeof(int64_t), &D_row_rank, PARSEC_VALUE,
       sizeof(int64_t), &D_col_rank, PARSEC_VALUE,
       PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, diagonal_key),
-                           PARSEC_INPUT | D_ARENA,
+                           PARSEC_INPUT | read_arena,
       sizeof(int64_t), &O_rows, PARSEC_VALUE,
       sizeof(int64_t), &O_cols, PARSEC_VALUE,
       sizeof(int64_t), &O_row_rank, PARSEC_VALUE,
       sizeof(int64_t), &O_col_rank, PARSEC_VALUE,
       PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, other_key),
-                           PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                           PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
       PARSEC_DTD_ARG_END);
   }
 }
@@ -1300,9 +1334,20 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const int64_t block,
                                       const int64_t level,
                                       const Hatrix::Args& opts) {
-  update_row_cluster_basis(A, domain, block, level, opts);
-  update_row_S_blocks(A, domain, block, level);
-  // update_row_transfer_bases(A, domain, block, level);
+
+  bool found_row_fill_in = false;
+  for (int64_t j = 0; j < block; ++j) {
+    if (F.exists(block, j, level)) {
+      found_row_fill_in = true;
+      break;
+    }
+  }
+
+  if (found_row_fill_in) {
+    update_row_cluster_basis(A, domain, block, level, opts);
+    update_row_S_blocks(A, domain, block, level);
+    // update_row_transfer_bases(A, domain, block, level);
+  }
 }
 
 void
@@ -1420,9 +1465,21 @@ update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const int64_t block,
                                       const int64_t level,
                                       const Hatrix::Args& opts) {
-  update_col_cluster_basis(A, domain, block, level, opts);
-  update_col_S_blocks(A, domain, block, level);
-  // update_col_transfer_bases(A, domain, block, level);
+  bool found_col_fill_in = false;
+  int64_t nblocks = pow(2, level);
+
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (F.exists(i, block, level)) {
+      found_col_fill_in = true;
+      break;
+    }
+  }
+
+  if (found_col_fill_in) {
+    update_col_cluster_basis(A, domain, block, level, opts);
+    update_col_S_blocks(A, domain, block, level);
+    // update_col_transfer_bases(A, domain, block, level);
+  }
 }
 
 void
@@ -1432,34 +1489,34 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
-    update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
 
     multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
-    triangle_reduction(A, domain, block, level);
-    compute_schurs_complement(A, domain, block, level);
-    compute_fill_ins(A, domain, block, level);
+    // triangle_reduction(A, domain, block, level);
+    // compute_schurs_complement(A, domain, block, level);
+    // compute_fill_ins(A, domain, block, level);
   }
 }
 
 void
 preallocate_blocks(SymmetricSharedBasisMatrix& A) {
   // data structure r for storing the projection of the bases for a level.
-  for (int level = A.max_level; level >= A.min_level-1; --level) {
-    for (int64_t i = 0; i < pow(2, level); ++i) {
-      if (mpi_rank(i) == MPIRANK) {
-        int64_t rank = A.ranks(i, level);
-        Matrix r_i(rank, rank);
+  // for (int level = A.max_level; level >= A.min_level-1; --level) {
+  //   for (int64_t i = 0; i < pow(2, level); ++i) {
+  //     if (mpi_rank(i) == MPIRANK) {
+  //       int64_t rank = A.ranks(i, level);
+  //       Matrix r_i(rank, rank);
 
-        r.insert(i, level, std::move(r_i));
+  //       r.insert(i, level, std::move(r_i));
 
-        Matrix t_i(rank, rank);
+  //       Matrix t_i(rank, rank);
 
-        t.insert(i, level, std::move(t_i));
-      }
-    }
-  }
+  //       t.insert(i, level, std::move(t_i));
+  //     }
+  //   }
+  // }
 
   for (int level = A.max_level - 1; level >= A.min_level; --level) {
     int nblocks = pow(2, level);
@@ -1469,7 +1526,7 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
     for (int i = 0; i < nblocks; ++i) {
       for (int j = 0; j <= i; ++j) {
         if (exists_and_inadmissible(A, i, j, level)) {
-          if (mpi_rank(i, j) == MPIRANK) {
+          if (mpi_rank(i) == MPIRANK) {
             std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
 
             const int64_t c_rows = A.ranks(i_children[0], child_level) +
@@ -1491,7 +1548,7 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
 
   for (int i = 0; i < nblocks; ++i) {
     for (int j = 0; j <= i; ++j) {
-      if (mpi_rank(i, j) == MPIRANK) {
+      if (mpi_rank(i) == MPIRANK) {
         std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
 
         const int64_t c_rows = A.ranks(i_children[0], child_level) +
@@ -1499,8 +1556,7 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
         const int64_t c_cols = A.ranks(j_children[0], child_level) +
           A.ranks(j_children[1], child_level);
         Matrix D_unelim(c_rows, c_cols);
-
-        A.D.insert(i, j, level, std::move(D_unelim));
+        A.D.insert(i, i, level, std::move(D_unelim));
       }
     }
   }
@@ -1514,8 +1570,8 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
   for (int64_t i = 0; i < nblocks; ++i) { // U
     parsec_data_key_t U_data_key = parsec_U.super.data_key(&parsec_U.super, i, level);
     parsec_data_key_t US_data_key = parsec_US.super.data_key(&parsec_US.super, i, level);
-    parsec_data_key_t r_data_key = parsec_r.super.data_key(&parsec_r.super, i, level);
-    parsec_data_key_t t_data_key = parsec_t.super.data_key(&parsec_t.super, i, level);
+    // parsec_data_key_t r_data_key = parsec_r.super.data_key(&parsec_r.super, i, level);
+    // parsec_data_key_t t_data_key = parsec_t.super.data_key(&parsec_t.super, i, level);
 
     if (mpi_rank(i) == MPIRANK) {
       Matrix& U_i = A.U(i, level);
@@ -1524,16 +1580,16 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       Matrix& US_i = A.US(i, level);
       parsec_US.matrix_map[US_data_key] = std::addressof(US_i);
 
-      Matrix& r_i = r(i, level);
-      parsec_r.matrix_map[r_data_key] = std::addressof(r_i);
+      // Matrix& r_i = r(i, level);
+      // parsec_r.matrix_map[r_data_key] = std::addressof(r_i);
 
-      Matrix& t_i = t(i, level);
-      parsec_t.matrix_map[t_data_key] = std::addressof(t_i);
+      // Matrix& t_i = t(i, level);
+      // parsec_t.matrix_map[t_data_key] = std::addressof(t_i);
     }
     parsec_U.mpi_ranks[U_data_key] = mpi_rank(i);
     parsec_US.mpi_ranks[US_data_key] = mpi_rank(i);
-    parsec_r.mpi_ranks[r_data_key] = mpi_rank(i);
-    parsec_t.mpi_ranks[t_data_key] = mpi_rank(i);
+    // parsec_r.mpi_ranks[r_data_key] = mpi_rank(i);
+    // parsec_t.mpi_ranks[t_data_key] = mpi_rank(i);
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1548,11 +1604,12 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       parsec_S.mpi_ranks[S_data_key] = mpi_rank(i, j);
 
       row_size = get_dim(A, domain, i, level), col_size = get_dim(A, domain, j, level);
-      parsec_data_key_t D_data_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
-      parsec_D.mpi_ranks[D_data_key] = mpi_rank(i, j);
+      parsec_data_key_t D_data_key = parsec_D.super.data_key(&parsec_D.super, i, level);
+      parsec_D.mpi_ranks[D_data_key] = mpi_rank(i);
 
-      if (exists_and_inadmissible(A, i, j, level) && (mpi_rank(i, j) == MPIRANK)) { // D blocks.
-        Matrix& D_ij = A.D(i, j, level);
+      if (exists_and_inadmissible(A, i, j, level) && (mpi_rank(i) == MPIRANK)) { // D blocks.
+        // std::cout << "MATRIX MAP: i: " << i << " j: " << j << " lvl: " << level << std::endl;
+        Matrix& D_ij = A.D(i, i, level);
         parsec_D.matrix_map[D_data_key] = std::addressof(D_ij);
       }
     }
@@ -1711,7 +1768,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
 void h2_dc_init_maps() {
   h2_dc_init(parsec_U, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_S, data_key_2d, rank_of_2d);
-  h2_dc_init(parsec_D, data_key_2d, rank_of_2d);
+  h2_dc_init(parsec_D, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_F, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d);
@@ -1743,7 +1800,7 @@ final_dense_factorize(SymmetricSharedBasisMatrix& A,
   for (int64_t d = 0; d < nblocks; ++d) {
     int64_t D_dd_nrows = get_dim(A, domain, d, level);
     int64_t D_dd_ncols = get_dim(A, domain, d, level);
-    parsec_data_key_t D_dd_key = parsec_D.super.data_key(&parsec_D.super, d, d, level);
+    parsec_data_key_t D_dd_key = parsec_D.super.data_key(&parsec_D.super, d, level);
 
     parsec_dtd_insert_task(dtd_tp, task_cholesky_full, 0, PARSEC_DEV_CPU,
       "full_cholesky_task",
@@ -1753,80 +1810,80 @@ final_dense_factorize(SymmetricSharedBasisMatrix& A,
                            PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
       PARSEC_DTD_ARG_END);
 
-    for (int64_t i = d+1; i < nblocks; ++i) {
-      parsec_data_key_t D_dd_key =
-        parsec_D.super.data_key(&parsec_D.super, d, d, level);
-      auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
+    // for (int64_t i = d+1; i < nblocks; ++i) {
+    //   parsec_data_key_t D_dd_key =
+    //     parsec_D.super.data_key(&parsec_D.super, d, d, level);
+    //   auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
 
-      int64_t D_dd_nrows = get_dim(A, domain, d, level);
-      int64_t D_dd_ncols = get_dim(A, domain, d, level);
-      int64_t D_id_nrows = get_dim(A, domain, i, level);
-      int64_t D_id_ncols = get_dim(A, domain, d, level);
+    //   int64_t D_dd_nrows = get_dim(A, domain, d, level);
+    //   int64_t D_dd_ncols = get_dim(A, domain, d, level);
+    //   int64_t D_id_nrows = get_dim(A, domain, i, level);
+    //   int64_t D_id_ncols = get_dim(A, domain, d, level);
 
-      parsec_dtd_insert_task(dtd_tp, task_solve_triangular_full, 0, PARSEC_DEV_CPU,
-        "solve_triangular_full_task",
-        sizeof(int64_t), &D_dd_nrows, PARSEC_VALUE,
-        sizeof(int64_t), &D_dd_ncols, PARSEC_VALUE,
-        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_dd_key),
-                             PARSEC_INPUT | FINAL_DENSE_ARENA,
-        sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
-        sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
-        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
-                             PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
-        PARSEC_DTD_ARG_END);
-    }
+    //   parsec_dtd_insert_task(dtd_tp, task_solve_triangular_full, 0, PARSEC_DEV_CPU,
+    //     "solve_triangular_full_task",
+    //     sizeof(int64_t), &D_dd_nrows, PARSEC_VALUE,
+    //     sizeof(int64_t), &D_dd_ncols, PARSEC_VALUE,
+    //     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_dd_key),
+    //                          PARSEC_INPUT | FINAL_DENSE_ARENA,
+    //     sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
+    //     sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
+    //     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
+    //                          PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
+    //     PARSEC_DTD_ARG_END);
+    // }
 
-    for (int64_t i = d+1; i < nblocks; ++i) {
-      for (int64_t j = d+1; j <= i; ++j) {
-        int64_t D_id_nrows = get_dim(A, domain, i, level);
-        int64_t D_id_ncols = get_dim(A, domain, d, level);
-        int64_t D_ij_nrows = get_dim(A, domain, i, level);
-        int64_t D_ij_ncols = get_dim(A, domain, j, level);
+    // for (int64_t i = d+1; i < nblocks; ++i) {
+    //   for (int64_t j = d+1; j <= i; ++j) {
+    //     int64_t D_id_nrows = get_dim(A, domain, i, level);
+    //     int64_t D_id_ncols = get_dim(A, domain, d, level);
+    //     int64_t D_ij_nrows = get_dim(A, domain, i, level);
+    //     int64_t D_ij_ncols = get_dim(A, domain, j, level);
 
-        auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
-        auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
+    //     auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
+    //     auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
 
-        if (i == j) {
-          auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
-          auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
+    //     if (i == j) {
+    //       auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
+    //       auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
 
-          parsec_dtd_insert_task(dtd_tp, task_syrk_full, 0, PARSEC_DEV_CPU,
-            "syrk_full_task",
-            sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
-                                 PARSEC_INPUT | FINAL_DENSE_ARENA,
-            sizeof(int64_t), &D_ij_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_ij_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
-                                 PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
-            PARSEC_DTD_ARG_END);
-        }
-        else {
-          auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
-          auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
-          auto D_jd_key = parsec_D.super.data_key(&parsec_D.super, j, d, level);
-          int64_t D_jd_nrows = get_dim(A, domain, j, level);
-          int64_t D_jd_ncols = get_dim(A, domain, d, level);
+    //       parsec_dtd_insert_task(dtd_tp, task_syrk_full, 0, PARSEC_DEV_CPU,
+    //         "syrk_full_task",
+    //         sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
+    //         sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
+    //         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
+    //                              PARSEC_INPUT | FINAL_DENSE_ARENA,
+    //         sizeof(int64_t), &D_ij_nrows, PARSEC_VALUE,
+    //         sizeof(int64_t), &D_ij_ncols, PARSEC_VALUE,
+    //         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
+    //                              PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
+    //         PARSEC_DTD_ARG_END);
+    //     }
+    //     else {
+    //       auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
+    //       auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
+    //       auto D_jd_key = parsec_D.super.data_key(&parsec_D.super, j, d, level);
+    //       int64_t D_jd_nrows = get_dim(A, domain, j, level);
+    //       int64_t D_jd_ncols = get_dim(A, domain, d, level);
 
-          parsec_dtd_insert_task(dtd_tp, task_matmul_full, 0, PARSEC_DEV_CPU,
-            "matmul_full_task",
-            sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
-                                 PARSEC_INPUT | FINAL_DENSE_ARENA,
-            sizeof(int64_t), &D_jd_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_jd_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_jd_key),
-                                 PARSEC_INPUT | FINAL_DENSE_ARENA,
-            sizeof(int64_t), &D_ij_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_ij_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
-                                 PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
-            PARSEC_DTD_ARG_END);
-        }
-      }
-    }
+    //       parsec_dtd_insert_task(dtd_tp, task_matmul_full, 0, PARSEC_DEV_CPU,
+    //         "matmul_full_task",
+    //         sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
+    //         sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
+    //         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
+    //                              PARSEC_INPUT | FINAL_DENSE_ARENA,
+    //         sizeof(int64_t), &D_jd_nrows, PARSEC_VALUE,
+    //         sizeof(int64_t), &D_jd_ncols, PARSEC_VALUE,
+    //         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_jd_key),
+    //                              PARSEC_INPUT | FINAL_DENSE_ARENA,
+    //         sizeof(int64_t), &D_ij_nrows, PARSEC_VALUE,
+    //         sizeof(int64_t), &D_ij_ncols, PARSEC_VALUE,
+    //         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
+    //                              PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
+    //         PARSEC_DTD_ARG_END);
+    //     }
+    //   }
+    // }
   }
 }
 
@@ -1843,18 +1900,9 @@ propagate_fill_ins_to_upper_level(SymmetricSharedBasisMatrix& A,
 
 }
 
-
-// This function is meant to be used with parsec. It will register the
-// data that has already been allocated by the matrix with parsec and
-// make it work with the runtime.
-long long int
-factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::Args& opts) {
-  Hatrix::profiling::PAPI papi;
-  papi.add_fp_ops(0);
-  papi.start();
-
-  int64_t level;
-
+void
+factorize_setup(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                const Hatrix::Args& opts) {
   parsec_arena_datatype_t* u_arena_t = parsec_dtd_create_arena_datatype(parsec, &U_ARENA);
   parsec_add2arena_rect(u_arena_t, parsec_datatype_double_t, opts.nleaf, opts.max_rank, opts.nleaf);
 
@@ -1871,17 +1919,49 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
                         opts.max_rank * 2, opts.max_rank * 2,
                         opts.max_rank * 2);
 
+  parsec_arena_datatype_t* u_non_leaf_arena_t =
+    parsec_dtd_create_arena_datatype(parsec, &U_NON_LEAF_ARENA);
+  parsec_add2arena_rect(u_non_leaf_arena_t, parsec_datatype_double_t,
+                        opts.max_rank * 2, opts.max_rank,
+                        opts.max_rank * 2);
+
   h2_dc_init_maps();
 
   preallocate_blocks(A);
   update_parsec_pointers(A, domain, A.max_level);
 
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
+    update_parsec_pointers(A, domain, level-1);
+  }
+}
+
+void factorize_teardown() {
+  h2_dc_destroy_maps();
+  parsec_dtd_destroy_arena_datatype(parsec, U_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, D_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, S_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, FINAL_DENSE_ARENA);
+  parsec_dtd_destroy_arena_datatype(parsec, U_NON_LEAF_ARENA);
+
+}
+
+
+// This function is meant to be used with parsec. It will register the
+// data that has already been allocated by the matrix with parsec and
+// make it work with the runtime.
+long long int
+factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::Args& opts) {
+  // Hatrix::profiling::PAPI papi;
+  // papi.add_fp_ops(0);
+  // papi.start();
+
+  int64_t level;
+
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, opts);
-    add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
+    // add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
     // propagate_fill_ins_to_upper_level(A, opts, level);
 
-    update_parsec_pointers(A, domain, level-1);
     merge_unfactorized_blocks(A, domain, level);
   }
 
@@ -1901,15 +1981,9 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   int rc = parsec_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
 
-  h2_dc_destroy_maps();
-  parsec_dtd_destroy_arena_datatype(parsec, U_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, D_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, S_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, FINAL_DENSE_ARENA);
+  // auto fp_ops = papi.fp_ops();
 
-  auto fp_ops = papi.fp_ops();
-
-  return fp_ops;
+  return 0;
 }
 
 void

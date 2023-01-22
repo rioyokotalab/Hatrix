@@ -666,4 +666,139 @@ std::vector<double> get_eigenvalues(const Matrix& A) {
   return eigv;
 }
 
+  std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>
+partial_pivoted_qr(Matrix& A, const int64_t rank) {
+  assert(rank <= A.min_dim());
+  // Pointer aliases
+  double* a = &A;
+  const int64_t m = A.rows;
+  const int64_t n = A.cols;
+  const int64_t lda = A.stride;
+
+  // Initialize variables for pivoted QR
+  const double tol = LAPACKE_dlamch('e');
+  const double tol3z = std::sqrt(tol);
+  const int min_dim = A.min_dim();
+  std::vector<double> tau(min_dim, 0);
+  std::vector<int64_t> ipiv(n, 0);
+  std::vector<double> cnorm(n, 0);
+  std::vector<double> partial_cnorm(n, 0);
+  for(int64_t j = 0; j < n; j++) {
+    ipiv[j] = j;
+    cnorm[j] = cblas_dnrm2(m, a + j * lda, 1);
+    partial_cnorm[j] = cnorm[j];
+  }
+
+  // Begin pivoted QR
+  int64_t r = 0;
+  double max_cnorm = *std::max_element(cnorm.begin(), cnorm.end());
+  // Handle zero matrix case
+  if(max_cnorm <= tol) {
+    return std::make_tuple(0, std::move(ipiv), std::move(tau));
+  }
+  while(r < rank) {
+    // Select pivot column and swap
+    const int64_t k = std::max_element(cnorm.begin() + r, cnorm.end()) - cnorm.begin();
+    cblas_dswap(m, a + r * lda, 1, a + k * lda, 1);
+    std::swap(cnorm[r], cnorm[k]);
+    std::swap(partial_cnorm[r], partial_cnorm[k]);
+    std::swap(ipiv[r], ipiv[k]);
+
+    // Generate householder reflector to annihilate A(r+1:m, r)
+    double *arr = a + r + (r * lda);
+    if(r < (m - 1)) {
+      LAPACKE_dlarfg(m-r, arr, arr+1, 1, &tau[r]);
+    }
+    else {
+      LAPACKE_dlarfg(1, arr, arr, 1, &tau[r]);
+    }
+
+    if(r < (min_dim - 1)) {
+      // Apply reflector to A(r:m,r+1:n) from left
+      const double _arr = *arr;
+      *arr = 1.0;
+      // w = A(r:m, r+1:n)^T * v
+      std::vector<double> w(n-r-1, 0);
+      double *arj = a + r + (r+1) * lda;
+      cblas_dgemv(CblasColMajor, CblasTrans,
+                  m-r, n-r-1, 1, arj, lda, arr, 1, 0, &w[0], 1);
+      // A(r:m,r+1:n) = A(r:m,r+1:n) - tau * v * w^T
+      cblas_dger(CblasColMajor, m-r, n-r-1, -tau[r], arr, 1, &w[0], 1, arj, lda);
+      *arr = _arr;
+    }
+    // Update partial column norm
+    for(int64_t j = r + 1; j < n; j++) {
+      // See LAPACK Working Note 176 (Section 3.2.1) for detail
+      // https://netlib.org/lapack/lawnspdf/lawn176.pdf
+      if(cnorm[j] != 0.0) {
+        double temp = std::fabs(A(r, j)/cnorm[j]);
+        temp = std::fmax(0.0, (1-temp)*(1+temp));
+        const double temp2 =
+            temp * (cnorm[j]/partial_cnorm[j]) * (cnorm[j]/partial_cnorm[j]);
+        if(temp2 > tol3z) {
+          cnorm[j] = cnorm[j] * std::sqrt(temp);
+        }
+        else {
+          if(r < (m-1)) {
+            cnorm[j] = cblas_dnrm2(m-r-1, a+(r+1)+j*lda, 1);
+            partial_cnorm[j] = cnorm[j];
+          }
+          else {
+            cnorm[j] = 0.0;
+            partial_cnorm[j] = 0.0;
+          }
+        }
+      }
+    }
+    r++;
+    max_cnorm = *std::max_element(cnorm.begin() + r, cnorm.end());
+  }
+  return std::make_tuple(std::move(r), std::move(ipiv), std::move(tau));
+}
+
+std::tuple<Matrix, Matrix>
+truncated_pivoted_qr(Matrix& A, const int64_t rank) {
+  const int64_t m = A.rows;
+  const int64_t n = A.cols;
+  int64_t r;
+  std::vector<int64_t> ipiv;
+  std::vector<double> tau;
+  std::tie(r, ipiv, tau) = partial_pivoted_qr(A, rank);
+  // Handle zero matrix case
+  if(r == 0) {
+    Matrix Q = generate_identity_matrix(m, rank);
+    Matrix R(rank, n);
+    return std::make_tuple(std::move(Q), std::move(R));
+  }
+  // Construct full Q
+  Matrix Q(m, m);
+  // Copy strictly lower triangular (or trapezoidal) part of A into Q
+  for(int64_t i = 0; i < m; i++) {
+    for(int64_t j = 0; j < std::min(i, rank); j++) {
+      Q(i, j) = A(i, j);
+    }
+  }
+  LAPACKE_dorgqr(LAPACK_COL_MAJOR, Q.rows, Q.cols, rank, &Q, Q.stride, &tau[0]);
+  // Construct full R
+  Matrix R(m, n);
+  // Copy first m rows of upper triangular part of A into R
+  for(int64_t i = 0; i < m; i++) {
+    for(int j = i; j < n; j++) {
+      R(i, j) = A(i, j);
+    }
+  }
+  // Permute columns of R
+  std::vector<int> ipivT(ipiv.size(), 0);
+  for(int64_t i = 0; i < ipiv.size(); i++) ipivT[ipiv[i]] = i;
+  Matrix RP(R);
+  for(int64_t i = 0; i < R.rows; i++) {
+    for(int64_t j = 0; j < R.cols; j++) {
+      RP(i, j) = R(i, ipivT[j]);
+    }
+  }
+  Q.shrink(m, rank);
+  RP.shrink(rank, n);
+  return std::make_tuple(std::move(Q), std::move(RP));
+}
+
 }  // namespace Hatrix

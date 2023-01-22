@@ -6,7 +6,9 @@
 #include "Hatrix/Hatrix.h"
 #include "franklin/franklin.hpp"
 
+#include "h2_construction.hpp"
 #include "h2_operations.hpp"
+
 
 using namespace Hatrix;
 
@@ -69,15 +71,15 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A, int64_t block, int64_t le
 template<typename T> void
 reduction_loop1(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
   const int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i >= block+1) {
       Matrix& D_i_block = A.D(i, block, level);
       auto D_i_block_splits = split_dense(D_i_block,
                                           D_i_block.rows - A.ranks(i, level),
                                           D_i_block.cols - A.ranks(block, level));
 
-      for (int64_t j = block+1; j <= i; ++j) {
-        if (exists_and_inadmissible(A, j, block, level)) {
+      for (int64_t j : near_neighbours(block, level)) {
+        if (j >= block+1) {
           Matrix& D_j_block = A.D(j, block, level);
           auto D_j_block_splits = split_dense(D_j_block,
                                               D_j_block.rows - A.ranks(j, level),
@@ -94,19 +96,19 @@ reduction_loop1(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&&
 template<typename T> void
 reduction_loop2(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level, T&& body) {
   const int64_t nblocks = pow(2, level);
-
-  for (int64_t i = block; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i >= block) {
       Matrix& D_i_block = A.D(i, block, level);
       auto D_i_block_splits = split_dense(D_i_block,
                                           D_i_block.rows - A.ranks(i, level),
                                           D_i_block.cols - A.ranks(block, level));
-      for (int64_t j = block; j <= i; ++j) {
-        if (exists_and_inadmissible(A, j, block, level)) {
+
+      for (int64_t j : near_neighbours(block, level)) {
+        if (j >= block && j <= i) {
           Matrix& D_j_block = A.D(j, block, level);
           auto D_j_block_splits = split_dense(D_j_block,
-                                    D_j_block.rows - A.ranks(j, level),
-                                    D_j_block.cols - A.ranks(block, level));
+                                              D_j_block.rows - A.ranks(j, level),
+                                              D_j_block.cols - A.ranks(block, level));
 
           body(i, j, D_i_block_splits, D_j_block_splits);
         }
@@ -120,15 +122,15 @@ template<typename T> void
 reduction_loop4(SymmetricSharedBasisMatrix& A, int64_t block,
                 int64_t level, T&& body) {
   int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i >= block+1) {
       Matrix& D_i_block = A.D(i, block, level);
       auto D_i_block_splits = split_dense(D_i_block,
                                           D_i_block.rows - A.ranks(i, level),
                                           D_i_block.cols - A.ranks(block, level));
 
-      for (int64_t j = 0; j <= block; ++j) {
-        if (exists_and_inadmissible(A, block, j, level)) {
+      for (int64_t j : near_neighbours(block, level)) {
+        if (j <= block) {
           Matrix& D_block_j = A.D(block, j, level);
           auto D_block_j_splits = split_dense(D_block_j,
                                            D_block_j.rows - A.ranks(block, level),
@@ -145,14 +147,14 @@ template<typename T> void
 reduction_loop5(SymmetricSharedBasisMatrix& A,
                 const int64_t block, int64_t level, T&& body) {
   const int64_t nblocks = pow(2, level);
-  for (int64_t i = block; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i >= block) {
       Matrix& D_i_block = A.D(i, block, level);
       auto D_i_block_splits = split_dense(D_i_block,
                                           D_i_block.rows - A.ranks(i, level),
                                           D_i_block.cols - A.ranks(block, level));
-      for (int64_t j = 0; j < block; ++j) {
-        if (exists_and_inadmissible(A, block, j, level)) {
+      for (int64_t j : near_neighbours(block, level)) {
+        if (j < block) {
           Matrix& D_block_j = A.D(block, j, level);
           auto D_block_j_splits = split_dense(D_block_j,
                                               D_block_j.rows - A.ranks(block, level),
@@ -169,8 +171,8 @@ reduction_loop5(SymmetricSharedBasisMatrix& A,
 template <typename T> void
 reduction_loop6(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level,
                 T&& body) {
-  for (int64_t i = 0; i < block; ++i) {
-    if (exists_and_inadmissible(A, block, i, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i < block) {
       Matrix& D_block_i = A.D(block, i, level);
       auto D_block_i_splits = split_dense(D_block_i,
                                           D_block_i.rows - A.ranks(block, level),
@@ -374,38 +376,6 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
       }
     }
   }
-
-  // rank * rank sized fill-in
-  for (int i = 0; i < block; ++i) {
-    for (int j = 0; j < block; ++j) {
-      if (exists_and_inadmissible(A, block, i, level) &&
-          exists_and_inadmissible(A, block, j, level)) {
-
-        if (exists_and_admissible(A, i, j, level)) {
-          Matrix fill_in(A.ranks(i, level), A.ranks(j, level));
-
-          auto D_i_block_splits = split_dense(A.D(block, i,level),
-                                              A.D(block, i,level).rows - A.ranks(block, level),
-                                              A.D(block, i,level).cols - A.ranks(i, level));
-
-          auto D_block_j_splits = split_dense(A.D(block, j, level),
-                                              A.D(block, j, level).rows - A.ranks(block, level),
-                                              A.D(block, j, level).cols - A.ranks(j, level));
-
-          // matmul(D_i_block_splits[2], D_block_j_splits[1], fill_in, false, false, -1, 0);
-
-          // Matrix projected_fill_in = matmul(matmul(A.U(i, level), fill_in), A.U(j, level), false, true);
-
-          // if (F.exists(i, j, level)) {
-          //   F(i, j, level) += projected_fill_in;
-          // }
-          // else {
-          //   F.insert(i, j, level, std::move(projected_fill_in));
-          // }
-        }
-      }
-    }
-  }
 }
 
 void
@@ -448,35 +418,6 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
   }
 }
 
-static bool
-col_has_admissible_blocks(SymmetricSharedBasisMatrix& A, const int64_t block,
-                          const int64_t level) {
-  bool has_admis = false;
-  const int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; i++) {
-    if (!A.is_admissible.exists(i, block, level) || // part of upper level admissible block
-        exists_and_admissible(A, i, block, level)) {
-      has_admis = true;
-      break;
-    }
-  }
- return has_admis;
-}
-
-static bool
-row_has_admissible_blocks(SymmetricSharedBasisMatrix& A, const int64_t block,
-                          const int64_t level) {
-  bool has_admis = false;
-  for (int64_t j = 0; j < block; j++) {
-    if (!A.is_admissible.exists(block, j, level) || // part of upper level admissible block
-        exists_and_admissible(A, block, j, level)) {
-      has_admis = true;
-      break;
-    }
-  }
-  return has_admis;
-}
-
 void
 update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
                          const int64_t block,
@@ -488,8 +429,8 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   const int64_t block_size = A.D(block, block, level).cols;
 
   Matrix fill_in(block_size, block_size);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_admissible(A, i, block, level)) {
+  for (int64_t i : far_neighbours(block, level)) {
+    if (i >= block+1) {
       if (F.exists(i, block, level)) {
         fill_in += matmul(F(i, block, level), F(i, block, level), true, false);
         F.erase(i, block, level);
@@ -498,14 +439,48 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   }
 
   fill_in += matmul(A.U(block, level), matmul(US(block, level), A.U(block, level), false, true));
+  // fill_in = concat(fill_in, matmul(A.U(block, level), US(block, level)), 1);
 
   Matrix col_concat_T = transpose(fill_in);
-
   Matrix Q,R;
-  std::tie(Q, R) = pivoted_qr_nopiv_return(col_concat_T, A.ranks(block, level));
+  Matrix Si, Vi;
 
-  Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
-  rq(R, Si, Vi);
+  switch(opts.kind_of_recompression) {
+  case 0:                       // accuracy truncated
+    int64_t rank;
+    std::tie(Q, R, rank) = error_pivoted_qr(col_concat_T,
+                                            opts.qr_accuracy * 1e-1,
+                                            false, false);
+
+    Q.shrink(A.U(block,level).rows, A.ranks(block, level));
+    R.shrink(A.ranks(block, level), A.ranks(block, level));
+
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
+    break;
+  case 1:                       // lapack constant rank QR
+    std::tie(Q, R) = pivoted_qr_nopiv_return(col_concat_T, A.ranks(block, level));
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
+    break;
+  case 2:                       // constant rank
+    std::tie(Q, R) = truncated_pivoted_qr(col_concat_T, A.ranks(block, level));
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
+    break;
+  case 3:                       // fixed rank svd
+    double err;
+    std::tie(Q, Si, Vi, err) = truncated_svd(col_concat_T, A.ranks(block, level));
+    break;
+  default:
+    throw std::runtime_error("wrong option for kind_of_recompression");
+  }
 
   US.erase(block, level);
   US.insert(block, level, std::move(Si));
@@ -536,22 +511,58 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   // This is a temporary way to verify the cluster basis update.
   Matrix fill_in(block_size, block_size);
 
-  for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_admissible(A, block, j, level)) {
+  for (int64_t j : far_neighbours(block, level)) {
+    if (j < block) {
       if (F.exists(block, j, level)) {
         fill_in += matmul(F(block, j, level), F(block, j, level), false, true);
-        // F.erase(block, j, level);
+        F.erase(block, j, level);
       }
     }
   }
 
   fill_in += matmul(matmul(A.U(block, level), US(block, level)), A.U(block, level), false, true);
 
-  Matrix Q,R;
-  std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
+  // fill_in = concat(fill_in, matmul(A.U(block, level), US(block, level)), 0);
 
-  Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
-  rq(R, Si, Vi);
+  Matrix Q,R;
+  Matrix Si, Vi;
+
+  switch(opts.kind_of_recompression) {
+  case 0:                       // accuracy truncated
+    int64_t rank;
+    std::tie(Q, R, rank) = error_pivoted_qr(fill_in,
+                                            opts.qr_accuracy * 1e-1,
+                                            false, false);
+
+    Q.shrink(A.U(block,level).rows, A.ranks(block, level));
+    R.shrink(A.ranks(block, level), A.ranks(block, level));
+
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
+    break;
+  case 1:                       // lapack constant rank QR
+    std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, A.ranks(block, level));
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
+    break;
+  case 2:                       // constant rank
+    std::tie(Q, R) = truncated_pivoted_qr(fill_in, A.ranks(block, level));
+    Vi.destructive_resize(R.rows, R.cols);
+    Si.destructive_resize(R.rows, R.rows);
+
+    rq(R, Si, Vi);
+    break;
+  case 3:                       // fixed rank svd
+    double err;
+    std::tie(Q, Si, Vi, err) = truncated_svd(fill_in, A.ranks(block, level));
+    break;
+  default:
+    throw std::runtime_error("wrong option for kind_of_recompression");
+  }
 
   US.erase(block, level);
   US.insert(block, level, std::move(Si));
@@ -569,14 +580,12 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
 void
 multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                      const int64_t level) {
-  int64_t nblocks = pow(2, level);
-  // capture the pre-matrix for verification of factorization.
   auto U_F = make_complement(A.U(block, level));
 
   // left multiply with the complement along the (symmetric) row.
   A.D(block, block, level) = matmul(U_F, A.D(block, block, level), true);
-  for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_inadmissible(A, block, j, level)) {
+  for (int64_t j : near_neighbours(block, level)) {
+    if (j < block) {
       auto D_splits =
         A.D(block, j, level).split({},
                                    std::vector<int64_t>(1,
@@ -588,8 +597,8 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
 
   // right multiply with the transpose of the complement
   A.D(block, block, level) = matmul(A.D(block, block, level), U_F);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i > block) {
       auto D_splits =
         A.D(i, block, level).split(std::vector<int64_t>(1, A.D(i, block, level).rows -
                                                         A.ranks(i, level)),
@@ -605,8 +614,8 @@ update_row_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
                     int64_t block, int64_t level,
                     const Hatrix::RowMap<Hatrix::Matrix>& r) {
   // update the S blocks with the new projected basis.
-  for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_admissible(A, block, j, level)) {
+  for (int64_t j : far_neighbours(block, level)) {
+    if (j < block) {
       A.S(block, j, level) = matmul(r(block), A.S(block, j, level));
     }
   }
@@ -618,8 +627,8 @@ update_col_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
                     const Hatrix::RowMap<Hatrix::Matrix>& t) {
   int64_t nblocks = pow(2, level);
   // update the S blocks in this column.
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_admissible(A, i, block, level)) {
+  for (int64_t i : far_neighbours(block, level)) {
+    if (i > block) {
       A.S(i, block, level) = matmul(A.S(i, block, level), t(block), false, true);
     }
   }
@@ -632,7 +641,7 @@ update_col_transfer_basis(Hatrix::SymmetricSharedBasisMatrix& A,
   // update the transfer matrices one level higher
   const int64_t parent_level = level - 1;
   const int64_t parent_block = block / 2;
-  if (parent_level > 0 && col_has_admissible_blocks(A, parent_block, parent_level)) {
+  if (parent_level > 0) {
     const int64_t c1 = parent_block * 2;
     const int64_t c2 = parent_block * 2 + 1;
 
@@ -668,7 +677,7 @@ update_row_transfer_basis(Hatrix::SymmetricSharedBasisMatrix& A,
   // update the transfer matrices one level higher.
   const int64_t parent_block = block / 2;
   const int64_t parent_level = level - 1;
-  if (parent_level > 0 && row_has_admissible_blocks(A, parent_block, parent_level)) {
+  if (parent_level > 0) {
     const int64_t c1 = parent_block * 2;
     const int64_t c2 = parent_block * 2 + 1;
 
@@ -713,7 +722,6 @@ update_row_cluster_basis_and_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
   }
 
   if (found_row_fill_in) {    // update row cluster bases
-    // recompress fill-ins on this row so that they dont generate further fill-ins.
     update_row_cluster_basis(A, block, level, F, r, opts);
     update_row_S_blocks(A, block, level, r);
     update_row_transfer_basis(A, block, level, r);
@@ -795,15 +803,13 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
     // Update coupling matrices of each admissible block to add fill in contributions.
     for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j <= i; ++j) {
-        if (exists_and_admissible(A, i, j, level)) {
-          if (F.exists(i, j, level)) {
-            Matrix projected_fill_in = matmul(matmul(A.U(i, level), F(i, j, level),
-                                                     true),
-                                              A.U(j, level));
-            A.S(i, j, level) += projected_fill_in;
-            F.erase(i, j, level);
-          }
+      for (int64_t j : far_neighbours(i, level)) {
+        if (F.exists(i, j, level)) {
+          Matrix projected_fill_in = matmul(matmul(A.U(i, level), F(i, j, level),
+                                                   true),
+                                            A.U(j, level));
+          A.S(i, j, level) += projected_fill_in;
+          F.erase(i, j, level);
         }
       }
     }

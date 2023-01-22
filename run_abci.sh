@@ -24,33 +24,31 @@ export OMP_PLACES=cores
 # mpirun -n 1 -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
 
 # mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
-make -j H2_dtd VERBOSE=1
+make -j H2_main
 
-export GMON_OUT_PREFIX=gmon.out-
+# export GMON_OUT_PREFIX=gmon.out-
 
-for adm in 0.8; do
+for adm in 4; do
     nleaf=256
-    ndim=3
-    max_rank=150
+    ndim=2
+    max_rank=25
 
-    for N in 8192; do
-
-        mpirun -n 2 \
-               ./bin/H2_dtd --N $N \
+    for N in 32768; do
+        ./bin/H2_main --N $N \
                --nleaf $nleaf \
                --kernel_func laplace \
                --kind_of_geometry grid \
                --ndim $ndim \
                --max_rank $max_rank \
-               --accuracy 1e-8 \
+               --accuracy 1e-12 \
                --admis $adm \
                --admis_kind geometry \
                --construct_algorithm miro \
-               --add_diag 1e-10 \
+               --add_diag 1e-9 \
                --use_nested_basis
     done
 done
 
-gprof -s bin/H2_dtd gmon.out-*
-gprof -q bin/H2_dtd gmon.sum > call_graph.out
-gprof bin/H2_dtd gmon.sum > gprof_out.out
+# gprof -s bin/H2_dtd gmon.out-*
+# gprof -q bin/H2_dtd gmon.sum > call_graph.out
+# gprof bin/H2_dtd gmon.sum > gprof_out.out

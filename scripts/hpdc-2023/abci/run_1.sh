@@ -1,10 +1,10 @@
 #!/bin/bash
 #$ -cwd
-#$ -l rt_F=16
-#$ -l h_rt=2:00:00
-#$ -N HSS_p16
-#$ -o HSS_p16_out.log
-#$ -e HSS_p16_err.log
+#$ -l rt_F=1
+#$ -l h_rt=5:00:00
+#$ -N HSS_P1
+#$ -o HSS_P1_out.log
+#$ -e HSS_P1_err.log
 
 source ~/.bashrc
 
@@ -23,29 +23,25 @@ make -j H2_dtd
 # rm gmon.out-*
 # export GMON_OUT_PREFIX=gmon.out-
 
-for adm in 7; do
+for adm in 5; do
     ndim=2
 
     for nleaf in 512; do
         for max_rank in 25; do
-    	    for N in 131072; do
-                mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST \
-                       ./bin/H2_dtd --N $N \
+    	    for N in 8192; do
+                mpirun -n 1 -ppn 1 -f $SGE_JOB_HOSTLIST ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \
                	       --kind_of_geometry grid \
                	       --ndim $ndim \
                	       --max_rank $max_rank \
-               	       --accuracy 1e-12 \
+               	       --accuracy 1e-8 \
                	       --admis $adm \
                	       --admis_kind geometry \
                	       --construct_algorithm miro \
-               	       --add_diag 1e-9 \
+               	       --add_diag 1e-8 \
                	       --use_nested_basis
     	    done
         done
     done
 done
-
-# gprof -s bin/H2_dtd gmon.out-*
-# gprof -q bin/H2_dtd gmon.sum > NEW.gprof

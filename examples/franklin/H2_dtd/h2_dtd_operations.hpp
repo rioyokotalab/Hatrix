@@ -91,3 +91,8 @@ update_parsec_pointers(Hatrix::SymmetricSharedBasisMatrix& A,
 void h2_dc_init_maps();
 void h2_dc_destroy_maps();
 void h2_destroy_arenas(int64_t max_level, int64_t min_level);
+
+void
+factorize_setup(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                const Hatrix::Args& opts);
+void factorize_teardown();

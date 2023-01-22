@@ -1,10 +1,10 @@
 #!/bin/bash
 #$ -cwd
-#$ -l rt_F=16
+#$ -l rt_F=32
 #$ -l h_rt=2:00:00
-#$ -N HSS_p16
-#$ -o HSS_p16_out.log
-#$ -e HSS_p16_err.log
+#$ -N HSS_p32
+#$ -o HSS_p32_out.log
+#$ -e HSS_p32_err.log
 
 source ~/.bashrc
 
@@ -28,8 +28,8 @@ for adm in 7; do
 
     for nleaf in 512; do
         for max_rank in 25; do
-    	    for N in 131072; do
-                mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST \
+    	    for N in 262144; do
+                mpirun -n 32 -ppn 1 -f $SGE_JOB_HOSTLIST \
                        ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \

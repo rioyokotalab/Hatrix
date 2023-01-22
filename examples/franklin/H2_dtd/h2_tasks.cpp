@@ -146,6 +146,7 @@ task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task)
   cholesky(D_splits[0], Hatrix::Lower);
   solve_triangular(D_splits[0], D_splits[2], Hatrix::Right, Hatrix::Lower,
                    false, true, 1.0);
+  syrk(D_splits[2], D_splits[3], Hatrix::Lower, false, -1, 1);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -352,6 +353,12 @@ task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   MatrixWrapper D_unelim(_D_unelim, D_unelim_rows, D_unelim_cols, D_unelim_rows);
   MatrixWrapper D_c1c2(_D_c1c2, D_c1c2_rows, D_c1c2_cols, D_c1c2_rows);
+
+  // for (int i = 0; i < D_unelim.rows; ++i) {
+  //   for (int j = 0; j < D_unelim.cols; ++j) {
+  //     std::cout << "i-> " << i << " j-> " << j << " b: " << D_unelim(i,j) << std::endl;
+  //   }
+  // }
 
   auto D_unelim_splits = split_dense(D_unelim,
                                      D_unelim_row_rank,
