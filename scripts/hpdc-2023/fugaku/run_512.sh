@@ -1,13 +1,13 @@
 #!/bin/bash
-#PJM -L "node=64"
+#PJM -L "node=512"
 #PJM -L "rscunit=rscunit_ft01"
-#PJM -L "rscgrp=small"
+#PJM -L "rscgrp=large"
 #PJM -L "elapse=24:00:00"
 #PJM -L "freq=2200"
 #PJM -L "throttling_state=0"
 #PJM -L "issue_state=0"
 #PJM -L "ex_pipe_state=0"
-#PJM --mpi "proc=64"
+#PJM --mpi "proc=512"
 #PJM --mpi "max-proc-per-node=1"
 #PJM -s
 
@@ -38,8 +38,8 @@ for adm in 7; do
 
     for nleaf in 512; do
         for max_rank in 25; do
-    	    for N in 65536; do
-                mpiexec -stdout out_64.log -stderr err_64.log ./bin/H2_dtd --N $N \
+    	    for N in 524288; do
+                mpiexec -stdout out_512.log -stderr err_512.log ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \
                	       --kind_of_geometry grid \

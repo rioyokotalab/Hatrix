@@ -24,6 +24,7 @@ using namespace Hatrix;
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
 
+  std::cout << "start args.";
   Args opts(argc, argv);
 
   auto start_domain = std::chrono::system_clock::now();
