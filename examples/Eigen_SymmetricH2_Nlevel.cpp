@@ -1255,7 +1255,7 @@ int main(int argc, char ** argv) {
 #endif
 
   bool s = false;
-  auto b = is_non_synthetic ?
+  auto b = N < 10000 || is_non_synthetic ?
            Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : 10 * (1. / Hatrix::PV);
   auto a = -b;
   int64_t v_a, v_b, temp1, temp2;
