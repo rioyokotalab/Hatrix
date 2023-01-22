@@ -1970,13 +1970,13 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_U.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_temp_fill_in_rows.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_temp_fill_in_cols.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_r.super);
-  parsec_dtd_data_flush_all(dtd_tp, &parsec_t.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_F.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_temp_fill_in_rows.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_temp_fill_in_cols.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_US.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_r.super);
+  // parsec_dtd_data_flush_all(dtd_tp, &parsec_t.super);
 
   int rc = parsec_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");

@@ -38,7 +38,7 @@ for adm in 7; do
 
     for nleaf in 512; do
         for max_rank in 25; do
-    	    for N in 65536; do
+    	    for N in 131072; do
                 mpiexec -stdout out_64.log -stderr err_64.log ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \

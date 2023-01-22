@@ -1,5 +1,5 @@
 #!/bin/bash
-#PJM -L "node=64"
+#PJM -L "node=256"
 #PJM -L "rscunit=rscunit_ft01"
 #PJM -L "rscgrp=small"
 #PJM -L "elapse=24:00:00"
@@ -7,7 +7,7 @@
 #PJM -L "throttling_state=0"
 #PJM -L "issue_state=0"
 #PJM -L "ex_pipe_state=0"
-#PJM --mpi "proc=64"
+#PJM --mpi "proc=256"
 #PJM --mpi "max-proc-per-node=1"
 #PJM -s
 
@@ -33,13 +33,13 @@ export XOS_MMM_L_PAGING_POLICY="demand:demand:demand"
 # make clean
 make -j H2_dtd
 
-for adm in 7; do
+for adm in 10; do
     ndim=2
 
     for nleaf in 512; do
         for max_rank in 25; do
-    	    for N in 65536; do
-                mpiexec -stdout out_64.log -stderr err_64.log ./bin/H2_dtd --N $N \
+    	    for N in 262144; do
+                mpiexec -stdout out_256.log -stderr err_256.log ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \
                	       --kind_of_geometry grid \
