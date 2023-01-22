@@ -38,11 +38,11 @@ make -j H2_dtd
 # make -j H2_main
 
 for adm in 0.8; do
-    nleaf=1024
+    nleaf=512
     ndim=3
     max_rank=50
 
-    for N in 131072; do
+    for N in 65563; do
         echo "compile and execute"
         mpiexec -stdout test_out.log -stderr test_err.log ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
