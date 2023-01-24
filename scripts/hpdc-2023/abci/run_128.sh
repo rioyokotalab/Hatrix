@@ -1,10 +1,10 @@
 #!/bin/bash
 #$ -cwd
-#$ -l rt_F=32
-#$ -l h_rt=2:00:00
-#$ -N HSS_p32
-#$ -o HSS_p32_out.log
-#$ -e HSS_p32_err.log
+#$ -l rt_F=128
+#$ -l h_rt=1:00:00
+#$ -N HSS128
+#$ -o HSS128_out.log
+#$ -e HSS128_err.log
 
 source ~/.bashrc
 
@@ -15,21 +15,17 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/acb10922qh/gitrepos/parsec/build/l
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/lib64
 
 export OMP_PLACES=cores
-# export VT_CONFIG=/home/acb10922qh/gitrepos/Hatrix/vt_config.conf
 
 # make clean
 make -j H2_dtd
-
-# rm gmon.out-*
-# export GMON_OUT_PREFIX=gmon.out-
 
 for adm in 7; do
     ndim=2
 
     for nleaf in 512; do
-        for max_rank in 100; do
-    	    for N in 262144; do
-                mpirun -n 32 -ppn 1 -f $SGE_JOB_HOSTLIST \
+        for max_rank in 25; do
+    	    for N in 1048576; do
+                mpirun -n 128 -ppn 1 -f $SGE_JOB_HOSTLIST \
                        ./bin/H2_dtd --N $N \
                	       --nleaf $nleaf \
                	       --kernel_func laplace \
@@ -46,6 +42,3 @@ for adm in 7; do
         done
     done
 done
-
-# gprof -s bin/H2_dtd gmon.out-*
-# gprof -q bin/H2_dtd gmon.sum > NEW.gprof

@@ -27,7 +27,7 @@ for adm in 7; do
     ndim=2
 
     for nleaf in 512; do
-        for max_rank in 25; do
+        for max_rank in 100; do
     	    for N in 131072; do
                 mpirun -n 16 -ppn 1 -f $SGE_JOB_HOSTLIST \
                        ./bin/H2_dtd --N $N \

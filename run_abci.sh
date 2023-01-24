@@ -29,9 +29,9 @@ make -j H2_main
 # export GMON_OUT_PREFIX=gmon.out-
 
 for adm in 4; do
-    nleaf=256
+    nleaf=512
     ndim=2
-    max_rank=25
+    max_rank=200
 
     for N in 32768; do
         ./bin/H2_main --N $N \
