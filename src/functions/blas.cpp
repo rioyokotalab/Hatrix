@@ -44,7 +44,8 @@ void matmul(const Matrix<double>& A, const Matrix<double>& B, Matrix<double>& C,
   assert(transA ? A.rows : A.cols == transB ? B.cols : B.rows);
   cblas_dgemm(CblasColMajor, transA ? CblasTrans : CblasNoTrans,
               transB ? CblasTrans : CblasNoTrans, C.rows, C.cols,
-              transA ? A.rows : A.cols, alpha, &A, A.stride, &B, B.stride, beta,
+              transA ? A.rows : A.cols, alpha,
+              &A, A.stride, &B, B.stride, beta,
               &C, C.stride);
 };
 
@@ -109,8 +110,7 @@ void triangular_matmul(const Matrix<float>& A, Matrix<float>& B, Side side, Mode
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
               diag ? CblasUnit : CblasNonUnit, B.rows, B.cols,
-              static_cast<float>(alpha), &A,
-              A.stride, &B, B.stride);
+              static_cast<float>(alpha), &A, A.stride, &B, B.stride);
 }
 
 template <>
@@ -121,8 +121,8 @@ void triangular_matmul(const Matrix<double>& A, Matrix<double>& B, Side side, Mo
   cblas_dtrmm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
-              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols, alpha, &A,
-              A.stride, &B, B.stride);
+              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols,
+              alpha, &A, A.stride, &B, B.stride);
 }
 
 template <typename DT>
@@ -140,8 +140,7 @@ void solve_triangular(const Matrix<float>& A, Matrix<float>& B, Side side, Mode 
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
               diag ? CblasUnit : CblasNonUnit, B.rows, B.cols,
-              static_cast<float>(alpha), &A,
-              A.stride, &B, B.stride);
+              static_cast<float>(alpha), &A, A.stride, &B, B.stride);
 }
 
 template <>
@@ -150,8 +149,8 @@ void solve_triangular(const Matrix<double>& A, Matrix<double>& B, Side side, Mod
   cblas_dtrsm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
-              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols, alpha, &A,
-              A.stride, &B, B.stride);
+              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols,
+              alpha, &A, A.stride, &B, B.stride);
 }
 
 template <typename DT>
