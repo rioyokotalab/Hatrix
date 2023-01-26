@@ -31,7 +31,8 @@ void matmul(const Matrix<float>& A, const Matrix<float>& B, Matrix<float>& C, bo
   assert(transA ? A.rows : A.cols == transB ? B.cols : B.rows);
   cblas_sgemm(CblasColMajor, transA ? CblasTrans : CblasNoTrans,
               transB ? CblasTrans : CblasNoTrans, C.rows, C.cols,
-              transA ? A.rows : A.cols, alpha, &A, A.stride, &B, B.stride, beta,
+              transA ? A.rows : A.cols, static_cast<float>(alpha),
+              &A, A.stride, &B, B.stride, static_cast<float>(beta),
               &C, C.stride);
 };
 
@@ -74,10 +75,10 @@ void syrk(const Matrix<float>& A, Matrix<float>& C, Mode uplo, bool transA, doub
               transA ? CblasTrans : CblasNoTrans,
               C.rows,
               transA ? A.rows : A.cols,
-              alpha,
+              static_cast<float>(alpha),
               &A,
               A.stride,
-              beta,
+              static_cast<float>(beta),
               &C,
               C.stride);
 }
@@ -107,7 +108,8 @@ void triangular_matmul(const Matrix<float>& A, Matrix<float>& B, Side side, Mode
   cblas_strmm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
-              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols, alpha, &A,
+              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols,
+              static_cast<float>(alpha), &A,
               A.stride, &B, B.stride);
 }
 
@@ -137,7 +139,8 @@ void solve_triangular(const Matrix<float>& A, Matrix<float>& B, Side side, Mode 
   cblas_strsm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
               uplo == Upper ? CblasUpper : CblasLower,
               transA ? CblasTrans : CblasNoTrans,
-              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols, alpha, &A,
+              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols,
+              static_cast<float>(alpha), &A,
               A.stride, &B, B.stride);
 }
 
@@ -152,13 +155,13 @@ void solve_triangular(const Matrix<double>& A, Matrix<double>& B, Side side, Mod
 }
 
 template <typename DT>
-// TODO explicit conversion
 void solve_diagonal(const Matrix<DT>& D, Matrix<DT>& B, Side side, double alpha) {
   assert(side == Left ? D.cols == B.rows : B.cols == D.rows);
 
+  DT alpha_dt = static_cast<DT>(alpha);
   for(int64_t j = 0; j < B.cols; j++) {
     for(int64_t i = 0; i < B.rows; i++) {
-      B(i, j) = alpha * B(i, j) / (side == Left ? D(i, i) : D(j, j));
+      B(i, j) = alpha_dt * B(i, j) / (side == Left ? D(i, i) : D(j, j));
     }
   }
 }
@@ -166,7 +169,7 @@ void solve_diagonal(const Matrix<DT>& D, Matrix<DT>& B, Side side, double alpha)
 template <>
 void scale(Matrix<float>& A, double alpha) {
   for (int64_t j=0; j<A.cols; ++j) {
-    cblas_sscal(A.rows, alpha, &A(0, j), 1);
+    cblas_sscal(A.rows, static_cast<float>(alpha), &A(0, j), 1);
   }
 }
 
