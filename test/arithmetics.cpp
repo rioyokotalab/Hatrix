@@ -185,6 +185,55 @@ TYPED_TEST(ArithmeticTests, UpperTriangularPart) {
   }
 }
 
+template <typename DT>
+class ScalarArithmeticTests : public testing::Test {
+  protected:
+  // Matrix dimensions used in the tests
+  std::vector<std::tuple<int64_t, int64_t, DT>> params = {
+    std::make_tuple(5, 5, 7.9834),
+    std::make_tuple(11, 21, -4),
+    std::make_tuple(18, 5, 1/8)
+  };
+};
+
+// template types used in the tests
+using Types = ::testing::Types<float, double>;
+TYPED_TEST_SUITE(ScalarArithmeticTests, Types);
+
+TYPED_TEST(ScalarArithmeticTests, ScalarMultiplicationOperator) {
+  for (auto const& [m, n, alpha] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> B = A * alpha;
+    Hatrix::Matrix<TypeParam> C = alpha * A;
+    Hatrix::scale(A, alpha);
+
+    // Check result
+    for (int64_t i = 0; i < m; ++i) {
+      for (int64_t j = 0; j < n; ++j) {
+        EXPECT_EQ(A(i, j), C(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (scalar * matrix) ("<<m<<"x"<<n<<" matrix, alpha = "<<alpha<<")";
+        EXPECT_EQ(A(i, j), B(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (matrix * scalar) ("<<m<<"x"<<n<<" matrix, alpha = "<<alpha<<")";
+      }
+    }
+  }
+}
+
+TYPED_TEST(ScalarArithmeticTests, ScalarMultiplicationEqualsOperator) {
+  for (auto const& [m, n, alpha] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_copy(A);
+    A *= alpha;
+
+    // Check result
+    for (int64_t i = 0; i < m; ++i) {
+      for (int64_t j = 0; j < n; ++j) {
+        EXPECT_EQ(A(i, j), A_copy(i, j) * alpha) << "Wrong value at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix, alpha = "<<alpha<<")";
+      }
+    }
+  }
+}
+
+//TODO add division tests
+
 
 class MatMulOperatorTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>> {};
@@ -220,53 +269,5 @@ INSTANTIATE_TEST_SUITE_P(
       std::string name = ("M" + std::to_string(std::get<0>(info.param)) + "K" +
                           std::to_string(std::get<1>(info.param)) + "N" +
                           std::to_string(std::get<2>(info.param)));
-      return name;
-    });
-
-TEST_P(ScalarMulOperatorTests, ScalarMultiplicationOperator) {
-  int64_t M, N;
-  double alpha;
-  Hatrix::Context::init();
-  std::tie(M, N, alpha) = GetParam();
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
-  Hatrix::Matrix B = A * alpha;
-  Hatrix::Matrix C = alpha * A;
-  Hatrix::scale(A, alpha);
-
-  // Check result
-  for (int64_t i = 0; i < M; ++i) {
-    for (int64_t j = 0; j < N; ++j) {
-      EXPECT_EQ(A(i, j), C(i, j));
-      EXPECT_EQ(A(i, j), B(i, j));
-    }
-  }
-  Hatrix::Context::finalize();
-}
-
-TEST_P(ScalarMulOperatorTests, ScalarMultiplicationEqualsOperator) {
-  int64_t M, N;
-  double alpha;
-  Hatrix::Context::init();
-  std::tie(M, N, alpha) = GetParam();
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
-  Hatrix::Matrix A_copy(A);
-  A *= alpha;
-
-  // Check result
-  for (int64_t i = 0; i < M; ++i) {
-    for (int64_t j = 0; j < N; ++j) {
-      EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
-    }
-  }
-  Hatrix::Context::finalize();
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    Operator, ScalarMulOperatorTests,
-    testing::Values(std::make_tuple(5, 5, 7.9834), std::make_tuple(11, 21, -4),
-                    std::make_tuple(18, 5, 1 / 8)),
-    [](const testing::TestParamInfo<ScalarMulOperatorTests::ParamType>& info) {
-      std::string name = ("M" + std::to_string(std::get<0>(info.param)) + "N" +
-                          std::to_string(std::get<1>(info.param)));
       return name;
     });

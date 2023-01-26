@@ -62,7 +62,7 @@ Matrix<DT>& operator/=(Matrix<DT>& A, DT alpha) {
 }
 
 template <typename DT>
-Matrix<DT> operator/(Matrix<DT>& A, DT alpha) {
+Matrix<DT> operator/(const Matrix<DT>& A, DT alpha) {
   Matrix<DT> C(A, true);
   C/alpha;
   return C;
@@ -144,9 +144,9 @@ template Matrix<double> operator*(const Matrix<double>& A, double alpha);
 template Matrix<double> operator*(double alpha, const Matrix<double>& A);
 
 template Matrix<float>& operator/=(Matrix<float>& A, float alpha);
-template Matrix<float> operator/(Matrix<float>& A, float alpha);
+template Matrix<float> operator/(const Matrix<float>& A, float alpha);
 template Matrix<double>& operator/=(Matrix<double>& A, double alpha);
-template Matrix<double> operator/(Matrix<double>& A, double alpha);
+template Matrix<double> operator/(const Matrix<double>& A, double alpha);
 
 template Matrix<float> abs(const Matrix<float>& A);
 template Matrix<double> abs(const Matrix<double>& A);
