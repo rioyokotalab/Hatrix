@@ -10,6 +10,7 @@ namespace Hatrix {
 template Matrix<double> generate_random_spd_matrix(int64_t, double);
 template Matrix<double> generate_random_matrix(int64_t, int64_t);
 template Matrix<double> generate_low_rank_matrix(int64_t, int64_t);
+template Matrix<float> generate_identity_matrix(int64_t, int64_t);
 template Matrix<double> generate_identity_matrix(int64_t, int64_t);
 template Matrix<double> generate_range_matrix(int64_t, int64_t, int64_t);
 template Matrix<double> generate_laplacend_matrix(const std::vector<std::vector<double>>&,

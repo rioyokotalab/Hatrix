@@ -120,7 +120,7 @@ std::tuple<Matrix<DT>, Matrix<DT>, int64_t> error_pivoted_qr(Matrix<DT>& A, doub
 
 // Compute the Frobenius norm of a matrix
 template <typename DT>
-double norm(const Matrix<DT>& A);
+DT norm(const Matrix<DT>& A);
 
 template <typename DT>
 void householder_qr_compact_wy(Matrix<DT>& A, Matrix<DT>& T);
@@ -156,5 +156,10 @@ std::tuple<Matrix<DT>, std::vector<int64_t>> error_id_row(Matrix<DT>& A, double 
 
 template <typename DT>
 std::vector<DT> get_eigenvalues(const Matrix<DT>& A);
+
+//TODO should this be private?
+template <typename DT>
+std::tuple<int64_t, std::vector<int64_t>, std::vector<DT>>
+partial_pivoted_qr(Matrix<DT>& A, const double stop_tol, bool relative);
 
 }  // namespace Hatrix
