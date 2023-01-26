@@ -13,43 +13,30 @@
 
 namespace Hatrix {
 
-template void array_copy(const double* from, double* to, int64_t size);
+template <>
+void array_copy(const float* from, float* to, int64_t size) {
+  cblas_scopy(size, from, 1, to, 1);
+}
 
-template void matmul(const Matrix<double>& A, const Matrix<double>& B, Matrix<double>& C, bool transA = false,
-            bool transB = false, double alpha = 1.0, double beta = 1.0);
-
-template Matrix<double> matmul(const Matrix<double>& A, const Matrix<double>& B, bool transA = false,
-              bool transB = false, double alpha = 1.0);
-
-template void syrk(const Matrix<double>& A, Matrix<double>& C, Mode uplo, bool transA, double alpha,
-            double beta);
-
-
-template void triangular_matmul(const Matrix<double>& A, Matrix<double>& B, Side side, Mode uplo,
-                       bool transA, bool diag, double alpha = 1.0);
-
-template Matrix<double> triangular_matmul_out(const Matrix<double>& A, const Matrix<double>& B, Side side, Mode uplo,
-			     bool transA, bool diag, double alpha = 1.0);
-
-template void solve_triangular(const Matrix<double>& A, Matrix<double>& B, Side side, Mode uplo,
-                      bool unit_diag, bool transA = false, double alpha = 1.0);
-
-template void solve_diagonal(const Matrix<double>& D, Matrix<double>& B, Side side, double alpha = 1.0);
-
-template void scale(Matrix<double>& A, double alpha);
-
-template void row_scale(Matrix<double>& A, const Matrix<double>& D);
-
-template void column_scale(Matrix<double>& A, const Matrix<double>& D);
-
-
-template <typename DT>
-void array_copy(const DT* from, DT* to, int64_t size) {
+template <>
+void array_copy(const double* from, double* to, int64_t size) {
   cblas_dcopy(size, from, 1, to, 1);
 }
 
-template <typename DT>
-void matmul(const Matrix<DT>& A, const Matrix<DT>& B, Matrix<DT>& C, bool transA,
+template <>
+void matmul(const Matrix<float>& A, const Matrix<float>& B, Matrix<float>& C, bool transA,
+            bool transB, double alpha, double beta) {
+  assert(transA ? A.cols : A.rows == C.rows);
+  assert(transB ? B.rows : B.cols == C.cols);
+  assert(transA ? A.rows : A.cols == transB ? B.cols : B.rows);
+  cblas_sgemm(CblasColMajor, transA ? CblasTrans : CblasNoTrans,
+              transB ? CblasTrans : CblasNoTrans, C.rows, C.cols,
+              transA ? A.rows : A.cols, alpha, &A, A.stride, &B, B.stride, beta,
+              &C, C.stride);
+};
+
+template <>
+void matmul(const Matrix<double>& A, const Matrix<double>& B, Matrix<double>& C, bool transA,
             bool transB, double alpha, double beta) {
   assert(transA ? A.cols : A.rows == C.rows);
   assert(transB ? B.rows : B.cols == C.cols);
@@ -63,6 +50,7 @@ void matmul(const Matrix<DT>& A, const Matrix<DT>& B, Matrix<DT>& C, bool transA
 template <typename DT>
 Matrix<DT> matmul(const Matrix<DT>& A, const Matrix<DT>& B, bool transA, bool transB,
               double alpha) {
+  // TODO is the same check performed by matmul anyway?
   if (transA) {
     if (transB) { assert(A.rows == B.cols); }
     else        { assert(A.rows == B.rows); }
@@ -77,8 +65,25 @@ Matrix<DT> matmul(const Matrix<DT>& A, const Matrix<DT>& B, bool transA, bool tr
   return C;
 }
 
-template <typename DT>
-void syrk(const Matrix<DT>& A, Matrix<DT>& C, Mode uplo, bool transA, double alpha,
+template <>
+void syrk(const Matrix<float>& A, Matrix<float>& C, Mode uplo, bool transA, double alpha,
+     double beta) {
+  assert(C.rows == C.cols);
+  cblas_ssyrk(CblasColMajor,
+              uplo == Lower ? CblasLower : CblasUpper,
+              transA ? CblasTrans : CblasNoTrans,
+              C.rows,
+              transA ? A.rows : A.cols,
+              alpha,
+              &A,
+              A.stride,
+              beta,
+              &C,
+              C.stride);
+}
+
+template <>
+void syrk(const Matrix<double>& A, Matrix<double>& C, Mode uplo, bool transA, double alpha,
      double beta) {
   assert(C.rows == C.cols);
   cblas_dsyrk(CblasColMajor,
@@ -94,8 +99,20 @@ void syrk(const Matrix<DT>& A, Matrix<DT>& C, Mode uplo, bool transA, double alp
               C.stride);
 }
 
-template <typename DT>
-void triangular_matmul(const Matrix<DT>& A, Matrix<DT>& B, Side side, Mode uplo,
+template <>
+void triangular_matmul(const Matrix<float>& A, Matrix<float>& B, Side side, Mode uplo,
+                       bool transA, bool diag, double alpha) {
+  assert(side == Left ? (transA ? A.rows == B.rows : A.cols == B.rows)
+                      : (transA ? B.cols == A.cols : B.cols == A.rows));
+  cblas_strmm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
+              uplo == Upper ? CblasUpper : CblasLower,
+              transA ? CblasTrans : CblasNoTrans,
+              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols, alpha, &A,
+              A.stride, &B, B.stride);
+}
+
+template <>
+void triangular_matmul(const Matrix<double>& A, Matrix<double>& B, Side side, Mode uplo,
                        bool transA, bool diag, double alpha) {
   assert(side == Left ? (transA ? A.rows == B.rows : A.cols == B.rows)
                       : (transA ? B.cols == A.cols : B.cols == A.rows));
@@ -114,8 +131,18 @@ Matrix<DT> triangular_matmul_out(const Matrix<DT>& A, const Matrix<DT>& B, Side 
   return C;
 }
 
-template <typename DT>
-void solve_triangular(const Matrix<DT>& A, Matrix<DT>& B, Side side, Mode uplo,
+template <>
+void solve_triangular(const Matrix<float>& A, Matrix<float>& B, Side side, Mode uplo,
+                      bool diag, bool transA, double alpha) {
+  cblas_strsm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
+              uplo == Upper ? CblasUpper : CblasLower,
+              transA ? CblasTrans : CblasNoTrans,
+              diag ? CblasUnit : CblasNonUnit, B.rows, B.cols, alpha, &A,
+              A.stride, &B, B.stride);
+}
+
+template <>
+void solve_triangular(const Matrix<double>& A, Matrix<double>& B, Side side, Mode uplo,
                       bool diag, bool transA, double alpha) {
   cblas_dtrsm(CblasColMajor, side == Left ? CblasLeft : CblasRight,
               uplo == Upper ? CblasUpper : CblasLower,
@@ -125,6 +152,7 @@ void solve_triangular(const Matrix<DT>& A, Matrix<DT>& B, Side side, Mode uplo,
 }
 
 template <typename DT>
+// TODO explicit conversion
 void solve_diagonal(const Matrix<DT>& D, Matrix<DT>& B, Side side, double alpha) {
   assert(side == Left ? D.cols == B.rows : B.cols == D.rows);
 
@@ -135,15 +163,32 @@ void solve_diagonal(const Matrix<DT>& D, Matrix<DT>& B, Side side, double alpha)
   }
 }
 
-template <typename DT>
-void scale(Matrix<DT>& A, double alpha) {
+template <>
+void scale(Matrix<float>& A, double alpha) {
+  for (int64_t j=0; j<A.cols; ++j) {
+    cblas_sscal(A.rows, alpha, &A(0, j), 1);
+  }
+}
+
+template <>
+void scale(Matrix<double>& A, double alpha) {
   for (int64_t j=0; j<A.cols; ++j) {
     cblas_dscal(A.rows, alpha, &A(0, j), 1);
   }
 }
 
-template <typename DT>
-void row_scale(Matrix<DT>& A, const Matrix<DT>& D) {
+template <>
+void row_scale(Matrix<float>& A, const Matrix<float>& D) {
+  assert(D.rows == D.cols);
+  assert(D.cols == A.rows);
+
+  for(int i = 0; i < A.rows; i++) {
+    cblas_sscal(A.cols, D(i, i), &A(i, 0), A.stride);
+  }
+}
+
+template <>
+void row_scale(Matrix<double>& A, const Matrix<double>& D) {
   assert(D.rows == D.cols);
   assert(D.cols == A.rows);
 
@@ -152,8 +197,18 @@ void row_scale(Matrix<DT>& A, const Matrix<DT>& D) {
   }
 }
 
-template <typename DT>
-void column_scale(Matrix<DT>& A, const Matrix<DT>& D) {
+template <>
+void column_scale(Matrix<float>& A, const Matrix<float>& D) {
+  assert(D.rows == D.cols);
+  assert(D.rows == A.cols);
+
+  for(int j = 0; j < A.cols; j++) {
+    cblas_sscal(A.rows, D(j, j), &A(0, j), 1);
+  }
+}
+
+template <>
+void column_scale(Matrix<double>& A, const Matrix<double>& D) {
   assert(D.rows == D.cols);
   assert(D.rows == A.cols);
 
@@ -161,5 +216,53 @@ void column_scale(Matrix<DT>& A, const Matrix<DT>& D) {
     cblas_dscal(A.rows, D(j, j), &A(0, j), 1);
   }
 }
+
+// explicit instantiation (these are the only available data-types)
+/* Note that scalar values are passed as doubles to facilitate template argument deduction
+   e.g. scale(A, 1) would lead to a conflict since 1 is interpreted as an integer
+   and implicit conversions are not considered for template deductions
+*/
+template void array_copy(const float* from, float* to, int64_t size);
+template void array_copy(const double* from, double* to, int64_t size);
+
+template void matmul(const Matrix<float>& A, const Matrix<float>& B, Matrix<float>& C, bool transA,
+            bool transB, double alpha, double beta);
+template Matrix<float> matmul(const Matrix<float>& A, const Matrix<float>& B, bool transA,
+              bool transB, double alpha);
+template void matmul(const Matrix<double>& A, const Matrix<double>& B, Matrix<double>& C, bool transA,
+            bool transB, double alpha, double beta);
+template Matrix<double> matmul(const Matrix<double>& A, const Matrix<double>& B, bool transA,
+              bool transB, double alpha);
+
+template void syrk(const Matrix<float>& A, Matrix<float>& C, Mode uplo, bool transA, double alpha,
+            double beta);
+template void syrk(const Matrix<double>& A, Matrix<double>& C, Mode uplo, bool transA, double alpha,
+            double beta);
+
+template void triangular_matmul(const Matrix<float>& A, Matrix<float>& B, Side side, Mode uplo,
+                       bool transA, bool diag, double alpha);
+template Matrix<float> triangular_matmul_out(const Matrix<float>& A, const Matrix<float>& B, Side side, Mode uplo,
+			     bool transA, bool diag, double alpha);
+template void triangular_matmul(const Matrix<double>& A, Matrix<double>& B, Side side, Mode uplo,
+                       bool transA, bool diag, double alpha);
+template Matrix<double> triangular_matmul_out(const Matrix<double>& A, const Matrix<double>& B, Side side, Mode uplo,
+			     bool transA, bool diag, double alpha);
+
+template void solve_triangular(const Matrix<float>& A, Matrix<float>& B, Side side, Mode uplo,
+                      bool unit_diag, bool transA, double alpha);
+template void solve_triangular(const Matrix<double>& A, Matrix<double>& B, Side side, Mode uplo,
+                      bool unit_diag, bool transA, double alpha);
+
+template void solve_diagonal(const Matrix<float>& D, Matrix<float>& B, Side side, double alpha);
+template void solve_diagonal(const Matrix<double>& D, Matrix<double>& B, Side side, double alpha);
+
+template void scale(Matrix<float>& A, double alpha);
+template void scale(Matrix<double>& A, double alpha);
+
+template void row_scale(Matrix<float>& A, const Matrix<float>& D);
+template void row_scale(Matrix<double>& A, const Matrix<double>& D);
+
+template void column_scale(Matrix<float>& A, const Matrix<float>& D);
+template void column_scale(Matrix<double>& A, const Matrix<double>& D);
 
 }  // namespace Hatrix
