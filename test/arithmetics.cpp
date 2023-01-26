@@ -2,111 +2,195 @@
 #include <cstdint>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "Hatrix/Hatrix.h"
 #include "gtest/gtest.h"
 
-class ArithmeticTests
-    : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {};
+template <typename DT>
+class ArithmeticTests : public testing::Test {
+  protected:
+  // Matrix dimensions used in the tests
+  std::vector<std::tuple<int64_t, int64_t>> params = {
+    std::make_tuple(50, 50),
+    std::make_tuple(23, 75),
+    std::make_tuple(100, 66)
+  };
+};
+
+// template types used in the tests
+using Types = ::testing::Types<float, double>;
+TYPED_TEST_SUITE(ArithmeticTests, Types);
+
+TYPED_TEST(ArithmeticTests, PlusOperator) {
+  for (auto const& [m, n] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> B = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> C = A + B;
+
+    for (int64_t i = 0; i < A.rows; ++i) {
+      for (int64_t j = 0; j < A.cols; ++j) {
+        EXPECT_EQ(C(i, j), A(i, j) + B(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+      }
+    }
+
+    // Check that A and B are unmodified.
+    // TODO is this not guaranteed by the const declaration?
+    for (int64_t i = 0; i < A.rows; ++i) {
+      for (int64_t j = 0; j < A.cols; ++j) {
+        EXPECT_NE(C(i, j), A(i, j)) << "A was modified at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+        EXPECT_NE(C(i, j), B(i, j)) << "B was modified at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+      }
+    }
+  }
+}
+
+TYPED_TEST(ArithmeticTests, PlusEqualsOperator) {
+  for (auto const& [m, n] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_check(A);
+    Hatrix::Matrix<TypeParam> B = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    A += B;
+
+    for (int64_t i = 0; i < A.rows; ++i) {
+      for (int64_t j = 0; j < A.cols; ++j) {
+        EXPECT_EQ(A_check(i, j) + B(i, j), A(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+      }
+    }
+  }
+}
+
+TYPED_TEST(ArithmeticTests, MinusOperator) {
+  for (auto const& [m, n] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> B = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> C = A - B;
+
+    for (int64_t i = 0; i < A.rows; ++i) {
+      for (int64_t j = 0; j < A.cols; ++j) {
+        EXPECT_EQ(C(i, j), A(i, j) - B(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+      }
+    }
+
+    // Check that A and B are unmodified.
+    // TODO is this not guaranteed by the const declaration?
+    for (int64_t i = 0; i < A.rows; ++i) {
+      for (int64_t j = 0; j < A.cols; ++j) {
+        EXPECT_NE(C(i, j), A(i, j)) << "A was modified at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+        EXPECT_NE(C(i, j), B(i, j)) << "B was modified at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+      }
+    }
+  }
+}
+
+TYPED_TEST(ArithmeticTests, MinusEqualsOperator) {
+  for (auto const& [m, n] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_check(A);
+    Hatrix::Matrix<TypeParam> B = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    A -= B;
+
+    for (int64_t i = 0; i < A.rows; ++i) {
+      for (int64_t j = 0; j < A.cols; ++j) {
+        EXPECT_EQ(A_check(i, j) - B(i, j), A(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+      }
+    }
+  }
+}
+
+TYPED_TEST(ArithmeticTests, abs) {
+  for (auto const& [m, n] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_check = abs(A);
+
+    for (int64_t i = 0; i < A.rows; ++i) {
+      for (int64_t j = 0; j < A.cols; ++j) {
+        EXPECT_EQ(A_check(i, j), A(i, j) < 0 ? -A(i, j) : A(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+      }
+    }
+  }
+}
+
+TYPED_TEST(ArithmeticTests, Transpose) {
+  for (auto const& [m, n] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_trans = transpose(A);
+
+    EXPECT_EQ(A_trans.rows, n) << "Wrong row-dimension ("<<m<<"x"<<n<<" matrix)";
+    EXPECT_EQ(A_trans.cols, m) << "Wrong column-dimension ("<<m<<"x"<<n<<" matrix)";
+    for (int64_t i = 0; i < m; ++i) {
+      for (int64_t j = 0; j < n; ++j) {
+        EXPECT_EQ(A(i, j), A_trans(j, i)) << "Wrong value at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+      }
+    }
+  }
+}
+
+TYPED_TEST(ArithmeticTests, LowerTriangularPart) {
+  for (auto const& [m, n] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_nounit_lower = lower_tri(A);
+    Hatrix::Matrix<TypeParam> A_unit_lower = lower_tri(A, true);
+
+    EXPECT_EQ(A_nounit_lower.rows, m) << "Wrong row-dimension (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+    EXPECT_EQ(A_nounit_lower.cols, n) << "Wrong column-dimension (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+    EXPECT_EQ(A_unit_lower.rows, m) << "Wrong row-dimension (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+    EXPECT_EQ(A_unit_lower.cols, n) << "Wrong column-dimension (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+
+    for (int64_t i = 0; i < m; ++i) {
+      for (int64_t j = 0; j < n; ++j) {
+        if(i == j) {
+          EXPECT_EQ(A(i, j), A_nounit_lower(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+          EXPECT_EQ(1., A_unit_lower(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] ("<<m<<"x"<<n<<" matrix)";
+        }
+        else if(i > j) {
+          EXPECT_EQ(A(i, j), A_nounit_lower(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+          EXPECT_EQ(A(i, j), A_unit_lower(i, j))  << "Wrong value at index ["<<i<<","<<j<<"] (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+        }
+        else {
+          EXPECT_EQ(0., A_nounit_lower(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+          EXPECT_EQ(0., A_unit_lower(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+        }
+      }
+    }
+  }
+}
+
+TYPED_TEST(ArithmeticTests, UpperTriangularPart) {
+  for (auto const& [m, n] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_nounit_upper = upper_tri(A);
+    Hatrix::Matrix<TypeParam> A_unit_upper = upper_tri(A, true);
+
+    EXPECT_EQ(A_nounit_upper.rows, m) << "Wrong row-dimension (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+    EXPECT_EQ(A_nounit_upper.cols, n) << "Wrong column-dimension (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+    EXPECT_EQ(A_unit_upper.rows, m) << "Wrong row-dimension (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+    EXPECT_EQ(A_unit_upper.cols, n) << "Wrong column-dimension (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+    for (int64_t i = 0; i < m; ++i) {
+      for (int64_t j = 0; j < n; ++j) {
+        if(i == j) {
+	  EXPECT_EQ(A(i, j), A_nounit_upper(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+	  EXPECT_EQ(1., A_unit_upper(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+        }
+        else if(i > j) {
+	  EXPECT_EQ(0., A_nounit_upper(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+	  EXPECT_EQ(0., A_unit_upper(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+        }
+        else {
+	  EXPECT_EQ(A(i, j), A_nounit_upper(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (non-unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+	  EXPECT_EQ(A(i, j), A_unit_upper(i, j)) << "Wrong value at index ["<<i<<","<<j<<"] (unit diagonal) ("<<m<<"x"<<n<<" matrix)";
+        }
+      }
+    }
+  }
+}
+
+
 class MatMulOperatorTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>> {};
 class ScalarMulOperatorTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, double>> {};
 
-TEST_P(ArithmeticTests, PlusOperator) {
-  int64_t m, n;
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix B = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix C = A + B;
-
-  for (int64_t i = 0; i < A.rows; ++i)
-    for (int64_t j = 0; j < A.cols; ++j) {
-      EXPECT_EQ(C(i, j), A(i, j) + B(i, j));
-    }
-
-  // Check that A and B are unmodified.
-  for (int64_t i = 0; i < A.rows; ++i)
-    for (int64_t j = 0; j < A.cols; ++j) {
-      EXPECT_NE(C(i, j), A(i, j));
-      EXPECT_NE(C(i, j), B(i, j));
-    }
-}
-
-TEST_P(ArithmeticTests, PlusEqualsOperator) {
-  int64_t m, n;
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_check(A);
-  Hatrix::Matrix B = Hatrix::generate_random_matrix(m, n);
-  A += B;
-
-  for (int64_t i = 0; i < A.rows; ++i)
-    for (int64_t j = 0; j < A.cols; ++j) {
-      EXPECT_EQ(A_check(i, j) + B(i, j), A(i, j));
-    }
-}
-
-TEST_P(ArithmeticTests, MinusOperator) {
-  int64_t m, n;
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix B = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix C = A - B;
-
-  for (int64_t i = 0; i < A.rows; ++i)
-    for (int64_t j = 0; j < A.cols; ++j) {
-      EXPECT_EQ(C(i, j), A(i, j) - B(i, j));
-    }
-
-  // Check that A and B are unmodified.
-  for (int64_t i = 0; i < A.rows; ++i)
-    for (int64_t j = 0; j < A.cols; ++j) {
-      EXPECT_NE(C(i, j), A(i, j));
-      EXPECT_NE(C(i, j), B(i, j));
-    }
-}
-
-TEST_P(ArithmeticTests, MinusEqualsOperator) {
-  int64_t m, n;
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_check(A);
-  Hatrix::Matrix B = Hatrix::generate_random_matrix(m, n);
-  A -= B;
-
-  for (int64_t i = 0; i < A.rows; ++i)
-    for (int64_t j = 0; j < A.cols; ++j) {
-      EXPECT_EQ(A_check(i, j) - B(i, j), A(i, j));
-    }
-}
-
-TEST_P(ArithmeticTests, abs) {
-  int64_t m, n;
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_check = abs(A);
-
-  for (int64_t i = 0; i < A.rows; ++i)
-    for (int64_t j = 0; j < A.cols; ++j) {
-      EXPECT_EQ(A_check(i, j), A(i, j) < 0 ? -A(i, j) : A(i, j));
-    }
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    LAPACK, ArithmeticTests,
-    testing::Values(std::make_tuple(50, 50), std::make_tuple(23, 75),
-                    std::make_tuple(100, 66)),
-    [](const testing::TestParamInfo<ArithmeticTests::ParamType>& info) {
-      std::string name = ("m" + std::to_string(std::get<0>(info.param)) + "n" +
-                          std::to_string(std::get<1>(info.param)));
-      return name;
-    });
 
 TEST_P(MatMulOperatorTests, MultiplicationOperator) {
   int64_t M, N, K;
@@ -186,86 +270,3 @@ INSTANTIATE_TEST_SUITE_P(
                           std::to_string(std::get<1>(info.param)));
       return name;
     });
-
-TEST_P(ArithmeticTests, Transpose) {
-  int64_t m, n;
-  Hatrix::Context::init();
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_trans = transpose(A);
-
-  EXPECT_EQ(A_trans.rows, n);
-  EXPECT_EQ(A_trans.cols, m);
-  for (int64_t i = 0; i < m; ++i) {
-    for (int64_t j = 0; j < n; ++j) {
-      EXPECT_EQ(A(i, j), A_trans(j, i));
-    }
-  }
-  Hatrix::Context::finalize();
-}
-
-TEST_P(ArithmeticTests, LowerTriangularPart) {
-  int64_t m = 10, n = 10;
-  Hatrix::Context::init();
-  // std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_nounit_lower = lower_tri(A);
-  Hatrix::Matrix A_unit_lower = lower_tri(A, true);
-
-  EXPECT_EQ(A_nounit_lower.rows, m);
-  EXPECT_EQ(A_nounit_lower.cols, n);
-  EXPECT_EQ(A_unit_lower.rows, m);
-  EXPECT_EQ(A_unit_lower.cols, n);
-
-  for (int64_t i = 0; i < m; ++i) {
-    for (int64_t j = 0; j < n; ++j) {
-      if(i == j) {
-        EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
-        EXPECT_EQ(1., A_unit_lower(i, j));
-      }
-      else if(i > j) {
-        EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
-        EXPECT_EQ(A(i, j), A_unit_lower(i, j));
-      }
-      else {
-        EXPECT_EQ(0., A_nounit_lower(i, j));
-        EXPECT_EQ(0., A_unit_lower(i, j));
-      }
-    }
-  }
-  Hatrix::Context::finalize();
-}
-
-TEST_P(ArithmeticTests, UpperTriangularPart) {
-  int64_t m, n;
-  Hatrix::Context::init();
-  std::tie(m, n) = GetParam();
-
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_nounit_upper = upper_tri(A);
-  Hatrix::Matrix A_unit_upper = upper_tri(A, true);
-
-  EXPECT_EQ(A_nounit_upper.rows, m);
-  EXPECT_EQ(A_nounit_upper.cols, n);
-  EXPECT_EQ(A_unit_upper.rows, m);
-  EXPECT_EQ(A_unit_upper.cols, n);
-  for (int64_t i = 0; i < m; ++i) {
-    for (int64_t j = 0; j < n; ++j) {
-      if(i == j) {
-	EXPECT_EQ(A(i, j), A_nounit_upper(i, j));
-	EXPECT_EQ(1., A_unit_upper(i, j));
-      }
-      else if(i > j) {
-	EXPECT_EQ(0., A_nounit_upper(i, j));
-	EXPECT_EQ(0., A_unit_upper(i, j));
-      }
-      else {
-	EXPECT_EQ(A(i, j), A_nounit_upper(i, j));
-	EXPECT_EQ(A(i, j), A_unit_upper(i, j));
-      }
-    }
-  }
-  Hatrix::Context::finalize();
-}
