@@ -7,35 +7,12 @@
 
 namespace Hatrix {
 
-template Matrix<double> generate_random_spd_matrix(int64_t, double);
-template Matrix<double> generate_random_matrix(int64_t, int64_t);
-template Matrix<double> generate_low_rank_matrix(int64_t, int64_t);
-template Matrix<float> generate_identity_matrix(int64_t, int64_t);
-template Matrix<double> generate_identity_matrix(int64_t, int64_t);
-template Matrix<double> generate_range_matrix(int64_t, int64_t, int64_t);
-template Matrix<double> generate_laplacend_matrix(const std::vector<std::vector<double>>&,
-				 int64_t, int64_t,
-				 int64_t, int64_t, double);
-template Matrix<double> generate_sqrexpnd_matrix(const std::vector<std::vector<double>>&,
-                                int64_t, int64_t,
-                                int64_t, int64_t,
-                                double, double, double,
-                                double);
-
-template <typename DT>
-Matrix<DT> generate_random_spd_matrix(int64_t rows, double diag_scale) {
-  Matrix A = generate_random_matrix(rows, rows);
-  Matrix SPD = matmul(A, A, true, false);
-  for (int i = 0; i < rows; ++i) { A(i,i) *= diag_scale; }
-
-  return SPD;
-}
-
 template <typename DT>
 Matrix<DT> generate_random_matrix(int64_t rows, int64_t cols) {
+  //TODO pass seed?
   std::mt19937 gen(100);
   //TODO should this adapt to the template type
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
+  std::uniform_real_distribution<DT> dist(0.0, 1.0);
   Matrix<DT> out(rows, cols);
   for (int64_t i = 0; i < rows; ++i) {
     for (int64_t j = 0; j < cols; ++j) {
@@ -43,6 +20,15 @@ Matrix<DT> generate_random_matrix(int64_t rows, int64_t cols) {
     }
   }
   return out;
+}
+
+template <typename DT>
+Matrix<DT> generate_random_spd_matrix(int64_t rows, DT diag_scale) {
+  Matrix<DT> A = generate_random_matrix<DT>(rows, rows);
+  Matrix<DT> SPD = matmul(A, A, true, false);
+  for (int i = 0; i < rows; ++i) { A(i,i) *= diag_scale; }
+
+  return SPD;
 }
 
 template <typename DT>
@@ -131,4 +117,39 @@ Matrix<DT> generate_sqrexpnd_matrix(const std::vector<std::vector<double>>& x,
   return out;
 
 }
+
+// explicit instantiation (these are the only available data-types)
+template Matrix<float> generate_random_matrix(int64_t rows, int64_t cols);
+template Matrix<double> generate_random_matrix(int64_t rows, int64_t cols);
+
+template Matrix<float> generate_random_spd_matrix(int64_t rows, float diag_scale);
+template Matrix<double> generate_random_spd_matrix(int64_t rows, double diag_scale);
+
+template Matrix<float> generate_low_rank_matrix(int64_t rows, int64_t cols);
+template Matrix<double> generate_low_rank_matrix(int64_t rows, int64_t cols);
+
+template Matrix<float> generate_identity_matrix(int64_t rows, int64_t cols);
+template Matrix<double> generate_identity_matrix(int64_t rows, int64_t cols);
+
+template Matrix<float> generate_range_matrix(int64_t rows, int64_t cols, int64_t start_range);
+template Matrix<double> generate_range_matrix(int64_t rows, int64_t cols, int64_t start_range);
+
+template Matrix<float> generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
+				 int64_t rows, int64_t cols,
+				 int64_t row_start, int64_t col_start, double pv);
+template Matrix<double> generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
+				 int64_t rows, int64_t cols,
+				 int64_t row_start, int64_t col_start, double pv);
+
+template Matrix<float> generate_sqrexpnd_matrix(const std::vector<std::vector<double>>& x,
+                                int64_t rows, int64_t cols,
+                                int64_t row_start, int64_t col_start,
+                                double beta, double nu, double noise,
+                                double sigma);
+template Matrix<double> generate_sqrexpnd_matrix(const std::vector<std::vector<double>>& x,
+                                int64_t rows, int64_t cols,
+                                int64_t row_start, int64_t col_start,
+                                double beta, double nu, double noise,
+                                double sigma);
+
 }  // namespace Hatrix
