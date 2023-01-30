@@ -6,91 +6,88 @@
 #include "Hatrix/Hatrix.h"
 #include "gtest/gtest.h"
 
-class ScaleTests
-    : public testing::TestWithParam<std::tuple<int64_t, int64_t, double>> {};
+template <typename DT>
+class ScaleTests : public testing::Test {
+  protected:
+  // Matrix dimensions and scalar parameter used in the tests
+  std::vector<std::tuple<int64_t, int64_t, DT>> params = {
+    std::make_tuple(10, 10, 4.32),
+    std::make_tuple(1, 7, 2),
+    std::make_tuple(15, 3, 99.9),
+    std::make_tuple(4, 1, 0.5),
+    std::make_tuple(8, 21, -3.4)
+  };
+};
 
-TEST_P(ScaleTests, Scaling) {
-  int64_t m, n;
-  double alpha;
-  std::tie(m, n, alpha) = GetParam();
-  Hatrix::Context::init();
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_copy(A);
+// template types used in the tests
+using Types = ::testing::Types<float, double>;
+TYPED_TEST_SUITE(ScaleTests, Types);
 
-  Hatrix::scale(A, alpha);
-  for (int64_t j = 0; j < A.cols; ++j) {
-    for (int64_t i = 0; i < A.rows; ++i) {
-      EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
+TYPED_TEST(ScaleTests, Scaling) {
+  for (auto const& [m, n, alpha] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_copy(A);
+
+    Hatrix::scale(A, alpha);
+    for (int64_t j = 0; j < A.cols; ++j) {
+      for (int64_t i = 0; i < A.rows; ++i) {
+        EXPECT_EQ(A(i, j), A_copy(i, j) * alpha) << "Wrong value at index [" << i << ", " << j << "] ("
+          << m << "x" << n << " matrix, alpha = "
+          << alpha << ")";
+      }
     }
   }
-  Hatrix::Context::finalize();
 }
 
-TEST_P(ScaleTests, ScalingPart) {
-  int64_t m, n;
-  double alpha;
-  std::tie(m, n, alpha) = GetParam();
-  Hatrix::Context::init();
-  Hatrix::Matrix A_big = Hatrix::generate_random_matrix(2*m, 2*n);
-  //TODO is there a way around this?
-  std::vector<Hatrix::Matrix<>> A_split = A_big.split(2, 2);
-  Hatrix::Matrix A_copy(A_split[0], true);
+//TODO What is this even testing?
+TYPED_TEST(ScaleTests, ScalingPart) {
+  for (auto const& [m, n, alpha] : this->params) {
+    Hatrix::Matrix<TypeParam> A_big = Hatrix::generate_random_matrix<TypeParam>(2*m, 2*n);
+    //TODO is there a way around this?
+    auto A_split = A_big.split(2, 2);
+    Hatrix::Matrix<TypeParam> A_copy(A_split[0], true);
 
-  Hatrix::scale(A_split[0], alpha);
-  for (int64_t j = 0; j < A_split[0].cols; ++j) {
-    for (int64_t i = 0; i < A_split[0].rows; ++i) {
-      EXPECT_EQ(A_big(i, j), A_copy(i, j) * alpha);
+    Hatrix::scale(A_split[0], alpha);
+    for (int64_t j = 0; j < A_split[0].cols; ++j) {
+      for (int64_t i = 0; i < A_split[0].rows; ++i) {
+        EXPECT_EQ(A_big(i, j), A_copy(i, j) * alpha) << "Wrong value at index [" << i << ", " << j << "] ("
+          << m << "x" << n << " matrix, alpha = "
+          << alpha << ")";
+      }
     }
   }
-  Hatrix::Context::finalize();
 }
 
-TEST_P(ScaleTests, RowScaling) {
-  int64_t m, n;
-  double alpha;
-  std::tie(m, n, alpha) = GetParam();
-  Hatrix::Context::init();
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_copy(A);
-  Hatrix::Matrix D = Hatrix::generate_random_matrix(m, m);
+TYPED_TEST(ScaleTests, RowScaling) {
+  for (auto const& [m, n, alpha] : this->params) {
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_copy(A);
+    Hatrix::Matrix<TypeParam> D = Hatrix::generate_random_matrix<TypeParam>(m, m);
 
-  Hatrix::row_scale(A, D);
-  for (int64_t j = 0; j < A.cols; ++j) {
-    for (int64_t i = 0; i < A.rows; ++i) {
-      EXPECT_EQ(A(i, j), A_copy(i, j) * D(i, i));
+    Hatrix::row_scale(A, D);
+    for (int64_t j = 0; j < A.cols; ++j) {
+      for (int64_t i = 0; i < A.rows; ++i) {
+        EXPECT_EQ(A(i, j), A_copy(i, j) * D(i, i)) << "Wrong value at index [" << i << ", " << j << "] ("
+          << m << "x" << n << " matrix, alpha = "
+          << alpha << ")";
+      }
     }
   }
-  Hatrix::Context::finalize();
 }
 
-TEST_P(ScaleTests, ColumnScaling) {
-  int64_t m, n;
-  double alpha;
-  std::tie(m, n, alpha) = GetParam();
-  Hatrix::Context::init();
-  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-  Hatrix::Matrix A_copy(A);
-  Hatrix::Matrix D = Hatrix::generate_random_matrix(n, n);
+TYPED_TEST(ScaleTests, ColumnScaling) {
+  for (auto const& [m, n, alpha] : this->params) {
+    Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+    Hatrix::Matrix A_copy(A);
+    Hatrix::Matrix D = Hatrix::generate_random_matrix(n, n);
 
-  Hatrix::column_scale(A, D);
-  for (int64_t j = 0; j < A.cols; ++j) {
-    for (int64_t i = 0; i < A.rows; ++i) {
-      EXPECT_EQ(A(i, j), A_copy(i, j) * D(j, j));
+    Hatrix::column_scale(A, D);
+    for (int64_t j = 0; j < A.cols; ++j) {
+      for (int64_t i = 0; i < A.rows; ++i) {
+        EXPECT_EQ(A(i, j), A_copy(i, j) * D(j, j)) << "Wrong value at index [" << i << ", " << j << "] ("
+          << m << "x" << n << " matrix, alpha = "
+          << alpha << ")";
+      }
     }
   }
-  Hatrix::Context::finalize();
 }
-
-INSTANTIATE_TEST_SUITE_P(
-    BLAS, ScaleTests,
-    testing::Values(std::make_tuple(10, 10, 4.32),
-                    std::make_tuple(1, 7, 2),
-                    std::make_tuple(15, 3, 99.9),
-                    std::make_tuple(4, 1, 0.5),
-                    std::make_tuple(8, 21, -3.4)
-                    ),
-    [](const testing::TestParamInfo<ScaleTests::ParamType>& info) {
-      std::string name = ("m" + std::to_string(std::get<0>(info.param)) + "n" +
-                          std::to_string(std::get<1>(info.param)));
-      return name;
-    });
