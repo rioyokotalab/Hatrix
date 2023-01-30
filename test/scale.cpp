@@ -77,9 +77,9 @@ TYPED_TEST(ScaleTests, RowScaling) {
 
 TYPED_TEST(ScaleTests, ColumnScaling) {
   for (auto const& [m, n, alpha] : this->params) {
-    Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
-    Hatrix::Matrix A_copy(A);
-    Hatrix::Matrix D = Hatrix::generate_random_matrix(n, n);
+    Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
+    Hatrix::Matrix<TypeParam> A_copy(A);
+    Hatrix::Matrix<TypeParam> D = Hatrix::generate_random_matrix<TypeParam>(n, n);
 
     Hatrix::column_scale(A, D);
     for (int64_t j = 0; j < A.cols; ++j) {
