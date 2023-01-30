@@ -771,15 +771,18 @@ int main(int argc, char ** argv) {
   const double ev_tol = argc > 14 ? atof(argv[14]) : 1.e-3;
   int64_t m_begin = argc > 15 ? atol(argv[15]) : 1;
   int64_t m_end = argc > 16 ? atol(argv[16]) : m_begin;
-  const bool compute_eig_acc = argc > 17 ? (atol(argv[17]) == 1) : false;
-  const int64_t print_csv_header = argc > 18 ? atol(argv[18]) : 1;
+  double a = argc > 17 ? atof(argv[17]) : 0;
+  double b = argc > 18 ? atof(argv[18]) : 0;
+  const bool compute_eig_acc = argc > 19 ? (atol(argv[19]) == 1) : false;
+  const int64_t print_csv_header = argc > 20 ? atol(argv[20]) : 1;
+
   // ELSES Input Files
-  const std::string file_name = argc > 19 ? std::string(argv[19]) : "";
-  const int64_t read_sorted_bodies = argc > 20 ? atol(argv[20]) : 0;
+  const std::string file_name = argc > 21 ? std::string(argv[21]) : "";
+  const int64_t read_sorted_bodies = argc > 22 ? atol(argv[22]) : 0;
 
   Hatrix::Context::init();
 
-  Hatrix::set_kernel_constants(1.e-3 / (double)N, 1.);
+  Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
     case 0: {
@@ -941,18 +944,19 @@ int main(int argc, char ** argv) {
 #endif
 
   bool s = false;
-  auto b = N < 10000 || is_non_synthetic ?
-           Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : 10 * (1. / Hatrix::PV);
-  auto a = -b;
+  if (a == 0 && b == 0) {
+    b = N < 10000 || is_non_synthetic ?
+        Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : N * (1. / Hatrix::PV);
+    a = -b;
+  }
   int64_t v_a, v_b, temp1, temp2;
   std::tie(v_a, temp1, temp2) = M.inertia(domain, a, s);
   std::tie(v_b, temp1, temp2) = M.inertia(domain, b, s);
   if(v_a != 0 || v_b != N) {
-    std::cerr << "Warning: starting interval does not contain the whole spectrum" << std::endl
-              << "at N=" << N << ",leaf_size=" << leaf_size << ",accuracy=" << accuracy
-              << ",admis=" << admis << ",b=" << b << std::endl;
-    a *= 2;
-    b *= 2;
+    std::cerr << "Warning: starting interval does not contain the whole spectrum "
+              << "(v(a)=v(" << a << ")=" << v_a << ","
+              << " v(b)=v(" << b << ")=" << v_b << ")"
+              << std::endl;
   }
   // Determine which eigenvalue(s) to approximate
   std::vector<int64_t> target_m;
