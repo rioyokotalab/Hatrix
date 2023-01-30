@@ -1148,20 +1148,22 @@ int main(int argc, char ** argv) {
   // 3: ELSES Geometry (ndim = 3)
   const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
   int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
-    // Eigenvalue computation parameters
+  // Eigenvalue computation parameters
   const double ev_tol = argc > 11 ? atof(argv[11]) : 1.e-3;
   int64_t m_begin = argc > 12 ? atol(argv[12]) : 1;
   int64_t m_end = argc > 13 ? atol(argv[13]) : m_begin;
-  const bool compute_eig_acc = argc > 14 ? (atol(argv[14]) == 1) : false;
-  const int64_t print_csv_header = argc > 15 ? atol(argv[15]) : 1;
+  double a = argc > 14 ? atof(argv[14]) : 0;
+  double b = argc > 15 ? atof(argv[15]) : 0;
+  const bool compute_eig_acc = argc > 16 ? (atol(argv[16]) == 1) : false;
+  const int64_t print_csv_header = argc > 17 ? atol(argv[17]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 16 ? std::string(argv[16]) : "";
-  const int64_t read_sorted_bodies = argc > 17 ? atol(argv[17]) : 0;
+  const std::string file_name = argc > 18 ? std::string(argv[18]) : "";
+  const int64_t read_sorted_bodies = argc > 19 ? atol(argv[19]) : 0;
 
   Hatrix::Context::init();
 
-  Hatrix::set_kernel_constants(1.e-3 / (double)N, 1.);
+  Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
     case 0: {
@@ -1286,18 +1288,19 @@ int main(int argc, char ** argv) {
 #endif
 
   bool s = false;
-  auto b = N < 10000 || is_non_synthetic ?
-           Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : 10 * (1. / Hatrix::PV);
-  auto a = -b;
+  if (a == 0 && b == 0) {
+    b = N < 10000 || is_non_synthetic ?
+        Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : N * (1. / Hatrix::PV);
+    a = -b;
+  }
   int64_t v_a, v_b, temp1, temp2;
   std::tie(v_a, temp1, temp2) = A.inertia(a, s);
   std::tie(v_b, temp1, temp2) = A.inertia(b, s);
   if(v_a != 0 || v_b != N) {
-    std::cerr << "Warning: starting interval does not contain the whole spectrum" << std::endl
-              << "at N=" << N << ",leaf_size=" << leaf_size << ",accuracy=" << accuracy
-              << ",admis=" << admis << ",b=" << b << std::endl;
-    a *= 2;
-    b *= 2;
+    std::cerr << "Warning: starting interval does not contain the whole spectrum "
+              << "(v(a)=v(" << a << ")=" << v_a << ","
+              << " v(b)=v(" << b << ")=" << v_b << ")"
+              << std::endl;
   }
   // Determine which eigenvalue(s) to approximate
   std::vector<int64_t> target_m;
