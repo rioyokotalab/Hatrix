@@ -19,21 +19,7 @@ for adm in 7; do
     max_rank=25
 
     for N in 8192; do
-        mpirun -n 4 ./bin/HSS_dtd --N $N \
-                      --nleaf $nleaf \
-                      --kernel_func laplace \
-                      --kind_of_geometry grid \
-                      --ndim $ndim \
-                      --max_rank $max_rank \
-                      --accuracy 1e-12 \
-                      --admis $adm \
-                      --admis_kind geometry \
-                      --construct_algorithm miro \
-                      --add_diag 1e-9 \
-                      --use_nested_basi
-
-
-        ./bin/H2_main --N $N \
+        mpirun -n 1 ./bin/HSS_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
