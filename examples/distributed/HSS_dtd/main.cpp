@@ -212,8 +212,6 @@ int main(int argc, char **argv) {
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
   DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
 
-  // std::cout << "begin generation. nums: " << DENSE_local_rows <<  " "
-  //           << DENSE_local_cols << std::endl;
   if (!MPIRANK) {
     std::cout << "begin data init.\n";
   }
@@ -351,8 +349,6 @@ int main(int argc, char **argv) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
 
-  // auto A_test = dense_cholesky_test(A, domain, opts);
-
 #ifdef USE_MKL
   mkl_set_num_threads(1);
 #endif
@@ -394,33 +390,6 @@ int main(int argc, char **argv) {
   if (!MPIRANK) {
     std::cout << "H2 solve end\n";
   }
-
-  // if (!MPIRANK) {
-  //   std::cout << "dense solve begin\n";
-  // }
-
-  // auto start_dense_solve = std::chrono::system_clock::now();
-  // descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
-  //           &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
-  // auto dense_solution = cholesky_solve(A, opts, X_mem, DESCX);
-  // auto stop_dense_solve = std::chrono::system_clock::now();
-  // double dense_solve_time = std::chrono::duration_cast<
-  //   std::chrono::milliseconds>(stop_dense_solve -
-  //                              start_dense_solve).count();
-
-  // dense_solution = dense_A^(-1) * x_mem
-
-  // if (!MPIRANK) {
-  //   std::cout << "dense solve end time: " << dense_solve_time << std::endl;
-  // }
-
-  // std::vector<Matrix> solve_diff;
-  // for (int i = 0; i < x.size(); ++i) {
-  //   solve_diff.push_back(h2_solution[i] - dense_solution[i]);
-  // }
-
-  // double solve_diff_norm = dist_norm2(solve_diff);
-  // double solve_error = solve_diff_norm / opts.N;
 
   // ||x - A * (A^-1 * x)|| / ||x||
 
