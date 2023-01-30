@@ -63,12 +63,12 @@ $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 # parsec H2 matrix
-.PHONY: examples/distributed/H2_dtd
-examples/distributed/H2_dtd:
+.PHONY: examples/distributed/HSS_dtd
+examples/distributed/HSS_dtd:
 	$(MAKE) -C $@
 
-H2_dtd : % : dirs examples/distributed/H2_dtd
-	$(MPICXX) libH2_dtd.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
+HSS_dtd : % : dirs examples/distributed/HSS_dtd
+	$(MPICXX) libHSS_dtd.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
@@ -103,7 +103,7 @@ test: $(TEST_EXECUTABLES)
 .PHONY: clean
 .SILENT: clean
 clean:
-	for dir in $(DIRS) examples/distributed/HSS examples/distributed/H2 examples/distributed/H2_dtd $(TEST) $(EXAMPLES); do \
+	for dir in $(DIRS) examples/distributed/HSS examples/distributed/H2 examples/distributed/HSS_dtd $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/ *.a

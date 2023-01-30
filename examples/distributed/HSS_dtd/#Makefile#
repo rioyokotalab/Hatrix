@@ -1,6 +1,6 @@
 TOPSRCDIR = ../../..
 SOURCES :=  $(wildcard *.cpp)
-sublib := libH2_dtd.a
+sublib := libHSS_dtd.a
 
 include $(TOPSRCDIR)/common.mk
 
