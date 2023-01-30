@@ -291,16 +291,18 @@ template <typename DT>
 class MatMulOperatorTests : public testing::Test {
   protected:
   // Matrix dimensions used in the tests
-  std::vector<std::tuple<int64_t, int64_t, int64_t>> params = {
-    std::make_tuple(16, 16, 16),
-    std::make_tuple(32, 16, 16),
-    std::make_tuple(16, 32, 16),
-    std::make_tuple(16, 16, 32),
-    std::make_tuple(32, 32, 16),
-    std::make_tuple(32, 16, 32),
-    std::make_tuple(16, 32, 32),
-    std::make_tuple(32, 32, 32)
-  };
+  std::vector<int64_t> sizes = {16, 32};
+  std::vector<std::tuple<int64_t, int64_t, int64_t>> dims;
+  
+  void SetUp() override {
+    for (size_t i = 0; i < sizes.size(); ++i) {
+      for (size_t j = 0; j < sizes.size(); ++j) {
+        for (size_t k = 0; k < sizes.size(); ++k) {
+          dims.push_back(std::make_tuple(sizes[i], sizes[j], sizes[k]));
+        }
+      }
+    }
+  }
 };
 
 // template types used in the tests
@@ -308,7 +310,7 @@ using Types = ::testing::Types<float, double>;
 TYPED_TEST_SUITE(MatMulOperatorTests, Types);
 
 TYPED_TEST(MatMulOperatorTests, MatMulOperator) {
-  for (auto const& [m, n, k] : this->params) {
+  for (auto const& [m, n, k] : this->dims) {
     Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, k);
     Hatrix::Matrix<TypeParam> B = Hatrix::generate_random_matrix<TypeParam>(k, n);
     Hatrix::Matrix<TypeParam> C(m, n);
@@ -325,7 +327,7 @@ TYPED_TEST(MatMulOperatorTests, MatMulOperator) {
 }
 
 TYPED_TEST(MatMulOperatorTests, MatMulEqualsOperator) {
-  for (auto const& [m, n, k] : this->params) {
+  for (auto const& [m, n, k] : this->dims) {
     if (n == k) {
       Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, k);
       Hatrix::Matrix<TypeParam> B = Hatrix::generate_random_matrix<TypeParam>(k, n);
