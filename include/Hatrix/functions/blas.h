@@ -47,8 +47,12 @@ void solve_triangular(const Matrix<DT>& A, Matrix<DT>& B, Side side, Mode uplo,
 template <typename DT>
 void solve_diagonal(const Matrix<DT>& D, Matrix<DT>& B, Side side, double alpha = 1.0);
 
+/* BLAS wrapper */
 template <typename DT>
-void scale(Matrix<DT>& A, double alpha);
+void scale(const int64_t n, DT* data, const DT alpha, const int64_t stride = 1);
+
+template <typename DT>
+void scale(Matrix<DT>& A, const double alpha);
 
 // Scale the rows of A using diagonal elements of D, i.e. perform A = D*A
 // Ignore non-diagonal elements of D

@@ -165,57 +165,42 @@ void solve_diagonal(const Matrix<DT>& D, Matrix<DT>& B, Side side, double alpha)
   }
 }
 
+// TODO should this be exposed via the header?
 template <>
-void scale(Matrix<float>& A, double alpha) {
-  for (int64_t j=0; j<A.cols; ++j) {
-    cblas_sscal(A.rows, static_cast<float>(alpha), &A(0, j), 1);
-  }
+void scale(const int64_t n, float* data, const float alpha, const int64_t stride) {
+   cblas_sscal(n, alpha, data, stride);
 }
 
 template <>
-void scale(Matrix<double>& A, double alpha) {
+void scale(const int64_t n, double* data, const double alpha, const int64_t stride) {
+   cblas_dscal(n, alpha, data, stride);
+}
+
+template <typename DT>
+void scale(Matrix<DT>& A, const double alpha) {
+  DT scale_factor = static_cast<DT>(alpha);
   for (int64_t j=0; j<A.cols; ++j) {
-    cblas_dscal(A.rows, alpha, &A(0, j), 1);
+    scale(A.rows, &A(0, j), scale_factor, 1);
   }
 }
 
-template <>
-void row_scale(Matrix<float>& A, const Matrix<float>& D) {
+template <typename DT>
+void row_scale(Matrix<DT>& A, const Matrix<DT>& D) {
   assert(D.rows == D.cols);
   assert(D.cols == A.rows);
 
   for(int i = 0; i < A.rows; i++) {
-    cblas_sscal(A.cols, D(i, i), &A(i, 0), A.stride);
+    scale(A.cols, &A(i, 0), D(i, i), A.stride);
   }
 }
 
-template <>
-void row_scale(Matrix<double>& A, const Matrix<double>& D) {
-  assert(D.rows == D.cols);
-  assert(D.cols == A.rows);
-
-  for(int i = 0; i < A.rows; i++) {
-    cblas_dscal(A.cols, D(i, i), &A(i, 0), A.stride);
-  }
-}
-
-template <>
-void column_scale(Matrix<float>& A, const Matrix<float>& D) {
+template <typename DT>
+void column_scale(Matrix<DT>& A, const Matrix<DT>& D) {
   assert(D.rows == D.cols);
   assert(D.rows == A.cols);
 
   for(int j = 0; j < A.cols; j++) {
-    cblas_sscal(A.rows, D(j, j), &A(0, j), 1);
-  }
-}
-
-template <>
-void column_scale(Matrix<double>& A, const Matrix<double>& D) {
-  assert(D.rows == D.cols);
-  assert(D.rows == A.cols);
-
-  for(int j = 0; j < A.cols; j++) {
-    cblas_dscal(A.rows, D(j, j), &A(0, j), 1);
+    scale(A.rows, &A(0, j), D(j, j), 1);
   }
 }
 
@@ -258,8 +243,11 @@ template void solve_triangular(const Matrix<double>& A, Matrix<double>& B, Side 
 template void solve_diagonal(const Matrix<float>& D, Matrix<float>& B, Side side, double alpha);
 template void solve_diagonal(const Matrix<double>& D, Matrix<double>& B, Side side, double alpha);
 
-template void scale(Matrix<float>& A, double alpha);
-template void scale(Matrix<double>& A, double alpha);
+template void scale(const int64_t n, float* data, const float alpha, const int64_t stride);
+template void scale(const int64_t n, double* data, const double alpha, const int64_t stride);
+
+template void scale(Matrix<float>& A, const double alpha);
+template void scale(Matrix<double>& A, const double alpha);
 
 template void row_scale(Matrix<float>& A, const Matrix<float>& D);
 template void row_scale(Matrix<double>& A, const Matrix<double>& D);
