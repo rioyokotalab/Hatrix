@@ -59,17 +59,6 @@ factorize_diagonal(Hatrix::SymmetricSharedBasisMatrix& A,
                    const int64_t level);
 
 void
-triangle_reduction(Hatrix::SymmetricSharedBasisMatrix& A,
-                   const Hatrix::Domain& domain,
-                   const int64_t block,
-                   const int64_t level);
-
-void
-compute_schurs_complement(Hatrix::SymmetricSharedBasisMatrix& A,
-                          const Hatrix::Domain& domain,
-                          const int64_t block,
-                          const int64_t level);
-void
 preallocate_blocks(Hatrix::SymmetricSharedBasisMatrix& A);
 
 void
