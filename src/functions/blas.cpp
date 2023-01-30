@@ -105,6 +105,7 @@ void solve_diagonal(const Matrix& D, Matrix& B, Side side, double alpha) {
 }
 
 void scale(Matrix& A, double alpha) {
+  if (A.numel() == 0) return;
   for (int64_t j=0; j<A.cols; ++j) {
     cblas_dscal(A.rows, alpha, &A(0, j), 1);
   }
@@ -114,6 +115,7 @@ void row_scale(Matrix& A, const Matrix& D) {
   assert(D.rows == D.cols);
   assert(D.cols == A.rows);
 
+  if (A.numel() == 0) return;
   for(int i = 0; i < A.rows; i++) {
     cblas_dscal(A.cols, D(i, i), &A(i, 0), A.stride);
   }
@@ -123,6 +125,7 @@ void column_scale(Matrix& A, const Matrix& D) {
   assert(D.rows == D.cols);
   assert(D.rows == A.cols);
 
+  if (A.numel() == 0) return;
   for(int j = 0; j < A.cols; j++) {
     cblas_dscal(A.rows, D(j, j), &A(0, j), 1);
   }
