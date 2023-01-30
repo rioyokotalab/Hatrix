@@ -1,7 +1,7 @@
 TOPSRCDIR = .
 include $(TOPSRCDIR)/common.mk
 
-DIRS := src/classes src/functions src/util examples/franklin
+DIRS := src/classes src/functions src/util examples/distributed
 OBJLIBS := libclasses.a libfunctions.a libutil.a
 TEST := test
 EXAMPLES := examples
@@ -44,8 +44,7 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
 
-all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES) \
-	HSS_slate HSS_scalapack
+all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES)
 
 $(DIRS):
 	$(MAKE) -C $@
@@ -64,52 +63,32 @@ $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
 # parsec H2 matrix
-.PHONY: examples/franklin/H2_dtd
-examples/franklin/H2_dtd:
+.PHONY: examples/distributed/HSS_dtd
+examples/distributed/HSS_dtd:
 	$(MAKE) -C $@
 
-H2_dtd : % : dirs examples/franklin/H2_dtd
-	$(MPICXX) libH2_dtd.a libfranklin.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
+HSS_dtd : % : dirs examples/distributed/HSS_dtd
+	$(MPICXX) libHSS_dtd.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
 # non-distributed HSS code.
-.PHONY: examples/franklin/HSS
-examples/franklin/HSS:
+.PHONY: examples/distributed/HSS
+examples/distributed/HSS:
 	$(MAKE) -C $@
 
-HSS_main : % : dirs examples/franklin/HSS
-	$(CXX) libHSS_main.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+HSS_main : % : dirs examples/distributed/HSS
+	$(CXX) libHSS_main.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
 # non-distributed H2 code
-.PHONY: examples/franklin/H2
-examples/franklin/H2:
+.PHONY: examples/distributed/H2
+examples/distributed/H2:
 	$(MAKE) -C $@
 
-H2_main : % : dirs examples/franklin/H2
-	$(CXX) libH2_main.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
-
-# slate rules
-.PHONY: examples/franklin/HSS_slate
-examples/franklin/HSS_slate:
-	$(MAKE) -C $@
-
-HSS_slate : % : dirs examples/franklin/HSS_slate
-	$(MPICXX) libHSS_slate.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(SLATE_LIB) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
-
-# scalapack rules
-.PHONY: examples/franklin/HSS_scalapack
-examples/franklin/HSS_scalapack:
-	$(MAKE) -C $@
-
-HSS_scalapack : % : dirs examples/franklin/HSS_scalapack
-	$(MPICXX) libHSS_scalapack.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
+H2_main : % : dirs examples/distributed/H2
+	$(CXX) libH2_main.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
@@ -124,7 +103,7 @@ test: $(TEST_EXECUTABLES)
 .PHONY: clean
 .SILENT: clean
 clean:
-	for dir in $(DIRS) examples/franklin/HSS examples/franklin/H2 examples/franklin/H2_dtd $(TEST) $(EXAMPLES); do \
+	for dir in $(DIRS) examples/distributed/HSS examples/distributed/H2 examples/distributed/HSS_dtd $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/ *.a

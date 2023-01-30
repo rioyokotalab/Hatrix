@@ -135,6 +135,7 @@ void RowColMap<T>::erase_all() {
 template class RowColMap<bool>;
 template class RowColMap<Hatrix::Matrix>;
 template class RowColMap<int64_t>;
+template class RowColMap<int>;
 template class RowColMap<std::vector<int64_t>>;
 
 template<class T>
@@ -211,6 +212,7 @@ bool RowColLevelMap<T>::exists(int64_t row, int64_t col, int64_t level) const {
 
 // explicit instatiation
 template class RowColLevelMap<bool>;
+template class RowColLevelMap<int>;
 template class RowColLevelMap<Matrix>;
 
 

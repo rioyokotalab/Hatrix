@@ -8,25 +8,42 @@ export TMPDIR=/tmp
 
 # export VECLIB_MAXIMUM_THREADS=1
 
-make -j H2_main
-make -j H2_dtd
+ulimit -c unlimited
 
-for adm in 0.8; do
+make -j H2_main
+make -j HSS_dtd
+
+for adm in 7; do
     nleaf=128
-    ndim=1
-    max_rank=100
-    for N in 1024; do
-        ./bin/H2_main --N $N \
+    ndim=2
+    max_rank=25
+
+    for N in 8192; do
+        mpirun -n 4 ./bin/HSS_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
-                      --kind_of_geometry circular \
+                      --kind_of_geometry grid \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-13 \
+                      --accuracy 1e-12 \
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \
-                      --add_diag 1e-8 \
+                      --add_diag 1e-9 \
+                      --use_nested_basi
+
+
+        ./bin/H2_main --N $N \
+                      --nleaf $nleaf \
+                      --kernel_func laplace \
+                      --kind_of_geometry grid \
+                      --ndim $ndim \
+                      --max_rank $max_rank \
+                      --accuracy 1e-12 \
+                      --admis $adm \
+                      --admis_kind geometry \
+                      --construct_algorithm miro \
+                      --add_diag 1e-9 \
                       --use_nested_basis
     done
 done

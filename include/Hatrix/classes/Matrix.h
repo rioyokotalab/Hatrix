@@ -14,7 +14,7 @@ class Matrix {
   // Shows whether a Matrix is a view of an object or the actual copy.
   bool is_view = false;
 
- private:
+ protected:
   // Not using a shared_ptr here since it is not capable of handling a
   // dynamic heap-allocated array.
   // https://stackoverflow.com/questions/13061979/shared-ptr-to-an-array-should-it-be-used
