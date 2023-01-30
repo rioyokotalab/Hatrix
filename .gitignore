@@ -11,3 +11,4 @@ hatrix_deps.sh
 run.sh
 *.data
 *.csv
+.DS_Store

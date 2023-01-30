@@ -44,8 +44,7 @@ EXAMPLE_EXECUTABLES := 2x2_BlockDense_LU \
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
 
-all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES) \
-	HSS_slate HSS_scalapack
+all: $(TEST_EXECUTABLES) $(EXAMPLE_EXECUTABLES) $(EXAMPLE_DIR_EXECUTABLES)
 
 $(DIRS):
 	$(MAKE) -C $@
@@ -90,26 +89,6 @@ examples/franklin/H2:
 
 H2_main : % : dirs examples/franklin/H2
 	$(CXX) libH2_main.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
-
-# slate rules
-.PHONY: examples/franklin/HSS_slate
-examples/franklin/HSS_slate:
-	$(MAKE) -C $@
-
-HSS_slate : % : dirs examples/franklin/HSS_slate
-	$(MPICXX) libHSS_slate.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(SLATE_LIB) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
-
-# scalapack rules
-.PHONY: examples/franklin/HSS_scalapack
-examples/franklin/HSS_scalapack:
-	$(MAKE) -C $@
-
-HSS_scalapack : % : dirs examples/franklin/HSS_scalapack
-	$(MPICXX) libHSS_scalapack.a libfranklin.a  $(OBJLIBS) $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
