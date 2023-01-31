@@ -366,8 +366,8 @@ class Domain {
       const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
       const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
       const auto diam = Xmax - Xmin;
-      cell.center[axis] = Xsum / (double)cell.nbodies;  // Centroid
-      cell.radius[axis] = diam / 2.;
+      cell.center[axis] = (Xmin + Xmax) / 2.;  // Midpoint
+      cell.radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
 
       if (cell.radius[axis] > radius_max) {
         radius_max = cell.radius[axis];
