@@ -939,7 +939,7 @@ int main(int argc, char ** argv) {
 
   // ELSES Input Files
   const std::string file_name = argc > 15 ? std::string(argv[15]) : "";
-  const int64_t read_sorted_bodies = argc > 16 ? atol(argv[16]) : 0;
+  const int64_t sort_bodies = argc > 16 ? atol(argv[16]) : 0;
   
 
   Hatrix::Context::init();
@@ -1018,21 +1018,16 @@ int main(int argc, char ** argv) {
 
   // Pre-processing step for ELSES geometry
   if (geom_type == 3) {
-    if (read_sorted_bodies == 1) {
-      geom_name = file_name + "_" + std::to_string(leaf_size);
-      const auto buckets = domain.read_bodies_ELSES_sorted(geom_name + ".xyz");
-      domain.build_tree_from_kmeans_ordering(leaf_size, buckets);
-      leaf_size = *(std::max_element(buckets.begin(), buckets.end()));
+    assert(file_name.length() > 0);
+    domain.read_bodies_ELSES(file_name + ".xyz");
+    assert(N == domain.N);
+
+    if (sort_bodies) {
+      domain.sort_bodies_ELSES();
+      geom_name = file_name + "_sorted";
     }
-    else {
-      domain.read_bodies_ELSES(file_name + ".xyz");
-      domain.build_tree(leaf_size);
-    }
-    N = domain.N;
+    domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
     domain.read_p2p_matrix_ELSES(file_name + ".dat");
-  }
-  else {
-    domain.build_tree(leaf_size);
   }
   domain.build_interactions(admis);
 

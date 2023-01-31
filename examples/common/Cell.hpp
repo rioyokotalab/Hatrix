@@ -10,6 +10,8 @@ namespace Hatrix {
 
 class Cell {
  public:
+  Body *body_ptr;                        // Pointer to first body
+  Cell *child_ptr;                       // Pointer to first child
   int64_t body_offset;                   // Index of first body within Domain.bodies
   int64_t nbodies;                       // Number of bodies within Cell
   int64_t child;                         // Index of first child within Domain.cells
@@ -17,6 +19,7 @@ class Cell {
   int64_t parent;                        // Index of parent within Domain cells
   int64_t level;                         // Level in cluster tree
   int64_t block_index;                   // Corresponding block index within matrix partition
+  int64_t key;                           // Key within space-filling curve ordering
   double center[MAX_NDIM];               // Center coordinates of cell
   double radius[MAX_NDIM];               // Size of the bounding box
   std::vector<int64_t> near_list;        // Index of cells in near interaction list
