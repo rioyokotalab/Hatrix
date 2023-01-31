@@ -41,6 +41,7 @@ void RowMap<T>::erase(int64_t key) {
 
 template class RowMap<Matrix>;
 template class RowMap<std::vector<int64_t>>;
+template class RowMap<std::set<int64_t>>;
 
 template<class T>
 T& RowColMap<T>::operator()(int64_t row, int64_t col) {

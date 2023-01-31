@@ -3,6 +3,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <iostream>
+#include <set>
 
 #include "Hatrix/classes/Matrix.h"
 
