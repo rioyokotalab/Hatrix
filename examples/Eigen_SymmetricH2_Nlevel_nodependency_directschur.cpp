@@ -863,7 +863,7 @@ int main(int argc, char ** argv) {
 
   // ELSES Input Files
   const std::string file_name = argc > 21 ? std::string(argv[21]) : "";
-  const int64_t read_sorted_bodies = argc > 22 ? atol(argv[22]) : 0;
+  const int64_t sort_bodies = argc > 22 ? atol(argv[22]) : 0;
 
   Hatrix::Context::init();
 
@@ -943,17 +943,14 @@ int main(int argc, char ** argv) {
   const bool is_non_synthetic = (geom_type == 3);
   if (is_non_synthetic) {
     assert(file_name.length() > 0);
-    if (read_sorted_bodies == 1) {
-      geom_name = file_name + "_" + std::to_string(leaf_size);
-      const auto buckets = domain.read_bodies_ELSES_sorted(geom_name + ".xyz");
-      domain.build_tree_from_kmeans_ordering(leaf_size, buckets);
-      leaf_size = *(std::max_element(buckets.begin(), buckets.end()));
+    domain.read_bodies_ELSES(file_name + ".xyz");
+    assert(N == domain.N);
+
+    if (sort_bodies) {
+      domain.sort_bodies_ELSES();
+      geom_name = file_name + "_sorted";
     }
-    else {
-      domain.read_bodies_ELSES(file_name + ".xyz");
-      domain.build_tree(leaf_size);
-    }
-    N = domain.N;
+    domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
     domain.read_p2p_matrix_ELSES(file_name + ".dat");
   }
   else {

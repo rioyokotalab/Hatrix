@@ -26,6 +26,7 @@ class Domain {
  public:
   int64_t N, ndim;
   int64_t ncells, tree_height;
+  double X0[MAX_NDIM], X0_min[MAX_NDIM], X0_max[MAX_NDIM], R0;  // Root level bounding box
   std::vector<Body> bodies;
   std::vector<Cell> cells;
   Matrix p2p_matrix;
@@ -429,6 +430,51 @@ class Domain {
       std::sort(cell.near_list.begin(), cell.near_list.end());
       std::sort(cell.far_list.begin(), cell.far_list.end());
     }
+  }
+
+  // Levelwise offset of Hilbert key
+  int64_t levelOffset(int64_t level) {
+    return (((int64_t)1 << 3 * level) - 1) / 7;
+  }
+
+  // Get 3-D Hilbert index from coordinates
+  void get3DIndex(const double X[MAX_NDIM], const int64_t level,
+                  int64_t iX[MAX_NDIM]) {
+    const double dx = 2 * R0 / (1 << level);
+    for (int64_t axis = 0; axis < 3; axis++) {
+      iX[axis] = floor((X[axis] - X0_min[axis]) / dx);
+    }
+  }
+
+  int64_t getKey(int64_t iX[MAX_NDIM], const int64_t level,
+                 const bool offset = true) {
+    // Preprocess
+    int64_t M = 1 << (level - 1);
+    for (int64_t Q=M; Q>1; Q>>=1) {
+      int64_t R = Q - 1;
+      for (int64_t d=0; d<3; d++) {
+        if (iX[d] & Q) iX[0] ^= R;
+        else {
+          int64_t t = (iX[0] ^ iX[d]) & R;
+          iX[0] ^= t;
+          iX[d] ^= t;
+        }
+      }
+    }
+    for (int64_t d=1; d<3; d++) iX[d] ^= iX[d-1];
+    int64_t t = 0;
+    for (int64_t Q=M; Q>1; Q>>=1)
+      if (iX[2] & Q) t ^= Q - 1;
+    for (int64_t d=0; d<3; d++) iX[d] ^= t;
+
+    int64_t i = 0;
+    for (int64_t l = 0; l < level; l++) {
+      i |= (iX[2] & (int64_t)1 << l) << 2*l;
+      i |= (iX[1] & (int64_t)1 << l) << (2*l + 1);
+      i |= (iX[0] & (int64_t)1 << l) << (2*l + 2);
+    }
+    if (offset) i += levelOffset(level);
+    return i;
   }
 
  public:
@@ -911,6 +957,23 @@ class Domain {
     }
   }
 
+  void calculate_bounding_box() {
+    Cell root;
+    root.body_offset = 0;
+    root.nbodies = N;
+    R0 = 0;
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      const auto Xmin = get_Xmin(bodies, root.get_bodies(), axis);
+      const auto Xmax = get_Xmax(bodies, root.get_bodies(), axis);
+      X0[axis] = (Xmin + Xmax) / 2.;
+      R0 = std::max(R0, (Xmax - Xmin) / 2.);
+    }
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      X0_min[axis] = X0[axis] - R0;
+      X0_max[axis] = X0[axis] + R0;
+    }
+  }
+
   void read_bodies_ELSES(const std::string& file_name) {
     std::ifstream file;
     file.open(file_name);
@@ -936,49 +999,134 @@ class Domain {
     file.close();
   }
 
-  void read_atoms_ELSES(const std::string& file_name) {
-    std::ifstream file;
-    file.open(file_name);
-    file >> N;
-    ndim = 3;
-
-    for(int64_t i = 0; i < N; i++) {
-      int64_t idx;
-      double x, y, z;
-      file >> idx >> x >> y >> z;
-      bodies.emplace_back(Body(x, y, z, (double)idx - 1));
+  // Build cells of tree adaptively using a top-down approach based on recursion
+  void build_cells(Body *bodies, Body *buffer,
+                   const int64_t begin, const int64_t end,
+                   Cell * cell, std::vector<Cell>& cells, const int64_t leaf_size,
+                   const double X[MAX_NDIM], const double R,
+                   const int64_t level = 0, const bool direction = false) {
+    // Create a tree cell
+    cell->body_ptr = bodies + begin;
+    if (direction) cell->body_ptr = buffer + begin;
+    cell->nbodies = end - begin;
+    cell->nchilds = 0;
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      cell->center[axis] = X[axis];
+      cell->radius[axis] = R;
     }
-    file.close();
-  }
-
-  std::vector<int64_t> read_bodies_ELSES_sorted(const std::string& file_name) {
-    std::ifstream file;
-    file.open(file_name);
-    int64_t num_particles, nleaf_cells;
-    file >> num_particles >> nleaf_cells;
-    constexpr int64_t num_atoms_per_particle = 4;
-    ndim = 3;
-    N = num_particles * num_atoms_per_particle;
-
-    std::vector<int64_t> buckets(nleaf_cells, 0);
-    for(int64_t i = 0; i < num_particles; i++) {
-      double x, y, z;
-      int64_t particle_idx, bucket_idx;
-
-      file >> x >> y >> z >> particle_idx >> bucket_idx;
-      int64_t body_idx = particle_idx * num_atoms_per_particle;
-      for (int64_t k = 0; k < num_atoms_per_particle; k++) {
-        bodies.emplace_back(Body(x, y, z, (double)body_idx));
-        body_idx++;
-        buckets[bucket_idx - 1]++;
+    int64_t iX[MAX_NDIM];
+    get3DIndex(X, level, iX);
+    cell->key = getKey(iX, level);
+    // Count number of bodies in each octant
+    int64_t size[8] = {0,0,0,0,0,0,0,0};
+    for (int64_t i = begin; i < end; i++) {
+      int64_t octant = ( bodies[i].X[0] > X[0]) +
+                       ((bodies[i].X[1] > X[1]) << 1) +
+                       ((bodies[i].X[2] > X[2]) << 2);
+      size[octant]++;
+    }
+    // Exclusive scan to get offsets
+    int64_t offset = begin;
+    int64_t offsets[8], counter[8];
+    for (int64_t i = 0; i < 8; i++) {
+      offsets[i] = offset;
+      offset += size[i];
+      if (size[i]) cell->nchilds++;
+    }
+    // If cell is a leaf
+    if (end - begin <= leaf_size) {
+      cell->nchilds = 0;
+      if (direction) {
+        for (int64_t i = begin; i < end; i++) {
+          buffer[i] = bodies[i];
+        }
+      }
+      return;
+    }
+    // Sort bodies by octant
+    for (int64_t i = 0; i < 8; i++) counter[i] = offsets[i];
+    for (int64_t i = begin; i < end; i++) {
+      int64_t octant = ( bodies[i].X[0] > X[0]) +
+                       ((bodies[i].X[1] > X[1]) << 1) +
+                       ((bodies[i].X[2] > X[2]) << 2);
+      buffer[counter[octant]] = bodies[i];
+      counter[octant]++;
+    }
+    // Loop over children and recurse
+    assert(cells.capacity() >= cells.size()+cell->nchilds);
+    cells.resize(cells.size()+cell->nchilds);
+    Cell *child = &cells.back() - cell->nchilds + 1;
+    cell->child_ptr = child;
+    for (int64_t i = 0, c = 0; i < 8; i++) {
+      double Xchild[MAX_NDIM];
+      for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
+        Xchild[axis] = X[axis];
+      }
+      double Rchild = R / 2.;
+      for (int64_t d = 0; d < 3; d++) {
+        Xchild[d] += Rchild * (((i & 1 << d) >> d) * 2 - 1);
+      }
+      if (size[i]) {
+        build_cells(buffer, bodies, offsets[i], offsets[i] + size[i],
+                    &child[c++], cells, leaf_size, Xchild, Rchild, level+1, !direction);
       }
     }
-    file.close();
-    return buckets;
   }
 
-  void build_tree_from_kmeans_ordering(const int64_t leaf_size,
-                                       const std::vector<int64_t>& buckets) {
+  void sort_bodies_ELSES() {
+    // Calculate root level bounding box
+    calculate_bounding_box();
+    // Every consecutive 240 bodies (atoms) comprise a molecule
+    const int64_t atom_leaf_size = 240;
+    const auto nmols = N / atom_leaf_size;
+    std::vector<Body> mol_centers(nmols);  // Center of each molecule
+    for (int64_t i = 0; i < nmols; i++) {
+      Cell cell;
+      cell.body_offset = i * atom_leaf_size;
+      cell.nbodies = atom_leaf_size;
+      for (int64_t axis = 0; axis < ndim; axis++) {
+        const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
+        const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
+        mol_centers[i].X[axis] = (Xmin + Xmax) / 2.;
+      }
+      mol_centers[i].value = (double)i;
+    }
+    // Partition until each box contain only one molecule
+    std::vector<Body> buffer = mol_centers;
+    std::vector<Cell> mol_cells(1);
+    const int64_t mol_leaf_size = 1;
+    mol_cells.reserve(nmols*(32/mol_leaf_size+1));
+    build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0], mol_cells, mol_leaf_size, X0, R0);
+    for (int64_t i = 0; i < mol_cells.size(); i++) {
+      if (mol_cells[i].nchilds == 0) {
+        for (int64_t b = 0; b < mol_cells[i].nbodies; b++) {
+          auto& bi = mol_cells[i].body_ptr[b];
+          bi.key = mol_cells[i].key;
+        }
+      }
+    }
+    // Sort molecules based on hilbert index
+    std::vector<Body> mol_centers_sorted = mol_centers;
+    std::sort(mol_centers_sorted.begin(), mol_centers_sorted.end(),
+              [](const Body& a, const Body& b) {
+                return a.key < b.key;
+              });
+    // Sort bodies based on molecule hilbert index
+    std::vector<Body> temp = bodies;
+    int64_t count = 0;
+    for (int64_t i = 0; i < nmols; i++) {
+      const auto& mol_i = mol_centers_sorted[i];
+      const auto srcBegin = (int64_t)mol_i.value * atom_leaf_size;
+      const auto dstBegin = count;
+      for (int64_t k = 0; k < atom_leaf_size; k++) {
+        bodies[dstBegin + k] = temp[srcBegin + k];
+      }
+      count += atom_leaf_size;
+    }
+  }
+
+  void build_tree_from_sorted_bodies(const int64_t leaf_size,
+                                     const std::vector<int64_t>& buckets) {
     tree_height = (int64_t)std::log2((double)N / (double)leaf_size);
     const int64_t nleaf_cells = (int64_t)1 << tree_height;
     assert(nleaf_cells == buckets.size());
@@ -996,13 +1144,12 @@ class Domain {
         cell.level = level;
         cell.block_index = node;
         if (level == tree_height) {
-          // Construct leaf node from kmeans buckets
+          // Construct leaf node
           cell.child = -1;
           cell.nchilds = 0;
           cell.body_offset = count;
           cell.nbodies = buckets[node];
           count += buckets[node];
-
         }
         else {
           // Construct non-leaf nodes from adjacent lower nodes
@@ -1017,7 +1164,6 @@ class Domain {
           // Set parent
           child1.parent = level_offset + node;
           child2.parent = level_offset + node;
-
         }
         // Calculate cell center and radius
         for (int64_t axis = 0; axis < ndim; axis++) {
@@ -1025,8 +1171,8 @@ class Domain {
           const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
           const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
           const auto diam = Xmax - Xmin;
-          cell.center[axis] = Xsum / (double)cell.nbodies;
-          cell.radius[axis] = diam / 2.;
+          cell.center[axis] = (Xmin + Xmax) / 2.;  // Midpoint
+          cell.radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
         }
       }
     }
