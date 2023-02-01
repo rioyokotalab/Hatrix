@@ -673,183 +673,184 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
     // The diagonal block is split along the row and column.
     Matrix& D_node = D(node, node, level);
-    const auto diag_row_split = D_node.rows - U(node, level).cols;
-    const auto diag_col_split = D_node.cols - U(node, level).cols;
-    auto D_node_splits = D_node.split(vec{diag_row_split}, vec{diag_col_split});
-    Matrix& D_node_cc = D_node_splits[0];
-    ldl(D_node_cc);
+    const auto node_c_size = D_node.rows - U(node, level).cols;
+    if (node_c_size > 0) {
+      auto D_node_splits = D_node.split(vec{node_c_size}, vec{node_c_size});
+      Matrix& D_node_cc = D_node_splits[0];
+      ldl(D_node_cc);
 
-    // Lower elimination
-    #pragma omp parallel for
-    for (int64_t i: near_neighbors(node, level)) {
-      const int64_t lower_row_split =
-          D(i, node, level).rows - (i <= node || level == height ?
-                                    U(i, level).cols :
-                                    U(i * 2, level + 1).cols);
-      auto D_i_splits = D(i, node, level).split(vec{lower_row_split}, vec{diag_col_split});
-      if (i > node) {
-        Matrix& D_i_cc = D_i_splits[0];
-        solve_triangular(D_node_cc, D_i_cc, Hatrix::Right, Hatrix::Lower, true, true);
-        solve_diagonal(D_node_cc, D_i_cc, Hatrix::Right);
+      // Lower elimination
+      #pragma omp parallel for
+      for (int64_t i: near_neighbors(node, level)) {
+        Matrix& D_i = D(i, node, level);
+        const auto lower_o_size =
+            (i <= node || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
+        const auto lower_c_size = D_i.rows - lower_o_size;
+        auto D_i_splits = D_i.split(vec{lower_c_size}, vec{node_c_size});
+        if (i > node && lower_c_size > 0) {
+          Matrix& D_i_cc = D_i_splits[0];
+          solve_triangular(D_node_cc, D_i_cc, Hatrix::Right, Hatrix::Lower, true, true);
+          solve_diagonal(D_node_cc, D_i_cc, Hatrix::Right);
+        }
+        Matrix& D_i_oc = D_i_splits[2];
+        solve_triangular(D_node_cc, D_i_oc, Hatrix::Right, Hatrix::Lower, true, true);
+        solve_diagonal(D_node_cc, D_i_oc, Hatrix::Right);
       }
-      Matrix& D_i_oc = D_i_splits[2];
-      solve_triangular(D_node_cc, D_i_oc, Hatrix::Right, Hatrix::Lower, true, true);
-      solve_diagonal(D_node_cc, D_i_oc, Hatrix::Right);
-    }
 
-    // Right elimination
-    #pragma omp parallel for
-    for (int64_t j: near_neighbors(node, level)) {
-      const int64_t right_col_split =
-          D(node, j, level).cols - (j <= node || level == height ?
-                                    U(j, level).cols :
-                                    U(j * 2, level + 1).cols);
-      auto D_j_splits = D(node, j, level).split(vec{diag_row_split}, vec{right_col_split});
-      if (j > node) {
-        Matrix& D_j_cc = D_j_splits[0];
-        solve_triangular(D_node_cc, D_j_cc, Hatrix::Left, Hatrix::Lower, true, false);
-        solve_diagonal(D_node_cc, D_j_cc, Hatrix::Left);
-      }
-      Matrix& D_j_co = D_j_splits[1];
-      solve_triangular(D_node_cc, D_j_co, Hatrix::Left, Hatrix::Lower, true, false);
-      solve_diagonal(D_node_cc, D_j_co, Hatrix::Left);
-    }
-
-    // Schur's complement into inadmissible block
-    #pragma omp parallel for collapse(2)
-    for (int64_t i: near_neighbors(node, level)) {
+      // Right elimination
+      #pragma omp parallel for
       for (int64_t j: near_neighbors(node, level)) {
-        if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
-          const Matrix& D_i = D(i, node, level);
-          const Matrix& D_j = D(node, j, level);
-          const auto lower_o_size =
-              (i <= node || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
-          const auto right_o_size =
-              (j <= node || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
-          const auto lower_c_size = D_i.rows - lower_o_size;
-          const auto right_c_size = D_j.cols - right_o_size;
-          const auto D_i_splits  = D_i.split(vec{lower_c_size}, vec{diag_col_split});
-          const auto D_j_splits  = D_j.split(vec{diag_row_split}, vec{right_c_size});
-          auto D_ij_splits = D(i, j, level).split(vec{lower_c_size}, vec{right_c_size});
+        Matrix& D_j = D(node, j, level);
+        const auto right_o_size =
+            (j <= node || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
+        const auto right_c_size = D_j.cols - right_o_size;
+        auto D_j_splits  = D_j.split(vec{node_c_size}, vec{right_c_size});
+        if (j > node && right_c_size > 0) {
+          Matrix& D_j_cc = D_j_splits[0];
+          solve_triangular(D_node_cc, D_j_cc, Hatrix::Left, Hatrix::Lower, true, false);
+          solve_diagonal(D_node_cc, D_j_cc, Hatrix::Left);
+        }
+        Matrix& D_j_co = D_j_splits[1];
+        solve_triangular(D_node_cc, D_j_co, Hatrix::Left, Hatrix::Lower, true, false);
+        solve_diagonal(D_node_cc, D_j_co, Hatrix::Left);
+      }
 
-          const Matrix& D_j_cc = D_j_splits[0];
-          const Matrix& D_j_co = D_j_splits[1];
-          if (i > node && j > node) {
-            // cc x cc -> cc
-            Matrix D_i_cc(D_i_splits[0], true);  // Deep-copy
-            Matrix& D_ij_cc = D_ij_splits[0];
-            column_scale(D_i_cc, D_node_cc);  // LD
-            matmul(D_i_cc, D_j_cc, D_ij_cc, false, false, -1, 1);  // LDL^T
-          }
-          if (i > node) {
-            // cc x co -> co
-            Matrix D_i_cc(D_i_splits[0], true);  // Deep-copy
-            Matrix& D_ij_co = D_ij_splits[1];
-            column_scale(D_i_cc, D_node_cc);  // LD
-            matmul(D_i_cc, D_j_co, D_ij_co, false, false, -1, 1);  // LDL^T
-          }
-          if (j > node) {
-            // oc x cc -> oc
-            Matrix D_i_oc(D_i_splits[2], true);  // Deep-copy
-            Matrix& D_ij_oc = D_ij_splits[2];
-            column_scale(D_i_oc, D_node_cc);  // LD
-            matmul(D_i_oc, D_j_cc, D_ij_oc, false, false, -1, 1);  // LDL^T
-          }
-          {
-            // oc x co -> oo
-            Matrix D_i_oc(D_i_splits[2], true);  // Deep-copy
-            Matrix& D_ij_oo = D_ij_splits[3];
-            column_scale(D_i_oc, D_node_cc);  // LD
-            matmul(D_i_oc, D_j_co, D_ij_oo, false, false, -1, 1);  // LDL^T
+      // Schur's complement into inadmissible block
+      #pragma omp parallel for collapse(2)
+      for (int64_t i: near_neighbors(node, level)) {
+        for (int64_t j: near_neighbors(node, level)) {
+          if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+            const Matrix& D_i = D(i, node, level);
+            const Matrix& D_j = D(node, j, level);
+            const auto lower_o_size =
+                (i <= node || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
+            const auto right_o_size =
+                (j <= node || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
+            const auto lower_c_size = D_i.rows - lower_o_size;
+            const auto right_c_size = D_j.cols - right_o_size;
+            const auto D_i_splits  = D_i.split(vec{lower_c_size}, vec{node_c_size});
+            const auto D_j_splits  = D_j.split(vec{node_c_size}, vec{right_c_size});
+            auto D_ij_splits = D(i, j, level).split(vec{lower_c_size}, vec{right_c_size});
+
+            const Matrix& D_j_cc = D_j_splits[0];
+            const Matrix& D_j_co = D_j_splits[1];
+            if (i > node && j > node && lower_c_size > 0 && right_c_size > 0) {
+              // cc x cc -> cc
+              Matrix D_i_cc(D_i_splits[0], true);  // Deep-copy
+              Matrix& D_ij_cc = D_ij_splits[0];
+              column_scale(D_i_cc, D_node_cc);  // LD
+              matmul(D_i_cc, D_j_cc, D_ij_cc, false, false, -1, 1);  // LDL^T
+            }
+            if (i > node && lower_c_size > 0) {
+              // cc x co -> co
+              Matrix D_i_cc(D_i_splits[0], true);  // Deep-copy
+              Matrix& D_ij_co = D_ij_splits[1];
+              column_scale(D_i_cc, D_node_cc);  // LD
+              matmul(D_i_cc, D_j_co, D_ij_co, false, false, -1, 1);  // LDL^T
+            }
+            if (j > node && right_c_size > 0) {
+              // oc x cc -> oc
+              Matrix D_i_oc(D_i_splits[2], true);  // Deep-copy
+              Matrix& D_ij_oc = D_ij_splits[2];
+              column_scale(D_i_oc, D_node_cc);  // LD
+              matmul(D_i_oc, D_j_cc, D_ij_oc, false, false, -1, 1);  // LDL^T
+            }
+            {
+              // oc x co -> oo
+              Matrix D_i_oc(D_i_splits[2], true);  // Deep-copy
+              Matrix& D_ij_oo = D_ij_splits[3];
+              column_scale(D_i_oc, D_node_cc);  // LD
+              matmul(D_i_oc, D_j_co, D_ij_oo, false, false, -1, 1);  // LDL^T
+            }
           }
         }
       }
-    }
 
-    // Schur's complement into admissible block (fill-in)
-    for (int64_t i: near_neighbors(node, level)) {
-      for (int64_t j: near_neighbors(node, level)) {
-        const bool is_admissible_ij =
-            !is_admissible.exists(i, j, level) ||
-            (is_admissible.exists(i, j, level) && is_admissible(i, j, level));
-        const bool fill_ij =
-            (i > node && j > node) ||  // b*b       fill-in block
-            (i > node && j < node) ||  // b*rank    fill-in block
-            (i < node && j > node) ||  // rank*b    fill-in block
-            (i < node && j < node);    // rank*rank fill-in block
-        if (is_admissible_ij && fill_ij) {
-          const Matrix& D_i = D(i, node, level);
-          const Matrix& D_j = D(node, j, level);
-          const auto lower_o_size =
-              (i <= node || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
-          const auto right_o_size =
-              (j <= node || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
-          const auto lower_c_size = D_i.rows - lower_o_size;
-          const auto right_c_size = D_j.cols - right_o_size;
-          const auto D_i_splits  = D_i.split(vec{lower_c_size}, vec{diag_col_split});
-          const auto D_j_splits  = D_j.split(vec{diag_row_split}, vec{right_c_size});
+      // Schur's complement into admissible block (fill-in)
+      for (int64_t i: near_neighbors(node, level)) {
+        for (int64_t j: near_neighbors(node, level)) {
+          const bool is_admissible_ij =
+              !is_admissible.exists(i, j, level) ||
+              (is_admissible.exists(i, j, level) && is_admissible(i, j, level));
+          const bool fill_ij =
+              (i > node && j > node) ||  // b*b       fill-in block
+              (i > node && j < node) ||  // b*rank    fill-in block
+              (i < node && j > node) ||  // rank*b    fill-in block
+              (i < node && j < node);    // rank*rank fill-in block
+          if (is_admissible_ij && fill_ij) {
+            const Matrix& D_i = D(i, node, level);
+            const Matrix& D_j = D(node, j, level);
+            const auto lower_o_size =
+                (i <= node || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
+            const auto right_o_size =
+                (j <= node || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
+            const auto lower_c_size = D_i.rows - lower_o_size;
+            const auto right_c_size = D_j.cols - right_o_size;
+            const auto D_i_splits  = D_i.split(vec{lower_c_size}, vec{node_c_size});
+            const auto D_j_splits  = D_j.split(vec{node_c_size}, vec{right_c_size});
 
-          Matrix D_i_cc(D_i_splits[0], true);  // Deep-copy
-          Matrix D_i_oc(D_i_splits[2], true);  // Deep-copy
-          column_scale(D_i_cc, D_node_cc);
-          column_scale(D_i_oc, D_node_cc);
-          const Matrix& D_j_cc = D_j_splits[0];
-          const Matrix& D_j_co = D_j_splits[1];
+            Matrix D_i_cc(D_i_splits[0], true);  // Deep-copy
+            Matrix D_i_oc(D_i_splits[2], true);  // Deep-copy
+            column_scale(D_i_cc, D_node_cc);
+            column_scale(D_i_oc, D_node_cc);
+            const Matrix& D_j_cc = D_j_splits[0];
+            const Matrix& D_j_co = D_j_splits[1];
 
-          Matrix F_ij(D_i.rows, D_j.cols);
-          if (i > node && j > node) {
-            // Create b*b fill-in block
-            Matrix fill_in(D_i.rows, D_j.cols);
-            auto fill_in_splits = fill_in.split(vec{lower_c_size}, vec{right_c_size});
-            matmul(D_i_cc, D_j_cc, fill_in_splits[0], false, false, -1, 1);  // Fill cc part
-            matmul(D_i_cc, D_j_co, fill_in_splits[1], false, false, -1, 1);  // Fill co part
-            matmul(D_i_oc, D_j_cc, fill_in_splits[2], false, false, -1, 1);  // Fill oc part
-            matmul(D_i_oc, D_j_co, fill_in_splits[3], false, false, -1, 1);  // Fill oo part
-            F_ij += fill_in;
-          }
-          if (i > node && j < node) {
-            // Create b*rank fill-in block
-            Matrix fill_in(D_i.rows, right_o_size);
-            auto fill_in_splits = fill_in.split(vec{lower_c_size}, vec{});
-            matmul(D_i_cc, D_j_co, fill_in_splits[0], false, false, -1, 1);  // Fill co part
-            matmul(D_i_oc, D_j_co, fill_in_splits[1], false, false, -1, 1);  // Fill oo part
-            // b*rank fill-in always has a form of Aik*Vk_c * inv(Akk_cc) x (Uk_c)^T*Akj*Vj_o
-            // Convert to b*b block by applying (Vj_o)^T from right
-            // Which is safe from bases update since j has been eliminated before (j < k)
-            F_ij += matmul(fill_in, U(j, level), false, true);
-          }
-          if (i < node && j > node) {
-            // Create rank*b fill-in block
-            Matrix fill_in(lower_o_size, D_j.cols);
-            auto fill_in_splits = fill_in.split(vec{}, vec{right_c_size});
-            matmul(D_i_oc, D_j_cc, fill_in_splits[0], false, false, -1, 1);  // Fill oc part
-            matmul(D_i_oc, D_j_co, fill_in_splits[1], false, false, -1, 1);  // Fill oo part
-            // rank*b fill-in always has a form of (Ui_o)^T*Aik*Vk_c * inv(Akk_cc) * (Uk_c)^T*A_kj
-            // Convert to b*b block by applying Ui_o from left
-            // Which is safe from bases update since i has been eliminated before (i < k)
-            F_ij += matmul(U(i, level), fill_in, false, false);
-          }
-          if (i < node && j < node) {
-            // Create rank*rank fill-in block
-            Matrix fill_in(lower_o_size, right_o_size);
-            matmul(D_i_oc, D_j_co, fill_in, false, false, -1, 1);  // Fill oo part
-            // rank*rank fill-in always has a form of (Ui_o)^T*Aik*Vk_c * inv(Akk_cc) * (Uk_c)^T*A_kj*Vj_o
-            // Convert to b*b block by applying Ui_o from left and (Vj_o)^T from right
-            // Which is safe from bases update since i and j have been eliminated before (i,j < k)
-            F_ij += matmul(matmul(U(i, level), fill_in),
-                           U(j, level), false, true);
-          }
-          // Save or accumulate with existing fill-in block that has been propagated from lower level
-          if (!F.exists(i, j, level)) {
-            F.insert(i, j, level, std::move(F_ij));
-            fill_in_neighbors(i, level).push_back(j);
-          }
-          else {
-            F(i, j, level) += F_ij;
+            Matrix F_ij(D_i.rows, D_j.cols);
+            if (i > node && j > node && lower_c_size > 0 && right_c_size > 0) {
+              // Create b*b fill-in block
+              Matrix fill_in(D_i.rows, D_j.cols);
+              auto fill_in_splits = fill_in.split(vec{lower_c_size}, vec{right_c_size});
+              matmul(D_i_cc, D_j_cc, fill_in_splits[0], false, false, -1, 1);  // Fill cc part
+              matmul(D_i_cc, D_j_co, fill_in_splits[1], false, false, -1, 1);  // Fill co part
+              matmul(D_i_oc, D_j_cc, fill_in_splits[2], false, false, -1, 1);  // Fill oc part
+              matmul(D_i_oc, D_j_co, fill_in_splits[3], false, false, -1, 1);  // Fill oo part
+              F_ij += fill_in;
+            }
+            if (i > node && j < node && lower_c_size > 0) {
+              // Create b*rank fill-in block
+              Matrix fill_in(D_i.rows, right_o_size);
+              auto fill_in_splits = fill_in.split(vec{lower_c_size}, vec{});
+              matmul(D_i_cc, D_j_co, fill_in_splits[0], false, false, -1, 1);  // Fill co part
+              matmul(D_i_oc, D_j_co, fill_in_splits[1], false, false, -1, 1);  // Fill oo part
+              // b*rank fill-in always has a form of Aik*Vk_c * inv(Akk_cc) x (Uk_c)^T*Akj*Vj_o
+              // Convert to b*b block by applying (Vj_o)^T from right
+              // Which is safe from bases update since j has been eliminated before (j < k)
+              F_ij += matmul(fill_in, U(j, level), false, true);
+            }
+            if (i < node && j > node && right_c_size > 0) {
+              // Create rank*b fill-in block
+              Matrix fill_in(lower_o_size, D_j.cols);
+              auto fill_in_splits = fill_in.split(vec{}, vec{right_c_size});
+              matmul(D_i_oc, D_j_cc, fill_in_splits[0], false, false, -1, 1);  // Fill oc part
+              matmul(D_i_oc, D_j_co, fill_in_splits[1], false, false, -1, 1);  // Fill oo part
+              // rank*b fill-in always has a form of (Ui_o)^T*Aik*Vk_c * inv(Akk_cc) * (Uk_c)^T*A_kj
+              // Convert to b*b block by applying Ui_o from left
+              // Which is safe from bases update since i has been eliminated before (i < k)
+              F_ij += matmul(U(i, level), fill_in, false, false);
+            }
+            if (i < node && j < node) {
+              // Create rank*rank fill-in block
+              Matrix fill_in(lower_o_size, right_o_size);
+              matmul(D_i_oc, D_j_co, fill_in, false, false, -1, 1);  // Fill oo part
+              // rank*rank fill-in always has a form of (Ui_o)^T*Aik*Vk_c * inv(Akk_cc) * (Uk_c)^T*A_kj*Vj_o
+              // Convert to b*b block by applying Ui_o from left and (Vj_o)^T from right
+              // Which is safe from bases update since i and j have been eliminated before (i,j < k)
+              F_ij += matmul(matmul(U(i, level), fill_in),
+                             U(j, level), false, true);
+            }
+            // Save or accumulate with existing fill-in block that has been propagated from lower level
+            if (!F.exists(i, j, level)) {
+              F.insert(i, j, level, std::move(F_ij));
+              fill_in_neighbors(i, level).push_back(j);
+            }
+            else {
+              F(i, j, level) += F_ij;
+            }
           }
         }
       }
-    }
+    } // if (node_c_size > 0)
   } // for (int64_t node = 0; node < num_nodes; ++node)
 }
 
@@ -869,10 +870,6 @@ void SymmetricH2::factorize(const Domain& domain) {
       if (!U.exists(i, level)) {
         throw std::logic_error("Cluster bases not found at U(" + std::to_string(i) +
                                "," + std::to_string(level) + ")");
-      }
-      if (U(i, level).rows <= U(i, level).cols) {
-        throw std::domain_error("Full rank cluster bases found at U(" + std::to_string(i) +
-                                "," + std::to_string(level) + ")");
       }
     }
 
@@ -1221,6 +1218,7 @@ int main(int argc, char ** argv) {
   const auto construct_max_rank = A.get_basis_max_rank();
   const auto construct_error = A.construction_error(domain);
   const auto lr_ratio = A.low_rank_block_ratio();
+  A.print_structure(A.height);
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
