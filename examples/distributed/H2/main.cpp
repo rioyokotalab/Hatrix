@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
 
     // std::cout << "max level: " << A.max_level << " min: " << A.min_level << std::endl;
 
-    // A.print_structure();
+    A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);
@@ -110,7 +110,6 @@ int main(int argc, char* argv[]) {
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
-  Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
 
   double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
   // double matvec_error = 0;

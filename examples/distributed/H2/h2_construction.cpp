@@ -11,7 +11,8 @@
 
 using namespace Hatrix;
 
-Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;  // This is actually RowLevelMap
+// This is actually RowLevelMap
+Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;
 
 static void
 dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& Cj,
@@ -20,7 +21,9 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
   int64_t j_level = Cj.level;
 
   bool well_separated = false;
-  if (i_level == j_level) {
+  if (i_level == j_level &&
+      ((!opts.use_nested_basis && i_level == A.max_level) ||
+       opts.use_nested_basis)) {
     double distance = 0;
     for (int64_t k = 0; k < opts.ndim; ++k) {
       distance += pow(Ci.center[k] - Cj.center[k], 2);
@@ -36,21 +39,46 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
     A.is_admissible.insert(Ci.level_index, Cj.level_index, i_level, std::move(val));
   }
 
-  if (i_level <= j_level && Ci.cells.size() > 0 && !well_separated) {
+  // Only descend down the tree if you are currently at a higher level and the blocks
+  // at the current level are inadmissible. You then want to refine the tree further
+  // since it has been found that the higher blocks are inadmissible.
+  //
+  // Alternatively, to create a BLR2 matrix you want to down to the finest level of granularity
+  // anyway and populate the blocks at that level. So that puts another OR condition to check
+  // if the use of nested basis is enabled.
+  if (i_level <= j_level && Ci.cells.size() > 0 && (!well_separated || !opts.use_nested_basis)) {
     // j is at a higher level and i is not leaf.
     dual_tree_traversal(A, Ci.cells[0], Cj, domain, opts);
     dual_tree_traversal(A, Ci.cells[1], Cj, domain, opts);
   }
-  else if (j_level <= i_level && Cj.cells.size() > 0 && !well_separated) {
+  else if (j_level <= i_level && Cj.cells.size() > 0 && (!well_separated || !opts.use_nested_basis)) {
     // i is at a higheer level and j is not leaf.
     dual_tree_traversal(A, Ci, Cj.cells[0], domain, opts);
     dual_tree_traversal(A, Ci, Cj.cells[1], domain, opts);
   }
 }
 
-void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+static void
+build_dense_level(SymmetricSharedBasisMatrix& A) {
+  int64_t level = A.max_level - 1;
+  int64_t nblocks = pow(2, level);
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      A.is_admissible.insert(i, j, level, false);
+    }
+  }
+}
+
+void init_geometry_admis(SymmetricSharedBasisMatrix& A,
+                         const Domain& domain, const Args& opts) {
   A.max_level = domain.tree.height() - 1;
   dual_tree_traversal(A, domain.tree, domain.tree, domain, opts);
+  // Using BLR2 so need an 'artificial' dense matrix level at max_level-1
+  // for accumulation of the partial factorization.
+  if (!opts.use_nested_basis) {
+    build_dense_level(A);
+  }
   A.min_level = 0;
   for (int64_t l = A.max_level; l > 0; --l) {
     int64_t nblocks = pow(2, l);
@@ -90,52 +118,6 @@ void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, co
       }
     }
   }
-
-  // make this BLR2
-
-  // for (int level = A.max_level - 1; level >= A.min_level; --level) {
-  //   int nblocks = pow(2, level);
-  //   for (int i = 0; i < nblocks; ++i) {
-  //     for (int j = 0; j < nblocks; ++j) {
-  //       if (A.is_admissible.exists(i, j, level)) {
-  //         A.is_admissible.erase(i, j, level);
-  //       }
-  //     }
-  //   }
-  // }
-
-  // // remove stuff from max_level and put it in level 1
-  // int nblocks = pow(2, A.max_level);
-  // for (int i = 0; i < nblocks; ++i) {
-  //   for (int j = 0; j < nblocks; ++j) {
-  //     if (!A.is_admissible.exists(i, j, A.max_level)) {
-  //       A.is_admissible.insert(i, j, A.max_level, true);
-  //     }
-  //   }
-  // }
-
-  // // temp populate near and far list and the leaf level
-  // for (int64_t i = 0; i < nblocks; ++i) {
-  //   far_neighbours.insert(i, A.max_level, std::vector<int64_t>());
-  //   near_neighbours.insert(i, A.max_level, std::vector<int64_t>());
-  //   for (int64_t j = 0; j <= i; ++j) {
-  //     if (A.is_admissible(i, j, A.max_level)) {
-  //       far_neighbours(i, A.max_level).push_back(j);
-  //     }
-  //     else {
-  //       near_neighbours(i, A.max_level).push_back(j);
-  //     }
-  //   }
-  // }
-
-  // nblocks = pow(2, A.max_level - 1);
-  // for (int i = 0; i < nblocks; ++i) {
-  //   for (int j = 0; j < nblocks; ++j) {
-  //     A.is_admissible.insert(i, j, A.max_level-1, false);
-  //   }
-  // }
-
-  // A.min_level = A.max_level;
 }
 
 static Matrix
