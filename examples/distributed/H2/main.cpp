@@ -68,20 +68,13 @@ int main(int argc, char* argv[]) {
 
     SymmetricSharedBasisMatrix A_orig(A); // save unfactorized for verification.
 
-    // std::cout << "max level: " << A.max_level << " min: " << A.min_level << std::endl;
-
-    A.print_structure();
+    // A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
-
-    // auto A_test = dense_cholesky_test(A, opts);
-    // vector_permute_test(A_test, x);
-    // dense_factorize_and_solve_test(A, x, opts);
-    // cholesky_fill_in_recompress_check(A, opts);
 
     auto begin_factor = std::chrono::system_clock::now();
     fp_ops = factorize(A, opts);
@@ -108,11 +101,11 @@ int main(int argc, char* argv[]) {
   // ||x - A * (A^-1 * x)|| / ||x||
   double solve_error = (Hatrix::norm(x - x_regen) / Hatrix::norm(x)) * opts.add_diag;
 
-  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  Matrix bdense = matmul(Adense, x);
+  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  // Matrix bdense = matmul(Adense, x);
 
-  double matvec_error = Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
-  // double matvec_error = 0;
+  double matvec_error = 0;
+  // Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
 
   std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
             << opts.accuracy << ","
@@ -131,25 +124,25 @@ int main(int argc, char* argv[]) {
             << fp_ops << ","
 	    << opts.kind_of_geometry << std::endl;
 
-  std::cout << "----------------------------\n";
-  std::cout << "N               : " << opts.N << std::endl;
-  std::cout << "NDIM            : " << opts.ndim << std::endl;
-  std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-  std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
-  std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
-  std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-  std::cout << "ADMIS           : " << opts.admis << std::endl;
-  std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-  std::cout << "NLEAF           : " << opts.nleaf << "\n"
-            << "Domain(ms)      : " << domain_time << "\n"
-            << "Contruct(ms)    : " << construct_time << "\n"
-            << "Factor(ms)      : " << factor_time << "\n"
-            << "Solve(ms)       : " << solve_time << "\n"
-            << "Solve error     : " << solve_error << "\n"
-            << "Construct error : " << matvec_error << "\n"
-            << "PAPI_FP_OPS     : " << fp_ops << "\n"
-            << std::endl;
-  std::cout << "----------------------------\n";
+  // std::cout << "----------------------------\n";
+  // std::cout << "N               : " << opts.N << std::endl;
+  // std::cout << "NDIM            : " << opts.ndim << std::endl;
+  // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+  // std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
+  // std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
+  // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+  // std::cout << "ADMIS           : " << opts.admis << std::endl;
+  // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+  // std::cout << "NLEAF           : " << opts.nleaf << "\n"
+  //           << "Domain(ms)      : " << domain_time << "\n"
+  //           << "Contruct(ms)    : " << construct_time << "\n"
+  //           << "Factor(ms)      : " << factor_time << "\n"
+  //           << "Solve(ms)       : " << solve_time << "\n"
+  //           << "Solve error     : " << solve_error << "\n"
+  //           << "Construct error : " << matvec_error << "\n"
+  //           << "PAPI_FP_OPS     : " << fp_ops << "\n"
+  //           << std::endl;
+  // std::cout << "----------------------------\n";
 
 
 

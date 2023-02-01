@@ -14,7 +14,7 @@ make -j H2_main
 
 for adm in 0.7; do
     nleaf=128
-    ndim=2
+    ndim=3
     max_rank=25
 
     for N in 8192; do
@@ -28,7 +28,7 @@ for adm in 0.7; do
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \
-                      --add_diag 1e-9 \
-                      --use_nested_basis
+                      --add_diag 1e-9 # \
+                      # --use_nested_basis
     done
 done

@@ -26,8 +26,7 @@ namespace Hatrix {
       PAPI_FP_OPS_INDEX = FP_OPS_INDEX;
       assert(PAPI_create_eventset(&event_set) == PAPI_OK);
       assert(PAPI_query_event(PAPI_FP_OPS) == PAPI_OK);
-      assert(PAPI_add_event(event_set, PAPI_FP_OPS)
-             == PAPI_OK);
+      assert(PAPI_add_event(event_set, PAPI_FP_OPS) == PAPI_OK);
 #endif
     }
 

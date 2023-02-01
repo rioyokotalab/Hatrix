@@ -4,7 +4,7 @@ BLAS_LIB     = ${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a \
              ${MKLROOT}/lib/intel64/libmkl_gnu_thread.a ${MKLROOT}/lib/intel64/libmkl_core.a \
              ${MKLROOT}/lib/intel64/libmkl_blacs_openmpi_lp64.a -Wl,--end-group -lgomp \
              -lpthread -lm -ldl
-PAPI_INCLUDE = $(shell pkg-config --cflags papi)
+PAPI_INCLUDE = -DHATRIX_ENABLE_PAPI $(shell pkg-config --cflags papi)
 PAPI_LIBS    = $(shell pkg-config --libs papi)
 CXXFLAGS     = -g -std=c++11 -O3 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
                $(shell pkg-config --cflags gtest gtest_main) $(PAPI_INCLUDE)
