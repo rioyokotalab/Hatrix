@@ -69,7 +69,7 @@ namespace Hatrix {
       add_diag(1e-4),
       admis_kind(DIAGONAL),
       construct_algorithm(MIRO),
-      use_nested_basis(true),
+      use_nested_basis(false),
       verbose(false),
       is_symmetric(false)
   {

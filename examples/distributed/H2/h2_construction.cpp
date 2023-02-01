@@ -11,7 +11,8 @@
 
 using namespace Hatrix;
 
-Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;  // This is actually RowLevelMap
+// This is actually RowLevelMap
+Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;
 
 static void
 dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& Cj,
@@ -36,19 +37,27 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
     A.is_admissible.insert(Ci.level_index, Cj.level_index, i_level, std::move(val));
   }
 
-  if (i_level <= j_level && Ci.cells.size() > 0 && !well_separated) {
+  // Only descend down the tree if you are currently at a higher level and the blocks
+  // at the current level are inadmissible. You then want to refine the tree further
+  // since it has been found that the higher blocks are inadmissible.
+  //
+  // Alternatively, to create a BLR2 matrix you want to down to the finest level of granularity
+  // anyway and populate the blocks at that level. So that puts another OR condition to check
+  // if the use of nested basis is enabled.
+  if (i_level <= j_level && Ci.cells.size() > 0 && (!well_separated || !opts.use_nested_basis)) {
     // j is at a higher level and i is not leaf.
     dual_tree_traversal(A, Ci.cells[0], Cj, domain, opts);
     dual_tree_traversal(A, Ci.cells[1], Cj, domain, opts);
   }
-  else if (j_level <= i_level && Cj.cells.size() > 0 && !well_separated) {
+  else if (j_level <= i_level && Cj.cells.size() > 0 && (!well_separated || !opts.use_nested_basis)) {
     // i is at a higheer level and j is not leaf.
     dual_tree_traversal(A, Ci, Cj.cells[0], domain, opts);
     dual_tree_traversal(A, Ci, Cj.cells[1], domain, opts);
   }
 }
 
-void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+void init_geometry_admis(SymmetricSharedBasisMatrix& A,
+                         const Domain& domain, const Args& opts) {
   A.max_level = domain.tree.height() - 1;
   dual_tree_traversal(A, domain.tree, domain.tree, domain, opts);
   A.min_level = 0;
