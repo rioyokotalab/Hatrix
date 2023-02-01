@@ -1218,7 +1218,6 @@ int main(int argc, char ** argv) {
   const auto construct_max_rank = A.get_basis_max_rank();
   const auto construct_error = A.construction_error(domain);
   const auto lr_ratio = A.low_rank_block_ratio();
-  A.print_structure(A.height);
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
