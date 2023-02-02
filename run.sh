@@ -16,9 +16,9 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 #:/mnt/nfs/packages/x86_64/intel/2022/mpi/2021.6.0/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64::/home/sameer.deshmukh/gitrepos/papi/src/lib
 
-make -j H2_dtd
+make -j H2_main
 
-for adm in 0.8 0.9 1 1.1 1.2 2; do
+for adm in 0.5 0.8 0.9 1 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 3; do
     nleaf=512
     max_rank=30
 
@@ -35,6 +35,7 @@ for adm in 0.8 0.9 1 1.1 1.2 2; do
                       --admis_kind geometry \
                       --construct_algorithm miro \
                       --add_diag 1e-9 \
+                      --kind_of_recompression 3 \
                       --use_nested_basis
         done
     done
