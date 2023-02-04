@@ -39,6 +39,7 @@ endif()
 add_library(Hatrix
   src/util/matrix_generators.cpp
   src/util/helpers.cpp
+  src/util/profiling.cpp
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
 
@@ -53,6 +54,14 @@ target_include_directories(Hatrix
   PRIVATE
     ${BLAS_INCLUDE_DIR}
 )
+
+if(USE_PAPI)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(PAPI REQUIRED papi)
+  target_compile_options(Hatrix PUBLIC -DHATRIX_ENABLE_PAPI)
+  target_include_directories(Hatrix PRIVATE ${PAPI_INCLUDE_DIRS})
+  target_link_libraries(Hatrix ${PAPI_LINK_LIBRARIES})
+endif()
 
 if(USE_CUDA)
   find_package(CUDA REQUIRED)
