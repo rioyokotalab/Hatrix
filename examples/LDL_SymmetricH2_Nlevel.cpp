@@ -116,7 +116,7 @@ class SymmetricH2 {
   double low_rank_block_ratio() const;
   void write_JSON(const Domain& domain, const std::string filename) const;
 
-  void factorize(const Domain& domain);
+  long long int factorize(const Domain& domain);
   Matrix solve(const Matrix& b) const;
   double solve_error(const Matrix& x, const Matrix& ref) const;
 };
@@ -850,7 +850,10 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
   } // for (int64_t node = 0; node < num_nodes; ++node)
 }
 
-void SymmetricH2::factorize(const Domain& domain) {
+long long int SymmetricH2::factorize(const Domain& domain) {
+  Hatrix::profiling::PAPI papi;
+  papi.add_fp_ops(0);
+  papi.start();
   // Initialize fill_in_neighbors array
   for (int64_t level = height; level > 0; level--) {
     const int64_t num_nodes = level_blocks[level];
@@ -1019,6 +1022,9 @@ void SymmetricH2::factorize(const Domain& domain) {
 
   // Factorize remaining root level
   ldl(D(0, 0, 0));
+
+  auto fp_ops = papi.fp_ops();
+  return fp_ops;
 }
 
 // Permute the vector forward and return the offset at which the new vector begins.
@@ -1444,7 +1450,7 @@ int main(int argc, char ** argv) {
 #endif
 
   const auto start_factor = std::chrono::system_clock::now();
-  A.factorize(domain);
+  const auto factor_fp_ops = A.factorize(domain);
   const auto stop_factor = std::chrono::system_clock::now();
   const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_factor - start_factor).count();
@@ -1453,6 +1459,7 @@ int main(int argc, char ** argv) {
 #ifndef OUTPUT_CSV
   std::cout << "factor_min_rank=" << factor_min_rank
             << " factor_max_rank=" << factor_max_rank
+            << " factor_fp_ops=" << factor_fp_ops
             << " factor_time=" << factor_time
             << std::endl;
 #endif
@@ -1477,7 +1484,7 @@ int main(int argc, char ** argv) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
-              << ",factor_min_rank,factor_max_rank,factor_time"
+              << ",factor_min_rank,factor_max_rank,factor_fp_ops,factor_time"
               << ",solve_time,solve_error"
               << std::endl;
   }
@@ -1504,6 +1511,7 @@ int main(int argc, char ** argv) {
             << "," << std::scientific << construct_error << std::defaultfloat
             << "," << factor_min_rank
             << "," << factor_max_rank
+            << "," << factor_fp_ops
             << "," << factor_time
             << "," << solve_time
             << "," << std::scientific << solve_error << std::defaultfloat
