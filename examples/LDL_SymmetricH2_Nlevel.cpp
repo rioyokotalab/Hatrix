@@ -26,7 +26,7 @@
 
 using vec = std::vector<int64_t>;
 
-// #define OUTPUT_CSV
+#define OUTPUT_CSV
 
 // Comment the following line to use SVD instead of pivoted QR for low-rank compression
 // #define USE_QR_COMPRESSION
@@ -1405,6 +1405,7 @@ int main(int argc, char ** argv) {
     domain.build_tree(leaf_size);
   }
   domain.build_interactions(admis);
+  domain.refine_interactions();
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
 
   const auto start_construct = std::chrono::system_clock::now();
