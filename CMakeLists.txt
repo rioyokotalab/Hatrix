@@ -35,6 +35,9 @@ endif()
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   add_compile_options(-O3)
 endif()
+if(CMAKE_BUILD_TYPE STREQUAL "Profile")
+  add_compile_options(-g -O3)
+endif()
 
 add_library(Hatrix
   src/util/matrix_generators.cpp
@@ -55,13 +58,18 @@ target_include_directories(Hatrix
     ${BLAS_INCLUDE_DIR}
 )
 
-# TODO Debug this and see why it does not work with -O3 flag
+option(USE_PAPI "Use PAPI to get CPU performance counters" OFF)
 if(USE_PAPI)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(PAPI REQUIRED papi)
-  target_compile_options(Hatrix PUBLIC -DHATRIX_ENABLE_PAPI)
+  target_compile_definitions(Hatrix PUBLIC HATRIX_ENABLE_PAPI)
+  target_compile_options(Hatrix PUBLIC -g)
   target_include_directories(Hatrix PRIVATE ${PAPI_INCLUDE_DIRS})
   target_link_libraries(Hatrix ${PAPI_LINK_LIBRARIES})
+  if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    message("Warning: PAPI may not work with Release build type that uses -DNDEBUG macro")
+    message("Please use \"Profile\" or \"Debug\" build type instead")
+  endif()
 endif()
 
 if(USE_CUDA)
