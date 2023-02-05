@@ -1463,7 +1463,7 @@ int main(int argc, char ** argv) {
             << " factor_time=" << factor_time
             << std::endl;
 #endif
-
+  /*
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
   Hatrix::Matrix x = Hatrix::body_neutral_charge(domain, 1, 0);
   Hatrix::Matrix b = Hatrix::matmul(Adense, x);
@@ -1473,6 +1473,9 @@ int main(int argc, char ** argv) {
   const double solve_time = std::chrono::duration_cast<std::chrono::milliseconds>
                             (solve_stop - solve_start).count();
   const auto solve_error = A.solve_error(x_solve, x);
+  */
+  const int64_t solve_time = 0;
+  const double solve_error = -1;
 #ifndef OUTPUT_CSV
   std::cout << "solve_time=" << solve_time
             << " solve_error=" << std::scientific << solve_error
