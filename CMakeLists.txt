@@ -55,6 +55,7 @@ target_include_directories(Hatrix
     ${BLAS_INCLUDE_DIR}
 )
 
+# TODO Debug this and see why it does not work with -O3 flag
 if(USE_PAPI)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(PAPI REQUIRED papi)
