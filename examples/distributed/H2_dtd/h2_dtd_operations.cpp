@@ -1484,14 +1484,14 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
-    update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
 
     multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
     compute_schurs_complement(A, domain, block, level);
-    compute_fill_ins(A, domain, block, level);
+    // compute_fill_ins(A, domain, block, level);
   }
 }
 

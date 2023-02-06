@@ -122,7 +122,9 @@ int main(int argc, char* argv[]) {
             << solve_error << ","
             << matvec_error << ","
             << fp_ops << ","
-	    << opts.kind_of_geometry << std::endl;
+	    << opts.kind_of_geometry << ","
+            << opts.use_nested_basis
+            << std::endl;
 
   // std::cout << "----------------------------\n";
   // std::cout << "N               : " << opts.N << std::endl;
