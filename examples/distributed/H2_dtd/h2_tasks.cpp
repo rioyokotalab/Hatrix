@@ -182,14 +182,15 @@ task_multiply_partial_complement_right(parsec_execution_stream_t* es, parsec_tas
   double *_U;
 
   parsec_dtd_unpack_args(this_task,
-                         &D_nrows, &D_ncols, &D_row_rank, &_D,
+                         &D_nrows, &D_ncols, &D_col_rank, &_D,
                          &U_nrows, &U_ncols, &_U);
 
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
   Matrix U_F = make_complement(U);
-  auto D_splits = D.split(std::vector<int64_t>(1, D_nrows - D_row_rank), {});
+  auto D_splits = D.split({},
+                          std::vector<int64_t>(1, D_nrows - D_col_rank));
 
   D_splits[1] = matmul(D_splits[1], U_F);
 

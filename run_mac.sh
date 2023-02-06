@@ -13,11 +13,11 @@ ulimit -c unlimited
 make -j H2_main
 
 for adm in 1.0; do
-    nleaf=512
+    nleaf=256
     ndim=3
     max_rank=50
 
-    for N in 16384 32768; do
+    for N in 8192; do
         ./bin/H2_main --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
