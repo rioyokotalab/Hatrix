@@ -73,7 +73,14 @@ int main(int argc, char* argv[]) {
   int64_t construct_max_rank, construct_average_rank,
     post_factor_max_rank, post_factor_average_rank;
 
-  Matrix x = generate_rhs_vector(opts);
+  std::mt19937 gen(0);
+  std::uniform_real_distribution<double> dist(0, 1);
+  Matrix x(opts.N, 1);
+  for (int64_t i = 0; i < opts.N; ++i) {
+    x(i, 0) = dist(gen);
+  }
+
+  // Matrix x = generate_rhs_vector(opts);
   long long int fp_ops;
 
   if (opts.is_symmetric) {
