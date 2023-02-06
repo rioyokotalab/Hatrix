@@ -1485,7 +1485,7 @@ int main(int argc, char ** argv) {
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
-    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel"
+    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
               << ",factor_min_rank,factor_max_rank,factor_fp_ops,factor_time"
               << ",solve_time,solve_error"
