@@ -228,6 +228,50 @@ void partial_matmul(SymmetricSharedBasisMatrix& A,
 
 void
 compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
+  int64_t nblocks = pow(2, level);
+  // schur's complement in front of diagonal block.
+
+  // r * c x (b * c).T -> b * r. This one is only between the co of the diagonal and the
+  // blocks below it. The schur's complement is applied only on the (i, block) dense block.
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (exists_and_inadmissible(A, i, block, level)) {
+      auto D_block_block_split = split_dense(A.D(block, block, level),
+                                             A.D(block, block, level).rows - A.ranks(block, level),
+                                             A.D(block, block, level).cols - A.ranks(block, level));
+      auto D_i_block_split =
+        A.D(i, block, level).split({},
+                                   std::vector<int64_t>(1,
+                                                        A.D(i, block, level).cols - A.ranks(block, level)));
+      matmul(D_i_block_split[0], D_block_block_split[2], D_i_block_split[1], false, true, -1, 1);
+    }
+  }
+
+  // b*c x (b*c).T -> b*b.
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    for (int64_t j = block+1; j < nblocks; ++j) {
+      if (exists_and_inadmissible(A, i, block, level) &&
+          exists_and_inadmissible(A, j, block, level)) {
+        if (exists_and_inadmissible(A, i, j, level)) {
+          auto D_i_block_split =
+            A.D(i, block, level).split({},
+                                       std::vector<int64_t>(1,
+                                                        A.D(i, block, level).cols - A.ranks(block, level)));
+          auto D_j_block_split =
+            A.D(j, block, level).split({},
+                                       std::vector<int64_t>(1,
+                                                            A.D(j, block, level).cols - A.ranks(block, level)));
+
+          if (i == j) {
+            syrk(D_i_block_split[0], A.D(i, j, level), Hatrix::Lower, false, -1, 1);
+          }
+          else {
+
+          }
+        }
+      }
+    }
+  }
+
   reduction_loop1(A, block, level,
                   [&](int64_t i, int64_t j, std::vector<Matrix>& D_i_block_splits,
                       std::vector<Matrix>& D_j_block_splits) {

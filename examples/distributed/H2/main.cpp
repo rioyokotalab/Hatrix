@@ -21,6 +21,31 @@
 
 using namespace Hatrix;
 
+static Hatrix::Matrix
+generate_rhs_vector(Hatrix::Args& opts) {
+  double cmax = 1;
+  std::mt19937 gen(0);
+  std::uniform_real_distribution<double> dist(0, cmax);
+  Matrix x(opts.N, 1);
+  double avg = 0;
+  double cmax2 = cmax * 2;
+
+  for (int64_t i = 0; i < opts.N; ++i) {
+    double c = dist(gen) * cmax2 - cmax;
+    x(i, 0) = c;
+    avg += c;
+  }
+  avg /= opts.N;
+
+  if (avg != 0.) {
+    for (int64_t i = 0; i < opts.N; ++i) {
+      x(i, 0) -= avg;
+    }
+  }
+
+  return x;
+}
+
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
 
@@ -48,10 +73,7 @@ int main(int argc, char* argv[]) {
   int64_t construct_max_rank, construct_average_rank,
     post_factor_max_rank, post_factor_average_rank;
 
-  std::mt19937 gen(0);
-  std::uniform_real_distribution<double> dist(10, 1000);
-  Matrix x(opts.N, 1);
-  for (int i = 0; i < opts.N; ++i) { x(i, 0) = dist(gen); }
+  Matrix x = generate_rhs_vector(opts);
   long long int fp_ops;
 
   if (opts.is_symmetric) {
@@ -68,7 +90,7 @@ int main(int argc, char* argv[]) {
 
     SymmetricSharedBasisMatrix A_orig(A); // save unfactorized for verification.
 
-    // A.print_structure();
+    A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);
