@@ -1207,7 +1207,6 @@ int main(int argc, char ** argv) {
     domain.build_tree(leaf_size);
   }
   domain.build_interactions(admis);
-  domain.refine_interactions();
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
 
   const auto start_construct = std::chrono::system_clock::now();
