@@ -1342,7 +1342,7 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::init();
 
-  Hatrix::set_kernel_constants(1.e-3 / (double)N, 1.);
+  Hatrix::set_kernel_constants(1.e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
     case 0: {
@@ -1411,7 +1411,6 @@ int main(int argc, char ** argv) {
     domain.build_tree(leaf_size);
   }
   domain.build_interactions(admis);
-  domain.refine_interactions();
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
 
   const auto start_construct = std::chrono::system_clock::now();
