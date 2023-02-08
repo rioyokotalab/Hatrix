@@ -577,9 +577,9 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               // copy oo portion of the D blocks.
               copy_dense = true;
               parsec_data_key_t D_unelim_key =
-                parsec_D.super.data_key(&parsec_D.super, i, parent_level);
+                parsec_D.super.data_key(&parsec_D.super, i, j, parent_level);
               parsec_data_key_t D_c1c2_key =
-                parsec_D.super.data_key(&parsec_D.super, c1, level);
+                parsec_D.super.data_key(&parsec_D.super, c1, c2, level);
 
 
               int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
@@ -607,7 +607,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               // copy full S blocks into the parent D block
               copy_dense = false;
               parsec_data_key_t D_unelim_key =
-                parsec_D.super.data_key(&parsec_D.super, i, parent_level);
+                parsec_D.super.data_key(&parsec_D.super, i, j, parent_level);
               parsec_data_key_t  S_c1c2_key =
                 parsec_S.super.data_key(&parsec_S.super, c1, c2, level);
               int64_t S_c1c2_rows = A.ranks(c1, level);
@@ -654,7 +654,7 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
   int64_t nblocks = pow(2, level);
 
   parsec_data_key_t U_key = parsec_U.super.data_key(&parsec_U.super, block, level);
-  parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, block, level);
+  parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
 
   int64_t D_nrows = get_dim(A, domain, block, level), U_nrows = get_dim(A, domain, block, level);
   int64_t D_ncols = get_dim(A, domain, block, level), U_ncols = A.ranks(block, level);
@@ -1344,7 +1344,7 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
 
     multiply_complements(A, domain, block, level);
-    factorize_diagonal(A, domain, block, level);
+    // factorize_diagonal(A, domain, block, level);
     // triangle_reduction(A, domain, block, level);
     // compute_schurs_complement(A, domain, block, level);
     // compute_fill_ins(A, domain, block, level);
@@ -1453,11 +1453,11 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       parsec_S.mpi_ranks[S_data_key] = mpi_rank(i, j);
 
       row_size = get_dim(A, domain, i, level), col_size = get_dim(A, domain, j, level);
-      parsec_data_key_t D_data_key = parsec_D.super.data_key(&parsec_D.super, i, level);
+      parsec_data_key_t D_data_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
       parsec_D.mpi_ranks[D_data_key] = mpi_rank(i);
 
       if (exists_and_inadmissible(A, i, j, level) && (mpi_rank(i) == MPIRANK)) { // D blocks.
-        Matrix& D_ij = A.D(i, i, level);
+        Matrix& D_ij = A.D(i, j, level);
         parsec_D.matrix_map[D_data_key] = std::addressof(D_ij);
       }
     }
@@ -1616,7 +1616,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
 void h2_dc_init_maps() {
   h2_dc_init(parsec_U, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_S, data_key_2d, rank_of_2d);
-  h2_dc_init(parsec_D, data_key_1d, rank_of_1d);
+  h2_dc_init(parsec_D, data_key_2d, rank_of_1d);
   h2_dc_init(parsec_F, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d);
@@ -1648,7 +1648,7 @@ final_dense_factorize(SymmetricSharedBasisMatrix& A,
   for (int64_t d = 0; d < nblocks; ++d) {
     int64_t D_dd_nrows = get_dim(A, domain, d, level);
     int64_t D_dd_ncols = get_dim(A, domain, d, level);
-    parsec_data_key_t D_dd_key = parsec_D.super.data_key(&parsec_D.super, d, level);
+    auto D_dd_key = parsec_D.super.data_key(&parsec_D.super, d, d, level);
 
     parsec_dtd_insert_task(dtd_tp, task_cholesky_full, 0, PARSEC_DEV_CPU,
       "full_cholesky_task",
@@ -1659,8 +1659,7 @@ final_dense_factorize(SymmetricSharedBasisMatrix& A,
       PARSEC_DTD_ARG_END);
 
     for (int64_t i = d+1; i < nblocks; ++i) {
-      parsec_data_key_t D_dd_key =
-        parsec_D.super.data_key(&parsec_D.super, d, d, level);
+      auto D_dd_key = parsec_D.super.data_key(&parsec_D.super, d, d, level);
       auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
 
       int64_t D_dd_nrows = get_dim(A, domain, d, level);
@@ -1822,10 +1821,10 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
     // add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
     // propagate_fill_ins_to_upper_level(A, opts, level);
 
-    // merge_unfactorized_blocks(A, domain, level);
+    merge_unfactorized_blocks(A, domain, level);
   }
 
-  // final_dense_factorize(A, domain, opts, level);
+  final_dense_factorize(A, domain, opts, level);
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);

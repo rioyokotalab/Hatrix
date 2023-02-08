@@ -333,12 +333,6 @@ task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   MatrixWrapper D_unelim(_D_unelim, D_unelim_rows, D_unelim_cols, D_unelim_rows);
   MatrixWrapper D_c1c2(_D_c1c2, D_c1c2_rows, D_c1c2_cols, D_c1c2_rows);
 
-  // for (int i = 0; i < D_unelim.rows; ++i) {
-  //   for (int j = 0; j < D_unelim.cols; ++j) {
-  //     std::cout << "i-> " << i << " j-> " << j << " b: " << D_unelim(i,j) << std::endl;
-  //   }
-  // }
-
   auto D_unelim_splits = split_dense(D_unelim,
                                      D_unelim_row_rank,
                                      D_unelim_col_rank);
