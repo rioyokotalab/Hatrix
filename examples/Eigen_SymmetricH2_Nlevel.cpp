@@ -120,7 +120,7 @@ class SymmetricH2 {
   void factorize(const Domain& domain);
   std::tuple<int64_t, int64_t, int64_t> inertia(const Domain& domain,
                                                 const double lambda, bool &singular) const;
-  std::tuple<double, int64_t, int64_t, double>
+  std::tuple<double, int64_t, int64_t, double, int64_t>
   get_mth_eigenvalue(const Domain& domain, const int64_t m, const double ev_tol,
                      double left, double right) const;
 };
@@ -1066,9 +1066,12 @@ SymmetricH2::inertia(const Domain& domain,
   return {negative_elements_count, ldl_min_rank, ldl_max_rank};
 }
 
-std::tuple<double, int64_t, int64_t, double>
+std::tuple<double, int64_t, int64_t, double, int64_t>
 SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const double ev_tol,
                                 double left, double right) const {
+  Hatrix::profiling::PAPI papi;
+  papi.add_fp_ops(0);
+  papi.start();
   int64_t shift_min_rank = get_basis_min_rank();
   int64_t shift_max_rank = get_basis_max_rank();
   double max_rank_shift = -1;
@@ -1089,7 +1092,8 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const dou
     if(value >= m) right = mid;
     else left = mid;
   }
-  return {(left + right) / 2, shift_min_rank, shift_max_rank, max_rank_shift};
+  const auto fp_ops = (int64_t)papi.fp_ops();
+  return {(left + right) / 2, shift_min_rank, shift_max_rank, max_rank_shift, fp_ops};
 }
 
 } // namespace Hatrix
@@ -1307,16 +1311,16 @@ int main(int argc, char ** argv) {
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
               << ",dense_eig_time"
-              << ",m,a0,b0,ev_tol,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
   for (int64_t k = 0; k < target_m.size(); k++) {
     const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;
-    int64_t ldl_min_rank, ldl_max_rank;
+    int64_t ldl_min_rank, ldl_max_rank, h2_eig_ops;
     const auto h2_eig_start = std::chrono::system_clock::now();
-    std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
+    std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift, h2_eig_ops) =
         A.get_mth_eigenvalue(domain, m, ev_tol, a, b);
     const auto h2_eig_stop = std::chrono::system_clock::now();
     const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
@@ -1329,6 +1333,7 @@ int main(int argc, char ** argv) {
               << " a0=" << a
               << " b0=" << b
               << " ev_tol=" << ev_tol
+              << " h2_eig_time=" << h2_eig_ops
               << " h2_eig_time=" << h2_eig_time
               << " ldl_min_rank=" << ldl_min_rank
               << " ldl_max_rank=" << ldl_max_rank
@@ -1365,6 +1370,7 @@ int main(int argc, char ** argv) {
               << "," << a
               << "," << b
               << "," << ev_tol
+              << "," << h2_eig_ops
               << "," << h2_eig_time
               << "," << ldl_min_rank
               << "," << ldl_max_rank
