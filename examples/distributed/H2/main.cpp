@@ -128,13 +128,17 @@ int main(int argc, char* argv[]) {
   }
 
   // ||x - A * (A^-1 * x)|| / ||x||
-  double solve_error = (Hatrix::norm(x - x_regen) / Hatrix::norm(x)) * opts.add_diag;
+  // double solve_error = (Hatrix::norm(x - x_regen) / Hatrix::norm(x)) * opts.add_diag;
+
+  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  // Matrix bdense = matmul(Adense, x);
+  Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
+  double solve_error = Hatrix::norm(dense_solution - h2_solution);
 
   // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   // Matrix bdense = matmul(Adense, x);
 
   double matvec_error = 0;
-  // Hatrix::norm(bdense - b) / Hatrix::norm(bdense);
 
   std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
             << opts.accuracy << ","
