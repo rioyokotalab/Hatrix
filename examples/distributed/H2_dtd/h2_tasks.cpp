@@ -152,6 +152,27 @@ task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task)
 }
 
 parsec_hook_return_t
+task_multiply_complement_right(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_nrows, D_ncols;
+  double *_D;
+  int64_t U_nrows, U_ncols;
+  double *_U;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_nrows, &D_ncols, &_D,
+                         &U_nrows, &U_ncols, &_U);
+
+  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
+
+  Matrix U_F = make_complement(U);
+
+  D = matmul(D, U_F);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
 task_multiply_partial_complement_left(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t D_nrows, D_ncols, D_col_rank;
   double *_D;
