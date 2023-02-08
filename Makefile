@@ -113,7 +113,9 @@ test: $(TEST_EXECUTABLES)
 .PHONY: clean
 .SILENT: clean
 clean:
-	for dir in $(DIRS) examples/distributed/HSS examples/distributed/H2 examples/distributed/HSS_dtd $(TEST) $(EXAMPLES); do \
+	for dir in $(DIRS) examples/distributed/HSS \
+	examples/distributed/H2 examples/distributed/HSS_dtd \
+	examples/distributed/H2_dtd $(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/ *.a

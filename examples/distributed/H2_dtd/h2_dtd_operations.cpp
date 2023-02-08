@@ -659,11 +659,6 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
   int64_t D_nrows = get_dim(A, domain, block, level), U_nrows = get_dim(A, domain, block, level);
   int64_t D_ncols = get_dim(A, domain, block, level), U_ncols = A.ranks(block, level);
 
-  // if (!MPIRANK) {
-  //   std::cout << "D_nrows: " << D_nrows << " D_ncols: " << D_ncols <<
-  //     " U_nrows: " << U_nrows << " U_ncols: " << U_ncols << std::endl;
-  // }
-
   int u_arena_type = A.max_level == level ? U_ARENA : U_NON_LEAF_ARENA;
   int d_arena_type = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
@@ -679,50 +674,15 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
     sizeof(int64_t), &U_ncols, PARSEC_VALUE,
     PARSEC_DTD_ARG_END);
 
+  for (int64_t j = 0; j < nblocks; ++j) {
+    if (exists_and_inadmissible(A, block, j, level)) {
 
-  // for (int64_t j = 0; j < block; ++j) {
-  //   if (exists_and_inadmissible(A, block, j, level)) {
-  //     int64_t D_nrows = get_dim(A, domain, block, level);
-  //     int64_t D_ncols = get_dim(A, domain, j, level);
-  //     int64_t D_col_rank = A.ranks(j, level);
-
-  //     parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
-
-  //     parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement_left, 0, PARSEC_DEV_CPU,
-  //     "multiply_complement_partial_left_task",
-  //     sizeof(int64_t), &D_nrows, PARSEC_VALUE,
-  //     sizeof(int64_t), &D_ncols, PARSEC_VALUE,
-  //     sizeof(int64_t), &D_col_rank, PARSEC_VALUE,
-  //     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
-  //                            PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
-  //     sizeof(int64_t), &U_nrows, PARSEC_VALUE,
-  //     sizeof(int64_t), &U_ncols, PARSEC_VALUE,
-  //     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-  //                            PARSEC_INPUT | U_ARENA,
-  //     PARSEC_DTD_ARG_END);
-  //   }
-  // }
+    }
+  }
 
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {
-      int64_t D_nrows = get_dim(A, domain, i, level);
-      int64_t D_ncols = get_dim(A, domain, block, level);
-      int64_t D_col_rank = A.ranks(i, level);
 
-      parsec_data_key_t D_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
-
-      parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement_right, 0, PARSEC_DEV_CPU,
-        "multiply_complement_partial_right_task",
-        sizeof(int64_t), &D_nrows, PARSEC_VALUE,
-        sizeof(int64_t), &D_ncols, PARSEC_VALUE,
-        sizeof(int64_t), &D_col_rank, PARSEC_VALUE,
-        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
-                             PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
-        sizeof(int64_t), &U_nrows, PARSEC_VALUE,
-        sizeof(int64_t), &U_ncols, PARSEC_VALUE,
-        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-                             PARSEC_INPUT | U_ARENA,
-        PARSEC_DTD_ARG_END);
     }
   }
 }
@@ -1445,7 +1405,7 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
         const int64_t c_cols = A.ranks(j_children[0], child_level) +
           A.ranks(j_children[1], child_level);
         Matrix D_unelim(c_rows, c_cols);
-        A.D.insert(i, i, level, std::move(D_unelim));
+        A.D.insert(i, j, level, std::move(D_unelim));
       }
     }
   }
@@ -1820,6 +1780,18 @@ factorize_setup(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
 
   for (int64_t level = A.max_level; level >= A.min_level; --level) {
     update_parsec_pointers(A, domain, level-1);
+  }
+
+  for (int level = A.max_level; level >= A.min_level; --level) {
+    int nblocks = pow(2, level);
+
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = i + 1; j < nblocks; ++j) {
+        if (A.is_admissible.exists(i, j, level)) {
+          A.is_admissible.erase(i, j, level);
+        }
+      }
+    }
   }
 }
 
@@ -2293,7 +2265,7 @@ solve(SymmetricSharedBasisMatrix& A,
       int dense_block_tag = i * last_nodes + j;
       int64_t i_index = i / MPISIZE;
       int64_t j_index = j / MPISIZE;
-      if (mpi_rank(i, j) == MPIRANK) {
+      if (mpi_rank(i) == MPIRANK && exists_and_inadmissible(A, i, j, level)) {
         MPI_Request request;
         MPI_Isend(&A.D(i, j, level), A.D(i, j, level).numel(), MPI_DOUBLE,
                   mpi_rank(i), dense_block_tag, MPI_COMM_WORLD, &request);
@@ -2305,14 +2277,14 @@ solve(SymmetricSharedBasisMatrix& A,
                   mpi_rank(i), j, MPI_COMM_WORLD, &request);
       }
 
-      if (mpi_rank(i) == MPIRANK) {
+      if (mpi_rank(i) == MPIRANK && exists_and_inadmissible(A, i, j, level)) {
         MPI_Status status;
         int64_t D_ij_nrows = get_dim(A, domain, i, level);
         int64_t D_ij_ncols = get_dim(A, domain, j, level);
 
         Matrix D_ij(D_ij_nrows, D_ij_ncols);
         MPI_Recv(&D_ij, D_ij.numel(), MPI_DOUBLE,
-                 mpi_rank(i, j), dense_block_tag, MPI_COMM_WORLD, &status);
+                 mpi_rank(i), dense_block_tag, MPI_COMM_WORLD, &status);
 
         Matrix x_last_j(D_ij_ncols, 1);
         MPI_Recv(&x_last_j, x_last_j.numel(), MPI_DOUBLE,
@@ -2323,7 +2295,7 @@ solve(SymmetricSharedBasisMatrix& A,
     }
 
     // diagonal block
-    if (mpi_rank(i, i) == MPIRANK) {
+    if (mpi_rank(i) == MPIRANK) {
       Matrix& D_ii = A.D(i, i, level);
       MPI_Request request;
       MPI_Isend(&D_ii, D_ii.numel(), MPI_DOUBLE,
@@ -2335,7 +2307,7 @@ solve(SymmetricSharedBasisMatrix& A,
       Matrix D_ii(get_dim(A, domain, i, level), get_dim(A, domain, i, level));
 
       MPI_Recv(&D_ii, D_ii.numel(), MPI_DOUBLE,
-               mpi_rank(i, i), i, MPI_COMM_WORLD, &status);
+               mpi_rank(i), i, MPI_COMM_WORLD, &status);
 
       int64_t i_index = i / MPISIZE;
       solve_triangular(D_ii, x_last[i_index], Hatrix::Left,
@@ -2350,7 +2322,7 @@ solve(SymmetricSharedBasisMatrix& A,
       int64_t i_index = i / MPISIZE;
       int64_t j_index = j / MPISIZE;
       int dense_block_tag = i * last_nodes + j;
-      if (mpi_rank(i, j) == MPIRANK) {
+      if (mpi_rank(i) == MPIRANK && exists_and_inadmissible(A, i, j, level)) {
         MPI_Request request;
         MPI_Isend(&A.D(i, j, level), A.D(i, j, level).numel(), MPI_DOUBLE,
                   mpi_rank(j), dense_block_tag, MPI_COMM_WORLD, &request);
@@ -2362,14 +2334,14 @@ solve(SymmetricSharedBasisMatrix& A,
                   mpi_rank(j), i, MPI_COMM_WORLD, &request);
       }
 
-      if (mpi_rank(j) == MPIRANK) {
+      if (mpi_rank(i) == MPIRANK && exists_and_inadmissible(A, i, j, level)) {
         MPI_Status status;
         int64_t D_ij_nrows = get_dim(A, domain, i, level);
         int64_t D_ij_ncols = get_dim(A, domain, j, level);
 
         Matrix D_ij(D_ij_nrows, D_ij_ncols);
         MPI_Recv(&D_ij, D_ij.numel(), MPI_DOUBLE,
-                 mpi_rank(i, j), dense_block_tag, MPI_COMM_WORLD, &status);
+                 mpi_rank(i), dense_block_tag, MPI_COMM_WORLD, &status);
 
         Matrix x_last_i(D_ij_nrows, 1);
         MPI_Recv(&x_last_i, x_last_i.numel(), MPI_DOUBLE,
@@ -2379,7 +2351,7 @@ solve(SymmetricSharedBasisMatrix& A,
       }
     }
 
-    if (mpi_rank(j, j) == MPIRANK) {
+    if (mpi_rank(j) == MPIRANK) {
       Matrix& D_jj = A.D(j, j, level);
       MPI_Request request;
       MPI_Isend(&D_jj, D_jj.numel(), MPI_DOUBLE,
@@ -2391,7 +2363,7 @@ solve(SymmetricSharedBasisMatrix& A,
       Matrix D_jj(get_dim(A, domain, j, level), get_dim(A, domain, j, level));
 
       MPI_Recv(&D_jj, D_jj.numel(), MPI_DOUBLE,
-               mpi_rank(j, j), j, MPI_COMM_WORLD, &status);
+               mpi_rank(j), j, MPI_COMM_WORLD, &status);
 
       int64_t j_index = j / MPISIZE;
       solve_triangular(D_jj, x_last[j_index], Hatrix::Left,

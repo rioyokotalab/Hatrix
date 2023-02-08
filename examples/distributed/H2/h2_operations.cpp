@@ -595,6 +595,8 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
 
   // left multiply with the complement along the (symmetric) row.
   A.D(block, block, level) = matmul(U_F, A.D(block, block, level), true);
+  A.D(block, block, level) = matmul(A.D(block, block, level), U_F);
+
   for (int64_t j : near_neighbours(block, level)) {
     if (j < block) {
       auto D_splits =
@@ -606,16 +608,10 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
     }
   }
 
-  // right multiply with the transpose of the complement
-  A.D(block, block, level) = matmul(A.D(block, block, level), U_F);
+  // right multiply with the complement.
   for (int64_t i : near_neighbours(block, level)) {
     if (i > block) {
-      auto D_splits =
-        A.D(i, block, level).split(std::vector<int64_t>(1, A.D(i, block, level).rows -
-                                                        A.ranks(i, level)),
-                                   {});
-
-      D_splits[1] = matmul(D_splits[1], U_F);
+      A.D(i, block, level) = matmul(A.D(i, block, level), U_F);
     }
   }
 }
