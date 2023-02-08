@@ -11,6 +11,7 @@ export TMPDIR=/tmp
 ulimit -c unlimited
 
 make -j H2_main
+make -j H2_dtd
 
 for adm in 0.8; do
     nleaf=512

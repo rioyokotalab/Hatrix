@@ -677,6 +677,7 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
   for (int64_t j = 0; j < nblocks; ++j) {
     if (exists_and_inadmissible(A, block, j, level)) {
       int64_t D_col_rank = A.ranks(j, level);
+      auto D_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
 
       parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement_left, 0, PARSEC_DEV_CPU,
         "multiply_partial_complement_left_task",
@@ -695,6 +696,8 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
 
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {
+      auto D_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
+
       parsec_dtd_insert_task(dtd_tp, task_multiply_complement_right, 0, PARSEC_DEV_CPU,
                              "multiply_complement_right_task",
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
@@ -716,7 +719,7 @@ void factorize_diagonal(SymmetricSharedBasisMatrix& A,
                         const int64_t level) {
   int64_t D_nrows = get_dim(A, domain, block, level);
   int64_t rank_nrows = A.ranks(block, level);
-  auto D_key = parsec_D.super.data_key(&parsec_D.super, block, level);
+  auto D_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
 
   int write_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
@@ -828,251 +831,6 @@ void triangle_reduction(SymmetricSharedBasisMatrix& A,
   // TRSM with co blocks behind the diagonal on the 'block' row.
   for (int64_t j = 0; j < block; ++j) {
     triangle_reduce_co(A, domain, block, j, level);
-  }
-}
-
-template<typename T> void
-reduction_loop1(SymmetricSharedBasisMatrix& A,
-                const Domain& domain,
-                int64_t block, int64_t level, T&& body) {
-  const int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-      auto D_i_block_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
-      int64_t D_i_block_rows = get_dim(A, domain, i, level);
-      int64_t D_i_block_cols = get_dim(A, domain, block, level);
-      int64_t D_i_block_row_rank = A.ranks(i, level);
-      int64_t D_i_block_col_rank = A.ranks(block, level);
-
-      for (int64_t j = block+1; j <= i; ++j) {
-        if (exists_and_inadmissible(A, j, block, level)) {
-          // parsec_data_key_t D_j_block_key;
-          auto D_j_block_key = parsec_D.super.data_key(&parsec_D.super, j, block, level);
-          int64_t D_j_block_rows = get_dim(A, domain, j, level);
-          int64_t D_j_block_cols = get_dim(A, domain, block, level);
-          int64_t D_j_block_row_rank = A.ranks(j, level);
-          int64_t D_j_block_col_rank = A.ranks(block, level);
-
-          body(i, j,
-               D_i_block_key, D_i_block_rows, D_i_block_cols,
-               D_i_block_row_rank, D_i_block_col_rank,
-               D_j_block_key, D_j_block_rows, D_j_block_cols,
-               D_j_block_row_rank, D_j_block_col_rank);
-        }
-      }
-    }
-  }
-}
-
-template<typename T> void
-reduction_loop2(SymmetricSharedBasisMatrix& A,
-                const Domain& domain,
-                int64_t block, int64_t level, T&& body) {
-  int64_t nblocks = pow(2, level);
-
-  for (int64_t i = block; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-      for (int64_t j = block; j <= i; ++j) {
-        if (exists_and_inadmissible(A, j, block, level)) {
-          auto D_i_block_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
-          int64_t D_i_block_rows = get_dim(A, domain, i, level);
-          int64_t D_i_block_cols = get_dim(A, domain, block, level);
-          int64_t D_i_block_row_rank = A.ranks(i, level);
-          int64_t D_i_block_col_rank = A.ranks(block, level);
-
-          auto D_j_block_key = parsec_D.super.data_key(&parsec_D.super, j, block, level);
-          int64_t D_j_block_rows = get_dim(A, domain, j, level);
-          int64_t D_j_block_cols = get_dim(A, domain, block, level);
-          int64_t D_j_block_row_rank = A.ranks(j, level);
-          int64_t D_j_block_col_rank = A.ranks(block, level);
-
-          body(i, j,
-               D_i_block_key, D_i_block_rows, D_i_block_cols,
-               D_i_block_row_rank, D_i_block_col_rank,
-               D_j_block_key, D_j_block_rows, D_j_block_cols,
-               D_j_block_row_rank, D_j_block_col_rank);
-        }
-      }
-    }
-  }
-}
-
-template<typename T> void
-reduction_loop4(SymmetricSharedBasisMatrix& A,
-                const Domain& domain,
-                int64_t block, int64_t level, T&& body) {
-  int64_t nblocks = pow(2, level);
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-      auto D_i_block_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
-      int64_t D_i_block_rows = get_dim(A, domain, i, level);
-      int64_t D_i_block_cols = get_dim(A, domain, block, level);
-      int64_t D_i_block_row_rank = A.ranks(i, level);
-      int64_t D_i_block_col_rank = A.ranks(block, level);
-
-      for (int64_t j = 0; j <= block; ++j) {
-        if (exists_and_inadmissible(A, block, j, level)) {
-          auto    D_block_j_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
-          int64_t D_block_j_rows = get_dim(A, domain, block, level);
-          int64_t D_block_j_cols = get_dim(A, domain, j, level);
-          int64_t D_block_j_row_rank = A.ranks(block, level);
-          int64_t D_block_j_col_rank = A.ranks(j, level);
-
-          body(i, j,
-               D_i_block_key, D_i_block_rows, D_i_block_cols,
-               D_i_block_row_rank, D_i_block_col_rank,
-               D_block_j_key, D_block_j_rows, D_block_j_cols,
-               D_block_j_row_rank, D_block_j_col_rank);
-        }
-      }
-    }
-  }
-}
-
-template<typename T> void
-reduction_loop5(SymmetricSharedBasisMatrix& A,
-                const Domain& domain,
-                int64_t block, int64_t level, T&& body) {
-  const int64_t nblocks = pow(2, level);
-  for (int64_t i = block; i < nblocks; ++i) {
-    if (exists_and_inadmissible(A, i, block, level)) {
-      auto D_i_block_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
-      int64_t D_i_block_rows = get_dim(A, domain, i, level);
-      int64_t D_i_block_cols = get_dim(A, domain, block, level);
-      int64_t D_i_block_row_rank = A.ranks(i, level);
-      int64_t D_i_block_col_rank = A.ranks(block, level);
-
-      for (int64_t j = 0; j < block; ++j) {
-        if (exists_and_inadmissible(A, block, j, level)) {
-          auto    D_block_j_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
-          int64_t D_block_j_rows = get_dim(A, domain, block, level);
-          int64_t D_block_j_cols = get_dim(A, domain, j, level);
-          int64_t D_block_j_row_rank = A.ranks(block, level);
-          int64_t D_block_j_col_rank = A.ranks(j, level);
-
-          body(i, j,
-               D_i_block_key, D_i_block_rows, D_i_block_cols,
-               D_i_block_row_rank, D_i_block_col_rank,
-               D_block_j_key, D_block_j_rows, D_block_j_cols,
-               D_block_j_row_rank, D_block_j_col_rank);
-        }
-      }
-    }
-  }
-}
-
-template <typename T> void
-reduction_loop6(SymmetricSharedBasisMatrix& A, const Domain& domain, int64_t block, int64_t level,
-                T&& body) {
-  for (int64_t i = 0; i < block; ++i) {
-    if (exists_and_inadmissible(A, block, i, level)) {
-      auto    D_block_i_key = parsec_D.super.data_key(&parsec_D.super, block, i, level);
-      int64_t D_block_i_rows = get_dim(A, domain, block, level);
-      int64_t D_block_i_cols = get_dim(A, domain, i, level);
-      int64_t D_block_i_row_rank = A.ranks(block, level);
-      int64_t D_block_i_col_rank = A.ranks(i, level);
-
-      body(i, D_block_i_key, D_block_i_rows,
-           D_block_i_cols, D_block_i_row_rank, D_block_i_col_rank);
-    }
-  }
-}
-
-
-void partial_syrk(SymmetricSharedBasisMatrix& A,
-                  const Domain& domain,
-                  int64_t block,
-                  int64_t row,
-                  int64_t col,
-                  int64_t level,
-                  parsec_data_key_t D_i_block_key,
-                  int64_t D_i_block_rows, int64_t D_i_block_cols,
-                  int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
-                  int64_t D_i_block_split_index,
-                  int64_t D_ij_split_index,
-                  Hatrix::Mode uplo, bool unit_diag, bool flip_row_index=false) {
-  if (exists_and_inadmissible(A, row, col, level)) {
-    auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, row, col, level);
-    int64_t D_ij_rows = get_dim(A, domain, row, level);
-    int64_t D_ij_cols = get_dim(A, domain, col, level);
-    int64_t D_ij_row_rank = A.ranks(row, level);
-    int64_t D_ij_col_rank = A.ranks(col, level);
-
-    parsec_dtd_insert_task(dtd_tp, task_partial_syrk, 0, PARSEC_DEV_CPU,
-      "partial_syrk_task",
-      // D_i_block
-      sizeof(int64_t), &D_i_block_rows, PARSEC_VALUE,
-      sizeof(int64_t), &D_i_block_cols, PARSEC_VALUE,
-      sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_i_block_split_index, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
-                           PARSEC_INPUT | D_ARENA,
-      // D_ij
-      sizeof(int64_t), &D_ij_rows, PARSEC_VALUE,
-      sizeof(int64_t), &D_ij_cols, PARSEC_VALUE,
-      sizeof(int64_t), &D_ij_row_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_ij_col_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_ij_split_index, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
-                           PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
-      sizeof(Hatrix::Mode), &uplo, PARSEC_VALUE,
-      sizeof(bool), &unit_diag, PARSEC_VALUE,
-      PARSEC_DTD_ARG_END);
-  }
-}
-
-void
-partial_matmul(SymmetricSharedBasisMatrix& A,
-               const Domain& domain,
-               int64_t block,
-               int64_t row,
-               int64_t col,
-               int64_t level,
-
-               parsec_data_key_t D_i_block_key, int64_t D_i_block_rows, int64_t D_i_block_cols,
-               int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
-               int64_t D_i_block_split_index,
-
-               parsec_data_key_t D_j_block_key, int64_t D_j_block_rows, int64_t D_j_block_cols,
-               int64_t D_j_block_row_rank, int64_t D_j_block_col_rank,
-               int64_t D_j_block_split_index, int64_t D_ij_split_index,
-               bool transA, bool transB, bool flip_col_index=false) {
-  if (exists_and_inadmissible(A, row, col, level)) {
-    auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, row, col, level);
-    int64_t D_ij_rows = get_dim(A, domain, row, level);
-    int64_t D_ij_cols = get_dim(A, domain, col, level);
-    int64_t D_ij_row_rank = A.ranks(row, level);
-    int64_t D_ij_col_rank = A.ranks(col, level);
-
-    parsec_dtd_insert_task(dtd_tp, task_partial_matmul, 0, PARSEC_DEV_CPU,
-      "partial_matmul_task",
-      // D_i_block
-      sizeof(int64_t), &D_i_block_rows, PARSEC_VALUE,
-      sizeof(int64_t), &D_i_block_cols, PARSEC_VALUE,
-      sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_i_block_split_index, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key), PARSEC_INPUT | D_ARENA,
-      // D_j_block
-      sizeof(int64_t), &D_j_block_rows, PARSEC_VALUE,
-      sizeof(int64_t), &D_j_block_cols, PARSEC_VALUE,
-      sizeof(int64_t), &D_j_block_row_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_j_block_col_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_j_block_split_index, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_j_block_key),
-                           PARSEC_INPUT | D_ARENA,
-      // D_ij
-      sizeof(int64_t), &D_ij_rows, PARSEC_VALUE,
-      sizeof(int64_t), &D_ij_cols, PARSEC_VALUE,
-      sizeof(int64_t), &D_ij_row_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_ij_col_rank, PARSEC_VALUE,
-      sizeof(int64_t), &D_ij_split_index, PARSEC_VALUE,
-      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
-                           PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
-      sizeof(bool), &transA, PARSEC_VALUE,
-      sizeof(bool), &transB, PARSEC_VALUE,
-      PARSEC_DTD_ARG_END);
   }
 }
 
@@ -1367,8 +1125,8 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
 
     multiply_complements(A, domain, block, level);
-    // factorize_diagonal(A, domain, block, level);
-    // triangle_reduction(A, domain, block, level);
+    factorize_diagonal(A, domain, block, level);
+    triangle_reduction(A, domain, block, level);
     // compute_schurs_complement(A, domain, block, level);
     // compute_fill_ins(A, domain, block, level);
   }

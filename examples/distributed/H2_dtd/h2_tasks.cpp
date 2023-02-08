@@ -159,15 +159,16 @@ task_multiply_complement_right(parsec_execution_stream_t* es, parsec_task_t* thi
   double *_U;
 
   parsec_dtd_unpack_args(this_task,
-                         &D_nrows, &D_ncols, &_D,
-                         &U_nrows, &U_ncols, &_U);
+                         &_D, &D_nrows, &D_ncols,
+                         &_U, &U_nrows, &U_ncols);
 
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
   Matrix U_F = make_complement(U);
 
-  D = matmul(D, U_F);
+  Matrix product = matmul(D, U_F);
+  D.copy_mem(product);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -180,8 +181,8 @@ task_multiply_partial_complement_left(parsec_execution_stream_t* es, parsec_task
   double *_U;
 
   parsec_dtd_unpack_args(this_task,
-                         &D_nrows, &D_ncols, &D_col_rank, &_D,
-                         &U_nrows, &U_ncols, &_U);
+                         &_D, &D_nrows, &D_ncols, &D_col_rank,
+                         &_U, &U_nrows, &U_ncols);
 
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
