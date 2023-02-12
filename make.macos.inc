@@ -4,7 +4,7 @@ BLAS_INCLUDE   = -I${VEC_LIB_INCLUDE}
 BLAS_LIB       = -framework Accelerate
 CXX            = clang++ -g
 MPICXX         = mpicxx -g
-CXXFLAGS       = -O0 -g -Wall --std=c++11 -Xpreprocessor -fopenmp \
+CXXFLAGS       = -O3 -g -Wall --std=c++11 -Xpreprocessor -fopenmp \
                  -I"$(shell brew --prefix libomp)/include" \
                  -I. -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) $(LAPACK_INCLUDE) \
                  $(shell pkg-config --cflags gtest gtest_main)

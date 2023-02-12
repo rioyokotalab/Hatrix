@@ -649,6 +649,34 @@ task_fill_in_cols_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
 parsec_hook_return_t
 task_schurs_complement_1(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_block_block_nrows;
+  int64_t D_block_rank;
+  double *_D_block_block;
+  int64_t D_i_block_nrows;
+  int64_t D_i_block_ncols;
+  double *_D_i_block;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_block_block_nrows,
+                         &D_block_rank,
+                         &_D_block_block,
+                         &D_i_block_nrows,
+                         &D_i_block_ncols,
+                         &_D_i_block);
+
+  MatrixWrapper D_block_block(_D_block_block, D_block_block_nrows, D_block_block_nrows, D_block_block_nrows);
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_nrows, D_i_block_ncols, D_i_block_nrows);
+
+  auto D_block_block_split = split_dense(D_block_block,
+                                          D_block_block_nrows - D_block_rank,
+                                          D_block_block_nrows - D_block_rank);
+
+  auto D_i_block_split = D_i_block.split({},
+                                         std::vector<int64_t>(1,
+                                                              D_i_block_ncols - D_block_rank));
+
+  matmul(D_i_block_split[0], D_block_block_split[2], D_i_block_split[1], false, true, -1, 1);
+
   return PARSEC_HOOK_RETURN_DONE;
 }
 
