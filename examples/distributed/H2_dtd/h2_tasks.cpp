@@ -646,3 +646,23 @@ task_fill_in_cols_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   return PARSEC_HOOK_RETURN_DONE;
 }
+
+parsec_hook_return_t
+task_schurs_complement_1(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_schurs_complement_2(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_schurs_complement_3(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_schurs_complement_4(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  return PARSEC_HOOK_RETURN_DONE;
+}

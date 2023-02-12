@@ -71,3 +71,15 @@ task_fill_in_cols_QR(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
 task_project_S_left(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_schurs_complement_1(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_schurs_complement_2(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_schurs_complement_3(parsec_execution_stream_t* es, parsec_task_t* this_task);
+
+parsec_hook_return_t
+task_schurs_complement_4(parsec_execution_stream_t* es, parsec_task_t* this_task);

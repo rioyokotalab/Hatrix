@@ -843,7 +843,53 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
 
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {
+      int64_t D_block_block_nrows = get_dim(A, domain, block, level);
+      int64_t D_block_block_rank = A.ranks(block, level);
 
+      int64_t D_i_block_nrows = get_dim(A, domain, i, level);
+      int64_t D_i_block_ncols = get_dim(A, domain, block, level);
+      int64_t D_col_rank = A.ranks(block, level);
+
+      parsec_dtd_insert_task(dtd_tp, task_schurs_complement_1, 0, PARSEC_DEV_CPU,
+                             "schurs_complement_1_task",
+                             PARSEC_DTD_ARG_END);
+
+    }
+  }
+
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    for (int64_t j = block+1; j < nblocks; ++j) {
+      if (exists_and_inadmissible(A, i, block, level) &&
+          exists_and_inadmissible(A, j, block, level)) {
+        if (exists_and_inadmissible(A, i, j, level)) {
+
+          parsec_dtd_insert_task(dtd_tp, task_schurs_complement_2, 0, PARSEC_DEV_CPU,
+                                 "schurs_complement_2_task",
+                                 PARSEC_DTD_ARG_END);
+        }
+      }
+    }
+  }
+
+  for (int64_t j = 0; j < block; ++j) {
+    if (exists_and_inadmissible(A, j, block, level)) {
+
+      parsec_dtd_insert_task(dtd_tp, task_schurs_complement_3, 0, PARSEC_DEV_CPU,
+                             "schurs_complement_3_task",
+                             PARSEC_DTD_ARG_END);
+    }
+  }
+
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    for (int64_t j = 0; j < block; ++j) {
+      if (exists_and_inadmissible(A, i, block, level) &&
+          exists_and_inadmissible(A, block, j, level)) {
+        if (exists_and_inadmissible(A, i, j, level)) {
+          parsec_dtd_insert_task(dtd_tp, task_schurs_complement_4, 0, PARSEC_DEV_CPU,
+                                 "schurs_complement_4_task",
+                                 PARSEC_DTD_ARG_END);
+        }
+      }
     }
   }
 }
