@@ -682,6 +682,44 @@ task_schurs_complement_1(parsec_execution_stream_t* es, parsec_task_t* this_task
 
 parsec_hook_return_t
 task_schurs_complement_2(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_i_block_nrows;
+  int64_t D_i_block_ncols;
+  int64_t D_block_rank;
+  double *_D_i_block;
+  int64_t D_j_block_nrows;
+  int64_t D_j_block_ncols;
+  double *_D_j_block;
+  int64_t D_i_j_nrows;
+  int64_t D_i_j_ncols;
+  double *_D_i_j;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_i_block_nrows,
+                         &D_i_block_ncols,
+                         &D_block_rank,
+                         &_D_i_block,
+                         &D_j_block_nrows,
+                         &D_j_block_ncols,
+                         &_D_j_block,
+                         &D_i_j_nrows,
+                         &D_i_j_ncols,
+                         &_D_i_j);
+
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_nrows, D_i_block_ncols, D_i_block_nrows);
+  MatrixWrapper D_j_block(_D_j_block, D_j_block_nrows, D_j_block_ncols, D_j_block_nrows);
+  MatrixWrapper D_i_j(_D_i_j, D_i_j_nrows, D_i_j_ncols, D_i_j_nrows);
+
+  auto D_i_block_split =
+    D_i_block.split({},
+                    std::vector<int64_t>(1,
+                                         D_i_block_ncols - D_block_rank));
+  auto D_j_block_split =
+    D_j_block.split({},
+                    std::vector<int64_t>(1,
+                                         D_j_block_ncols - D_block_rank));
+
+  matmul(D_i_block_split[0], D_j_block_split[0], D_i_j, false, true, -1, 1);
+
   return PARSEC_HOOK_RETURN_DONE;
 }
 
@@ -701,6 +739,11 @@ task_syrk_2(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   MatrixWrapper D_i_block(_D_i_block, D_i_block_nrows, D_i_block_ncols, D_i_block_nrows);
   MatrixWrapper D_i_j(_D_i_j, D_i_j_nrows, D_i_j_ncols, D_i_j_nrows);
+
+  auto D_i_block_split = D_i_block.split({},
+                                         std::vector<int64_t>(1, D_i_block_ncols - D_block_rank));
+
+  syrk(D_i_block_split[0], D_i_j, Hatrix::Lower, false, -1, 1);
 
   return PARSEC_HOOK_RETURN_DONE;
 }

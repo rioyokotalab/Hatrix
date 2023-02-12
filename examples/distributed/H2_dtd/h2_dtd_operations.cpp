@@ -896,9 +896,29 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
               PARSEC_DTD_ARG_END);
           }
           else {
+            int64_t D_j_block_nrows = get_dim(A, domain, j, level);
+            int64_t D_j_block_ncols = get_dim(A, domain, block, level);
+
+            auto D_i_block_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
+            auto D_j_block_key = parsec_D.super.data_key(&parsec_D.super, j, block, level);
+            auto D_i_j_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
+
             parsec_dtd_insert_task(dtd_tp, task_schurs_complement_2, 0, PARSEC_DEV_CPU,
-                                   "schurs_complement_2_task",
-                                   PARSEC_DTD_ARG_END);
+              "schurs_complement_2_task",
+              sizeof(int64_t), &D_i_block_nrows, PARSEC_VALUE,
+              sizeof(int64_t), &D_i_block_ncols, PARSEC_VALUE,
+              sizeof(int64_t), &D_block_rank, PARSEC_VALUE,
+              PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
+                                   PARSEC_INPUT | dense_arena,
+              sizeof(int64_t), &D_j_block_nrows, PARSEC_VALUE,
+              sizeof(int64_t), &D_j_block_ncols, PARSEC_VALUE,
+              PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_j_block_key),
+                                   PARSEC_INPUT | dense_arena,
+              sizeof(int64_t), &D_i_j_nrows, PARSEC_VALUE,
+              sizeof(int64_t), &D_i_j_ncols, PARSEC_VALUE,
+              PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_j_key),
+                                   PARSEC_INOUT | dense_arena | PARSEC_AFFINITY,
+              PARSEC_DTD_ARG_END);
           }
         }
       }
