@@ -1267,7 +1267,7 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
     compute_schurs_complement(A, domain, block, level);
-    // compute_fill_ins(A, domain, block, level);
+    compute_fill_ins(A, domain, block, level);
   }
 }
 
