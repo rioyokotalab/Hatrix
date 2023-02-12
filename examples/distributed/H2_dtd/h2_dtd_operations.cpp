@@ -841,6 +841,8 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                           const int64_t level) {
   int64_t nblocks = pow(2, level);
 
+  int dense_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
+
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_inadmissible(A, i, block, level)) {
       int64_t D_block_block_nrows = get_dim(A, domain, block, level);
@@ -856,11 +858,11 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
          sizeof(int64_t), &D_block_block_nrows, PARSEC_VALUE,
          sizeof(int64_t), &D_block_rank, PARSEC_VALUE,
          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_block_block_key),
-                             PARSEC_INPUT | FINAL_DENSE_ARENA,
+                             PARSEC_INPUT | dense_arena,
          sizeof(int64_t), &D_i_block_nrows, PARSEC_VALUE,
          sizeof(int64_t), &D_i_block_ncols, PARSEC_VALUE,
          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
-                             PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
+                             PARSEC_INOUT | dense_arena | PARSEC_AFFINITY,
          PARSEC_DTD_ARG_END);
     }
   }
@@ -875,8 +877,6 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
           int64_t D_block_rank = A.ranks(block, level);
           int64_t D_i_j_nrows = get_dim(A, domain, i, level);
           int64_t D_i_j_ncols = get_dim(A, domain, j, level);
-
-          int dense_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
           if (i == j) {
             auto D_i_block_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
@@ -927,10 +927,25 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
 
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_inadmissible(A, j, block, level)) {
+      int64_t D_block_block_nrows = get_dim(A, domain, block, level);
+      int64_t D_block_j_ncols = get_dim(A, domain, j, level);
+      int64_t D_block_rank = A.ranks(block, level);
+      int64_t D_j_rank = A.ranks(j, level);
+
+      auto D_block_block_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
+      auto D_block_j_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
 
       parsec_dtd_insert_task(dtd_tp, task_schurs_complement_3, 0, PARSEC_DEV_CPU,
-                             "schurs_complement_3_task",
-                             PARSEC_DTD_ARG_END);
+        "schurs_complement_3_task",
+        sizeof(int64_t), &D_block_block_nrows, PARSEC_VALUE,
+        sizeof(int64_t), &D_block_j_ncols, PARSEC_VALUE,
+        sizeof(int64_t), &D_block_rank, PARSEC_VALUE,
+        sizeof(int64_t), &D_j_rank, PARSEC_VALUE,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_block_block_key),
+                             PARSEC_INPUT | dense_arena,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_block_j_key),
+                             PARSEC_INOUT | PARSEC_AFFINITY | dense_arena,
+        PARSEC_DTD_ARG_END);
     }
   }
 

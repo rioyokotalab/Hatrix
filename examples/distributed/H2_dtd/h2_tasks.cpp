@@ -750,6 +750,32 @@ task_syrk_2(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
 parsec_hook_return_t
 task_schurs_complement_3(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_block_block_nrows;
+  int64_t D_block_j_ncols;
+  int64_t D_block_rank;
+  int64_t D_j_rank;
+  double *_D_block_block, *_D_block_j;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_block_block_nrows,
+                         &D_block_j_ncols,
+                         &D_block_rank,
+                         &D_j_rank,
+                         &_D_block_block,
+                         &_D_block_j);
+
+  MatrixWrapper D_block_block(_D_block_block, D_block_block_nrows, D_block_block_nrows, D_block_block_nrows);
+  MatrixWrapper D_block_j(_D_block_j, D_block_block_nrows, D_block_j_ncols, D_block_block_nrows);
+
+  auto D_block_block_split = split_dense(D_block_block,
+                                         D_block_block_nrows - D_block_rank,
+                                         D_block_block_nrows - D_block_rank);
+  auto D_block_j_split = split_dense(D_block_j,
+                                     D_block_block_nrows - D_block_rank,
+                                     D_block_j_ncols - D_j_rank);
+
+  matmul(D_block_block_split[2], D_block_j_split[1], D_block_j_split[3], false, false, -1, 1);
+
   return PARSEC_HOOK_RETURN_DONE;
 }
 
