@@ -674,7 +674,7 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
     sizeof(int64_t), &U_ncols, PARSEC_VALUE,
     PARSEC_DTD_ARG_END);
 
-  for (int64_t j = 0; j < nblocks; ++j) {
+  for (int64_t j = 0; j < block; ++j) {
     if (exists_and_inadmissible(A, block, j, level)) {
       int64_t D_col_rank = A.ranks(j, level);
       auto D_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
@@ -1127,7 +1127,7 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
-    // compute_schurs_complement(A, domain, block, level);
+    compute_schurs_complement(A, domain, block, level);
     // compute_fill_ins(A, domain, block, level);
   }
 }
@@ -1676,7 +1676,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
       if (exists_and_inadmissible(A, block, irow, level)) {
         int64_t irow_index = irow / MPISIZE;
         int64_t block_index = block / MPISIZE;
-        if (mpi_rank(block, irow) == MPIRANK) {
+        if (mpi_rank(block) == MPIRANK) {
           MPI_Request request;
           MPI_Isend(&A.D(block, irow, level), A.D(block, irow, level).numel(), MPI_DOUBLE,
                     mpi_rank(irow), irow, MPI_COMM_WORLD, &request);
@@ -1696,7 +1696,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
           Matrix D_block_irow(D_block_irow_nrows, D_block_irow_ncols);
 
           MPI_Recv(&D_block_irow, D_block_irow.numel(), MPI_DOUBLE,
-                   mpi_rank(block, irow), irow, MPI_COMM_WORLD, &status);
+                   mpi_rank(block), irow, MPI_COMM_WORLD, &status);
 
           Matrix x_block(D_block_irow_nrows, 1);
 
@@ -1725,7 +1725,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
       if (exists_and_inadmissible(A, irow, block, level)) {
         int64_t irow_index = irow / MPISIZE;
         int64_t block_index = block / MPISIZE;
-        if (mpi_rank(irow, block) == MPIRANK) {
+        if (mpi_rank(irow) == MPIRANK) {
           MPI_Request request;
           MPI_Isend(&A.D(irow, block, level), A.D(irow, block, level).numel(), MPI_DOUBLE,
                     mpi_rank(irow), irow, MPI_COMM_WORLD, &request);
@@ -1892,7 +1892,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
     for (int64_t icol = 0; icol < block; ++icol) {
       if (exists_and_inadmissible(A, block, icol, level)) {
         int64_t icol_index = icol / MPISIZE;
-        if (mpi_rank(block, icol) == MPIRANK) {
+        if (mpi_rank(block) == MPIRANK) {
           MPI_Request request;
           MPI_Isend(&A.D(block, icol, level), A.D(block, icol, level).numel(), MPI_DOUBLE,
                     mpi_rank(icol), icol, MPI_COMM_WORLD, &request);
@@ -1935,7 +1935,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
       if (exists_and_inadmissible(A, icol, block, level)) {
         int64_t icol_index = icol / MPISIZE;
         int64_t block_index = block / MPISIZE;
-        if (mpi_rank(icol, block) == MPIRANK) {
+        if (mpi_rank(icol) == MPIRANK) {
           MPI_Request request;
           MPI_Isend(&A.D(icol, block, level), A.D(icol, block, level).numel(), MPI_DOUBLE,
                     mpi_rank(block), block, MPI_COMM_WORLD, &request);
@@ -1977,7 +1977,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
     int64_t row_split = get_dim(A, domain, block, level) - rank;
     int64_t col_split = get_dim(A, domain, block, level) - rank;
 
-    if (mpi_rank(block, block) == MPIRANK) {
+    if (mpi_rank(block) == MPIRANK) {
       MPI_Request request;
 
       MPI_Isend(&A.D(block, block, level), A.D(block, block, level).numel(), MPI_DOUBLE,

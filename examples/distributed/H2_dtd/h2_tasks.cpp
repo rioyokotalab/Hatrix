@@ -190,7 +190,8 @@ task_multiply_partial_complement_left(parsec_execution_stream_t* es, parsec_task
   Matrix U_F = make_complement(U);
 
   auto D_splits = D.split({},
-                          std::vector<int64_t>(1, D_ncols - D_col_rank));
+                          std::vector<int64_t>(1,
+                                               D_ncols - D_col_rank));
   D_splits[1] = matmul(U_F, D_splits[1], true);
 
   return PARSEC_HOOK_RETURN_DONE;
