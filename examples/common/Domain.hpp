@@ -1009,6 +1009,7 @@ class Domain {
     cell->body_ptr = bodies + begin;
     if (direction) cell->body_ptr = buffer + begin;
     cell->nbodies = end - begin;
+    cell->level = level;
     cell->nchilds = 0;
     for (int64_t axis = 0; axis < ndim; axis++) {
       cell->center[axis] = X[axis];
