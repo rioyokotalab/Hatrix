@@ -781,5 +781,39 @@ task_schurs_complement_3(parsec_execution_stream_t* es, parsec_task_t* this_task
 
 parsec_hook_return_t
 task_schurs_complement_4(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_i_dim;
+  int64_t D_j_dim;
+  int64_t D_block_dim;
+  int64_t A_i_rank;
+  int64_t A_j_rank;
+  int64_t A_block_rank;
+  double *_D_i_j, *_D_block_j, *_D_i_block;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_i_dim,
+                         &D_j_dim,
+                         &D_block_dim,
+                         &A_i_rank,
+                         &A_j_rank,
+                         &A_block_rank,
+                         &_D_i_block,
+                         &_D_block_j,
+                         &_D_i_j);
+
+  MatrixWrapper D_i_j(_D_i_j, D_i_dim, D_j_dim, D_i_dim);
+  MatrixWrapper D_i_block(_D_i_block, D_i_dim, D_block_dim, D_i_dim);
+  MatrixWrapper D_block_j(_D_block_j, D_block_dim, D_j_dim, D_block_dim);
+
+  auto D_i_block_split = D_i_block.split({},
+                                         std::vector<int64_t>(1, D_j_dim - A_j_rank));
+  auto D_block_j_split = split_dense(D_block_j,
+                                     D_block_dim - A_block_rank,
+                                     D_j_dim - A_j_rank);
+  auto D_i_j_split = D_i_j.split({},
+                                 std::vector<int64_t>(1, D_j_dim - A_j_rank));
+
+
+  matmul(D_i_block_split[0], D_block_j_split[1], D_i_j_split[1], false, false, -1, 1);
+
   return PARSEC_HOOK_RETURN_DONE;
 }

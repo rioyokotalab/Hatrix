@@ -954,9 +954,33 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A,
       if (exists_and_inadmissible(A, i, block, level) &&
           exists_and_inadmissible(A, block, j, level)) {
         if (exists_and_inadmissible(A, i, j, level)) {
+          int64_t D_i_dim = get_dim(A, domain, i, level);
+          int64_t D_j_dim = get_dim(A, domain, j, level);
+          int64_t D_block_dim = get_dim(A, domain, block, level);
+          int64_t A_i_rank = A.ranks(i, level);
+          int64_t A_j_rank = A.ranks(j, level);
+          int64_t A_block_rank = A.ranks(block, level);
+
+          auto D_i_block_key = parsec_D.super.data_key(&parsec_D.super, i, block, level);
+          auto D_block_j_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
+          auto D_i_j_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
+
           parsec_dtd_insert_task(dtd_tp, task_schurs_complement_4, 0, PARSEC_DEV_CPU,
-                                 "schurs_complement_4_task",
-                                 PARSEC_DTD_ARG_END);
+            "schurs_complement_4_task",
+            sizeof(int64_t), &D_i_dim, PARSEC_VALUE,
+            sizeof(int64_t), &D_j_dim, PARSEC_VALUE,
+            sizeof(int64_t), &D_block_dim, PARSEC_VALUE,
+            sizeof(int64_t), &A_i_rank, PARSEC_VALUE,
+            sizeof(int64_t), &A_j_rank, PARSEC_VALUE,
+            sizeof(int64_t), &A_block_rank, PARSEC_VALUE,
+            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
+                                 PARSEC_INPUT | dense_arena,
+            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_block_j_key),
+                                 PARSEC_INPUT | dense_arena,
+            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_j_key),
+                                 PARSEC_INOUT | PARSEC_AFFINITY | dense_arena,
+            PARSEC_DTD_ARG_END);
+
         }
       }
     }
