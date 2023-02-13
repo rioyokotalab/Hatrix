@@ -190,19 +190,14 @@ SymmetricH2::svd_like_compression(Matrix& A) const {
   Matrix R;
   const double qr_tol = accuracy * 1e-1;
   std::tie(Ui, R, rank) = error_pivoted_qr(A, qr_tol, use_rel_acc, false);
+  if (R.rows > R.cols) {
+    R.shrink(R.cols, R.cols);  // Ignore zero entries below
+  }
   Si = Matrix(R.rows, R.rows);
   Vi = Matrix(R.rows, R.cols);
   rq(R, Si, Vi);
 #else
-  if (max_rank > 0) { // Randomized SVD
-    const auto k = max_rank + 10; // oversampling
-    const Matrix Y = generate_random_matrix(A.cols, k);
-    Matrix AY = matmul(A, Y);
-    std::tie(Ui, Si, Vi, rank) = error_svd(AY, accuracy, use_rel_acc, false);
-  }
-  else { // SVD
-    std::tie(Ui, Si, Vi, rank) = error_svd(A, accuracy, use_rel_acc, false);
-  }
+  std::tie(Ui, Si, Vi, rank) = error_svd(A, accuracy, use_rel_acc, false);
 #endif
 
   // Fixed-accuracy with bounded rank
@@ -1315,7 +1310,7 @@ int main(int argc, char ** argv) {
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-8;
   // Use relative or absolute error threshold for LRA
   const bool use_rel_acc = argc > 4 ? (atol(argv[4]) == 1) : false;
-  // Randomized SVD with bounded rank
+  // Fixed accuracy with bounded rank
   const int64_t max_rank = argc > 5 ? atol(argv[5]) : 30;
   const double admis = argc > 6 ? atof(argv[6]) : 3;
 
@@ -1447,7 +1442,7 @@ int main(int argc, char ** argv) {
 #ifdef USE_QR_COMPRESSION
             << "QR"
 #else
-            << (max_rank > 0 ? "RandSVD" : "SVD")
+            << "SVD"
 #endif
             << " admis=" << admis << std::setw(3)
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
@@ -1519,7 +1514,7 @@ int main(int argc, char ** argv) {
 #ifdef USE_QR_COMPRESSION
             << "QR"
 #else
-            << (max_rank > 0 ? "RandSVD" : "SVD")
+            << "SVD"
 #endif
             << "," << admis
             << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
