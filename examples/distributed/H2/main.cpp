@@ -97,8 +97,6 @@ int main(int argc, char* argv[]) {
     construct_average_rank = A.average_rank();
     dense_blocks = A.leaf_dense_blocks();
 
-    SymmetricSharedBasisMatrix A_orig(A); // save unfactorized for verification.
-
     A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
@@ -117,8 +115,8 @@ int main(int argc, char* argv[]) {
     post_factor_average_rank = A.average_rank();
 
     auto begin_solve = std::chrono::system_clock::now();
-    h2_solution = solve(A, x);
-    x_regen = matmul(A_orig, h2_solution);
+    h2_solution = solve(A, b);
+    // x_regen = matmul(A_orig, h2_solution);
 
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
@@ -130,57 +128,57 @@ int main(int argc, char* argv[]) {
   }
 
   // ||x - A * (A^-1 * x)|| / ||x||
-  double solve_error = (Hatrix::norm(x - x_regen) / Hatrix::norm(x)) * opts.add_diag;
+  // std::cout << "SOLVE: " << (Hatrix::norm(x - h2_solution) / Hatrix::norm(x));
+  double solve_error = Hatrix::norm(x - h2_solution) / opts.N;
 
   // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  // Matrix bdense = matmul(Adense, x);
-  // Matrix dense_solution = cholesky_solve(Adense, x, Hatrix::Lower);
-  // double solve_error = Hatrix::norm(dense_solution - h2_solution);
+  // Matrix dense_solution = cholesky_solve(Adense, b, Hatrix::Lower);
+  // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
 
   // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   // Matrix bdense = matmul(Adense, x);
 
   double matvec_error = 0;
 
-  std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
-            << opts.accuracy << ","
-            << opts.qr_accuracy << ","
-            << opts.kind_of_recompression << ","
-            << opts.max_rank << ","
-            << opts.admis << ","
-            << construct_max_rank << ","
-            << opts.nleaf <<  ","
-            << domain_time <<  ","
-            << construct_time  << ","
-            << factor_time << ","
-            << solve_time << ","
-            << solve_error << ","
-            << matvec_error << ","
-            << fp_ops << ","
-	    << opts.kind_of_geometry << ","
-            << opts.use_nested_basis << ","
-            << dense_blocks
-            << std::endl;
-
-  // std::cout << "----------------------------\n";
-  // std::cout << "N               : " << opts.N << std::endl;
-  // std::cout << "NDIM            : " << opts.ndim << std::endl;
-  // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-  // std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
-  // std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
-  // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-  // std::cout << "ADMIS           : " << opts.admis << std::endl;
-  // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-  // std::cout << "NLEAF           : " << opts.nleaf << "\n"
-  //           << "Domain(ms)      : " << domain_time << "\n"
-  //           << "Contruct(ms)    : " << construct_time << "\n"
-  //           << "Factor(ms)      : " << factor_time << "\n"
-  //           << "Solve(ms)       : " << solve_time << "\n"
-  //           << "Solve error     : " << solve_error << "\n"
-  //           << "Construct error : " << matvec_error << "\n"
-  //           << "PAPI_FP_OPS     : " << fp_ops << "\n"
+  // std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
+  //           << opts.accuracy << ","
+  //           << opts.qr_accuracy << ","
+  //           << opts.kind_of_recompression << ","
+  //           << opts.max_rank << ","
+  //           << opts.admis << ","
+  //           << construct_max_rank << ","
+  //           << opts.nleaf <<  ","
+  //           << domain_time <<  ","
+  //           << construct_time  << ","
+  //           << factor_time << ","
+  //           << solve_time << ","
+  //           << solve_error << ","
+  //           << matvec_error << ","
+  //           << fp_ops << ","
+  //           << opts.kind_of_geometry << ","
+  //           << opts.use_nested_basis << ","
+  //           << dense_blocks
   //           << std::endl;
-  // std::cout << "----------------------------\n";
+
+  std::cout << "----------------------------\n";
+  std::cout << "N               : " << opts.N << std::endl;
+  std::cout << "NDIM            : " << opts.ndim << std::endl;
+  std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+  std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
+  std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
+  std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+  std::cout << "ADMIS           : " << opts.admis << std::endl;
+  std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+  std::cout << "NLEAF           : " << opts.nleaf << "\n"
+            << "Domain(ms)      : " << domain_time << "\n"
+            << "Contruct(ms)    : " << construct_time << "\n"
+            << "Factor(ms)      : " << factor_time << "\n"
+            << "Solve(ms)       : " << solve_time << "\n"
+            << "Solve error     : " << solve_error << "\n"
+            << "Construct error : " << matvec_error << "\n"
+            << "PAPI_FP_OPS     : " << fp_ops << "\n"
+            << std::endl;
+  std::cout << "----------------------------\n";
 
 
 

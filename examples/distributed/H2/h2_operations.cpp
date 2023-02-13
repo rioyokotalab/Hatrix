@@ -1077,9 +1077,6 @@ multiply_S(const Hatrix::SymmetricSharedBasisMatrix& A,
            int x_hat_offset, int b_hat_offset, int level) {
   int64_t nblocks = pow(2, level);
 
-  std::mt19937 gen(0);
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
-
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
@@ -1096,9 +1093,6 @@ matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Matrix& x) {
   int leaf_nblocks = pow(2, A.max_level);
   std::vector<Matrix> x_hat;
   auto x_splits = x.split(leaf_nblocks, 1);
-
-  std::mt19937 gen(0);
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
 
   // V leaf nodes
   for (int i = 0; i < leaf_nblocks; ++i) {
@@ -1168,7 +1162,13 @@ matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
   // Multiply with the dense blocks to obtain the final product in b_splits.
   for (int i = 0; i < leaf_nblocks; ++i) {
+    // b_splits[i] = triangular_matmul_out(A.D(i, i, A.max_level), x_splits[i],
+    //                   Hatrix::Left, Hatrix::Lower, false, false, 1.0);
+    // b_splits[i] = bb;
+    // b_splits[i].print();
+    // A.D(i, i, A.max_level).print();
     matmul(A.D(i, i, A.max_level), x_splits[i], b_splits[i]);
+    // b_splits[i].print();
   }
 
   for (int64_t i = 0; i < leaf_nblocks; ++i) {

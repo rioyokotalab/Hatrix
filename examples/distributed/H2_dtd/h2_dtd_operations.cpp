@@ -1097,6 +1097,37 @@ update_row_transfer_bases(SymmetricSharedBasisMatrix& A,
                           const Hatrix::Domain& domain,
                           const int64_t block,
                           const int64_t level) {
+  const int64_t parent_block = block / 2;
+  const int64_t parent_level = level - 1;
+
+  if (parent_level > 0) {
+    const int64_t c1 = parent_block * 2;
+    const int64_t c2 = parent_block * 2 + 1;
+
+    int64_t U_nrows = get_dim(A, domain, parent_block, parent_level);
+    int64_t U_ncols = A.ranks(parent_block, parent_level);
+
+    int64_t rank_c1 = A.ranks(c1, level);
+    int64_t rank_c2 = A.ranks(c2, level);
+
+    auto r_c1_key = parsec_r.super.data_key(&parsec_r.super, c1, level);
+    auto r_c2_key = parsec_r.super.data_key(&parsec_r.super, c2, level);
+    auto U_key = parsec_U.super.data_key(&parsec_U.super, parent_block, parent_level);
+
+    int basis_arena = level == A.max_level ? U_ARENA : U_NON_LEAF_ARENA;
+
+    parsec_dtd_insert_task(dtd_tp, task_row_transfer_basis_update, 0, PARSEC_DEV_CPU,
+                           "row_transfer_basis_update_task",
+                           sizeof(int64_t), &U_nrows, PARSEC_VALUE,
+                           sizeof(int64_t), &U_ncols, PARSEC_VALUE,
+                           sizeof(int64_t), &rank_c1, PARSEC_VALUE,
+                           sizeof(int64_t), &rank_c2, PARSEC_VALUE,
+                           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
+                           PARSEC_INOUT | basis_arena | PARSEC_AFFINITY,
+                           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_r.super, r_c1_key),
+                           PARSEC_INPUT | S_ARENA
+                           PARSEC_DTD_ARG_END);
+  }
 }
 
 void

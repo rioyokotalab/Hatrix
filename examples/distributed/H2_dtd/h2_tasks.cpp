@@ -253,90 +253,6 @@ task_trsm_cc_oc(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 }
 
 parsec_hook_return_t
-task_partial_syrk(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_i_block_rows, D_i_block_cols, D_i_block_row_rank,
-    D_i_block_col_rank, D_i_block_split_index;
-  double *_D_i_block;
-  int64_t D_ij_rows, D_ij_cols, D_ij_row_rank, D_ij_col_rank,
-    D_ij_split_index;
-  double *_D_ij;
-  Hatrix::Mode uplo;
-  bool unit_diag;
-
-  parsec_dtd_unpack_args(this_task,
-                         &D_i_block_rows, &D_i_block_cols, &D_i_block_row_rank,
-                         &D_i_block_col_rank, &D_i_block_split_index,
-                         &_D_i_block,
-                         &D_ij_rows, &D_ij_cols, &D_ij_row_rank, &D_ij_col_rank,
-                         &D_ij_split_index,
-                         &_D_ij, &uplo, &unit_diag);
-
-  MatrixWrapper D_i_block(_D_i_block, D_i_block_rows, D_i_block_cols, D_i_block_rows);
-  MatrixWrapper D_ij(_D_ij, D_ij_rows, D_ij_cols, D_ij_rows);
-
-  auto D_i_block_splits = split_dense(D_i_block,
-                                      D_i_block_rows - D_i_block_row_rank,
-                                      D_i_block_cols - D_i_block_col_rank);
-  auto D_ij_splits = split_dense(D_ij,
-                                 D_ij_rows - D_ij_row_rank,
-                                 D_ij_cols - D_ij_col_rank);
-
-  syrk(D_i_block_splits[D_i_block_split_index], D_ij_splits[D_ij_split_index],
-       uplo, unit_diag, -1.0, 1.0);
-
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
-task_partial_matmul(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_i_block_rows, D_i_block_cols, D_i_block_row_rank,
-    D_i_block_col_rank, D_i_block_split_index;
-  double *_D_i_block;
-
-  int64_t D_j_block_rows, D_j_block_cols, D_j_block_row_rank,
-    D_j_block_col_rank, D_j_block_split_index;
-  double *_D_j_block;
-
-  int64_t D_ij_rows, D_ij_cols, D_ij_row_rank, D_ij_col_rank,
-    D_ij_split_index;
-  double *_D_ij;
-  bool transA, transB;
-
-  parsec_dtd_unpack_args(this_task,
-                         &D_i_block_rows, &D_i_block_cols, &D_i_block_row_rank,
-                         &D_i_block_col_rank, &D_i_block_split_index,
-                         &_D_i_block,
-                         &D_j_block_rows, &D_j_block_cols, &D_j_block_row_rank,
-                         &D_j_block_col_rank, &D_j_block_split_index,
-                         &_D_j_block,
-                         &D_ij_rows, &D_ij_cols, &D_ij_row_rank, &D_ij_col_rank,
-                         &D_ij_split_index,
-                         &_D_ij,
-                         &transA, &transB);
-
-  MatrixWrapper D_i_block(_D_i_block, D_i_block_rows, D_i_block_cols, D_i_block_rows);
-  MatrixWrapper D_j_block(_D_j_block, D_j_block_rows, D_j_block_cols, D_j_block_rows);
-  MatrixWrapper D_ij(_D_ij, D_ij_rows, D_ij_cols, D_ij_rows);
-
-  auto D_i_block_splits = split_dense(D_i_block,
-                                      D_i_block_rows - D_i_block_row_rank,
-                                      D_i_block_cols - D_i_block_col_rank);
-  auto D_j_block_splits = split_dense(D_j_block,
-                                      D_j_block_rows - D_j_block_row_rank,
-                                      D_j_block_cols - D_j_block_col_rank);
-  auto D_ij_splits = split_dense(D_ij,
-                                 D_ij_rows - D_ij_row_rank,
-                                 D_ij_cols - D_ij_col_rank);
-
-  matmul(D_i_block_splits[D_i_block_split_index],
-         D_j_block_splits[D_j_block_split_index],
-         D_ij_splits[D_ij_split_index], transA, transB,
-         -1.0, 1.0);
-
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
 task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   bool copy_dense;
   double *_D_unelim;
@@ -814,6 +730,22 @@ task_schurs_complement_4(parsec_execution_stream_t* es, parsec_task_t* this_task
 
 
   matmul(D_i_block_split[0], D_block_j_split[1], D_i_j_split[1], false, false, -1, 1);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_row_transfer_basis_update(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t U_nrows, U_ncols, rank_c1, rank_c2;
+  double *_r_c1, *_r_c2, *_U;
+
+  parsec_dtd_unpack_args(this_task,
+                         &U_nrows, &U_ncols, &rank_c1, &rank_c2,
+                         &_r_c1, &_r_c2, &_U);
+
+  MatrixWrapper r_c1(_r_c1, rank_c1, rank_c1, rank_c1);
+  MatrixWrapper r_c2(_r_c1, rank_c1, rank_c1, rank_c1);
+  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
