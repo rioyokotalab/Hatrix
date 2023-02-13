@@ -6,6 +6,9 @@
 #include "internal_types.hpp"
 #include "SymmetricSharedBasisMatrix.hpp"
 
+// storage for near and far blocks at each level.
+extern Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;  // This is actually RowLevelMap
+
 namespace Hatrix {
 
   // double sqrexp_kernel(const std::vector<double>& coords_row,
@@ -52,5 +55,8 @@ namespace Hatrix {
   double laplace_kernel(const std::vector<double>& coords_row,
                         const std::vector<double>& coords_col,
                         const double eta);
+
+  void init_geometry_admis(SymmetricSharedBasisMatrix& A,
+                           const Domain& domain, const Args& opts);
 
 }
