@@ -12,23 +12,24 @@ ulimit -c unlimited
 
 make -j H2_main
 
-for adm in 1; do
+for adm in 1.2; do
     nleaf=512
-    ndim=1
-    max_rank=400
+    ndim=2
+    max_rank=300
 
-    for N in 4096; do
+    for N in 8192; do
         ./bin/H2_main --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-12 \
+                      --accuracy -1 \
                       --admis $adm \
                       --admis_kind geometry \
                       --construct_algorithm miro \
-                      --add_diag 1e-7  \
+                      --add_diag 1e-9  \
+                      --kind_of_recompression 3 \
                       --use_nested_basis
     done
 done

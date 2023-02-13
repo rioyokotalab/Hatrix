@@ -80,7 +80,6 @@ int main(int argc, char* argv[]) {
     x(i, 0) = dist(gen);
   }
 
-  // Matrix x = generate_rhs_vector(opts);
   long long int fp_ops;
   int64_t dense_blocks;
 
@@ -131,14 +130,6 @@ int main(int argc, char* argv[]) {
   // std::cout << "SOLVE: " << (Hatrix::norm(x - h2_solution) / Hatrix::norm(x));
   double solve_error = Hatrix::norm(x - h2_solution) / opts.N;
 
-  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  // Matrix dense_solution = cholesky_solve(Adense, b, Hatrix::Lower);
-  // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
-
-  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  // Matrix bdense = matmul(Adense, x);
-
-  double matvec_error = 0;
 
   // std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
   //           << opts.accuracy << ","
@@ -169,14 +160,15 @@ int main(int argc, char* argv[]) {
   std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
   std::cout << "ADMIS           : " << opts.admis << std::endl;
   std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+  std::cout << "POST FACT. RANK : " << post_factor_max_rank << std::endl;
   std::cout << "NLEAF           : " << opts.nleaf << "\n"
             << "Domain(ms)      : " << domain_time << "\n"
             << "Contruct(ms)    : " << construct_time << "\n"
             << "Factor(ms)      : " << factor_time << "\n"
             << "Solve(ms)       : " << solve_time << "\n"
             << "Solve error     : " << solve_error << "\n"
-            << "Construct error : " << matvec_error << "\n"
             << "PAPI_FP_OPS     : " << fp_ops << "\n"
+            << "Kind of recomp. : " << opts.kind_of_recompression
             << std::endl;
   std::cout << "----------------------------\n";
 

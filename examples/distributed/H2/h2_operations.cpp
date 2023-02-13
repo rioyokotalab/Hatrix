@@ -81,7 +81,8 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
       auto D_i_block_split =
         A.D(i, block, level).split({},
                                    std::vector<int64_t>(1,
-                                                        A.D(i, block, level).cols - A.ranks(block, level)));
+                                                        A.D(i, block, level).cols -
+                                                        A.ranks(block, level)));
       matmul(D_i_block_split[0], D_block_block_split[2], D_i_block_split[1], false, true, -1, 1);
     }
   }
@@ -95,11 +96,13 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
           auto D_i_block_split =
             A.D(i, block, level).split({},
                                        std::vector<int64_t>(1,
-                                                        A.D(i, block, level).cols - A.ranks(block, level)));
+                                                        A.D(i, block, level).cols -
+                                                            A.ranks(block, level)));
           auto D_j_block_split =
             A.D(j, block, level).split({},
                                        std::vector<int64_t>(1,
-                                                            A.D(j, block, level).cols - A.ranks(block, level)));
+                                                            A.D(j, block, level).cols -
+                                                            A.ranks(block, level)));
 
           if (i == j) {
             syrk(D_i_block_split[0], A.D(i, j, level), Hatrix::Lower, false, -1, 1);
@@ -136,7 +139,9 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
         if (exists_and_inadmissible(A, i, j, level)) {
           auto D_i_block_splits =
             A.D(i, block, level).split({},
-                                       std::vector<int64_t>(1, A.D(i, block, level).cols - A.ranks(block, level)));
+                                       std::vector<int64_t>(1,
+                                                            A.D(i, block, level).cols -
+                                                            A.ranks(block, level)));
           auto D_block_j_splits =
             split_dense(A.D(block, j, level),
                         A.D(block, j, level).rows - A.ranks(block, level),
@@ -144,7 +149,8 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
 
           auto D_ij_splits =
             A.D(i, j, level).split({},
-                                   std::vector<int64_t>(1, A.D(i, j, level).cols - A.ranks(j, level)));
+                                   std::vector<int64_t>(1, A.D(i, j, level).cols -
+                                                        A.ranks(j, level)));
           matmul(D_i_block_splits[0], D_block_j_splits[1], D_ij_splits[1], false, false, -1, 1);
         }
       }
@@ -1162,13 +1168,7 @@ matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
   // Multiply with the dense blocks to obtain the final product in b_splits.
   for (int i = 0; i < leaf_nblocks; ++i) {
-    // b_splits[i] = triangular_matmul_out(A.D(i, i, A.max_level), x_splits[i],
-    //                   Hatrix::Left, Hatrix::Lower, false, false, 1.0);
-    // b_splits[i] = bb;
-    // b_splits[i].print();
-    // A.D(i, i, A.max_level).print();
     matmul(A.D(i, i, A.max_level), x_splits[i], b_splits[i]);
-    // b_splits[i].print();
   }
 
   for (int64_t i = 0; i < leaf_nblocks; ++i) {
