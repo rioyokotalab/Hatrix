@@ -1125,7 +1125,7 @@ update_row_transfer_bases(SymmetricSharedBasisMatrix& A,
                            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
                            PARSEC_INOUT | basis_arena | PARSEC_AFFINITY,
                            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_r.super, r_c1_key),
-                           PARSEC_INPUT | S_ARENA
+                           PARSEC_INPUT | S_ARENA,
                            PARSEC_DTD_ARG_END);
   }
 }

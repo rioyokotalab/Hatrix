@@ -246,8 +246,6 @@ int main(int argc, char **argv) {
   int64_t dense_blocks = A.leaf_dense_blocks();
   construct_max_rank = A.max_rank(); // get max rank of H2 matrix post construct.
 
-  SymmetricSharedBasisMatrix A_copy(A);
-
   // Allocate the vectors as a vector of Matrix objects of the form H2_A * x = b,
   // and dense_A * x = b_check.
   std::vector<Matrix> x, b, b_check, x_regen;
@@ -352,8 +350,6 @@ int main(int argc, char **argv) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
 
-  // auto A_test = dense_cholesky_test(A, domain, opts);
-
 #ifdef USE_MKL
   mkl_set_num_threads(1);
 #endif
@@ -389,9 +385,7 @@ int main(int argc, char **argv) {
     std::cout << "H2 solve begin\n";
   }
 
-  solve(A, x, h2_solution, domain); // h2_solution = H2_A^(-1) * x
-  matmul(A_copy, domain, h2_solution, x_regen);
-
+  solve(A, b, h2_solution, domain); // h2_solution = H2_A^(-1) * b
   if (!MPIRANK) {
     std::cout << "H2 solve end\n";
   }
@@ -400,11 +394,12 @@ int main(int argc, char **argv) {
 
   std::vector<Matrix> h2_solve_diff;
   for (int i = 0; i < x.size(); ++i) {
-    h2_solve_diff.push_back(x_regen[i] - x[i]);
+    h2_solve_diff.push_back(h2_solution[i] - x[i]);
   }
 
   double solve_h2_diff_norm = dist_norm2(h2_solve_diff);
-  double solve_error = (solve_h2_diff_norm / dist_norm2(x)) * opts.add_diag;
+  // double solve_error = (solve_h2_diff_norm / dist_norm2(x));
+  double solve_error = solve_h2_diff_norm / opts.N;
 
   parsec_fini(&parsec);
 
