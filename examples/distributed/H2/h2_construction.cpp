@@ -30,7 +30,7 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
     }
     distance = sqrt(distance);
 
-    if (distance * opts.admis > (Ci.radius + Cj.radius)) {
+    if (distance  > (Ci.radius + Cj.radius) * opts.admis) {
       // well-separated blocks.
       well_separated = true;
     }
