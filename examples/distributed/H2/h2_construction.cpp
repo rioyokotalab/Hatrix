@@ -30,7 +30,7 @@ dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& C
     }
     distance = sqrt(distance);
 
-    if (distance  > (Ci.radius + Cj.radius) * opts.admis) {
+    if (distance >= (Ci.radius + Cj.radius) * opts.admis) {
       // well-separated blocks.
       well_separated = true;
     }
@@ -85,7 +85,7 @@ void init_geometry_admis(SymmetricSharedBasisMatrix& A,
     bool all_dense = true;
     for (int64_t i = 0; i < nblocks; ++i) {
       for (int64_t j = 0; j < nblocks; ++j) {
-        if (A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) {
+        if ((A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) || !A.is_admissible.exists(i, j, l)) {
           all_dense = false;
         }
       }

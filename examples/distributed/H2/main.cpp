@@ -82,6 +82,7 @@ int main(int argc, char* argv[]) {
 
   // Matrix x = generate_rhs_vector(opts);
   long long int fp_ops;
+  int64_t dense_blocks;
 
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
@@ -94,6 +95,7 @@ int main(int argc, char* argv[]) {
 
     construct_max_rank = A.max_rank();
     construct_average_rank = A.average_rank();
+    dense_blocks = A.leaf_dense_blocks();
 
     SymmetricSharedBasisMatrix A_orig(A); // save unfactorized for verification.
 
@@ -156,7 +158,8 @@ int main(int argc, char* argv[]) {
             << matvec_error << ","
             << fp_ops << ","
 	    << opts.kind_of_geometry << ","
-            << opts.use_nested_basis
+            << opts.use_nested_basis << ","
+            << dense_blocks
             << std::endl;
 
   // std::cout << "----------------------------\n";

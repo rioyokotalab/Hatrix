@@ -12,7 +12,7 @@ ulimit -c unlimited
 
 make -j H2_main
 
-for adm in 1; do
+for adm in 0.1; do
     nleaf=512
     ndim=3
     max_rank=50
