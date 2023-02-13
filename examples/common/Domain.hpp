@@ -918,7 +918,7 @@ class Domain {
     }
   }
 
-  void initialize_cube_uniform_grid() {
+  void initialize_random_uniform_grid() {
     for (int64_t i = 0; i < N; i++) {
       const double px = ndim > 0 ? ((double)rand() / RAND_MAX) : 0.;
       const double py = ndim > 1 ? ((double)rand() / RAND_MAX) : 0.;

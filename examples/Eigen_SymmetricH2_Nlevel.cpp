@@ -1128,6 +1128,7 @@ int main(int argc, char ** argv) {
   // 1: Unit Cubical
   // 2: StarsH Uniform Grid
   // 3: ELSES Geometry (ndim = 3)
+  // 4: Random Uniform Grid
   const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
   int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
     // Eigenvalue computation parameters
@@ -1190,6 +1191,11 @@ int main(int argc, char ** argv) {
     case 3: {
       domain.ndim = 3;
       geom_name = file_name;
+      break;
+    }
+    case 4: {
+      domain.initialize_random_uniform_grid();
+      geom_name += "random_uniform_grid";
       break;
     }
     default: {
