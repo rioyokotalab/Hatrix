@@ -82,10 +82,10 @@ class Domain {
 
   static bool is_well_separated(const Cell& source, const Cell& target,
                                 const double theta) {
-    const auto distance = dist2(MAX_NDIM, source.center, target.center);
-    const auto source_size = source.get_radius();
-    const auto target_size = target.get_radius();
-    return (distance > (theta * (source_size + target_size)));
+    const auto distance = std::sqrt(dist2(MAX_NDIM, source.center, target.center));
+    const auto source_diam = source.get_diameter();
+    const auto target_diam = target.get_diameter();
+    return (distance > (theta * std::max(source_diam, target_diam)));
   }
 
   // Taken from: H2Pack GitHub
@@ -360,15 +360,14 @@ class Domain {
     cell.nbodies = right - left;
     cell.level = level;
     cell.block_index = block_index;
-    double radius_max = 0.;
+    double radius_max = 0;
     int64_t sort_axis = 0;
     for (int64_t axis = 0; axis < ndim; axis++) {
       const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
       const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
       const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
-      const auto diam = Xmax - Xmin;
       cell.center[axis] = (Xmin + Xmax) / 2.;  // Midpoint
-      cell.radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
+      cell.radius[axis] = (Xmax - Xmin) / 2.;
 
       if (cell.radius[axis] > radius_max) {
         radius_max = cell.radius[axis];
@@ -916,6 +915,16 @@ class Domain {
         const double value = (double)i / (double)N;
         bodies.emplace_back(Body(px, py, pz, value));
       }
+    }
+  }
+
+  void initialize_cube_uniform_grid() {
+    for (int64_t i = 0; i < N; i++) {
+      const double px = ndim > 0 ? ((double)rand() / RAND_MAX) : 0.;
+      const double py = ndim > 1 ? ((double)rand() / RAND_MAX) : 0.;
+      const double pz = ndim > 2 ? ((double)rand() / RAND_MAX) : 0.;
+      const double value = (double)i / (double)N;
+      bodies.emplace_back(Body(px, py, pz, value));
     }
   }
 
