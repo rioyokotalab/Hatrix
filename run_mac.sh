@@ -15,7 +15,7 @@ make -j H2_main
 for adm in 1.2; do
     nleaf=512
     ndim=2
-    max_rank=300
+    max_rank=200
 
     for N in 8192; do
         ./bin/H2_main --N $N \

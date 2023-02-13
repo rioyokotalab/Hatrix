@@ -15,19 +15,14 @@ static Matrix
 generate_column_block(int64_t block, int64_t block_size,
                       int64_t level,
                       const SymmetricSharedBasisMatrix& A,
-                      const Matrix& dense,
-                      const Matrix& rand) {
+                      const Matrix& dense) {
   int64_t nblocks = pow(2, level);
   auto dense_splits = dense.split(nblocks, nblocks);
-  auto rand_splits = rand.split(nblocks, 1);
   Matrix AY(block_size, block_size);
-
-  // Matrix AY(dense_splits[block * nblocks + 0], true);
 
   for (int64_t j = 0; j < nblocks; ++j) {
     if (A.is_admissible.exists(block, j, level) &&
         !A.is_admissible(block, j, level)) { continue; }
-    // AY = concat(AY, dense_splits[block * nblocks + j], 1);
     AY += dense_splits[block * nblocks + j];
     // matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
   }
@@ -39,9 +34,8 @@ static Matrix
 generate_column_bases(int64_t block, int64_t block_size, int64_t level,
                       SymmetricSharedBasisMatrix& A,
                       const Matrix& dense,
-                      const Matrix&rand,
                       const Args& opts) {
-  Matrix AY = generate_column_block(block, block_size, level, A, dense, rand);
+  Matrix AY = generate_column_block(block, block_size, level, A, dense);
   Matrix Ui;
   std::vector<int64_t> pivots;
   int64_t rank;
@@ -68,7 +62,6 @@ static void
 generate_leaf_nodes(const Domain& domain,
                     SymmetricSharedBasisMatrix& A,
                     const Matrix& dense,
-                    const Matrix& rand,
                     const Args& opts) {
   int64_t nblocks = pow(2, A.max_level);
   auto dense_splits = dense.split(nblocks, nblocks);
@@ -96,7 +89,6 @@ generate_leaf_nodes(const Domain& domain,
                                      A.max_level,
                                      A,
                                      dense,
-                                     rand,
                                      opts));
   }
 
@@ -122,9 +114,8 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
                            const int64_t level,
                            SymmetricSharedBasisMatrix& A,
                            const Matrix& dense,
-                           const Matrix& rand,
                            const Args& opts) {
-  Matrix col_block = generate_column_block(node, block_size, level, A, dense, rand);
+  Matrix col_block = generate_column_block(node, block_size, level, A, dense);
   auto col_block_splits = col_block.split(2, 1);
 
   int64_t c1 = node * 2;
@@ -183,7 +174,6 @@ generate_transfer_matrices(const Domain& domain,
                            const RowLevelMap& Uchild,
                            SymmetricSharedBasisMatrix& A,
                            const Matrix& dense,
-                           const Matrix& rand,
                            const Args& opts) {
   int64_t nblocks = pow(2, level);
   auto dense_splits = dense.split(nblocks, nblocks);
@@ -206,7 +196,6 @@ generate_transfer_matrices(const Domain& domain,
                                                     level,
                                                     A,
                                                     dense,
-                                                    rand,
                                                     opts);
       auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, A.ranks(c1, child_level)),
                                               {});
@@ -251,12 +240,11 @@ void
 construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   int64_t P = opts.max_rank;
   Matrix dense = generate_p2p_matrix(domain, opts.kernel);
-  Matrix rand = generate_random_matrix(opts.N, P);
-  generate_leaf_nodes(domain, A, dense, rand, opts);
+  generate_leaf_nodes(domain, A, dense, opts);
 
   RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.max_level-1; level > 0; --level) {
-    Uchild = generate_transfer_matrices(domain, level, Uchild, A, dense, rand, opts);
+    Uchild = generate_transfer_matrices(domain, level, Uchild, A, dense, opts);
   }
 }
