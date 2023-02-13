@@ -1459,11 +1459,11 @@ int main(int argc, char ** argv) {
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
             << std::endl
-            << "construct_min_rank_leaf=" << construct_min_rank_leaf
-            << " construct_max_rank_leaf=" << construct_max_rank_leaf
-            << " csp_all=" << csp_all
+            << "csp_all=" << csp_all
             << " csp_dense=" << csp_dense
             << " csp_lowrank=" << csp_lowrank
+            << " construct_min_rank_leaf=" << construct_min_rank_leaf
+            << " construct_max_rank_leaf=" << construct_max_rank_leaf
             << std::endl;
 #endif
 
@@ -1505,7 +1505,7 @@ int main(int argc, char ** argv) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
               << ",height,construct_min_rank,construct_max_rank,construct_time,construct_error"
-              << ",construct_min_rank_leaf,construct_max_rank_leaf,csp_all,csp_dense,csp_lowrank"
+              << ",csp_all,csp_dense,csp_lowrank,construct_min_rank_leaf,construct_max_rank_leaf"
               << ",factor_min_rank,factor_max_rank,factor_fp_ops,factor_time"
               << ",solve_time,solve_error"
               << std::endl;
@@ -1530,11 +1530,11 @@ int main(int argc, char ** argv) {
             << "," << construct_max_rank
             << "," << construct_time
             << "," << std::scientific << construct_error << std::defaultfloat
-            << "," << construct_min_rank_leaf
-            << "," << construct_max_rank_leaf
             << "," << csp_all
             << "," << csp_dense
             << "," << csp_lowrank
+            << "," << construct_min_rank_leaf
+            << "," << construct_max_rank_leaf
             << "," << factor_min_rank
             << "," << factor_max_rank
             << "," << factor_fp_ops
