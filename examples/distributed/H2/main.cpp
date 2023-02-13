@@ -130,6 +130,12 @@ int main(int argc, char* argv[]) {
   // std::cout << "SOLVE: " << (Hatrix::norm(x - h2_solution) / Hatrix::norm(x));
   double solve_error = Hatrix::norm(x - h2_solution) / opts.N;
 
+  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  // Matrix dense_solution = cholesky_solve(Adense, b, Hatrix::Lower);
+  // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
+
+  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  // Matrix bdense = matmul(Adense, x);
 
   // std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
   //           << opts.accuracy << ","
