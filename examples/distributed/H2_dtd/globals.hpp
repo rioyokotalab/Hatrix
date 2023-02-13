@@ -135,6 +135,3 @@ constexpr int DESC_LEN = 9;
 // SCALAPACK data for the large dense matrix used for construction and verification.
 extern double* DENSE_MEM;
 extern std::vector<int> DENSE;
-
-// storage for near and far blocks at each level.
-extern Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;  // This is actually RowLevelMap

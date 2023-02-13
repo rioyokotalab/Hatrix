@@ -243,6 +243,7 @@ int main(int argc, char **argv) {
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
 
+  int64_t dense_blocks = A.leaf_dense_blocks();
   construct_max_rank = A.max_rank(); // get max rank of H2 matrix post construct.
 
   SymmetricSharedBasisMatrix A_copy(A);
@@ -440,7 +441,8 @@ int main(int argc, char **argv) {
               << construct_time  << ","
               << factorize_time << ","
               << fp_ops << ","
-              << cores
+              << cores << ","
+              << dense_blocks
               << std::endl;
   }
 
