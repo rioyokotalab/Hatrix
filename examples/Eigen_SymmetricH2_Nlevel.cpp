@@ -109,12 +109,13 @@ class SymmetricH2 {
               const int64_t max_rank, const double admis,
               const int64_t matrix_type);
 
-  int64_t get_basis_min_rank() const;
-  int64_t get_basis_max_rank() const;
+  int64_t get_basis_min_rank(const int64_t level_begin, const int64_t level_end) const;
+  int64_t get_basis_max_rank(const int64_t level_begin, const int64_t level_end) const;
+  int64_t get_level_max_nblocks(const char nearfar,
+                                const int64_t level_begin, const int64_t level_end) const;
   double construction_error(const Domain& domain) const;
   void print_structure(const int64_t level) const;
   void print_ranks() const;
-  double low_rank_block_ratio() const;
   void write_JSON(const Domain& domain, const std::string filename) const;
 
   void factorize(const Domain& domain);
@@ -371,9 +372,10 @@ SymmetricH2::SymmetricH2(const Domain& domain,
   }
 }
 
-int64_t SymmetricH2::get_basis_min_rank() const {
+int64_t SymmetricH2::get_basis_min_rank(const int64_t level_begin,
+                                        const int64_t level_end) const {
   int64_t rank_min = N;
-  for (int64_t level = height; level > 0; level--) {
+  for (int64_t level = level_begin; level <= level_end; level++) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
       if (U.exists(node, level) && U(node, level).cols > 0) {
@@ -384,9 +386,10 @@ int64_t SymmetricH2::get_basis_min_rank() const {
   return rank_min;
 }
 
-int64_t SymmetricH2::get_basis_max_rank() const {
+int64_t SymmetricH2::get_basis_max_rank(const int64_t level_begin,
+                                        const int64_t level_end) const {
   int64_t rank_max = -N;
-  for (int64_t level = height; level > 0; level--) {
+  for (int64_t level = level_begin; level <= level_end; level++) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
       if (U.exists(node, level) && U(node, level).cols > 0) {
@@ -395,6 +398,22 @@ int64_t SymmetricH2::get_basis_max_rank() const {
     }
   }
   return rank_max;
+}
+
+int64_t SymmetricH2::get_level_max_nblocks(const char nearfar,
+                                           const int64_t level_begin, const int64_t level_end) const {
+  int64_t csp = 0;
+  bool is_near = (nearfar == 'n' || nearfar == 'a');
+  bool is_far = (nearfar == 'f' || nearfar == 'a');
+  for (int64_t level = level_begin; level <= level_end; level++) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      const int64_t num_dense   = is_near ? near_neighbors(node, level).size() : 0;
+      const int64_t num_lowrank = is_far  ? far_neighbors(node, level).size()  : 0;
+      csp = std::max(csp, num_dense + num_lowrank);
+    }
+  }
+  return csp;
 }
 
 double SymmetricH2::construction_error(const Domain& domain) const {
@@ -471,21 +490,6 @@ void SymmetricH2::print_ranks() const {
                 << std::endl;
     }
   }
-}
-
-double SymmetricH2::low_rank_block_ratio() const {
-  double total = 0, low_rank = 0;
-  const int64_t num_nodes = level_blocks[height];
-  for (int64_t i = 0; i < num_nodes; i++) {
-    for (int64_t j = 0; j < num_nodes; j++) {
-      if ((is_admissible.exists(i, j, height) && is_admissible(i, j, height)) ||
-          !is_admissible.exists(i, j, height)) {
-        low_rank += 1;
-      }
-      total += 1;
-    }
-  }
-  return low_rank / total;
 }
 
 void SymmetricH2::fill_JSON(const Domain& domain,
@@ -1061,8 +1065,8 @@ SymmetricH2::inertia(const Domain& domain,
       }
     }
   }
-  const auto ldl_min_rank = A_shifted.get_basis_min_rank();
-  const auto ldl_max_rank = A_shifted.get_basis_max_rank();
+  const auto ldl_min_rank = A_shifted.get_basis_min_rank(1, height);
+  const auto ldl_max_rank = A_shifted.get_basis_max_rank(1, height);
   return {negative_elements_count, ldl_min_rank, ldl_max_rank};
 }
 
@@ -1072,8 +1076,8 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const dou
   Hatrix::profiling::PAPI papi;
   papi.add_fp_ops(0);
   papi.start();
-  int64_t shift_min_rank = get_basis_min_rank();
-  int64_t shift_max_rank = get_basis_max_rank();
+  int64_t shift_min_rank = get_basis_min_rank(1, height);
+  int64_t shift_max_rank = get_basis_max_rank(1, height);
   double max_rank_shift = -1;
   bool singular = false;
   while((right - left) >= ev_tol) {
@@ -1218,10 +1222,14 @@ int main(int argc, char ** argv) {
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
-  const auto construct_min_rank = A.get_basis_min_rank();
-  const auto construct_max_rank = A.get_basis_max_rank();
+  const auto construct_min_rank = A.get_basis_min_rank(1, A.height);
+  const auto construct_max_rank = A.get_basis_max_rank(1, A.height);
   const auto construct_error = A.construction_error(domain);
-  const auto lr_ratio = A.low_rank_block_ratio();
+  const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
+  const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
+  const auto csp_all = A.get_level_max_nblocks('a', 1, A.height);
+  const auto csp_dense = A.get_level_max_nblocks('n', 1, A.height);
+  const auto csp_lowrank = A.get_level_max_nblocks('f', 1, A.height);
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -1240,11 +1248,16 @@ int main(int argc, char ** argv) {
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
             << " height=" << A.height
-            << " lr_ratio=" << lr_ratio * 100 << "%"
             << " construct_min_rank=" << construct_min_rank
             << " construct_max_rank=" << construct_max_rank
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
+            << std::endl
+            << "construct_min_rank_leaf=" << construct_min_rank_leaf
+            << " construct_max_rank_leaf=" << construct_max_rank_leaf
+            << " csp_all=" << csp_all
+            << " csp_dense=" << csp_dense
+            << " csp_lowrank=" << csp_lowrank
             << std::endl;
 #endif
 
@@ -1309,7 +1322,8 @@ int main(int argc, char ** argv) {
   if (print_csv_header == 1) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
-              << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
+              << ",height,construct_min_rank,construct_max_rank,construct_time,construct_error"
+              << ",construct_min_rank_leaf,construct_max_rank_leaf,csp_all,csp_dense,csp_lowrank"
               << ",dense_eig_time"
               << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
@@ -1360,11 +1374,15 @@ int main(int argc, char ** argv) {
               << "," << kernel_name
               << "," << geom_name
               << "," << A.height
-              << "," << lr_ratio
               << "," << construct_min_rank
               << "," << construct_max_rank
               << "," << construct_time
               << "," << std::scientific << construct_error << std::defaultfloat
+              << "," << construct_min_rank_leaf
+              << "," << construct_max_rank_leaf
+              << "," << csp_all
+              << "," << csp_dense
+              << "," << csp_lowrank
               << "," << dense_eig_time
               << "," << m
               << "," << a
