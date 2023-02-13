@@ -1513,7 +1513,7 @@ int main(int argc, char ** argv) {
 #ifdef USE_QR_COMPRESSION
             << "QR"
 #else
-            << "SVD"
+            << (max_rank > 0 ? "RandSVD" : "SVD")
 #endif
             << "," << admis
             << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
