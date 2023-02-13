@@ -40,16 +40,24 @@ class Cell {
     return (nchilds == 0);
   }
 
-  double get_radius() const {
-    double rad = 0.;
+  double get_size() const {
+    double size = 0.;
     for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
-      rad += radius[axis] * radius[axis];
+      size += radius[axis] * radius[axis];
     }
-    return rad;
+    return size;
+  }
+
+  double get_radius() const {
+    double r = 0.;
+    for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
+      r = std::max(r, radius[axis]);
+    }
+    return r;
   }
 
   double get_diameter() const {
-    return 4. * get_radius();
+    return 2 * get_radius();
   }
 
   std::vector<int64_t> get_bodies() const {
