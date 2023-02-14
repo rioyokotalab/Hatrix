@@ -1,10 +1,10 @@
 #!/bin/bash
 #$ -cwd
 #$ -l rt_F=1
-#$ -l h_rt=12:00:00
-#$ -N HATRIX
-#$ -o HATRIX_out.log
-#$ -e HATRIX_err.log
+#$ -l h_rt=2:00:00
+#$ -N H2
+#$ -o H2_out.log
+#$ -e H2_err.log
 
 source ~/.bashrc
 
@@ -26,54 +26,30 @@ make -j H2_main
 
 nleaf=1024
 ndim=3
+max_rank=100
 
-# BLR2
-for adm in 1; do
-    for pert in 0; do
-        for max_rank in 100; do
-            for N in 65536; do
-                for i in `seq 1`; do
-                    ./bin/H2_main --N $N \
-                                  --nleaf $nleaf \
-                                  --kernel_func laplace \
-                                  --kind_of_geometry grid \
-                                  --ndim $ndim \
-                                  --max_rank $max_rank \
-                                  --accuracy -1 \
-                                  --admis $adm \
-                                  --admis_kind geometry \
-                                  --construct_algorithm miro \
-                                  --add_diag 1e-9 \
-                                  --kind_of_recompression 3 \
-                                  --perturbation $pert
-                done
-            done
-        done
-    done
+for i in "16384 1 0" "65536 1 0"; do
+    set -- $i
+    N=$1
+    adm=$2
+    pert=$3
+
+    ./bin/H2_main --N $N \
+                  --nleaf $nleaf \
+                  --kernel_func laplace \
+                  --kind_of_geometry grid \
+                  --ndim $ndim \
+                  --max_rank $max_rank \
+                  --accuracy -1 \
+                  --admis $adm \
+                  --admis_kind geometry \
+                  --construct_algorithm miro \
+                  --add_diag 1e-9 \
+                  --perturbation $pert \
+                  --use_nested_basis
+
 done
 
-# H2
-for adm in 1; do
-    for pert in 0; do
-        for max_rank in 100; do
-            for N in 65536; do
-                for i in `seq 1`; do
-                    ./bin/H2_main --N $N \
-                                  --nleaf $nleaf \
-                                  --kernel_func laplace \
-                                  --kind_of_geometry grid \
-                                  --ndim $ndim \
-                                  --max_rank $max_rank \
-                                  --accuracy -1 \
-                                  --admis $adm \
-                                  --admis_kind geometry \
-                                  --construct_algorithm miro \
-                                  --add_diag 1e-9 \
-                                  --kind_of_recompression 3 \
-                                  --perturbation $pert \
-                                  --use_nested_basis
-                done
-            done
-        done
-    done
-done
+# gprof -s bin/H2_dtd gmon.out-*
+# gprof -q bin/H2_dtd gmon.sum > call_graph.out
+# gprof bin/H2_dtd gmon.sum > gprof_out.out
