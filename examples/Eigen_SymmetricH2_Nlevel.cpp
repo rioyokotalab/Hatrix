@@ -114,14 +114,15 @@ class SymmetricH2 {
   int64_t get_level_max_nblocks(const char nearfar,
                                 const int64_t level_begin, const int64_t level_end) const;
   double construction_error(const Domain& domain) const;
+  int64_t memory_usage() const;
   void print_structure(const int64_t level) const;
   void print_ranks() const;
   void write_JSON(const Domain& domain, const std::string filename) const;
 
   void factorize(const Domain& domain);
-  std::tuple<int64_t, int64_t, int64_t> inertia(const Domain& domain,
-                                                const double lambda, bool &singular) const;
-  std::tuple<double, int64_t, int64_t, double, int64_t>
+  std::tuple<int64_t, int64_t, int64_t, int64_t>
+  inertia(const Domain& domain, const double lambda, bool &singular) const;
+  std::tuple<double, int64_t, int64_t, int64_t, double, int64_t>
   get_mth_eigenvalue(const Domain& domain, const int64_t m, const double ev_tol,
                      double left, double right) const;
 };
@@ -444,6 +445,40 @@ double SymmetricH2::construction_error(const Domain& domain) const {
   }
   return (use_rel_acc ? std::sqrt(diff_norm / dense_norm) : std::sqrt(diff_norm));
 }
+
+int64_t SymmetricH2::memory_usage() const {
+  int64_t mem = 0;
+  for (int64_t level = height; level > 0; level--) {
+    const auto num_nodes = level_blocks[level];
+    for (int64_t i = 0; i < num_nodes; i++) {
+      if (U.exists(i, level)) {
+        mem += U(i, level).memory_used();
+      }
+      if (US_row.exists(i, level)) {
+        mem += US_row(i, level).memory_used();
+      }
+      for (auto j: near_neighbors(i, level)) {
+        if (D.exists(i, j, level)) {
+          mem += D(i, j, level).memory_used();
+        }
+      }
+      for (auto j: far_neighbors(i, level)) {
+        if (S.exists(i, j, level)) {
+          mem += S(i, j, level).memory_used();
+        }
+      }
+      if (fill_in_neighbors.exists(i, level)) {
+        for (auto j: fill_in_neighbors(i, level)) {
+          if (F.exists(i, j, level)) {
+            mem += F(i, j, level).memory_used();
+          }
+        }
+      }
+    }
+  }
+  return mem;
+}
+
 
 void SymmetricH2::print_structure(const int64_t level) const {
   if (level == 0) { return; }
@@ -1024,7 +1059,7 @@ void SymmetricH2::factorize(const Domain& domain) {
   ldl(D(0, 0, 0));
 }
 
-std::tuple<int64_t, int64_t, int64_t>
+std::tuple<int64_t, int64_t, int64_t, int64_t>
 SymmetricH2::inertia(const Domain& domain,
                      const double lambda, bool &singular) const {
   SymmetricH2 A_shifted(*this);
@@ -1062,10 +1097,11 @@ SymmetricH2::inertia(const Domain& domain,
   }
   const auto ldl_min_rank = A_shifted.get_basis_min_rank(1, height);
   const auto ldl_max_rank = A_shifted.get_basis_max_rank(1, height);
-  return {negative_elements_count, ldl_min_rank, ldl_max_rank};
+  const auto ldl_mem = A_shifted.memory_usage();
+  return {negative_elements_count, ldl_min_rank, ldl_max_rank, ldl_mem};
 }
 
-std::tuple<double, int64_t, int64_t, double, int64_t>
+std::tuple<double, int64_t, int64_t, int64_t, double, int64_t>
 SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const double ev_tol,
                                 double left, double right) const {
   Hatrix::profiling::PAPI papi;
@@ -1073,16 +1109,18 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const dou
   papi.start();
   int64_t shift_min_rank = get_basis_min_rank(1, height);
   int64_t shift_max_rank = get_basis_max_rank(1, height);
+  int64_t shift_max_mem = 0;
   double max_rank_shift = -1;
   bool singular = false;
   while((right - left) >= ev_tol) {
     const auto mid = (left + right) / 2;
-    int64_t value, factor_min_rank, factor_max_rank;
-    std::tie(value, factor_min_rank, factor_max_rank) = (*this).inertia(domain, mid, singular);
-    if(factor_max_rank >= shift_max_rank) {
+    int64_t value, factor_min_rank, factor_max_rank, factor_mem;
+    std::tie(value, factor_min_rank, factor_max_rank, factor_mem) = (*this).inertia(domain, mid, singular);
+    if(factor_max_rank > shift_max_rank) {
       shift_min_rank = factor_min_rank;
       shift_max_rank = factor_max_rank;
       max_rank_shift = mid;
+      shift_max_mem = factor_mem;
     }
     if(singular) {
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
@@ -1092,7 +1130,7 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const dou
     else left = mid;
   }
   const auto fp_ops = (int64_t)papi.fp_ops();
-  return {(left + right) / 2, shift_min_rank, shift_max_rank, max_rank_shift, fp_ops};
+  return {(left + right) / 2, shift_min_rank, shift_max_rank, shift_max_mem, max_rank_shift, fp_ops};
 }
 
 } // namespace Hatrix
@@ -1106,17 +1144,22 @@ int main(int argc, char ** argv) {
   // Fixed accuracy with bounded rank
   const int64_t max_rank = argc > 5 ? atol(argv[5]) : 30;
   const double admis = argc > 6 ? atof(argv[6]) : 3;
+  // 0: Default
+  // 1: dist(i,j)  > admis*(min(diam(i), diam(j)))
+  // 2: dist(i,j)  > admis*(max(diam(i), diam(j)))
+  // 3: dist2(i,j) > admis*(size(i)+size(j))  (default)
+  const int64_t admis_variant = argc > 7 ? atol(argv[7]) : 0;
 
   // Specify compressed representation
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = argc > 7 ? atol(argv[7]) : 1;
+  const int64_t matrix_type = argc > 8 ? atol(argv[8]) : 1;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
   // 2: ELSES Dense Matrix
-  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
+  const int64_t kernel_type = argc > 9 ? atol(argv[9]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
@@ -1124,20 +1167,20 @@ int main(int argc, char ** argv) {
   // 2: StarsH Uniform Grid
   // 3: ELSES Geometry (ndim = 3)
   // 4: Random Uniform Grid
-  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
-  int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
+  const int64_t geom_type = argc > 10 ? atol(argv[10]) : 0;
+  int64_t ndim  = argc > 11 ? atol(argv[11]) : 1;
     // Eigenvalue computation parameters
-  const double ev_tol = argc > 11 ? atof(argv[11]) : 1.e-3;
-  int64_t m_begin = argc > 12 ? atol(argv[12]) : 1;
-  int64_t m_end = argc > 13 ? atol(argv[13]) : m_begin;
-  double a = argc > 14 ? atof(argv[14]) : 0;
-  double b = argc > 15 ? atof(argv[15]) : 0;
-  const bool compute_eig_acc = argc > 16 ? (atol(argv[16]) == 1) : false;
-  const int64_t print_csv_header = argc > 17 ? atol(argv[17]) : 1;
+  const double ev_tol = argc > 12 ? atof(argv[12]) : 1.e-3;
+  int64_t m_begin = argc > 13 ? atol(argv[13]) : 1;
+  int64_t m_end = argc > 14 ? atol(argv[14]) : m_begin;
+  double a = argc > 15 ? atof(argv[15]) : 0;
+  double b = argc > 16 ? atof(argv[16]) : 0;
+  const bool compute_eig_acc = argc > 17 ? (atol(argv[17]) == 1) : false;
+  const int64_t print_csv_header = argc > 18 ? atol(argv[18]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 18 ? std::string(argv[18]) : "";
-  const int64_t sort_bodies = argc > 19 ? atol(argv[19]) : 0;
+  const std::string file_name = argc > 19 ? std::string(argv[19]) : "";
+  const int64_t sort_bodies = argc > 20 ? atol(argv[20]) : 0;
 
   Hatrix::Context::init();
 
@@ -1215,7 +1258,7 @@ int main(int argc, char ** argv) {
   else {
     domain.build_tree(leaf_size);
   }
-  domain.build_interactions(admis);
+  domain.build_interactions(admis, admis_variant);
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
 
   const auto start_construct = std::chrono::system_clock::now();
@@ -1226,6 +1269,7 @@ int main(int argc, char ** argv) {
   const auto construct_min_rank = A.get_basis_min_rank(1, A.height);
   const auto construct_max_rank = A.get_basis_max_rank(1, A.height);
   const auto construct_error = A.construction_error(domain);
+  const auto construct_mem = A.memory_usage();
   const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
   const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
   const auto csp_all = A.get_level_max_nblocks('a', 1, A.height);
@@ -1245,12 +1289,14 @@ int main(int argc, char ** argv) {
             << "SVD"
 #endif
             << " admis=" << admis << std::setw(3)
+            << " admis_variant=" << admis_variant
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
             << " height=" << A.height
             << " construct_min_rank=" << construct_min_rank
             << " construct_max_rank=" << construct_max_rank
+            << " construct_mem=" << construct_mem
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
             << std::endl
@@ -1283,9 +1329,9 @@ int main(int argc, char ** argv) {
         Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : N * (1. / Hatrix::PV);
     a = -b;
   }
-  int64_t v_a, v_b, temp1, temp2;
-  std::tie(v_a, temp1, temp2) = A.inertia(domain, a, s);
-  std::tie(v_b, temp1, temp2) = A.inertia(domain, b, s);
+  int64_t v_a, v_b, temp1, temp2, temp3;
+  std::tie(v_a, temp1, temp2, temp3) = A.inertia(domain, a, s);
+  std::tie(v_b, temp1, temp2, temp3) = A.inertia(domain, b, s);
   if(v_a != 0 || v_b != N) {
     std::cerr << "Warning: starting interval does not contain the whole spectrum "
               << "(v(a)=v(" << a << ")=" << v_a << ","
@@ -1323,23 +1369,24 @@ int main(int argc, char ** argv) {
   if (print_csv_header == 1) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
-              << ",height,construct_min_rank,construct_max_rank,construct_time,construct_error"
+              << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
               << ",csp_all,csp_dense,csp_lowrank,construct_min_rank_leaf,construct_max_rank_leaf"
               << ",dense_eig_time"
-              << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
   for (int64_t k = 0; k < target_m.size(); k++) {
     const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;
-    int64_t ldl_min_rank, ldl_max_rank, h2_eig_ops;
+    int64_t ldl_min_rank, ldl_max_rank, ldl_max_mem, h2_eig_ops;
     const auto h2_eig_start = std::chrono::system_clock::now();
-    std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift, h2_eig_ops) =
+    std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, ldl_max_mem, max_rank_shift, h2_eig_ops) =
         A.get_mth_eigenvalue(domain, m, ev_tol, a, b);
     const auto h2_eig_stop = std::chrono::system_clock::now();
     const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                (h2_eig_stop - h2_eig_start).count();
+    const auto h2_eig_mem = construct_mem + ldl_max_mem;
     const double dense_mth_eigv = compute_eig_acc ? dense_eigv[m - 1] : -1;
     const double eig_abs_err = compute_eig_acc ? std::abs(h2_mth_eigv - dense_mth_eigv) : -1;
     const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
@@ -1348,10 +1395,11 @@ int main(int argc, char ** argv) {
               << " a0=" << a
               << " b0=" << b
               << " ev_tol=" << ev_tol
-              << " h2_eig_time=" << h2_eig_ops
+              << " h2_eig_ops=" << h2_eig_ops
               << " h2_eig_time=" << h2_eig_time
               << " ldl_min_rank=" << ldl_min_rank
               << " ldl_max_rank=" << ldl_max_rank
+              << " h2_eig_mem=" << h2_eig_mem
               << " max_rank_shift=" << max_rank_shift
               << " dense_eigv=" << dense_mth_eigv
               << " h2_eigv=" << h2_mth_eigv
@@ -1377,6 +1425,7 @@ int main(int argc, char ** argv) {
               << "," << A.height
               << "," << construct_min_rank
               << "," << construct_max_rank
+              << "," << construct_mem
               << "," << construct_time
               << "," << std::scientific << construct_error << std::defaultfloat
               << "," << csp_all
@@ -1393,6 +1442,7 @@ int main(int argc, char ** argv) {
               << "," << h2_eig_time
               << "," << ldl_min_rank
               << "," << ldl_max_rank
+              << "," << h2_eig_mem
               << "," << max_rank_shift
               << "," << dense_mth_eigv
               << "," << h2_mth_eigv
