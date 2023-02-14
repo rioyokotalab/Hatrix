@@ -80,12 +80,54 @@ class Domain {
     return dist;
   }
 
-  static bool is_well_separated(const Cell& source, const Cell& target,
-                                const double theta) {
+  // Eq.(5.6) of "Hierarchical Matrices: Algorithms and Analysis" (W. Hackbusch, 2015)
+  static bool admis_check_var1(const Cell& source, const Cell& target,
+                               const double theta) {
+    const auto distance = std::sqrt(dist2(MAX_NDIM, source.center, target.center));
+    const auto source_diam = source.get_diameter();
+    const auto target_diam = target.get_diameter();
+    return (distance > (theta * std::min(source_diam, target_diam)));
+  }
+
+  // Eq.(5.7a) of "Hierarchical Matrices: Algorithms and Analysis" (W. Hackbusch, 2015)
+  static bool admis_check_var2(const Cell& source, const Cell& target,
+                               const double theta) {
     const auto distance = std::sqrt(dist2(MAX_NDIM, source.center, target.center));
     const auto source_diam = source.get_diameter();
     const auto target_diam = target.get_diameter();
     return (distance > (theta * std::max(source_diam, target_diam)));
+  }
+
+  // Another variant that uses bounding box size in all directions
+  static bool admis_check_var3(const Cell& source, const Cell& target,
+                               const double theta) {
+    const auto distance = dist2(MAX_NDIM, source.center, target.center);
+    const auto source_size = source.get_size();
+    const auto target_size = target.get_size();
+    return (distance > (theta * (source_size + target_size)));
+  }
+
+  static bool is_well_separated(const Cell& source, const Cell& target,
+                                const double theta, const int64_t admis_variant = 0) {
+    bool admissible = false;
+    switch (admis_variant) {
+      case 1: {
+        admissible = admis_check_var1(source, target, theta);
+        break;
+      }
+      case 2: {
+        admissible = admis_check_var2(source, target, theta);
+        break;
+      }
+      case 3: {
+        admissible = admis_check_var3(source, target, theta);
+        break;
+      }
+      default: {
+        admissible = admis_check_var3(source, target, theta);
+      }
+    }
+    return admissible;
   }
 
   // Taken from: H2Pack GitHub
@@ -398,12 +440,12 @@ class Domain {
                                  level + 1, (block_index << 1) + 1);
   }
 
-  void dual_tree_traversal(Cell& Ci, Cell& Cj, const double theta) {
+  void dual_tree_traversal(Cell& Ci, Cell& Cj, const double theta, const int64_t admis_variant) {
     const auto i_level = Ci.level;
     const auto j_level = Cj.level;
     bool admissible = false;
     if (i_level == j_level) {
-      admissible = is_well_separated(Ci, Cj, theta);
+      admissible = is_well_separated(Ci, Cj, theta, admis_variant);
       if (admissible) {
         Ci.far_list.push_back(get_cell_idx(Cj.block_index, Cj.level));
       }
@@ -413,12 +455,12 @@ class Domain {
     }
     if (!admissible) {
       if (i_level <= j_level && !Ci.is_leaf()) {
-        dual_tree_traversal(cells[Ci.child], Cj, theta);
-        dual_tree_traversal(cells[Ci.child + 1], Cj, theta);
+        dual_tree_traversal(cells[Ci.child], Cj, theta, admis_variant);
+        dual_tree_traversal(cells[Ci.child + 1], Cj, theta, admis_variant);
       }
       else if (j_level <= i_level && !Cj.is_leaf()) {
-        dual_tree_traversal(Ci, cells[Cj.child], theta);
-        dual_tree_traversal(Ci, cells[Cj.child + 1], theta);
+        dual_tree_traversal(Ci, cells[Cj.child], theta, admis_variant);
+        dual_tree_traversal(Ci, cells[Cj.child + 1], theta, admis_variant);
       }
     }
   }
@@ -496,8 +538,8 @@ class Domain {
     cardinal_recursive_bisection(0, N, leaf_size, 0, 0);
   }
 
-  void build_interactions(const double theta) {
-    dual_tree_traversal(cells[0], cells[0], theta);
+  void build_interactions(const double theta, const int64_t admis_variant = 0) {
+    dual_tree_traversal(cells[0], cells[0], theta, admis_variant);
     sort_interaction_lists();
   }
 
