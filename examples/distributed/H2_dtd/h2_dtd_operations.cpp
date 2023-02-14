@@ -465,7 +465,7 @@ matmul(SymmetricSharedBasisMatrix& A,
     for (int j = 0; j < i; ++j) {
       int D_ncols = domain.cell_size(j, A.max_level);
       int proc_j = mpi_rank(j);
-      int proc_D = mpi_rank(i, j);
+      int proc_D = mpi_rank(i);
       int D_tag = i + j * nblocks;
 
       // send D blocks where they are to be computed.
@@ -503,7 +503,7 @@ matmul(SymmetricSharedBasisMatrix& A,
     for (int j = 0; j < i; ++j) {
       int D_ncols = domain.cell_size(j, A.max_level);
       int proc_j = mpi_rank(j);
-      int proc_D = mpi_rank(i, j);
+      int proc_D = mpi_rank(i);
       int D_tag = i + j * nblocks;
 
       if (A.is_admissible.exists(i, j, A.max_level) &&
