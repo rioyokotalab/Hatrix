@@ -113,6 +113,7 @@ class SymmetricH2 {
   int64_t get_level_max_nblocks(const char nearfar,
                                 const int64_t level_begin, const int64_t level_end) const;
   double construction_error(const Domain& domain) const;
+  int64_t memory_usage() const;
   void print_structure(const int64_t level) const;
   void print_ranks() const;
   void write_JSON(const Domain& domain, const std::string filename) const;
@@ -439,6 +440,39 @@ double SymmetricH2::construction_error(const Domain& domain) const {
     }
   }
   return (use_rel_acc ? std::sqrt(diff_norm / dense_norm) : std::sqrt(diff_norm));
+}
+
+int64_t SymmetricH2::memory_usage() const {
+  int64_t mem = 0;
+  for (int64_t level = height; level > 0; level--) {
+    const auto num_nodes = level_blocks[level];
+    for (int64_t i = 0; i < num_nodes; i++) {
+      if (U.exists(i, level)) {
+        mem += U(i, level).memory_used();
+      }
+      if (US_row.exists(i, level)) {
+        mem += US_row(i, level).memory_used();
+      }
+      for (auto j: near_neighbors(i, level)) {
+        if (D.exists(i, j, level)) {
+          mem += D(i, j, level).memory_used();
+        }
+      }
+      for (auto j: far_neighbors(i, level)) {
+        if (S.exists(i, j, level)) {
+          mem += S(i, j, level).memory_used();
+        }
+      }
+      if (fill_in_neighbors.exists(i, level)) {
+        for (auto j: fill_in_neighbors(i, level)) {
+          if (F.exists(i, j, level)) {
+            mem += F(i, j, level).memory_used();
+          }
+        }
+      }
+    }
+  }
+  return mem;
 }
 
 void SymmetricH2::print_structure(const int64_t level) const {
@@ -1313,17 +1347,22 @@ int main(int argc, char ** argv) {
   // Fixed accuracy with bounded rank
   const int64_t max_rank = argc > 5 ? atol(argv[5]) : 30;
   const double admis = argc > 6 ? atof(argv[6]) : 3;
+  // 0: Default
+  // 1: dist(i,j)  > admis*(min(diam(i), diam(j)))
+  // 2: dist(i,j)  > admis*(max(diam(i), diam(j)))
+  // 3: dist2(i,j) > admis*(size(i)+size(j))  (default)
+  const int64_t admis_variant = argc > 7 ? atol(argv[7]) : 0;
 
   // Specify compressed representation
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = argc > 7 ? atol(argv[7]) : 1;
+  const int64_t matrix_type = argc > 8 ? atol(argv[8]) : 1;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
   // 2: ELSES Dense Matrix
-  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
+  const int64_t kernel_type = argc > 9 ? atol(argv[9]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
@@ -1331,14 +1370,14 @@ int main(int argc, char ** argv) {
   // 2: StarsH Uniform Grid
   // 3: ELSES Geometry (ndim = 3)
   // 4: Random Uniform Grid
-  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
-  int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
+  const int64_t geom_type = argc > 10 ? atol(argv[10]) : 0;
+  int64_t ndim  = argc > 11 ? atol(argv[11]) : 1;
 
-  const int64_t print_csv_header = argc > 11 ? atol(argv[11]) : 1;
+  const int64_t print_csv_header = argc > 12 ? atol(argv[12]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 12 ? std::string(argv[12]) : "";
-  const int64_t sort_bodies = argc > 13 ? atol(argv[13]) : 0;
+  const std::string file_name = argc > 13 ? std::string(argv[13]) : "";
+  const int64_t sort_bodies = argc > 14 ? atol(argv[14]) : 0;
 
   Hatrix::Context::init();
 
@@ -1415,7 +1454,7 @@ int main(int argc, char ** argv) {
   else {
     domain.build_tree(leaf_size);
   }
-  domain.build_interactions(admis);
+  domain.build_interactions(admis, admis_variant);
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
 
   const auto start_construct = std::chrono::system_clock::now();
@@ -1425,6 +1464,7 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   const auto construct_min_rank = A.get_basis_min_rank(1, A.height);
   const auto construct_max_rank = A.get_basis_max_rank(1, A.height);
+  const auto construct_mem = A.memory_usage();
   const auto construct_error = A.construction_error(domain);
   const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
   const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
@@ -1445,12 +1485,14 @@ int main(int argc, char ** argv) {
             << "SVD"
 #endif
             << " admis=" << admis << std::setw(3)
+            << " admis_variant=" << admis_variant
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
             << " height=" << A.height
             << " construct_min_rank=" << construct_min_rank
             << " construct_max_rank=" << construct_max_rank
+            << " construct_mem=" << construct_mem
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
             << std::endl
@@ -1469,9 +1511,11 @@ int main(int argc, char ** argv) {
                              (stop_factor - start_factor).count();
   const auto factor_min_rank = A.get_basis_min_rank(1, A.height);
   const auto factor_max_rank = A.get_basis_max_rank(1, A.height);
+  const auto factor_mem = A.memory_usage();
 #ifndef OUTPUT_CSV
   std::cout << "factor_min_rank=" << factor_min_rank
             << " factor_max_rank=" << factor_max_rank
+            << " factor_mem=" << factor_mem
             << " factor_fp_ops=" << factor_fp_ops
             << " factor_time=" << factor_time
             << std::endl;
@@ -1498,10 +1542,10 @@ int main(int argc, char ** argv) {
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
-    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
-              << ",height,construct_min_rank,construct_max_rank,construct_time,construct_error"
+    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,admis_variant,matrix_type,kernel,geometry"
+              << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
               << ",csp_all,csp_dense,csp_lowrank,construct_min_rank_leaf,construct_max_rank_leaf"
-              << ",factor_min_rank,factor_max_rank,factor_fp_ops,factor_time"
+              << ",factor_min_rank,factor_max_rank,factor_mem,factor_fp_ops,factor_time"
               << ",solve_time,solve_error"
               << std::endl;
   }
@@ -1517,12 +1561,14 @@ int main(int argc, char ** argv) {
             << "SVD"
 #endif
             << "," << admis
+            << "," << admis_variant
             << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << "," << kernel_name
             << "," << geom_name
             << "," << A.height
             << "," << construct_min_rank
             << "," << construct_max_rank
+            << "," << construct_mem
             << "," << construct_time
             << "," << std::scientific << construct_error << std::defaultfloat
             << "," << csp_all
@@ -1532,6 +1578,7 @@ int main(int argc, char ** argv) {
             << "," << construct_max_rank_leaf
             << "," << factor_min_rank
             << "," << factor_max_rank
+            << "," << factor_mem
             << "," << factor_fp_ops
             << "," << factor_time
             << "," << solve_time
