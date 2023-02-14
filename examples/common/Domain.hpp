@@ -478,6 +478,23 @@ class Domain {
     return (((int64_t)1 << 3 * level) - 1) / 7;
   }
 
+  // Get level from Hilbert key
+  int64_t getLevel(int64_t i) {
+    int level = -1;
+    uint64_t offset = 0;
+    while (i >= offset) {
+      level++;
+      offset += (int64_t)1 << 3 * level;
+    }
+    return level;
+  }
+
+  // Get first child's Hilbert key
+  int64_t getChild(int64_t i) {
+    int64_t level = getLevel(i);
+    return (i - levelOffset(level)) * 8 + levelOffset(level+1);
+  }
+
   // Get 3-D Hilbert index from coordinates
   void get3DIndex(const double X[MAX_NDIM], const int64_t level,
                   int64_t iX[MAX_NDIM]) {
@@ -1149,11 +1166,24 @@ class Domain {
     const int64_t mol_leaf_size = 1;
     mol_cells.reserve(nmols*(32/mol_leaf_size+1));
     build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0], mol_cells, mol_leaf_size, X0, R0);
+    int64_t max_level = 0;
     for (int64_t i = 0; i < mol_cells.size(); i++) {
       if (mol_cells[i].nchilds == 0) {
+        max_level = std::max(max_level, mol_cells[i].level);
+      }
+    }
+    for (int64_t i = 0; i < mol_cells.size(); i++) {
+      if (mol_cells[i].nchilds == 0) {
+        auto hilbert_level = mol_cells[i].level;
+        auto hilbert_idx = mol_cells[i].key;
+        // Ensure hilbert indices are on the same level
+        while (hilbert_level < max_level) {
+          hilbert_idx = getChild(hilbert_idx);
+          hilbert_level++;
+        }
         for (int64_t b = 0; b < mol_cells[i].nbodies; b++) {
           auto& bi = mol_cells[i].body_ptr[b];
-          bi.key = mol_cells[i].key;
+          bi.key = hilbert_idx;
         }
       }
     }
