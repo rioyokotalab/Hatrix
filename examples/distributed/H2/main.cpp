@@ -137,46 +137,45 @@ int main(int argc, char* argv[]) {
   // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   // Matrix bdense = matmul(Adense, x);
 
-  // std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
-  //           << opts.accuracy << ","
-  //           << opts.qr_accuracy << ","
-  //           << opts.kind_of_recompression << ","
-  //           << opts.max_rank << ","
-  //           << opts.admis << ","
-  //           << construct_max_rank << ","
-  //           << opts.nleaf <<  ","
-  //           << domain_time <<  ","
-  //           << construct_time  << ","
-  //           << factor_time << ","
-  //           << solve_time << ","
-  //           << solve_error << ","
-  //           << matvec_error << ","
-  //           << fp_ops << ","
-  //           << opts.kind_of_geometry << ","
-  //           << opts.use_nested_basis << ","
-  //           << dense_blocks
-  //           << std::endl;
-
-  std::cout << "----------------------------\n";
-  std::cout << "N               : " << opts.N << std::endl;
-  std::cout << "NDIM            : " << opts.ndim << std::endl;
-  std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-  std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
-  std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
-  std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-  std::cout << "ADMIS           : " << opts.admis << std::endl;
-  std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-  std::cout << "POST FACT. RANK : " << post_factor_max_rank << std::endl;
-  std::cout << "NLEAF           : " << opts.nleaf << "\n"
-            << "Domain(ms)      : " << domain_time << "\n"
-            << "Contruct(ms)    : " << construct_time << "\n"
-            << "Factor(ms)      : " << factor_time << "\n"
-            << "Solve(ms)       : " << solve_time << "\n"
-            << "Solve error     : " << solve_error << "\n"
-            << "PAPI_FP_OPS     : " << fp_ops << "\n"
-            << "Kind of recomp. : " << opts.kind_of_recompression
+  std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
+            << opts.accuracy << ","
+            << opts.qr_accuracy << ","
+            << opts.kind_of_recompression << ","
+            << opts.max_rank << ","
+            << opts.admis << ","
+            << construct_max_rank << ","
+            << opts.nleaf <<  ","
+            << domain_time <<  ","
+            << construct_time  << ","
+            << factor_time << ","
+            << solve_time << ","
+            << solve_error << ","
+            << fp_ops << ","
+            << opts.kind_of_geometry << ","
+            << opts.use_nested_basis << ","
+            << dense_blocks
             << std::endl;
-  std::cout << "----------------------------\n";
+
+  // std::cout << "----------------------------\n";
+  // std::cout << "N               : " << opts.N << std::endl;
+  // std::cout << "NDIM            : " << opts.ndim << std::endl;
+  // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
+  // std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
+  // std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
+  // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
+  // std::cout << "ADMIS           : " << opts.admis << std::endl;
+  // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
+  // std::cout << "POST FACT. RANK : " << post_factor_max_rank << std::endl;
+  // std::cout << "NLEAF           : " << opts.nleaf << "\n"
+  //           << "Domain(ms)      : " << domain_time << "\n"
+  //           << "Contruct(ms)    : " << construct_time << "\n"
+  //           << "Factor(ms)      : " << factor_time << "\n"
+  //           << "Solve(ms)       : " << solve_time << "\n"
+  //           << "Solve error     : " << solve_error << "\n"
+  //           << "PAPI_FP_OPS     : " << fp_ops << "\n"
+  //           << "Kind of recomp. : " << opts.kind_of_recompression
+  //           << std::endl;
+  // std::cout << "----------------------------\n";
 
 
 
