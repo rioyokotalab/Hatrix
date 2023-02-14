@@ -95,6 +95,17 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::init();
 
+#ifdef OUTPUT_CSV
+  if (print_csv_header == 1) {
+    // Print CSV header
+    std::cout << "N,kernel,geometry"
+              << ",construct_time"
+              << ",dense_eig_time"
+              << ",m,a0,b0,ev_tol,ldl_eig_mem,ldl_eig_time,dense_eigv,ldl_eigv,eig_abs_err,success"
+              << std::endl;
+  }
+#endif
+
   Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
@@ -225,16 +236,7 @@ int main(int argc, char ** argv) {
       target_m.push_back(m);
     }
   }
-#ifdef OUTPUT_CSV
-  if (print_csv_header == 1) {
-    // Print CSV header
-    std::cout << "N,kernel,geometry"
-              << ",construct_time"
-              << ",dense_eig_time"
-              << ",m,a0,b0,ev_tol,ldl_eig_mem,ldl_eig_time,dense_eigv,ldl_eigv,eig_abs_err,success"
-              << std::endl;
-  }
-#endif
+
   for (int64_t k = 0; k < target_m.size(); k++) {
     const int64_t m = target_m[k];
     double ldl_mth_eigv;

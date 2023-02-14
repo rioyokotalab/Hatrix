@@ -1189,6 +1189,18 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::init();
 
+#ifdef OUTPUT_CSV
+  if (print_csv_header == 1) {
+    // Print CSV header
+    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
+              << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
+              << ",csp_all,csp_dense,csp_lowrank,construct_min_rank_leaf,construct_max_rank_leaf"
+              << ",dense_eig_time"
+              << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << std::endl;
+  }
+#endif
+
   Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
@@ -1370,17 +1382,7 @@ int main(int argc, char ** argv) {
       target_m.push_back(m);
     }
   }
-#ifdef OUTPUT_CSV
-  if (print_csv_header == 1) {
-    // Print CSV header
-    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
-              << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
-              << ",csp_all,csp_dense,csp_lowrank,construct_min_rank_leaf,construct_max_rank_leaf"
-              << ",dense_eig_time"
-              << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
-              << std::endl;
-  }
-#endif
+
   for (int64_t k = 0; k < target_m.size(); k++) {
     const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;

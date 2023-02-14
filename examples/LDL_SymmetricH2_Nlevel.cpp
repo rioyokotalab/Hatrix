@@ -1381,6 +1381,18 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::init();
 
+#ifdef OUTPUT_CSV
+  if (print_csv_header == 1) {
+    // Print CSV header
+    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,admis_variant,matrix_type,kernel,geometry"
+              << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
+              << ",csp_all,csp_dense,csp_lowrank,construct_min_rank_leaf,construct_max_rank_leaf"
+              << ",factor_min_rank,factor_max_rank,factor_mem,factor_fp_ops,factor_time"
+              << ",solve_time,solve_error"
+              << std::endl;
+  }
+#endif
+
   Hatrix::set_kernel_constants(1.e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
@@ -1540,15 +1552,6 @@ int main(int argc, char ** argv) {
 #endif
 
 #ifdef OUTPUT_CSV
-  if (print_csv_header == 1) {
-    // Print CSV header
-    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,admis_variant,matrix_type,kernel,geometry"
-              << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
-              << ",csp_all,csp_dense,csp_lowrank,construct_min_rank_leaf,construct_max_rank_leaf"
-              << ",factor_min_rank,factor_max_rank,factor_mem,factor_fp_ops,factor_time"
-              << ",solve_time,solve_error"
-              << std::endl;
-  }
   std::cout << N
             << "," << leaf_size
             << "," << accuracy
