@@ -1245,7 +1245,8 @@ int main(int argc, char ** argv) {
     }
     case 3: {
       domain.ndim = 3;
-      geom_name = file_name;
+      const auto prefix_end = file_name.find_last_of("/\\");
+      geom_name = file_name.substr(prefix_end + 1);
       break;
     }
     case 4: {
@@ -1267,7 +1268,7 @@ int main(int argc, char ** argv) {
 
     if (sort_bodies) {
       domain.sort_bodies_ELSES();
-      geom_name = file_name + "_sorted";
+      geom_name = geom_name + "_sorted";
     }
     domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
     domain.read_p2p_matrix_ELSES(file_name + ".dat");
