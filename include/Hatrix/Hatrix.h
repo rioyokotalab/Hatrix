@@ -2,6 +2,7 @@
 
 #include "classes/BLR.h"
 #include "classes/IndexedMap.h"
+#include "classes/LowRank.h"
 #include "classes/Matrix.h"
 #include "functions/math_common.h"
 #include "functions/arithmetics.h"
