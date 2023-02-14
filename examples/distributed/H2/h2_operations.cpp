@@ -17,6 +17,7 @@ using namespace Hatrix;
 Hatrix::RowLevelMap US;
 
 std::vector<double> timer;
+std::vector<int64_t> counts;
 
 void
 factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
@@ -579,6 +580,7 @@ update_row_cluster_basis_and_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
   }
 
   if (found_row_fill_in) {    // update row cluster bases
+    counts[1] += 1;
     update_row_cluster_basis(A, block, level, F, r, opts);
     update_row_S_blocks(A, block, level, r);
     update_row_transfer_basis(A, block, level, r);
@@ -603,6 +605,7 @@ update_col_cluster_basis_and_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
   }
 
   if (found_col_fill_in) {
+    counts[0] += 1;
     update_col_cluster_basis(A, block, level, F, t, opts);
     update_col_S_blocks(A, block, level, t);
     update_col_transfer_basis(A, block, level, t);
@@ -664,6 +667,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   RowColLevelMap<Matrix> F;
   int64_t level;
   timer.resize(8, 0);
+  counts.resize(10, 0);
 
   for (int level = A.max_level; level >= A.min_level; --level) {
     int nblocks = pow(2, level);
@@ -798,6 +802,8 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
             << timer[5] << ","
             << timer[6] << ","
             << timer[7] << ","
+            << counts[0] << ","
+            << counts[1]
     " --- ";
 
   auto fp_ops = papi.fp_ops();
