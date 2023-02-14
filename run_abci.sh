@@ -17,38 +17,63 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/l
 # put in bash_profile for remote MPI processes.
 # ulimit -c unlimited             # does not pass to remote child processes.
 
+export MKL_NUM_THREADS=40
+export OMP_NUM_THREADS=40
 export OMP_PLACES=cores
-# export OMP_NUM_THREADS=1
-# mpirun -n 4 -genv I_MPI_DEBUG=10  xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
-# mpirun -n 1  -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
-# mpirun -n 1 -gtool "gdb:0=attach" ./bin/H2_dtd --N $N \
+export OMP_PROC_BIND=close
 
-# mpiexec.hydra -n 2 -genv I_MPI_BIND_NUMA=0,1 xterm -e gdb -ex=run --args ./bin/H2_dtd --N $N \
 make -j H2_main
 
-# export GMON_OUT_PREFIX=gmon.out-
+nleaf=1024
+ndim=3
 
-for adm in 4; do
-    nleaf=512
-    ndim=2
-    max_rank=200
-
-    for N in 32768; do
-        ./bin/H2_main --N $N \
-               --nleaf $nleaf \
-               --kernel_func laplace \
-               --kind_of_geometry grid \
-               --ndim $ndim \
-               --max_rank $max_rank \
-               --accuracy 1e-12 \
-               --admis $adm \
-               --admis_kind geometry \
-               --construct_algorithm miro \
-               --add_diag 1e-9 \
-               --use_nested_basis
+# BLR2
+for adm in 0.8; do
+    for pert in 1e-2; do
+        for max_rank in 100; do
+            for N in 16384; do
+                for i in `seq 1`; do
+                    ./bin/H2_main --N $N \
+                                  --nleaf $nleaf \
+                                  --kernel_func laplace \
+                                  --kind_of_geometry grid \
+                                  --ndim $ndim \
+                                  --max_rank $max_rank \
+                                  --accuracy -1 \
+                                  --admis $adm \
+                                  --admis_kind geometry \
+                                  --construct_algorithm miro \
+                                  --add_diag 1e-9 \
+                                  --kind_of_recompression 3 \
+                                  --perturbation $pert \
+                done
+            done
+        done
     done
 done
 
-# gprof -s bin/H2_dtd gmon.out-*
-# gprof -q bin/H2_dtd gmon.sum > call_graph.out
-# gprof bin/H2_dtd gmon.sum > gprof_out.out
+# H2
+for adm in 0.8; do
+    for pert in 1e-2; do
+        for max_rank in 100; do
+            for N in 16384; do
+                for i in `seq 1`; do
+                    ./bin/H2_main --N $N \
+                                  --nleaf $nleaf \
+                                  --kernel_func laplace \
+                                  --kind_of_geometry grid \
+                                  --ndim $ndim \
+                                  --max_rank $max_rank \
+                                  --accuracy -1 \
+                                  --admis $adm \
+                                  --admis_kind geometry \
+                                  --construct_algorithm miro \
+                                  --add_diag 1e-9 \
+                                  --kind_of_recompression 3 \
+                                  --perturbation $pert \
+                                  --use_nested_basis
+                done
+            done
+        done
+    done
+done

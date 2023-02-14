@@ -290,7 +290,7 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
     if (i >= block+1) {
       if (F.exists(i, block, level)) {
         fill_in += matmul(F(i, block, level), F(i, block, level), true, false);
-        F.erase(i, block, level);
+        // F.erase(i, block, level);
       }
     }
   }
@@ -372,7 +372,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
     if (j < block) {
       if (F.exists(block, j, level)) {
         fill_in += matmul(F(block, j, level), F(block, j, level), false, true);
-        F.erase(block, j, level);
+        // F.erase(block, j, level);
       }
     }
   }

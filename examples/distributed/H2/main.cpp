@@ -153,7 +153,8 @@ int main(int argc, char* argv[]) {
             << fp_ops << ","
             << opts.kind_of_geometry << ","
             << opts.use_nested_basis << ","
-            << dense_blocks
+            << dense_blocks << ","
+            << opts.perturbation
             << std::endl;
 
   // std::cout << "----------------------------\n";

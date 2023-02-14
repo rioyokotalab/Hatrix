@@ -79,7 +79,7 @@ namespace Hatrix {
       }
       distance = sqrt(distance);
 
-      if (distance >= (Ci.radius + Cj.radius) * opts.admis) {
+      if (distance >= ((Ci.radius + Cj.radius) * opts.admis + opts.perturbation)) {
         // well-separated blocks.
         well_separated = true;
       }
