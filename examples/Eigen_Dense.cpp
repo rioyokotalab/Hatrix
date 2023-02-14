@@ -231,7 +231,7 @@ int main(int argc, char ** argv) {
     std::cout << "N,kernel,geometry"
               << ",construct_time"
               << ",dense_eig_time"
-              << ",m,a0,b0,ev_tol,ldl_eig_time,dense_eigv,ldl_eigv,eig_abs_err,success"
+              << ",m,a0,b0,ev_tol,ldl_eig_mem,ldl_eig_time,dense_eigv,ldl_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
@@ -243,6 +243,7 @@ int main(int argc, char ** argv) {
     const auto ldl_eig_stop = std::chrono::system_clock::now();
     const double ldl_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (ldl_eig_stop - ldl_eig_start).count();
+    const auto ldl_eig_mem = A.memory_used() * 2;
     const double dense_mth_eigv = compute_eig_acc ? dense_eigv[m - 1] : -1;
     const double eig_abs_err = compute_eig_acc ? std::abs(ldl_mth_eigv - dense_mth_eigv) : -1;
     const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
@@ -251,6 +252,7 @@ int main(int argc, char ** argv) {
               << " a0=" << a
               << " b0=" << b
               << " ev_tol=" << ev_tol
+              << " ldl_eig_mem=" << ldl_eig_mem
               << " ldl_eig_time=" << ldl_eig_time
               << " dense_eigv=" << dense_mth_eigv
               << " ldl_eigv=" << ldl_mth_eigv
@@ -267,6 +269,7 @@ int main(int argc, char ** argv) {
               << "," << a
               << "," << b
               << "," << ev_tol
+              << "," << ldl_eig_mem
               << "," << ldl_eig_time
               << "," << dense_mth_eigv
               << "," << ldl_mth_eigv
