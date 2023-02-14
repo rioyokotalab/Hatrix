@@ -29,6 +29,9 @@ using vec = std::vector<int64_t>;
 
 #define OUTPUT_CSV
 
+// Uncomment the following line to output memory consumption
+// #define OUTPUT_MEM
+
 // Comment the following line to use SVD instead of pivoted QR for low-rank compression
 // #define USE_QR_COMPRESSION
 
@@ -448,6 +451,7 @@ double SymmetricH2::construction_error(const Domain& domain) const {
 
 int64_t SymmetricH2::memory_usage() const {
   int64_t mem = 0;
+#ifdef OUTPUT_MEM
   for (int64_t level = height; level > 0; level--) {
     const auto num_nodes = level_blocks[level];
     for (int64_t i = 0; i < num_nodes; i++) {
@@ -476,6 +480,7 @@ int64_t SymmetricH2::memory_usage() const {
       }
     }
   }
+#endif
   return mem;
 }
 
