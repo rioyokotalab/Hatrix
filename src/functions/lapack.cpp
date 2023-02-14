@@ -123,6 +123,24 @@ void lu(Matrix<double>& A, Matrix<double>& L, Matrix<double>& U) {
 }
 
 template <>
+void lu_nopiv(Matrix<float>& A) {
+LAPACKE_mkl_sgetrfnpi(
+    LAPACK_COL_MAJOR,
+    A.rows, A.cols, A.min_dim(),
+    &A, A.stride
+  );
+}
+
+template <>
+void lu_nopiv(Matrix<double>& A) {
+LAPACKE_mkl_dgetrfnpi(
+    LAPACK_COL_MAJOR,
+    A.rows, A.cols, A.min_dim(),
+    &A, A.stride
+  );
+}
+
+template <>
 void lu(Matrix<float>& A) {
   float * a = &A;
   int m = A.rows;

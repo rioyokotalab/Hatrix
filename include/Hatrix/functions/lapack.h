@@ -24,6 +24,10 @@ void lu(Matrix<DT>& A, Matrix<DT>& L, Matrix<DT>& U);
 template <typename DT>
 void lu(Matrix<DT>& A);
 
+// Compute the in-place LU factorization of A. Non-pivoted MKL version
+template <typename DT>
+void lu_nopiv(Matrix<DT>& A);
+
 // Compute in-place Cholesky factorization fo A with LAPACK DPOTRF.
 template <typename DT>
 void cholesky(Matrix<DT>& A, Mode uplo);
