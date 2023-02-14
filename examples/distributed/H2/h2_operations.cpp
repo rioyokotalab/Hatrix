@@ -2,6 +2,8 @@
 #include <exception>
 #include <cmath>
 #include <random>
+#include <vector>
+#include <chrono>
 
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
@@ -13,6 +15,8 @@
 using namespace Hatrix;
 
 Hatrix::RowLevelMap US;
+
+std::vector<double> timer;
 
 void
 factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
@@ -613,14 +617,42 @@ factorize_level(SymmetricSharedBasisMatrix& A,
   const int64_t nblocks = pow(2, level);
 
   for (int64_t block = 0; block < nblocks; ++block) {
+    auto start_cluster_update = std::chrono::system_clock::now();
     update_row_cluster_basis_and_S_blocks(A, F, r, opts, block, level);
     update_col_cluster_basis_and_S_blocks(A, F, t, opts, block, level);
+    auto stop_cluster_update = std::chrono::system_clock::now();
+    timer[0] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_cluster_update - start_cluster_update).count();
 
+    auto start_multiply_complements = std::chrono::system_clock::now();
     multiply_complements(A, block, level);
+    auto stop_multiply_complements = std::chrono::system_clock::now();
+    timer[1] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_multiply_complements - start_multiply_complements).count();
+
+    auto start_factorize_diag = std::chrono::system_clock::now();
     factorize_diagonal(A, block, level);
+    auto stop_factorize_diag = std::chrono::system_clock::now();
+    timer[2] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_factorize_diag - start_factorize_diag).count();
+
+    auto start_triangle = std::chrono::system_clock::now();
     triangle_reduction(A, block, level);
+    auto stop_triangle = std::chrono::system_clock::now();
+    timer[3] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_triangle - start_triangle).count();
+
+    auto start_schurs = std::chrono::system_clock::now();
     compute_schurs_complement(A, block, level);
+    auto stop_schurs = std::chrono::system_clock::now();
+    timer[4] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_schurs - start_schurs).count();
+
+    auto start_fill_ins = std::chrono::system_clock::now();
     compute_fill_ins(A, block, level, F);
+    auto stop_fill_ins = std::chrono::system_clock::now();
+    timer[5] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_fill_ins - start_fill_ins).count();
   } // for (int block = 0; block < nblocks; ++block)
 }
 
@@ -631,6 +663,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   papi.start();
   RowColLevelMap<Matrix> F;
   int64_t level;
+  timer.resize(8, 0);
 
   for (int level = A.max_level; level >= A.min_level; --level) {
     int nblocks = pow(2, level);
@@ -651,6 +684,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
     factorize_level(A, level, F, r, t, opts);
 
+    auto start_merge = std::chrono::system_clock::now();
     const int64_t parent_level = level-1;
     const int64_t parent_nblocks = pow(2, parent_level);
 
@@ -723,10 +757,14 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
     t.erase_all();
 
     merge_unfactorized_blocks(A, level);
+    auto stop_merge = std::chrono::system_clock::now();
+    timer[6] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_merge - start_merge).count();
   } // level loop
 
   F.erase_all();
 
+  auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
     cholesky(A.D(d, d, level), Hatrix::Lower);
@@ -747,6 +785,20 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
       }
     }
   }
+
+  auto stop_last = std::chrono::system_clock::now();
+  timer[7] += std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_last - start_last).count();
+
+  std::cout << timer[0] << ","
+            << timer[1] << ","
+            << timer[2] << ","
+            << timer[3] << ","
+            << timer[4] << ","
+            << timer[5] << ","
+            << timer[6] << ","
+            << timer[7] << ","
+    " --- ";
 
   auto fp_ops = papi.fp_ops();
   return fp_ops;

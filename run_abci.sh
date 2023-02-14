@@ -28,10 +28,10 @@ nleaf=1024
 ndim=3
 
 # BLR2
-for adm in 0.8; do
-    for pert in 1e-2; do
+for adm in 1; do
+    for pert in 0; do
         for max_rank in 100; do
-            for N in 16384; do
+            for N in 65536; do
                 for i in `seq 1`; do
                     ./bin/H2_main --N $N \
                                   --nleaf $nleaf \
@@ -45,7 +45,7 @@ for adm in 0.8; do
                                   --construct_algorithm miro \
                                   --add_diag 1e-9 \
                                   --kind_of_recompression 3 \
-                                  --perturbation $pert \
+                                  --perturbation $pert
                 done
             done
         done
@@ -53,10 +53,10 @@ for adm in 0.8; do
 done
 
 # H2
-for adm in 0.8; do
-    for pert in 1e-2; do
+for adm in 1; do
+    for pert in 0; do
         for max_rank in 100; do
-            for N in 16384; do
+            for N in 65536; do
                 for i in `seq 1`; do
                     ./bin/H2_main --N $N \
                                   --nleaf $nleaf \
