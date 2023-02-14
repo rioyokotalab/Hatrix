@@ -350,7 +350,7 @@ class Domain {
   }
 
  private:
-  void orthogonal_recursive_bisection(
+  void cardinal_recursive_bisection(
       const int64_t left, const int64_t right, const int64_t leaf_size,
       const int64_t level, const int64_t block_index) {
     // Initialize cell
@@ -392,10 +392,10 @@ class Domain {
     cell.nchilds = 2;
     cells[cell.child].parent = cell_idx;
     cells[cell.child + 1].parent = cell_idx;
-    orthogonal_recursive_bisection(left, mid, leaf_size,
-                                   level + 1, block_index << 1);
-    orthogonal_recursive_bisection(mid, right, leaf_size,
-                                   level + 1, (block_index << 1) + 1);
+    cardinal_recursive_bisection(left, mid, leaf_size,
+                                 level + 1, block_index << 1);
+    cardinal_recursive_bisection(mid, right, leaf_size,
+                                 level + 1, (block_index << 1) + 1);
   }
 
   void dual_tree_traversal(Cell& Ci, Cell& Cj, const double theta) {
@@ -493,7 +493,7 @@ class Domain {
     // Initialize empty cells
     cells.resize(ncells);
     // Partition
-    orthogonal_recursive_bisection(0, N, leaf_size, 0, 0);
+    cardinal_recursive_bisection(0, N, leaf_size, 0, 0);
   }
 
   void build_interactions(const double theta) {
