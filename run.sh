@@ -1,5 +1,5 @@
 #!/bin/bash
-#YBATCH -r epyc-7502_4
+#YBATCH -r epyc-7502_8
 #SBATCH -N 1
 #SBATCH -J TEST_H2
 #SBATCH --time=72:00:00
@@ -23,27 +23,43 @@ export OMP_PROC_BIND=close
 
 make -j H2_main
 
-for adm in 1.2; do
-    nleaf=1024
-    ndim=3
+for i in "16384 0.8 0.01" "32768 0.6 0" "65536 1 0" "131072 1 0" "262144 1 0"; do
+    set -- $i
+    N=$1
+    adm=$2
+    pert=$3
 
-    for max_rank in 100; do
-        for N in 16384 32768 65536 131072; do
-            for i in `seq 10`; do
-                ./bin/H2_main --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func laplace \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy -1 \
-                              --admis $adm \
-                              --admis_kind geometry \
-                              --construct_algorithm miro \
-                              --add_diag 1e-9 \
-                              --kind_of_recompression 3 \
-                              --use_nested_basis
-            done
-        done
-    done
+    ./bin/H2_main --N $N \
+                  --nleaf $nleaf \
+                  --kernel_func laplace \
+                  --kind_of_geometry grid \
+                  --ndim $ndim \
+                  --max_rank $max_rank \
+                  --accuracy -1 \
+                  --admis $adm \
+                  --admis_kind geometry \
+                  --construct_algorithm miro \
+                  --add_diag 1e-9 \
+                  --perturbation $pert
+done
+
+for i in "16384 0.8 0" "32768 0.8 0" "65536 0.9 0" "131072 1 0" "262144 1 0"; do
+    set -- $i
+    N=$1
+    adm=$2
+    pert=$3
+
+    ./bin/H2_main --N $N \
+                  --nleaf $nleaf \
+                  --kernel_func laplace \
+                  --kind_of_geometry grid \
+                  --ndim $ndim \
+                  --max_rank $max_rank \
+                  --accuracy -1 \
+                  --admis $adm \
+                  --admis_kind geometry \
+                  --construct_algorithm miro \
+                  --add_diag 1e-9 \
+                  --perturbation $pert \
+                  --use_nested_basis
 done
