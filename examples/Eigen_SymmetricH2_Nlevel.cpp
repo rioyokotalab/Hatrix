@@ -407,7 +407,7 @@ int64_t SymmetricH2::get_level_max_nblocks(const char nearfar,
   for (int64_t level = level_begin; level <= level_end; level++) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
-      const int64_t num_dense   = is_near ? near_neighbors(node, level).size() : 0;
+      const int64_t num_dense   = (is_near &&  (level == height)) ? near_neighbors(node, level).size() : 0;
       const int64_t num_lowrank = is_far  ? far_neighbors(node, level).size()  : 0;
       csp = std::max(csp, num_dense + num_lowrank);
     }
@@ -1194,7 +1194,7 @@ int main(int argc, char ** argv) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
               << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
-              << ",csp_all,csp_dense,csp_lowrank,construct_min_rank_leaf,construct_max_rank_leaf"
+              << ",csp,csp_dense,construct_min_rank_leaf,construct_max_rank_leaf"
               << ",dense_eig_time"
               << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
@@ -1290,9 +1290,8 @@ int main(int argc, char ** argv) {
   const auto construct_mem = A.memory_usage();
   const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
   const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
-  const auto csp_all = A.get_level_max_nblocks('a', 1, A.height);
-  const auto csp_dense = A.get_level_max_nblocks('n', 1, A.height);
-  const auto csp_lowrank = A.get_level_max_nblocks('f', 1, A.height);
+  const auto csp = A.get_level_max_nblocks('a', 1, A.height);
+  const auto csp_dense = A.get_level_max_nblocks('n', A.height, A.height);
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -1318,9 +1317,8 @@ int main(int argc, char ** argv) {
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
             << std::endl
-            << "csp_all=" << csp_all
+            << "csp=" << csp
             << " csp_dense=" << csp_dense
-            << " csp_lowrank=" << csp_lowrank
             << " construct_min_rank_leaf=" << construct_min_rank_leaf
             << " construct_max_rank_leaf=" << construct_max_rank_leaf
             << std::endl;
@@ -1436,9 +1434,8 @@ int main(int argc, char ** argv) {
               << "," << construct_mem
               << "," << construct_time
               << "," << std::scientific << construct_error << std::defaultfloat
-              << "," << csp_all
+              << "," << csp
               << "," << csp_dense
-              << "," << csp_lowrank
               << "," << construct_min_rank_leaf
               << "," << construct_max_rank_leaf
               << "," << dense_eig_time
