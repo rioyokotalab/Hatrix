@@ -70,6 +70,7 @@ if(USE_CUDA)
 else()
   find_package(BLAS REQUIRED)
   find_package(LAPACK REQUIRED)
+  find_package(OpenMP REQUIRED)
   target_sources(Hatrix PRIVATE
     src/classes/IndexedMap.cpp
     src/classes/LowRank.cpp

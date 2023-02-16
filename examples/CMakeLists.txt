@@ -50,6 +50,7 @@ else()
     #Eigen_SymmetricH2_Nlevel
     UMV_H2_Nlevel
     2x2_BlockDense
+    NxN_BlockDense
     #Construction_SymmetricH2_Nlevel_with_sampling
   )
 endif()
