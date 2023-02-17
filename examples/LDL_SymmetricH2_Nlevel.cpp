@@ -189,20 +189,33 @@ SymmetricH2::svd_like_compression(Matrix& A) const {
   int64_t rank;
 #ifdef USE_QR_COMPRESSION
   Matrix R;
-  const double qr_tol = accuracy * 1e-1;
-  std::tie(Ui, R, rank) = error_pivoted_qr(A, qr_tol, use_rel_acc, false);
+  if (accuracy > 0.) {
+    const double qr_tol = accuracy * 1e-1;
+    std::tie(Ui, R, rank) = error_pivoted_qr(A, qr_tol, use_rel_acc, false);
+  }
+  else {
+    rank = max_rank;
+    std::tie(Ui, R) = truncated_pivoted_qr(A, rank);
+  }
   if (R.rows > R.cols) {
-    R.shrink(R.cols, R.cols);  // Ignore zero entries below
+    R.shrink(R.cols, R.cols);  // Ignore zero entries below diagonal
   }
   Si = Matrix(R.rows, R.rows);
   Vi = Matrix(R.rows, R.cols);
   rq(R, Si, Vi);
 #else
-  std::tie(Ui, Si, Vi, rank) = error_svd(A, accuracy, use_rel_acc, false);
+  if (accuracy > 0.) {
+    std::tie(Ui, Si, Vi, rank) = error_svd(A, accuracy, use_rel_acc, false);
+  }
+  else {
+    rank = max_rank;
+    double _;
+    std::tie(Ui, Si, Vi, _) = truncated_svd(A, rank);
+  }
 #endif
 
   // Fixed-accuracy with bounded rank
-  rank = max_rank > 0 ? std::min(max_rank, rank) : rank;
+  rank = (accuracy > 0. && max_rank > 0) ? std::min(max_rank, rank) : rank;
 
   return std::make_tuple(std::move(Ui), std::move(Si), std::move(Vi), std::move(rank));
 }
@@ -1341,6 +1354,7 @@ Matrix body_neutral_charge(const Domain& domain,
 int main(int argc, char ** argv) {
   int64_t N = argc > 1 ? atol(argv[1]) : 256;
   int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
+  // accuracy = 0 means fixed rank
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-8;
   // Use relative or absolute error threshold for LRA
   const bool use_rel_acc = argc > 4 ? (atol(argv[4]) == 1) : false;

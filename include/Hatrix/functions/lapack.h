@@ -144,7 +144,7 @@ std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double error, b
 
 std::vector<double> get_eigenvalues(const Matrix& A);
 
-std::tuple<Matrix, Matrix>
-truncated_pivoted_qr(Matrix& A, const int64_t rank);
+std::tuple<int64_t, std::vector<int64_t>, std::vector<double>> partial_pivoted_qr(Matrix& A, const int64_t rank);
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, const int64_t rank);
 
 }  // namespace Hatrix

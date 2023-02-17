@@ -723,7 +723,7 @@ std::vector<double> get_eigenvalues(const Matrix& A) {
   return eigv;
 }
 
-  std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>
+std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>
 partial_pivoted_qr(Matrix& A, const int64_t rank) {
   assert(rank <= A.min_dim());
   // Pointer aliases
@@ -813,8 +813,7 @@ partial_pivoted_qr(Matrix& A, const int64_t rank) {
   return std::make_tuple(std::move(r), std::move(ipiv), std::move(tau));
 }
 
-std::tuple<Matrix, Matrix>
-truncated_pivoted_qr(Matrix& A, const int64_t rank) {
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, const int64_t rank) {
   const int64_t m = A.rows;
   const int64_t n = A.cols;
   int64_t r;
