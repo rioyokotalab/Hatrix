@@ -1041,24 +1041,24 @@ class Domain {
     }
   }
 
-  void read_bodies_ELSES(const std::string& file_name) {
+  void read_bodies_ELSES(const std::string& file_name,
+                         const int64_t num_electrons_per_atom = 4) {
     std::ifstream file;
     file.open(file_name);
-    int64_t num_particles;
-    file >> num_particles;
-    constexpr int64_t num_atoms_per_particle = 4;
+    int64_t num_atoms;
+    file >> num_atoms;
     ndim = 3;
-    N = num_particles * num_atoms_per_particle;
+    N = num_atoms * num_electrons_per_atom;
 
     file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore the rest of line after num_particles
     file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore line before atom positions
     int64_t body_idx = 0;
-    for(int64_t i = 0; i < num_particles; i++) {
+    for(int64_t i = 0; i < num_atoms; i++) {
       std::string pref;
       double x, y, z;
       file >> pref >> x >> y >> z;
       file.ignore(1, '\n'); //Ignore newline
-      for (int64_t k = 0; k < num_atoms_per_particle; k++) {
+      for (int64_t k = 0; k < num_electrons_per_atom; k++) {
         bodies.emplace_back(Body(x, y, z, (double)body_idx));
         body_idx++;
       }
@@ -1141,17 +1141,16 @@ class Domain {
     }
   }
 
-  void sort_bodies_ELSES() {
+  void sort_bodies_ELSES(const int64_t molecule_size = 240) {
     // Calculate root level bounding box
     calculate_bounding_box();
-    // Every consecutive 240 bodies (atoms) comprise a molecule
-    const int64_t atom_leaf_size = 240;
-    const auto nmols = N / atom_leaf_size;
+    // Every leaf_size consecutive electrons comprise a molecule
+    const auto nmols = N / molecule_size;
     std::vector<Body> mol_centers(nmols);  // Center of each molecule
     for (int64_t i = 0; i < nmols; i++) {
       Cell cell;
-      cell.body_offset = i * atom_leaf_size;
-      cell.nbodies = atom_leaf_size;
+      cell.body_offset = i * molecule_size;
+      cell.nbodies = molecule_size;
       for (int64_t axis = 0; axis < ndim; axis++) {
         const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
         const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
@@ -1162,9 +1161,9 @@ class Domain {
     // Partition until each box contain only one molecule
     std::vector<Body> buffer = mol_centers;
     std::vector<Cell> mol_cells(1);
-    const int64_t mol_leaf_size = 1;
-    mol_cells.reserve(nmols*(32/mol_leaf_size+1));
-    build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0], mol_cells, mol_leaf_size, X0, R0);
+    const int64_t leaf_box_size = 1;
+    mol_cells.reserve(nmols*(32/leaf_box_size+1));
+    build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0], mol_cells, leaf_box_size, X0, R0);
     int64_t max_level = 0;
     for (int64_t i = 0; i < mol_cells.size(); i++) {
       if (mol_cells[i].nchilds == 0) {
@@ -1192,17 +1191,17 @@ class Domain {
               [](const Body& a, const Body& b) {
                 return a.key < b.key;
               });
-    // Sort bodies based on molecule hilbert index
+    // Sort electrons based on molecule hilbert index
     std::vector<Body> temp = bodies;
     int64_t count = 0;
     for (int64_t i = 0; i < nmols; i++) {
       const auto& mol_i = mol_centers_sorted[i];
-      const auto srcBegin = (int64_t)mol_i.value * atom_leaf_size;
+      const auto srcBegin = (int64_t)mol_i.value * molecule_size;
       const auto dstBegin = count;
-      for (int64_t k = 0; k < atom_leaf_size; k++) {
+      for (int64_t k = 0; k < molecule_size; k++) {
         bodies[dstBegin + k] = temp[srcBegin + k];
       }
-      count += atom_leaf_size;
+      count += molecule_size;
     }
   }
 
@@ -1251,9 +1250,8 @@ class Domain {
           const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
           const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
           const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
-          const auto diam = Xmax - Xmin;
           cell.center[axis] = (Xmin + Xmax) / 2.;  // Midpoint
-          cell.radius[axis] = (diam == 0. && Xmin == 0.) ? 0. : (1.e-8 + diam / 2.);
+          cell.radius[axis] = (Xmax - Xmin) / 2.;
         }
       }
     }
