@@ -414,13 +414,13 @@ int64_t SymmetricH2::get_basis_max_rank(const int64_t level_begin,
 int64_t SymmetricH2::get_level_max_nblocks(const char nearfar,
                                            const int64_t level_begin, const int64_t level_end) const {
   int64_t csp = 0;
-  bool is_near = (nearfar == 'n' || nearfar == 'a');
-  bool is_far = (nearfar == 'f' || nearfar == 'a');
+  const bool count_far = (nearfar == 'f' || nearfar == 'a');
   for (int64_t level = level_begin; level <= level_end; level++) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
-      const int64_t num_dense   = (is_near &&  (level == height)) ? near_neighbors(node, level).size() : 0;
-      const int64_t num_lowrank = is_far  ? far_neighbors(node, level).size()  : 0;
+      const bool count_near = (nearfar == 'a') ? (level == height) : (nearfar == 'n');
+      const int64_t num_dense   = count_near ? near_neighbors(node, level).size() : 0;
+      const int64_t num_lowrank = count_far  ? far_neighbors(node, level).size()  : 0;
       csp = std::max(csp, num_dense + num_lowrank);
     }
   }
@@ -1454,7 +1454,7 @@ int main(int argc, char ** argv) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,admis_variant,matrix_type,kernel,geometry"
               << ",height,min_adm_level,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
-              << ",csp,csp_dense,construct_min_rank_leaf,construct_max_rank_leaf"
+              << ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,construct_min_rank_leaf,construct_max_rank_leaf"
               << ",factor_min_rank,factor_max_rank,factor_mem,factor_fp_ops,factor_time"
               << ",solve_time,solve_error"
               << std::endl;
@@ -1556,7 +1556,9 @@ int main(int argc, char ** argv) {
   const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
   const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
   const auto csp = A.get_level_max_nblocks('a', 1, A.height);
-  const auto csp_dense = A.get_level_max_nblocks('n', A.height, A.height);
+  const auto csp_dense_leaf = A.get_level_max_nblocks('n', A.height, A.height);
+  const auto csp_dense_all = A.get_level_max_nblocks('n', 1, A.height);
+  const auto csp_lr_all = A.get_level_max_nblocks('f', 1, A.height);
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -1584,7 +1586,9 @@ int main(int argc, char ** argv) {
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
             << std::endl
             << "csp=" << csp
-            << " csp_dense=" << csp_dense
+            << " csp_dense_leaf=" << csp_dense_leaf
+            << " csp_dense_all=" << csp_dense_all
+            << " csp_lr_all=" << csp_lr_all
             << " construct_min_rank_leaf=" << construct_min_rank_leaf
             << " construct_max_rank_leaf=" << construct_max_rank_leaf
             << std::endl;
@@ -1651,7 +1655,9 @@ int main(int argc, char ** argv) {
             << "," << construct_time
             << "," << std::scientific << construct_error << std::defaultfloat
             << "," << csp
-            << "," << csp_dense
+            << "," << csp_dense_leaf
+            << "," << csp_dense_all
+            << "," << csp_lr_all
             << "," << construct_min_rank_leaf
             << "," << construct_max_rank_leaf
             << "," << factor_min_rank
