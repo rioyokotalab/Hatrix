@@ -393,6 +393,7 @@ class Domain {
 
  private:
   void cardinal_recursive_bisection(
+      std::vector<Body>& bodies, std::vector<Cell>& cells,
       const int64_t left, const int64_t right, const int64_t leaf_size,
       const int64_t level, const int64_t block_index) {
     // Initialize cell
@@ -434,9 +435,9 @@ class Domain {
     cell.nchilds = 2;
     cells[cell.child].parent = cell_idx;
     cells[cell.child + 1].parent = cell_idx;
-    cardinal_recursive_bisection(left, mid, leaf_size,
+    cardinal_recursive_bisection(bodies, cells, left, mid, leaf_size,
                                  level + 1, block_index << 1);
-    cardinal_recursive_bisection(mid, right, leaf_size,
+    cardinal_recursive_bisection(bodies, cells, mid, right, leaf_size,
                                  level + 1, (block_index << 1) + 1);
   }
 
@@ -552,7 +553,7 @@ class Domain {
     // Initialize empty cells
     cells.resize(ncells);
     // Partition
-    cardinal_recursive_bisection(0, N, leaf_size, 0, 0);
+    cardinal_recursive_bisection(bodies, cells, 0, N, leaf_size, 0, 0);
   }
 
   void build_interactions(const double theta, const int64_t admis_variant = 0) {
