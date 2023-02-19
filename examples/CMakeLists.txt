@@ -51,6 +51,7 @@ else()
     UMV_H2_Nlevel
     2x2_BlockDense
     NxN_BlockDense
+    NxN_BLR
     #Construction_SymmetricH2_Nlevel_with_sampling
   )
 endif()

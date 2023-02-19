@@ -14,20 +14,6 @@ double get_time() {
 
 namespace Hatrix {
 
-
-
-  template <typename DT>
-  RowColLevelMap<bool> create_admissibility(int leaf_size, int num_blocks) {
-    RowColLevelMap<bool> map;
-
-    for (int i=0; i<num_blocks; ++i) {
-      for (int j=0; j<num_blocks; ++j) {
-        map.insert(i, j, 0, i!=j);
-      }
-    }
-    return map;
-  }
-
   template <typename DT>
   RowColLevelMap<Matrix<DT>> create_map(const Matrix<DT>& A, int leaf_size, int num_blocks) {
     RowColLevelMap<Matrix<DT>> map;

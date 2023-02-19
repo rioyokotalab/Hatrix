@@ -10,6 +10,8 @@
 #endif
 
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/classes/LowRank.h"
+#include "Hatrix/functions/arithmetics.h"
 
 namespace Hatrix {
 
@@ -48,6 +50,49 @@ void matmul(const Matrix<double>& A, const Matrix<double>& B, Matrix<double>& C,
               &A, A.stride, &B, B.stride, beta,
               &C, C.stride);
 };
+
+template <typename DT>
+void matmul(const LowRank<DT>& A, const LowRank<DT>& B, Matrix<DT>& C, bool transA,
+            bool transB, double alpha, double beta) {
+  // LR LR D
+  // TODO Many optimizations possible
+  // Even in non-shared case, UxS, SxV may be optimized across blocks!
+  Matrix<DT> Abasis_inner_matrices = matmul(
+    transA ? A.V : A.U, matmul(
+      matmul(
+        A.S, matmul(transA ? A.U : A.V, transB ? B.V : B.U, transA, transB, alpha),
+        transA, false
+      ), B.S,false, transB
+    ), transA, false
+  );
+  matmul(Abasis_inner_matrices, transB ? B.U : B.V, C, false, transB, 1, beta);
+}
+
+template <typename DT>
+void matmul(const LowRank<DT>& A, const LowRank<DT>& B, LowRank<DT>& C, bool transA,
+            bool transB, double alpha, double beta) {
+  // LR LR LR
+  // TODO Not implemented
+  if (transA || transB) std::abort();
+  assert(A.rank == B.rank);
+  Matrix<DT> SxVxU = matmul(A.S, matmul(A.V, B.U, transA, transB, alpha));
+  Matrix<DT> SxVxUxS = matmul(SxVxU, B.S);
+  C.S *= (DT) beta;
+  LowRank<DT> AxB(A.U, SxVxUxS, B.V, false);
+
+  C += AxB;
+}
+
+template <typename DT>
+void matmul(const LowRank<DT>& A, const Matrix<DT>& B, Matrix<DT>& C, bool transA,
+            bool transB, double alpha, double beta) {
+  // LR D D
+  Matrix<DT> AS_basis_B = matmul(
+    A.S, matmul(transA ? A.U : A.V, B, transA, transB, alpha),
+    transA, false
+  );
+  matmul(transA ? A.V : A.U, AS_basis_B, C, transA, false, 1, beta);
+}
 
 template <typename DT>
 Matrix<DT> matmul(const Matrix<DT>& A, const Matrix<DT>& B, bool transA, bool transB,
@@ -220,6 +265,19 @@ template void matmul(const Matrix<double>& A, const Matrix<double>& B, Matrix<do
             bool transB, double alpha, double beta);
 template Matrix<double> matmul(const Matrix<double>& A, const Matrix<double>& B, bool transA,
               bool transB, double alpha);
+
+template void matmul(const LowRank<float>& A, const Matrix<float>& B, Matrix<float>& C, bool transA,
+            bool transB, double alpha, double beta);
+template void matmul(const LowRank<float>& A, const LowRank<float>& B, Matrix<float>& C, bool transA,
+            bool transB, double alpha, double beta);
+template void matmul(const LowRank<float>& A, const LowRank<float>& B, LowRank<float>& C, bool transA,
+            bool transB, double alpha, double beta);
+template void matmul(const LowRank<double>& A, const Matrix<double>& B, Matrix<double>& C, bool transA,
+            bool transB, double alpha, double beta);
+template void matmul(const LowRank<double>& A, const LowRank<double>& B, Matrix<double>& C, bool transA,
+            bool transB, double alpha, double beta);
+template void matmul(const LowRank<double>& A, const LowRank<double>& B, LowRank<double>& C, bool transA,
+            bool transB, double alpha, double beta);
 
 template void syrk(const Matrix<float>& A, Matrix<float>& C, Mode uplo, bool transA, double alpha,
             double beta);

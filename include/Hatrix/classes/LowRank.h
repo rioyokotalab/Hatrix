@@ -15,13 +15,13 @@ class LowRank {
   int64_t cols = 0;
   int64_t rank = 0;
   DT error = 0.0;
+  Matrix<DT> U, S, V;
 
   // Shows whether a Matrix is a view of an object or the actual copy.
   // TODO can a LowRank matrix be a view?
   //bool is_view = false;
 
- private:
-  Matrix<DT> U, S, V;
+ 
 
  public:
   LowRank() = default;
@@ -37,15 +37,21 @@ class LowRank {
   // https://stackoverflow.com/questions/40457302/c-vector-emplace-back-calls-copy-constructor
   //Matrix(const Matrix& A, bool copy);
 
+  LowRank(const Matrix<DT>& U, const Matrix<DT>& S, const Matrix<DT>& V, bool copy=false);
+
+  LowRank(Matrix<DT>&& U, Matrix<DT>&& S, Matrix<DT>&& V);
+
   LowRank& operator=(const LowRank& A) = default;
 
   LowRank& operator=(LowRank&& A) = default;
 
   LowRank(LowRank&& A) = default;
 
-  LowRank(Matrix<DT>& A, int64_t rank);
+  LowRank(const Matrix<DT>& A, int64_t rank);
 
   const DT& operator()(int64_t i, int64_t j) const;
+
+  Matrix<DT> make_dense() const;
 
   // WARNING: does not deallocate the extra data!
   // TODO might be useful

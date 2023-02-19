@@ -1,5 +1,6 @@
 #pragma once
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/classes/LowRank.h"
 
 namespace Hatrix {
 
@@ -7,6 +8,9 @@ template <typename DT>
 Matrix<DT>& operator+=(Matrix<DT>& A, const Matrix<DT>& B);
 template <typename DT>
 Matrix<DT> operator+(const Matrix<DT>& A, const Matrix<DT>& B);
+
+template <typename DT>
+LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B);
 
 template <typename DT>
 Matrix<DT>& operator-=(Matrix<DT>& A, const Matrix<DT>& B);

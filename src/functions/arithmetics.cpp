@@ -6,7 +6,9 @@
 #include <iostream>
 
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/classes/LowRank.h"
 #include "Hatrix/functions/blas.h"
+#include "Hatrix/functions/lapack.h"
 
 namespace Hatrix {
 
@@ -17,6 +19,69 @@ Matrix<DT>& operator+=(Matrix<DT>& A, const Matrix<DT>& B) {
   for (int64_t j = 0; j < A.cols; ++j)
     for (int64_t i = 0; i < A.rows; ++i) A(i, j) += B(i, j);
 
+  return A;
+}
+
+template <typename DT>
+LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B) {
+ 
+  // Merge Column Basis
+  assert(A.U.rows == B.U.rows);
+  int64_t rank = A.U.cols;
+  assert(rank == B.U.cols);
+
+  Matrix<DT> InnerU(rank+rank, rank);
+  std::vector<Matrix<DT>> InnerH = InnerU.split(2, 1);
+  matmul(A.U, B.U, InnerH[0], true, false, 1, 0); 
+  
+  Matrix<DT> Bu_AuAtBu(B.U);
+  matmul(A.U, InnerH[0], Bu_AuAtBu, false, false, -1, 1);
+  Matrix<DT> OuterU_1(A.U.rows, rank);
+  qr(Bu_AuAtBu, OuterU_1, InnerH[1]); 
+
+  Matrix<DT> OuterU_0 = std::move(A.U);
+ 
+  // Merge row basis
+  assert(A.V.cols == B.V.cols);
+  rank = A.V.rows;
+  assert(rank == B.V.rows);
+  Matrix<DT> InnerV(rank, rank+rank);
+  InnerH = InnerV.split(1,2);
+  matmul(B.V, A.V, InnerH[0], false, true, 1, 0);
+  Matrix<DT> Bv_BvAvtAv(B.V);
+  matmul(InnerH[0], A.V, Bv_BvAvtAv, false, false, -1, 1);
+  Matrix<DT> OuterV_1(rank, A.V.cols);
+  rq(Bv_BvAvtAv, InnerH[1], OuterV_1);
+
+  Matrix<DT> OuterV_0 = std::move(A.V);
+ 
+  // Merge S
+  rank = A.S.rows;
+  assert(rank == A.S.cols);
+  Matrix<DT> InnerUBs = matmul(InnerU, B.S);
+  Matrix<DT> M = matmul(InnerUBs, InnerV);
+  std::vector<Matrix<DT>> MH = M.split(2,2);
+  MH[0] += A.S;
+  Matrix<DT> Uhat(M.rows, M.rows);
+  Matrix<DT> Shat(M.rows, M.cols);
+  Matrix<DT> Vhat(M.cols, M.cols);
+  svd(M, Uhat, Shat, Vhat);
+  Uhat.shrink(Uhat.rows, rank);
+  Shat.shrink(rank, rank);
+  Vhat.shrink(rank, Vhat.cols);
+
+
+  A.U = Matrix<DT>(A.rows, rank);
+  A.V = Matrix<DT>(rank, A.cols);
+  A.S = std::move(Shat);
+  std::vector<Matrix<DT>> Uhat_split = Uhat.split(2,1);
+  matmul(OuterU_0, Uhat_split[0], A.U);
+  matmul(OuterU_1, Uhat_split[1], A.U);
+
+  std::vector<Matrix<DT>> Vhat_split = Vhat.split(1,2);
+  matmul(Vhat_split[0], OuterV_0, A.V);
+  matmul(Vhat_split[1], OuterV_1, A.V);
+  
   return A;
 }
 
@@ -136,6 +201,9 @@ template Matrix<float>& operator+=(Matrix<float>& A, const Matrix<float>& B);
 template Matrix<float> operator+(const Matrix<float>& A, const Matrix<float>& B);
 template Matrix<double>& operator+=(Matrix<double>& A, const Matrix<double>& B);
 template Matrix<double> operator+(const Matrix<double>& A, const Matrix<double>& B);
+
+template LowRank<float>& operator+=(LowRank<float>& A, const LowRank<float>& B);
+template LowRank<double>& operator+=(LowRank<double>& A, const LowRank<double>& B);
 
 template Matrix<float>& operator-=(Matrix<float>& A, const Matrix<float>& B);
 template Matrix<float> operator-(const Matrix<float>& A, const Matrix<float>& B);

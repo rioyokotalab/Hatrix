@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "Hatrix/classes/Matrix.h"
+#include "Hatrix/classes/LowRank.h"
 
 namespace std {
 
