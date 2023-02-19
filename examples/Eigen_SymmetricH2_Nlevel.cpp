@@ -67,6 +67,7 @@ class SymmetricH2 {
   double admis;
   int64_t matrix_type;
   int64_t height;
+  int64_t min_adm_level;
   RowLevelMap U;
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
@@ -131,6 +132,7 @@ class SymmetricH2 {
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
+  min_adm_level = -1;
   if (matrix_type == H2_MATRIX) {
     height = domain.tree_height;
     level_blocks.assign(height + 1, 0);
@@ -151,6 +153,9 @@ void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
         const auto j_far = domain.cells[far_idx].block_index;
         is_admissible.insert(i, j_far, level, true);
         far_neighbors(i, level).push_back(j_far);
+      }
+      if ((min_adm_level == -1) && (far_neighbors(i, level).size() > 0)) {
+        min_adm_level = level;
       }
     }
   }
@@ -180,6 +185,7 @@ void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
         }
       }
     }
+    min_adm_level = height;
   }
 }
 
@@ -402,13 +408,13 @@ int64_t SymmetricH2::get_basis_max_rank(const int64_t level_begin,
 int64_t SymmetricH2::get_level_max_nblocks(const char nearfar,
                                            const int64_t level_begin, const int64_t level_end) const {
   int64_t csp = 0;
-  bool is_near = (nearfar == 'n' || nearfar == 'a');
-  bool is_far = (nearfar == 'f' || nearfar == 'a');
+  const bool count_far = (nearfar == 'f' || nearfar == 'a');
   for (int64_t level = level_begin; level <= level_end; level++) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
-      const int64_t num_dense   = (is_near &&  (level == height)) ? near_neighbors(node, level).size() : 0;
-      const int64_t num_lowrank = is_far  ? far_neighbors(node, level).size()  : 0;
+      const bool count_near = (nearfar == 'a') ? (level == height) : (nearfar == 'n');
+      const int64_t num_dense   = count_near ? near_neighbors(node, level).size() : 0;
+      const int64_t num_lowrank = count_far  ? far_neighbors(node, level).size()  : 0;
       csp = std::max(csp, num_dense + num_lowrank);
     }
   }
@@ -895,13 +901,13 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
 void SymmetricH2::factorize(const Domain& domain) {
   // Initialize fill_in_neighbors array
-  for (int64_t level = height; level > 0; level--) {
+  for (int64_t level = height; level >= min_adm_level; level--) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
       fill_in_neighbors.insert(node, level, std::vector<int64_t>());
     }
   }
-  for (int64_t level = height; level > 0; level--) {
+  for (int64_t level = height; level >= min_adm_level; level--) {
     RowMap<Matrix> r;
     const int64_t num_nodes = level_blocks[level];
     // Make sure all cluster bases exist and none of them is full-rank
@@ -929,7 +935,7 @@ void SymmetricH2::factorize(const Domain& domain) {
     const int64_t parent_level = level - 1;
     const int64_t parent_num_nodes = level_blocks[parent_level];
     // Propagate fill-in to upper level admissible blocks (if any)
-    if (parent_level > 0) {
+    if (parent_level >= min_adm_level) {
       // Mark parent node that has fill-in coming from the current level
       RowMap<std::set<int64_t>> parent_fill_in_neighbors;
       for (int64_t i = 0; i < parent_num_nodes; i++) {
@@ -1058,10 +1064,35 @@ void SymmetricH2::factorize(const Domain& domain) {
         D.insert(i, j, parent_level, std::move(D_unelim));
       }
     }
-  } // for (int64_t level = height; level > 0; level--)
+  } // for (int64_t level = height; level >= min_adm_level; level--)
 
-  // Factorize remaining root level
-  ldl(D(0, 0, 0));
+  // Factorize remaining blocks as block dense matrix
+  const auto level = min_adm_level - 1;
+  const auto num_nodes = level_blocks[level];
+  for (int64_t k = 0; k < num_nodes; k++) {
+    ldl(D(k, k, level));
+    // Lower elimination
+    #pragma omp parallel for
+    for (int64_t i = k + 1; i < num_nodes; i++) {
+      solve_triangular(D(k, k, level), D(i, k, level), Hatrix::Right, Hatrix::Lower, true, true);
+      solve_diagonal(D(k, k, level), D(i, k, level), Hatrix::Right);
+    }
+    // Right elimination
+    #pragma omp parallel for
+    for (int64_t j = k + 1; j < num_nodes; j++) {
+      solve_triangular(D(k, k, level), D(k, j, level), Hatrix::Left, Hatrix::Lower, true, false);
+      solve_diagonal(D(k, k, level), D(k, j, level), Hatrix::Left);
+    }
+    // Schur's complement
+    #pragma omp parallel for collapse(2)
+    for (int64_t i = k + 1; i < num_nodes; i++) {
+      for (int64_t j = k + 1; j < num_nodes; j++) {
+        Matrix Dik(D(i, k, level), true);  // Deep-copy
+        column_scale(Dik, D(k, k, level));  // LD
+        matmul(Dik, D(k, j, level), D(i, j, level), false, false, -1, 1);
+      }
+    }
+  }
 }
 
 std::tuple<int64_t, int64_t, int64_t, int64_t>
@@ -1077,29 +1108,33 @@ SymmetricH2::inertia(const Domain& domain,
   A_shifted.factorize(domain);
   // Count negative entries in D
   int64_t negative_elements_count = 0;
-  for(int64_t level = height; level >= 0; level--) {
+  for(int64_t level = height; level >= min_adm_level; level--) {
     int64_t num_nodes = level_blocks[level];
     for(int64_t node = 0; node < num_nodes; node++) {
-      if(level == 0) {
-        const Matrix& D_lambda = A_shifted.D(node, node, level);
-        for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
-          negative_elements_count += (D_lambda(i, i) < 0 ? 1 : 0);
-          if(std::isnan(D_lambda(i, i)) || std::abs(D_lambda(i, i)) < EPS) singular = true;
-        }
-      }
-      else {
-        const Matrix& D_node = A_shifted.D(node, node, level);
-        const auto rank = A_shifted.U(node, level).cols;
-        const auto D_node_splits = D_node.split(vec{D_node.rows - rank},
-                                                vec{D_node.cols - rank});
-        const Matrix& D_lambda = D_node_splits[0];
-        for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
-          negative_elements_count += (D_lambda(i, i) < 0 ? 1 : 0);
-          if(std::isnan(D_lambda(i, i)) || std::abs(D_lambda(i, i)) < EPS) singular = true;
-        }
+      const Matrix& D_node = A_shifted.D(node, node, level);
+      const auto rank = A_shifted.U(node, level).cols;
+      const auto D_node_splits = D_node.split(vec{D_node.rows - rank},
+                                              vec{D_node.cols - rank});
+      const Matrix& D_lambda = D_node_splits[0];
+      for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
+        negative_elements_count += (D_lambda(i, i) < 0 ? 1 : 0);
+        if(std::isnan(D_lambda(i, i)) || std::abs(D_lambda(i, i)) < EPS) singular = true;
       }
     }
   }
+  // Remaining blocks that are factorized as block-dense matrix
+  {
+    const auto level = min_adm_level - 1;
+    const auto num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      const Matrix& D_lambda = A_shifted.D(node, node, level);
+      for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
+        negative_elements_count += (D_lambda(i, i) < 0 ? 1 : 0);
+        if(std::isnan(D_lambda(i, i)) || std::abs(D_lambda(i, i)) < EPS) singular = true;
+      }
+    }
+  }
+
   const auto ldl_min_rank = A_shifted.get_basis_min_rank(1, height);
   const auto ldl_max_rank = A_shifted.get_basis_max_rank(1, height);
   const auto ldl_mem = A_shifted.memory_usage();
@@ -1194,7 +1229,7 @@ int main(int argc, char ** argv) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
               << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
-              << ",csp,csp_dense,construct_min_rank_leaf,construct_max_rank_leaf"
+              << ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,construct_min_rank_leaf,construct_max_rank_leaf"
               << ",dense_eig_time"
               << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
@@ -1262,16 +1297,22 @@ int main(int argc, char ** argv) {
   // Pre-processing step for ELSES geometry
   const bool is_non_synthetic = (geom_type == 3);
   if (is_non_synthetic) {
+    const int64_t num_atoms_per_molecule = 60;
+    const int64_t num_electrons_per_atom = kernel_type == 2 ? 4 : 1;
+    const int64_t molecule_size = num_atoms_per_molecule * num_electrons_per_atom;
     assert(file_name.length() > 0);
-    domain.read_bodies_ELSES(file_name + ".xyz");
+    assert(leaf_size == molecule_size);
+    domain.read_bodies_ELSES(file_name + ".xyz", num_electrons_per_atom);
     assert(N == domain.N);
 
     if (sort_bodies) {
-      domain.sort_bodies_ELSES();
+      domain.sort_bodies_ELSES(leaf_size);
       geom_name = geom_name + "_sorted";
     }
     domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
-    domain.read_p2p_matrix_ELSES(file_name + ".dat");
+    if (kernel_type == 2) {
+      domain.read_p2p_matrix_ELSES(file_name + ".dat");
+    }
   }
   else {
     domain.build_tree(leaf_size);
@@ -1291,7 +1332,9 @@ int main(int argc, char ** argv) {
   const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
   const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
   const auto csp = A.get_level_max_nblocks('a', 1, A.height);
-  const auto csp_dense = A.get_level_max_nblocks('n', A.height, A.height);
+  const auto csp_dense_leaf = A.get_level_max_nblocks('n', A.height, A.height);
+  const auto csp_dense_all = A.get_level_max_nblocks('n', 1, A.height);
+  const auto csp_lr_all = A.get_level_max_nblocks('f', 1, A.height);
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -1318,7 +1361,9 @@ int main(int argc, char ** argv) {
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
             << std::endl
             << "csp=" << csp
-            << " csp_dense=" << csp_dense
+            << " csp_dense_leaf=" << csp_dense_leaf
+            << " csp_dense_all=" << csp_dense_all
+            << " csp_lr_all=" << csp_lr_all
             << " construct_min_rank_leaf=" << construct_min_rank_leaf
             << " construct_max_rank_leaf=" << construct_max_rank_leaf
             << std::endl;
@@ -1435,7 +1480,9 @@ int main(int argc, char ** argv) {
               << "," << construct_time
               << "," << std::scientific << construct_error << std::defaultfloat
               << "," << csp
-              << "," << csp_dense
+              << "," << csp_dense_leaf
+              << "," << csp_dense_all
+              << "," << csp_lr_all
               << "," << construct_min_rank_leaf
               << "," << construct_max_rank_leaf
               << "," << dense_eig_time
