@@ -23,6 +23,12 @@ Matrix<DT>& operator+=(Matrix<DT>& A, const Matrix<DT>& B) {
 }
 
 template <typename DT>
+Matrix<DT>& operator+=(Matrix<DT>& A, const LowRank<DT>& B) {
+  A += B.make_dense();
+  return A;
+}
+
+template <typename DT>
 LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B) {
  
   // Merge Column Basis
@@ -201,6 +207,10 @@ template Matrix<float>& operator+=(Matrix<float>& A, const Matrix<float>& B);
 template Matrix<float> operator+(const Matrix<float>& A, const Matrix<float>& B);
 template Matrix<double>& operator+=(Matrix<double>& A, const Matrix<double>& B);
 template Matrix<double> operator+(const Matrix<double>& A, const Matrix<double>& B);
+
+template Matrix<float>& operator+=(Matrix<float>& A, const LowRank<float>& B);
+template Matrix<double>& operator+=(Matrix<double>& A, const LowRank<double>& B);
+
 
 template LowRank<float>& operator+=(LowRank<float>& A, const LowRank<float>& B);
 template LowRank<double>& operator+=(LowRank<double>& A, const LowRank<double>& B);

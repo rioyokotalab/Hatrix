@@ -128,9 +128,16 @@ namespace Hatrix {
         B_split = B.split(1, 2);
       }
       if (uplo == Hatrix::Upper) {
-        trsm<DT>(dense_map, lr_map, row+1, col+1, level+1, max_level, B_split[1], side, uplo);
-        matmul(lr_map(row, col+1, level+1), B_split[1], B_split[0], false, false, -1, 1);
+        //std::cout<<"TRSM on ("<<row+1<<","<<col+1<<","<<level+1<<")"<<std::endl;
         trsm<DT>(dense_map, lr_map, row, col, level+1, max_level, B_split[0], side, uplo);
+        //trsm<DT>(dense_map, lr_map, row+1, col+1, level+1, max_level, B_split[1], side, uplo);
+        //matmul(lr_map(row, col+1, level+1), B_split[1], B_split[0], false, false, -1, 1);
+        //std::cout<<"GEMM on ("<<row<<","<<col+1<<","<<level+1<<")"<<std::endl;
+        //matmul(B_split[1], lr_map(row, col+1, level+1), B_split[0], false, false, -1, 1);
+        matmul(B_split[0], lr_map(row, col+1, level+1), B_split[1], false, false, -1, 1);
+        //std::cout<<"TRSM on ("<<row<<","<<col<<","<<level+1<<")"<<std::endl;
+        trsm<DT>(dense_map, lr_map, row+1, col+1, level+1, max_level, B_split[1], side, uplo);
+        //trsm<DT>(dense_map, lr_map, row, col, level+1, max_level, B_split[0], side, uplo);
       } else {
         trsm<DT>(dense_map, lr_map, row, col, level+1, max_level, B_split[0], side, uplo);
         matmul(lr_map(row+1, col, level+1), B_split[0], B_split[1], false, false, -1, 1);
@@ -143,31 +150,95 @@ namespace Hatrix {
   }
 
   template <typename DT>
-  void getrf(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, int row, int col, int level, int max_level) {
+  void add(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level, LowRank<DT>& T) {
+    if (is_admissible(row, col, level)) {
+      lr_map(row, col, level) += T;
+      //std::cout<<"Add to low rank: "<<row<<","<<col<<","<<level<<std::endl;
+    } else {
+      if (level < max_level) {
+        int start = row * 2;
+        std::vector<Matrix<DT>> U_split = T.U.split(2, 1);
+        std::vector<Matrix<DT>> V_split = T.V.split(1, 2);
+        LowRank<DT> T0(U_split[0], T.S, V_split[0], false);
+        LowRank<DT> T1(U_split[0], T.S, V_split[1], false);
+        LowRank<DT> T2(U_split[1], T.S, V_split[0], false);
+        LowRank<DT> T3(U_split[1], T.S, V_split[1], false);
+        add(dense_map, lr_map, is_admissible, start, start, level+1, max_level, T0);
+        add(dense_map, lr_map, is_admissible, start, start+1, level+1, max_level, T1);
+        add(dense_map, lr_map, is_admissible, start+1, start, level+1, max_level, T2);
+        add(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level, T3);
+      } else { //this must be a dense block
+        dense_map(row, col, level) += T;
+        std::cout<<"Add to Dense: "<<row<<","<<col<<","<<level<<std::endl;
+      }
+    }
+  }
+
+  template <typename DT>
+  void matmul(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level) {
+    if (level < max_level) {
+      std::cout<<"Mul ("<<row<<","<<col-1<<","<<level<<") x ("<<row-1<<","<<col<<","<<level<<")"<<std::endl;
+      LowRank<DT> temp = matmul(lr_map(row, col-1, level), lr_map(row-1, col, level), false, false, -1);
+      add(dense_map, lr_map, is_admissible, row, col, level, max_level, temp);
+    } else {
+      std::cout<<"Mul (final) ("<<row<<","<<col-1<<","<<level<<") x ("<<row-1<<","<<col<<","<<level<<")"<<std::endl;
+      matmul(lr_map(row, col-1, level), lr_map(row-1, col, level), dense_map(row, col, level), false, false, -1, 1);
+    }
+  }
+
+  template <typename DT>
+  void getrf(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level) {
     int start = row * 2;
     if (level < max_level) {
-      //std::cout<<"GETRF on ("<<start<<","<<start<<","<<level<<")"<<std::endl;
-      getrf<DT>(dense_map, lr_map, start, start, level+1, max_level);
-      //std::cout<<"TRSM on ("<<start<<","<<start+1<<","<<level+1<<")"<<std::endl;
+      std::cout<<"GETRF on ("<<start<<","<<start<<","<<level<<")"<<std::endl;
+      getrf<DT>(dense_map, lr_map, is_admissible, start, start, level+1, max_level);
+      std::cout<<"TRSM on ("<<start<<","<<start+1<<","<<level+1<<")"<<std::endl;
       Hatrix::trsm<DT>(dense_map, lr_map, start, start, level+1, max_level, lr_map(start, start+1, level+1).U, Hatrix::Left, Hatrix::Lower);
       //Hatrix::solve_triangular(dense_map(start, start, level+1), lr_map(start, start+1, level+1).U, Hatrix::Left, Hatrix::Lower, true, false);
-      //std::cout<<"TRSM on ("<<start+1<<","<<start<<","<<level+1<<")"<<std::endl;
+      std::cout<<"TRSM on ("<<start+1<<","<<start<<","<<level+1<<")"<<std::endl;
       Hatrix::trsm<DT>(dense_map, lr_map, start, start, level+1, max_level, lr_map(start+1, start, level+1).V, Hatrix::Right, Hatrix::Upper);
       //Hatrix::solve_triangular(dense_map(start, start, level+1), lr_map(start+1, start, level+1).V, Hatrix::Right, Hatrix::Upper, false, false);
-      //std::cout<<"GEMM on ("<<start+1<<","<<start+1<<","<<level+1<<")"<<std::endl;
-      Hatrix::matmul(lr_map(start+1, start, level+1), lr_map(start, start+1, level+1), dense_map(start+1, start+1, level+1), false, false, -1, 1);
-      //std::cout<<"GETRF on ("<<start+1<<","<<start+1<<","<<level<<")"<<std::endl;
-      getrf<DT>(dense_map, lr_map, start+1, start+1, level+1, max_level);
+      std::cout<<"GEMM on ("<<start+1<<","<<start+1<<","<<level+1<<")"<<std::endl;
+      Hatrix::matmul(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level);
+      //Hatrix::matmul(lr_map(start+1, start, level+1), lr_map(start, start+1, level+1), dense_map(start+1, start+1, level+1), false, false, -1, 1);
+      std::cout<<"GETRF on ("<<start+1<<","<<start+1<<","<<level<<")"<<std::endl;
+      getrf<DT>(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level);
     } else {
-      //std::cout<<"GETRF on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
+      std::cout<<"GETRF(dense) on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
       Hatrix::lu_nopiv(dense_map(row,col,level));
+    }
+  }
+
+  template <typename DT>
+  void trsm_solve(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, int row, int col, int level, int max_level, Hatrix::Matrix<DT>& B, Hatrix::Side side, Hatrix::Mode uplo) {
+    int start = row * 2;
+    if (level < max_level) {
+      std::vector<Hatrix::Matrix<DT>> B_split;
+      if (side == Hatrix::Left) {
+        B_split = B.split(2, 1);
+      } else {
+        assert(false);
+      }
+      if (uplo == Hatrix::Upper) {
+        trsm_solve<DT>(dense_map, lr_map, row+1, col+1, level+1, max_level, B_split[1], side, uplo);
+        //matmul(lr_map(row, col+1, level+1), B_split[1], B_split[0], false, false, -1, 1);
+        matmul(lr_map(start, start+1, level+1), B_split[1], B_split[0], false, false, -1, 1);
+        trsm_solve<DT>(dense_map, lr_map, start, start, level+1, max_level, B_split[0], side, uplo);
+      } else {
+        trsm_solve<DT>(dense_map, lr_map, start, start, level+1, max_level, B_split[0], side, uplo);
+        matmul(lr_map(start+1, start, level+1), B_split[0], B_split[1], false, false, -1, 1);
+        trsm_solve<DT>(dense_map, lr_map, start+1, start+1, level+1, max_level, B_split[1], side, uplo);
+      }
+    } else {
+      bool diag = uplo == Hatrix::Lower;
+      Hatrix::solve_triangular(dense_map(row, col, level), B, side, uplo, diag, false);
     }
   }
 }
 
 int main() {
   int n = 1024;
-  int leaf_size = 512;
+  int leaf_size = 256;
   int num_blocks = n / leaf_size;
   int rank = 100;
 
@@ -190,7 +261,7 @@ int main() {
   Hatrix::RowColLevelMap<Hatrix::LowRank<double>> lr_map = Hatrix::create_lr_map(D, is_admissible, leaf_size, rank);
   double toc = get_time();
   std::cout<<"Time (Construction): "<<toc-tic<<std::endl;
- 
+
   /*for (int i=0; i<num_blocks; i++) {
     for (int j=0; j<num_blocks; j++) {
       map(i,j,0).print();
@@ -203,7 +274,7 @@ int main() {
   {
     #pragma omp single 
     {
-      Hatrix::getrf<double>(dense_map, lr_map, 0, 0, 0, max_level);
+      Hatrix::getrf<double>(dense_map, lr_map, is_admissible, 0, 0, 0, max_level);
     }
   }
   
@@ -217,8 +288,8 @@ int main() {
   {
     #pragma omp single 
     {
-      Hatrix::trsm<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Upper);
-      Hatrix::trsm<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Lower);
+      Hatrix::trsm_solve<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Upper);
+      Hatrix::trsm_solve<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Lower);
     }
   }
   //b.print();
@@ -232,6 +303,34 @@ int main() {
 
   double error = Hatrix::norm(b_copy - b);
   std::cout<<"Error: "<<error<<std::endl;
+
+  std::vector<Hatrix::Matrix<double>> lu_blocks1 = D_copy.split(2,2);
+  std::vector<Hatrix::Matrix<double>> lu_blocks2 = lu_blocks1[0].split(2,2);
+  error = Hatrix::norm(lu_blocks2[0] - dense_map(0,0,2));
+  std::cout<<"Error (0,0): "<<error<<std::endl;
+  error = Hatrix::norm(lu_blocks2[1] - lr_map(0,1,2).make_dense());
+  std::cout<<"Error (0,1): "<<error<<std::endl;
+  error = Hatrix::norm(lu_blocks2[2] - lr_map(1,0,2).make_dense());
+  std::cout<<"Error (1,0): "<<error<<std::endl;
+  error = Hatrix::norm(lu_blocks2[3] - dense_map(1,1,2));
+  std::cout<<"Error (1,1): "<<error<<std::endl;
+
+  error = Hatrix::norm(lu_blocks1[1] - lr_map(0,1,1).make_dense());
+  std::cout<<"Error (0,1): "<<error<<std::endl;
+  error = Hatrix::norm(lu_blocks1[2] - lr_map(1,0,1).make_dense());
+  std::cout<<"Error (1,0): "<<error<<std::endl;
+
+  lu_blocks2 = lu_blocks1[3].split(2,2);
+  error = Hatrix::norm(lu_blocks2[0] - dense_map(2,2,2));
+  std::cout<<"Error (0,0): "<<error<<std::endl;
+  error = Hatrix::norm(lu_blocks2[1] - lr_map(2,3,2).make_dense());
+  std::cout<<"Error (0,1): "<<error<<std::endl;
+  error = Hatrix::norm(lu_blocks2[2] - lr_map(3,2,2).make_dense());
+  std::cout<<"Error (1,0): "<<error<<std::endl;
+  error = Hatrix::norm(lu_blocks2[3] - dense_map(3,3,2));
+  std::cout<<"Error (1,1): "<<error<<std::endl;
+
+
 
   //b.print();
   //std::cout<<std::endl;

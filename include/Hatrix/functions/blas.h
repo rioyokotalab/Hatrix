@@ -19,12 +19,20 @@ void matmul(const LowRank<DT>& A, const Matrix<DT>& B, Matrix<DT>& C, bool trans
             bool transB = false, double alpha = 1.0, double beta = 1.0);
 
 template <typename DT>
+void matmul(const Matrix<DT>& A, const LowRank<DT>& B, Matrix<DT>& C, bool transA = false,
+            bool transB = false, double alpha = 1.0, double beta = 1.0);
+
+template <typename DT>
 void matmul(const LowRank<DT>& A, const LowRank<DT>& B, Matrix<DT>& C, bool transA = false,
             bool transB = false, double alpha = 1.0, double beta = 1.0);
 
 template <typename DT>
 void matmul(const LowRank<DT>& A, const LowRank<DT>& B, LowRank<DT>& C, bool transA = false,
             bool transB = false, double alpha = 1.0, double beta = 1.0);
+
+template <typename DT>
+LowRank<DT> matmul(const LowRank<DT>& A, const LowRank<DT>& B, bool transA = false,
+            bool transB = false, double alpha = 1.0);
 
 template <typename DT>
 Matrix<DT> matmul(const Matrix<DT>& A, const Matrix<DT>& B, bool transA = false,

@@ -69,6 +69,20 @@ void matmul(const LowRank<DT>& A, const LowRank<DT>& B, Matrix<DT>& C, bool tran
 }
 
 template <typename DT>
+LowRank<DT> matmul(const LowRank<DT>& A, const LowRank<DT>& B, bool transA,
+            bool transB, double alpha) {
+  // LR LR LR
+  // TODO Not implemented
+  if (transA || transB) std::abort();
+  assert(A.rank == B.rank);
+  Matrix<DT> SxVxU = matmul(A.S, matmul(A.V, B.U, transA, transB, alpha));
+  Matrix<DT> SxVxUxS = matmul(SxVxU, B.S);
+  LowRank<DT> AxB(A.U, SxVxUxS, B.V, false);
+
+  return AxB;
+}
+
+template <typename DT>
 void matmul(const LowRank<DT>& A, const LowRank<DT>& B, LowRank<DT>& C, bool transA,
             bool transB, double alpha, double beta) {
   // LR LR LR
@@ -92,6 +106,17 @@ void matmul(const LowRank<DT>& A, const Matrix<DT>& B, Matrix<DT>& C, bool trans
     transA, false
   );
   matmul(transA ? A.V : A.U, AS_basis_B, C, transA, false, 1, beta);
+}
+
+template <typename DT>
+void matmul(const Matrix<DT>& A, const LowRank<DT>& B, Matrix<DT>& C, bool transA,
+            bool transB, double alpha, double beta) {
+  // D LR D
+  Matrix<DT> A_basis_BS = matmul(
+    matmul(A, transB ? B.V : B.U, transA, transB, alpha), B.S,
+    false, transB
+  );
+  matmul(A_basis_BS, transB ? B.U : B.V, C, false, transB, 1, beta);
 }
 
 template <typename DT>
@@ -268,16 +293,24 @@ template Matrix<double> matmul(const Matrix<double>& A, const Matrix<double>& B,
 
 template void matmul(const LowRank<float>& A, const Matrix<float>& B, Matrix<float>& C, bool transA,
             bool transB, double alpha, double beta);
+template void matmul(const Matrix<float>& A, const LowRank<float>& B, Matrix<float>& C, bool transA,
+            bool transB, double alpha, double beta);
 template void matmul(const LowRank<float>& A, const LowRank<float>& B, Matrix<float>& C, bool transA,
             bool transB, double alpha, double beta);
 template void matmul(const LowRank<float>& A, const LowRank<float>& B, LowRank<float>& C, bool transA,
             bool transB, double alpha, double beta);
+template LowRank<float> matmul(const LowRank<float>& A, const LowRank<float>& B, bool transA,
+            bool transB, double alpha);
 template void matmul(const LowRank<double>& A, const Matrix<double>& B, Matrix<double>& C, bool transA,
+            bool transB, double alpha, double beta);
+template void matmul(const Matrix<double>& A, const LowRank<double>& B, Matrix<double>& C, bool transA,
             bool transB, double alpha, double beta);
 template void matmul(const LowRank<double>& A, const LowRank<double>& B, Matrix<double>& C, bool transA,
             bool transB, double alpha, double beta);
 template void matmul(const LowRank<double>& A, const LowRank<double>& B, LowRank<double>& C, bool transA,
             bool transB, double alpha, double beta);
+template LowRank<double> matmul(const LowRank<double>& A, const LowRank<double>& B, bool transA,
+            bool transB, double alpha);
 
 template void syrk(const Matrix<float>& A, Matrix<float>& C, Mode uplo, bool transA, double alpha,
             double beta);
