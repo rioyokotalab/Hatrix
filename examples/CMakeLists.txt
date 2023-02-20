@@ -53,6 +53,7 @@ else()
     NxN_BlockDense
     NxN_BLR
     HODLR_2level
+    HODLR_3level
     #Construction_SymmetricH2_Nlevel_with_sampling
   )
 endif()
