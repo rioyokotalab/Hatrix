@@ -53,6 +53,8 @@ class LowRank {
 
   Matrix<DT> make_dense() const;
 
+  void print() const;
+
   // WARNING: does not deallocate the extra data!
   // TODO might be useful
   //void shrink(int64_t rows, int64_t cols);

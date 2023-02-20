@@ -77,6 +77,16 @@ Matrix<DT> LowRank<DT>::make_dense() const {
 }
 
 template <typename DT>
+void LowRank<DT>::print() const {
+  std::cout<<"U:"<<std::endl;
+  U.print();
+  std::cout<<"S:"<<std::endl;
+  S.print();
+  std::cout<<"V:"<<std::endl;
+  V.print();
+};
+
+template <typename DT>
 const DT& LowRank<DT>::operator()(int64_t i, int64_t j) const {
   /*if (i >= rows || i < 0) {
     throw std::invalid_argument("Matrix#operator() -> expected i < rows && i > 0, but got i= " +
