@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
 
   // ||x - A * (A^-1 * x)|| / ||x||
   // std::cout << "SOLVE: " << (Hatrix::norm(x - h2_solution) / Hatrix::norm(x));
-  double solve_error = Hatrix::norm(x - h2_solution) / opts.N;
+  double solve_error = Hatrix::norm(h2_solution - x) / opts.N;
 
   // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   // Matrix dense_solution = cholesky_solve(Adense, b, Hatrix::Lower);

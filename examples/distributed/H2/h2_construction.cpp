@@ -90,10 +90,6 @@ generate_leaf_nodes(const Domain& domain,
                                      A,
                                      dense,
                                      opts));
-
-    std::cout << "Insert: " << i << " l: " << A.max_level
-              << " " << Hatrix::norm(matmul(A.U(i, A.max_level), A.U(i, A.max_level), true, false)) << std::endl;
-
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {

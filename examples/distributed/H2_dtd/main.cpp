@@ -266,7 +266,7 @@ int main(int argc, char **argv) {
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
 
   std::mt19937 gen(MPIRANK);
-  std::uniform_real_distribution<double> dist(10, 1000);
+  std::uniform_real_distribution<double> dist(0, 1);
   for (int block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
     int numel = domain.cell_size(block, A.max_level);
     int index = block / MPISIZE;

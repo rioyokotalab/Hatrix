@@ -193,7 +193,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
 
     if (mpi_rank(block) == MPIRANK) {
-      std::cout << "b: " << block << " l: " << level << std::endl;
       A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
       A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
     }
@@ -205,8 +204,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 void
 construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   generate_leaf_nodes(A, domain, opts);
-
-
 
   for (int64_t level = A.max_level-1; level >= A.min_level-1; --level) {
     generate_transfer_matrices(A, domain, opts, level);

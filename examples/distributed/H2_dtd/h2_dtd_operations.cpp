@@ -614,12 +614,6 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               int64_t S_c1c2_cols = A.ranks(c2, level);
               int64_t MINUS_ONE = -1;
 
-              // if (!MPIRANK) {
-              //   std::cout << "S BLOCK DIMS: rows -> " << S_c1c2_rows << " cols -> " << S_c1c2_cols << std::endl;
-              //   std::cout << "U UNELIM DIMS: rows ->  " << D_unelim_rows
-              //             << " cols -> " << D_unelim_cols << std::endl;
-              // }
-
               int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
 
               parsec_dtd_insert_task(dtd_tp, task_copy_blocks, 80, PARSEC_DEV_CPU,
