@@ -64,10 +64,10 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
   double *U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
-  int U[9], V[9];
+  int U[9];
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
-  int LWORK;
+  int LWORK; double *WORK;
 
   // obtain the shared basis of each row.
   for (int64_t block = 0; block < nblocks; ++block) {
@@ -76,20 +76,15 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
     // init global S vector for this block.
     double *S_MEM = new double[(int64_t)nleaf];
-    double *WORK = new double[1];
-    LWORK = -1;
 
     // SVD workspace query.
     {
+      LWORK = -1;
       int IAY = nleaf * block + 1;
       int JAY = 1;
       int IU = nleaf * block + 1;
       int JU = 1;
-
-      if (!MPIRANK)
-        std::cout << "IAY: " << IAY << " JAY: " << JAY
-                  << " IU: " << IU << std::endl;
-
+      WORK = (double*)calloc(1, sizeof(double));
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &nleaf, &nleaf,
@@ -99,15 +94,10 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      if (!MPIRANK) {
-        std::cout << "\tINFO: " << INFO << " LWORK: " << LWORK << std::endl;
-        std::cout << "\tIAY: " << IAY << " JAY: " << JAY
-                  << " IU: " << IU << " U_nrows: " << U_nrows << std::endl;
-      }
 
+      LWORK = (int)WORK[0] + nleaf*nleaf; // workspace query throws a weird error so add nleaf*nleaf.
+      free(WORK);
     }
-    LWORK = WORK[0];
-    delete[] WORK;
 
     // SVD computation.
     {
@@ -115,7 +105,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JAY = 1;
       int IU = nleaf * block + 1;
       int JU = 1;
-      WORK = new double[(int64_t)LWORK];
+      WORK = (double*)calloc(LWORK, sizeof(double));
+
       pdgesvd_(&JOB_U, &JOB_VT,
                &nleaf, &nleaf,
                AY_MEM, &IAY, &JAY, AY,
@@ -124,8 +115,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
+      free(WORK);
     }
-
 
     // init cblacs info for the local U block.
     int U_LOCAL_CONTEXT;        // local CBLACS context
@@ -146,14 +137,14 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
              &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
              &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
 
-
+    int IU = nleaf * block + 1;
+    int JU = 1;
     pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
               U_MEM, &IU, &JU, U,
               &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
               &BLACS_CONTEXT);
 
     if (mpi_rank(block) == MPIRANK) {
-
       A.U.insert(block, A.max_level, std::move(U_LOCAL_MEM)); // store U in A.
 
       // Init US from the row vector.
@@ -165,7 +156,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     int64_t rank = opts.max_rank;
     A.ranks.insert(block, A.max_level, std::move(rank));
 
-    delete[] WORK;
     delete[] S_MEM;
   }
 
