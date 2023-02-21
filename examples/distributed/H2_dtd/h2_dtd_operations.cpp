@@ -1291,14 +1291,14 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
-    update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
 
     multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
-    compute_schurs_complement(A, domain, block, level);
-    compute_fill_ins(A, domain, block, level);
+    // compute_schurs_complement(A, domain, block, level);
+    // compute_fill_ins(A, domain, block, level);
   }
 }
 
@@ -1363,7 +1363,8 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
 }
 
 void
-update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int64_t level) {
+update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain,
+                       int64_t level) {
   const int64_t nblocks = pow(2, level);
 
   // setup pointers to data for use with parsec.
@@ -1397,7 +1398,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain, int6
       int row_size = A.ranks(i, level), col_size = A.ranks(j, level);
       parsec_data_key_t S_data_key = parsec_S.super.data_key(&parsec_S.super, i, j, level);
 
-      if (exists_and_admissible(A, i, j, level) && mpi_rank(i, j) == MPIRANK) {     // S blocks.
+      if (exists_and_admissible(A, i, j, level) && mpi_rank(i) == MPIRANK) {     // S blocks.
         Matrix& S_ij = A.S(i, j, level);
         parsec_S.matrix_map[S_data_key] = std::addressof(S_ij);
       }

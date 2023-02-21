@@ -131,6 +131,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
               &BLACS_CONTEXT);
 
     if (mpi_rank(block) == MPIRANK) {
+      std::cout << "Insert: " << block << " l: " << A.max_level << std::endl;
       A.U.insert(block, A.max_level, std::move(U)); // store U in A.
 
       // Init US from the row vector.
@@ -179,7 +180,34 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 }
 
 void
+generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
+                           int64_t level) {
+  int64_t nblocks = pow(2, level);
+  int64_t child_level = level + 1;
+
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t c1 = block * 2;
+    int64_t c2 = block * 2 + 1;
+    int64_t rank = opts.max_rank;
+    int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
+
+    if (mpi_rank(block) == MPIRANK) {
+      std::cout << "b: " << block << " l: " << level << std::endl;
+      A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
+      A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
+    }
+
+    A.ranks.insert(block, level, std::move(rank));
+  }
+}
+
+void
 construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   generate_leaf_nodes(A, domain, opts);
 
+
+
+  for (int64_t level = A.max_level-1; level >= A.min_level-1; --level) {
+    generate_transfer_matrices(A, domain, opts, level);
+  }
 }
