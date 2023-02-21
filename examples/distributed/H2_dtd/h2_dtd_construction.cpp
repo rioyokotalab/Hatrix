@@ -12,10 +12,9 @@
 
 using namespace Hatrix;
 
-
-
 void
-generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
+generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
+                    const Domain& domain,
                     const Args& opts) {
   int N = opts.N;
   int nleaf = opts.nleaf;
@@ -33,8 +32,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
     for (int64_t j = 0; j <= i; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           !A.is_admissible(i, j, A.max_level)) {
-        if (mpi_rank(i) == MPIRANK) {
-          // regenerate the dense block to avoid communication.
+        if (mpi_rank(i) == MPIRANK) { // row-cyclic process distribution.
           Matrix Aij = generate_p2p_interactions(domain,
                                                  i, j, A.max_level,
                                                  opts.kernel);
@@ -141,8 +139,39 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
       A.US.insert(block, A.max_level, std::move(US));
     }
 
+    int64_t rank = opts.max_rank;
+    A.ranks.insert(block, A.max_level, std::move(rank));
+
     delete[] WORK;
     delete[] S_MEM;
+  }
+
+  // Generate S blocks for the lower triangle
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (exists_and_admissible(A, i, j, A.max_level)) {
+        // send U(j) to where S(i,j) exists.
+        if (mpi_rank(j) == MPIRANK) {
+          MPI_Request request;
+          Matrix& Uj = A.U(j, A.max_level);
+          MPI_Isend(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(i),
+                    j, MPI_COMM_WORLD, &request);
+        }
+
+        if (mpi_rank(i) == MPIRANK) {
+          MPI_Status status;
+          Matrix Uj(opts.nleaf, opts.max_rank);
+          MPI_Recv(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(j),
+                   j, MPI_COMM_WORLD, &status);
+
+          Matrix Aij = generate_p2p_interactions(domain,
+                                                 i, j, A.max_level,
+                                                 opts.kernel);
+          Matrix S_block = matmul(matmul(A.U(i, A.max_level), Aij, true, false), Uj);
+          A.S.insert(i, j, A.max_level, std::move(S_block));
+        }
+      }
+    }
   }
 
   delete[] AY_MEM;
