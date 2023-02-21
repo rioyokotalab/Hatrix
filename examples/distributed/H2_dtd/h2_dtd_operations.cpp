@@ -194,7 +194,7 @@ multiply_S(SymmetricSharedBasisMatrix& A,
       if (A.is_admissible.exists(i, j, level) &&
           A.is_admissible(i, j, level)) {
         int proc_j = mpi_rank(j);
-        int proc_S = mpi_rank(i, j);
+        int proc_S = mpi_rank(i);
         int S_ncols = A.ranks(j, level);
         MPI_Request i_request, j_request;
 
@@ -238,7 +238,7 @@ multiply_S(SymmetricSharedBasisMatrix& A,
         int x_hat_j_tag = j + S_tag + 1;
         int x_hat_i_tag = i + S_tag + 1;
         int proc_j = mpi_rank(j);
-        int proc_S = mpi_rank(i, j);
+        int proc_S = mpi_rank(i);
 
         if (proc_i == MPIRANK) {
           // receive for b_hat[i]
@@ -2279,7 +2279,7 @@ solve(SymmetricSharedBasisMatrix& A,
                   mpi_rank(j), i, MPI_COMM_WORLD, &request);
       }
 
-      if (mpi_rank(i) == MPIRANK && exists_and_inadmissible(A, i, j, level)) {
+      if (mpi_rank(j) == MPIRANK && exists_and_inadmissible(A, i, j, level)) {
         MPI_Status status;
         int64_t D_ij_nrows = get_dim(A, domain, i, level);
         int64_t D_ij_ncols = get_dim(A, domain, j, level);
