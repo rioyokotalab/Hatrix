@@ -12,240 +12,211 @@
 
 using namespace Hatrix;
 
-static Matrix
-generate_column_block(int64_t block, int64_t block_size,
-                      int64_t level,
-                      const SymmetricSharedBasisMatrix& A,
-                      const Matrix& dense) {
-  int64_t nblocks = pow(2, level);
-  auto dense_splits = dense.split(nblocks, nblocks);
-  Matrix AY(block_size, block_size);
-
-  for (int64_t j = 0; j < nblocks; ++j) {
-    if (A.is_admissible.exists(block, j, level) &&
-        !A.is_admissible(block, j, level)) { continue; }
-    AY += dense_splits[block * nblocks + j];
-    // matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
-  }
-
-  return AY;
-}
-
-static Matrix
-generate_column_bases(int64_t block, int64_t block_size, int64_t level,
-                      SymmetricSharedBasisMatrix& A,
-                      const Matrix& dense,
-                      const Args& opts) {
-  Matrix AY = generate_column_block(block, block_size, level, A, dense);
-  Matrix Ui;
-  std::vector<int64_t> pivots;
-  int64_t rank;
-
-  if (opts.accuracy == -1) {        // constant rank compression
-    rank = opts.max_rank;
-    Matrix Si, Vi; double error;
-    std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
-  }
-  else {
-    std::tie(Ui, pivots, rank) = error_pivoted_qr_max_rank(AY, opts.accuracy, (int64_t)opts.max_rank);
-  }
-
-  Matrix _U, _S, _V; double _error;
-  std::tie(_U, _S, _V, _error) = truncated_svd(AY, rank);
-  A.US.insert(block, level, std::move(_S));
-
-  A.ranks.insert(block, level, std::move(rank));
-
-  return Ui;
-}
-
-static void
-generate_leaf_nodes(const Domain& domain,
-                    SymmetricSharedBasisMatrix& A,
-                    const Matrix& dense,
+void
+generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
+                    const Domain& domain,
                     const Args& opts) {
+  int N = opts.N;
+  int nleaf = opts.nleaf;
+  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  int AY[9]; int INFO;
+
+  double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  descinit_(AY, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
+            &AY_local_nrows, &INFO);
+
   int64_t nblocks = pow(2, A.max_level);
-  auto dense_splits = dense.split(nblocks, nblocks);
 
   for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j : near_neighbours(i, A.max_level)) {
-      Matrix Aij(dense_splits[i * nblocks + j], true);
-
-      for (int64_t i = 0; i < Aij.rows; ++i) {
-        for (int64_t j = i+1; j < Aij.cols; ++j) {
-          Aij(i, j) = 0;
+    for (int64_t j = 0; j <= i; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
+        if (mpi_rank(i) == MPIRANK) { // row-cyclic process distribution.
+          Matrix Aij = generate_p2p_interactions(domain,
+                                                 i, j, A.max_level,
+                                                 opts.kernel);
+          A.D.insert(i, j, A.max_level, std::move(Aij));
         }
       }
-
-      // Aij.print();
-      A.D.insert(i, j, A.max_level, std::move(Aij));
     }
   }
 
-  for (int64_t i = 0; i < nblocks; ++i) {
-    A.U.insert(i,
-               A.max_level,
-               generate_column_bases(i,
-                                     domain.cell_size(i, A.max_level),
-                                     A.max_level,
-                                     A,
-                                     dense,
-                                     opts));
+  double ALPHA = 1.0;
+  double BETA = 1.0;
+  // Accumulate admissible blocks from the large distributed dense matrix.
+  for (int64_t block = 0; block < nblocks; ++block) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (exists_and_inadmissible(A, block, j, A.max_level)) { continue; }
+
+      int IA = nleaf * block + 1;
+      int JA = nleaf * j + 1;
+
+      pdgeadd_(&NOTRANS, &nleaf, &nleaf,
+               &ALPHA,
+               DENSE_MEM, &IA, &JA, DENSE.data(),
+               &BETA,
+               AY_MEM, &IA, &ONE, AY);
+    }
   }
 
+  // init global U matrix
+  int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  double *U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
+  int U[9];
+  descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
+            &U_nrows, &INFO);
+  int LWORK; double *WORK;
+
+  // obtain the shared basis of each row.
+  for (int64_t block = 0; block < nblocks; ++block) {
+    const char JOB_U = 'V';
+    const char JOB_VT = 'N';
+
+    // init global S vector for this block.
+    double *S_MEM = new double[(int64_t)nleaf];
+
+    // SVD workspace query.
+    {
+      LWORK = -1;
+      int IAY = nleaf * block + 1;
+      int JAY = 1;
+      int IU = nleaf * block + 1;
+      int JU = 1;
+      WORK = (double*)calloc(1, sizeof(double));
+
+      pdgesvd_(&JOB_U, &JOB_VT,
+               &nleaf, &nleaf,
+               AY_MEM, &IAY, &JAY, AY,
+               S_MEM,
+               U_MEM, &IU, &ONE, U,
+               NULL, NULL, NULL, NULL,
+               WORK, &LWORK,
+               &INFO);
+
+      LWORK = (int)WORK[0] + nleaf*nleaf; // workspace query throws a weird error so add nleaf*nleaf.
+      free(WORK);
+    }
+
+    // SVD computation.
+    {
+      int IAY = nleaf * block + 1;
+      int JAY = 1;
+      int IU = nleaf * block + 1;
+      int JU = 1;
+      WORK = (double*)calloc(LWORK, sizeof(double));
+
+      pdgesvd_(&JOB_U, &JOB_VT,
+               &nleaf, &nleaf,
+               AY_MEM, &IAY, &JAY, AY,
+               S_MEM,
+               U_MEM, &IU, &ONE, U,
+               NULL, NULL, NULL, NULL,
+               WORK, &LWORK,
+               &INFO);
+      free(WORK);
+    }
+
+    // init cblacs info for the local U block.
+    int U_LOCAL_CONTEXT;        // local CBLACS context
+    int IMAP[1];                // workspace to map the original grid.
+    int U_LOCAL_PNROWS, U_LOCAL_PNCOLS, U_LOCAL_PROW, U_LOCAL_PCOL; // local process grid parameters.
+    IMAP[0] = mpi_rank(block);           // specify the rank from the global grid for the local grid.
+    Cblacs_get(-1, 0, &U_LOCAL_CONTEXT);                    // init the new CBLACS context.
+    Cblacs_gridmap(&U_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
+    Cblacs_gridinfo(U_LOCAL_CONTEXT,                       // init grid params from the context.
+                    &U_LOCAL_PNROWS, &U_LOCAL_PNCOLS, &U_LOCAL_PROW, &U_LOCAL_PCOL);
+
+    // store opts.max_rank columns of U in the A.U for this process.
+    // init local U block for communication.
+    int U_LOCAL[9];
+    int U_LOCAL_nrows = nleaf, U_LOCAL_ncols = opts.max_rank;
+    Matrix U_LOCAL_MEM(U_LOCAL_nrows, U_LOCAL_ncols);
+    descset_(U_LOCAL,
+             &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
+             &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
+
+    int IU = nleaf * block + 1;
+    int JU = 1;
+    pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
+              U_MEM, &IU, &JU, U,
+              &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
+              &BLACS_CONTEXT);
+
+    if (mpi_rank(block) == MPIRANK) {
+      A.U.insert(block, A.max_level, std::move(U_LOCAL_MEM)); // store U in A.
+
+      // Init US from the row vector.
+      Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
+      for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
+      A.US.insert(block, A.max_level, std::move(US));
+    }
+
+    int64_t rank = opts.max_rank;
+    A.ranks.insert(block, A.max_level, std::move(rank));
+
+    delete[] S_MEM;
+  }
+
+  // Generate S blocks for the lower triangle
   for (int64_t i = 0; i < nblocks; ++i) {
-    // for (int64_t j : far_neighbours(i, A.max_level)) {
     for (int64_t j = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, A.max_level) &&
-          A.is_admissible(i, j, A.max_level)) {
-        Matrix Sblock = matmul(matmul(A.U(i, A.max_level),
-                                      dense_splits[i * nblocks + j], true, false),
-                               A.U(j, A.max_level));
-        A.S.insert(i, j, A.max_level, std::move(Sblock));
+      if (exists_and_admissible(A, i, j, A.max_level)) {
+        // send U(j) to where S(i,j) exists.
+        if (mpi_rank(j) == MPIRANK) {
+          MPI_Request request;
+          Matrix& Uj = A.U(j, A.max_level);
+          MPI_Isend(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(i),
+                    j, MPI_COMM_WORLD, &request);
+        }
+
+        if (mpi_rank(i) == MPIRANK) {
+          MPI_Status status;
+          Matrix Uj(opts.nleaf, opts.max_rank);
+          MPI_Recv(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(j),
+                   j, MPI_COMM_WORLD, &status);
+
+          Matrix Aij = generate_p2p_interactions(domain,
+                                                 i, j, A.max_level,
+                                                 opts.kernel);
+          Matrix S_block = matmul(matmul(A.U(i, A.max_level), Aij, true, false), Uj);
+          A.S.insert(i, j, A.max_level, std::move(S_block));
+        }
       }
     }
   }
+
+  delete[] AY_MEM;
+  delete[] U_MEM;
 }
 
-static Matrix
-generate_U_transfer_matrix(const Matrix& Ubig_c1,
-                           const Matrix& Ubig_c2,
-                           const int64_t node,
-                           const int64_t block_size,
-                           const int64_t level,
-                           SymmetricSharedBasisMatrix& A,
-                           const Matrix& dense,
-                           const Args& opts) {
-  Matrix col_block = generate_column_block(node, block_size, level, A, dense);
-  auto col_block_splits = col_block.split(2, 1);
-
-  int64_t c1 = node * 2;
-  int64_t c2 = node * 2 + 1;
-  int64_t child_level = level + 1;
-  int64_t r_c1 = A.ranks(c1, child_level);
-  int64_t r_c2 = A.ranks(c2, child_level);
-
-  Matrix temp(r_c1 + r_c2, col_block.cols);
-  auto temp_splits = temp.split(std::vector<int64_t>(1, r_c1), {});
-
-  matmul(Ubig_c1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
-  matmul(Ubig_c2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
-
-  Matrix Utransfer;
-  std::vector<int64_t> pivots;
-  int64_t rank;
-  if (opts.accuracy == -1) {      // constant rank factorization
-    rank = opts.max_rank;
-    Matrix Si, Vi; double error;
-    std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
-  }
-  else {
-    std::tie(Utransfer, pivots, rank) =
-      error_pivoted_qr_max_rank(temp, opts.accuracy, opts.max_rank);
-  }
-
-  Matrix _U, _S, _V; double _error;
-  std::tie(_U, _S, _V, _error) = truncated_svd(temp, rank);
-  A.US.insert(node, level, std::move(_S));
-
-  A.ranks.insert(node, level, std::move(rank));
-
-  return Utransfer;
-}
-
-static bool
-row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
-                          int64_t level) {
-  bool has_admis = false;
-
-  for (int64_t i = 0; i < pow(2, level); ++i) {
-    if (!A.is_admissible.exists(row, i, level) || exists_and_admissible(A, row, i, level)) {
-      has_admis = true;
-      break;
-    }
-  }
-
-  return has_admis;
-}
-
-
-static RowLevelMap
-generate_transfer_matrices(const Domain& domain,
-                           const int64_t level,
-                           const RowLevelMap& Uchild,
-                           SymmetricSharedBasisMatrix& A,
-                           const Matrix& dense,
-                           const Args& opts) {
+void
+generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
+                           int64_t level) {
   int64_t nblocks = pow(2, level);
-  auto dense_splits = dense.split(nblocks, nblocks);
+  int64_t child_level = level + 1;
 
-  RowLevelMap Ubig_parent;
-  for (int64_t node = 0; node < nblocks; ++node) {
-    int64_t c1 = node * 2;
-    int64_t c2 = node * 2 + 1;
-    int64_t child_level = level + 1;
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t c1 = block * 2;
+    int64_t c2 = block * 2 + 1;
+    int64_t rank = opts.max_rank;
+    int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
 
-    const Matrix& Ubig_c1 = Uchild(c1, child_level);
-    const Matrix& Ubig_c2 = Uchild(c2, child_level);
-    int64_t block_size = Ubig_c1.rows + Ubig_c2.rows;
-
-    if (row_has_admissible_blocks(A, node, level) && A.max_level != 1) {
-      Matrix Utransfer = generate_U_transfer_matrix(Ubig_c1,
-                                                    Ubig_c2,
-                                                    node,
-                                                    block_size,
-                                                    level,
-                                                    A,
-                                                    dense,
-                                                    opts);
-      auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, A.ranks(c1, child_level)),
-                                              {});
-
-      Matrix Ubig(block_size, A.ranks(node, level));
-      auto Ubig_splits = Ubig.split(2, 1);
-
-      matmul(Ubig_c1, Utransfer_splits[0], Ubig_splits[0]);
-      matmul(Ubig_c2, Utransfer_splits[1], Ubig_splits[1]);
-
-      A.U.insert(node, level, std::move(Utransfer));
-      Ubig_parent.insert(node, level, std::move(Ubig));
+    if (mpi_rank(block) == MPIRANK) {
+      A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
+      A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
     }
-    else {                      // add identity transfer matrix
-      int64_t rank = std::max(A.ranks(c1, child_level), A.ranks(c2, child_level));
-      Ubig_parent.insert(node, level,
-                         generate_identity_matrix(block_size, rank));
-      A.U.insert(node, level,
-                 generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
-                                          rank));
-      A.US.insert(node, level, generate_identity_matrix(rank, rank));
 
-      A.ranks.insert(node, level, std::move(rank));
-    }
+    A.ranks.insert(block, level, std::move(rank));
   }
-
-  for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, level) &&
-          A.is_admissible(i, j, level)) {
-        Matrix Sdense = matmul(matmul(Ubig_parent(i, level),
-                                      dense_splits[i * nblocks + j], true, false),
-                               Ubig_parent(j, level));
-        A.S.insert(i, j, level, std::move(Sdense));
-      }
-    }
-  }
-
-  return Ubig_parent;
 }
 
 void
 construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
-  Matrix dense = generate_p2p_matrix(domain, opts.kernel);
-  generate_leaf_nodes(domain, A, dense, opts);
+  generate_leaf_nodes(A, domain, opts);
 
-  RowLevelMap Uchild = A.U;
-
-  for (int64_t level = A.max_level-1; level >= 0; --level) {
-    Uchild = generate_transfer_matrices(domain, level, Uchild, A, dense, opts);
+  for (int64_t level = A.max_level-1; level >= A.min_level-1; --level) {
+    generate_transfer_matrices(A, domain, opts, level);
   }
 }

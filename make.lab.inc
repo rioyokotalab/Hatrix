@@ -6,7 +6,7 @@ BLAS_LIB     = ${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a \
              -lpthread -lm -ldl
 PAPI_INCLUDE = $(shell pkg-config --cflags papi)
 PAPI_LIBS    = $(shell pkg-config --libs papi)
-CXXFLAGS     = -std=c++11 -O3 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
+CXXFLAGS     = -std=c++14 -O3 -g -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
                $(shell pkg-config --cflags gtest gtest_main) $(PAPI_INCLUDE)
 CXX          = g++
 MPICXX       = mpicxx

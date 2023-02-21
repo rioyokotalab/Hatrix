@@ -19,6 +19,7 @@ namespace Hatrix {
     int64_t ndim;
     int64_t max_rank;
     double admis;               // admissibility value
+    double perturbation;           // constant added to admissibility
     double accuracy;            // desired construction accuracy
     double qr_accuracy;         // cut off accuracy for QR factorization
     // 0 - accuracy truncated, 1 - lapack constant rank QR, 2 - constant rank no pivot, 3 - fixed rank svd

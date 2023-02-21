@@ -202,7 +202,6 @@ int main(int argc, char **argv) {
   Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
 
-  DENSE.resize(DESC_LEN);
   DENSE_NBROW = opts.nleaf;
   DENSE_NBCOL = opts.nleaf;
   DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
@@ -212,8 +211,6 @@ int main(int argc, char **argv) {
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
   DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
 
-  // std::cout << "begin generation. nums: " << DENSE_local_rows <<  " "
-  //           << DENSE_local_cols << std::endl;
   if (!MPIRANK) {
     std::cout << "begin data init.\n";
   }
@@ -248,12 +245,11 @@ int main(int argc, char **argv) {
 
   // Allocate the vectors as a vector of Matrix objects of the form H2_A * x = b,
   // and dense_A * x = b_check.
-  std::vector<Matrix> x, b, b_check, x_regen;
+  std::vector<Matrix> x, b, b_check;
   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
     x.push_back(Matrix(opts.nleaf, 1));
     b.push_back(Matrix(opts.nleaf, 1));
     b_check.push_back(Matrix(opts.nleaf, 1));
-    x_regen.push_back(Matrix(opts.nleaf, 1));
   }
 
   // scalapack data structures for x and b.
@@ -269,7 +265,7 @@ int main(int argc, char **argv) {
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
 
   std::mt19937 gen(MPIRANK);
-  std::uniform_real_distribution<double> dist(10, 1000);
+  std::uniform_real_distribution<double> dist(0, 1);
   for (int block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
     int numel = domain.cell_size(block, A.max_level);
     int index = block / MPISIZE;
@@ -329,8 +325,6 @@ int main(int argc, char **argv) {
   // ---- BEGIN PARSEC ----
 
   /* Initializing parsec context */
-  int parsec_argc = argc - 24;
-  char ** parsec_argv = argv + 24;
   parsec = parsec_init( cores, NULL, NULL);
   if( NULL == parsec ) {
     printf("Cannot initialize PaRSEC\n");
@@ -397,12 +391,14 @@ int main(int argc, char **argv) {
     h2_solve_diff.push_back(h2_solution[i] - x[i]);
   }
 
-  double solve_h2_diff_norm = dist_norm2(h2_solve_diff);
-  // double solve_error = (solve_h2_diff_norm / dist_norm2(x));
-  double solve_error = solve_h2_diff_norm / opts.N;
+  double h2_norm = dist_norm2(h2_solution);
+  double x_norm = dist_norm2(x);
+
+  std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
+
+  double solve_error = dist_norm2(h2_solve_diff) / opts.N;
 
   parsec_fini(&parsec);
-
 
   Hatrix::Context::finalize();
 

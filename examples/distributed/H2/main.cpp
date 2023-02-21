@@ -127,8 +127,7 @@ int main(int argc, char* argv[]) {
   }
 
   // ||x - A * (A^-1 * x)|| / ||x||
-  // std::cout << "SOLVE: " << (Hatrix::norm(x - h2_solution) / Hatrix::norm(x));
-  double solve_error = Hatrix::norm(x - h2_solution) / opts.N;
+  double solve_error = Hatrix::norm(h2_solution - x) / opts.N;
 
   // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   // Matrix dense_solution = cholesky_solve(Adense, b, Hatrix::Lower);
@@ -136,6 +135,10 @@ int main(int argc, char* argv[]) {
 
   // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   // Matrix bdense = matmul(Adense, x);
+  double h2_norm = Hatrix::norm(h2_solution);
+  double x_norm = Hatrix::norm(x);
+
+  std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
 
   std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
             << opts.accuracy << ","
@@ -153,7 +156,8 @@ int main(int argc, char* argv[]) {
             << fp_ops << ","
             << opts.kind_of_geometry << ","
             << opts.use_nested_basis << ","
-            << dense_blocks
+            << dense_blocks << ","
+            << opts.perturbation
             << std::endl;
 
   // std::cout << "----------------------------\n";
