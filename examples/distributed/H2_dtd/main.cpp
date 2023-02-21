@@ -245,12 +245,11 @@ int main(int argc, char **argv) {
 
   // Allocate the vectors as a vector of Matrix objects of the form H2_A * x = b,
   // and dense_A * x = b_check.
-  std::vector<Matrix> x, b, b_check, x_regen;
+  std::vector<Matrix> x, b, b_check;
   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
     x.push_back(Matrix(opts.nleaf, 1));
     b.push_back(Matrix(opts.nleaf, 1));
     b_check.push_back(Matrix(opts.nleaf, 1));
-    x_regen.push_back(Matrix(opts.nleaf, 1));
   }
 
   // scalapack data structures for x and b.
@@ -392,8 +391,12 @@ int main(int argc, char **argv) {
     h2_solve_diff.push_back(h2_solution[i] - x[i]);
   }
 
-  double solve_h2_diff_norm = dist_norm2(h2_solve_diff);
-  double solve_error = solve_h2_diff_norm / opts.N;
+  double h2_norm = dist_norm2(h2_solution);
+  double x_norm = dist_norm2(x);
+
+  std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
+
+  double solve_error = dist_norm2(h2_solve_diff) / opts.N;
 
   parsec_fini(&parsec);
 

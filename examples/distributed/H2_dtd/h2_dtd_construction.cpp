@@ -64,7 +64,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
   double *U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
-  int U[9];
+  int U[9], V[9];
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 

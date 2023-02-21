@@ -14,11 +14,11 @@ make -j H2_dtd
 make -j H2_main
 
 for adm in 1; do
-    nleaf=256
+    nleaf=512
     ndim=1
-    max_rank=64
+    max_rank=100
 
-    for N in 2048; do
+    for N in 8192; do
         ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
