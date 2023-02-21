@@ -73,8 +73,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
   for (int64_t block = 0; block < nblocks; ++block) {
     char JOB_U = 'V';
     char JOB_VT = 'N';
-    int IA = nleaf * block + 1;
-    int JA = 1;
+    int IAY = nleaf * block + 1;
+    int JAY = 1;
     int IU = nleaf * block + 1;
     int JU = 1;
 
@@ -86,7 +86,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
     // SVD workspace query.
     pdgesvd_(&JOB_U, &JOB_VT,
              &nleaf, &nleaf,
-             AY_MEM, &IA, &JA, AY,
+             AY_MEM, &IAY, &JAY, AY,
              S_MEM,
              U_MEM, &IU, &JU, U,
              NULL, NULL, NULL, NULL, // not calculating VT so NULL
@@ -99,7 +99,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
     WORK = new double[(int64_t)LWORK];
     pdgesvd_(&JOB_U, &JOB_VT,
              &nleaf, &nleaf,
-             AY_MEM, &IA, &JA, AY,
+             AY_MEM, &IAY, &JAY, AY,
              S_MEM,
              U_MEM, &IU, &JU, U,
              NULL, NULL, NULL, NULL, // not calculating VT so NULL
@@ -110,22 +110,36 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
     // init cblacs info for the local U block.
     int U_LOCAL_CONTEXT;        // local CBLACS context
     int IMAP[1];                // workspace to map the original grid.
-    int LOCAL_PNROWS, LOCAL_PNCOLS, LOCAL_PROW, LOCAL_PCOL; // local process grid parameters.
+    int U_LOCAL_PNROWS, U_LOCAL_PNCOLS, U_LOCAL_PROW, U_LOCAL_PCOL; // local process grid parameters.
+    IMAP[0] = mpi_rank(block);           // specify the rank from the global grid for the local grid.
     Cblacs_get(-1, 0, &U_LOCAL_CONTEXT);                    // init the new CBLACS context.
     Cblacs_gridmap(&U_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
     Cblacs_gridinfo(U_LOCAL_CONTEXT,                       // init grid params from the context.
-                    &LOCAL_PNROWS, &LOCAL_PNCOLS, &LOCAL_PROW, &LOCAL_PCOL);
+                    &U_LOCAL_PNROWS, &U_LOCAL_PNCOLS, &U_LOCAL_PROW, &U_LOCAL_PCOL);
 
     // store opts.max_rank columns of U in the A.U for this process.
     // init local U block for communication.
     int U_LOCAL[9];
     int U_LOCAL_nrows = nleaf, U_LOCAL_ncols = opts.max_rank;
-
-    // descset_(U_LOCAL,
-    //          &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
-    //          &);
-
     Matrix U(U_LOCAL_nrows, U_LOCAL_ncols);
+    descset_(U_LOCAL,
+             &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
+             &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
+
+
+    pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
+              AY_MEM, &IAY, &JAY, AY,
+              &U, &ONE, &ONE, U_LOCAL,
+              &BLACS_CONTEXT);
+
+    if (mpi_rank(block) == MPIRANK) {
+      A.U.insert(block, A.max_level, std::move(U)); // store U in A.
+
+      // Init US from the row vector.
+      Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
+      for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
+      A.US.insert(block, A.max_level, std::move(US));
+    }
 
     delete[] WORK;
     delete[] S_MEM;
