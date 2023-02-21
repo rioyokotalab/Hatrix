@@ -113,7 +113,7 @@ extern "C" {
                 const double *alpha,
                 const double *a, const int *ia, const int *ja, const int *desca,
                 const double *beta,
-                double *c, const int *ic, const int *jc, const int *descc );
+                double *c, const int *ic, const int *jc, const int *descc);
 
 //   // scalapack copying routines
 //   // https://netlib.org/scalapack/slug/node164.html

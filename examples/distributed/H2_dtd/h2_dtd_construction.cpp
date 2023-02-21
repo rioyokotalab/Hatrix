@@ -22,8 +22,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
   int AY[9]; int INFO;
 
-  double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
-  descinit_(AY, &N, &nleaf, &DENSE_NBROW, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
+  double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  descinit_(AY, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &AY_local_nrows, &INFO);
 
   int64_t nblocks = pow(2, A.max_level);
@@ -53,7 +53,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JA = nleaf * j + 1;
 
       pdgeadd_(&NOTRANS, &nleaf, &nleaf,
-               &ALPHA, DENSE_MEM, &IA, &JA, DENSE.data(),
+               &ALPHA,
+               DENSE_MEM, &IA, &JA, DENSE.data(),
                &BETA,
                AY_MEM, &IA, &ONE, AY);
     }
@@ -69,8 +70,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
   // obtain the shared basis of each row.
   for (int64_t block = 0; block < nblocks; ++block) {
-    char JOB_U = 'V';
-    char JOB_VT = 'N';
+    const char JOB_U = 'V';
+    const char JOB_VT = 'N';
     int IAY = nleaf * block + 1;
     int JAY = 1;
     int IU = nleaf * block + 1;
@@ -87,7 +88,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
              AY_MEM, &IAY, &JAY, AY,
              S_MEM,
              U_MEM, &IU, &JU, U,
-             NULL, NULL, NULL, NULL, // not calculating VT so NULL
+             NULL, NULL, NULL, NULL,
              WORK, &LWORK,
              &INFO);
     LWORK = WORK[0];
@@ -100,7 +101,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
              AY_MEM, &IAY, &JAY, AY,
              S_MEM,
              U_MEM, &IU, &JU, U,
-             NULL, NULL, NULL, NULL, // not calculating VT so NULL
+             NULL, NULL, NULL, NULL,
              WORK, &LWORK,
              &INFO);
 
@@ -119,20 +120,20 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     // init local U block for communication.
     int U_LOCAL[9];
     int U_LOCAL_nrows = nleaf, U_LOCAL_ncols = opts.max_rank;
-    Matrix U(U_LOCAL_nrows, U_LOCAL_ncols);
+    Matrix U_LOCAL_MEM(U_LOCAL_nrows, U_LOCAL_ncols);
     descset_(U_LOCAL,
              &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
              &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
 
 
     pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
-              AY_MEM, &IAY, &JAY, AY,
-              &U, &ONE, &ONE, U_LOCAL,
+              U_MEM, &IU, &JU, U,
+              &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
               &BLACS_CONTEXT);
 
     if (mpi_rank(block) == MPIRANK) {
-      std::cout << "Insert: " << block << " l: " << A.max_level << std::endl;
-      A.U.insert(block, A.max_level, std::move(U)); // store U in A.
+
+      A.U.insert(block, A.max_level, std::move(U_LOCAL_MEM)); // store U in A.
 
       // Init US from the row vector.
       Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);

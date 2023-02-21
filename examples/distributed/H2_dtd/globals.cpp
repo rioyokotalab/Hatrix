@@ -16,7 +16,7 @@ const char NOTRANS = 'N';
 const char TRANS = 'T';
 
 double *DENSE_MEM = NULL;
-std::vector<int> DENSE;
+std::vector<int> DENSE(9);
 int DENSE_NBROW, DENSE_NBCOL;
 int DENSE_local_rows, DENSE_local_cols;
 

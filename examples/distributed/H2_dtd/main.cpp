@@ -202,7 +202,6 @@ int main(int argc, char **argv) {
   Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
 
-  DENSE.resize(DESC_LEN);
   DENSE_NBROW = opts.nleaf;
   DENSE_NBCOL = opts.nleaf;
   DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
@@ -212,8 +211,6 @@ int main(int argc, char **argv) {
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
   DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
 
-  // std::cout << "begin generation. nums: " << DENSE_local_rows <<  " "
-  //           << DENSE_local_cols << std::endl;
   if (!MPIRANK) {
     std::cout << "begin data init.\n";
   }
@@ -328,83 +325,82 @@ int main(int argc, char **argv) {
 
   // ---- BEGIN PARSEC ----
 
-  /* Initializing parsec context */
-  int parsec_argc = argc - 24;
-  char ** parsec_argv = argv + 24;
-  parsec = parsec_init( cores, NULL, NULL);
-  if( NULL == parsec ) {
-    printf("Cannot initialize PaRSEC\n");
-    exit(-1);
-  }
+//   /* Initializing parsec context */
+//   int parsec_argc = argc - 24;
+//   char ** parsec_argv = argv + 24;
+//   parsec = parsec_init( cores, NULL, NULL);
+//   if( NULL == parsec ) {
+//     printf("Cannot initialize PaRSEC\n");
+//     exit(-1);
+//   }
 
-  parsec_profiling_start();
+//   parsec_profiling_start();
 
-  dtd_tp = parsec_dtd_taskpool_new();
-  rc = parsec_context_add_taskpool( parsec, dtd_tp );
+//   dtd_tp = parsec_dtd_taskpool_new();
+//   rc = parsec_context_add_taskpool( parsec, dtd_tp );
 
-  rc = parsec_context_start( parsec );
-  PARSEC_CHECK_ERROR(rc, "parsec_context_start");
+//   rc = parsec_context_start( parsec );
+//   PARSEC_CHECK_ERROR(rc, "parsec_context_start");
 
-  std::vector<Matrix> h2_solution;
-  for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
-    h2_solution.push_back(Matrix(opts.nleaf, 1));
-  }
+//   std::vector<Matrix> h2_solution;
+//   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
+//     h2_solution.push_back(Matrix(opts.nleaf, 1));
+//   }
 
-#ifdef USE_MKL
-  mkl_set_num_threads(1);
-#endif
-  int max_threads = omp_get_max_threads();
+// #ifdef USE_MKL
+//   mkl_set_num_threads(1);
+// #endif
+//   int max_threads = omp_get_max_threads();
 
-  omp_set_num_threads(1);
+//   omp_set_num_threads(1);
 
-  if (!MPIRANK) {
-  std::cout << "factor begin:\n";
-  }
+//   if (!MPIRANK) {
+//   std::cout << "factor begin:\n";
+//   }
 
-  factorize_setup(A, domain, opts);
+//   factorize_setup(A, domain, opts);
 
-  auto start_factorize = std::chrono::system_clock::now();
-  auto fp_ops = factorize(A, domain, opts);
-  auto stop_factorize = std::chrono::system_clock::now();
-  double factorize_time = std::chrono::duration_cast<
-    std::chrono::milliseconds>(stop_factorize -
-                               start_factorize).count();
+//   auto start_factorize = std::chrono::system_clock::now();
+//   auto fp_ops = factorize(A, domain, opts);
+//   auto stop_factorize = std::chrono::system_clock::now();
+//   double factorize_time = std::chrono::duration_cast<
+//     std::chrono::milliseconds>(stop_factorize -
+//                                start_factorize).count();
 
-  factorize_teardown();
+//   factorize_teardown();
 
-  if (!MPIRANK) {
-    std::cout << "factor end\n";
-  }
+//   if (!MPIRANK) {
+//     std::cout << "factor end\n";
+//   }
 
-  parsec_context_wait(parsec);
-  parsec_taskpool_free( dtd_tp );
+//   parsec_context_wait(parsec);
+//   parsec_taskpool_free( dtd_tp );
 
-  omp_set_num_threads(max_threads);
+//   omp_set_num_threads(max_threads);
 
-  if (!MPIRANK) {
-    std::cout << "H2 solve begin\n";
-  }
+//   if (!MPIRANK) {
+//     std::cout << "H2 solve begin\n";
+//   }
 
-  solve(A, b, h2_solution, domain); // h2_solution = H2_A^(-1) * b
-  if (!MPIRANK) {
-    std::cout << "H2 solve end\n";
-  }
+//   solve(A, b, h2_solution, domain); // h2_solution = H2_A^(-1) * b
+//   if (!MPIRANK) {
+//     std::cout << "H2 solve end\n";
+//   }
 
-  // ||x - A * (A^-1 * x)|| / ||x||
+//   // ||x - A * (A^-1 * x)|| / ||x||
 
-  std::vector<Matrix> h2_solve_diff;
-  for (int i = 0; i < x.size(); ++i) {
-    h2_solve_diff.push_back(h2_solution[i] - x[i]);
-  }
+//   std::vector<Matrix> h2_solve_diff;
+//   for (int i = 0; i < x.size(); ++i) {
+//     h2_solve_diff.push_back(h2_solution[i] - x[i]);
+//   }
 
-  double solve_h2_diff_norm = dist_norm2(h2_solve_diff);
-  // double solve_error = (solve_h2_diff_norm / dist_norm2(x));
-  double solve_error = solve_h2_diff_norm / opts.N;
+//   double solve_h2_diff_norm = dist_norm2(h2_solve_diff);
+//   double solve_error = solve_h2_diff_norm / opts.N;
 
-  parsec_fini(&parsec);
+//   parsec_fini(&parsec);
 
-
-  Hatrix::Context::finalize();
+//   Hatrix::Context::finalize();
+  double solve_error = 0, factorize_time = 0, fp_ops = 0;
 
   if (!MPIRANK) {
     // std::cout << "----------------------------\n";

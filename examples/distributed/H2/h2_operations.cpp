@@ -803,7 +803,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
             << timer[6] << ","
             << timer[7] << ","
             << counts[0] << ","
-            << counts[1]
+            << counts[1] <<
     " --- ";
 
   auto fp_ops = papi.fp_ops();
