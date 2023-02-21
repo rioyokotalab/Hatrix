@@ -1396,7 +1396,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain,
         Matrix& S_ij = A.S(i, j, level);
         parsec_S.matrix_map[S_data_key] = std::addressof(S_ij);
       }
-      parsec_S.mpi_ranks[S_data_key] = mpi_rank(i, j);
+      parsec_S.mpi_ranks[S_data_key] = mpi_rank(i);
 
       row_size = get_dim(A, domain, i, level), col_size = get_dim(A, domain, j, level);
       parsec_data_key_t D_data_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
