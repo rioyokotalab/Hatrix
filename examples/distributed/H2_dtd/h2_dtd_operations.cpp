@@ -1561,7 +1561,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
 
 void h2_dc_init_maps() {
   h2_dc_init(parsec_U, data_key_1d, rank_of_1d);
-  h2_dc_init(parsec_S, data_key_2d, rank_of_2d);
+  h2_dc_init(parsec_S, data_key_2d, rank_of_1d);
   h2_dc_init(parsec_D, data_key_2d, rank_of_1d);
   h2_dc_init(parsec_F, data_key_2d, rank_of_2d);
   h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d);

@@ -67,43 +67,64 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int U[9], V[9];
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
+  int LWORK;
 
   // obtain the shared basis of each row.
   for (int64_t block = 0; block < nblocks; ++block) {
     const char JOB_U = 'V';
     const char JOB_VT = 'N';
-    int IAY = nleaf * block + 1;
-    int JAY = 1;
-    int IU = nleaf * block + 1;
-    int JU = 1;
 
     // init global S vector for this block.
     double *S_MEM = new double[(int64_t)nleaf];
     double *WORK = new double[1];
-    int LWORK = -1;
+    LWORK = -1;
 
     // SVD workspace query.
-    pdgesvd_(&JOB_U, &JOB_VT,
-             &nleaf, &nleaf,
-             AY_MEM, &IAY, &JAY, AY,
-             S_MEM,
-             U_MEM, &IU, &JU, U,
-             NULL, NULL, NULL, NULL,
-             WORK, &LWORK,
-             &INFO);
+    {
+      int IAY = nleaf * block + 1;
+      int JAY = 1;
+      int IU = nleaf * block + 1;
+      int JU = 1;
+
+      if (!MPIRANK)
+        std::cout << "IAY: " << IAY << " JAY: " << JAY
+                  << " IU: " << IU << std::endl;
+
+
+      pdgesvd_(&JOB_U, &JOB_VT,
+               &nleaf, &nleaf,
+               AY_MEM, &IAY, &JAY, AY,
+               S_MEM,
+               U_MEM, &IU, &ONE, U,
+               NULL, NULL, NULL, NULL,
+               WORK, &LWORK,
+               &INFO);
+      if (!MPIRANK) {
+        std::cout << "\tINFO: " << INFO << " LWORK: " << LWORK << std::endl;
+        std::cout << "\tIAY: " << IAY << " JAY: " << JAY
+                  << " IU: " << IU << " U_nrows: " << U_nrows << std::endl;
+      }
+
+    }
     LWORK = WORK[0];
     delete[] WORK;
 
     // SVD computation.
-    WORK = new double[(int64_t)LWORK];
-    pdgesvd_(&JOB_U, &JOB_VT,
-             &nleaf, &nleaf,
-             AY_MEM, &IAY, &JAY, AY,
-             S_MEM,
-             U_MEM, &IU, &JU, U,
-             NULL, NULL, NULL, NULL,
-             WORK, &LWORK,
-             &INFO);
+    {
+      int IAY = nleaf * block + 1;
+      int JAY = 1;
+      int IU = nleaf * block + 1;
+      int JU = 1;
+      WORK = new double[(int64_t)LWORK];
+      pdgesvd_(&JOB_U, &JOB_VT,
+               &nleaf, &nleaf,
+               AY_MEM, &IAY, &JAY, AY,
+               S_MEM,
+               U_MEM, &IU, &ONE, U,
+               NULL, NULL, NULL, NULL,
+               WORK, &LWORK,
+               &INFO);
+    }
 
 
     // init cblacs info for the local U block.

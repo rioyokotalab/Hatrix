@@ -115,6 +115,13 @@ extern "C" {
                 const double *beta,
                 double *c, const int *ic, const int *jc, const int *descc);
 
+  void  pdormbr_(const char* vect, const char* side, const char* trans,
+                 const int* m, const int* n, const int* k,
+                 const double* a, const int* ia, const int* ja, const int* desca,
+                 const double* tau,
+                 double* c, const int* ic, const int* jc, const int* descc,
+                 double* work, const int* lwork, int* info);
+
 //   // scalapack copying routines
 //   // https://netlib.org/scalapack/slug/node164.html
 }
