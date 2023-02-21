@@ -62,14 +62,12 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
   }
 
   // init global U matrix
-  int U_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  int U_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
-  double *U_MEM = new double[(int64_t)U_local_nrows * (int64_t)U_local_ncols];
+  int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  double *U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
   int U[9];
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
-            &U_local_nrows, &INFO);
-
-
+            &U_nrows, &INFO);
 
   // obtain the shared basis of each row.
   for (int64_t block = 0; block < nblocks; ++block) {
@@ -108,10 +106,30 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
              WORK, &LWORK,
              &INFO);
 
+
+    // init cblacs info for the local U block.
+    int U_LOCAL_CONTEXT;        // local CBLACS context
+    int IMAP[1];                // workspace to map the original grid.
+    int LOCAL_PNROWS, LOCAL_PNCOLS, LOCAL_PROW, LOCAL_PCOL; // local process grid parameters.
+    Cblacs_get(-1, 0, &U_LOCAL_CONTEXT);                    // init the new CBLACS context.
+    Cblacs_gridmap(&U_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
+    Cblacs_gridinfo(U_LOCAL_CONTEXT,                       // init grid params from the context.
+                    &LOCAL_PNROWS, &LOCAL_PNCOLS, &LOCAL_PROW, &LOCAL_PCOL);
+
+    // store opts.max_rank columns of U in the A.U for this process.
+    // init local U block for communication.
+    int U_LOCAL[9];
+    int U_LOCAL_nrows = nleaf, U_LOCAL_ncols = opts.max_rank;
+
+    // descset_(U_LOCAL,
+    //          &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
+    //          &);
+
+    Matrix U(U_LOCAL_nrows, U_LOCAL_ncols);
+
     delete[] WORK;
     delete[] S_MEM;
   }
-
 
   delete[] AY_MEM;
   delete[] U_MEM;
