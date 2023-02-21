@@ -15,16 +15,17 @@ using namespace Hatrix;
 
 
 void
-generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain,
+                    const Args& opts) {
   int N = opts.N;
   int nleaf = opts.nleaf;
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
-  double *AY_MEM = NULL;
   int AY[9]; int INFO;
 
-  AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
-  descinit_(AY, &N, &nleaf, &DENSE_NBROW, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
+  double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
+  descinit_(AY, &N, &nleaf, &DENSE_NBROW, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
+            &AY_local_nrows, &INFO);
 
   int64_t nblocks = pow(2, A.max_level);
 
@@ -60,7 +61,60 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Domain& domain, const A
     }
   }
 
+  // init global U matrix
+  int U_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int U_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  double *U_MEM = new double[(int64_t)U_local_nrows * (int64_t)U_local_ncols];
+  int U[9];
+  descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
+            &U_local_nrows, &INFO);
+
+
+
+  // obtain the shared basis of each row.
+  for (int64_t block = 0; block < nblocks; ++block) {
+    char JOB_U = 'V';
+    char JOB_VT = 'N';
+    int IA = nleaf * block + 1;
+    int JA = 1;
+    int IU = nleaf * block + 1;
+    int JU = 1;
+
+    // init global S vector for this block.
+    double *S_MEM = new double[(int64_t)nleaf];
+    double *WORK = new double[1];
+    int LWORK = -1;
+
+    // SVD workspace query.
+    pdgesvd_(&JOB_U, &JOB_VT,
+             &nleaf, &nleaf,
+             AY_MEM, &IA, &JA, AY,
+             S_MEM,
+             U_MEM, &IU, &JU, U,
+             NULL, NULL, NULL, NULL, // not calculating VT so NULL
+             WORK, &LWORK,
+             &INFO);
+    LWORK = WORK[0];
+    delete[] WORK;
+
+    // SVD computation.
+    WORK = new double[(int64_t)LWORK];
+    pdgesvd_(&JOB_U, &JOB_VT,
+             &nleaf, &nleaf,
+             AY_MEM, &IA, &JA, AY,
+             S_MEM,
+             U_MEM, &IU, &JU, U,
+             NULL, NULL, NULL, NULL, // not calculating VT so NULL
+             WORK, &LWORK,
+             &INFO);
+
+    delete[] WORK;
+    delete[] S_MEM;
+  }
+
+
   delete[] AY_MEM;
+  delete[] U_MEM;
 }
 
 void

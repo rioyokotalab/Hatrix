@@ -26,12 +26,14 @@ extern "C" {
   //          column is to be determined.
   // ISRCPROC :: The coordinate of the process that possesses the first
   //             row or column of the distributed matrix. Global input.
-  int numroc_(const int* N, const int* NB, const int* IPROC, const int* ISRCPROC ,
+  int numroc_(const int* N, const int* NB, const int* IPROC, const int* ISRCPROC,
               const int* NPROCS);
 
   // init descriptor for scalapack matrices.
-  void descinit_(int *desc, const int *m,  const int *n, const int *mb,
-                 const int *nb, const int *irsrc, const int *icsrc, const int *BLACS_CONTEXT,
+  void descinit_(int *desc,
+                 const int *m,  const int *n, const int *mb, const int *nb,
+                 const int *irsrc, const int *icsrc,
+                 const int *BLACS_CONTEXT,
                  const int *lld, int *info);
 
   // set values of the descriptor without error checking.
@@ -98,10 +100,12 @@ extern "C" {
                double *b, const int *ib, const int *jb, const int *descb );
 
   void pdgesvd_(const char* jobu, const char* jobvt,
-                const int* m, const int* n, const double* a, const int* ia, const int* ja,
-                const int* desca, double* s, double* u, const int* iu, const int* ju,
-                const int* descu, double* vt, const int* ivt, const int* jvt,
-                const int* descvt, double* work, const int* lwork, int* info);
+                const int* m, const int* n,
+                const double* a, const int* ia, const int* ja, const int* desca,
+                double* s,      // note that the S does not have index specifiers.
+                double* u, const int* iu, const int* ju, const int* descu,
+                double* vt, const int* ivt, const int* jvt, const int* descvt,
+                double* work, const int* lwork, int* info);
 
   // add two matrices.
   // sub(C):=beta*sub(C) + alpha*op(sub(A)),
