@@ -40,7 +40,7 @@ LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B) {
   std::vector<Matrix<DT>> InnerH = InnerU.split(2, 1);
   matmul(A.U, B.U, InnerH[0], true, false, 1, 0); 
   
-  Matrix<DT> Bu_AuAtBu(B.U);
+  Matrix<DT> Bu_AuAtBu(B.U, true);
   matmul(A.U, InnerH[0], Bu_AuAtBu, false, false, -1, 1);
   Matrix<DT> OuterU_1(A.U.rows, rank);
   qr(Bu_AuAtBu, OuterU_1, InnerH[1]); 
@@ -54,7 +54,7 @@ LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B) {
   Matrix<DT> InnerV(rank, rank+rank);
   InnerH = InnerV.split(1,2);
   matmul(B.V, A.V, InnerH[0], false, true, 1, 0);
-  Matrix<DT> Bv_BvAvtAv(B.V);
+  Matrix<DT> Bv_BvAvtAv(B.V, true);
   matmul(InnerH[0], A.V, Bv_BvAvtAv, false, false, -1, 1);
   Matrix<DT> OuterV_1(rank, A.V.cols);
   rq(Bv_BvAvtAv, InnerH[1], OuterV_1);

@@ -54,6 +54,7 @@ else()
     NxN_BLR
     HODLR_2level
     HODLR_3level
+    HODLR_Nlevel_parallel
     #Construction_SymmetricH2_Nlevel_with_sampling
   )
 endif()

@@ -90,9 +90,9 @@ namespace Hatrix {
 
 int main() {
   int n = 1024;
-  int leaf_size = 32;
+  int leaf_size = 256;
   int num_blocks = n / leaf_size;
-  int rank = 16;
+  int rank = 100;
 
   
   std::vector<std::vector<double>> randpts;
