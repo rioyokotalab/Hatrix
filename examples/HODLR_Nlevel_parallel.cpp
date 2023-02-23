@@ -15,9 +15,33 @@ double get_time() {
 
 namespace Hatrix {
 
+  void add_children(RowColLevelMap<bool>& map, int row, int col, int level, int max_level) {
+    if (level > max_level)
+      return;
+
+    row *= 2;
+    col *= 2;
+    if (col > row) {
+      map.insert(row, col, level, true);
+      std::cout<<"Insert "<<row<<","<<col<<","<<level<<"(child)"<<std::endl;
+      add_children(map, row, col, level+1, max_level);
+      map.insert(row+1, col, level, true);
+      std::cout<<"Insert "<<row+1<<","<<col<<","<<level<<"(child)"<<std::endl;
+      add_children(map, row+1, col, level+1, max_level);
+    } else {
+      //no diagonal blocks are addmissible
+      map.insert(row, col, level, true);
+      std::cout<<"Insert "<<row<<","<<col<<","<<level<<"(child)"<<std::endl;
+      add_children(map, row, col, level+1, max_level);
+      map.insert(row, col+1, level, true);
+      std::cout<<"Insert "<<row<<","<<col+1<<","<<level<<"(child)"<<std::endl;
+      add_children(map, row, col+1, level+1, max_level);
+    }
+  }
+
   bool is_admissible(RowColLevelMap<bool>& map, int row, int col, int level) {
     map.insert(row, col, level, row!=col);
-    //std::cout<<"Insert "<<row<<","<<col<<","<<level<<"("<<(row!=col)<<")"<<std::endl;
+    std::cout<<"Insert "<<row<<","<<col<<","<<level<<"("<<(row!=col)<<")"<<std::endl;
     return row!=col;
   }
 
@@ -32,7 +56,9 @@ namespace Hatrix {
       add_admissibility(map, start, start+1, level+1, max_level);
       add_admissibility(map, start+1, start, level+1, max_level);
       add_admissibility(map, start+1, start+1, level+1, max_level);
-    }   
+    } else {
+      add_children(map, row, col, level+1, max_level);
+    }
   }
 
   RowColLevelMap<bool> create_admissibility(int max_level) {
@@ -174,6 +200,26 @@ namespace Hatrix {
     return map;
   }
 
+  void wait_for_children(RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level) {
+    row *= 2;
+    col *= 2;
+    if (level < max_level) {
+      wait_for_children(is_admissible, row, col, level+1, max_level);
+      if (row > col) {
+        wait_for_children(is_admissible, row, col+1, level+1, max_level);
+      } else {
+        wait_for_children(is_admissible, row+1, col, level+1, max_level);
+      }
+    } else {
+      if (row > col) {
+        #pragma omp taskwait depend(in: is_admissible(row, col, level), is_admissible(row, col+1, level))
+      } else {
+        #pragma omp taskwait depend(in: is_admissible(row, col, level), is_admissible(row+1, col, level))
+      }
+    }
+
+  }
+
   template <typename DT>
   void trsm(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, int row, int col, int level, int max_level, Hatrix::Matrix<DT>& B, Hatrix::Side side, Hatrix::Mode uplo) {
     int start = row * 2;
@@ -240,23 +286,26 @@ namespace Hatrix {
   void getrf(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level) {
     int start = row * 2;
     if (level < max_level) {
-      #pragma omp task shared(dense_map, lr_map, is_admissible) depend(inout: is_admissible(start, start, level+1))
+      //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(inout: is_admissible(start, start, level+1))
       {
         getrf<DT>(dense_map, lr_map, is_admissible, start, start, level+1, max_level);
       }
-      #pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start, start, level+1)) depend(inout: is_admissible(start, start+1, level+1))
+      //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start, start, level+1)) depend(inout: is_admissible(start, start+1, level+1))
       {
         Hatrix::trsm<DT>(dense_map, lr_map, start, start, level+1, max_level, lr_map(start, start+1, level+1).U, Hatrix::Left, Hatrix::Lower);
       }
-      #pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start, start, level+1)) depend(inout: is_admissible(start+1, start, level+1))
+      //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start, start, level+1)) depend(inout: is_admissible(start+1, start, level+1))
       {
         Hatrix::trsm<DT>(dense_map, lr_map, start, start, level+1, max_level, lr_map(start+1, start, level+1).V, Hatrix::Right, Hatrix::Upper);
       }
-      #pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start+1, start, level+1), is_admissible(start, start+1, level+1)) depend(inout: is_admissible(start+1, start+1, level+1))
+      //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start+1, start, level+1), is_admissible(start, start+1, level+1)) depend(inout: is_admissible(start+1, start+1, level+1))
+      // wait for all tasks on children of the input low-rank blocks
+      wait_for_children(is_admissible, start+1, start, level+1, max_level);
+      wait_for_children(is_admissible, start, start+1, level+1, max_level);
       {
         Hatrix::matmul(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level);
       }
-      #pragma omp task shared(dense_map, lr_map, is_admissible) depend(inout: is_admissible(start+1, start+1, level+1))
+      //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(inout: is_admissible(start+1, start+1, level+1))
       {
         getrf<DT>(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level);
       }
@@ -293,10 +342,10 @@ namespace Hatrix {
 }
 
 int main() {
-  int n = 8192;
-  int leaf_size = 64;
+  int n = 1024;
+  int leaf_size = 128;
   int num_blocks = n / leaf_size;
-  int rank = 20;
+  int rank = 100;
 
   int max_level = 0;
   int size = n;
