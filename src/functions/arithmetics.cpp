@@ -45,7 +45,8 @@ LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B) {
   Matrix<DT> OuterU_1(A.U.rows, rank);
   qr(Bu_AuAtBu, OuterU_1, InnerH[1]); 
 
-  Matrix<DT> OuterU_0 = std::move(A.U);
+  // changed to copy here because move would change the pre-allocated view
+  Matrix<DT> OuterU_0(A.U, true);
  
   // Merge row basis
   assert(A.V.cols == B.V.cols);
@@ -59,7 +60,8 @@ LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B) {
   Matrix<DT> OuterV_1(rank, A.V.cols);
   rq(Bv_BvAvtAv, InnerH[1], OuterV_1);
 
-  Matrix<DT> OuterV_0 = std::move(A.V);
+  // changed to copy here because move would change the pre-allocated view
+  Matrix<DT> OuterV_0(A.V, true);
  
   // Merge S
   rank = A.S.rows;
@@ -77,15 +79,16 @@ LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B) {
   Vhat.shrink(rank, Vhat.cols);
 
 
-  A.U = Matrix<DT>(A.rows, rank);
-  A.V = Matrix<DT>(rank, A.cols);
+  //A.U = Matrix<DT>(A.rows, rank);
+  //A.V = Matrix<DT>(rank, A.cols);
+  // This should be save since all views point to the same S
   A.S = std::move(Shat);
   std::vector<Matrix<DT>> Uhat_split = Uhat.split(2,1);
-  matmul(OuterU_0, Uhat_split[0], A.U);
+  matmul(OuterU_0, Uhat_split[0], A.U, false, false, 1, 0);
   matmul(OuterU_1, Uhat_split[1], A.U);
 
   std::vector<Matrix<DT>> Vhat_split = Vhat.split(1,2);
-  matmul(Vhat_split[0], OuterV_0, A.V);
+  matmul(Vhat_split[0], OuterV_0, A.V, false, false, 1, 0);
   matmul(Vhat_split[1], OuterV_1, A.V);
   
   return A;
