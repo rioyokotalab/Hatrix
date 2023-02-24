@@ -680,7 +680,8 @@ task_schurs_complement_3(parsec_execution_stream_t* es, parsec_task_t* this_task
                          &_D_block_block,
                          &_D_block_j);
 
-  MatrixWrapper D_block_block(_D_block_block, D_block_block_nrows, D_block_block_nrows, D_block_block_nrows);
+  MatrixWrapper D_block_block(_D_block_block,
+                              D_block_block_nrows, D_block_block_nrows, D_block_block_nrows);
   MatrixWrapper D_block_j(_D_block_j, D_block_block_nrows, D_block_j_ncols, D_block_block_nrows);
 
   auto D_block_block_split = split_dense(D_block_block,
@@ -746,6 +747,20 @@ task_row_transfer_basis_update(parsec_execution_stream_t* es, parsec_task_t* thi
   MatrixWrapper r_c1(_r_c1, rank_c1, rank_c1, rank_c1);
   MatrixWrapper r_c2(_r_c1, rank_c1, rank_c1, rank_c1);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_project_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t nrows, ncols, rank_i, rank_j;
+  double *_Ui, *_Uj, *_Fij, *_Sij;
+
+  // parsec_dtd_unpack_args(this_task,
+  //                        &nrows, &ncols, &rank_i, &rank_j,
+  //                        &_Ui, &_Uj, &_Fij, &_Sij);
+
+  // MatrixWrapper Ui(_Ui, nrows, rank_i, nrows);
 
   return PARSEC_HOOK_RETURN_DONE;
 }

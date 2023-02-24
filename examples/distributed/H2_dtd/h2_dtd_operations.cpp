@@ -581,7 +581,6 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
               parsec_data_key_t D_c1c2_key =
                 parsec_D.super.data_key(&parsec_D.super, c1, c2, level);
 
-
               int write_arena = A.max_level == parent_level ? D_ARENA : FINAL_DENSE_ARENA;
               int read_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
@@ -1142,7 +1141,7 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   if (found_row_fill_in) {
     update_row_cluster_basis(A, domain, block, level, opts);
     update_row_S_blocks(A, domain, block, level);
-    update_row_transfer_bases(A, domain, block, level);
+    // update_row_transfer_bases(A, domain, block, level);
   }
 }
 
@@ -1274,7 +1273,7 @@ update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   if (found_col_fill_in) {
     update_col_cluster_basis(A, domain, block, level, opts);
     update_col_S_blocks(A, domain, block, level);
-    update_col_transfer_bases(A, domain, block, level);
+    // update_col_transfer_bases(A, domain, block, level);
   }
 }
 
@@ -1285,14 +1284,14 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    // update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
-    // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
 
     multiply_complements(A, domain, block, level);
     factorize_diagonal(A, domain, block, level);
     triangle_reduction(A, domain, block, level);
-    // compute_schurs_complement(A, domain, block, level);
-    // compute_fill_ins(A, domain, block, level);
+    compute_schurs_complement(A, domain, block, level);
+    compute_fill_ins(A, domain, block, level);
   }
 }
 
@@ -1429,7 +1428,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
           int64_t F_ij_col_rank = A.ranks(j, level);
           auto F_ij_key = parsec_F.super.data_key(&parsec_F.super, i, j, level);
 
-          if (mpi_rank(i, j) == MPIRANK) {
+          if (mpi_rank(i) == MPIRANK) {
             if (!F.exists(i, j, level)) {
               Matrix fill_in = Matrix(get_dim(A, domain, i, level),
                                       get_dim(A, domain, j, level));
@@ -1444,7 +1443,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
             F.insert(i, j, level, std::move(fill_in));
           }
 
-          parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i, j);
+          parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i);
 
           int64_t D_i_block_rows = get_dim(A, domain, i, level);
           int64_t D_i_block_cols = get_dim(A, domain, block, level);
@@ -1496,7 +1495,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
           int64_t F_ij_col_rank = A.ranks(j, level);
           auto F_ij_key = parsec_F.super.data_key(&parsec_F.super, i, j, level);
 
-          if (mpi_rank(i, j) == MPIRANK) {
+          if (mpi_rank(i) == MPIRANK) {
             if (!F.exists(i, j, level)) {
               Matrix fill_in = Matrix(get_dim(A, domain, i, level),
                                       get_dim(A, domain, j, level));
@@ -1510,7 +1509,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
             Matrix fill_in;
             F.insert(i, j, level, std::move(fill_in));
           }
-          parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i, j);
+          parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i);
 
           int64_t D_i_block_rows = get_dim(A, domain, i, level);
           int64_t D_i_block_cols = get_dim(A, domain, block, level);
@@ -1563,7 +1562,7 @@ void h2_dc_init_maps() {
   h2_dc_init(parsec_U, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_S, data_key_2d, rank_of_1d);
   h2_dc_init(parsec_D, data_key_2d, rank_of_1d);
-  h2_dc_init(parsec_F, data_key_2d, rank_of_2d);
+  h2_dc_init(parsec_F, data_key_2d, rank_of_1d);
   h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d);
   h2_dc_init(parsec_US, data_key_1d, rank_of_1d);
@@ -1633,9 +1632,6 @@ final_dense_factorize(SymmetricSharedBasisMatrix& A,
         int64_t D_ij_nrows = get_dim(A, domain, i, level);
         int64_t D_ij_ncols = get_dim(A, domain, j, level);
 
-        auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
-        auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
-
         if (i == j) {
           auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
           auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
@@ -1682,8 +1678,51 @@ final_dense_factorize(SymmetricSharedBasisMatrix& A,
 
 static void
 add_fill_in_contributions_to_skeleton_matrices(SymmetricSharedBasisMatrix& A,
+                                               const Hatrix::Domain& domain,
                                                const Hatrix::Args& opts,
                                                const int64_t level) {
+  int64_t nblocks = pow(2, level);
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (F.exists(i, j, level)) {
+        auto Ui_key = parsec_U.super.data_key(&parsec_U.super, i, level);
+        auto Uj_key = parsec_U.super.data_key(&parsec_U.super, j, level);
+        auto Fij_key = parsec_F.super.data_key(&parsec_F.super, i, j, level);
+        auto Sij_key = parsec_S.super.data_key(&parsec_S.super, i, j, level);
+
+        std::cout << "i,j: " << Hatrix::norm(F(i, j, level)) << std::endl;
+
+        int64_t nrows = get_dim(A, domain, i, level);
+        int64_t ncols = get_dim(A, domain, j, level);
+        int64_t rank_i = A.ranks(i, level);
+        int64_t rank_j = A.ranks(j, level);
+
+        int arena_u = level == A.max_level ? U_ARENA : U_NON_LEAF_ARENA;
+        int arena_d = level == A.max_level ? D_ARENA : FINAL_DENSE_ARENA;
+
+        // auto Fij_tile = parsec_dtd_tile_of(&parsec_F.super, Fij_key);
+
+        // std::cout << "Fij tile: " << Fij_tile << std::endl;
+
+        parsec_dtd_insert_task(dtd_tp, task_project_fill_in, 0, PARSEC_DEV_CPU,
+          "project_fill_in_task",
+          sizeof(int64_t), &nrows, PARSEC_VALUE,
+          sizeof(int64_t), &ncols, PARSEC_VALUE,
+          sizeof(int64_t), &rank_i, PARSEC_VALUE,
+          sizeof(int64_t), &rank_j, PARSEC_VALUE,
+          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, Ui_key),
+                               PARSEC_INPUT | arena_u,
+          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, Uj_key),
+                               PARSEC_INPUT | arena_u,
+          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, Fij_key),
+                               PARSEC_INPUT | arena_d,
+          PASSED_BY_REF, parsec_dtd_tile_of(&parsec_S.super, Sij_key),
+                               PARSEC_INOUT | S_ARENA | PARSEC_AFFINITY,
+          PARSEC_DTD_ARG_END);
+      }
+    }
+  }
 }
 
 static void
@@ -1747,7 +1786,6 @@ void factorize_teardown() {
   parsec_dtd_destroy_arena_datatype(parsec, S_ARENA);
   parsec_dtd_destroy_arena_datatype(parsec, FINAL_DENSE_ARENA);
   parsec_dtd_destroy_arena_datatype(parsec, U_NON_LEAF_ARENA);
-
 }
 
 
@@ -1756,15 +1794,11 @@ void factorize_teardown() {
 // make it work with the runtime.
 long long int
 factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::Args& opts) {
-  // Hatrix::profiling::PAPI papi;
-  // papi.add_fp_ops(0);
-  // papi.start();
-
   int64_t level;
 
   for (level = A.max_level; level >= A.min_level; --level) {
     factorize_level(A, domain, level, opts);
-    // add_fill_in_contributions_to_skeleton_matrices(A, opts, level);
+    add_fill_in_contributions_to_skeleton_matrices(A, domain, opts, level);
     // propagate_fill_ins_to_upper_level(A, opts, level);
 
     merge_unfactorized_blocks(A, domain, level);
@@ -1785,8 +1819,6 @@ factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::A
 
   int rc = parsec_taskpool_wait(dtd_tp);
   PARSEC_CHECK_ERROR(rc, "parsec_dtd_taskpool_wait");
-
-  // auto fp_ops = papi.fp_ops();
 
   return 0;
 }
