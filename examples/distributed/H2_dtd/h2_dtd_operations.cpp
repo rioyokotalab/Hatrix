@@ -1159,7 +1159,7 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   if (found_row_fill_in) {
     update_row_cluster_basis(A, domain, block, level, opts);
     update_row_S_blocks(A, domain, block, level);
-    // update_row_transfer_bases(A, domain, block, level);
+    update_row_transfer_bases(A, domain, block, level);
   }
 }
 

@@ -724,11 +724,17 @@ task_project_fill_in(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t nrows, ncols, rank_i, rank_j;
   double *_Ui, *_Uj, *_Fij, *_Sij;
 
-  // parsec_dtd_unpack_args(this_task,
-  //                        &nrows, &ncols, &rank_i, &rank_j,
-  //                        &_Ui, &_Uj, &_Fij, &_Sij);
+  parsec_dtd_unpack_args(this_task,
+                         &nrows, &ncols, &rank_i, &rank_j,
+                         &_Ui, &_Uj, &_Fij, &_Sij);
 
-  // MatrixWrapper Ui(_Ui, nrows, rank_i, nrows);
+  MatrixWrapper Ui(_Ui, nrows, rank_i, nrows);
+  MatrixWrapper Uj(_Uj, ncols, rank_j, ncols);
+  MatrixWrapper Fij(_Fij, nrows, ncols, nrows);
+  MatrixWrapper Sij(_Sij, rank_i, rank_j, rank_i);
+
+  Matrix temp = matmul(matmul(Ui, Fij, true), Uj);
+  Sij += temp;
 
   return PARSEC_HOOK_RETURN_DONE;
 }

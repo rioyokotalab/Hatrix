@@ -22,12 +22,6 @@ parsec_hook_return_t
 task_trsm_cc_oc(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
-task_partial_syrk(parsec_execution_stream_t* es, parsec_task_t* this_task);
-
-parsec_hook_return_t
-task_partial_matmul(parsec_execution_stream_t* es, parsec_task_t* this_task);
-
-parsec_hook_return_t
 task_copy_blocks(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
