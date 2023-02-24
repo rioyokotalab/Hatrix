@@ -10,10 +10,7 @@
 #include "parsec/data.h"
 
 parsec_hook_return_t
-task_multiply_full_complement(parsec_execution_stream_t* es, parsec_task_t* this_task);
-
-parsec_hook_return_t
-task_multiply_partial_complement_left(parsec_execution_stream_t* es, parsec_task_t* this_task);
+task_multiply_complement(parsec_execution_stream_t* es, parsec_task_t* this_task);
 
 parsec_hook_return_t
 task_multiply_complement_right(parsec_execution_stream_t* es, parsec_task_t* this_task);

@@ -109,28 +109,6 @@ task_matmul_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 }
 
 parsec_hook_return_t
-task_multiply_full_complement(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_nrows, D_ncols, U_nrows, U_ncols;
-  double *_D, *_U;
-
-  parsec_dtd_unpack_args(this_task,
-                         &_D,
-                         &D_nrows, &D_ncols,
-                         &_U,
-                         &U_nrows, &U_ncols);
-
-  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
-  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
-
-  Matrix UF = make_complement(U);
-  Matrix product = matmul(matmul(UF, D, true), UF);
-
-  D.copy_mem(product);
-
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
 task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t D_nrows, rank_nrows;
   double *_D;
@@ -152,23 +130,34 @@ task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task)
 }
 
 parsec_hook_return_t
-task_multiply_complement_right(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_nrows, D_ncols;
-  double *_D;
-  int64_t U_nrows, U_ncols;
-  double *_U;
+task_multiply_complement(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_nrows, D_ncols, D_row_rank, D_col_rank, U_nrows, U_ncols;
+  double *_D, *_U;
+  char which;
 
   parsec_dtd_unpack_args(this_task,
-                         &_D, &D_nrows, &D_ncols,
-                         &_U, &U_nrows, &U_ncols);
+                         &D_nrows, &D_ncols, &D_row_rank, &D_col_rank,
+                         &U_nrows, &U_ncols,
+                         &_D, &_U, &which);
 
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
-  Matrix U_F = make_complement(U);
+  Matrix UF = make_complement(U);
+  Matrix product;
 
-  Matrix product = matmul(D, U_F);
-  D.copy_mem(product);
+  switch(which) {
+  case 'F':                     // multiply full complements.
+    product = matmul(matmul(UF, D, true), UF);
+    D.copy_mem(product);
+    break;
+  case 'L':                     // multiply only the left side.
+    break;
+  case 'R':                     // multiply only the right side.
+    Matrix product = matmul(D, UF);
+    D.copy_mem(product);
+    break;
+  }
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -580,7 +569,8 @@ task_schurs_complement_1(parsec_execution_stream_t* es, parsec_task_t* this_task
                          &D_i_block_ncols,
                          &_D_i_block);
 
-  MatrixWrapper D_block_block(_D_block_block, D_block_block_nrows, D_block_block_nrows, D_block_block_nrows);
+  MatrixWrapper D_block_block(_D_block_block, D_block_block_nrows,
+                              D_block_block_nrows, D_block_block_nrows);
   MatrixWrapper D_i_block(_D_i_block, D_i_block_nrows, D_i_block_ncols, D_i_block_nrows);
 
   auto D_block_block_split = split_dense(D_block_block,
