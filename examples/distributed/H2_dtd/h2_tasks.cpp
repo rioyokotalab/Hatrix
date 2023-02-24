@@ -145,47 +145,25 @@ task_multiply_complement(parsec_execution_stream_t* es, parsec_task_t* this_task
 
   Matrix UF = make_complement(U);
   Matrix product;
+  std::vector<Matrix> D_splits;
 
-  switch(which) {
-  case 'F':                     // multiply full complements.
-    product = matmul(matmul(UF, D, true), UF);
+  if (which == 'F') {           // multiply complements from the left and right
+    Matrix product = matmul(matmul(UF, D, true), UF);
     D.copy_mem(product);
-    break;
-  case 'L':                     // multiply only the left side.
-    break;
-  case 'R':                     // multiply only the right side.
+  }
+  else if (which == 'L') {      // left multiplication
+    auto D_splits = D.split({},
+                       std::vector<int64_t>(1,
+                                            D_ncols - D_col_rank));
+    D_splits[1] = matmul(UF, D_splits[1], true);
+  }
+  else if (which == 'R') {      // right multiplication
     Matrix product = matmul(D, UF);
     D.copy_mem(product);
-    break;
   }
 
   return PARSEC_HOOK_RETURN_DONE;
 }
-
-parsec_hook_return_t
-task_multiply_partial_complement_left(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_nrows, D_ncols, D_col_rank;
-  double *_D;
-  int64_t U_nrows, U_ncols;
-  double *_U;
-
-  parsec_dtd_unpack_args(this_task,
-                         &_D, &D_nrows, &D_ncols, &D_col_rank,
-                         &_U, &U_nrows, &U_ncols);
-
-  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
-  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
-
-  Matrix U_F = make_complement(U);
-
-  auto D_splits = D.split({},
-                          std::vector<int64_t>(1,
-                                               D_ncols - D_col_rank));
-  D_splits[1] = matmul(U_F, D_splits[1], true);
-
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
 
 parsec_hook_return_t
 task_trsm_co(parsec_execution_stream_t* es, parsec_task_t* this_task) {

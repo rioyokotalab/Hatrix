@@ -676,20 +676,24 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
 
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_inadmissible(A, block, j, level)) {
+      int64_t D_row_rank = A.ranks(block, level);
       int64_t D_col_rank = A.ranks(j, level);
       auto D_key = parsec_D.super.data_key(&parsec_D.super, block, j, level);
+      which = 'L';
 
-      parsec_dtd_insert_task(dtd_tp, task_multiply_partial_complement_left, 0, PARSEC_DEV_CPU,
-        "multiply_partial_complement_left_task",
-        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
-                             PARSEC_INOUT | d_arena_type | PARSEC_AFFINITY,
+      parsec_dtd_insert_task(dtd_tp, task_multiply_complement, 100, PARSEC_DEV_CPU,
+        "multiply_complement_task",
         sizeof(int64_t), &D_nrows, PARSEC_VALUE,
         sizeof(int64_t), &D_ncols, PARSEC_VALUE,
+        sizeof(int64_t), &D_row_rank, PARSEC_VALUE,
         sizeof(int64_t), &D_col_rank, PARSEC_VALUE,
-        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-                         PARSEC_INPUT | u_arena_type,
         sizeof(int64_t), &U_nrows, PARSEC_VALUE,
         sizeof(int64_t), &U_ncols, PARSEC_VALUE,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_key),
+                             PARSEC_INOUT | d_arena_type | PARSEC_AFFINITY,
+        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
+                             PARSEC_INPUT | u_arena_type,
+        sizeof(char), &which, PARSEC_VALUE,
         PARSEC_DTD_ARG_END);
     }
   }
