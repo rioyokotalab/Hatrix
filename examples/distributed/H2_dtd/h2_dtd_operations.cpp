@@ -1159,7 +1159,7 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   if (found_row_fill_in) {
     update_row_cluster_basis(A, domain, block, level, opts);
     update_row_S_blocks(A, domain, block, level);
-    update_row_transfer_bases(A, domain, block, level);
+    // update_row_transfer_bases(A, domain, block, level);
   }
 }
 
@@ -1709,8 +1709,6 @@ add_fill_in_contributions_to_skeleton_matrices(SymmetricSharedBasisMatrix& A,
         auto Fij_key = parsec_F.super.data_key(&parsec_F.super, i, j, level);
         auto Sij_key = parsec_S.super.data_key(&parsec_S.super, i, j, level);
 
-        std::cout << "i,j: " << Hatrix::norm(F(i, j, level)) << std::endl;
-
         int64_t nrows = get_dim(A, domain, i, level);
         int64_t ncols = get_dim(A, domain, j, level);
         int64_t rank_i = A.ranks(i, level);
@@ -1853,7 +1851,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
     }
 
     // send the diagonal block to the rank that has the corresponding vector.
-    if (mpi_rank(block, block) == MPIRANK) {
+    if (mpi_rank(block) == MPIRANK) {
       MPI_Request block_request;
       MPI_Isend(&A.D(block, block, level), A.D(block, block, level).numel(), MPI_DOUBLE,
                 mpi_rank(block), block, MPI_COMM_WORLD, &block_request);
@@ -1956,7 +1954,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
 
           Matrix D_irow_block(D_irow_block_nrows, D_irow_block_ncols);
           MPI_Recv(&D_irow_block, D_irow_block.numel(), MPI_DOUBLE,
-                   mpi_rank(irow, block), irow, MPI_COMM_WORLD, &status);
+                   mpi_rank(irow), irow, MPI_COMM_WORLD, &status);
 
           Matrix x_block(D_irow_block_ncols, 1);
           MPI_Recv(&x_block, x_block.numel(), MPI_DOUBLE,
@@ -2124,7 +2122,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
 
           Matrix D_block_icol(D_block_icol_nrows, D_block_icol_ncols);
           MPI_Recv(&D_block_icol, D_block_icol.numel(), MPI_DOUBLE,
-                   mpi_rank(block, icol), icol, MPI_COMM_WORLD, &status);
+                   mpi_rank(block), icol, MPI_COMM_WORLD, &status);
 
           Matrix x_block(D_block_icol_nrows, 1);
           MPI_Recv(&x_block, x_block.numel(), MPI_DOUBLE,
@@ -2166,7 +2164,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
 
           Matrix D_icol_block(D_icol_block_nrows, D_icol_block_ncols);
           MPI_Recv(&D_icol_block, D_icol_block.numel(), MPI_DOUBLE,
-                   mpi_rank(icol, block), block, MPI_COMM_WORLD, &status);
+                   mpi_rank(icol), block, MPI_COMM_WORLD, &status);
 
           Matrix x_icol(D_icol_block_nrows, 1);
           MPI_Recv(&x_icol, x_icol.numel(), MPI_DOUBLE,
@@ -2200,7 +2198,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
 
       Matrix D_copy(get_dim(A, domain, block, level), get_dim(A, domain, block, level));
       MPI_Recv(&D_copy, D_copy.numel(), MPI_DOUBLE,
-               mpi_rank(block, block), block, MPI_COMM_WORLD, &status);
+               mpi_rank(block), block, MPI_COMM_WORLD, &status);
       auto block_splits = split_dense(D_copy,
                                       D_copy.rows - rank,
                                       D_copy.cols - rank);
@@ -2377,4 +2375,6 @@ solve(SymmetricSharedBasisMatrix& A,
   for (int64_t i = 0; i < x_levels[0].size(); ++i) {
     h2_solution[i] = x_levels[0][i];
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
 }
