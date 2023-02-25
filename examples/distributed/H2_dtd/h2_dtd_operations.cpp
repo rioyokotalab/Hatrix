@@ -1189,13 +1189,15 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
     if (exists_and_admissible(A, i, block, level) && F.exists(i, block, level)) {
       int64_t F_i_block_nrows = get_dim(A, domain, i, level);
       int64_t F_i_block_ncols = get_dim(A, domain, block, level);
+      char which = 'C';
       parsec_data_key_t F_i_block_key =
         parsec_F.super.data_key(&parsec_F.super, i, block, level);
 
-      parsec_dtd_insert_task(dtd_tp, task_fill_in_cols_addition, 0, PARSEC_DEV_CPU,
-        "fill_in_cols_addition_task",
+      parsec_dtd_insert_task(dtd_tp, task_fill_in_addition, 0, PARSEC_DEV_CPU,
+        "fill_in_addition_task",
         sizeof(int64_t), &F_i_block_nrows, PARSEC_VALUE,
         sizeof(int64_t), &F_i_block_ncols, PARSEC_VALUE,
+        sizeof(char), &which, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_i_block_key),
                              PARSEC_INPUT | D_ARENA,
         sizeof(int64_t), &block_size, PARSEC_VALUE,
