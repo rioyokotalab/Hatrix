@@ -234,6 +234,17 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   int child_block_size = N / child_nblocks;
 
+  // Allocate a global matrix to store the transfer matrices. The transfer matrices for the
+  // entire level are stacked by row in this global matrix.
+  int UTRANSFER_nrows = child_nblocks * rank;
+  int UTRANSFER_local_nrows = numroc_(&UTRANSFER_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int UTRANSFER_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
+  int UTRANSFER[9];
+  double *UTRANSFER_MEM =
+    new double[(int64_t)UTRANSFER_local_nrows * (int64_t)UTRANSFER_local_ncols];
+  descinit_(UTRANSFER, &UTRANSFER_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
+
   for (int64_t block = 0; block < nblocks; ++block) {
     int64_t c1 = block * 2;
     int64_t c2 = block * 2 + 1;
@@ -272,6 +283,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
             AY_MEM, &IA, &JA, AY,
             &BETA,
             TEMP_MEM, &ITEMP, &JTEMP, TEMP);
+
+    // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
+    double *S_MEM = new double[(int64_t)child_block_size]();
+
+
+
+    delete[] S_MEM;
 
   }
   delete[] TEMP_MEM;
