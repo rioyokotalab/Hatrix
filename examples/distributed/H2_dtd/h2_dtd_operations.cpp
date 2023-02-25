@@ -1053,9 +1053,10 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   int64_t r_nrows = A.ranks(block, level);
   parsec_data_key_t r_key = parsec_r.super.data_key(&parsec_r.super,
                                                     block, level);
+  char which = 'R';
 
-  parsec_dtd_insert_task(dtd_tp, task_fill_in_QR, 0, PARSEC_DEV_CPU,
-    "fill_in_QR_task",
+  parsec_dtd_insert_task(dtd_tp, task_fill_in_recompression, 0, PARSEC_DEV_CPU,
+    "fill_in_recompression_task",
     sizeof(int64_t), &block_size, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_rows.super, fill_in_key),
                          PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
@@ -1069,6 +1070,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
     sizeof(int64_t), &r_nrows, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_r.super, r_key),
                          PARSEC_INPUT | S_ARENA,
+    sizeof(char), &which, PARSEC_VALUE,
     PARSEC_DTD_ARG_END);
 
 }
@@ -1089,6 +1091,7 @@ update_row_S_blocks(SymmetricSharedBasisMatrix& A,
       int64_t r_nrows = A.ranks(block, level);
       parsec_data_key_t r_key = parsec_r.super.data_key(&parsec_r.super,
                                                         block, level);
+      char which = 'R';
 
       parsec_dtd_insert_task(dtd_tp, task_project_S, 0, PARSEC_DEV_CPU,
         "project_S_task",
@@ -1099,6 +1102,7 @@ update_row_S_blocks(SymmetricSharedBasisMatrix& A,
         sizeof(int64_t), &r_nrows, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_r.super, r_key),
                              PARSEC_INPUT | S_ARENA,
+        sizeof(char), &which, PARSEC_VALUE,
         PARSEC_DTD_ARG_END);
     }
   }
@@ -1218,9 +1222,10 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   int64_t t_nrows = A.ranks(block, level);
   parsec_data_key_t t_key = parsec_t.super.data_key(&parsec_t.super,
                                                     block, level);
+  char which = 'C';
 
-  parsec_dtd_insert_task(dtd_tp, task_fill_in_cols_QR, 0, PARSEC_DEV_CPU,
-    "fill_in_cols_QR_task",
+  parsec_dtd_insert_task(dtd_tp, task_fill_in_recompression, 0, PARSEC_DEV_CPU,
+    "fill_in_recompression_task",
     sizeof(int64_t), &block_size, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_cols.super, fill_in_key),
                          PARSEC_INPUT | D_ARENA,
@@ -1234,6 +1239,7 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
     sizeof(int64_t), &t_nrows, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_t.super, t_key),
                          PARSEC_INOUT | S_ARENA,
+    sizeof(char), &which, PARSEC_VALUE,
     PARSEC_DTD_ARG_END);
 }
 
@@ -1253,9 +1259,10 @@ update_col_S_blocks(SymmetricSharedBasisMatrix& A,
       int64_t t_nrows = A.ranks(i, level);
       parsec_data_key_t t_key = parsec_t.super.data_key(&parsec_t.super,
                                                         i, level);
+      char which = 'C';
 
-      parsec_dtd_insert_task(dtd_tp, task_project_S_left, 0, PARSEC_DEV_CPU,
-        "project_S_left_task",
+      parsec_dtd_insert_task(dtd_tp, task_project_S, 0, PARSEC_DEV_CPU,
+        "project_S_task",
         sizeof(int64_t), &S_nrows, PARSEC_VALUE,
         sizeof(int64_t), &S_ncols, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_S.super, S_key),
@@ -1263,6 +1270,7 @@ update_col_S_blocks(SymmetricSharedBasisMatrix& A,
         sizeof(int64_t), &t_nrows, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_t.super, t_key),
                              PARSEC_INPUT | S_ARENA,
+        sizeof(char), &which, PARSEC_VALUE,
         PARSEC_DTD_ARG_END);
     }
   }

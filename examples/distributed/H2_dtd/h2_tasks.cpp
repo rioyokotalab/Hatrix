@@ -393,8 +393,6 @@ task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
     fill_in += matmul(F, F, true, false);
     break;
   }
-
-
   // parsec_data_copy_t* _F_block_j_tile, *_fill_in_tile;
   // parsec_dtd_unpack_refs(this_task, &_F_block_j_tile, &_fill_in_tile);
 
@@ -406,119 +404,76 @@ task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 }
 
 parsec_hook_return_t
-task_fill_in_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+task_fill_in_recompression(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t block_size;
   double *_fill_in;
   int64_t rank;
   double *_US;
   int64_t U_nrows, U_ncols;
   double *_U;
-  int64_t r_nrows;
-  double *_r;
+  int64_t proj_nrows;
+  double *_proj;
+  char which;
 
   parsec_dtd_unpack_args(this_task,
                          &block_size, &_fill_in,
                          &rank, &_US,
                          &U_nrows, &U_ncols, &_U,
-                         &r_nrows, &_r);
+                         &proj_nrows, &_proj, &which);
 
   MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
   MatrixWrapper US(_US, rank, rank, rank);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
-  MatrixWrapper r(_r, r_nrows, r_nrows, r_nrows);
+  MatrixWrapper proj(_proj, proj_nrows, proj_nrows, proj_nrows);
 
-  fill_in += matmul(matmul(U, US), U, false, true);
+  Matrix Q, Si, VT; double err;
 
-  Matrix Q,R;
-  std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in, rank);
+  if (which == 'R') {           // row fill in recompresion
+    fill_in += matmul(matmul(U, US), U, false, true);
 
-  Matrix r_row = matmul(Q, U, true, false);
-  r.copy_mem(r_row);
+    std::tie(Q, Si, VT, err) = truncated_svd(fill_in, rank);
+    Matrix proj_row = matmul(Q, U, true, false);
+    proj.copy_mem(proj_row);
+  }
+  else if (which == 'C') {      // col fill in recompression
+    fill_in += matmul(U, matmul(US, U, false, true));
+    Matrix fill_in_cols_T = transpose(fill_in);
+
+    std::tie(Q, Si, VT, err) = truncated_svd(fill_in_cols_T, rank);
+    Matrix proj_col = matmul(Q, U, true, false);
+    proj.copy_mem(proj_col);
+  }
+
   U.copy_mem(Q);
-
-  Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
-  rq(R, Si, Vi);
   US.copy_mem(Si);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
-
 
 parsec_hook_return_t
 task_project_S(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t S_nrows, S_ncols;
   double *_S;
-  int64_t r_nrows;
-  double *_r;
+  int64_t proj_nrows;
+  double *_proj;
+  char which;
 
   parsec_dtd_unpack_args(this_task,
                          &S_nrows, &S_ncols, &_S,
-                         &r_nrows, &_r);
+                         &proj_nrows, &_proj,
+                         &which);
 
   MatrixWrapper S(_S, S_nrows, S_ncols, S_nrows);
-  MatrixWrapper r(_r, r_nrows, r_nrows, r_nrows);
+  MatrixWrapper proj(_proj, proj_nrows, proj_nrows, proj_nrows);
 
-  Matrix rS = matmul(r, S);
-
-  S.copy_mem(rS);
-
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
-task_project_S_left(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t S_nrows, S_ncols;
-  double *_S;
-  int64_t t_nrows;
-  double *_t;
-
-  parsec_dtd_unpack_args(this_task,
-                         &S_nrows, &S_ncols, &_S,
-                         &t_nrows, &_t);
-  MatrixWrapper S(_S, S_nrows, S_ncols, S_nrows);
-  MatrixWrapper t(_t, t_nrows, t_nrows, t_nrows);
-
-  Matrix St = matmul(S, t, false, true);
-  S.copy_mem(St);
-
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
-task_fill_in_cols_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t block_size;
-  double *_fill_in_cols;
-  int64_t rank;
-  double *_US;
-  int64_t U_nrows, U_ncols;
-  double *_U;
-  int64_t t_nrows;
-  double *_t;
-
-  parsec_dtd_unpack_args(this_task,
-                         &block_size, &_fill_in_cols,
-                         &rank, &_US,
-                         &U_nrows, &U_ncols, &_U,
-                         &t_nrows, &_t);
-
-  MatrixWrapper fill_in_cols(_fill_in_cols, block_size, block_size, block_size);
-  MatrixWrapper US(_US, rank, rank, rank);
-  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
-  MatrixWrapper t(_t, t_nrows, t_nrows, t_nrows);
-
-  fill_in_cols += matmul(U, matmul(US, U, false, true));
-  Matrix fill_in_cols_T = transpose(fill_in_cols);
-
-  Matrix Q, R;
-  std::tie(Q, R) = pivoted_qr_nopiv_return(fill_in_cols_T, rank);
-
-  Matrix t_row = matmul(Q, U, true, false);
-  t.copy_mem(t_row);
-  U.copy_mem(Q);
-
-  Matrix Si(R.rows, R.rows), Vi(R.rows, R.cols);
-  rq(R, Si, Vi);
-  US.copy_mem(Si);
+  if (which == 'R') {           // fill in projection along the rows.
+    Matrix proj_S = matmul(proj, S);
+    S.copy_mem(proj_S);
+  }
+  else if (which == 'C') {       // fill in projection along the cols.
+    Matrix proj_S = matmul(S, proj, false, true);
+    S.copy_mem(proj_S);
+  }
 
   return PARSEC_HOOK_RETURN_DONE;
 }
