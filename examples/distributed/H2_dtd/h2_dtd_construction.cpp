@@ -15,7 +15,8 @@ using namespace Hatrix;
 void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Domain& domain,
-                    const Args& opts) {
+                    const Args& opts,
+                    double* U_MEM, int* U) {
   int N = opts.N;
   int nleaf = opts.nleaf;
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
@@ -60,13 +61,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
   }
 
-  // init global U matrix
-  int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
-  double *U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
-  int U[9];
-  descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
-            &U_nrows, &INFO);
   int LWORK; double *WORK;
 
   // obtain the shared basis of each row.
@@ -188,7 +182,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   }
 
   delete[] AY_MEM;
-  delete[] U_MEM;
 }
 
 void
@@ -214,7 +207,18 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
 void
 construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
-  generate_leaf_nodes(A, domain, opts);
+  // init global U matrix
+  int nleaf = opts.nleaf; int N = opts.N; int INFO;
+  int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  double *U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
+  int U[9];
+  descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
+            &U_nrows, &INFO);
+
+  generate_leaf_nodes(A, domain, opts, U_MEM, U);
+
+  delete[] U_MEM;
 
   for (int64_t level = A.max_level-1; level >= A.min_level-1; --level) {
     generate_transfer_matrices(A, domain, opts, level);
