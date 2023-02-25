@@ -19,7 +19,7 @@ for adm in 1; do
     max_rank=100
 
     for N in 4096; do
-        lldb -- ./bin/H2_dtd --N $N \
+        ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -30,8 +30,8 @@ for adm in 1; do
                       --admis_kind geometry \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3
-                      # --use_nested_basis
+                      --kind_of_recompression 3 \
+                      --use_nested_basis
 
         # ./bin/H2_main --N $N \
         #              --nleaf $nleaf \

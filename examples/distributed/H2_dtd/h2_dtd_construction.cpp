@@ -193,8 +193,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // 1. Generate blocks from the current admissible blocks for this level.
   int N = opts.N;
   int level_block_size = N / nblocks;
-  double ALPHA = 1.0;
-  double BETA = 1.0;
 
   int AY_local_nrows = numroc_(&N, &level_block_size, &MYROW, &ZERO, &MPIGRID[0]);
   int AY_local_ncols = numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO,
@@ -205,6 +203,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
   // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
+  double ALPHA = 1.0;
+  double BETA = 1.0;
   for (int64_t block = 0; block < nblocks; ++block) {
     for (int64_t j = 0; j < nblocks; ++j) {
       if (exists_and_inadmissible(A, block, j, level)) { continue; }
@@ -212,18 +212,69 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int IA = level_block_size * block + 1;
       int JA = level_block_size * j + 1;
 
-      // pdgeadd_(&NOTRANS, &level_block_);
+      pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
+               &ALPHA,
+               DENSE_MEM, &IA, &JA, DENSE.data(),
+               &BETA,
+               AY_MEM, &IA, &ONE, AY);
     }
   }
+
+  // Allocate a temporary global matrix to store the product of the real basis with the
+  // summation of the admissible blocks.
+  int64_t child_nblocks = pow(2, child_level); int rank = opts.max_rank;
+  int TEMP_nrows = child_nblocks * rank;
+  int TEMP_local_nrows = numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int TEMP_local_ncols = numroc_(&level_block_size, &level_block_size,
+                                 &MYCOL, &ZERO, &MPIGRID[1]);
+  int TEMP[9];
+  double *TEMP_MEM = new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+  descinit_(TEMP, &TEMP_nrows, &level_block_size, &rank, &level_block_size, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &TEMP_local_nrows, &INFO);
+
+  int child_block_size = N / child_nblocks;
 
   for (int64_t block = 0; block < nblocks; ++block) {
     int64_t c1 = block * 2;
     int64_t c2 = block * 2 + 1;
-    int64_t rank = opts.max_rank;
-    int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
+    int rank = opts.max_rank;
 
-    // 2.
+    // 2. Apply the real basis U to the summation of the admissible blocks.
+    double ALPHA = 1.0;
+    double BETA = 1.0;
+
+    // Upper basis block.
+    int IU = c1 * child_block_size + 1;
+    int JU = 1;
+    int IA = c1 * child_block_size + 1;
+    int JA = 1;
+    int ITEMP = c1 * rank + 1;
+    int JTEMP = 1;
+    pdgemm_(&TRANS, &NOTRANS,
+            &rank, &child_block_size, &child_block_size,
+            &ALPHA,
+            U_MEM, &IU, &JU, U,
+            AY_MEM, &IA, &JA, AY,
+            &BETA,
+            TEMP_MEM, &ITEMP, &JTEMP, TEMP);
+
+    // Lower basis block.
+    IU = c2 * child_block_size + 1;
+    JU = 1;
+    IA = c2 * child_block_size + 1;
+    JA = 1;
+    ITEMP = c1 * rank + 1;
+    JTEMP = 1;
+    pdgemm_(&TRANS, &NOTRANS,
+            &rank, &child_block_size, &child_block_size,
+            &ALPHA,
+            U_MEM, &IU, &JU, U,
+            AY_MEM, &IA, &JA, AY,
+            &BETA,
+            TEMP_MEM, &ITEMP, &JTEMP, TEMP);
+
   }
+  delete[] TEMP_MEM;
 
   delete[] AY_MEM;
 }
@@ -242,31 +293,26 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
   generate_leaf_nodes(A, domain, opts, U_MEM, U);
 
   for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
-    // int nblocks = pow(2, level);
-    // int level_block_size = N / nblocks;
-    // U_nrows = numroc_(&N, &level_block_size, &MYROW, &ZERO, &MPIGRID[0]);
-    // U_ncols = numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO, &MPIGRID[1]);
-
     generate_transfer_matrices(A, domain, opts, level, U_MEM, U);
   }
 
   // add a dummy level to facilitate easier interfacing with parsec.
-  int64_t level = A.min_level-1;
-  int64_t child_level = level + 1;
-  int64_t nblocks = pow(2, level);
-  for (int64_t block = 0; block < nblocks; ++block) {
-    int64_t c1 = block * 2;
-    int64_t c2 = block * 2 + 1;
-    int64_t rank = opts.max_rank;
-    int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
+  // int64_t level = A.min_level-1;
+  // int64_t child_level = level + 1;
+  // int64_t nblocks = pow(2, level);
+  // for (int64_t block = 0; block < nblocks; ++block) {
+  //   int64_t c1 = block * 2;
+  //   int64_t c2 = block * 2 + 1;
+  //   int64_t rank = opts.max_rank;
+  //   int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
 
-    if (mpi_rank(block) == MPIRANK) {
-      A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
-      A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
-    }
+  //   if (mpi_rank(block) == MPIRANK) {
+  //     A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
+  //     A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
+  //   }
 
-    A.ranks.insert(block, level, std::move(rank));
-  }
+  //   A.ranks.insert(block, level, std::move(rank));
+  // }
 
   delete[] U_MEM;
 }
