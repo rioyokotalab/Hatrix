@@ -186,15 +186,44 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
 void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
-                           int64_t level) {
+                           int64_t level, double *U_MEM, int* U) {
   int64_t nblocks = pow(2, level);
   int64_t child_level = level + 1;
+
+  // 1. Generate blocks from the current admissible blocks for this level.
+  int N = opts.N;
+  int level_block_size = N / nblocks;
+  double ALPHA = 1.0;
+  double BETA = 1.0;
+
+  int AY_local_nrows = numroc_(&N, &level_block_size, &MYROW, &ZERO, &MPIGRID[0]);
+  int AY_local_ncols = numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO,
+                               &MPIGRID[1]);
+  int AY[9]; int INFO;
+  double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
+  std::cout << "level : " << level << std::endl;
+  descinit_(AY, &N, &level_block_size, &level_block_size, &level_block_size,
+            &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
+
+  // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
+  for (int64_t block = 0; block < nblocks; ++block) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (exists_and_inadmissible(A, block, j, level)) { continue; }
+
+      int IA = level_block_size * block + 1;
+      int JA = level_block_size * j + 1;
+
+      // pdgeadd_(&NOTRANS, &level_block_);
+    }
+  }
 
   for (int64_t block = 0; block < nblocks; ++block) {
     int64_t c1 = block * 2;
     int64_t c2 = block * 2 + 1;
     int64_t rank = opts.max_rank;
     int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
+
+    // 2.
 
     if (mpi_rank(block) == MPIRANK) {
       A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
@@ -203,6 +232,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
     A.ranks.insert(block, level, std::move(rank));
   }
+
+  delete[] AY_MEM;
 }
 
 void
@@ -218,9 +249,13 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
 
   generate_leaf_nodes(A, domain, opts, U_MEM, U);
 
-  delete[] U_MEM;
+  for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
+    // int nblocks = pow(2, level);
+    // int level_block_size = N / nblocks;
+    // U_nrows = numroc_(&N, &level_block_size, &MYROW, &ZERO, &MPIGRID[0]);
+    // U_ncols = numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO, &MPIGRID[1]);
 
-  for (int64_t level = A.max_level-1; level >= A.min_level-1; --level) {
-    generate_transfer_matrices(A, domain, opts, level);
+    generate_transfer_matrices(A, domain, opts, level, U_MEM, U);
   }
+  delete[] U_MEM;
 }

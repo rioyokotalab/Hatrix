@@ -15,11 +15,11 @@ make -j H2_dtd
 
 for adm in 1; do
     nleaf=512
-    ndim=3
+    ndim=1
     max_rank=100
 
-    for N in 8192; do
-        mpirun -n 4 ./bin/H2_dtd --N $N \
+    for N in 4096; do
+        lldb -- ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -30,7 +30,8 @@ for adm in 1; do
                       --admis_kind geometry \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3
+                      --kind_of_recompression 3 \
+                      --use_nested_basis
 
         # ./bin/H2_main --N $N \
         #              --nleaf $nleaf \
