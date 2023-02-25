@@ -370,19 +370,29 @@ parsec_dtd_unpack_refs(parsec_task_t *this_task, ...)
 
 parsec_hook_return_t
 task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t F_block_j_nrows,  F_block_j_ncols;
-  double *_F_block_j;
+  int64_t F_nrows,  F_ncols;
+  char which;
+  double *_F;
   int64_t block_size;
   double *_fill_in;
 
   parsec_dtd_unpack_args(this_task,
-                         &F_block_j_nrows, &F_block_j_ncols, &_F_block_j,
+                         &F_nrows, &F_ncols,
+                         &which,
+                         &_F,
                          &block_size, &_fill_in);
 
-  MatrixWrapper F_block_j(_F_block_j, F_block_j_nrows, F_block_j_ncols, F_block_j_ncols);
+  MatrixWrapper F(_F, F_nrows, F_ncols, F_ncols);
   MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
 
-  fill_in += matmul(F_block_j, F_block_j, false, true);
+  switch(which) {
+  case 'R':
+    fill_in += matmul(F, F, false, true);
+    break;
+  case 'C':
+    break;
+  }
+
 
   // parsec_data_copy_t* _F_block_j_tile, *_fill_in_tile;
   // parsec_dtd_unpack_refs(this_task, &_F_block_j_tile, &_fill_in_tile);
@@ -390,6 +400,25 @@ task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   // PARSEC_OBJ_RELEASE(_F_block_j_tile->data_copy->original); // release the parsec reference.
 
   // TODO: free the F(block, j) fill in with a custom desctructor..
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
+parsec_hook_return_t
+task_fill_in_cols_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t F_i_block_nrows,  F_i_block_ncols;
+  double *_F_i_block;
+  int64_t block_size;
+  double *_fill_in;
+
+  parsec_dtd_unpack_args(this_task,
+                         &F_i_block_nrows, &F_i_block_ncols, &_F_i_block,
+                         &block_size, &_fill_in);
+
+  MatrixWrapper F_i_block(_F_i_block, F_i_block_nrows, F_i_block_ncols, F_i_block_ncols);
+  MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
+
+  fill_in += matmul(F_i_block, F_i_block, true, false);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -432,6 +461,7 @@ task_fill_in_QR(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   return PARSEC_HOOK_RETURN_DONE;
 }
 
+
 parsec_hook_return_t
 task_project_S(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t S_nrows, S_ncols;
@@ -468,25 +498,6 @@ task_project_S_left(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
   Matrix St = matmul(S, t, false, true);
   S.copy_mem(St);
-
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
-task_fill_in_cols_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t F_i_block_nrows,  F_i_block_ncols;
-  double *_F_i_block;
-  int64_t block_size;
-  double *_fill_in;
-
-  parsec_dtd_unpack_args(this_task,
-                         &F_i_block_nrows, &F_i_block_ncols, &_F_i_block,
-                         &block_size, &_fill_in);
-
-  MatrixWrapper F_i_block(_F_i_block, F_i_block_nrows, F_i_block_ncols, F_i_block_ncols);
-  MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
-
-  fill_in += matmul(F_i_block, F_i_block, true, false);
 
   return PARSEC_HOOK_RETURN_DONE;
 }

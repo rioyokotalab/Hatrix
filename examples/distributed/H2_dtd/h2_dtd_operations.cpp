@@ -1024,11 +1024,13 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
         int64_t F_block_j_ncols = get_dim(A, domain, j, level);
         parsec_data_key_t F_block_j_key =
           parsec_F.super.data_key(&parsec_F.super, block, j, level);
+        char which = 'R';
 
         parsec_dtd_insert_task(dtd_tp, task_fill_in_addition, 0, PARSEC_DEV_CPU,
           "fill_in_addition_task",
           sizeof(int64_t), &F_block_j_nrows, PARSEC_VALUE,
           sizeof(int64_t), &F_block_j_ncols, PARSEC_VALUE,
+          sizeof(char), &which, PARSEC_VALUE,
           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_block_j_key),
                                PARSEC_INPUT | D_ARENA,
           sizeof(int64_t), &block_size, PARSEC_VALUE,
