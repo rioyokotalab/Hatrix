@@ -245,7 +245,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     new double[(int64_t)UTRANSFER_local_nrows * (int64_t)UTRANSFER_local_ncols];
   descinit_(UTRANSFER, &UTRANSFER_nrows, &level_block_size, &rank, &level_block_size, &ZERO, &ZERO,
             &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
-
   int LWORK; double *WORK;
 
   for (int64_t block = 0; block < nblocks; ++block) {
@@ -277,7 +276,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     JU = 1;
     IA = c2 * child_block_size + 1;
     JA = 1;
-    ITEMP = c1 * rank + 1;
+    ITEMP = c2 * rank + 1;
     JTEMP = 1;
     pdgemm_(&TRANS, &NOTRANS,
             &rank, &child_block_size, &child_block_size,
@@ -310,7 +309,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      LWORK = (int)WORK[0] + pow(fmax(level_block_size, block_nrows), 2);
+      LWORK = (int)WORK[0];
       free(WORK);
     }
 
@@ -333,11 +332,47 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       free(WORK);
     }
 
+    // Init CBLACS info for the local U block.
+    int U_LOCAL_CONTEXT;
+    int IMAP[1];                // workspace to map the original grid.
+    int U_LOCAL_PNROWS, U_LOCAL_PNCOLS, U_LOCAL_PROW, U_LOCAL_PCOL; // local process grid parameters.
+    IMAP[0] = mpi_rank(block);           // specify the rank from the global grid for the local grid.
+    Cblacs_get(-1, 0, &U_LOCAL_CONTEXT);                    // init the new CBLACS context.
+    Cblacs_gridmap(&U_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
+    Cblacs_gridinfo(U_LOCAL_CONTEXT,                       // init grid params from the context.
+                    &U_LOCAL_PNROWS, &U_LOCAL_PNCOLS, &U_LOCAL_PROW, &U_LOCAL_PCOL);
+
+    // store opts.max_rank columns of U in the A.U for this process.
+    // init local U block for communication.
+    int U_LOCAL[9];
+    int U_LOCAL_nrows = opts.max_rank * 2, U_LOCAL_ncols = opts.max_rank;
+    Matrix U_LOCAL_MEM(U_LOCAL_nrows, U_LOCAL_ncols);
+    descset_(U_LOCAL,
+             &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
+             &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
+
+    IU = block * opts.max_rank * 2 + 1;
+    JU = 1;
+    pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
+              UTRANSFER_MEM, &IU, &JU, UTRANSFER,
+              &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
+              &BLACS_CONTEXT);
+
+    if (mpi_rank(block) == MPIRANK) {
+      A.U.insert(block, level, std::move(U_LOCAL_MEM));
+
+      // Init US from the row vector.
+      Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
+      for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
+      A.US.insert(block, level, std::move(US));
+    }
+
+    A.ranks.insert(block, level, std::move(rank));
     delete[] S_MEM;
-
   }
-  delete[] TEMP_MEM;
 
+  delete[] UTRANSFER_MEM;
+  delete[] TEMP_MEM;
   delete[] AY_MEM;
 }
 
@@ -359,22 +394,22 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
   }
 
   // add a dummy level to facilitate easier interfacing with parsec.
-  // int64_t level = A.min_level-1;
-  // int64_t child_level = level + 1;
-  // int64_t nblocks = pow(2, level);
-  // for (int64_t block = 0; block < nblocks; ++block) {
-  //   int64_t c1 = block * 2;
-  //   int64_t c2 = block * 2 + 1;
-  //   int64_t rank = opts.max_rank;
-  //   int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
+  int64_t level = A.min_level-1;
+  int64_t child_level = level + 1;
+  int64_t nblocks = pow(2, level);
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t c1 = block * 2;
+    int64_t c2 = block * 2 + 1;
+    int64_t rank = opts.max_rank;
+    int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
 
-  //   if (mpi_rank(block) == MPIRANK) {
-  //     A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
-  //     A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
-  //   }
+    if (mpi_rank(block) == MPIRANK) {
+      A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
+      A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
+    }
 
-  //   A.ranks.insert(block, level, std::move(rank));
-  // }
+    A.ranks.insert(block, level, std::move(rank));
+  }
 
   delete[] U_MEM;
 }
