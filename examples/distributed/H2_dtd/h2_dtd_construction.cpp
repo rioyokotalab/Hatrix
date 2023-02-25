@@ -238,12 +238,15 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // entire level are stacked by row in this global matrix.
   int UTRANSFER_nrows = child_nblocks * rank;
   int UTRANSFER_local_nrows = numroc_(&UTRANSFER_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
-  int UTRANSFER_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
+  int UTRANSFER_local_ncols = numroc_(&level_block_size, &level_block_size,
+                                      &MYCOL, &ZERO, &MPIGRID[1]);
   int UTRANSFER[9];
   double *UTRANSFER_MEM =
     new double[(int64_t)UTRANSFER_local_nrows * (int64_t)UTRANSFER_local_ncols];
-  descinit_(UTRANSFER, &UTRANSFER_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
+  descinit_(UTRANSFER, &UTRANSFER_nrows, &level_block_size, &rank, &level_block_size, &ZERO, &ZERO,
             &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
+
+  int LWORK; double *WORK;
 
   for (int64_t block = 0; block < nblocks; ++block) {
     int64_t c1 = block * 2;
@@ -286,8 +289,33 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
     // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
     double *S_MEM = new double[(int64_t)child_block_size]();
+    const char JOB_U = 'V';
+    const char JOB_VT = 'N';
 
+    int block_nrows = rank * 2;
+    // SVD workspace query.
+    {
+      LWORK = -1;
+      int ITEMP = block * block_nrows + 1;
+      int JTEMP = 1;
+      int IU = block * block_nrows + 1;
+      int JU = 1;
+      WORK = (double*)calloc(1, sizeof(double));
 
+      pdgesvd_(&JOB_U, &JOB_VT,
+               &block_nrows, &level_block_size,
+               TEMP_MEM, &ITEMP, &JTEMP, TEMP,
+               S_MEM,
+               UTRANSFER_MEM, &IU, &JU, UTRANSFER,
+               NULL, NULL, NULL, NULL,
+               WORK, &LWORK,
+               &INFO);
+      LWORK = (int)WORK[0] + block_nrows * level_block_size;
+      free(WORK);
+    }
+
+    // SVD computation
+    {}
 
     delete[] S_MEM;
 
