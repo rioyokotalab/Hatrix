@@ -766,8 +766,10 @@ void triangle_reduce_cc_oc(SymmetricSharedBasisMatrix& A,
       int read_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
       int write_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
-      parsec_dtd_insert_task(dtd_tp, task_trsm_cc_oc, 0, PARSEC_DEV_CPU,
-        "trsm_cc_oc_task",
+      char which = 'T';           // triangle reduce of trailing blocks.
+
+      parsec_dtd_insert_task(dtd_tp, task_trsm, 0, PARSEC_DEV_CPU,
+        "trsm_task",
         sizeof(int64_t), &D_rows, PARSEC_VALUE,
         sizeof(int64_t), &D_cols, PARSEC_VALUE,
         sizeof(int64_t), &D_row_rank, PARSEC_VALUE,
@@ -780,6 +782,7 @@ void triangle_reduce_cc_oc(SymmetricSharedBasisMatrix& A,
         sizeof(int64_t), &O_col_rank, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, other_key),
                              PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
+        sizeof(char), &which, PARSEC_VALUE,
         PARSEC_DTD_ARG_END);
     }
 }
@@ -808,8 +811,10 @@ void triangle_reduce_co(SymmetricSharedBasisMatrix& A,
     int read_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
     int write_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
 
-    parsec_dtd_insert_task(dtd_tp, task_trsm_co, 0, PARSEC_DEV_CPU,
-      "trsm_co_task",
+    char which = 'B';           // triangle reduce of backward blocks.
+
+    parsec_dtd_insert_task(dtd_tp, task_trsm, 0, PARSEC_DEV_CPU,
+      "trsm_task",
       sizeof(int64_t), &D_rows, PARSEC_VALUE,
       sizeof(int64_t), &D_cols, PARSEC_VALUE,
       sizeof(int64_t), &D_row_rank, PARSEC_VALUE,
@@ -822,6 +827,7 @@ void triangle_reduce_co(SymmetricSharedBasisMatrix& A,
       sizeof(int64_t), &O_col_rank, PARSEC_VALUE,
       PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, other_key),
                            PARSEC_INOUT | write_arena | PARSEC_AFFINITY,
+      sizeof(char), &which, PARSEC_VALUE,
       PARSEC_DTD_ARG_END);
   }
 }

@@ -166,14 +166,15 @@ task_multiply_complement(parsec_execution_stream_t* es, parsec_task_t* this_task
 }
 
 parsec_hook_return_t
-task_trsm_co(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+task_trsm(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t D_rows, D_cols, D_row_rank, D_col_rank;
   int64_t O_rows, O_cols, O_row_rank, O_col_rank;
   double *_diagonal, *_other;
+  char which;
 
   parsec_dtd_unpack_args(this_task,
                          &D_rows, &D_cols, &D_row_rank, &D_col_rank, &_diagonal,
-                         &O_rows, &O_cols, &O_row_rank, &O_col_rank, &_other);
+                         &O_rows, &O_cols, &O_row_rank, &O_col_rank, &_other, &which);
 
   MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
   MatrixWrapper other(_other, O_rows, O_cols, O_rows);
@@ -185,36 +186,17 @@ task_trsm_co(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                                   O_rows - O_row_rank,
                                   O_cols - O_col_rank);
 
-  solve_triangular(diagonal_splits[0], other_splits[1], Hatrix::Left, Hatrix::Lower,
-                   false, false, 1.0);
+  if (which == 'T') {
+    solve_triangular(diagonal_splits[0], other_splits[0], Hatrix::Right, Hatrix::Lower,
+                     false, true, 1.0);
+    solve_triangular(diagonal_splits[0], other_splits[2], Hatrix::Right, Hatrix::Lower,
+                     false, true, 1.0);
+  }
+  else if (which == 'B') {
+    solve_triangular(diagonal_splits[0], other_splits[1], Hatrix::Left, Hatrix::Lower,
+                     false, false, 1.0);
+  }
 
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
-task_trsm_cc_oc(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_rows, D_cols, D_row_rank, D_col_rank;
-  int64_t O_rows, O_cols, O_row_rank, O_col_rank;
-  double *_diagonal, *_other;
-
-  parsec_dtd_unpack_args(this_task,
-                         &D_rows, &D_cols, &D_row_rank, &D_col_rank, &_diagonal,
-                         &O_rows, &O_cols, &O_row_rank, &O_col_rank, &_other);
-
-  MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
-  MatrixWrapper other(_other, O_rows, O_cols, O_rows);
-
-  auto diagonal_splits = split_dense(diagonal,
-                                     D_rows - D_row_rank,
-                                     D_cols - D_col_rank);
-  auto other_splits = split_dense(other,
-                                  O_rows - O_row_rank,
-                                  O_cols - O_col_rank);
-
-  solve_triangular(diagonal_splits[0], other_splits[0], Hatrix::Right, Hatrix::Lower,
-                   false, true, 1.0);
-  solve_triangular(diagonal_splits[0], other_splits[2], Hatrix::Right, Hatrix::Lower,
-                   false, true, 1.0);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -512,6 +494,39 @@ task_schurs_complement_1(parsec_execution_stream_t* es, parsec_task_t* this_task
   return PARSEC_HOOK_RETURN_DONE;
 }
 
+
+parsec_hook_return_t
+task_schurs_complement_3(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+  int64_t D_block_block_nrows;
+  int64_t D_block_j_ncols;
+  int64_t D_block_rank;
+  int64_t D_j_rank;
+  double *_D_block_block, *_D_block_j;
+
+  parsec_dtd_unpack_args(this_task,
+                         &D_block_block_nrows,
+                         &D_block_j_ncols,
+                         &D_block_rank,
+                         &D_j_rank,
+                         &_D_block_block,
+                         &_D_block_j);
+
+  MatrixWrapper D_block_block(_D_block_block,
+                              D_block_block_nrows, D_block_block_nrows, D_block_block_nrows);
+  MatrixWrapper D_block_j(_D_block_j, D_block_block_nrows, D_block_j_ncols, D_block_block_nrows);
+
+  auto D_block_block_split = split_dense(D_block_block,
+                                         D_block_block_nrows - D_block_rank,
+                                         D_block_block_nrows - D_block_rank);
+  auto D_block_j_split = split_dense(D_block_j,
+                                     D_block_block_nrows - D_block_rank,
+                                     D_block_j_ncols - D_j_rank);
+
+  matmul(D_block_block_split[2], D_block_j_split[1], D_block_j_split[3], false, false, -1, 1);
+
+  return PARSEC_HOOK_RETURN_DONE;
+}
+
 parsec_hook_return_t
 task_schurs_complement_2(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t D_i_block_nrows;
@@ -555,6 +570,8 @@ task_schurs_complement_2(parsec_execution_stream_t* es, parsec_task_t* this_task
   return PARSEC_HOOK_RETURN_DONE;
 }
 
+
+
 parsec_hook_return_t
 task_syrk_2(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t D_i_block_nrows;
@@ -576,38 +593,6 @@ task_syrk_2(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                                          std::vector<int64_t>(1, D_i_block_ncols - D_block_rank));
 
   syrk(D_i_block_split[0], D_i_j, Hatrix::Lower, false, -1, 1);
-
-  return PARSEC_HOOK_RETURN_DONE;
-}
-
-parsec_hook_return_t
-task_schurs_complement_3(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_block_block_nrows;
-  int64_t D_block_j_ncols;
-  int64_t D_block_rank;
-  int64_t D_j_rank;
-  double *_D_block_block, *_D_block_j;
-
-  parsec_dtd_unpack_args(this_task,
-                         &D_block_block_nrows,
-                         &D_block_j_ncols,
-                         &D_block_rank,
-                         &D_j_rank,
-                         &_D_block_block,
-                         &_D_block_j);
-
-  MatrixWrapper D_block_block(_D_block_block,
-                              D_block_block_nrows, D_block_block_nrows, D_block_block_nrows);
-  MatrixWrapper D_block_j(_D_block_j, D_block_block_nrows, D_block_j_ncols, D_block_block_nrows);
-
-  auto D_block_block_split = split_dense(D_block_block,
-                                         D_block_block_nrows - D_block_rank,
-                                         D_block_block_nrows - D_block_rank);
-  auto D_block_j_split = split_dense(D_block_j,
-                                     D_block_block_nrows - D_block_rank,
-                                     D_block_j_ncols - D_j_rank);
-
-  matmul(D_block_block_split[2], D_block_j_split[1], D_block_j_split[3], false, false, -1, 1);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
