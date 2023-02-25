@@ -1,5 +1,5 @@
 #!/bin/bash
-#YBATCH -r epyc-7502_8
+#YBATCH -r threadripper-3960x_8
 #SBATCH -N 1
 #SBATCH -J TEST_H2
 #SBATCH --time=72:00:00
@@ -16,22 +16,22 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 #:/mnt/nfs/packages/x86_64/intel/2022/mpi/2021.6.0/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64::/home/sameer.deshmukh/gitrepos/papi/src/lib
 
-export MKL_NUM_THREADS=32
-export OMP_NUM_THREADS=32
-export OMP_PLACES=cores
-export OMP_PROC_BIND=close
+export MKL_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+# export OMP_PLACES=cores
+# export OMP_PROC_BIND=close
 
 
 make -j H2_dtd
 # make -j H2_main
 
 for adm in 1; do
-    nleaf=512
-    ndim=1
+    nleaf=1024
+    ndim=3
     max_rank=100
 
-    for N in 4096; do
-        mpirun -n 2 ./bin/H2_dtd --N $N \
+    for N in 16384; do
+        mpirun -n 16 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
