@@ -192,14 +192,15 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   // 1. Generate blocks from the current admissible blocks for this level.
   int N = opts.N;
+  int nleaf = opts.nleaf;
   int level_block_size = N / nblocks;
 
-  int AY_local_nrows = numroc_(&N, &level_block_size, &MYROW, &ZERO, &MPIGRID[0]);
+  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int AY_local_ncols = numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO,
                                &MPIGRID[1]);
   int AY[9]; int INFO;
   double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
-  descinit_(AY, &N, &level_block_size, &level_block_size, &level_block_size,
+  descinit_(AY, &N, &level_block_size, &nleaf, &level_block_size,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
   // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
@@ -369,6 +370,19 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
     A.ranks.insert(block, level, std::move(rank));
     delete[] S_MEM;
+  }
+
+  // 4. Generate the real basis at this level from the transfer matrices and the real basis one
+  // level below.
+  int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int U_REAL_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
+  int U_REAL[9];
+  double *U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols];
+  descinit_(U_REAL, &N, &rank, &nleaf, &rank, &ZERO, &ZERO, &BLACS_CONTEXT,
+            &U_REAL_local_nrows, &INFO);
+
+  for (int64_t block = 0; block < nblocks; ++block) {
+
   }
 
   delete[] UTRANSFER_MEM;
