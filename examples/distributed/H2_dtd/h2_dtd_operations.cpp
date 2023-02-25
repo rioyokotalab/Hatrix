@@ -1396,37 +1396,37 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain,
                        int64_t level) {
   const int64_t nblocks = pow(2, level);
 
-  if (level >= A.min_level) {
-    // setup pointers to data for use with parsec.
-    for (int64_t i = 0; i < nblocks; ++i) { // U
-      parsec_data_key_t U_data_key = parsec_U.super.data_key(&parsec_U.super, i, level);
-      parsec_data_key_t US_data_key = parsec_US.super.data_key(&parsec_US.super, i, level);
-      parsec_data_key_t r_data_key = parsec_r.super.data_key(&parsec_r.super, i, level);
-      parsec_data_key_t t_data_key = parsec_t.super.data_key(&parsec_t.super, i, level);
+  // setup pointers to data for use with parsec.
+  for (int64_t i = 0; i < nblocks; ++i) { // U
+    parsec_data_key_t U_data_key = parsec_U.super.data_key(&parsec_U.super, i, level);
+    parsec_data_key_t US_data_key = parsec_US.super.data_key(&parsec_US.super, i, level);
+    parsec_data_key_t r_data_key = parsec_r.super.data_key(&parsec_r.super, i, level);
+    parsec_data_key_t t_data_key = parsec_t.super.data_key(&parsec_t.super, i, level);
 
-      if (mpi_rank(i) == MPIRANK) {
-        Matrix& U_i = A.U(i, level);
-        parsec_U.matrix_map[U_data_key] = std::addressof(U_i);
+    if (mpi_rank(i) == MPIRANK) {
+      Matrix& U_i = A.U(i, level);
+      parsec_U.matrix_map[U_data_key] = std::addressof(U_i);
 
-        Matrix& US_i = A.US(i, level);
-        parsec_US.matrix_map[US_data_key] = std::addressof(US_i);
+      Matrix& US_i = A.US(i, level);
+      parsec_US.matrix_map[US_data_key] = std::addressof(US_i);
 
-        Matrix& r_i = r(i, level);
-        parsec_r.matrix_map[r_data_key] = std::addressof(r_i);
+      Matrix& r_i = r(i, level);
+      parsec_r.matrix_map[r_data_key] = std::addressof(r_i);
 
-        Matrix& t_i = t(i, level);
-        parsec_t.matrix_map[t_data_key] = std::addressof(t_i);
-      }
-      parsec_U.mpi_ranks[U_data_key] = mpi_rank(i);
-      parsec_US.mpi_ranks[US_data_key] = mpi_rank(i);
-      parsec_r.mpi_ranks[r_data_key] = mpi_rank(i);
-      parsec_t.mpi_ranks[t_data_key] = mpi_rank(i);
+      Matrix& t_i = t(i, level);
+      parsec_t.matrix_map[t_data_key] = std::addressof(t_i);
     }
+    parsec_U.mpi_ranks[U_data_key] = mpi_rank(i);
+    parsec_US.mpi_ranks[US_data_key] = mpi_rank(i);
+    parsec_r.mpi_ranks[r_data_key] = mpi_rank(i);
+    parsec_t.mpi_ranks[t_data_key] = mpi_rank(i);
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j <= i; ++j) {
-      int row_size = A.ranks(i, level), col_size = A.ranks(j, level);
+      int64_t row_size, col_size;
+      row_size = A.ranks(i, level);
+      col_size = A.ranks(j, level);
       parsec_data_key_t S_data_key = parsec_S.super.data_key(&parsec_S.super, i, j, level);
 
       if (exists_and_admissible(A, i, j, level) && mpi_rank(i) == MPIRANK) {     // S blocks.

@@ -201,7 +201,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                                &MPIGRID[1]);
   int AY[9]; int INFO;
   double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
-  std::cout << "level : " << level << std::endl;
   descinit_(AY, &N, &level_block_size, &level_block_size, &level_block_size,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
@@ -224,13 +223,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
 
     // 2.
-
-    if (mpi_rank(block) == MPIRANK) {
-      A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
-      A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
-    }
-
-    A.ranks.insert(block, level, std::move(rank));
   }
 
   delete[] AY_MEM;
@@ -257,5 +249,24 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
 
     generate_transfer_matrices(A, domain, opts, level, U_MEM, U);
   }
+
+  // add a dummy level to facilitate easier interfacing with parsec.
+  int64_t level = A.min_level-1;
+  int64_t child_level = level + 1;
+  int64_t nblocks = pow(2, level);
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t c1 = block * 2;
+    int64_t c2 = block * 2 + 1;
+    int64_t rank = opts.max_rank;
+    int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
+
+    if (mpi_rank(block) == MPIRANK) {
+      A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
+      A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
+    }
+
+    A.ranks.insert(block, level, std::move(rank));
+  }
+
   delete[] U_MEM;
 }
