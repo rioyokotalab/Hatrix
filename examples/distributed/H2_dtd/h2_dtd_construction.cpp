@@ -310,12 +310,28 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      LWORK = (int)WORK[0] + block_nrows * level_block_size;
+      LWORK = (int)WORK[0] + pow(fmax(level_block_size, block_nrows), 2);
       free(WORK);
     }
 
     // SVD computation
-    {}
+    {
+      int ITEMP = block * block_nrows + 1;
+      int JTEMP = 1;
+      int IU = block * block_nrows + 1;
+      int JU = 1;
+      WORK = (double*)calloc((int64_t)LWORK, sizeof(double));
+
+      pdgesvd_(&JOB_U, &JOB_VT,
+               &block_nrows, &level_block_size,
+               TEMP_MEM, &ITEMP, &JTEMP, TEMP,
+               S_MEM,
+               UTRANSFER_MEM, &IU, &JU, UTRANSFER,
+               NULL, NULL, NULL, NULL,
+               WORK, &LWORK,
+               &INFO);
+      free(WORK);
+    }
 
     delete[] S_MEM;
 
