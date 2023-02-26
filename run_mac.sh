@@ -19,7 +19,7 @@ for adm in 1; do
     max_rank=100
 
     for N in 2048; do
-        lldb -- ./bin/H2_dtd --N $N \
+        ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \

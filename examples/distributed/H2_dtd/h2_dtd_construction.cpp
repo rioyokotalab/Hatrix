@@ -12,6 +12,9 @@
 
 using namespace Hatrix;
 
+double *U_MEM, *U_REAL_MEM;
+int U[9];
+
 void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Domain& domain,
@@ -186,7 +189,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
 void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
-                           int64_t level, double *U_MEM, int* U) {
+                           int64_t level) {
   int64_t nblocks = pow(2, level);
   int64_t child_level = level + 1;
 
@@ -288,7 +291,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
             TEMP_MEM, &ITEMP, &JTEMP, TEMP);
 
     // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
-    double *S_MEM = new double[(int64_t)child_block_size]();
+    double *S_MEM = new double[(int64_t)level_block_size]();
     const char JOB_U = 'V';
     const char JOB_VT = 'N';
 
@@ -377,13 +380,61 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int U_REAL_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
   int U_REAL[9];
-  double *U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols];
+  U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols];
   descinit_(U_REAL, &N, &rank, &nleaf, &rank, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_REAL_local_nrows, &INFO);
 
   for (int64_t block = 0; block < nblocks; ++block) {
+    // Apply the child basis to the upper part of the transfer matrix to generate the
+    // upper part of the real basis.
+    int64_t c1 = block * 2;
+    int64_t c2 = block * 2 + 1;
 
+    // Compute upper part of the real basis for this level.
+    {
+      int IU = c1 * child_block_size + 1;
+      int JU = 1;
+      int IUTRANSFER = c1 * rank + 1;
+      int JUTRANSFER = 1;
+      int IU_REAL = c1 * child_block_size + 1;
+      int JU_REAL = 1;
+
+      pdgemm_(&NOTRANS, &NOTRANS,
+              &child_block_size, &rank, &rank,
+              &ALPHA,
+              U_MEM, &IU, &JU, U,
+              UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
+              &BETA,
+              U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
+    }
+
+    // Compute lower part of the real basis for this level.
+    {
+      int IU = c2 * child_block_size + 1;
+      int JU = 1;
+      int IUTRANSFER = c2 * rank + 1;
+      int JUTRANSFER = 1;
+      int IU_REAL = c2 * child_block_size + 1;
+      int JU_REAL = 1;
+
+      pdgemm_(&NOTRANS, &NOTRANS,
+              &child_block_size, &rank, &rank,
+              &ALPHA,
+              U_MEM, &IU, &JU, U,
+              UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
+              &BETA,
+              U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
+    }
   }
+  // Free the real basis of the child level and set the U_REAL to real basis.
+  delete[] U_MEM;
+  U_MEM = U_REAL_MEM;
+  memcpy(U, U_REAL, sizeof(int) * 9);
+
+  // Use the real basis for generation of S blocks.
+
+  // Allocate a (nblocks * max_rank) ** 2 global matrix for temporary storage of the S blocks.
+  int S_BLOCKS_local_nrows;
 
   delete[] UTRANSFER_MEM;
   delete[] TEMP_MEM;
@@ -396,16 +447,17 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
   int nleaf = opts.nleaf; int N = opts.N; int INFO;
   int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
-  double *U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
-  int U[9];
+  U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 
   generate_leaf_nodes(A, domain, opts, U_MEM, U);
 
   for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
-    generate_transfer_matrices(A, domain, opts, level, U_MEM, U);
+    generate_transfer_matrices(A, domain, opts, level);
   }
+
+  delete[] U_MEM;
 
   // add a dummy level to facilitate easier interfacing with parsec.
   int64_t level = A.min_level-1;
@@ -424,6 +476,4 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
 
     A.ranks.insert(block, level, std::move(rank));
   }
-
-  delete[] U_MEM;
 }
