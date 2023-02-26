@@ -202,31 +202,31 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int N = opts.N;
   int nleaf = opts.nleaf;
 
-  // int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  // int AY_local_ncols = numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
-  //                              &MPIGRID[1]);
-  // int AY[9];
-  // double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
-  // descinit_(AY, &N, &level_block_size, &nleaf, &nleaf,
-  //           &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
+  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int AY_local_ncols = numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
+                               &MPIGRID[1]);
+  int AY[9];
+  double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
+  descinit_(AY, &N, &level_block_size, &nleaf, &nleaf,
+            &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
-  // // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
-  // double ALPHA = 1.0;
-  // double BETA = 1.0;
-  // for (int64_t block = 0; block < nblocks; ++block) {
-  //   for (int64_t j = 0; j < nblocks; ++j) {
-  //     if (exists_and_inadmissible(A, block, j, level)) { continue; }
+  // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
+  double ALPHA = 1.0;
+  double BETA = 1.0;
+  for (int64_t block = 0; block < nblocks; ++block) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (exists_and_inadmissible(A, block, j, level)) { continue; }
 
-  //     int IA = level_block_size * block + 1;
-  //     int JA = level_block_size * j + 1;
+      int IA = level_block_size * block + 1;
+      int JA = level_block_size * j + 1;
 
-  //     pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
-  //              &ALPHA,
-  //              DENSE_MEM, &IA, &JA, DENSE.data(),
-  //              &BETA,
-  //              AY_MEM, &IA, &ONE, AY);
-  //   }
-  // }
+      pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
+               &ALPHA,
+               DENSE_MEM, &IA, &JA, DENSE.data(),
+               &BETA,
+               AY_MEM, &IA, &ONE, AY);
+    }
+  }
 
   // Allocate a temporary global matrix to store the product of the real basis with the
   // summation of the admissible blocks.
@@ -238,59 +238,70 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                                  &MYCOL, &ZERO, &MPIGRID[1]);
   int TEMP[9];
   // Use rank as NB cuz it throws a 806 error for an unknown reason.
-  descinit_(TEMP, &TEMP_nrows, &level_block_size, &rank, &nleaf, &ZERO, &ZERO,
+  std::cout << "TEMP : "
+            << TEMP_nrows
+            << " " << level_block_size
+            << " " << rank
+            << " " << nleaf
+            << std::endl;
+  descinit_(TEMP, &TEMP_nrows, &level_block_size, &rank, &rank, &ZERO, &ZERO,
             &BLACS_CONTEXT, &TEMP_local_nrows, &INFO);
   double *TEMP_MEM = new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
   int child_block_size = N / child_nblocks;
 
   // 2. Apply the real basis U to the summation of the admissible blocks.
-  // for (int64_t block = 0; block < nblocks; ++block) {
-  //   int64_t c1 = block * 2;
-  //   int64_t c2 = block * 2 + 1;
-  //   int rank = opts.max_rank;
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int64_t c1 = block * 2;
+    int64_t c2 = block * 2 + 1;
+    int rank = opts.max_rank;
 
-  //   double ALPHA = 1.0;
-  //   double BETA = 1.0;
+    double ALPHA = 1.0;
+    double BETA = 1.0;
 
-  //   // Upper basis block.
-  //   int IU = c1 * child_block_size + 1;
-  //   int JU = 1;
-  //   int IA = c1 * child_block_size + 1;
-  //   int JA = 1;
-  //   int ITEMP = c1 * rank + 1;
-  //   int JTEMP = 1;
-  //   pdgemm_(&TRANS, &NOTRANS,
-  //           &rank, &child_block_size, &child_block_size,
-  //           &ALPHA,
-  //           U_MEM, &IU, &JU, U,
-  //           AY_MEM, &IA, &JA, AY,
-  //           &BETA,
-  //           TEMP_MEM, &ITEMP, &JTEMP, TEMP);
+    // Upper basis block.
+    int IU = c1 * child_block_size + 1;
+    int JU = 1;
+    int IA = c1 * child_block_size + 1;
+    int JA = 1;
+    int ITEMP = c1 * rank + 1;
+    int JTEMP = 1;
+    pdgemm_(&TRANS, &NOTRANS,
+            &rank, &child_block_size, &child_block_size,
+            &ALPHA,
+            U_MEM, &IU, &JU, U,
+            AY_MEM, &IA, &JA, AY,
+            &BETA,
+            TEMP_MEM, &ITEMP, &JTEMP, TEMP);
 
-  //   // Lower basis block.
-  //   IU = c2 * child_block_size + 1;
-  //   JU = 1;
-  //   IA = c2 * child_block_size + 1;
-  //   JA = 1;
-  //   ITEMP = c2 * rank + 1;
-  //   JTEMP = 1;
-  //   pdgemm_(&TRANS, &NOTRANS,
-  //           &rank, &child_block_size, &child_block_size,
-  //           &ALPHA,
-  //           U_MEM, &IU, &JU, U,
-  //           AY_MEM, &IA, &JA, AY,
-  //           &BETA,
-  //           TEMP_MEM, &ITEMP, &JTEMP, TEMP);
-  // }
+    // Lower basis block.
+    IU = c2 * child_block_size + 1;
+    JU = 1;
+    IA = c2 * child_block_size + 1;
+    JA = 1;
+    ITEMP = c2 * rank + 1;
+    JTEMP = 1;
+    pdgemm_(&TRANS, &NOTRANS,
+            &rank, &child_block_size, &child_block_size,
+            &ALPHA,
+            U_MEM, &IU, &JU, U,
+            AY_MEM, &IA, &JA, AY,
+            &BETA,
+            TEMP_MEM, &ITEMP, &JTEMP, TEMP);
+  }
   // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
   // Allocate a global matrix to store the transfer matrices. The transfer matrices for the
   // entire level are stacked by row in this global matrix.
-  // int UTRANSFER_local_nrows = numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
-  // int UTRANSFER_local_ncols = numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  int UTRANSFER_local_nrows = numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int UTRANSFER_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
   int UTRANSFER[9];
-  memcpy(UTRANSFER, TEMP, sizeof(int) * 9);
-  // descinit_(UTRANSFER, &TEMP_nrows, &level_block_size, &rank, &nleaf, &ZERO, &ZERO,
-  //           &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
+
+  std::cout << "UTRANSFER: "
+            << TEMP_nrows << " "
+            << rank << " "
+            << rank << " "
+            << rank << " " << std::endl;
+  descinit_(UTRANSFER, &TEMP_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
   double *UTRANSFER_MEM =
     new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols];
 
@@ -311,8 +322,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
       WORK = new double[1];
 
+      std::cout << "NROWS: " << block_nrows
+                << " N: " << rank
+                << " ITEMP: " << ITEMP
+                << " JTEMP: " << JTEMP
+                << std::endl;
+
       pdgesvd_(&JOB_U, &JOB_VT,
-               &block_nrows, &level_block_size,
+               &block_nrows, &rank,
                TEMP_MEM, &ITEMP, &JTEMP, TEMP,
                S_MEM,
                UTRANSFER_MEM, &IU, &JU, UTRANSFER,
@@ -324,23 +341,23 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
 
     // SVD computation
-    // {
-    //   int ITEMP = block * block_nrows + 1;
-    //   int JTEMP = 1;
-    //   int IU = block * block_nrows + 1;
-    //   int JU = 1;
-    //   WORK = new double[LWORK];
+    {
+      int ITEMP = block * block_nrows + 1;
+      int JTEMP = 1;
+      int IU = block * block_nrows + 1;
+      int JU = 1;
+      WORK = new double[LWORK];
 
-    //   pdgesvd_(&JOB_U, &JOB_VT,
-    //            &block_nrows, &rank,
-    //            TEMP_MEM, &ITEMP, &JTEMP, TEMP,
-    //            S_MEM,
-    //            UTRANSFER_MEM, &IU, &JU, UTRANSFER,
-    //            NULL, NULL, NULL, NULL,
-    //            WORK, &LWORK,
-    //            &INFO);
-    //   delete[] WORK;
-    // }
+      pdgesvd_(&JOB_U, &JOB_VT,
+               &block_nrows, &rank,
+               TEMP_MEM, &ITEMP, &JTEMP, TEMP,
+               S_MEM,
+               UTRANSFER_MEM, &IU, &JU, UTRANSFER,
+               NULL, NULL, NULL, NULL,
+               WORK, &LWORK,
+               &INFO);
+      delete[] WORK;
+    }
   }
 
     // Init CBLACS info for the local U block.
@@ -547,14 +564,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 void
 construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   // init global U matrix
-  // int nleaf = opts.nleaf; int N = opts.N; int INFO;
-  // int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  // int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
-  // U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
-  // descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
-  //           &U_nrows, &INFO);
+  int nleaf = opts.nleaf; int N = opts.N; int INFO;
+  int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
+  descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
+            &U_nrows, &INFO);
 
-  // generate_leaf_nodes(A, domain, opts, U_MEM, U);
+  generate_leaf_nodes(A, domain, opts, U_MEM, U);
 
   for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
     generate_transfer_matrices(A, domain, opts, level);
