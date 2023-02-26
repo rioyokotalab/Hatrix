@@ -358,207 +358,206 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                &INFO);
       delete[] WORK;
     }
-  }
 
     // Init CBLACS info for the local U block.
-    // int U_LOCAL_CONTEXT;
-    // int IMAP[1];                // workspace to map the original grid.
-    // int U_LOCAL_PNROWS, U_LOCAL_PNCOLS, U_LOCAL_PROW, U_LOCAL_PCOL; // local process grid parameters.
-    // IMAP[0] = mpi_rank(block);           // specify the rank from the global grid for the local grid.
-    // Cblacs_get(-1, 0, &U_LOCAL_CONTEXT);                    // init the new CBLACS context.
-    // Cblacs_gridmap(&U_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
-    // Cblacs_gridinfo(U_LOCAL_CONTEXT,                       // init grid params from the context.
-    //                 &U_LOCAL_PNROWS, &U_LOCAL_PNCOLS, &U_LOCAL_PROW, &U_LOCAL_PCOL);
+    int U_LOCAL_CONTEXT;
+    int IMAP[1];                // workspace to map the original grid.
+    int U_LOCAL_PNROWS, U_LOCAL_PNCOLS, U_LOCAL_PROW, U_LOCAL_PCOL; // local process grid parameters.
+    IMAP[0] = mpi_rank(block);           // specify the rank from the global grid for the local grid.
+    Cblacs_get(-1, 0, &U_LOCAL_CONTEXT);                    // init the new CBLACS context.
+    Cblacs_gridmap(&U_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
+    Cblacs_gridinfo(U_LOCAL_CONTEXT,                       // init grid params from the context.
+                    &U_LOCAL_PNROWS, &U_LOCAL_PNCOLS, &U_LOCAL_PROW, &U_LOCAL_PCOL);
 
-    // // store opts.max_rank columns of U in the A.U for this process.
-    // // init local U block for communication.
-    // int U_LOCAL[9];
-    // int U_LOCAL_nrows = opts.max_rank * 2, U_LOCAL_ncols = opts.max_rank;
-    // Matrix U_LOCAL_MEM(U_LOCAL_nrows, U_LOCAL_ncols);
-    // descset_(U_LOCAL,
-    //          &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
-    //          &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
+    // store opts.max_rank columns of U in the A.U for this process.
+    // init local U block for communication.
+    int U_LOCAL[9];
+    int U_LOCAL_nrows = opts.max_rank * 2, U_LOCAL_ncols = opts.max_rank;
+    Matrix U_LOCAL_MEM(U_LOCAL_nrows, U_LOCAL_ncols);
+    descset_(U_LOCAL,
+             &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
+             &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
 
-    // int IU = block * opts.max_rank * 2 + 1;
-    // int JU = 1;
-    // pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
-    //           UTRANSFER_MEM, &IU, &JU, UTRANSFER,
-    //           &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
-    //           &BLACS_CONTEXT);
+    int IU = block * opts.max_rank * 2 + 1;
+    int JU = 1;
+    pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
+              UTRANSFER_MEM, &IU, &JU, UTRANSFER,
+              &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
+              &BLACS_CONTEXT);
 
-    // if (mpi_rank(block) == MPIRANK) {
-    //   A.U.insert(block, level, std::move(U_LOCAL_MEM));
+    if (mpi_rank(block) == MPIRANK) {
+      A.U.insert(block, level, std::move(U_LOCAL_MEM));
 
-    //   // Init US from the row vector.
-    //   Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
-    //   for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
-    //   A.US.insert(block, level, std::move(US));
-    // }
+      // Init US from the row vector.
+      Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
+      for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
+      A.US.insert(block, level, std::move(US));
+    }
 
-    // A.ranks.insert(block, level, std::move(rank));
+    A.ranks.insert(block, level, std::move(rank));
 
-    // delete[] S_MEM;
-    // Cblacs_gridexit(U_LOCAL_CONTEXT);
-  // }
+    delete[] S_MEM;
+    Cblacs_gridexit(U_LOCAL_CONTEXT);
+  }
 
   // 4. Generate the real basis at this level from the transfer matrices and the real basis one
   // level below.
-  // int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  // int U_REAL_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
-  // int U_REAL[9];
-  // U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols];
-  // descinit_(U_REAL, &N, &rank, &nleaf, &rank, &ZERO, &ZERO, &BLACS_CONTEXT,
-  //           &U_REAL_local_nrows, &INFO);
+  int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int U_REAL_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
+  int U_REAL[9];
+  U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols];
+  descinit_(U_REAL, &N, &rank, &nleaf, &rank, &ZERO, &ZERO, &BLACS_CONTEXT,
+            &U_REAL_local_nrows, &INFO);
 
-  // for (int64_t block = 0; block < nblocks; ++block) {
-  //   // Apply the child basis to the upper part of the transfer matrix to generate the
-  //   // upper part of the real basis.
-  //   int64_t c1 = block * 2;
-  //   int64_t c2 = block * 2 + 1;
+  for (int64_t block = 0; block < nblocks; ++block) {
+    // Apply the child basis to the upper part of the transfer matrix to generate the
+    // upper part of the real basis.
+    int64_t c1 = block * 2;
+    int64_t c2 = block * 2 + 1;
 
-  //   // Compute upper part of the real basis for this level.
-  //   {
-  //     int IU = c1 * child_block_size + 1;
-  //     int JU = 1;
-  //     int IUTRANSFER = c1 * rank + 1;
-  //     int JUTRANSFER = 1;
-  //     int IU_REAL = c1 * child_block_size + 1;
-  //     int JU_REAL = 1;
+    // Compute upper part of the real basis for this level.
+    {
+      int IU = c1 * child_block_size + 1;
+      int JU = 1;
+      int IUTRANSFER = c1 * rank + 1;
+      int JUTRANSFER = 1;
+      int IU_REAL = c1 * child_block_size + 1;
+      int JU_REAL = 1;
 
-  //     pdgemm_(&NOTRANS, &NOTRANS,
-  //             &child_block_size, &rank, &rank,
-  //             &ALPHA,
-  //             U_MEM, &IU, &JU, U,
-  //             UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
-  //             &BETA,
-  //             U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
-  //   }
+      pdgemm_(&NOTRANS, &NOTRANS,
+              &child_block_size, &rank, &rank,
+              &ALPHA,
+              U_MEM, &IU, &JU, U,
+              UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
+              &BETA,
+              U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
+    }
 
-  //   // Compute lower part of the real basis for this level.
-  //   {
-  //     int IU = c2 * child_block_size + 1;
-  //     int JU = 1;
-  //     int IUTRANSFER = c2 * rank + 1;
-  //     int JUTRANSFER = 1;
-  //     int IU_REAL = c2 * child_block_size + 1;
-  //     int JU_REAL = 1;
+    // Compute lower part of the real basis for this level.
+    {
+      int IU = c2 * child_block_size + 1;
+      int JU = 1;
+      int IUTRANSFER = c2 * rank + 1;
+      int JUTRANSFER = 1;
+      int IU_REAL = c2 * child_block_size + 1;
+      int JU_REAL = 1;
 
-  //     pdgemm_(&NOTRANS, &NOTRANS,
-  //             &child_block_size, &rank, &rank,
-  //             &ALPHA,
-  //             U_MEM, &IU, &JU, U,
-  //             UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
-  //             &BETA,
-  //             U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
-  //   }
-  // }
-  // // Free the real basis of the child level and set the U_REAL to real basis.
-  // delete[] U_MEM;
-  // U_MEM = U_REAL_MEM;
-  // memcpy(U, U_REAL, sizeof(int) * 9);
+      pdgemm_(&NOTRANS, &NOTRANS,
+              &child_block_size, &rank, &rank,
+              &ALPHA,
+              U_MEM, &IU, &JU, U,
+              UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
+              &BETA,
+              U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
+    }
+  }
+  // Free the real basis of the child level and set the U_REAL to real basis.
+  delete[] U_MEM;
+  U_MEM = U_REAL_MEM;
+  memcpy(U, U_REAL, sizeof(int) * 9);
 
-  // // Use the real basis for generation of S blocks.
+  // Use the real basis for generation of S blocks.
 
-  // // Allocate a (nblocks * max_rank) ** 2 global matrix for temporary storage of the S blocks.
-  // int S_BLOCKS_nrows = nblocks * rank;
-  // int S_BLOCKS_local_nrows = numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
-  // int S_BLOCKS_local_ncols = numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
-  // int S_BLOCKS[9];
-  // double *S_BLOCKS_MEM = new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
-  // descinit_(S_BLOCKS, &S_BLOCKS_nrows, &S_BLOCKS_nrows, &rank, &rank,
-  //           &ZERO, &ZERO, &BLACS_CONTEXT, &S_BLOCKS_local_nrows, &INFO);
+  // Allocate a (nblocks * max_rank) ** 2 global matrix for temporary storage of the S blocks.
+  int S_BLOCKS_nrows = nblocks * rank;
+  int S_BLOCKS_local_nrows = numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int S_BLOCKS_local_ncols = numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
+  int S_BLOCKS[9];
+  double *S_BLOCKS_MEM = new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
+  descinit_(S_BLOCKS, &S_BLOCKS_nrows, &S_BLOCKS_nrows, &rank, &rank,
+            &ZERO, &ZERO, &BLACS_CONTEXT, &S_BLOCKS_local_nrows, &INFO);
 
-  // // Allocate a temporary block for storing the intermediate result of the product of the
-  // // real basis and admissible dense matrix.
-  // int TEMP_PRODUCT_local_nrows = fmax(numroc_(&rank, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
-  // int TEMP_PRODUCT_local_ncols = numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
-  // int TEMP_PRODUCT[9];
-  // double *TEMP_PRODUCT_MEM =
-  //   new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
+  // Allocate a temporary block for storing the intermediate result of the product of the
+  // real basis and admissible dense matrix.
+  int TEMP_PRODUCT_local_nrows = fmax(numroc_(&rank, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int TEMP_PRODUCT_local_ncols = numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  int TEMP_PRODUCT[9];
+  double *TEMP_PRODUCT_MEM =
+    new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
 
-  // descset_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
-  //           &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
+  descset_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
+            &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
 
-  // for (int64_t i = 0; i < nblocks; ++i) {
-  //   for (int64_t j = 0; j < i; ++j) {
-  //     if (exists_and_admissible(A, i, j, level)) {
-  //       // Multiply the real basis with the admissible block and store it in a temporary matrix.
-  //       int IU = i * level_block_size + 1;
-  //       int JU = 1;
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (exists_and_admissible(A, i, j, level)) {
+        // Multiply the real basis with the admissible block and store it in a temporary matrix.
+        int IU = i * level_block_size + 1;
+        int JU = 1;
 
-  //       int IDENSE = i * level_block_size + 1;
-  //       int JDENSE = j * level_block_size + 1;
+        int IDENSE = i * level_block_size + 1;
+        int JDENSE = j * level_block_size + 1;
 
-  //       int ITEMP_PRODUCT = 1;
-  //       int JTEMP_PRODUCT = j * level_block_size + 1;
-  //       pdgemm_(&TRANS, &NOTRANS,
-  //               &rank, &level_block_size, &level_block_size,
-  //               &ALPHA,
-  //               U_MEM, &IU, &JU, U,
-  //               DENSE_MEM, &IDENSE, &JDENSE, DENSE.data(),
-  //               &BETA,
-  //               TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
+        int ITEMP_PRODUCT = 1;
+        int JTEMP_PRODUCT = j * level_block_size + 1;
+        pdgemm_(&TRANS, &NOTRANS,
+                &rank, &level_block_size, &level_block_size,
+                &ALPHA,
+                U_MEM, &IU, &JU, U,
+                DENSE_MEM, &IDENSE, &JDENSE, DENSE.data(),
+                &BETA,
+                TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
 
-  //       IU = j * level_block_size + 1;
-  //       JU = 1;
+        IU = j * level_block_size + 1;
+        JU = 1;
 
-  //       int IS_BLOCKS = i * rank + 1;
-  //       int JS_BLOCKS = j * rank + 1;
+        int IS_BLOCKS = i * rank + 1;
+        int JS_BLOCKS = j * rank + 1;
 
-  //       pdgemm_(&NOTRANS, &NOTRANS,
-  //               &rank, &rank, &level_block_size,
-  //               &ALPHA,
-  //               TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT,
-  //               U_MEM, &IU, &JU, U,
-  //               &BETA,
-  //               S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
-  //     }
-  //   }
-  // }
+        pdgemm_(&NOTRANS, &NOTRANS,
+                &rank, &rank, &level_block_size,
+                &ALPHA,
+                TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT,
+                U_MEM, &IU, &JU, U,
+                &BETA,
+                S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
+      }
+    }
+  }
 
-  // // Copy the S blocks to the H2 matrix data structure.
-  // for (int64_t i = 0; i < nblocks; ++i) {
-  //   for (int64_t j = 0; j < i; ++j) {
-  //     if (exists_and_admissible(A, i, j, level)) {
-  //       // Init CBLACS info for the local S block.
-  //       int S_LOCAL_CONTEXT;
-  //       int IMAP[1];                // workspace to map the original grid.
-  //       // local process grid parameters.
-  //       int S_LOCAL_PNROWS, S_LOCAL_PNCOLS, S_LOCAL_PROW, S_LOCAL_PCOL;
-  //       // specify the rank from the global grid for the local grid.
-  //       IMAP[0] = mpi_rank(i);
-  //       Cblacs_get(-1, 0, &S_LOCAL_CONTEXT);                    // init the new CBLACS context.
-  //       Cblacs_gridmap(&S_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
-  //       Cblacs_gridinfo(S_LOCAL_CONTEXT,                       // init grid params from the context.
-  //                       &S_LOCAL_PNROWS, &S_LOCAL_PNCOLS, &S_LOCAL_PROW, &S_LOCAL_PCOL);
+  // Copy the S blocks to the H2 matrix data structure.
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (exists_and_admissible(A, i, j, level)) {
+        // Init CBLACS info for the local S block.
+        int S_LOCAL_CONTEXT;
+        int IMAP[1];                // workspace to map the original grid.
+        // local process grid parameters.
+        int S_LOCAL_PNROWS, S_LOCAL_PNCOLS, S_LOCAL_PROW, S_LOCAL_PCOL;
+        // specify the rank from the global grid for the local grid.
+        IMAP[0] = mpi_rank(i);
+        Cblacs_get(-1, 0, &S_LOCAL_CONTEXT);                    // init the new CBLACS context.
+        Cblacs_gridmap(&S_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
+        Cblacs_gridinfo(S_LOCAL_CONTEXT,                       // init grid params from the context.
+                        &S_LOCAL_PNROWS, &S_LOCAL_PNCOLS, &S_LOCAL_PROW, &S_LOCAL_PCOL);
 
-  //       // Store the info for the S block to be copied into in S_LOCAL.
-  //       int S_LOCAL[9];
-  //       int S_LOCAL_nrows = opts.max_rank, S_LOCAL_ncols = opts.max_rank;
-  //       Matrix S_LOCAL_MEM(S_LOCAL_nrows, S_LOCAL_ncols);
-  //       descset_(S_LOCAL,
-  //                &S_LOCAL_nrows, &S_LOCAL_ncols, &S_LOCAL_nrows, &S_LOCAL_ncols,
-  //                &S_LOCAL_PROW, &S_LOCAL_PCOL, &S_LOCAL_CONTEXT, &S_LOCAL_nrows, &INFO);
+        // Store the info for the S block to be copied into in S_LOCAL.
+        int S_LOCAL[9];
+        int S_LOCAL_nrows = opts.max_rank, S_LOCAL_ncols = opts.max_rank;
+        Matrix S_LOCAL_MEM(S_LOCAL_nrows, S_LOCAL_ncols);
+        descset_(S_LOCAL,
+                 &S_LOCAL_nrows, &S_LOCAL_ncols, &S_LOCAL_nrows, &S_LOCAL_ncols,
+                 &S_LOCAL_PROW, &S_LOCAL_PCOL, &S_LOCAL_CONTEXT, &S_LOCAL_nrows, &INFO);
 
-  //       int IS_BLOCKS = i * rank + 1;
-  //       int JS_BLOCKS = j * rank + 1;
-  //       pdgemr2d_(&S_LOCAL_nrows, &S_LOCAL_ncols,
-  //                 S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS,
-  //                 &S_LOCAL_MEM, &ONE, &ONE, S_LOCAL,
-  //                 &BLACS_CONTEXT);
+        int IS_BLOCKS = i * rank + 1;
+        int JS_BLOCKS = j * rank + 1;
+        pdgemr2d_(&S_LOCAL_nrows, &S_LOCAL_ncols,
+                  S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS,
+                  &S_LOCAL_MEM, &ONE, &ONE, S_LOCAL,
+                  &BLACS_CONTEXT);
 
-  //       if (mpi_rank(i) == MPIRANK) {
-  //         A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
-  //       }
-  //     }
-  //   }
-  // }
+        if (mpi_rank(i) == MPIRANK) {
+          A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
+        }
+      }
+    }
+  }
 
-  // delete[] S_BLOCKS_MEM;
-  // delete[] TEMP_PRODUCT_MEM;
-  // delete[] UTRANSFER_MEM;
-  // delete[] TEMP_MEM;
-  // delete[] AY_MEM;
+  delete[] S_BLOCKS_MEM;
+  delete[] TEMP_PRODUCT_MEM;
+  delete[] UTRANSFER_MEM;
+  delete[] TEMP_MEM;
+  delete[] AY_MEM;
 }
 
 void
@@ -577,7 +576,7 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
     generate_transfer_matrices(A, domain, opts, level);
   }
 
-  // delete[] U_MEM;
+  delete[] U_MEM;
 
   // add a dummy level to facilitate easier interfacing with parsec.
   int64_t level = A.min_level-1;
