@@ -455,6 +455,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
       if (exists_and_admissible(A, i, j, level)) {
+
+        // Multiply the real basis with the admissible block and store it in a temporary matrix.
         int IU = i * level_block_size + 1;
         int JU = 1;
 
@@ -463,7 +465,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
         int ITEMP_PRODUCT = 1;
         int JTEMP_PRODUCT = j * level_block_size + 1;
-
         pdgemm_(&TRANS, &NOTRANS,
                 &rank, &level_block_size, &level_block_size,
                 &ALPHA,
@@ -471,6 +472,20 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                 DENSE_MEM, &IDENSE, &JDENSE, DENSE.data(),
                 &BETA,
                 TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
+
+        IU = 1;
+        JU = j * level_block_size + 1;
+
+        int IS_BLOCKS = i * rank + 1;
+        int JS_BLOCKS = j * rank + 1;
+
+        pdgemm_(&NOTRANS, &NOTRANS,
+                &rank, &rank, &level_block_size,
+                &ALPHA,
+                TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT,
+                U_MEM, &IU, &JU, U,
+                &BETA,
+                S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
       }
     }
   }
