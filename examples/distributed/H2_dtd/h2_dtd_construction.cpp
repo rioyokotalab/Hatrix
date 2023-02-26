@@ -472,8 +472,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                 &BETA,
                 TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
 
-        IU = 1;
-        JU = j * level_block_size + 1;
+        IU = j * level_block_size + 1;
+        JU = 1;
 
         int IS_BLOCKS = i * rank + 1;
         int JS_BLOCKS = j * rank + 1;
@@ -497,8 +497,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
           // Init CBLACS info for the local S block.
           int S_LOCAL_CONTEXT;
           int IMAP[1];                // workspace to map the original grid.
-          int S_LOCAL_PNROWS, S_LOCAL_PNCOLS, S_LOCAL_PROW, S_LOCAL_PCOL; // local process grid parameters.
-          IMAP[0] = mpi_rank(i);           // specify the rank from the global grid for the local grid.
+          // local process grid parameters.
+          int S_LOCAL_PNROWS, S_LOCAL_PNCOLS, S_LOCAL_PROW, S_LOCAL_PCOL;
+          // specify the rank from the global grid for the local grid.
+          IMAP[0] = mpi_rank(i);
           Cblacs_get(-1, 0, &S_LOCAL_CONTEXT);                    // init the new CBLACS context.
           Cblacs_gridmap(&S_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
           Cblacs_gridinfo(S_LOCAL_CONTEXT,                       // init grid params from the context.
@@ -526,7 +528,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       }
     }
   }
-
 
   delete[] S_BLOCKS_MEM;
   delete[] TEMP_PRODUCT_MEM;

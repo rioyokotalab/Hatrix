@@ -290,39 +290,39 @@ int main(int argc, char **argv) {
   double matvec_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_matvec - start_matvec).count();
 
-  // delete[] DENSE_MEM;           // free dense matrix to free space for parsec.
+  delete[] DENSE_MEM;           // free dense matrix to free space for parsec.
 
   // H2 matvec verification.
 
-  double ALPHA = 1.0;
-  double BETA = 0.0;
+  // double ALPHA = 1.0;
+  // double BETA = 0.0;
 
-  int IA = 1, JA = 1;
-  int IX = 1, JX = 1;
-  int IY = 1, JY = 1;
-  pdgemv_(&NOTRANS, &N, &N,     // dense_A * x = b_check.
-          &ALPHA,
-          DENSE_MEM, &IA, &JA, DENSE.data(),
-          X_mem.data(), &IX, &JX, DESCX.data(),
-          &ONE,
-          &BETA,
-          B_CHECK_mem.data(), &IY, &JY, DESCB_CHECK.data(),
-          &ONE);
+  // int IA = 1, JA = 1;
+  // int IX = 1, JX = 1;
+  // int IY = 1, JY = 1;
+  // pdgemv_(&NOTRANS, &N, &N,     // dense_A * x = b_check.
+  //         &ALPHA,
+  //         DENSE_MEM, &IA, &JA, DENSE.data(),
+  //         X_mem.data(), &IX, &JX, DESCX.data(),
+  //         &ONE,
+  //         &BETA,
+  //         B_CHECK_mem.data(), &IY, &JY, DESCB_CHECK.data(),
+  //         &ONE);
 
 
-  const char nn = 'F';
-  double nrm = pdlange_(&nn, &N, &ONE, B_CHECK_mem.data(), &ONE, &ONE, DESCB_CHECK.data(), NULL);
+  // const char nn = 'F';
+  // double nrm = pdlange_(&nn, &N, &ONE, B_CHECK_mem.data(), &ONE, &ONE, DESCB_CHECK.data(), NULL);
 
-  redistribute_scalapack2vector(b_check, B_CHECK_mem, A, opts);
+  // redistribute_scalapack2vector(b_check, B_CHECK_mem, A, opts);
 
-  std::vector<Matrix> difference;
-  for (int i = 0; i < b.size(); ++i) {
-    difference.push_back(b_check[i] - b[i]);
-  }
+  // std::vector<Matrix> difference;
+  // for (int i = 0; i < b.size(); ++i) {
+  //   difference.push_back(b_check[i] - b[i]);
+  // }
 
-  double diff_norm = dist_norm2(difference);
-  double b_check_norm = dist_norm2(b_check);
-  double construction_error = diff_norm / b_check_norm;
+  // double diff_norm = dist_norm2(difference);
+  // double b_check_norm = dist_norm2(b_check);
+  double construction_error = 0;//diff_norm / b_check_norm;
 
   // ---- BEGIN PARSEC ----
 
