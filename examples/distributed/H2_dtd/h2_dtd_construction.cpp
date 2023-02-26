@@ -444,12 +444,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   // Allocate a temporary block for storing the intermediate result of the product of the
   // real basis and admissible dense matrix.
-  int TEMP_PRODUCT_local_nrows = numroc_(&rank, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int TEMP_PRODUCT_local_nrows = fmax(numroc_(&rank, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int TEMP_PRODUCT_local_ncols = numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
   int TEMP_PRODUCT[9];
   double *TEMP_PRODUCT_MEM =
     new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
-  descinit_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
+
+  descset_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
             &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -493,37 +494,35 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
       if (exists_and_admissible(A, i, j, level)) {
+        // Init CBLACS info for the local S block.
+        int S_LOCAL_CONTEXT;
+        int IMAP[1];                // workspace to map the original grid.
+        // local process grid parameters.
+        int S_LOCAL_PNROWS, S_LOCAL_PNCOLS, S_LOCAL_PROW, S_LOCAL_PCOL;
+        // specify the rank from the global grid for the local grid.
+        IMAP[0] = mpi_rank(i);
+        Cblacs_get(-1, 0, &S_LOCAL_CONTEXT);                    // init the new CBLACS context.
+        Cblacs_gridmap(&S_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
+        Cblacs_gridinfo(S_LOCAL_CONTEXT,                       // init grid params from the context.
+                        &S_LOCAL_PNROWS, &S_LOCAL_PNCOLS, &S_LOCAL_PROW, &S_LOCAL_PCOL);
+
+        // Store the info for the S block to be copied into in S_LOCAL.
+        int S_LOCAL[9];
+        int S_LOCAL_nrows = opts.max_rank, S_LOCAL_ncols = opts.max_rank;
+        Matrix S_LOCAL_MEM(S_LOCAL_nrows, S_LOCAL_ncols);
+        descset_(S_LOCAL,
+                 &S_LOCAL_nrows, &S_LOCAL_ncols, &S_LOCAL_nrows, &S_LOCAL_ncols,
+                 &S_LOCAL_PROW, &S_LOCAL_PCOL, &S_LOCAL_CONTEXT, &S_LOCAL_nrows, &INFO);
+
+        int IS_BLOCKS = i * rank + 1;
+        int JS_BLOCKS = j * rank + 1;
+        pdgemr2d_(&S_LOCAL_nrows, &S_LOCAL_ncols,
+                  S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS,
+                  &S_LOCAL_MEM, &ONE, &ONE, S_LOCAL,
+                  &BLACS_CONTEXT);
+
         if (mpi_rank(i) == MPIRANK) {
-          // Init CBLACS info for the local S block.
-          int S_LOCAL_CONTEXT;
-          int IMAP[1];                // workspace to map the original grid.
-          // local process grid parameters.
-          int S_LOCAL_PNROWS, S_LOCAL_PNCOLS, S_LOCAL_PROW, S_LOCAL_PCOL;
-          // specify the rank from the global grid for the local grid.
-          IMAP[0] = mpi_rank(i);
-          Cblacs_get(-1, 0, &S_LOCAL_CONTEXT);                    // init the new CBLACS context.
-          Cblacs_gridmap(&S_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
-          Cblacs_gridinfo(S_LOCAL_CONTEXT,                       // init grid params from the context.
-                          &S_LOCAL_PNROWS, &S_LOCAL_PNCOLS, &S_LOCAL_PROW, &S_LOCAL_PCOL);
-
-          // Store the info for the S block to be copied into in S_LOCAL.
-          int S_LOCAL[9];
-          int S_LOCAL_nrows = opts.max_rank, S_LOCAL_ncols = opts.max_rank;
-          Matrix S_LOCAL_MEM(S_LOCAL_nrows, S_LOCAL_ncols);
-          descset_(S_LOCAL,
-                   &S_LOCAL_nrows, &S_LOCAL_ncols, &S_LOCAL_nrows, &S_LOCAL_ncols,
-                   &S_LOCAL_PROW, &S_LOCAL_PCOL, &S_LOCAL_CONTEXT, &S_LOCAL_nrows, &INFO);
-
-          int IS_BLOCKS = i * rank + 1;
-          int JS_BLOCKS = j * rank + 1;
-          pdgemr2d_(&S_LOCAL_nrows, &S_LOCAL_ncols,
-                    S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS,
-                    &S_LOCAL_MEM, &ONE, &ONE, S_LOCAL,
-                    &BLACS_CONTEXT);
-
-          if (mpi_rank(i) == MPIRANK) {
-            A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
-          }
+          A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
         }
       }
     }
