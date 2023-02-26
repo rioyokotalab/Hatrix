@@ -326,6 +326,7 @@ namespace Hatrix {
         {  std::cout<<"GEMM (t-task)"<<row*2<<","<<start+1<<","<<level+1<<std::endl;
           matmul(lr_map(row*2, start, level+1).V, lr_map(start, start+1, level+1), lr_map(row*2, start+1, level+1).V, false, false, -1, 1);
         }
+        //#pragma omp taskwait
         update_children(is_admissible, row*2, start+1, level+1, max_level);
         //#pragma omp taskwait
         //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(row*2, start+1, level+1))
@@ -342,6 +343,7 @@ namespace Hatrix {
         {  std::cout<<"GEMM (t-task)"<<start+1<<","<<col*2<<","<<level+1<<std::endl;
           matmul(lr_map(start+1, start, level+1), lr_map(start, col*2, level+1).U, lr_map(start+1, col*2, level+1).U, false, false, -1, 1);
         }
+        //#pragma omp taskwait
         update_children(is_admissible, start+1, col*2, level+1, max_level);
         //#pragma omp taskwait
         //std::cout<<"TRSM2"<<std::endl;
@@ -352,11 +354,11 @@ namespace Hatrix {
       bool diag = uplo == Hatrix::Lower;
       int src_idx = diag?row:col;
       //std::cout<<"TRSM "<<row<<","<<col<<","<<level<<std::endl;
-      //#pragma omp task shared(dense_map, lr_map) depend(in: is_admissible(src_idx, src_idx, level)) depend(inout: is_admissible(row, col, level))
+      #pragma omp task shared(dense_map, lr_map) depend(in: is_admissible(src_idx, src_idx, level)) depend(inout: is_admissible(row, col, level))
       {  std::cout<<"TRSM (task) "<<row<<","<<col<<","<<level<<std::endl;
         Hatrix::solve_triangular(dense_map(src_idx, src_idx, level), diag?lr_map(row, col, level).U:lr_map(row, col, level).V, side, uplo, diag, false);
       }
-      #pragma omp taskwait
+      //#pragma omp taskwait
       //std::cout<<"Finished"<<std::endl;
     }
   }
@@ -408,7 +410,7 @@ namespace Hatrix {
   void getrf(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level) {
     int start = row * 2;
     if (level < max_level) {
-      std::cout<<"GETRF on ("<<start<<","<<start<<","<<level<<")"<<std::endl;
+      //std::cout<<"GETRF on ("<<start<<","<<start<<","<<level<<")"<<std::endl;
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(inout: is_admissible(start, start, level+1))
       {
         getrf<DT>(dense_map, lr_map, is_admissible, start, start, level+1, max_level);
@@ -416,12 +418,12 @@ namespace Hatrix {
       #pragma omp taskwait
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start, start, level+1)) depend(inout: is_admissible(start, start+1, level+1))
       {
-        std::cout<<"TRSM on ("<<start<<","<<start+1<<","<<level+1<<")"<<std::endl;
+        //std::cout<<"TRSM on ("<<start<<","<<start+1<<","<<level+1<<")"<<std::endl;
         Hatrix::trsm<DT>(dense_map, lr_map, is_admissible, start, start+1, level+1, max_level, Hatrix::Left, Hatrix::Lower);
       }
       #pragma omp taskwait
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start, start, level+1)) depend(inout: is_admissible(start+1, start, level+1))
-      {std::cout<<"TRSM on ("<<start+1<<","<<start<<","<<level+1<<")"<<std::endl;
+      {//std::cout<<"TRSM on ("<<start+1<<","<<start<<","<<level+1<<")"<<std::endl;
         Hatrix::trsm<DT>(dense_map, lr_map, is_admissible, start+1, start, level+1, max_level, Hatrix::Right, Hatrix::Upper);
       }
       #pragma omp taskwait
@@ -431,7 +433,7 @@ namespace Hatrix {
       }
       #pragma omp taskwait
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(inout: is_admissible(start+1, start+1, level+1))
-      {std::cout<<"GETRF(dense) on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
+      {//std::cout<<"GETRF(dense) on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
         getrf<DT>(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level);
       }
       #pragma omp taskwait
