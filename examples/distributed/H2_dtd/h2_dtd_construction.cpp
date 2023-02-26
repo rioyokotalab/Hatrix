@@ -434,8 +434,50 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // Use the real basis for generation of S blocks.
 
   // Allocate a (nblocks * max_rank) ** 2 global matrix for temporary storage of the S blocks.
-  int S_BLOCKS_local_nrows;
+  int S_BLOCKS_nrows = nblocks * rank;
+  int S_BLOCKS_local_nrows = numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int S_BLOCKS_local_ncols = numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
+  int S_BLOCKS[9];
+  double *S_BLOCKS_MEM = new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
+  descinit_(S_BLOCKS, &S_BLOCKS_nrows, &S_BLOCKS_nrows, &rank, &rank,
+            &ZERO, &ZERO, &BLACS_CONTEXT, &S_BLOCKS_local_nrows, &INFO);
 
+  // Allocate a temporary block for storing the intermediate result of the product of the
+  // real basis and admissible dense matrix.
+  int TEMP_PRODUCT_local_nrows = numroc_(&rank, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int TEMP_PRODUCT_local_ncols = numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  int TEMP_PRODUCT[9];
+  double *TEMP_PRODUCT_MEM =
+    new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
+  descinit_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
+            &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (exists_and_admissible(A, i, j, level)) {
+        int IU = i * level_block_size + 1;
+        int JU = 1;
+
+        int IDENSE = i * level_block_size + 1;
+        int JDENSE = j * level_block_size + 1;
+
+        int ITEMP_PRODUCT = 1;
+        int JTEMP_PRODUCT = j * level_block_size + 1;
+
+        pdgemm_(&TRANS, &NOTRANS,
+                &rank, &level_block_size, &level_block_size,
+                &ALPHA,
+                U_MEM, &IU, &JU, U,
+                DENSE_MEM, &IDENSE, &JDENSE, DENSE.data(),
+                &BETA,
+                TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
+      }
+    }
+  }
+
+
+  delete[] S_BLOCKS_MEM;
+  delete[] TEMP_PRODUCT_MEM;
   delete[] UTRANSFER_MEM;
   delete[] TEMP_MEM;
   delete[] AY_MEM;
