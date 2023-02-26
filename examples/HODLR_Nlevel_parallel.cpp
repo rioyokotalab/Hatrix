@@ -268,19 +268,25 @@ namespace Hatrix {
     int child_row = row * 2;
     int child_col = col * 2;
     if (row > col) {
+      // Must go from bottom to top
+      update_parent(is_admissible, child_row, child_col, level+1, max_level);
+      update_parent(is_admissible, child_row, child_col+1, level+1, max_level);
+      //std::cout<<"Update parent of ("<<child_row<<","<<child_col<<","<<level+1<<") ("<<row<<","<<col<<","<<level<<std::endl;
       #pragma omp task depend(in: is_admissible(child_row, child_col, level+1), is_admissible(child_row, child_col+1, level+1)) depend(out: is_admissible(row, col, level))
       {
         empty_task();
       }
-      update_parent(is_admissible, child_row, child_col, level+1, max_level);
-      update_parent(is_admissible, child_row, child_col+1, level+1, max_level);
+      
     } else {
+      // Must go from bottom to top
+      update_parent(is_admissible, child_row, child_col, level+1, max_level);
+      update_parent(is_admissible, child_row+1, child_col, level+1, max_level);
+      //std::cout<<"Update parent of ("<<child_row<<","<<child_col<<","<<level+1<<") ("<<row<<","<<col<<","<<level<<std::endl;
       #pragma omp task depend(in: is_admissible(child_row, child_col, level+1), is_admissible(child_row+1, child_col, level+1)) depend(out: is_admissible(row, col, level))
       {
         empty_task();
       }
-      update_parent(is_admissible, child_row, child_col, level+1, max_level);
-      update_parent(is_admissible, child_row+1, child_col, level+1, max_level);
+      
     }
   }
 
@@ -318,6 +324,7 @@ namespace Hatrix {
         int start = col * 2;
         //std::cout<<"TRSM1"<<std::endl;
         trsm<DT>(dense_map, lr_map, is_admissible, row*2, start, level+1, max_level, side, uplo);
+        //#pragma omp taskwait
         //std::cout<<"GEMM1"<<std::endl;
         //wait_for_children(is_admissible, start, start+1, level+2, max_level);
         update_parent(is_admissible, row*2, start, level+1, max_level);
@@ -330,11 +337,13 @@ namespace Hatrix {
         update_children(is_admissible, row*2, start+1, level+1, max_level);
         //#pragma omp taskwait
         //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(row*2, start+1, level+1))
-          trsm<DT>(dense_map, lr_map, is_admissible, row*2, start+1, level+1, max_level, side, uplo);
+        trsm<DT>(dense_map, lr_map, is_admissible, row*2, start+1, level+1, max_level, side, uplo);
       } else {
         int start = row * 2;
         //std::cout<<"TRSM1"<<std::endl;
         trsm<DT>(dense_map, lr_map, is_admissible, start, col*2, level+1, max_level, side, uplo);
+        //#pragma omp taskwait
+        
         //std::cout<<"GEMM"<<std::endl;
         //wait_for_children(is_admissible, start+1, start, level+2, max_level);
         update_parent(is_admissible, start+1, start, level+1, max_level);
@@ -348,7 +357,7 @@ namespace Hatrix {
         //#pragma omp taskwait
         //std::cout<<"TRSM2"<<std::endl;
         //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start+1, col*2, level+1))
-          trsm<DT>(dense_map, lr_map, is_admissible, start+1, col*2, level+1, max_level, side, uplo);
+        trsm<DT>(dense_map, lr_map, is_admissible, start+1, col*2, level+1, max_level, side, uplo);
       }
     } else {
       bool diag = uplo == Hatrix::Lower;
@@ -473,9 +482,9 @@ namespace Hatrix {
 
 int main() {
   int n = 1024;
-  int leaf_size = 128;
+  int leaf_size = 32;
   int num_blocks = n / leaf_size;
-  int rank = 100;
+  int rank = 16;
 
   int max_level = 0;
   int size = n;
