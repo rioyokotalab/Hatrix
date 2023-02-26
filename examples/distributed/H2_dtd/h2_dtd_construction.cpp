@@ -313,7 +313,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      LWORK = (int)WORK[0];
+      LWORK = (int)WORK[0] + level_block_size * block_nrows;
       free(WORK);
     }
 
