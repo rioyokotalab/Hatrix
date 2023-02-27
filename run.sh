@@ -23,15 +23,15 @@ export OMP_NUM_THREADS=1
 
 
 make -j H2_dtd
-make -j H2_main
+# make -j H2_main
 
 for adm in 1; do
-    nleaf=128
+    nleaf=1024
     ndim=1
-    max_rank=64
+    max_rank=100
 
-    for N in 2048; do
-        mpirun -n 2 ./bin/H2_dtd --N $N \
+    for N in 16384 32768 65536 131072 262144; do
+        mpirun -n 1 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -43,21 +43,6 @@ for adm in 1; do
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
                       --kind_of_recompression 3 \
-                      --use_nested_basis
-
-
-        ./bin/H2_main --N $N \
-                     --nleaf $nleaf \
-                     --kernel_func laplace \
-                     --kind_of_geometry grid \
-                     --ndim $ndim \
-                     --max_rank $max_rank \
-                     --accuracy -1 \
-                     --admis $adm \
-                     --admis_kind geometry \
-                     --construct_algorithm miro \
-                     --add_diag 1e-9  \
-                     --kind_of_recompression 3 \
                       --use_nested_basis
     done
 done
