@@ -57,6 +57,13 @@ class Matrix {
   // WARNING: does not deallocate the extra data!
   void shrink(int64_t rows, int64_t cols);
 
+  void create_view(const Matrix<DT>& A);
+
+  Matrix<DT> get_row_block(const int64_t start, const int64_t size) const;
+  Matrix<DT> get_col_block(const int64_t start, const int64_t size) const;
+
+
+
   // Split the matrix into n_row_splits * n_col_splits blocks.
   // n_row_splits is the number of blocks in the row dimension and
   // n_col_splits is the number of blocks in the column dimension.

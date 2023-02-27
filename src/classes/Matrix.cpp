@@ -68,11 +68,18 @@ template <typename DT>
 Matrix<DT>::Matrix(const Matrix<DT>& A, bool copy)
     : rows(A.rows),
       cols(A.cols) {
-  if (A.is_view && !copy) {
+
+  if (!copy) {
     is_view = true;
     stride = A.stride;
     data_ptr = A.data_ptr;
   }
+  // why not make a view if A is not a view?
+  /*if (A.is_view && !copy) {
+    is_view = true;
+    stride = A.stride;
+    data_ptr = A.data_ptr;
+  }*/
   else {
     try {
       data_ptr = new DT[rows * cols]();
@@ -158,6 +165,15 @@ Matrix<DT>& Matrix<DT>::operator=(const Matrix<DT>& A) {
 }
 
 template <typename DT>
+void Matrix<DT>::create_view(const Matrix<DT>& A) {
+  this->rows = A.rows;
+  this->cols = A.cols;
+  this->stride = A.stride;
+  this->data_ptr = A.data_ptr;
+  this->is_view = true;
+}
+
+template <typename DT>
 Matrix<DT>::Matrix(int64_t rows, int64_t cols)
     : rows(rows),
       cols(cols),
@@ -228,6 +244,28 @@ void Matrix<DT>::shrink(int64_t new_rows, int64_t new_cols) {
   rows = new_rows;
   cols = new_cols;
   stride = rows;
+}
+
+template <typename DT>
+Matrix<DT> Matrix<DT>::get_row_block(const int64_t start, const int64_t size) const {
+
+  Matrix<DT> row_block(size, this->cols);
+  row_block.stride = this->stride;
+  row_block.is_view = true;
+  row_block.data_ptr = &data_ptr[start];
+
+  return row_block;
+}
+
+template <typename DT>
+Matrix<DT> Matrix<DT>::get_col_block(const int64_t start, const int64_t size) const {
+
+  Matrix<DT> col_block(this->rows, size);
+  col_block.stride = this->stride;
+  col_block.is_view = true;
+  col_block.data_ptr = &data_ptr[start * stride];
+
+  return col_block;
 }
 
 template <typename DT>
