@@ -1013,6 +1013,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   parsec_data_key_t fill_in_key =
     parsec_temp_fill_in_rows.super.data_key(&parsec_temp_fill_in_rows.super,
                                        block, level);
+  int arena_d = level == A.max_level ? D_ARENA : FINAL_DENSE_ARENA;
 
   if (mpi_rank(block) == MPIRANK) { // fill-in addition happens where the bases is present.
     Matrix fill_in(block_size, block_size);
@@ -1038,10 +1039,10 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
           sizeof(int64_t), &F_block_j_ncols, PARSEC_VALUE,
           sizeof(char), &which, PARSEC_VALUE,
           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_block_j_key),
-                               PARSEC_INPUT | D_ARENA,
+                               PARSEC_INPUT | arena_d,
           sizeof(int64_t), &block_size, PARSEC_VALUE,
           PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_rows.super, fill_in_key),
-                               PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                               PARSEC_INOUT | arena_d | PARSEC_AFFINITY,
           PARSEC_DTD_ARG_END);
 
       }
@@ -1066,17 +1067,17 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
     "fill_in_recompression_task",
     sizeof(int64_t), &block_size, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_rows.super, fill_in_key),
-                         PARSEC_INPUT | D_ARENA,
+                         PARSEC_INPUT | arena_d,
     sizeof(int64_t), &rank, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_US.super, US_key),
-                         PARSEC_INPUT | S_ARENA,
+                         PARSEC_INOUT | S_ARENA,
     sizeof(int64_t), &U_nrows, PARSEC_VALUE,
     sizeof(int64_t), &U_ncols, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
                          PARSEC_INOUT | basis_arena | PARSEC_AFFINITY,
     sizeof(int64_t), &r_nrows, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_r.super, r_key),
-                         PARSEC_INOUT | S_ARENA | PARSEC_AFFINITY,
+                         PARSEC_INOUT | S_ARENA,
     sizeof(char), &which, PARSEC_VALUE,
     PARSEC_DTD_ARG_END);
 }
@@ -1137,8 +1138,8 @@ update_row_transfer_bases(SymmetricSharedBasisMatrix& A,
 
     int basis_arena = level == A.max_level ? U_ARENA : U_NON_LEAF_ARENA;
 
-    parsec_dtd_insert_task(dtd_tp, task_row_transfer_basis_update, 0, PARSEC_DEV_CPU,
-       "row_transfer_basis_update_task",
+    parsec_dtd_insert_task(dtd_tp, task_transfer_basis_update, 0, PARSEC_DEV_CPU,
+       "transfer_basis_update_task",
        sizeof(int64_t), &U_nrows, PARSEC_VALUE,
        sizeof(int64_t), &U_ncols, PARSEC_VALUE,
        sizeof(int64_t), &rank_c1, PARSEC_VALUE,
@@ -1152,6 +1153,47 @@ update_row_transfer_bases(SymmetricSharedBasisMatrix& A,
        PARSEC_DTD_ARG_END);
   }
 }
+
+void
+update_col_transfer_bases(SymmetricSharedBasisMatrix& A,
+                          const Hatrix::Domain& domain,
+                          const int64_t block,
+                          const int64_t level) {
+  const int64_t parent_block = block / 2;
+  const int64_t parent_level = level - 1;
+
+  if (parent_level > 0) {
+    const int64_t c1 = parent_block * 2;
+    const int64_t c2 = parent_block * 2 + 1;
+
+    int64_t U_nrows = get_dim(A, domain, parent_block, parent_level);
+    int64_t U_ncols = A.ranks(parent_block, parent_level);
+    int64_t rank_c1 = A.ranks(c1, level);
+    int64_t rank_c2 = A.ranks(c2, level);
+
+    auto t_c1_key = parsec_t.super.data_key(&parsec_t.super, c1, level);
+    auto t_c2_key = parsec_t.super.data_key(&parsec_t.super, c2, level);
+    auto U_key = parsec_U.super.data_key(&parsec_U.super, parent_block, parent_level);
+
+    int basis_arena = level == A.max_level ? U_ARENA : U_NON_LEAF_ARENA;
+
+    parsec_dtd_insert_task(dtd_tp, task_transfer_basis_update, 0, PARSEC_DEV_CPU,
+      "transfer_basis_update_task",
+      sizeof(int64_t), &U_nrows, PARSEC_VALUE,
+      sizeof(int64_t), &U_ncols, PARSEC_VALUE,
+      sizeof(int64_t), &rank_c1, PARSEC_VALUE,
+      sizeof(int64_t), &rank_c2, PARSEC_VALUE,
+      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_t.super, t_c1_key),
+                           PARSEC_INPUT | S_ARENA,
+      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_t.super, t_c2_key),
+                           PARSEC_INPUT | S_ARENA,
+      PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
+                           PARSEC_INOUT | basis_arena | PARSEC_AFFINITY,
+      PARSEC_DTD_ARG_END);
+  }
+}
+
+
 
 void
 update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
@@ -1186,6 +1228,7 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   parsec_data_key_t fill_in_key =
     parsec_temp_fill_in_cols.super.data_key(&parsec_temp_fill_in_cols.super,
                                             block, level);
+  int arena_d = level == A.max_level ? D_ARENA : FINAL_DENSE_ARENA;
 
   if (mpi_rank(block) == MPIRANK) {
     Matrix fill_in(block_size, block_size);
@@ -1209,10 +1252,10 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
         sizeof(int64_t), &F_i_block_ncols, PARSEC_VALUE,
         sizeof(char), &which, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_i_block_key),
-                             PARSEC_INPUT | D_ARENA,
+                             PARSEC_INPUT | arena_d,
         sizeof(int64_t), &block_size, PARSEC_VALUE,
         PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_cols.super, fill_in_key),
-                             PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                             PARSEC_INOUT | arena_d | PARSEC_AFFINITY,
         PARSEC_DTD_ARG_END);
     }
   }
@@ -1235,7 +1278,7 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
     "fill_in_recompression_task",
     sizeof(int64_t), &block_size, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_temp_fill_in_cols.super, fill_in_key),
-                         PARSEC_INPUT | D_ARENA,
+                         PARSEC_INPUT | arena_d,
     sizeof(int64_t), &rank, PARSEC_VALUE,
     PASSED_BY_REF, parsec_dtd_tile_of(&parsec_US.super, US_key),
                          PARSEC_INOUT | S_ARENA,
@@ -1284,14 +1327,6 @@ update_col_S_blocks(SymmetricSharedBasisMatrix& A,
 }
 
 void
-update_col_transfer_bases(SymmetricSharedBasisMatrix& A,
-                          const Hatrix::Domain& domain,
-                          const int64_t block,
-                          const int64_t level) {
-}
-
-
-void
 update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const Hatrix::Domain& domain,
                                       const int64_t block,
@@ -1310,7 +1345,7 @@ update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   if (found_col_fill_in) {
     update_col_cluster_basis(A, domain, block, level, opts);
     update_col_S_blocks(A, domain, block, level);
-    // update_col_transfer_bases(A, domain, block, level);
+    update_col_transfer_bases(A, domain, block, level);
   }
 }
 

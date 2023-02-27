@@ -637,27 +637,27 @@ task_schurs_complement_4(parsec_execution_stream_t* es, parsec_task_t* this_task
 }
 
 parsec_hook_return_t
-task_row_transfer_basis_update(parsec_execution_stream_t* es, parsec_task_t* this_task) {
+task_transfer_basis_update(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   int64_t U_nrows, U_ncols, rank_c1, rank_c2;
-  double *_r_c1, *_r_c2, *_U;
+  double *_proj_c1, *_proj_c2, *_U;
 
   parsec_dtd_unpack_args(this_task,
                          &U_nrows, &U_ncols, &rank_c1, &rank_c2,
-                         &_r_c1, &_r_c2, &_U);
+                         &_proj_c1, &_proj_c2, &_U);
 
-  MatrixWrapper r_c1(_r_c1, rank_c1, rank_c1, rank_c1);
-  MatrixWrapper r_c2(_r_c1, rank_c1, rank_c1, rank_c1);
+  MatrixWrapper proj_c1(_proj_c1, rank_c1, rank_c1, rank_c1);
+  MatrixWrapper proj_c2(_proj_c2, rank_c2, rank_c2, rank_c2);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
-  Matrix Utransfer_new(U_nrows, U_ncols);
+  Matrix Utransfer_new(U);
 
   auto Utransfer_new_splits = Utransfer_new.split(std::vector<int64_t>(1, rank_c1),
                                                   {});
   auto Utransfer_splits = U.split(std::vector<int64_t>(1, rank_c1),
                                   {});
 
-  matmul(r_c1, Utransfer_splits[0], Utransfer_new_splits[0], false, false, 1.0, 0.0);
-  matmul(r_c2, Utransfer_splits[1], Utransfer_new_splits[1], false, false, 1.0, 0.0);
+  matmul(proj_c1, Utransfer_splits[0], Utransfer_new_splits[0], false, false, 1.0, 0.0);
+  matmul(proj_c2, Utransfer_splits[1], Utransfer_new_splits[1], false, false, 1.0, 0.0);
 
   U.copy_mem(Utransfer_new);
 
