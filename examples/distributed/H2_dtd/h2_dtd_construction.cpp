@@ -25,12 +25,12 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
   int AY[9]; int INFO;
-
   double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
   descinit_(AY, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &AY_local_nrows, &INFO);
 
   int64_t nblocks = pow(2, A.max_level);
+  int rank = opts.max_rank;
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j <= i; ++j) {
@@ -65,14 +65,13 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   }
 
   int LWORK; double *WORK;
-
+  const char JOB_U = 'V';
+  const char JOB_VT = 'N';
   // obtain the shared basis of each row.
   for (int64_t block = 0; block < nblocks; ++block) {
-    const char JOB_U = 'V';
-    const char JOB_VT = 'N';
-
     // init global S vector for this block.
     double *S_MEM = new double[(int64_t)nleaf];
+
 
     // SVD workspace query.
     {
@@ -92,7 +91,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                WORK, &LWORK,
                &INFO);
 
-      LWORK = (int)WORK[0] + nleaf*nleaf; // workspace query throws a weird error so add nleaf*nleaf.
+      LWORK = (int)WORK[0] + nleaf*nleaf + IAY; // workspace query throws a weird error so add nleaf*rank.
       free(WORK);
     }
 
@@ -154,7 +153,9 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     A.ranks.insert(block, A.max_level, std::move(rank));
 
     delete[] S_MEM;
-    Cblacs_gridexit(U_LOCAL_CONTEXT);
+    if (MPIRANK == IMAP[0]) {
+      Cblacs_gridexit(U_LOCAL_CONTEXT);
+    }
   }
 
   // Generate S blocks for the lower triangle
@@ -287,12 +288,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int UTRANSFER_local_nrows = numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
   int UTRANSFER_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
   int UTRANSFER[9];
-
-  std::cout << "UTRANSFER: "
-            << TEMP_nrows << " "
-            << rank << " "
-            << rank << " "
-            << rank << " " << std::endl;
   descinit_(UTRANSFER, &TEMP_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
             &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
   double *UTRANSFER_MEM =
@@ -323,7 +318,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      LWORK = (int)WORK[0] + level_block_size * block_nrows;
+      LWORK = (int)WORK[0] + block_nrows * rank + ITEMP;
       delete[] WORK;
     }
 
@@ -383,7 +378,9 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     A.ranks.insert(block, level, std::move(rank));
 
     delete[] S_MEM;
-    Cblacs_gridexit(U_LOCAL_CONTEXT);
+    if (IMAP[0] == MPIRANK) {
+      Cblacs_gridexit(U_LOCAL_CONTEXT);
+    }
   }
 
   // 4. Generate the real basis at this level from the transfer matrices and the real basis one
@@ -537,7 +534,9 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
           A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
         }
 
-        Cblacs_gridexit(S_LOCAL_CONTEXT);
+        if (IMAP[0] == MPIRANK) {
+          Cblacs_gridexit(S_LOCAL_CONTEXT);
+        }
       }
     }
   }
@@ -554,7 +553,7 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
   // init global U matrix
   int nleaf = opts.nleaf; int N = opts.N; int INFO;
   int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  int U_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  int U_ncols = fmax(numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
