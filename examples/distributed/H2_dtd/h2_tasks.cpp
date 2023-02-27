@@ -630,7 +630,6 @@ task_schurs_complement_4(parsec_execution_stream_t* es, parsec_task_t* this_task
   auto D_i_j_split = D_i_j.split({},
                                  std::vector<int64_t>(1, D_j_dim - A_j_rank));
 
-
   matmul(D_i_block_split[0], D_block_j_split[1], D_i_j_split[1], false, false, -1, 1);
 
   return PARSEC_HOOK_RETURN_DONE;
@@ -649,16 +648,15 @@ task_transfer_basis_update(parsec_execution_stream_t* es, parsec_task_t* this_ta
   MatrixWrapper proj_c2(_proj_c2, rank_c2, rank_c2, rank_c2);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
-  Matrix Utransfer_new(U);
+  Matrix Utransfer_new(U, true);
 
   auto Utransfer_new_splits = Utransfer_new.split(std::vector<int64_t>(1, rank_c1),
                                                   {});
-  auto Utransfer_splits = U.split(std::vector<int64_t>(1, rank_c1),
-                                  {});
+  auto Utransfer_splits     = U.split(std::vector<int64_t>(1, rank_c1),
+                                      {});
 
   matmul(proj_c1, Utransfer_splits[0], Utransfer_new_splits[0], false, false, 1.0, 0.0);
   matmul(proj_c2, Utransfer_splits[1], Utransfer_new_splits[1], false, false, 1.0, 0.0);
-
   U.copy_mem(Utransfer_new);
 
   return PARSEC_HOOK_RETURN_DONE;

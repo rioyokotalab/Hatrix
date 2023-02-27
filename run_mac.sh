@@ -30,7 +30,7 @@ for adm in 1.2; do
                       --admis_kind geometry \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3 --use_nested_basis
+                      --kind_of_recompression 3  --use_nested_basis
 
         # ./bin/H2_main --N $N \
         #              --nleaf $nleaf \
