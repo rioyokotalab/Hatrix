@@ -1454,6 +1454,8 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
                  int64_t block,
                  int64_t level) {
   int nblocks = pow(2, level);
+  int arena_d = level == A.max_level ? D_ARENA : FINAL_DENSE_ARENA;
+  int arena_u = level == A.max_level ? U_ARENA : U_NON_LEAF_ARENA;
 
   // nb * nb fill-ins.
   for (int i = block+1; i < nblocks; ++i) {
@@ -1471,6 +1473,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
             if (!F.exists(i, j, level)) {
               Matrix fill_in = Matrix(get_dim(A, domain, i, level),
                                       get_dim(A, domain, j, level));
+
               F.insert(i, j, level, std::move(fill_in));
               Matrix& F_ij_ref = F(i, j, level);
               parsec_F.matrix_map[F_ij_key] = std::addressof(F_ij_ref);
@@ -1503,19 +1506,19 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
             sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
             sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
-                                 PARSEC_INPUT | D_ARENA,
+                                 PARSEC_INPUT | arena_d,
             sizeof(int64_t), &D_j_block_rows, PARSEC_VALUE,
             sizeof(int64_t), &D_j_block_cols, PARSEC_VALUE,
             sizeof(int64_t), &D_j_block_row_rank, PARSEC_VALUE,
             sizeof(int64_t), &D_j_block_col_rank, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_j_block_key),
-                                 PARSEC_INPUT | D_ARENA,
+                                 PARSEC_INPUT | arena_d,
             sizeof(int64_t), &F_ij_rows, PARSEC_VALUE,
             sizeof(int64_t), &F_ij_cols, PARSEC_VALUE,
             sizeof(int64_t), &F_ij_row_rank, PARSEC_VALUE,
             sizeof(int64_t), &F_ij_col_rank, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_ij_key),
-                                 PARSEC_INOUT | PARSEC_AFFINITY | D_ARENA,
+                                 PARSEC_INOUT | PARSEC_AFFINITY | arena_d,
             PARSEC_DTD_ARG_END);
         }
       }
@@ -1573,23 +1576,23 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
             sizeof(int64_t), &D_i_block_row_rank, PARSEC_VALUE,
             sizeof(int64_t), &D_i_block_col_rank, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_i_block_key),
-                                 PARSEC_INPUT | D_ARENA,
+                                 PARSEC_INPUT | arena_d,
             sizeof(int64_t), &D_block_j_rows, PARSEC_VALUE,
             sizeof(int64_t), &D_block_j_cols, PARSEC_VALUE,
             sizeof(int64_t), &D_block_j_row_rank, PARSEC_VALUE,
             sizeof(int64_t), &D_block_j_col_rank, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_block_j_key),
-                                 PARSEC_INPUT | D_ARENA,
+                                 PARSEC_INPUT | arena_d,
             sizeof(int64_t), &U_j_rows, PARSEC_VALUE,
             sizeof(int64_t), &U_j_cols, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_j_key),
-                                 PARSEC_INPUT | U_ARENA,
+                                 PARSEC_INPUT | arena_u,
             sizeof(int64_t), &F_ij_rows, PARSEC_VALUE,
             sizeof(int64_t), &F_ij_cols, PARSEC_VALUE,
             sizeof(int64_t), &F_ij_row_rank, PARSEC_VALUE,
             sizeof(int64_t), &F_ij_col_rank, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_F.super, F_ij_key),
-                                 PARSEC_INOUT | D_ARENA | PARSEC_AFFINITY,
+                                 PARSEC_INOUT | arena_d | PARSEC_AFFINITY,
             PARSEC_DTD_ARG_END);
         }
       }
