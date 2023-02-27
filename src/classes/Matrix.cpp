@@ -75,6 +75,7 @@ Matrix<DT>::Matrix(const Matrix<DT>& A, bool copy)
     data_ptr = A.data_ptr;
   }
   // why not make a view if A is not a view?
+  // This change breaks the HODLR3_level
   /*if (A.is_view && !copy) {
     is_view = true;
     stride = A.stride;

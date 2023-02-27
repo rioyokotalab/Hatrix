@@ -305,10 +305,10 @@ namespace Hatrix {
 }
 
 int main() {
-  int n = 8192;
-  int leaf_size = 64;
+  int n = 1024*8;
+  int leaf_size = 32;
   int num_blocks = n / leaf_size;
-  int rank = 20;
+  int rank = 16;
 
   int max_level = 0;
   int size = n;

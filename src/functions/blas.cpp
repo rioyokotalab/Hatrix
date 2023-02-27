@@ -84,17 +84,26 @@ LowRank<DT> matmul(const LowRank<DT>& A, const LowRank<DT>& B, bool transA,
 
 template <typename DT>
 void matmul(const LowRank<DT>& A, const LowRank<DT>& B, LowRank<DT>& C, bool transA,
-            bool transB, double alpha, double beta) {
+            bool transB, double alpha, double beta, bool add) {
   // LR LR LR
   // TODO Not implemented
   if (transA || transB) std::abort();
   assert(A.rank == B.rank);
   Matrix<DT> SxVxU = matmul(A.S, matmul(A.V, B.U, transA, transB, alpha));
   Matrix<DT> SxVxUxS = matmul(SxVxU, B.S);
-  C.S *= (DT) beta;
-  LowRank<DT> AxB(A.U, SxVxUxS, B.V, false);
+  if (add) {
+    C.S *= (DT) beta;
+    LowRank<DT> AxB(A.U, SxVxUxS, B.V, false);
 
-  C += AxB;
+    C += AxB;
+  } else {
+    C.U.create_view(A.U);
+    // move SxVxUxS to C.S
+    C.S = std::move(SxVxUxS);
+    C.V.create_view(B.V);
+    C.cols = B.V.cols;
+    C.rows = A.U.rows;
+  }
 }
 
 template <typename DT>
@@ -298,7 +307,7 @@ template void matmul(const Matrix<float>& A, const LowRank<float>& B, Matrix<flo
 template void matmul(const LowRank<float>& A, const LowRank<float>& B, Matrix<float>& C, bool transA,
             bool transB, double alpha, double beta);
 template void matmul(const LowRank<float>& A, const LowRank<float>& B, LowRank<float>& C, bool transA,
-            bool transB, double alpha, double beta);
+            bool transB, double alpha, double beta, bool add);
 template LowRank<float> matmul(const LowRank<float>& A, const LowRank<float>& B, bool transA,
             bool transB, double alpha);
 template void matmul(const LowRank<double>& A, const Matrix<double>& B, Matrix<double>& C, bool transA,
@@ -308,7 +317,7 @@ template void matmul(const Matrix<double>& A, const LowRank<double>& B, Matrix<d
 template void matmul(const LowRank<double>& A, const LowRank<double>& B, Matrix<double>& C, bool transA,
             bool transB, double alpha, double beta);
 template void matmul(const LowRank<double>& A, const LowRank<double>& B, LowRank<double>& C, bool transA,
-            bool transB, double alpha, double beta);
+            bool transB, double alpha, double beta, bool add);
 template LowRank<double> matmul(const LowRank<double>& A, const LowRank<double>& B, bool transA,
             bool transB, double alpha);
 

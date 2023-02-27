@@ -28,7 +28,7 @@ void matmul(const LowRank<DT>& A, const LowRank<DT>& B, Matrix<DT>& C, bool tran
 
 template <typename DT>
 void matmul(const LowRank<DT>& A, const LowRank<DT>& B, LowRank<DT>& C, bool transA = false,
-            bool transB = false, double alpha = 1.0, double beta = 1.0);
+            bool transB = false, double alpha = 1.0, double beta = 1.0, bool add=true);
 
 template <typename DT>
 LowRank<DT> matmul(const LowRank<DT>& A, const LowRank<DT>& B, bool transA = false,

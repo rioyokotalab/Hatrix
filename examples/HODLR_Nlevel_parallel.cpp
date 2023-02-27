@@ -330,7 +330,7 @@ namespace Hatrix {
         update_parent(is_admissible, row*2, start, level+1, max_level);
         update_parent(is_admissible, start, start+1, level+1, max_level);
         #pragma omp task shared(lr_map) depend(in: is_admissible(row*2, start, level+1), is_admissible(start, start+1, level+1)) depend(inout: is_admissible(row*2, start+1, level+1))
-        {  std::cout<<"GEMM (t-task)"<<row*2<<","<<start+1<<","<<level+1<<std::endl;
+        {  //std::cout<<"GEMM (t-task)"<<row*2<<","<<start+1<<","<<level+1<<std::endl;
           matmul(lr_map(row*2, start, level+1).V, lr_map(start, start+1, level+1), lr_map(row*2, start+1, level+1).V, false, false, -1, 1);
         }
         //#pragma omp taskwait
@@ -349,7 +349,7 @@ namespace Hatrix {
         update_parent(is_admissible, start+1, start, level+1, max_level);
         update_parent(is_admissible, start, col*2, level+1, max_level);
         #pragma omp task shared(lr_map) depend(in: is_admissible(start, col*2, level+1), is_admissible(start+1, start, level+1)) depend(inout: is_admissible(start+1, col*2, level+1))
-        {  std::cout<<"GEMM (t-task)"<<start+1<<","<<col*2<<","<<level+1<<std::endl;
+        {  //std::cout<<"GEMM (t-task)"<<start+1<<","<<col*2<<","<<level+1<<std::endl;
           matmul(lr_map(start+1, start, level+1), lr_map(start, col*2, level+1).U, lr_map(start+1, col*2, level+1).U, false, false, -1, 1);
         }
         //#pragma omp taskwait
@@ -364,7 +364,7 @@ namespace Hatrix {
       int src_idx = diag?row:col;
       //std::cout<<"TRSM "<<row<<","<<col<<","<<level<<std::endl;
       #pragma omp task shared(dense_map, lr_map) depend(in: is_admissible(src_idx, src_idx, level)) depend(inout: is_admissible(row, col, level))
-      {  std::cout<<"TRSM (task) "<<row<<","<<col<<","<<level<<std::endl;
+      {  //std::cout<<"TRSM (task) "<<row<<","<<col<<","<<level<<std::endl;
         Hatrix::solve_triangular(dense_map(src_idx, src_idx, level), diag?lr_map(row, col, level).U:lr_map(row, col, level).V, side, uplo, diag, false);
       }
       //#pragma omp taskwait
@@ -373,64 +373,126 @@ namespace Hatrix {
   }
 
   template <typename DT>
-  void add(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level, LowRank<DT>& T) {
-    if (is_admissible(row, col, level)) {
-      lr_map(row, col, level) += T;
+  void add(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level, LowRank<DT>& temp, int block_start, int block_size) {
+    /*if (is_admissible(row, col, level)) {
+      //#pragma omp task shared(lr_map, T) depend(inout: is_admissible(row, col, level)) depend(in: T)
+      {
+        lr_map(row, col, level) += T;
+      }
+      update_children(is_admissible, row, col, level, max_level);
     } else {
-      if (level < max_level) {
-        //std::cout<<"Add on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
-        int start = row * 2;
-        std::vector<Matrix<DT>> U_split = T.U.split(2, 1);
-        std::vector<Matrix<DT>> V_split = T.V.split(1, 2);
-        LowRank<DT> T0(U_split[0], T.S, V_split[0], false);
-        LowRank<DT> T1(U_split[0], T.S, V_split[1], false);
-        LowRank<DT> T2(U_split[1], T.S, V_split[0], false);
-        LowRank<DT> T3(U_split[1], T.S, V_split[1], false);
-        add(dense_map, lr_map, is_admissible, start, start, level+1, max_level, T0);
-        add(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level, T3);
-        // The order is important here since one of the following operations seems to manimulate T
-        // Is this a problem if I increase the level?
-        // Changed the low rank addition instead to make a copy when needed and now the issue seems to be resolved
-        add(dense_map, lr_map, is_admissible, start, start+1, level+1, max_level, T1);
-        add(dense_map, lr_map, is_admissible, start+1, start, level+1, max_level, T2);
-      } else { //this must be a dense block
-         dense_map(row, col, level) += T;
+    */
+    if (level < max_level) {
+      //std::cout<<"Add on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
+      int start = row * 2;
+      //std::cout<<"Try to split"<<std::endl;
+      //std::vector<Matrix<DT>> U_split = T.U.split(2, 1);
+      //std::vector<Matrix<DT>> V_split = T.V.split(1, 2); 
+      block_size = block_size/2;
+      /*yMatrix<DT> U0 = test.U.get_row_block(block_start, block_size);
+      Matrix<DT> U1 = test.U.get_row_block(block_start+block_size, block_size);
+      Matrix<DT> V0 = test.V.get_col_block(block_start, block_size);
+      Matrix<DT> V1 = test.V.get_col_block(block_start+block_size, block_size);
+      LowRank<DT> T0(U_split[0], T.S, V_split[0], false);
+      LowRank<DT> T1(U_split[0], T.S, V_split[1], false);
+      LowRank<DT> T2(U_split[1], T.S, V_split[0], false);
+      LowRank<DT> T3(U_split[1], T.S, V_split[1], false);*/
+      //#pragma omp task shared(dense_map, lr_map, is_admissible, T0) depend(out: T0)
+      add(dense_map, lr_map, is_admissible, start, start, level+1, max_level, temp, block_start, block_size);
+      //#pragma omp task shared(dense_map, lr_map, is_admissible, T3) depend(out: T3)
+      add(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level, temp, block_start+block_size, block_size);
+      // The order is important here since one of the following operations seems to manimulate T
+      // Is this a problem if I increase the level?
+      // Changed the low rank addition instead to make a copy when needed and now the issue seems to be resolved
+      //#pragma omp task shared(dense_map, lr_map, is_admissible, T1) depend(out: T1)
+        
+      // off-diagonal blocks
+      #pragma omp task shared(lr_map, temp) depend(inout: is_admissible(start, start+1, level+1)) depend(in: temp)
+      {
+        // upper
+        //std::cout<<block_start<<" "<<block_size<<std::endl;
+        Matrix<DT> U = temp.U.get_row_block(block_start, block_size);
+        Matrix<DT> V = temp.V.get_col_block(block_start+block_size, block_size);
+        LowRank<DT> T(U, temp.S, V, false);
+        /*std::cout<<U(0,0)<<","<<U(1,0)<<U(0,1)<<std::endl;
+        std::cout<<T.U(0,0)<<","<<T.U(1,0)<<T.U(0,1)<<std::endl;
+        std::cout<<V(0,0)<<","<<V(1,0)<<V(0,1)<<std::endl;
+        std::cout<<T.V(0,0)<<","<<T.V(1,0)<<T.V(0,1)<<std::endl;*/
+        lr_map(start, start+1, level+1) += T;
+        update_children(is_admissible, start, start+1, level+1, max_level);
+      }
+      #pragma omp task shared(lr_map, temp) depend(inout: is_admissible(start+1, start, level+1)) depend(in: temp)
+      {
+        // lower
+        Matrix<DT> U = temp.U.get_row_block(block_start+block_size, block_size);
+        Matrix<DT> V = temp.V.get_col_block(block_start, block_size);
+        LowRank<DT> T(U, temp.S, V, false);
+        lr_map(start+1, start, level+1) += T;
+        update_children(is_admissible, start+1, start, level+1, max_level);
+      }
+
+        
+      //add(dense_map, lr_map, is_admissible, start, start+1, level+1, max_level, T1, block_start, block_size);
+      //#pragma omp task shared(dense_map, lr_map, is_admissible, T2) depend(out: T2)
+      //add(dense_map, lr_map, is_admissible, start+1, start, level+1, max_level, T2, block_start, block_size);
+    } else { //this must be a dense block
+      //std::cout<<"Add on dense ("<<row<<","<<col<<","<<level<<")"<<std::endl;
+      #pragma omp task shared(dense_map, temp) depend(inout: is_admissible(row, col, level)) depend(in: temp)
+      {
+        Matrix<DT> U = temp.U.get_row_block(block_start, block_size);
+        Matrix<DT> V = temp.V.get_col_block(block_start, block_size);
+        //std::cout<<U(0,0)<<","<<U(1,0)<<U(0,1)<<std::endl;
+        //std::cout<<T.U(0,0)<<","<<T.U(1,0)<<T.U(0,1)<<std::endl;
+        //std::cout<<V(0,0)<<","<<V(1,0)<<V(0,1)<<std::endl;
+        //std::cout<<T.V(0,0)<<","<<T.V(1,0)<<T.V(0,1)<<std::endl;
+        LowRank<DT> T(U, temp.S, V, false);
+        dense_map(row, col, level) += T;
       }
     }
   }
 
   template <typename DT>
-  void matmul(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level) {
+  void matmul(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level, Hatrix::LowRank<DT>& temp) {
     if (level < max_level) {
       // wait for all tasks on children of the input low-rank blocks
       //std::cout<<"GEMM on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
       //wait_for_children(is_admissible, row, col-1, level+1, max_level);
       //wait_for_children(is_admissible, row-1, col, level+1, max_level);
-      LowRank<DT> temp = matmul(lr_map(row, col-1, level), lr_map(row-1, col, level), false, false, -1);
-      //std::cout<<"Add on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
-      add(dense_map, lr_map, is_admissible, row, col, level, max_level, temp);
+      //update_parent(is_admissible, row, col-1, level, max_level);
+      //update_parent(is_admissible, row-1, col, level, max_level);
+      update_parent(is_admissible, row, col-1, level, max_level);
+      update_parent(is_admissible, row-1, col, level, max_level);
+      #pragma omp task shared(dense_map, lr_map, temp) depend(in: is_admissible(row, col-1, level), is_admissible(row-1, col, level)) depend(out: temp)
+      {  
+        matmul(lr_map(row, col-1, level), lr_map(row-1, col, level), temp, false, false, -1, 1, false);
+      }
+      //#pragma omp taskwait
+        //std::cout<<"Add on ("<<row<<","<<col<<","<<level<<")"<<std::endl
+      // can't infer the row number from temp, since processing might not be finished yet
+      add(dense_map, lr_map, is_admissible, row, col, level, max_level, temp, 0, lr_map(row, col-1, level).rows);
+
     } else {
-      //#pragma omp task shared(dense_map, lr_map) depend(in: is_admissible(row, col-1, level), is_admissible(row-1, col, level)) depend(inout: is_admissible(row, col, level))
+      #pragma omp task shared(dense_map, lr_map) depend(in: is_admissible(row, col-1, level), is_admissible(row-1, col, level)) depend(inout: is_admissible(row, col, level))
         matmul(lr_map(row, col-1, level), lr_map(row-1, col, level), dense_map(row, col, level), false, false, -1, 1);
      }
   }
 
   template <typename DT>
-  void getrf(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level) {
+  void getrf(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, Hatrix::RowColLevelMap<bool>& is_admissible, int row, int col, int level, int max_level, Hatrix::LowRank<DT>& temp) {
     int start = row * 2;
     if (level < max_level) {
       //std::cout<<"GETRF on ("<<start<<","<<start<<","<<level<<")"<<std::endl;
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(inout: is_admissible(start, start, level+1))
       {
-        getrf<DT>(dense_map, lr_map, is_admissible, start, start, level+1, max_level);
+        getrf<DT>(dense_map, lr_map, is_admissible, start, start, level+1, max_level, temp);
       }
-      #pragma omp taskwait
+      //#pragma omp taskwait
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start, start, level+1)) depend(inout: is_admissible(start, start+1, level+1))
       {
         //std::cout<<"TRSM on ("<<start<<","<<start+1<<","<<level+1<<")"<<std::endl;
         Hatrix::trsm<DT>(dense_map, lr_map, is_admissible, start, start+1, level+1, max_level, Hatrix::Left, Hatrix::Lower);
       }
-      #pragma omp taskwait
+      //#pragma omp taskwait
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start, start, level+1)) depend(inout: is_admissible(start+1, start, level+1))
       {//std::cout<<"TRSM on ("<<start+1<<","<<start<<","<<level+1<<")"<<std::endl;
         Hatrix::trsm<DT>(dense_map, lr_map, is_admissible, start+1, start, level+1, max_level, Hatrix::Right, Hatrix::Upper);
@@ -438,14 +500,14 @@ namespace Hatrix {
       #pragma omp taskwait
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(in: is_admissible(start+1, start, level+1), is_admissible(start, start+1, level+1)) depend(inout: is_admissible(start+1, start+1, level+1))
       {std::cout<<"GEMM on ("<<start+1<<","<<start+1<<","<<level+1<<")"<<std::endl;
-        Hatrix::matmul(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level);
+        Hatrix::matmul(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level, temp);
       }
       #pragma omp taskwait
       //#pragma omp task shared(dense_map, lr_map, is_admissible) depend(inout: is_admissible(start+1, start+1, level+1))
       {//std::cout<<"GETRF(dense) on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
-        getrf<DT>(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level);
+        getrf<DT>(dense_map, lr_map, is_admissible, start+1, start+1, level+1, max_level, temp);
       }
-      #pragma omp taskwait
+      //#pragma omp taskwait
     } else {
       #pragma omp task shared(dense_map) depend(inout: is_admissible(row, col, level))
         {std::cout<<"GETRF(task) on ("<<row<<","<<col<<","<<level<<")"<<std::endl;
@@ -482,7 +544,7 @@ namespace Hatrix {
 
 int main() {
   int n = 1024;
-  int leaf_size = 32;
+  int leaf_size = 256;
   int num_blocks = n / leaf_size;
   int rank = 16;
 
@@ -514,11 +576,12 @@ int main() {
   
   omp_set_num_threads(4);
   tic = get_time();
+  Hatrix::LowRank<double> temp;
   #pragma omp parallel
   {
     #pragma omp single 
     {
-      Hatrix::getrf<double>(dense_map, lr_map, is_admissible, 0, 0, 0, max_level);
+      Hatrix::getrf<double>(dense_map, lr_map, is_admissible, 0, 0, 0, max_level, temp);
     }
   }
   
