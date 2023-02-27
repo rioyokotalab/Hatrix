@@ -189,6 +189,21 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   delete[] AY_MEM;
 }
 
+static bool
+row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
+                          int64_t level) {
+  bool has_admis = false;
+
+  for (int64_t i = 0; i < pow(2, level); ++i) {
+    if (!A.is_admissible.exists(row, i, level) || exists_and_admissible(A, row, i, level)) {
+      has_admis = true;
+      break;
+    }
+  }
+
+  return has_admis;
+}
+
 void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
                            int64_t level) {
@@ -368,11 +383,17 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
               &BLACS_CONTEXT);
 
     if (mpi_rank(block) == MPIRANK) {
-      A.U.insert(block, level, std::move(U_LOCAL_MEM));
-      // Init US from the row vector.
-      Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
-      for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
-      A.US.insert(block, level, std::move(US));
+      if (row_has_admissible_blocks(A, block, level) && A.max_level != 1) {
+        A.U.insert(block, level, std::move(U_LOCAL_MEM));
+        // Init US from the row vector.
+        Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
+        for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
+        A.US.insert(block, level, std::move(US));
+      }
+      else {
+        A.U.insert(block, level, generate_identity_matrix(block_nrows, rank));
+        A.US.insert(block, level, generate_identity_matrix(rank, rank));
+      }
     }
 
     A.ranks.insert(block, level, std::move(rank));
