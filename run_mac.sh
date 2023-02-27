@@ -19,7 +19,7 @@ for adm in 1.2; do
     max_rank=100
 
     for N in 4096; do
-        mpirun -n 2 ./bin/H2_dtd --N $N \
+        mpirun -n 4 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \

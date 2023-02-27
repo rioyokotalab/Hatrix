@@ -396,7 +396,7 @@ int main(int argc, char **argv) {
   double h2_norm = dist_norm2(h2_solution);
   double x_norm = dist_norm2(x);
 
-  std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
+  // std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
 
   double solve_error = dist_norm2(h2_solve_diff) / opts.N;
 
