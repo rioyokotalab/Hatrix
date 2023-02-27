@@ -649,11 +649,17 @@ task_row_transfer_basis_update(parsec_execution_stream_t* es, parsec_task_t* thi
   MatrixWrapper r_c2(_r_c1, rank_c1, rank_c1, rank_c1);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
-  // Matrix Utranfer_new();
+  Matrix Utransfer_new(U_nrows, U_ncols);
 
+  auto Utransfer_new_splits = Utransfer_new.split(std::vector<int64_t>(1, rank_c1),
+                                                  {});
   auto Utransfer_splits = U.split(std::vector<int64_t>(1, rank_c1),
                                   {});
 
+  matmul(r_c1, Utransfer_splits[0], Utransfer_new_splits[0], false, false, 1.0, 0.0);
+  matmul(r_c2, Utransfer_splits[1], Utransfer_new_splits[1], false, false, 1.0, 0.0);
+
+  U.copy_mem(Utransfer_new);
 
   return PARSEC_HOOK_RETURN_DONE;
 }

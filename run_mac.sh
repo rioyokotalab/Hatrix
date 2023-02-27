@@ -13,13 +13,13 @@ ulimit -c unlimited
 make -j H2_dtd
 make -j H2_main
 
-for adm in 1; do
-    nleaf=128
+for adm in 1.2; do
+    nleaf=256
     ndim=3
-    max_rank=64
+    max_rank=100
 
-    for N in 2048; do
-        mpirun -n 4 ./bin/H2_dtd --N $N \
+    for N in 4096; do
+        mpirun -n 1 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
