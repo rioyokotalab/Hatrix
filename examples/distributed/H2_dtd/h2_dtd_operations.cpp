@@ -1374,11 +1374,10 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
     for (int64_t i = 0; i < pow(2, level); ++i) {
       if (mpi_rank(i) == MPIRANK) {
         int64_t rank = A.ranks(i, level);
-        Matrix r_i(rank, rank);
-        r.insert(i, level, std::move(r_i));
+        r.insert(i, level, generate_identity_matrix(rank, rank));
 
         Matrix t_i(rank, rank);
-        t.insert(i, level, std::move(t_i));
+        t.insert(i, level, generate_identity_matrix(rank, rank));
       }
     }
   }
