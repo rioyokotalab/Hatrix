@@ -1122,7 +1122,6 @@ update_row_transfer_bases(SymmetricSharedBasisMatrix& A,
                           const int64_t level) {
   const int64_t parent_block = block / 2;
   const int64_t parent_level = level - 1;
-  int basis_arena = level == A.max_level ? U_ARENA : U_NON_LEAF_ARENA;
 
   if (parent_level > 0) {
     const int64_t c1 = parent_block * 2;
@@ -1135,7 +1134,8 @@ update_row_transfer_bases(SymmetricSharedBasisMatrix& A,
 
     auto r_c1_key = parsec_r.super.data_key(&parsec_r.super, c1, level);
     auto r_c2_key = parsec_r.super.data_key(&parsec_r.super, c2, level);
-    auto U_key = parsec_U.super.data_key(&parsec_U.super, parent_block, parent_level);
+    auto U_key = parsec_U.super.data_key(&parsec_U.super,
+                                         parent_block, parent_level);
 
     parsec_dtd_insert_task(dtd_tp, task_transfer_basis_update, 0, PARSEC_DEV_CPU,
        "transfer_basis_update_task",
@@ -1148,7 +1148,7 @@ update_row_transfer_bases(SymmetricSharedBasisMatrix& A,
        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_r.super, r_c2_key),
                            PARSEC_INPUT | S_ARENA,
        PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-                           PARSEC_INOUT | basis_arena | PARSEC_AFFINITY,
+                           PARSEC_INOUT | U_NON_LEAF_ARENA | PARSEC_AFFINITY,
        PARSEC_DTD_ARG_END);
   }
 }
@@ -1160,7 +1160,6 @@ update_col_transfer_bases(SymmetricSharedBasisMatrix& A,
                           const int64_t level) {
   const int64_t parent_block = block / 2;
   const int64_t parent_level = level - 1;
-  int basis_arena = level == A.max_level ? U_ARENA : U_NON_LEAF_ARENA;
 
   if (parent_level > 0) {
     const int64_t c1 = parent_block * 2;
@@ -1173,7 +1172,8 @@ update_col_transfer_bases(SymmetricSharedBasisMatrix& A,
 
     auto t_c1_key = parsec_t.super.data_key(&parsec_t.super, c1, level);
     auto t_c2_key = parsec_t.super.data_key(&parsec_t.super, c2, level);
-    auto U_key = parsec_U.super.data_key(&parsec_U.super, parent_block, parent_level);
+    auto U_key = parsec_U.super.data_key(&parsec_U.super,
+                                         parent_block, parent_level);
 
     parsec_dtd_insert_task(dtd_tp, task_transfer_basis_update, 0, PARSEC_DEV_CPU,
       "transfer_basis_update_task",
@@ -1186,7 +1186,7 @@ update_col_transfer_bases(SymmetricSharedBasisMatrix& A,
       PASSED_BY_REF, parsec_dtd_tile_of(&parsec_t.super, t_c2_key),
                            PARSEC_INPUT | S_ARENA,
       PASSED_BY_REF, parsec_dtd_tile_of(&parsec_U.super, U_key),
-                           PARSEC_INOUT | basis_arena | PARSEC_AFFINITY,
+                           PARSEC_INOUT | U_NON_LEAF_ARENA | PARSEC_AFFINITY,
       PARSEC_DTD_ARG_END);
   }
 }
@@ -1209,7 +1209,9 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   if (found_row_fill_in) {
     update_row_cluster_basis(A, domain, block, level, opts);
     update_row_S_blocks(A, domain, block, level);
-    update_row_transfer_bases(A, domain, block, level);
+    if (level-1 >= A.min_level) {
+      update_row_transfer_bases(A, domain, block, level);
+    }
   }
 }
 
@@ -1341,7 +1343,9 @@ update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   if (found_col_fill_in) {
     update_col_cluster_basis(A, domain, block, level, opts);
     update_col_S_blocks(A, domain, block, level);
-    update_col_transfer_bases(A, domain, block, level);
+    if (level-1 >= A.min_level) {
+      update_col_transfer_bases(A, domain, block, level);
+    }
   }
 }
 
