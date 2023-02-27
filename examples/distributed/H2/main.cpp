@@ -135,6 +135,9 @@ int main(int argc, char* argv[]) {
 
   // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   // Matrix bdense = matmul(Adense, x);
+  // double construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);
+  double construct_error = 0;
+
   double h2_norm = Hatrix::norm(h2_solution);
   double x_norm = Hatrix::norm(x);
 
@@ -152,6 +155,7 @@ int main(int argc, char* argv[]) {
             << construct_time  << ","
             << factor_time << ","
             << solve_time << ","
+            << construct_error << ","
             << solve_error << ","
             << fp_ops << ","
             << opts.kind_of_geometry << ","

@@ -19,8 +19,7 @@ int U[9];
 void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Domain& domain,
-                    const Args& opts,
-                    double* U_MEM, int* U) {
+                    const Args& opts) {
   int N = opts.N;
   int nleaf = opts.nleaf;
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
@@ -238,12 +237,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                                  &MYCOL, &ZERO, &MPIGRID[1]);
   int TEMP[9];
   // Use rank as NB cuz it throws a 806 error for an unknown reason.
-  std::cout << "TEMP : "
-            << TEMP_nrows
-            << " " << level_block_size
-            << " " << rank
-            << " " << nleaf
-            << std::endl;
   descinit_(TEMP, &TEMP_nrows, &level_block_size, &rank, &rank, &ZERO, &ZERO,
             &BLACS_CONTEXT, &TEMP_local_nrows, &INFO);
   double *TEMP_MEM = new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
@@ -322,12 +315,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
       WORK = new double[1];
 
-      std::cout << "NROWS: " << block_nrows
-                << " N: " << rank
-                << " ITEMP: " << ITEMP
-                << " JTEMP: " << JTEMP
-                << std::endl;
-
       pdgesvd_(&JOB_U, &JOB_VT,
                &block_nrows, &rank,
                TEMP_MEM, &ITEMP, &JTEMP, TEMP,
@@ -387,7 +374,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
     if (mpi_rank(block) == MPIRANK) {
       A.U.insert(block, level, std::move(U_LOCAL_MEM));
-
       // Init US from the row vector.
       Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
       for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
@@ -405,11 +391,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int U_REAL_local_ncols = numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
   int U_REAL[9];
-  U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols];
+  U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols]();
   descinit_(U_REAL, &N, &rank, &nleaf, &rank, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_REAL_local_nrows, &INFO);
 
-  for (int64_t block = 0; block < nblocks; ++block) {
+  for (int64_t block = 0; block < 1; ++block) {
     // Apply the child basis to the upper part of the transfer matrix to generate the
     // upper part of the real basis.
     int64_t c1 = block * 2;
@@ -467,6 +453,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   descinit_(S_BLOCKS, &S_BLOCKS_nrows, &S_BLOCKS_nrows, &rank, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &S_BLOCKS_local_nrows, &INFO);
 
+  // multiply the 0th real basis
+
   // Allocate a temporary block for storing the intermediate result of the product of the
   // real basis and admissible dense matrix.
   int TEMP_PRODUCT_local_nrows = fmax(numroc_(&rank, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
@@ -474,7 +462,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int TEMP_PRODUCT[9];
   double *TEMP_PRODUCT_MEM =
     new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
-
   descset_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
             &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
 
@@ -549,6 +536,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
         if (mpi_rank(i) == MPIRANK) {
           A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
         }
+
+        Cblacs_gridexit(S_LOCAL_CONTEXT);
       }
     }
   }
@@ -570,7 +559,7 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 
-  generate_leaf_nodes(A, domain, opts, U_MEM, U);
+  generate_leaf_nodes(A, domain, opts);
 
   for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
     generate_transfer_matrices(A, domain, opts, level);
