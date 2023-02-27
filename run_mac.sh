@@ -15,7 +15,7 @@ make -j H2_main
 
 for adm in 1; do
     nleaf=128
-    ndim=1
+    ndim=3
     max_rank=64
 
     for N in 2048; do
@@ -30,7 +30,8 @@ for adm in 1; do
                       --admis_kind geometry \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3
+                      --kind_of_recompression 3 \
+                      --use_nested_basis
 
         # ./bin/H2_main --N $N \
         #              --nleaf $nleaf \
