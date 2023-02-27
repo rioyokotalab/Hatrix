@@ -1,7 +1,7 @@
 #!/bin/bash
-#YBATCH -r threadripper-3960x_8
+#YBATCH -r dgx-a100_8
 #SBATCH -N 1
-#SBATCH -J TEST_H2
+#SBATCH -J BLR2
 #SBATCH --time=72:00:00
 
 source ~/.bashrc
@@ -42,7 +42,6 @@ for adm in 1; do
                       --admis_kind geometry \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3 \
-                      --use_nested_basis
+                      --kind_of_recompression 3
     done
 done
