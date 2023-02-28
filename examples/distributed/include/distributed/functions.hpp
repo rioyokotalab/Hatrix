@@ -59,4 +59,6 @@ namespace Hatrix {
   void init_geometry_admis(SymmetricSharedBasisMatrix& A,
                            const Domain& domain, const Args& opts);
 
+  void init_diagonal_admis(SymmetricSharedBasisMatrix& A,
+                           const Domain& domain, const Args& opts);
 }

@@ -86,7 +86,15 @@ int main(int argc, char* argv[]) {
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
     SymmetricSharedBasisMatrix A;
-    init_geometry_admis(A, domain, opts);
+    if (opts.admis_kind == GEOMETRY) {
+      init_geometry_admis(A, domain, opts);
+    }
+    else if (opts.admis_kind == DIAGONAL) {
+      init_diagonal_admis(A, domain, opts);
+    }
+    A.print_structure();
+
+
     construct_h2_matrix_miro(A, domain, opts);
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
@@ -96,7 +104,6 @@ int main(int argc, char* argv[]) {
     construct_average_rank = A.average_rank();
     dense_blocks = A.leaf_dense_blocks();
 
-    A.print_structure();
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);

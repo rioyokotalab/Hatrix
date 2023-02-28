@@ -119,6 +119,29 @@ namespace Hatrix {
     }
   }
 
+  static void
+  populate_near_far_lists(SymmetricSharedBasisMatrix& A) {
+    // populate near and far lists. comment out when doing H2.
+    for (int64_t level = A.max_level; level >= A.min_level; --level) {
+      int64_t nblocks = pow(2, level);
+
+      for (int64_t i = 0; i < nblocks; ++i) {
+        far_neighbours.insert(i, level, std::vector<int64_t>());
+        near_neighbours.insert(i, level, std::vector<int64_t>());
+        for (int64_t j = 0; j <= i; ++j) {
+          if (A.is_admissible.exists(i, j, level)) {
+            if (A.is_admissible(i, j, level)) {
+              far_neighbours(i, level).push_back(j);
+            }
+            else {
+              near_neighbours(i, level).push_back(j);
+            }
+          }
+        }
+      }
+    }
+  }
+
   void init_geometry_admis(SymmetricSharedBasisMatrix& A,
                            const Domain& domain, const Args& opts) {
     A.max_level = domain.tree.height() - 1;
@@ -147,26 +170,76 @@ namespace Hatrix {
     }
 
     if (A.max_level != A.min_level) { A.min_level++; }
+    populate_near_far_lists(A);
+  }
 
-    // populate near and far lists. comment out when doing H2.
-    for (int64_t level = A.max_level; level >= A.min_level; --level) {
-      int64_t nblocks = pow(2, level);
-
-      for (int64_t i = 0; i < nblocks; ++i) {
-        far_neighbours.insert(i, level, std::vector<int64_t>());
-        near_neighbours.insert(i, level, std::vector<int64_t>());
-        for (int64_t j = 0; j <= i; ++j) {
-          if (A.is_admissible.exists(i, j, level)) {
-            if (A.is_admissible(i, j, level)) {
-              far_neighbours(i, level).push_back(j);
-            }
-            else {
-              near_neighbours(i, level).push_back(j);
-            }
-          }
+  static void
+  compute_matrix_structure(SymmetricSharedBasisMatrix& A, int64_t level, const Args& opts) {
+    if (level == 0) { return; }
+    int64_t nodes = pow(2, level);
+    if (level == A.max_level) {
+      for (int i = 0; i < nodes; ++i) {
+        for (int j = 0; j < nodes; ++j) {
+          A.is_admissible.insert(i, j, level, std::abs(i - j) > opts.admis);
         }
       }
     }
+    else {
+      int64_t child_level = level + 1;
+      for (int i = 0; i < nodes; ++i) {
+        std::vector<int> row_children({i * 2, i * 2 + 1});
+        for (int j = 0; j < nodes; ++j) {
+          std::vector<int> col_children({j * 2, j * 2 + 1});
+
+          bool admis_block = true;
+          for (int c1 = 0; c1 < 2; ++c1) {
+            for (int c2 = 0; c2 < 2; ++c2) {
+              if (A.is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
+                  !A.is_admissible(row_children[c1], col_children[c2], child_level)) {
+                admis_block = false;
+              }
+            }
+          }
+
+          if (admis_block) {
+            for (int c1 = 0; c1 < 2; ++c1) {
+              for (int c2 = 0; c2 < 2; ++c2) {
+                A.is_admissible.erase(row_children[c1], col_children[c2], child_level);
+              }
+            }
+          }
+
+          A.is_admissible.insert(i, j, level, std::move(admis_block));
+        }
+      }
+    }
+
+    compute_matrix_structure(A, level-1, opts);
+  }
+
+  void init_diagonal_admis(SymmetricSharedBasisMatrix& A,
+                           const Domain& domain, const Args& opts) {
+    A.max_level = domain.tree.height() - 1;
+    compute_matrix_structure(A, A.max_level, opts);
+    for (int64_t l = A.max_level; l > 0; --l) {
+      int64_t nblocks = pow(2, l);
+      bool all_dense = true;
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if ((A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) || !A.is_admissible.exists(i, j, l)) {
+            all_dense = false;
+          }
+        }
+      }
+
+      if (all_dense) {
+        A.min_level = l;
+        break;
+      }
+    }
+
+    if (A.max_level != A.min_level) { A.min_level++; }
+    populate_near_far_lists(A);
   }
 
   void generate_p2p_interactions(const Domain& domain,
