@@ -73,6 +73,7 @@ else()
   find_package(OpenMP REQUIRED)
   target_sources(Hatrix PRIVATE
     src/classes/IndexedMap.cpp
+    src/classes/HODLR.cpp
     src/classes/LowRank.cpp
     src/classes/Matrix.cpp
     src/functions/arithmetics.cpp

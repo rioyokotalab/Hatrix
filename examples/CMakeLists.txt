@@ -55,6 +55,7 @@ else()
     HODLR_2level
     HODLR_3level
     HODLR_Nlevel_parallel
+    HODLR_Nlevel_parallel_interleaved
     #Construction_SymmetricH2_Nlevel_with_sampling
   )
 endif()
