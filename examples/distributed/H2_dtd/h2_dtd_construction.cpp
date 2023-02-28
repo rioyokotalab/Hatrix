@@ -80,7 +80,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JAY = 1;
       int IU = nleaf * block + 1;
       int JU = 1;
-      WORK = (double*)calloc(1, sizeof(double));
+      WORK = new double[1];
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &nleaf, &nleaf,
@@ -91,8 +91,10 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                WORK, &LWORK,
                &INFO);
 
-      LWORK = (int)WORK[0] + nleaf*nleaf + IAY; // workspace query throws a weird error so add nleaf*rank.
-      free(WORK);
+      LWORK = WORK[0] + nleaf * (AY_local_nrows + AY_local_ncols + 1) + AY_local_ncols;
+      // workspace query throws a weird error so add nleaf*rank.
+
+      delete[] WORK;
     }
 
     // SVD computation.
@@ -101,7 +103,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JAY = 1;
       int IU = nleaf * block + 1;
       int JU = 1;
-      WORK = (double*)calloc(LWORK, sizeof(double));
+      WORK =  new double[(int64_t)LWORK];
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &nleaf, &nleaf,
@@ -111,7 +113,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      free(WORK);
+      delete[] WORK;
     }
 
     // init cblacs info for the local U block.
@@ -333,7 +335,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      LWORK = (int)WORK[0] + block_nrows * rank + ITEMP;
+      LWORK = WORK[0] + nleaf * (TEMP_local_nrows + TEMP_local_ncols + 1) + TEMP_local_ncols;
       delete[] WORK;
     }
 
@@ -343,7 +345,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int JTEMP = 1;
       int IU = block * block_nrows + 1;
       int JU = 1;
-      WORK = new double[LWORK];
+      WORK = new double[(int64_t)LWORK];
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &block_nrows, &rank,

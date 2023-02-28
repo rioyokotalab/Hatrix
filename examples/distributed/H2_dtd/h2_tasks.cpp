@@ -419,8 +419,8 @@ task_fill_in_recompression(parsec_execution_stream_t* es, parsec_task_t* this_ta
   }
   else if (which == 'C') {      // col fill in recompression
     fill_in += matmul(U, matmul(US, U, false, true));
-    Matrix fill_in_cols_T = transpose(fill_in);
 
+    Matrix fill_in_cols_T = transpose(fill_in);
     std::tie(Q, Si, VT, err) = truncated_svd(fill_in_cols_T, rank);
     Matrix proj_col = matmul(Q, U, true, false);
     proj.copy_mem(proj_col);
