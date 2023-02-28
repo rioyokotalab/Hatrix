@@ -69,62 +69,6 @@ namespace Hatrix {
     return map;
   }
 
-  /*
-  void add_admissibility(RowColLevelMap<bool>& map, int row, int col, int level, int max_level) {
-    is_admissible(map, row, col, level);
-    is_admissible(map, row+1, col, level);
-    is_admissible(map, row, col+1, level);
-    is_admissible(map, row+1, col+1, level);
-    std::cout<<row<<","<<col<<","<<level<<" is "<<map(row,col,level)<<std::endl;
-    std::cout<<row<<","<<col+1<<","<<level<<" is "<<map(row,col+1,level)<<std::endl;
-    std::cout<<row+1<<","<<col<<","<<level<<" is "<<map(row+1,col,level)<<std::endl;
-    std::cout<<row+1<<","<<col+1<<","<<level<<" is "<<map(row+1,col+1,level)<<std::endl;
-
-
-    if (level < max_level) {
-      add_admissibility(map, row, col, level+1, max_level);
-      add_admissibility(map, row+2*level, col+2*level, level+1, max_level);
-    }
-  }
-
-  RowColLevelMap<bool> create_admissibility(int max_level) {
-    RowColLevelMap<bool> map;
-    
-    map.insert(0, 0, 0, false);
-    add_admissibility(map, 0, 0, 1, max_level);
-    return map;
-  }
-  */
-
-  /*
-  template <typename DT>
-  void add_low_rank(const Matrix<DT>& A, RowColLevelMap<LowRank<DT>>& map, int row, int col, int level, int leaf_size, int rank, omp_lock_t& lock) {
-    
-    
-    std::vector<Hatrix::Matrix<DT>> A_split = A.split(2, 2);
-    //#pragma omp task shared(map)
-    {
-      LowRank<DT> LR(A_split[1], rank);
-      omp_set_lock(&lock);
-      map.insert(row, col+1, level, std::move(LR));
-      std::cout<<"LowRank "<<row<<","<<col+1<<","<<level<<std::endl;
-      omp_unset_lock(&lock);
-    }
-    //#pragma omp task shared(map)
-    {
-      LowRank<DT> LR(A_split[2], rank);
-      omp_set_lock(&lock);
-      map.insert(row+1, col, level, std::move(LR));
-      std::cout<<"LowRank "<<row+1<<","<<col<<","<<level<<std::endl;
-      omp_unset_lock(&lock);
-    }
-    if (A_split[0].rows > leaf_size) {
-      add_low_rank(A_split[0], map, row, col, level+1, leaf_size, rank, lock);
-      add_low_rank(A_split[3], map, row+2*level, col+2*level, level+1, leaf_size, rank, lock);
-    }
-  }
-  */
-
   template<typename DT>
   void spawn_children(RowColLevelMap<LowRank<DT>>& map, int row, int col, int level, int max_level) {
     if (level >= max_level)
@@ -576,7 +520,7 @@ int main() {
     }
   }*/
   
-  omp_set_num_threads(4);
+  omp_set_num_threads(7);
   tic = get_time();
   Hatrix::LowRank<double> temp;
   #pragma omp parallel
