@@ -70,7 +70,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   // obtain the shared basis of each row.
   for (int64_t block = 0; block < nblocks; ++block) {
     // init global S vector for this block.
-    double *S_MEM = new double[(int64_t)nleaf];
+    double *S_MEM = new double[(int64_t)nleaf]();
 
 
     // SVD workspace query.
@@ -80,7 +80,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JAY = 1;
       int IU = nleaf * block + 1;
       int JU = 1;
-      WORK = new double[1];
+      WORK = new double[1]();
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &nleaf, &nleaf,
@@ -103,7 +103,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JAY = 1;
       int IU = nleaf * block + 1;
       int JU = 1;
-      WORK =  new double[(int64_t)LWORK];
+      WORK =  new double[(int64_t)LWORK]();
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &nleaf, &nleaf,
@@ -223,7 +223,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int AY_local_ncols = numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
                                &MPIGRID[1]);
   int AY[9];
-  double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols];
+  double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
   descinit_(AY, &N, &level_block_size, &nleaf, &nleaf,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
@@ -308,7 +308,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   descinit_(UTRANSFER, &TEMP_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
             &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
   double *UTRANSFER_MEM =
-    new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols];
+    new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
 
   int LWORK; double *WORK;
 
@@ -325,7 +325,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int IU = block * block_nrows + 1;
       int JU = 1;
 
-      WORK = new double[1];
+      WORK = new double[1]();
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &block_nrows, &rank,
@@ -345,7 +345,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int JTEMP = 1;
       int IU = block * block_nrows + 1;
       int JU = 1;
-      WORK = new double[(int64_t)LWORK];
+      WORK = new double[(int64_t)LWORK]();
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &block_nrows, &rank,
@@ -577,7 +577,7 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
   int nleaf = opts.nleaf; int N = opts.N; int INFO;
   int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int U_ncols = fmax(numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]), 1);
-  U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols];
+  U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols]();
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 

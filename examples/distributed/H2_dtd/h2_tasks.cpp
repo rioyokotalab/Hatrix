@@ -434,18 +434,18 @@ task_fill_in_recompression(parsec_execution_stream_t* es, parsec_task_t* this_ta
 
 parsec_hook_return_t
 task_project_S(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t S_nrows, S_ncols;
+  int64_t S_nrows;
   double *_S;
   int64_t proj_nrows;
   double *_proj;
   char which;
 
   parsec_dtd_unpack_args(this_task,
-                         &S_nrows, &S_ncols, &_S,
+                         &S_nrows, &_S,
                          &proj_nrows, &_proj,
                          &which);
 
-  MatrixWrapper S(_S, S_nrows, S_ncols, S_nrows);
+  MatrixWrapper S(_S, S_nrows, S_nrows, S_nrows);
   MatrixWrapper proj(_proj, proj_nrows, proj_nrows, proj_nrows);
 
   if (which == 'R') {           // fill in projection along the rows.

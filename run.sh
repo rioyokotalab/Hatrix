@@ -30,8 +30,8 @@ for adm in 1; do
     ndim=3
     max_rank=32
 
-    for N in 16384; do
-        mpirun -n 1 ./bin/H2_dtd --N $N \
+    for N in 131072; do
+        mpirun -n 1 gdb --args ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
