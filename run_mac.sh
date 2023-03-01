@@ -30,6 +30,7 @@ for adm in 1; do
                       --admis_kind diagonal \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3
+                      --kind_of_recompression 3 \
+                      --parsec_cores 2
     done
 done

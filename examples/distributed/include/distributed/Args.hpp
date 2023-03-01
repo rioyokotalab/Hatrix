@@ -31,6 +31,7 @@ namespace Hatrix {
     bool verbose;             // whether execution is verbose.
     bool is_symmetric;
     int num_args;               // number of arguments actually passed by the user.
+    int parsec_cores;           // number of cores usable by parsec.
 
     Args(int argc=0, char **argv=NULL);
     void usage(const char *name);

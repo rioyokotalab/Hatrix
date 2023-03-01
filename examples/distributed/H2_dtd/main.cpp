@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  int cores = -1;
+
 
   std::cout << "init args.\n";
   Args opts(argc, argv);
@@ -168,6 +168,7 @@ int main(int argc, char **argv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
   MPI_Dims_create(MPISIZE, 2, MPIGRID);
   N = opts.N;
+  int cores = opts.parsec_cores;
   if (!MPIRANK) {
     std::cout << "MPIGRID g[0] : " << MPIGRID[0]
               << " g[1]: " << MPIGRID[1]
@@ -353,9 +354,9 @@ int main(int argc, char **argv) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
 
-// #ifdef USE_MKL
+#ifdef USE_MKL
   mkl_set_num_threads(1);
-// #endif
+#endif
   int max_threads = omp_get_max_threads();
 
   omp_set_num_threads(1);
