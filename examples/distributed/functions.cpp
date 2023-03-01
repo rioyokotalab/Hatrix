@@ -221,7 +221,28 @@ namespace Hatrix {
   void init_diagonal_admis(SymmetricSharedBasisMatrix& A,
                            const Domain& domain, const Args& opts) {
     A.max_level = domain.tree.height() - 1;
-    compute_matrix_structure(A, A.max_level, opts);
+    if (opts.use_nested_basis) {
+      compute_matrix_structure(A, A.max_level, opts);
+    }
+    else {
+      int64_t level = A.max_level;
+      int64_t nodes = pow(2, level);
+      for (int i = 0; i < nodes; ++i) {
+        for (int j = 0; j < nodes; ++j) {
+          A.is_admissible.insert(i, j, level, std::abs(i - j) > opts.admis);
+        }
+      }
+
+      // dense level for BLR2 matrix.
+      level--;
+      nodes = pow(2, level);
+      for (int i = 0; i < nodes; ++i) {
+        for (int j = 0; j < nodes; ++j) {
+          A.is_admissible.insert(i, j, level, false);
+        }
+      }
+    }
+
     for (int64_t l = A.max_level; l > 0; --l) {
       int64_t nblocks = pow(2, l);
       bool all_dense = true;

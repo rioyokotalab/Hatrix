@@ -13,7 +13,7 @@ ulimit -c unlimited
 make -j H2_dtd
 # make -j H2_main
 
-for adm in 1.2; do
+for adm in 1; do
     nleaf=256
     ndim=3
     max_rank=100
@@ -30,7 +30,6 @@ for adm in 1.2; do
                       --admis_kind diagonal \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3 \
-                      --use_nested_basis
+                      --kind_of_recompression 3
     done
 done
