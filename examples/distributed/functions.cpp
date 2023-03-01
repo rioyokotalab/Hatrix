@@ -157,7 +157,8 @@ namespace Hatrix {
       bool all_dense = true;
       for (int64_t i = 0; i < nblocks; ++i) {
         for (int64_t j = 0; j < nblocks; ++j) {
-          if ((A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) || !A.is_admissible.exists(i, j, l)) {
+          if ((A.is_admissible.exists(i, j, l) &&
+               A.is_admissible(i, j, l)) || !A.is_admissible.exists(i, j, l)) {
             all_dense = false;
           }
         }
@@ -226,7 +227,8 @@ namespace Hatrix {
       bool all_dense = true;
       for (int64_t i = 0; i < nblocks; ++i) {
         for (int64_t j = 0; j < nblocks; ++j) {
-          if ((A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) || !A.is_admissible.exists(i, j, l)) {
+          if ((A.is_admissible.exists(i, j, l) &&
+               A.is_admissible(i, j, l)) || !A.is_admissible.exists(i, j, l)) {
             all_dense = false;
           }
         }
