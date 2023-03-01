@@ -353,9 +353,9 @@ int main(int argc, char **argv) {
     h2_solution.push_back(Matrix(opts.nleaf, 1));
   }
 
-#ifdef USE_MKL
+// #ifdef USE_MKL
   mkl_set_num_threads(1);
-#endif
+// #endif
   int max_threads = omp_get_max_threads();
 
   omp_set_num_threads(1);
