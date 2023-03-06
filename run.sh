@@ -26,12 +26,15 @@ make -j H2_dtd
 # make -j H2_main
 
 for adm in 1; do
-    nleaf=64
+    nleaf=256
     ndim=3
-    max_rank=32
+    max_rank=50
 
-    for N in 131072; do
-        mpirun -n 1 gdb --args ./bin/H2_dtd --N $N \
+    # gdb -q -iex "set auto-load safe-path /home/user/gdb" -ex run --args
+
+    for N in 8192; do
+        mpirun --oversubscribe -n 16 \
+               ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
