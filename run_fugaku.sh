@@ -34,18 +34,18 @@ export XOS_MMM_L_PAGING_POLICY="demand:demand:demand"
 
 # make -j H2_main
 #make clean
-make -j H2_main
+make -j H2_dtd
 # make -j H2_main
 
 
-for adm in 1.2; do
-    nleaf=1024
+for adm in 1; do
+    nleaf=256
     ndim=3
 
-    for max_rank in 100; do
-        for N in 16384 32768 65536 131072; do
-            for i in `seq 10`; do
-                ./bin/H2_main --N $N \
+    for max_rank in 50; do
+        for N in 8192; do
+            for i in `seq 1`; do
+                ./bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \
@@ -53,7 +53,7 @@ for adm in 1.2; do
                               --max_rank $max_rank \
                               --accuracy -1 \
                               --admis $adm \
-                              --admis_kind geometry \
+                              --admis_kind diagonal \
                               --construct_algorithm miro \
                               --add_diag 1e-9 \
                               --kind_of_recompression 3 \
