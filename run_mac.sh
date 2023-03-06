@@ -10,7 +10,7 @@ export TMPDIR=/tmp
 
 ulimit -c unlimited
 
-make -j H2_dtd
+make -j H2_ptg
 # make -j H2_main
 
 for adm in 1; do
@@ -19,8 +19,7 @@ for adm in 1; do
     max_rank=50
 
     for N in 8192; do
-        mpirun --oversubscribe -n 16 xterm -e lldb -o "b malloc_error_break" \
-               -o run -- ./bin/H2_dtd --N $N \
+        mpirun -n 4 ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
