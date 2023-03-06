@@ -304,17 +304,17 @@ int main(int argc, char **argv) {
 
 
   /* Initializing parsec context */
-  parsec = parsec_init( cores, NULL, NULL);
-  if( NULL == parsec ) {
-    printf("Cannot initialize PaRSEC\n");
-    exit(-1);
-  }
+  // parsec = parsec_init( cores, NULL, NULL);
+  // if( NULL == parsec ) {
+  //   printf("Cannot initialize PaRSEC\n");
+  //   exit(-1);
+  // }
 
-  parsec_profiling_start();
+  // parsec_profiling_start();
 
   double solve_error = 0, fp_ops = 0, factorize_time = 0;
 
-  parsec_fini(&parsec);
+  // parsec_fini(&parsec);
 
 
   if (!MPIRANK) {
