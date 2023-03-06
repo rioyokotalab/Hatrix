@@ -15,10 +15,12 @@ namespace Hatrix {
     {"max_rank",            required_argument, 0, 'r'},
     {"accuracy",            required_argument, 0, 'e'},
     {"admis",               required_argument, 0, 'a'},
+    {"perturbation",        required_argument, 0, 'p'},
     {"admis_kind",          required_argument, 0, 'm'},
     {"construct_algorithm", required_argument, 0, 'c'},
     {"add_diag",            required_argument, 0, 'z'},
     {"qr_accuracy",         required_argument, 0, 'q'},
+    {"parsec_cores",        required_argument, 0, 'i'},
     {"kind_of_recompression", required_argument, 0, 's'},
     {"use_nested_basis",    no_argument,       0, 'b'},
     {"verbose",             no_argument,       0, 'v'},
@@ -63,15 +65,17 @@ namespace Hatrix {
       ndim(1),
       max_rank(2),
       admis(0),
+      perturbation(0),
       accuracy(1),
       qr_accuracy(1e-2),
       kind_of_recompression(1),
       add_diag(1e-4),
       admis_kind(DIAGONAL),
       construct_algorithm(MIRO),
-      use_nested_basis(true),
+      use_nested_basis(false),
       verbose(false),
-      is_symmetric(false)
+      is_symmetric(false),
+      parsec_cores(-1)
   {
     KERNEL_FUNC kfunc;
     while(1) {
@@ -82,6 +86,9 @@ namespace Hatrix {
       if (c == -1) break;
       num_args++;
       switch(c) {
+      case 'i':
+        parsec_cores = std::stol(optarg);
+        break;
       case 'n':
         N = std::stol(optarg);
         break;
@@ -127,6 +134,9 @@ namespace Hatrix {
         break;
       case 'a':
         admis = std::stod(optarg);
+        break;
+      case 'p':
+        perturbation = std::stod(optarg);
         break;
       case 'm':
         if (!strcmp(optarg, "geometry")) {
@@ -211,6 +221,8 @@ namespace Hatrix {
             "--qr_accuracy (-q)                          : Desired accuracy for QR. (%lf).\n"
             "--kind_of_recompression (-s)                : Recompression scheme (0,1,2,3) (%lld). \n"
             "--admis (-a)                                : Admissibility constant (%lf).\n"
+            "--pertubation (-p)                          : Parameter to add to the admissibility (%lf).\n"
+            "--parsec_cores (-i)                         : Parameter to control the number of physical cores used by a single process of PaRSEC. (%d) \n"
             "--admis_kind (-m) [diagonal|geometry]       : Whether geometry-based or diagonal-based admis (%s).\n"
             "--construct_algorithm (-c) [miro|id_random] : Construction algorithm to use (%s).\n"
             "--add_diag (-z)                             : Value to add to the diagonal (%lf).\n"
@@ -229,6 +241,8 @@ namespace Hatrix {
             qr_accuracy,
             kind_of_recompression,
             admis,
+            perturbation,
+            parsec_cores,
             admis_kind_to_string(admis_kind).c_str(),
             construct_algorithm_to_string(construct_algorithm).c_str(),
             add_diag,

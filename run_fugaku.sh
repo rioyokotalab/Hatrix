@@ -1,5 +1,5 @@
 #!/bin/bash
-#PJM -L "node=16"
+#PJM -L "node=1"
 #PJM -L "rscunit=rscunit_ft01"
 #PJM -L "rscgrp=small"
 #PJM -L "elapse=24:00:00"
@@ -7,7 +7,7 @@
 #PJM -L "throttling_state=0"
 #PJM -L "issue_state=0"
 #PJM -L "ex_pipe_state=0"
-#PJM --mpi "proc=16"
+#PJM --mpi "proc=1"
 #PJM --mpi "max-proc-per-node=1"
 #PJM -s
 
@@ -21,9 +21,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0003/hp190122/u01594/gitrepos/parsec
 
 #export PARALLEL=1
 #export OMP_NUM_THREADS=1
-export PLE_MPI_STD_EMPTYFILE=off
-export FLIB_SCCR_CNTL=FALSE
-export FLIB_PTHREAD=1
+# export PLE_MPI_STD_EMPTYFILE=off
+# export FLIB_SCCR_CNTL=FALSE
+# export FLIB_PTHREAD=1
 
 export OMP_PLACES=cores
 export OMP_DISPLAY_AFFINITY=TRUE
@@ -34,27 +34,31 @@ export XOS_MMM_L_PAGING_POLICY="demand:demand:demand"
 
 # make -j H2_main
 #make clean
-make -j H2_dtd
+make -j H2_main
 # make -j H2_main
 
-for adm in 0.8; do
-    nleaf=512
-    ndim=3
-    max_rank=50
 
-    for N in 65563; do
-        echo "compile and execute"
-        mpiexec -stdout test_out.log -stderr test_err.log ./bin/H2_dtd --N $N \
-                      --nleaf $nleaf \
-                      --kernel_func laplace \
-                      --kind_of_geometry grid \
-                      --ndim $ndim \
-                      --max_rank $max_rank \
-                      --accuracy 1e-8 \
-                      --admis $adm \
-                      --admis_kind geometry \
-                      --construct_algorithm miro \
-                      --add_diag 1e-10 \
-                      --use_nested_basis
+for adm in 1.2; do
+    nleaf=1024
+    ndim=3
+
+    for max_rank in 100; do
+        for N in 16384 32768 65536 131072; do
+            for i in `seq 10`; do
+                ./bin/H2_main --N $N \
+                              --nleaf $nleaf \
+                              --kernel_func laplace \
+                              --kind_of_geometry grid \
+                              --ndim $ndim \
+                              --max_rank $max_rank \
+                              --accuracy -1 \
+                              --admis $adm \
+                              --admis_kind geometry \
+                              --construct_algorithm miro \
+                              --add_diag 1e-9 \
+                              --kind_of_recompression 3 \
+                              --use_nested_basis
+            done
+        done
     done
 done

@@ -11,148 +11,20 @@
 
 using namespace Hatrix;
 
-Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;  // This is actually RowLevelMap
-
-static void
-dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& Cj,
-                    const Domain& domain, const Args& opts) {
-  int64_t i_level = Ci.level;
-  int64_t j_level = Cj.level;
-
-  bool well_separated = false;
-  if (i_level == j_level) {
-    double distance = 0;
-    for (int64_t k = 0; k < opts.ndim; ++k) {
-      distance += pow(Ci.center[k] - Cj.center[k], 2);
-    }
-    distance = sqrt(distance);
-
-    if (distance * opts.admis > (Ci.radius + Cj.radius)) {
-      // well-separated blocks.
-      well_separated = true;
-    }
-
-    bool val = well_separated;
-    A.is_admissible.insert(Ci.level_index, Cj.level_index, i_level, std::move(val));
-  }
-
-  if (i_level <= j_level && Ci.cells.size() > 0 && !well_separated) {
-    // j is at a higher level and i is not leaf.
-    dual_tree_traversal(A, Ci.cells[0], Cj, domain, opts);
-    dual_tree_traversal(A, Ci.cells[1], Cj, domain, opts);
-  }
-  else if (j_level <= i_level && Cj.cells.size() > 0 && !well_separated) {
-    // i is at a higheer level and j is not leaf.
-    dual_tree_traversal(A, Ci, Cj.cells[0], domain, opts);
-    dual_tree_traversal(A, Ci, Cj.cells[1], domain, opts);
-  }
-}
-
-void init_geometry_admis(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
-  A.max_level = domain.tree.height() - 1;
-  dual_tree_traversal(A, domain.tree, domain.tree, domain, opts);
-  A.min_level = 0;
-  for (int64_t l = A.max_level; l > 0; --l) {
-    int64_t nblocks = pow(2, l);
-    bool all_dense = true;
-    for (int64_t i = 0; i < nblocks; ++i) {
-      for (int64_t j = 0; j < nblocks; ++j) {
-        if (A.is_admissible.exists(i, j, l) && A.is_admissible(i, j, l)) {
-          all_dense = false;
-        }
-      }
-    }
-
-    if (all_dense) {
-      A.min_level = l;
-      break;
-    }
-  }
-
-  if (A.max_level != A.min_level) { A.min_level++; }
-
-  // populate near and far lists. comment out when doing H2.
-  for (int64_t level = A.max_level; level >= A.min_level; --level) {
-    int64_t nblocks = pow(2, level);
-
-    for (int64_t i = 0; i < nblocks; ++i) {
-      far_neighbours.insert(i, level, std::vector<int64_t>());
-      near_neighbours.insert(i, level, std::vector<int64_t>());
-      for (int64_t j = 0; j <= i; ++j) {
-        if (A.is_admissible.exists(i, j, level)) {
-          if (A.is_admissible(i, j, level)) {
-            far_neighbours(i, level).push_back(j);
-          }
-          else {
-            near_neighbours(i, level).push_back(j);
-          }
-        }
-      }
-    }
-  }
-
-  // make this BLR2
-
-  // for (int level = A.max_level - 1; level >= A.min_level; --level) {
-  //   int nblocks = pow(2, level);
-  //   for (int i = 0; i < nblocks; ++i) {
-  //     for (int j = 0; j < nblocks; ++j) {
-  //       if (A.is_admissible.exists(i, j, level)) {
-  //         A.is_admissible.erase(i, j, level);
-  //       }
-  //     }
-  //   }
-  // }
-
-  // // remove stuff from max_level and put it in level 1
-  // int nblocks = pow(2, A.max_level);
-  // for (int i = 0; i < nblocks; ++i) {
-  //   for (int j = 0; j < nblocks; ++j) {
-  //     if (!A.is_admissible.exists(i, j, A.max_level)) {
-  //       A.is_admissible.insert(i, j, A.max_level, true);
-  //     }
-  //   }
-  // }
-
-  // // temp populate near and far list and the leaf level
-  // for (int64_t i = 0; i < nblocks; ++i) {
-  //   far_neighbours.insert(i, A.max_level, std::vector<int64_t>());
-  //   near_neighbours.insert(i, A.max_level, std::vector<int64_t>());
-  //   for (int64_t j = 0; j <= i; ++j) {
-  //     if (A.is_admissible(i, j, A.max_level)) {
-  //       far_neighbours(i, A.max_level).push_back(j);
-  //     }
-  //     else {
-  //       near_neighbours(i, A.max_level).push_back(j);
-  //     }
-  //   }
-  // }
-
-  // nblocks = pow(2, A.max_level - 1);
-  // for (int i = 0; i < nblocks; ++i) {
-  //   for (int j = 0; j < nblocks; ++j) {
-  //     A.is_admissible.insert(i, j, A.max_level-1, false);
-  //   }
-  // }
-
-  // A.min_level = A.max_level;
-}
-
 static Matrix
 generate_column_block(int64_t block, int64_t block_size,
                       int64_t level,
                       const SymmetricSharedBasisMatrix& A,
-                      const Matrix& dense,
-                      const Matrix& rand) {
+                      const Matrix& dense) {
   int64_t nblocks = pow(2, level);
   auto dense_splits = dense.split(nblocks, nblocks);
-  auto rand_splits = rand.split(nblocks, 1);
-  Matrix AY(block_size, rand.cols);
+  Matrix AY(block_size, block_size);
 
   for (int64_t j = 0; j < nblocks; ++j) {
     if (A.is_admissible.exists(block, j, level) &&
         !A.is_admissible(block, j, level)) { continue; }
-    matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
+    AY += dense_splits[block * nblocks + j];
+    // matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
   }
 
   return AY;
@@ -162,16 +34,16 @@ static Matrix
 generate_column_bases(int64_t block, int64_t block_size, int64_t level,
                       SymmetricSharedBasisMatrix& A,
                       const Matrix& dense,
-                      const Matrix&rand,
                       const Args& opts) {
-  Matrix AY = generate_column_block(block, block_size, level, A, dense, rand);
+  Matrix AY = generate_column_block(block, block_size, level, A, dense);
   Matrix Ui;
   std::vector<int64_t> pivots;
   int64_t rank;
 
   if (opts.accuracy == -1) {        // constant rank compression
     rank = opts.max_rank;
-    std::tie(Ui, pivots) = pivoted_qr(AY, rank);
+    Matrix Si, Vi; double error;
+    std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
   }
   else {
     std::tie(Ui, pivots, rank) = error_pivoted_qr_max_rank(AY, opts.accuracy, (int64_t)opts.max_rank);
@@ -190,16 +62,21 @@ static void
 generate_leaf_nodes(const Domain& domain,
                     SymmetricSharedBasisMatrix& A,
                     const Matrix& dense,
-                    const Matrix& rand,
                     const Args& opts) {
   int64_t nblocks = pow(2, A.max_level);
   auto dense_splits = dense.split(nblocks, nblocks);
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j : near_neighbours(i, A.max_level)) {
-      // TODO: Make this only a lower triangular matrix with the diagonal.
-      // Will need a special type.
       Matrix Aij(dense_splits[i * nblocks + j], true);
+
+      for (int64_t i = 0; i < Aij.rows; ++i) {
+        for (int64_t j = i+1; j < Aij.cols; ++j) {
+          Aij(i, j) = 0;
+        }
+      }
+
+      // Aij.print();
       A.D.insert(i, j, A.max_level, std::move(Aij));
     }
   }
@@ -212,7 +89,6 @@ generate_leaf_nodes(const Domain& domain,
                                      A.max_level,
                                      A,
                                      dense,
-                                     rand,
                                      opts));
   }
 
@@ -238,9 +114,8 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
                            const int64_t level,
                            SymmetricSharedBasisMatrix& A,
                            const Matrix& dense,
-                           const Matrix& rand,
                            const Args& opts) {
-  Matrix col_block = generate_column_block(node, block_size, level, A, dense, rand);
+  Matrix col_block = generate_column_block(node, block_size, level, A, dense);
   auto col_block_splits = col_block.split(2, 1);
 
   int64_t c1 = node * 2;
@@ -260,10 +135,12 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
   int64_t rank;
   if (opts.accuracy == -1) {      // constant rank factorization
     rank = opts.max_rank;
-    std::tie(Utransfer, pivots) = pivoted_qr(temp, rank);
+    Matrix Si, Vi; double error;
+    std::tie(Utransfer, Si, Vi, error) = truncated_svd(temp, rank);
   }
   else {
-    std::tie(Utransfer, pivots, rank) = error_pivoted_qr_max_rank(temp, opts.accuracy, opts.max_rank);
+    std::tie(Utransfer, pivots, rank) =
+      error_pivoted_qr_max_rank(temp, opts.accuracy, opts.max_rank);
   }
 
   Matrix _U, _S, _V; double _error;
@@ -297,13 +174,9 @@ generate_transfer_matrices(const Domain& domain,
                            const RowLevelMap& Uchild,
                            SymmetricSharedBasisMatrix& A,
                            const Matrix& dense,
-                           const Matrix& rand,
                            const Args& opts) {
   int64_t nblocks = pow(2, level);
   auto dense_splits = dense.split(nblocks, nblocks);
-
-  std::mt19937 gen(0);
-  std::uniform_real_distribution<double> dist(0.0, 1.0);
 
   RowLevelMap Ubig_parent;
   for (int64_t node = 0; node < nblocks; ++node) {
@@ -323,7 +196,6 @@ generate_transfer_matrices(const Domain& domain,
                                                     level,
                                                     A,
                                                     dense,
-                                                    rand,
                                                     opts);
       auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, A.ranks(c1, child_level)),
                                               {});
@@ -368,12 +240,11 @@ void
 construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
   int64_t P = opts.max_rank;
   Matrix dense = generate_p2p_matrix(domain, opts.kernel);
-  Matrix rand = generate_random_matrix(opts.N, P);
-  generate_leaf_nodes(domain, A, dense, rand, opts);
+  generate_leaf_nodes(domain, A, dense, opts);
 
   RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.max_level-1; level > 0; --level) {
-    Uchild = generate_transfer_matrices(domain, level, Uchild, A, dense, rand, opts);
+    Uchild = generate_transfer_matrices(domain, level, Uchild, A, dense, opts);
   }
 }

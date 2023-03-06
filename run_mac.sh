@@ -10,40 +10,27 @@ export TMPDIR=/tmp
 
 ulimit -c unlimited
 
-make -j H2_main
-make -j HSS_dtd
+make -j H2_dtd
+# make -j H2_main
 
-for adm in 7; do
-    nleaf=128
-    ndim=2
-    max_rank=25
+for adm in 1; do
+    nleaf=256
+    ndim=3
+    max_rank=100
 
-    for N in 8192; do
-        mpirun -n 4 ./bin/HSS_dtd --N $N \
+    for N in 4096; do
+        ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
                       --ndim $ndim \
                       --max_rank $max_rank \
-                      --accuracy 1e-12 \
+                      --accuracy -1 \
                       --admis $adm \
-                      --admis_kind geometry \
+                      --admis_kind diagonal \
                       --construct_algorithm miro \
-                      --add_diag 1e-9 \
-                      --use_nested_basi
-
-
-        ./bin/H2_main --N $N \
-                      --nleaf $nleaf \
-                      --kernel_func laplace \
-                      --kind_of_geometry grid \
-                      --ndim $ndim \
-                      --max_rank $max_rank \
-                      --accuracy 1e-12 \
-                      --admis $adm \
-                      --admis_kind geometry \
-                      --construct_algorithm miro \
-                      --add_diag 1e-9 \
-                      --use_nested_basis
+                      --add_diag 1e-9  \
+                      --kind_of_recompression 3 \
+                      --parsec_cores 2
     done
 done

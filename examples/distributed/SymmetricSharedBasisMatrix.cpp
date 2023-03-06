@@ -77,8 +77,25 @@ void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
   actually_print_structure(level-1);
 }
 
-void SymmetricSharedBasisMatrix::print_structure() {
+void
+SymmetricSharedBasisMatrix::print_structure() {
   actually_print_structure(max_level);
+}
+
+int64_t
+SymmetricSharedBasisMatrix::leaf_dense_blocks() {
+  int64_t nblocks = pow(2, max_level);
+  int64_t ndense_blocks = 0;
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j <= i; ++j) {
+      if (is_admissible.exists(i, j, max_level) && !is_admissible(i, j, max_level)) {
+        ndense_blocks += 1;
+      }
+    }
+  }
+
+  return ndense_blocks;
 }
 
 SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix(const SymmetricSharedBasisMatrix& A) :
