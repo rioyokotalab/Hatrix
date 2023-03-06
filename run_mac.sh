@@ -16,10 +16,11 @@ make -j H2_dtd
 for adm in 1; do
     nleaf=256
     ndim=3
-    max_rank=100
+    max_rank=50
 
-    for N in 4096; do
-        ./bin/H2_dtd --N $N \
+    for N in 8192; do
+        mpirun --oversubscribe -n 16 xterm -e lldb -o "b malloc_error_break" \
+               -o run -- ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -31,6 +32,7 @@ for adm in 1; do
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
                       --kind_of_recompression 3 \
-                      --parsec_cores 2
+                      --parsec_cores 2 \
+		      --use_nested_basis
     done
 done
