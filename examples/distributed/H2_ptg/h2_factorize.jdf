@@ -1,3 +1,30 @@
 extern "C" %{
   #include "h2_ptg_functions.hpp"
+  #include "parsec.h"
 %}
+
+multiply_complements(k)
+
+k = 0 .. 0
+
+/**
+ * Here we define which process will execute the task, this is explained in
+ * further details in following examples
+ */
+
+/**
+ * A task has a finite number of input/output, and needs at least one input even
+ * if this one is not used. We start here by a task that doesn't use
+ * information, so we have only one 'flow' named A that receives NULL.
+ */
+READ A <- NULL
+
+/**
+ * This is the body of the task that will be executed by one of the thread in the
+ * engine.
+ */
+BODY
+{
+    printf("HelloWorld %d\n", k);
+}
+END

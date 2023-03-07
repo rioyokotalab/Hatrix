@@ -2,6 +2,7 @@
 
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/Users/sameer/gitrepos/parsec/build/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/Users/sameer/gitrepos/parsec/build/lib
+export PATH=/Users/sameer/gitrepos/parsec/build/bin:$PATH
 
 # Keep for this reason: https://github.com/open-mpi/ompi/issues/7393
 export TMPDIR=/tmp
@@ -10,7 +11,7 @@ export TMPDIR=/tmp
 
 ulimit -c unlimited
 
-make -j H2_ptg
+make H2_ptg
 # make -j H2_main
 
 for adm in 1; do
