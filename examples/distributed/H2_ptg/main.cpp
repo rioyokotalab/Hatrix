@@ -304,7 +304,8 @@ int main(int argc, char **argv) {
 
 
   /* Initializing parsec context */
-  // parsec = parsec_init( cores, NULL, NULL);
+  parsec = parsec_init( cores, NULL, NULL);
+  parsec_taskpool_t *hatrix_factorize = h2_factorize_New(parsec);
   // if( NULL == parsec ) {
   //   printf("Cannot initialize PaRSEC\n");
   //   exit(-1);
@@ -313,8 +314,6 @@ int main(int argc, char **argv) {
   // parsec_profiling_start();
 
   double solve_error = 0, fp_ops = 0, factorize_time = 0;
-
-  // parsec_fini(&parsec);
 
 
   if (!MPIRANK) {
