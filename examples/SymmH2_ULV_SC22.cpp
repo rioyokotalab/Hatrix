@@ -107,7 +107,7 @@ void getCommTime(double* cmtime) {
 #endif
 }
 
-double _singularity = 1.e-8;
+double _singularity = 1.e-9;
 double _alpha = 1.;
 
 void laplace3d(double* r2) {
@@ -2049,9 +2049,9 @@ int main(int argc, char* argv[]) {
   int64_t Nleaf = (int64_t)1 << levels;
   int64_t ncells = Nleaf + Nleaf - 1;
 
-  //void(*ef)(double*) = laplace3d;
-  void(*ef)(double*) = yukawa3d;
-  set_kernel_constants(1.e-3 / Nbody, 1.);
+  void(*ef)(double*) = laplace3d;
+  //void(*ef)(double*) = yukawa3d;
+  set_kernel_constants(1.e-9, 1.);
 
   struct Body* body = (struct Body*)malloc(sizeof(struct Body) * Nbody);
   struct Cell* cell = (struct Cell*)malloc(sizeof(struct Cell) * ncells);
