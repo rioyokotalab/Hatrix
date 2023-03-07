@@ -11,16 +11,16 @@ export TMPDIR=/tmp
 
 ulimit -c unlimited
 
-make H2_ptg
+make H2_dtd
 # make -j H2_main
 
-for adm in 1; do
+for adm in 0; do
     nleaf=256
-    ndim=3
+    ndim=1
     max_rank=50
 
     for N in 8192; do
-        mpirun -n 4 ./bin/H2_ptg --N $N \
+        mpirun -n 1 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -32,7 +32,6 @@ for adm in 1; do
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
                       --kind_of_recompression 3 \
-                      --parsec_cores 2 \
 		      --use_nested_basis
     done
 done

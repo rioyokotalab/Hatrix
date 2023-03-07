@@ -262,6 +262,9 @@ namespace Hatrix {
     }
 
     if (A.max_level != A.min_level) { A.min_level++; }
+    if (opts.use_nested_basis && A.min_level == 1) {
+      A.is_admissible.insert(0, 0, 0, false);
+    }
     populate_near_far_lists(A);
   }
 
