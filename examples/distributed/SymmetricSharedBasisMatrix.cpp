@@ -56,7 +56,7 @@ int64_t SymmetricSharedBasisMatrix::average_rank() {
 
 void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
   int64_t nblocks = pow(2, level);
-  std::cout << "LEVEL:" << level << " NBLOCKS: " << nblocks << "MIN: " << min_level << std::endl;
+  std::cout << "LEVEL:" << level << " NBLOCKS: " << nblocks << " MIN: " << min_level << std::endl;
   for (int64_t i = 0; i < nblocks; ++i) {
     std::cout << "| " ;
     for (int64_t j = 0; j < nblocks; ++j) {

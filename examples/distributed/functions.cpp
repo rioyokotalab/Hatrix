@@ -262,7 +262,7 @@ namespace Hatrix {
       }
     }
 
-    if ((A.max_level != A.min_level) && A.min_level == -1) { A.min_level++; }
+    if ((A.max_level != A.min_level) && A.min_level != -1) { A.min_level++; }
     if (A.min_level == -1) {
 	    A.min_level = 1; // HSS matrix detected.
     }
