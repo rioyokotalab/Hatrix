@@ -242,6 +242,7 @@ namespace Hatrix {
         }
       }
     }
+    A.min_level = -1;
 
     for (int64_t l = A.max_level; l > 0; --l) {
       int64_t nblocks = pow(2, l);
@@ -261,7 +262,10 @@ namespace Hatrix {
       }
     }
 
-    if (A.max_level != A.min_level) { A.min_level++; }
+    if ((A.max_level != A.min_level) && A.min_level == -1) { A.min_level++; }
+    if (A.min_level == -1) {
+	    A.min_level = 1; // HSS matrix detected.
+    }
     if (opts.use_nested_basis && A.min_level == 1) {
       A.is_admissible.insert(0, 0, 0, false);
     }
