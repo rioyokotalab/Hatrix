@@ -15,7 +15,7 @@ JDF_COMPILED_SOURCES := $(subst .c,.o,$(AUTO_JDF_SRCS))
 
 jdf_sources.mk : %.jdf
 
-%.o : %.cpp h2_factorize.c
+%.o : %.cpp
 	$(MPICXX) $(CXXFLAGS) $(PARSEC_INCLUDE) -I$(TOPSRCDIR)/examples/distributed/include $^ -c -o $@
 
 .PHONY: clean

@@ -12,15 +12,14 @@ export TMPDIR=/tmp
 ulimit -c unlimited
 
 make H2_ptg
-# make -j H2_main
 
-for adm in 0; do
-    nleaf=256
-    ndim=1
-    max_rank=50
+nleaf=256
+max_rank=50
+ndim=3
+adm=0
 
-    for N in 8192; do
-        mpirun -n 1 ./bin/H2_ptg --N $N \
+for N in 8192; do
+    ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -33,5 +32,4 @@ for adm in 0; do
                       --add_diag 1e-9  \
                       --kind_of_recompression 3 \
 		      --use_nested_basis
-    done
 done

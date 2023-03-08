@@ -19,6 +19,7 @@
 #include "globals.hpp"
 #include "h2_construction.hpp"
 #include "h2_operations.hpp"
+#include "h2_ptg_functions.hpp"
 
 #include "omp.h"
 
@@ -310,10 +311,16 @@ int main(int argc, char **argv) {
   //   exit(-1);
   // }
 
+  factorize_setup(A, domain, opts);
+
+  factorize_teardown();
+
   // parsec_profiling_start();
 
   double solve_error = 0, fp_ops = 0, factorize_time = 0;
 
+
+  parsec_fini(&parsec);
 
   if (!MPIRANK) {
     // std::cout << "----------------------------\n";
