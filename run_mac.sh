@@ -11,7 +11,7 @@ export TMPDIR=/tmp
 
 ulimit -c unlimited
 
-make H2_dtd
+make H2_ptg
 # make -j H2_main
 
 for adm in 0; do
@@ -20,7 +20,7 @@ for adm in 0; do
     max_rank=50
 
     for N in 8192; do
-        mpirun -n 1 ./bin/H2_dtd --N $N \
+        mpirun -n 1 ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \

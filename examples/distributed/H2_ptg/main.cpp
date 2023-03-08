@@ -305,7 +305,6 @@ int main(int argc, char **argv) {
 
   /* Initializing parsec context */
   parsec = parsec_init( cores, NULL, NULL);
-  parsec_taskpool_t *hatrix_factorize = h2_factorize_New(parsec);
   // if( NULL == parsec ) {
   //   printf("Cannot initialize PaRSEC\n");
   //   exit(-1);

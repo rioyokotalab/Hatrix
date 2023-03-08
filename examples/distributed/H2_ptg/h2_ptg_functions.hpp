@@ -25,5 +25,3 @@ parsec_data_key_t data_key_1d(parsec_data_collection_t* dc, ...);
 parsec_data_key_t data_key_2d(parsec_data_collection_t* dc, ...);
 uint32_t rank_of_1d(parsec_data_collection_t* desc, ...);
 uint32_t rank_of_2d(parsec_data_collection_t* desc, ...);
-
-int hatrix_factorize_New(parsec_context_t *parsec);

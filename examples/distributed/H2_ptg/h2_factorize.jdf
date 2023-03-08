@@ -1,12 +1,14 @@
 extern "C" %{
-  #include "h2_ptg_functions.hpp"
   #include "parsec.h"
 %}
 
+NB [ type="int" ]
+
 multiply_complements(k)
 
-k = 0 .. 0
+k = 0 .. NB
 
+  : descA(k)
 /**
  * Here we define which process will execute the task, this is explained in
  * further details in following examples
