@@ -3,7 +3,10 @@ LAPACK_LIB     = -L/opt/homebrew/opt/lapack/lib -llapacke -llapack
 BLAS_INCLUDE   = -I${VEC_LIB_INCLUDE}
 BLAS_LIB       = -framework Accelerate
 CXX            = clang++ -g
+CC             = clang
 MPICXX         = mpicxx -g
+MPICC          = mpicc
+CFLAGS         = -O0 -g -Wall -Xpreprocessor -I"$(shell brew --prefix libomp)/include"
 CXXFLAGS       = -O0 -g -Wall --std=c++11 -Xpreprocessor -fopenmp \
                  -I"$(shell brew --prefix libomp)/include" \
                  -I. -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) $(LAPACK_INCLUDE) \

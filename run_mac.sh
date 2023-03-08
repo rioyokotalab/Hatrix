@@ -11,7 +11,7 @@ export TMPDIR=/tmp
 
 ulimit -c unlimited
 
-make H2_ptg
+make -j H2_ptg
 
 nleaf=256
 max_rank=50

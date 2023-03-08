@@ -1,26 +1,27 @@
 TOPSRCDIR = ../../..
 SOURCES :=  $(wildcard *.cpp)
-JDF_SOURCES := $(wildcard *.jdf)
-JDF_OUTPUTS := $(basename $(JDF_SOURCES))
+JDF_SOURCES := h2_factorize.jdf
+JDF_OUTPUTS := h2_factorize
 sublib := libH2_ptg.a
 
 include $(TOPSRCDIR)/common.mk
 
-include jdf_sources.mk
-JDF_COMPILED_SOURCES := $(subst .c,.o,$(AUTO_JDF_SRCS))
+# include jdf_sources.mk
+# JDF_COMPILED_SOURCES := $(subst .c,.o,$(AUTO_JDF_SRCS))
 
 %.jdf :
 	parsec-ptgpp -E -i $(JDF_SOURCES) -o $(JDF_OUTPUTS)
-	echo "AUTO_JDF_SRCS=`echo *.c`" > jdf_sources.mk
 
-jdf_sources.mk : %.jdf
+%.c : %.jdf
+	parsec-ptgpp -E -i $(JDF_SOURCES) -o $(JDF_OUTPUTS)
+
+%.o : %.c
+	echo "hello C rule. $^"
+	$(MPICC) $(CFLAGS) $(PARSEC_INCLUDE) $< -c -o $@
 
 %.o : %.cpp
-	$(MPICXX) $(CXXFLAGS) $(PARSEC_INCLUDE) -I$(TOPSRCDIR)/examples/distributed/include $^ -c -o $@
+	$(MPICXX) $(CXXFLAGS) $(PARSEC_INCLUDE) -I$(TOPSRCDIR)/examples/distributed/include $< -c -o $@
 
 .PHONY: clean
-
 clean:
-	rm jdf_sources.mk
-	rm *.c
-	rm *.h
+	$(RM) *.c *.h *.o
