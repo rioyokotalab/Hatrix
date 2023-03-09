@@ -7,6 +7,7 @@
 #include "math.h"
 #include "string.h"
 #include "inttypes.h"
+#include <vector>
 
 #ifdef USE_MKL
 #include "mkl.h"
@@ -158,6 +159,48 @@ void uniform_unit_cube(struct Body* bodies, int64_t nbodies, int64_t dim, unsign
     bodies[i].X[0] = r0;
     bodies[i].X[1] = r1;
     bodies[i].X[2] = r2;
+  }
+}
+
+void uniform_unit_3d_cube_no_rnd(struct Body* bodies, int64_t N) {
+  int64_t ndim = 3;
+  int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
+  int64_t total = side;
+  for (int64_t i = 1; i < ndim; ++i) { total *= side; }
+
+  int64_t ncoords = ndim * side;
+  std::vector<double> coord(ncoords);
+
+  for (int64_t i = 0; i < side; ++i) {
+    double val = double(i) / side;
+    for (int64_t j = 0; j < ndim; ++j) {
+      coord[j * side + i] = val;
+    }
+  }
+
+  std::vector<int64_t> pivot(ndim, 0);
+
+  int64_t k = 0;
+  for (int64_t i = 0; i < N; ++i) {
+    std::vector<double> points(ndim);
+    for (k = 0; k < ndim; ++k) {
+      points[k] = coord[pivot[k] + k * side];
+    }
+
+    bodies[i].X[0] = points[0];
+    bodies[i].X[1] = points[1];
+    bodies[i].X[2] = points[2];
+
+    k = ndim - 1;
+    pivot[k]++;
+
+    while(pivot[k] == side) {
+      pivot[k] = 0;
+      if (k > 0) {
+        --k;
+        pivot[k]++;
+      }
+    }
   }
 }
 
@@ -2064,7 +2107,8 @@ int main(int argc, char* argv[]) {
   struct RightHandSides* rhs = (struct RightHandSides*)malloc(sizeof(struct RightHandSides) * (levels + 1));
 
   if (fname == NULL) {
-    mesh_unit_sphere(body, Nbody);
+    // mesh_unit_sphere(body, Nbody);
+    uniform_unit_3d_cube_no_rnd(body, Nbody);
     //mesh_unit_cube(body, Nbody);
     //uniform_unit_cube(body, Nbody, 3, 1234);
     buildTree(&ncells, cell, body, Nbody, levels);
