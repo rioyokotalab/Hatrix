@@ -6,12 +6,18 @@ export PATH=/Users/sameer/gitrepos/parsec/build/bin:$PATH
 
 # Keep for this reason: https://github.com/open-mpi/ompi/issues/7393
 export TMPDIR=/tmp
+ROOT=$PWD
+
+set -e
 
 # export VECLIB_MAXIMUM_THREADS=1
+cd examples/distributed/H2_ptg
+./compile_jdf.sh
+cd $ROOT
 
 ulimit -c unlimited
 
-make -j H2_ptg
+make H2_ptg
 
 nleaf=256
 max_rank=50
