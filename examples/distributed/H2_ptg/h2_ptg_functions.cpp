@@ -1,4 +1,5 @@
 #include "h2_ptg_functions.hpp"
+#include "h2_ptg_internal.h"
 #include "h2_factorize.h"
 #include "h2_operations.hpp"
 
@@ -367,10 +368,11 @@ h2_factorize_Destruct(parsec_taskpool_t *h2_factorize) {
 
 parsec_taskpool_t *
 h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                const Hatrix::Args& opts) {
+                 const Hatrix::Args& opts, h2_factorize_params_t* h2_params) {
   parsec_data_collection_t *parsec_D_dc = &parsec_D.super;
 
-  parsec_h2_factorize_taskpool_t* h2_factorize = parsec_h2_factorize_new(parsec_D_dc);
+  parsec_h2_factorize_taskpool_t* h2_factorize = parsec_h2_factorize_new(parsec_D_dc,
+                                                                         h2_params);
 
   return (parsec_taskpool_t*)h2_factorize;
 }

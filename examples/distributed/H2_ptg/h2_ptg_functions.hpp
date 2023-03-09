@@ -5,6 +5,7 @@
 
 #include "globals.hpp"
 #include "parsec/data_dist/matrix/two_dim_rectangle_cyclic.h"
+#include "h2_ptg_internal.h"
 
 typedef struct h2_dc_t {
   parsec_data_collection_t super; // inherit from parsec_data_collection_t
@@ -46,6 +47,6 @@ void factorize_teardown();
 // make a task pool for this factorization.
 parsec_taskpool_t *
 h2_factorize_New(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                 const Hatrix::Args& opts);
+                 const Hatrix::Args& opts, h2_factorize_params_t* h2_params);
 void
 h2_factorize_Destruct(parsec_taskpool_t *h2_factorize);

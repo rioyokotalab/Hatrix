@@ -1,15 +1,20 @@
 extern "C" %{
+
+  #include "math.h"
   #include "parsec.h"
+  #include "h2_ptg_internal.h"
+
 %}
 
 /* data descriptors */
 parsec_D [ type="parsec_data_collection_t*"]
+h2_params [ type="h2_factorize_params_t*" ]
 
 multiply_complements(i, j, level)
 
-i = 0 .. 3
-j = 0 .. 3
-level = 2 .. 2
+level = h2_params->min_level .. 3
+i = 0 .. %{ return pow(2, level); %}
+j = 0 .. %{ return pow(2, level); %}
 
   : parsec_D(i, j, level)
 /**

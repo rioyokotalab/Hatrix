@@ -20,6 +20,7 @@
 #include "h2_construction.hpp"
 #include "h2_operations.hpp"
 #include "h2_ptg_functions.hpp"
+#include "h2_ptg_internal.h"
 
 #include "omp.h"
 
@@ -28,6 +29,12 @@
 #endif
 
 using namespace Hatrix;
+
+static void
+h2_factorize_params_init(SymmetricSharedBasisMatrix& A, h2_factorize_params* h2_params) {
+  h2_params->min_level = A.min_level;
+  h2_params->max_level = A.max_level;
+}
 
 static void
 redistribute_vector2scalapack(std::vector<Matrix>& x,
@@ -310,10 +317,12 @@ int main(int argc, char **argv) {
   //   printf("Cannot initialize PaRSEC\n");
   //   exit(-1);
   // }
-
+  h2_factorize_params_t h2_params;
+  h2_factorize_params_init(A, &h2_params);
+  std::cout << "min: " << A.min_level << " max: " << A.max_level << std::endl;
   factorize_setup(A, domain, opts);
 
-  parsec_taskpool_t *h2_factorize_tasks = h2_factorize_New(A, domain, opts);
+  parsec_taskpool_t *h2_factorize_tasks = h2_factorize_New(A, domain, opts, &h2_params);
   parsec_context_add_taskpool(parsec, h2_factorize_tasks);
   parsec_context_start(parsec);
   parsec_context_wait(parsec);
