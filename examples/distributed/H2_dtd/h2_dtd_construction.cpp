@@ -250,7 +250,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   int block_nrows = rank * 2;
   int TEMP_nrows = nblocks * block_nrows;
-  int TEMP_local_nrows = numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int TEMP_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]),1);
   int TEMP_local_ncols = fmax(numroc_(&level_block_size, &nleaf,
                                       &MYCOL, &ZERO, &ONE), 1);
   int TEMP[9];
@@ -302,9 +302,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
   // Allocate a global matrix to store the transfer matrices. The transfer matrices for the
   // entire level are stacked by row in this global matrix.
-  int UTRANSFER_local_nrows = numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
+  int UTRANSFER_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int UTRANSFER_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &ONE), 1);
   int UTRANSFER[9];
+
   descinit_(UTRANSFER, &TEMP_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
             &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
   double *UTRANSFER_MEM =
@@ -466,23 +467,23 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   // Allocate a (nblocks * max_rank) ** 2 global matrix for temporary storage of the S blocks.
   int S_BLOCKS_nrows = nblocks * rank;
-  int S_BLOCKS_local_nrows = numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
-  int S_BLOCKS_local_ncols = numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
+  int S_BLOCKS_local_nrows = fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int S_BLOCKS_local_ncols = fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int S_BLOCKS[9];
   double *S_BLOCKS_MEM = new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
+
   descinit_(S_BLOCKS, &S_BLOCKS_nrows, &S_BLOCKS_nrows, &rank, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &S_BLOCKS_local_nrows, &INFO);
-
   // multiply the 0th real basis
 
   // Allocate a temporary block for storing the intermediate result of the product of the
   // real basis and admissible dense matrix.
   int TEMP_PRODUCT_local_nrows = fmax(numroc_(&rank, &rank, &MYROW, &ZERO, &ONE), 1);
-  int TEMP_PRODUCT_local_ncols = numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  int TEMP_PRODUCT_local_ncols = fmax(numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int TEMP_PRODUCT[9];
   double *TEMP_PRODUCT_MEM =
     new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
-  descset_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
+  descinit_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
             &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
 
   for (int64_t i = 0; i < nblocks; ++i) {

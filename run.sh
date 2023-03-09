@@ -25,15 +25,15 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 make -j H2_dtd
 # make -j H2_main
 
-for adm in 1; do
+for adm in 0; do
     nleaf=256
     ndim=3
     max_rank=50
 
     # gdb -q -iex "set auto-load safe-path /home/user/gdb" -ex run --args
 
-    for N in 8192; do
-        mpirun --oversubscribe -n 16 \
+    for N in 65536; do
+        mpirun --oversubscribe -n 32 \
                ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
