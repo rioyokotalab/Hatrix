@@ -359,3 +359,18 @@ void factorize_teardown() {
   parsec_dtd_destroy_arena_datatype(parsec, FINAL_DENSE_ARENA);
   parsec_dtd_destroy_arena_datatype(parsec, U_NON_LEAF_ARENA);
 }
+
+void
+h2_factorize_Destruct(parsec_taskpool_t *h2_factorize) {
+  parsec_taskpool_free(h2_factorize);
+}
+
+parsec_taskpool_t *
+h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                const Hatrix::Args& opts) {
+  parsec_data_collection_t *parsec_D_dc = &parsec_D.super;
+
+  parsec_h2_factorize_taskpool_t* h2_factorize = parsec_h2_factorize_new(parsec_D_dc);
+
+  return (parsec_taskpool_t*)h2_factorize;
+}

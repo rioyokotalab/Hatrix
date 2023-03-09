@@ -42,3 +42,10 @@ void
 factorize_setup(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                 const Hatrix::Args& opts);
 void factorize_teardown();
+
+// make a task pool for this factorization.
+parsec_taskpool_t *
+h2_factorize_New(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                 const Hatrix::Args& opts);
+void
+h2_factorize_Destruct(parsec_taskpool_t *h2_factorize);

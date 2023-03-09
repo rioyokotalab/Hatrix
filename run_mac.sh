@@ -24,7 +24,7 @@ max_rank=50
 ndim=3
 adm=0
 
-for N in 8192; do
+for N in 1024; do
     ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
@@ -36,6 +36,5 @@ for N in 8192; do
                       --admis_kind diagonal \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3 \
-		      --use_nested_basis
+                      --kind_of_recompression 3
 done

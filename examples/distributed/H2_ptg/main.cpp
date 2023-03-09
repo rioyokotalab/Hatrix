@@ -313,6 +313,12 @@ int main(int argc, char **argv) {
 
   factorize_setup(A, domain, opts);
 
+  parsec_taskpool_t *h2_factorize_tasks = h2_factorize_New(A, domain, opts);
+  parsec_context_add_taskpool(parsec, h2_factorize_tasks);
+  parsec_context_start(parsec);
+  parsec_context_wait(parsec);
+  h2_factorize_Destruct(h2_factorize_tasks);
+
   factorize_teardown();
 
   // parsec_profiling_start();

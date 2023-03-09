@@ -2,13 +2,16 @@ extern "C" %{
   #include "parsec.h"
 %}
 
-NB [ type="int" ]
+/* data descriptors */
+parsec_D [ type="parsec_data_collection_t*"]
 
-multiply_complements(k)
+multiply_complements(i, j, level)
 
-k = 0 .. NB
+i = 0 .. 3
+j = 0 .. 3
+level = 2 .. 2
 
-  : descA(k)
+  : parsec_D(i, j, level)
 /**
  * Here we define which process will execute the task, this is explained in
  * further details in following examples
@@ -27,6 +30,6 @@ READ A <- NULL
  */
 BODY
 {
-    printf("HelloWorld %d\n", k);
+  printf("HelloWorld %d %d %d\n", i, j, level);
 }
 END
