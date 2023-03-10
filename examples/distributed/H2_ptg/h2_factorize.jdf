@@ -14,7 +14,7 @@ h2_params [ type="h2_factorize_params_t*" ]
 diagonal_multiply_complements(i, level)
 
 level = 1 .. 2
-i = 0 .. %{ return pow(2, level); %}
+i = 0 .. %{ return pow(2, level)-1; %}
 
   : parsec_D(i, i, level)
 /**
@@ -35,6 +35,6 @@ i = 0 .. %{ return pow(2, level); %}
  */
 BODY
 {
-  printf("HelloWorld %d %d\n", i, level);
+  printf("block %d level %d\n", i, level);
 }
 END

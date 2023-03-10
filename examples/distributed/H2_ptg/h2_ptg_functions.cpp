@@ -298,7 +298,6 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain,
       parsec_D.mpi_ranks[D_data_key] = mpi_rank(i);
 
       if (exists_and_inadmissible(A, i, j, level) && (mpi_rank(i) == MPIRANK)) { // D blocks.
-        std::cout << "map D: " << i << " level: " << level << std::endl;
         Matrix& D_ij = A.D(i, j, level);
         parsec_D.matrix_map[D_data_key] = std::addressof(D_ij);
       }

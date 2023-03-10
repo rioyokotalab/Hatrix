@@ -36,5 +36,6 @@ for N in 1024; do
                       --admis_kind diagonal \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
+                      --parsec_cores 1 \
                       --kind_of_recompression 3
 done
