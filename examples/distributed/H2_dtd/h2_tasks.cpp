@@ -140,6 +140,10 @@ task_multiply_complement(parsec_execution_stream_t* es, parsec_task_t* this_task
                          &U_nrows, &U_ncols,
                          &_D, &_U, &which);
 
+  CORE_multiply_complement(D_nrows, D_ncols, D_row_rank, D_col_rank,
+                           U_nrows, U_ncols,
+                           _D, _U, which);
+
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 

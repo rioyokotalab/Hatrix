@@ -6,4 +6,5 @@
 #include "Domain.hpp"
 #include "functions.hpp"
 #include "internal_types.hpp"
+#include "tasks_c_interface.h"
 #include "SymmetricSharedBasisMatrix.hpp"

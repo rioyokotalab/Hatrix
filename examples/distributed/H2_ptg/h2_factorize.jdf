@@ -3,7 +3,7 @@ extern "C" %{
   #include "math.h"
   #include "parsec.h"
   #include "h2_ptg_internal.h"
-
+  #include "tasks_c_interface.h"
 %}
 
 /* data descriptors */
@@ -28,6 +28,7 @@ i = 0 .. %{ return pow(2, level)-1; %}
  * information, so we have only one 'flow' named A that receives NULL.
  */
   RW D <- (level == h2_params->max_level) ? parsec_D(i, i, level)
+       -> parsec_D(i, i, level)
   READ U <- (level == h2_params->max_level) ? parsec_U(i, level)
 
 /**
