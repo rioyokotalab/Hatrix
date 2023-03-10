@@ -36,6 +36,8 @@ i = 0 .. %{ return pow(2, level)-1; %}
  */
 BODY
 {
+  double *_D = D;
+  double *_U = U;
   printf("block %d level %d\n", i, level);
 }
 END
