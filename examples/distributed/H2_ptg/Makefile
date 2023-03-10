@@ -11,4 +11,4 @@ include $(TOPSRCDIR)/common.mk
 
 .PHONY: clean
 clean:
-	$(RM) *.c *.h *.o
+	$(RM) *.c h2_factorize.h *.o

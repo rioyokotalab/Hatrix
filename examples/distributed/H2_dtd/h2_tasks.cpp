@@ -144,28 +144,6 @@ task_multiply_complement(parsec_execution_stream_t* es, parsec_task_t* this_task
                            U_nrows, U_ncols,
                            _D, _U, which);
 
-  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
-  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
-
-  Matrix UF = make_complement(U);
-  Matrix product;
-  std::vector<Matrix> D_splits;
-
-  if (which == 'F') {           // multiply complements from the left and right
-    Matrix product = matmul(matmul(UF, D, true), UF);
-    D.copy_mem(product);
-  }
-  else if (which == 'L') {      // left multiplication
-    auto D_splits = D.split({},
-                       std::vector<int64_t>(1,
-                                            D_ncols - D_col_rank));
-    D_splits[1] = matmul(UF, D_splits[1], true);
-  }
-  else if (which == 'R') {      // right multiplication
-    Matrix product = matmul(D, UF);
-    D.copy_mem(product);
-  }
-
   return PARSEC_HOOK_RETURN_DONE;
 }
 

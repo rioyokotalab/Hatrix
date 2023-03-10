@@ -4,6 +4,8 @@
 typedef struct h2_factorize_params {
   int min_level;
   int max_level;
+  int max_rank;
+  int nleaf;
 } h2_factorize_params_t;
 
 #endif

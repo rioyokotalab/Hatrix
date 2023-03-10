@@ -37,6 +37,8 @@ data_of_key(parsec_data_collection_t* desc, parsec_data_key_t key) {
     dc->data_map[key] = data;
   }
 
+  std::cout << "data: " << data << " key: " << key << std::endl;
+
   return data;
 }
 
@@ -66,7 +68,11 @@ parsec_data_key_t data_key_1d(parsec_data_collection_t* dc, ...) {
     key += pow(2, i);
   }
 
-  return key + b;
+  key += b;
+
+  std::cout << "1D key: b-> " << b << " lvl-> " << level <<  " key-> " << key << std::endl;
+
+  return key;
 }
 
 parsec_data_key_t

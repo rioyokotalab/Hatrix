@@ -4,6 +4,10 @@ extern "C" %{
   #include "parsec.h"
   #include "h2_ptg_internal.h"
   #include "tasks_c_interface.h"
+
+  int64_t get_dim(const int64_t block, const int64_t level, h2_factorize_params_t* params) {
+    return level == params->max_level ? params->nleaf : params->max_rank * 2;
+  }
 %}
 
 /* data descriptors */
@@ -13,8 +17,8 @@ h2_params [ type="h2_factorize_params_t*" ]
 
 diagonal_multiply_complements(i, level)
 
-level = h2_params->max_level .. h2_params->min_level
 i = 0 .. %{ return pow(2, level)-1; %}
+level = 2
 
   : parsec_D(i, i, level)
 /**
@@ -27,9 +31,8 @@ i = 0 .. %{ return pow(2, level)-1; %}
  * if this one is not used. We start here by a task that doesn't use
  * information, so we have only one 'flow' named A that receives NULL.
  */
-  RW D <- (level == h2_params->max_level) ? parsec_D(i, i, level)
-       -> parsec_D(i, i, level)
-  READ U <- (level == h2_params->max_level) ? parsec_U(i, level)
+  RW D <- parsec_D(i, i, level)
+  R U <- parsec_U(i, level)
 
 /**
  * This is the body of the task that will be executed by one of the thread in the
@@ -37,8 +40,19 @@ i = 0 .. %{ return pow(2, level)-1; %}
  */
 BODY
 {
-  double *_D = D;
-  double *_U = U;
+  int64_t D_nrows = get_dim(i, level, h2_params);
+  int64_t D_ncols = get_dim(i, level, h2_params);
+  int64_t D_row_rank = h2_params->max_rank;
+  int64_t D_col_rank = h2_params->max_rank;
+  int64_t U_nrows = get_dim(i, level, h2_params);
+  int64_t U_ncols = h2_params->max_rank;
+  char which  = 'F';
+
   printf("block %d level %d\n", i, level);
+
+  CORE_multiply_complement(D_nrows, D_ncols, D_row_rank, D_col_rank,
+                           U_nrows, U_ncols, (double*)D, (double*)U, which);
+
+
 }
 END

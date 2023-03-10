@@ -31,9 +31,11 @@
 using namespace Hatrix;
 
 static void
-h2_factorize_params_init(SymmetricSharedBasisMatrix& A, h2_factorize_params* h2_params) {
+h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize_params* h2_params) {
   h2_params->min_level = A.min_level;
   h2_params->max_level = A.max_level;
+  h2_params->max_rank = opts.max_rank;
+  h2_params->nleaf = opts.nleaf;
 }
 
 static void
@@ -175,7 +177,7 @@ int main(int argc, char **argv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
   MPI_Dims_create(MPISIZE, 2, MPIGRID);
   N = opts.N;
-  int cores = opts.parsec_cores;
+  int cores = 1;
   if (!MPIRANK) {
     std::cout << "MPIGRID g[0] : " << MPIGRID[0]
               << " g[1]: " << MPIGRID[1]
@@ -318,13 +320,15 @@ int main(int argc, char **argv) {
   //   exit(-1);
   // }
   h2_factorize_params_t h2_params;
-  h2_factorize_params_init(A, &h2_params);
+  h2_factorize_params_init(A, opts, &h2_params);
   std::cout << "min: " << A.min_level << " max: " << A.max_level << std::endl;
 
 
   parsec_h2_factorize_taskpool_t*h2_factorize_tasks = h2_factorize_New(A, domain, opts, &h2_params);
   factorize_setup(A, domain, opts, h2_factorize_tasks);
   parsec_context_add_taskpool(parsec, (parsec_taskpool_t*)h2_factorize_tasks);
+
+  std::cout << "START PARSEC\n";
   parsec_context_start(parsec);
   parsec_context_wait(parsec);
   h2_factorize_Destruct(h2_factorize_tasks);
