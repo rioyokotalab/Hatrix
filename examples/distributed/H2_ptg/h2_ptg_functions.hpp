@@ -31,12 +31,14 @@ extern Hatrix::RowColMap<Hatrix::Matrix> temp_fill_in_rows, temp_fill_in_cols;
 void
 h2_dc_init(h2_dc_t& parsec_data,
            parsec_data_key_t (*data_key_func)(parsec_data_collection_t*, ...),
-           uint32_t (*rank_of_func)(parsec_data_collection_t*, ...));
+           uint32_t (*rank_of_func)(parsec_data_collection_t*, ...),
+           parsec_data_t* (*data_of_func)(parsec_data_collection_t*, ...));
 void h2_dc_destroy(h2_dc_t& parsec_type);
 
 parsec_data_key_t data_key_1d(parsec_data_collection_t* dc, ...);
 parsec_data_key_t data_key_2d(parsec_data_collection_t* dc, ...);
 uint32_t rank_of_1d(parsec_data_collection_t* desc, ...);
+uint32_t rank_of_2d_as_1d(parsec_data_collection_t* desc, ...);
 uint32_t rank_of_2d(parsec_data_collection_t* desc, ...);
 
 void

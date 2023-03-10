@@ -71,7 +71,8 @@ parsec_data_key_t data_key_1d(parsec_data_collection_t* dc, ...) {
   return key + b;
 }
 
-parsec_data_key_t data_key_2d(parsec_data_collection_t* dc, ...) {
+parsec_data_key_t
+data_key_2d(parsec_data_collection_t* dc, ...) {
   int m = -1, n = -1, level = -1;
 
   va_list ap;
@@ -97,6 +98,47 @@ parsec_data_key_t data_key_2d(parsec_data_collection_t* dc, ...) {
   return data_key;
 }
 
+parsec_data_t*
+data_of_1d(parsec_data_collection_t* desc, ...) {
+  int b = -1, level = -1;
+
+  /* Get coordinates */
+  va_list ap;
+  va_start(ap, desc);
+  b = va_arg(ap, int);
+  level = va_arg(ap, int);
+  va_end(ap);
+
+  if (b == -1 || level == -1) {
+    std::cout << "[HATRIX_ERROR] data_key_1d() -> received wrong parameters b = "
+              << b << " and level = " << level << ". Aborting.\n";
+  }
+  parsec_data_key_t key = data_key_1d(desc, b, level);
+
+  return data_of_key(desc, key);
+}
+
+parsec_data_t*
+data_of_2d(parsec_data_collection_t* desc, ...) {
+  int m = -1, n = -1, level = -1;
+
+  va_list ap;
+  va_start(ap, desc);
+  m = va_arg(ap, int);
+  n = va_arg(ap, int);
+  level = va_arg(ap, int);
+  va_end(ap);
+
+  if (m == -1 || n == -1 || level == -1) {
+    std::cout << "[HATRIX ERROR] data_key_2d() -> received a wrong key in m, n or level.\n";
+    abort();
+  }
+
+  parsec_data_key_t key = data_key_1d(desc, m, n, level);
+
+  return data_of_key(desc, key);
+}
+
 uint32_t rank_of_1d(parsec_data_collection_t* desc, ...) {
   int b = -1, level = -1;
 
@@ -114,6 +156,20 @@ uint32_t rank_of_1d(parsec_data_collection_t* desc, ...) {
   }
 
   return mpi_rank(b);
+}
+
+uint32_t
+rank_of_2d_as_1d(parsec_data_collection_t* desc, ...) {
+  int m = -1, n = -1, level = -1;
+
+  va_list ap;
+  va_start(ap, desc);
+  m = va_arg(ap, int);
+  n = va_arg(ap, int);
+  level = va_arg(ap, int);
+  va_end(ap);
+
+  return rank_of_1d(desc, m, level);
 }
 
 // block cyclic distribution.
@@ -138,28 +194,32 @@ uint32_t rank_of_2d(parsec_data_collection_t* desc, ...) {
 void
 h2_dc_init(h2_dc_t& parsec_data,
            parsec_data_key_t (*data_key_func)(parsec_data_collection_t*, ...),
-           uint32_t (*rank_of_func)(parsec_data_collection_t*, ...)) {
+           uint32_t (*rank_of_func)(parsec_data_collection_t*, ...),
+           parsec_data_t* (*data_of_func)(parsec_data_collection_t*, ...)) {
   parsec_data_collection_t *o = (parsec_data_collection_t*)(&parsec_data);
   parsec_data_collection_init(o, MPISIZE, MPIRANK);
 
-  o->rank_of = rank_of_func;
   o->data_key = data_key_func;
-  o->data_of_key = data_of_key;
+
+  o->rank_of = rank_of_func;
   o->rank_of_key = rank_of_key;
+
+  o->data_of = data_of_func;
+  o->data_of_key = data_of_key;
 
   parsec_dtd_data_collection_init(o);
 }
 
 void h2_dc_init_maps() {
-  h2_dc_init(parsec_U, data_key_1d, rank_of_1d);
-  h2_dc_init(parsec_S, data_key_2d, rank_of_1d);
-  h2_dc_init(parsec_D, data_key_2d, rank_of_1d);
-  h2_dc_init(parsec_F, data_key_2d, rank_of_1d);
-  h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d);
-  h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d);
-  h2_dc_init(parsec_US, data_key_1d, rank_of_1d);
-  h2_dc_init(parsec_r, data_key_1d, rank_of_1d);
-  h2_dc_init(parsec_t, data_key_1d, rank_of_1d);
+  h2_dc_init(parsec_U, data_key_1d, rank_of_1d, data_of_1d);
+  h2_dc_init(parsec_S, data_key_2d, rank_of_2d_as_1d, data_of_2d);
+  h2_dc_init(parsec_D, data_key_2d, rank_of_2d_as_1d, data_of_2d);
+  h2_dc_init(parsec_F, data_key_2d, rank_of_2d_as_1d, data_of_2d);
+  h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d, data_of_1d);
+  h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d, data_of_1d);
+  h2_dc_init(parsec_US, data_key_1d, rank_of_1d, data_of_1d);
+  h2_dc_init(parsec_r, data_key_1d, rank_of_1d, data_of_1d);
+  h2_dc_init(parsec_t, data_key_1d, rank_of_1d, data_of_1d);
 }
 
 void
@@ -238,6 +298,7 @@ update_parsec_pointers(SymmetricSharedBasisMatrix& A, const Domain& domain,
       parsec_D.mpi_ranks[D_data_key] = mpi_rank(i);
 
       if (exists_and_inadmissible(A, i, j, level) && (mpi_rank(i) == MPIRANK)) { // D blocks.
+        std::cout << "map D: " << i << " level: " << level << std::endl;
         Matrix& D_ij = A.D(i, j, level);
         parsec_D.matrix_map[D_data_key] = std::addressof(D_ij);
       }
@@ -370,8 +431,10 @@ parsec_taskpool_t *
 h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                  const Hatrix::Args& opts, h2_factorize_params_t* h2_params) {
   parsec_data_collection_t *parsec_D_dc = &parsec_D.super;
+  parsec_data_collection_t *parsec_U_dc = &parsec_D.super;
 
   parsec_h2_factorize_taskpool_t* h2_factorize = parsec_h2_factorize_new(parsec_D_dc,
+                                                                         parsec_U_dc,
                                                                          h2_params);
 
   return (parsec_taskpool_t*)h2_factorize;

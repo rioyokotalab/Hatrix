@@ -8,15 +8,15 @@ extern "C" %{
 
 /* data descriptors */
 parsec_D [ type="parsec_data_collection_t*"]
+parsec_U [ type="parsec_data_collection_t*"]
 h2_params [ type="h2_factorize_params_t*" ]
 
-multiply_complements(i, j, level)
+diagonal_multiply_complements(i, level)
 
-level = h2_params->min_level .. 3
+level = 1 .. 2
 i = 0 .. %{ return pow(2, level); %}
-j = 0 .. %{ return pow(2, level); %}
 
-  : parsec_D(i, j, level)
+  : parsec_D(i, i, level)
 /**
  * Here we define which process will execute the task, this is explained in
  * further details in following examples
@@ -27,7 +27,7 @@ j = 0 .. %{ return pow(2, level); %}
  * if this one is not used. We start here by a task that doesn't use
  * information, so we have only one 'flow' named A that receives NULL.
  */
-READ A <- NULL
+  READ A <- parsec_D(i, i, level)
 
 /**
  * This is the body of the task that will be executed by one of the thread in the
@@ -35,6 +35,6 @@ READ A <- NULL
  */
 BODY
 {
-  printf("HelloWorld %d %d %d\n", i, j, level);
+  printf("HelloWorld %d %d\n", i, level);
 }
 END
