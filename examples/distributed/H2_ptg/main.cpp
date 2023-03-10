@@ -315,20 +315,17 @@ int main(int argc, char **argv) {
 
   /* Initializing parsec context */
   parsec = parsec_init( cores, NULL, NULL);
-  // if( NULL == parsec ) {
-  //   printf("Cannot initialize PaRSEC\n");
-  //   exit(-1);
-  // }
+  if( NULL == parsec ) {
+    printf("Cannot initialize PaRSEC\n");
+    exit(-1);
+  }
   h2_factorize_params_t h2_params;
   h2_factorize_params_init(A, opts, &h2_params);
-  std::cout << "min: " << A.min_level << " max: " << A.max_level << std::endl;
-
 
   parsec_h2_factorize_taskpool_t*h2_factorize_tasks = h2_factorize_New(A, domain, opts, &h2_params);
   factorize_setup(A, domain, opts, h2_factorize_tasks);
   parsec_context_add_taskpool(parsec, (parsec_taskpool_t*)h2_factorize_tasks);
 
-  std::cout << "START PARSEC\n";
   parsec_context_start(parsec);
   parsec_context_wait(parsec);
   h2_factorize_Destruct(h2_factorize_tasks);
@@ -339,7 +336,7 @@ int main(int argc, char **argv) {
 
   double solve_error = 0, fp_ops = 0, factorize_time = 0;
 
-  parsec_fini(&parsec);
+
 
   if (!MPIRANK) {
     // std::cout << "----------------------------\n";
@@ -376,6 +373,7 @@ int main(int argc, char **argv) {
               << std::endl;
   }
 
+  parsec_fini(&parsec);
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);
   MPI_Finalize();

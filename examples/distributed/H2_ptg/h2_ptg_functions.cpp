@@ -216,8 +216,8 @@ h2_dc_init(h2_dc_t& parsec_data,
 
 void h2_dc_init_maps() {
   h2_dc_init(parsec_U, data_key_1d, rank_of_1d, data_of_1d);
-  h2_dc_init(parsec_S, data_key_2d, rank_of_2d_as_1d, data_of_2d);
   h2_dc_init(parsec_D, data_key_2d, rank_of_2d_as_1d, data_of_2d);
+  h2_dc_init(parsec_S, data_key_2d, rank_of_2d_as_1d, data_of_2d);
   h2_dc_init(parsec_F, data_key_2d, rank_of_2d_as_1d, data_of_2d);
   h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d, data_of_1d);
   h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d, data_of_1d);
@@ -229,8 +229,8 @@ void h2_dc_init_maps() {
 void
 h2_dc_destroy_maps() {
   h2_dc_destroy(parsec_U);
-  h2_dc_destroy(parsec_S);
   h2_dc_destroy(parsec_D);
+  h2_dc_destroy(parsec_S);
   h2_dc_destroy(parsec_F);
   h2_dc_destroy(parsec_temp_fill_in_rows);
   h2_dc_destroy(parsec_temp_fill_in_cols);

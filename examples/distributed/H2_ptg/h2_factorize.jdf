@@ -18,7 +18,7 @@ h2_params [ type="h2_factorize_params_t*" ]
 diagonal_multiply_complements(i, level)
 
 i = 0 .. %{ return pow(2, level)-1; %}
-level = 2
+level = h2_params->max_level
 
   : parsec_D(i, i, level)
 /**
