@@ -54,3 +54,14 @@ void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols, int64_t D_row_ra
     D.copy_mem(product);
   }
 }
+
+void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
+  auto D_splits = split_dense(D,
+                              D_nrows - rank_nrows,
+                              D_nrows - rank_nrows);
+
+  cholesky(D_splits[0], Hatrix::Lower);
+  solve_triangular(D_splits[0], D_splits[2], Hatrix::Right, Hatrix::Lower,
+                   false, true, 1.0);
+  syrk(D_splits[2], D_splits[3], Hatrix::Lower, false, -1, 1);
+}

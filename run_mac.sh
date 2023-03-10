@@ -25,7 +25,7 @@ ndim=3
 adm=0
 
 for N in 1024; do
-    ./bin/H2_ptg --N $N \
+    lldb -- ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \
@@ -36,6 +36,5 @@ for N in 1024; do
                       --admis_kind diagonal \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --parsec_cores 1 \
                       --kind_of_recompression 3
 done

@@ -117,14 +117,7 @@ task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task)
                          &D_nrows, &rank_nrows, &_D);
 
   MatrixWrapper D(_D, D_nrows, D_nrows, D_nrows);
-  auto D_splits = split_dense(D,
-                              D_nrows - rank_nrows,
-                              D_nrows - rank_nrows);
-
-  cholesky(D_splits[0], Hatrix::Lower);
-  solve_triangular(D_splits[0], D_splits[2], Hatrix::Right, Hatrix::Lower,
-                   false, true, 1.0);
-  syrk(D_splits[2], D_splits[3], Hatrix::Lower, false, -1, 1);
+  CORE_factorize_diagonal(D_nrows, rank_nrows, _D);
 
   return PARSEC_HOOK_RETURN_DONE;
 }

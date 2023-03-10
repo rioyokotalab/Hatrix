@@ -15,29 +15,19 @@ parsec_D [ type="parsec_data_collection_t*"]
 parsec_U [ type="parsec_data_collection_t*"]
 h2_params [ type="h2_factorize_params_t*" ]
 
+/* diagonal_multiply_complements task */
+
 diagonal_multiply_complements(i, level)
 
 i = 0 .. %{ return pow(2, level)-1; %}
 level = h2_params->max_level
 
-  : parsec_D(i, i, level)
-/**
- * Here we define which process will execute the task, this is explained in
- * further details in following examples
- */
+: parsec_D(i, i, level)
 
-/**
- * A task has a finite number of input/output, and needs at least one input even
- * if this one is not used. We start here by a task that doesn't use
- * information, so we have only one 'flow' named A that receives NULL.
- */
-  RW D <- parsec_D(i, i, level)
-  R U <- parsec_U(i, level)
+RW D <- parsec_D(i, i, level)
+     -> parsec_D(i, i, level)
+READ U <- parsec_U(i, level)
 
-/**
- * This is the body of the task that will be executed by one of the thread in the
- * engine.
- */
 BODY
 {
   int64_t D_nrows = get_dim(i, level, h2_params);
@@ -48,11 +38,31 @@ BODY
   int64_t U_ncols = h2_params->max_rank;
   char which  = 'F';
 
-  printf("block %d level %d\n", i, level);
+  printf("prod: %d level: %d\n", i, level);
 
   CORE_multiply_complement(D_nrows, D_ncols, D_row_rank, D_col_rank,
                            U_nrows, U_ncols, (double*)D, (double*)U, which);
 
 
+}
+END
+
+/* factorize_diagonal task */
+factorize_diagonal(i, level)
+
+i = 0 .. %{ return pow(2, level)-1; %}
+level = h2_params->max_level
+
+: parsec_D(i, i, level)
+
+RW D <- D diagonal_multiply_complements(i, level)
+     -> parsec_D(i, i, level)
+
+BODY
+{
+  int64_t D_nrows = get_dim(i, level, h2_params);
+  int64_t rank_nrows = h2_params->max_rank;
+
+  CORE_factorize_diagonal(D_nrows, rank_nrows, D);
 }
 END

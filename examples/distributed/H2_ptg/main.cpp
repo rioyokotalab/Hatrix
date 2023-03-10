@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
   MPI_Dims_create(MPISIZE, 2, MPIGRID);
   N = opts.N;
-  int cores = 1;
+  int cores = opts.parsec_cores;
   if (!MPIRANK) {
     std::cout << "MPIGRID g[0] : " << MPIGRID[0]
               << " g[1]: " << MPIGRID[1]
