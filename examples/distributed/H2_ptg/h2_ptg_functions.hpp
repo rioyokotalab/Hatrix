@@ -6,6 +6,7 @@
 #include "globals.hpp"
 #include "parsec/data_dist/matrix/two_dim_rectangle_cyclic.h"
 #include "h2_ptg_internal.h"
+#include "h2_factorize.h"
 
 typedef struct h2_dc_t {
   parsec_data_collection_t super; // inherit from parsec_data_collection_t
@@ -20,8 +21,6 @@ typedef struct h2_dc_t {
 extern h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F,
   parsec_temp_fill_in_rows, parsec_temp_fill_in_cols,
   parsec_US, parsec_r, parsec_t;
-
-extern int U_ARENA, D_ARENA, S_ARENA, FINAL_DENSE_ARENA, U_NON_LEAF_ARENA;
 
 extern Hatrix::RowColLevelMap<Hatrix::Matrix> F;
 extern Hatrix::RowColMap<Hatrix::Matrix> r, t;
@@ -43,12 +42,12 @@ uint32_t rank_of_2d(parsec_data_collection_t* desc, ...);
 
 void
 factorize_setup(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                const Hatrix::Args& opts);
+                const Hatrix::Args& opts, parsec_h2_factorize_taskpool_t* h2_factorize_tasks);
 void factorize_teardown();
 
 // make a task pool for this factorization.
-parsec_taskpool_t *
+parsec_h2_factorize_taskpool_t *
 h2_factorize_New(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                 const Hatrix::Args& opts, h2_factorize_params_t* h2_params);
+                 const Hatrix::Args& opts, h2_factorize_params_t* h2_factorize_tasks);
 void
-h2_factorize_Destruct(parsec_taskpool_t *h2_factorize);
+h2_factorize_Destruct(parsec_h2_factorize_taskpool_t *h2_factorize);

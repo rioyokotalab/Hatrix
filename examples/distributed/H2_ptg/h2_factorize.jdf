@@ -13,7 +13,7 @@ h2_params [ type="h2_factorize_params_t*" ]
 
 diagonal_multiply_complements(i, level)
 
-level = 1 .. 2
+level = h2_params->max_level .. h2_params->min_level
 i = 0 .. %{ return pow(2, level)-1; %}
 
   : parsec_D(i, i, level)
@@ -27,7 +27,8 @@ i = 0 .. %{ return pow(2, level)-1; %}
  * if this one is not used. We start here by a task that doesn't use
  * information, so we have only one 'flow' named A that receives NULL.
  */
-  READ A <- parsec_D(i, i, level)
+  RW D <- (level == h2_params->max_level) ? parsec_D(i, i, level)
+  READ U <- (level == h2_params->max_level) ? parsec_U(i, level)
 
 /**
  * This is the body of the task that will be executed by one of the thread in the

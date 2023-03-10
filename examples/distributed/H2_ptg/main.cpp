@@ -320,10 +320,11 @@ int main(int argc, char **argv) {
   h2_factorize_params_t h2_params;
   h2_factorize_params_init(A, &h2_params);
   std::cout << "min: " << A.min_level << " max: " << A.max_level << std::endl;
-  factorize_setup(A, domain, opts);
 
-  parsec_taskpool_t *h2_factorize_tasks = h2_factorize_New(A, domain, opts, &h2_params);
-  parsec_context_add_taskpool(parsec, h2_factorize_tasks);
+
+  parsec_h2_factorize_taskpool_t*h2_factorize_tasks = h2_factorize_New(A, domain, opts, &h2_params);
+  factorize_setup(A, domain, opts, h2_factorize_tasks);
+  parsec_context_add_taskpool(parsec, (parsec_taskpool_t*)h2_factorize_tasks);
   parsec_context_start(parsec);
   parsec_context_wait(parsec);
   h2_factorize_Destruct(h2_factorize_tasks);
@@ -333,7 +334,6 @@ int main(int argc, char **argv) {
   // parsec_profiling_start();
 
   double solve_error = 0, fp_ops = 0, factorize_time = 0;
-
 
   parsec_fini(&parsec);
 

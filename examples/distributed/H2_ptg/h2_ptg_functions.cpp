@@ -7,8 +7,6 @@ h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F,
   parsec_temp_fill_in_rows, parsec_temp_fill_in_cols,
   parsec_US, parsec_r, parsec_t;
 
-int U_ARENA, D_ARENA, S_ARENA, FINAL_DENSE_ARENA, U_NON_LEAF_ARENA;
-
 Hatrix::RowColLevelMap<Hatrix::Matrix> F;
 Hatrix::RowColMap<Hatrix::Matrix> r, t;
 // store temporary fill-ins.
@@ -366,28 +364,14 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
 
 void
 factorize_setup(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                const Hatrix::Args& opts) {
-  parsec_arena_datatype_t* u_arena_t = parsec_dtd_create_arena_datatype(parsec, &U_ARENA);
-  parsec_add2arena_rect(u_arena_t, parsec_datatype_double_t, opts.nleaf, opts.max_rank, opts.nleaf);
+                const Hatrix::Args& opts, parsec_h2_factorize_taskpool_t* h2_factorize_tasks) {
+  // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_D_ARENA_ADT_IDX],
+  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+  //                  opts.nleaf, opts.nleaf, opts.nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
-  parsec_arena_datatype_t* d_arena_t = parsec_dtd_create_arena_datatype(parsec, &D_ARENA);
-  parsec_add2arena_rect(d_arena_t, parsec_datatype_double_t, opts.nleaf, opts.nleaf, opts.nleaf);
-
-  parsec_arena_datatype_t* s_arena_t = parsec_dtd_create_arena_datatype(parsec, &S_ARENA);
-  parsec_add2arena_rect(s_arena_t, parsec_datatype_double_t, opts.max_rank, opts.max_rank,
-                        opts.max_rank);
-
-  parsec_arena_datatype_t* final_dense_arena_t =
-    parsec_dtd_create_arena_datatype(parsec, &FINAL_DENSE_ARENA);
-  parsec_add2arena_rect(final_dense_arena_t, parsec_datatype_double_t,
-                        opts.max_rank * 2, opts.max_rank * 2,
-                        opts.max_rank * 2);
-
-  parsec_arena_datatype_t* u_non_leaf_arena_t =
-    parsec_dtd_create_arena_datatype(parsec, &U_NON_LEAF_ARENA);
-  parsec_add2arena_rect(u_non_leaf_arena_t, parsec_datatype_double_t,
-                        opts.max_rank * 2, opts.max_rank,
-                        opts.max_rank * 2);
+  // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_U_ARENA_ADT_IDX],
+  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+  //                  opts.nleaf, opts.max_rank, opts.nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
   h2_dc_init_maps();
 
@@ -414,19 +398,17 @@ factorize_setup(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
 
 void factorize_teardown() {
   h2_dc_destroy_maps();
-  parsec_dtd_destroy_arena_datatype(parsec, U_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, D_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, S_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, FINAL_DENSE_ARENA);
-  parsec_dtd_destroy_arena_datatype(parsec, U_NON_LEAF_ARENA);
 }
 
 void
-h2_factorize_Destruct(parsec_taskpool_t *h2_factorize) {
-  parsec_taskpool_free(h2_factorize);
+h2_factorize_Destruct(parsec_h2_factorize_taskpool_t *h2_factorize) {
+  // parsec_del2arena( &h2_factorize->arenas_datatypes[PARSEC_h2_factorize_D_ARENA_ADT_IDX] );
+  // parsec_del2arena( &h2_factorize->arenas_datatypes[PARSEC_h2_factorize_U_ARENA_ADT_IDX] );
+
+  parsec_taskpool_free((parsec_taskpool_t*)h2_factorize);
 }
 
-parsec_taskpool_t *
+parsec_h2_factorize_taskpool_t *
 h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                  const Hatrix::Args& opts, h2_factorize_params_t* h2_params) {
   parsec_data_collection_t *parsec_D_dc = &parsec_D.super;
@@ -436,5 +418,5 @@ h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                                                                          parsec_U_dc,
                                                                          h2_params);
 
-  return (parsec_taskpool_t*)h2_factorize;
+  return h2_factorize;
 }
