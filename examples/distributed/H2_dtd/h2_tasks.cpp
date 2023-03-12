@@ -115,8 +115,6 @@ task_factorize_diagonal(parsec_execution_stream_t* es, parsec_task_t* this_task)
 
   parsec_dtd_unpack_args(this_task,
                          &D_nrows, &rank_nrows, &_D);
-
-  MatrixWrapper D(_D, D_nrows, D_nrows, D_nrows);
   CORE_factorize_diagonal(D_nrows, rank_nrows, _D);
 
   return PARSEC_HOOK_RETURN_DONE;
