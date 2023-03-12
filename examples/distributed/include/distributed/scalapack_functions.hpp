@@ -136,3 +136,7 @@ extern const char NOTRANS;
 extern const char TRANS;
 
 constexpr int DESC_LEN = 9;
+
+void
+construct_h2_matrix(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain& domain,
+                    const Hatrix::Args& opts, double* DENSE_MEM, std::vector<int>& DENSE);
