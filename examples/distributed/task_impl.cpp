@@ -56,6 +56,7 @@ void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols, int64_t D_row_ra
 }
 
 void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
+  MatrixWrapper D(_D, D_nrows, D_nrows, D_nrows);
   auto D_splits = split_dense(D,
                               D_nrows - rank_nrows,
                               D_nrows - rank_nrows);

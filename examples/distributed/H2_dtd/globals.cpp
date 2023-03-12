@@ -3,8 +3,6 @@
 
 parsec_context_t *parsec = NULL;
 parsec_taskpool_t *dtd_tp = NULL;
-int MPIRANK, MPISIZE, MPIGRID[2],
-  MYROW, MYCOL, info;
 int N;
 int BLACS_CONTEXT;
 
@@ -34,18 +32,4 @@ indxl2g(int indxloc, int nb, int iproc, int isrcproc, int nprocs) {
 int
 indxg2p(int INDXGLOB, int NB, int ISRCPROC, int NPROCS) {
   return (ISRCPROC + (INDXGLOB - 1) / NB) % NPROCS;
-}
-
-int
-mpi_rank(int i) {
-  return (i % MPISIZE);
-}
-
-int
-mpi_rank(int i, int j) {
-  if (i == j) {
-    return mpi_rank(i);
-  }
-  // row major distribution similar to scalapack.
-  return (i % MPIGRID[0]) * MPIGRID[1] + (j % MPIGRID[1]);
 }
