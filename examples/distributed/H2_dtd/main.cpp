@@ -115,7 +115,8 @@ dist_norm2(std::vector<Matrix>& x) {
 static std::vector<Matrix>
 cholesky_solve(SymmetricSharedBasisMatrix& A,
                Args& opts,
-               std::vector<double>& X_mem, std::vector<int>& DESCX) {
+               std::vector<double>& X_mem, std::vector<int>& DESCX,
+               double* DENSE_MEM, std::vector<int>& DENSE) {
   std::vector<Matrix> dense_solution;
   for (int64_t block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
     dense_solution.push_back(Matrix(opts.nleaf, 1));
@@ -207,10 +208,12 @@ int main(int argc, char **argv) {
   int DENSE_NBCOL = opts.nleaf;
   int DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
   int DENSE_local_cols = numroc_(&N, &DENSE_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
+  std::vector<int> DENSE(DESC_LEN);
 
   descinit_(DENSE.data(), &N, &N, &DENSE_NBROW, &DENSE_NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
-  DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
+  double* DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
+
 
   if (!MPIRANK) {
     std::cout << "begin data init.\n";
@@ -241,7 +244,7 @@ int main(int argc, char **argv) {
     init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   }
   if(!MPIRANK) A.print_structure();
-  construct_h2_matrix_dtd(A, domain, opts); // construct H2 matrix.
+  construct_h2_matrix_dtd(A, domain, opts, DENSE_MEM, DENSE); // construct H2 matrix.
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
