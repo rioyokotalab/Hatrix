@@ -16,7 +16,6 @@
 
 #include "parsec.h"
 
-#include "h2_construction.hpp"
 #include "h2_operations.hpp"
 #include "h2_ptg_functions.hpp"
 #include "h2_ptg_internal.h"
@@ -253,7 +252,7 @@ int main(int argc, char **argv) {
     init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   }
   if(!MPIRANK) A.print_structure();
-  construct_h2_matrix_dtd(A, domain, opts, DENSE_MEM, DENSE); // construct H2 matrix.
+  construct_h2_matrix(A, domain, opts, DENSE_MEM, DENSE); // construct H2 matrix.
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
