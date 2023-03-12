@@ -5,8 +5,6 @@
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 
-#include "globals.hpp"
-
 #include "parsec/data_dist/matrix/two_dim_rectangle_cyclic.h"
 
 // matvec between H2 matrix and vector X. Store the result in B.

@@ -7,5 +7,6 @@
 #include "functions.hpp"
 #include "mpi_functions.hpp"
 #include "internal_types.hpp"
+#include "scalapack_functions.hpp"
 #include "tasks_c_interface.h"
 #include "SymmetricSharedBasisMatrix.hpp"

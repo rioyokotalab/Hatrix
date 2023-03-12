@@ -1,7 +1,6 @@
 #include "Hatrix/Hatrix.h"
-#include "globals.hpp"
+#include "distributed/scalapack_functions.hpp"
 
-int N;
 int BLACS_CONTEXT;
 
 int ZERO = 0;

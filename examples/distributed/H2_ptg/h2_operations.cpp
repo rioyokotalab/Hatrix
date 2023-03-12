@@ -3,7 +3,6 @@
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 
-#include "globals.hpp"
 #include "h2_operations.hpp"
 
 using namespace Hatrix;

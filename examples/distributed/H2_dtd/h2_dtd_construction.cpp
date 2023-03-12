@@ -7,8 +7,6 @@
 
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
-
-#include "globals.hpp"
 #include "h2_dtd_construction.hpp"
 
 using namespace Hatrix;
@@ -210,13 +208,13 @@ void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
                            int64_t level, double* DENSE_MEM, std::vector<int>& DENSE) {
   int INFO;
+  int N = opts.N;
   int64_t child_level = level + 1;
   int64_t nblocks = pow(2, level);
   int64_t child_nblocks = pow(2, child_level);
   int rank = opts.max_rank;
   int level_block_size = N / nblocks;
   // 1. Generate blocks from the current admissible blocks for this level.
-  int N = opts.N;
   int nleaf = opts.nleaf;
 
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);

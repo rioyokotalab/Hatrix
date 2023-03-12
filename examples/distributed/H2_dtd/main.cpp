@@ -16,7 +16,6 @@
 
 #include "parsec.h"
 
-#include "globals.hpp"
 #include "h2_dtd_construction.hpp"
 #include "h2_dtd_operations.hpp"
 #include "h2_dtd_factorize_tests.hpp"
@@ -117,6 +116,7 @@ cholesky_solve(SymmetricSharedBasisMatrix& A,
                Args& opts,
                std::vector<double>& X_mem, std::vector<int>& DESCX,
                double* DENSE_MEM, std::vector<int>& DENSE) {
+  int N = opts.N;
   std::vector<Matrix> dense_solution;
   for (int64_t block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
     dense_solution.push_back(Matrix(opts.nleaf, 1));
@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &MPISIZE);
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
   MPI_Dims_create(MPISIZE, 2, MPIGRID);
-  N = opts.N;
+  int N = opts.N;
   int cores = opts.parsec_cores;
   if (!MPIRANK) {
     std::cout << "MPIGRID g[0] : " << MPIGRID[0]

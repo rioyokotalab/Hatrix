@@ -5,8 +5,6 @@
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 
-#include "globals.hpp"
-
 #include "parsec/data_dist/matrix/two_dim_rectangle_cyclic.h"
 
 typedef struct h2_dc_t {

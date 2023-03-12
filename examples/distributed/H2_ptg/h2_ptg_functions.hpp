@@ -3,7 +3,6 @@
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 
-#include "globals.hpp"
 #include "parsec/data_dist/matrix/two_dim_rectangle_cyclic.h"
 #include "h2_ptg_internal.h"
 #include "h2_factorize.h"
