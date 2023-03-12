@@ -335,7 +335,7 @@ int main(int argc, char **argv) {
 
 
   /* Initializing parsec context */
-  parsec = parsec_init( cores, NULL, NULL);
+  parsec_context_t* parsec = parsec_init( cores, NULL, NULL);
   if( NULL == parsec ) {
     printf("Cannot initialize PaRSEC\n");
     exit(-1);
@@ -343,7 +343,7 @@ int main(int argc, char **argv) {
 
   parsec_profiling_start();
 
-  dtd_tp = parsec_dtd_taskpool_new();
+  parsec_taskpool_t* dtd_tp = parsec_dtd_taskpool_new();
   rc = parsec_context_add_taskpool( parsec, dtd_tp );
 
   rc = parsec_context_start( parsec );
@@ -365,16 +365,16 @@ int main(int argc, char **argv) {
   std::cout << "factor begin:\n";
   }
 
-  factorize_setup(A, domain, opts);
+  factorize_setup(A, domain, opts, parsec);
 
   auto start_factorize = std::chrono::system_clock::now();
-  auto fp_ops = factorize(A, domain, opts);
+  auto fp_ops = factorize(A, domain, opts, dtd_tp);
   auto stop_factorize = std::chrono::system_clock::now();
   double factorize_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_factorize -
                                start_factorize).count();
 
-  factorize_teardown();
+  factorize_teardown(parsec);
 
   if (!MPIRANK) {
     std::cout << "factor end\n";

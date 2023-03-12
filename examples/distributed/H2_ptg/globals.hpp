@@ -133,8 +133,6 @@ int indxg2l(int INDXGLOB, int NB, int NPROCS);
 int indxl2g(int indxloc, int nb, int iproc, int isrcproc, int nprocs);
 int indxg2p(int INDXGLOB, int NB, int ISRCPROC, int NPROCS);
 
-extern parsec_context_t *parsec;
-extern parsec_taskpool_t *dtd_tp;
 extern int N; // total matrix dimension.
 extern int BLACS_CONTEXT;
 extern int info;

@@ -39,7 +39,8 @@ matmul(Hatrix::SymmetricSharedBasisMatrix& A,
        std::vector<Hatrix::Matrix>& b);
 
 long long int
-factorize(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::Args& opts);
+factorize(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+          const Hatrix::Args& opts, parsec_taskpool_t* dtd_tp);
 
 void
 solve(Hatrix::SymmetricSharedBasisMatrix& A,
@@ -94,5 +95,5 @@ void h2_destroy_arenas(int64_t max_level, int64_t min_level);
 
 void
 factorize_setup(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                const Hatrix::Args& opts);
-void factorize_teardown();
+                const Hatrix::Args& opts, parsec_context_t* parsec);
+void factorize_teardown(parsec_context_t* parsec);

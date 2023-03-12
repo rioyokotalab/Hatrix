@@ -1,9 +1,6 @@
 #include "Hatrix/Hatrix.h"
 #include "globals.hpp"
 
-parsec_context_t *parsec = NULL;
-parsec_taskpool_t *dtd_tp = NULL;
-
 int N;
 int BLACS_CONTEXT;
 
