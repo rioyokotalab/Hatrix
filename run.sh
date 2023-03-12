@@ -26,14 +26,14 @@ make -j H2_dtd
 # make -j H2_main
 
 for adm in 0; do
-    nleaf=256
+    nleaf=32
     ndim=3
-    max_rank=50
+    max_rank=20
 
     # gdb -q -iex "set auto-load safe-path /home/user/gdb" -ex run --args
 
     for N in 65536; do
-        mpirun --oversubscribe -n 32 \
+        mpirun --oversubscribe -n 64 \
                ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
