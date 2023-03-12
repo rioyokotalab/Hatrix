@@ -16,7 +16,6 @@
 
 #include "parsec.h"
 
-#include "h2_dtd_construction.hpp"
 #include "h2_dtd_operations.hpp"
 #include "h2_dtd_factorize_tests.hpp"
 

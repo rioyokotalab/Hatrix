@@ -1,5 +1,7 @@
 #pragma once
 
+#include "distributed/distributed.hpp"
+
 extern "C" {
   /* Cblacs declarations: https://netlib.org/blacs/BLACS/QRef.html */
   void Cblacs_pinfo(int*, int*);

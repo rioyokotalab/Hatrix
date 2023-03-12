@@ -40,9 +40,7 @@ task_cholesky_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                          &D_nrows, &D_ncols,
                          &_D);
 
-  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
-
-  cholesky(D, Hatrix::Lower);
+  CORE_cholesky_full(D_nrows, D_ncols, _D);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -58,10 +56,8 @@ task_solve_triangular_full(parsec_execution_stream_t* es, parsec_task_t* this_ta
                          &D_dd_nrows, &D_dd_ncols, &_D_dd,
                          &D_id_nrows, &D_id_ncols, &_D_id);
 
-  MatrixWrapper D_dd(_D_dd, D_dd_nrows, D_dd_ncols, D_dd_nrows);
-  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
-
-  solve_triangular(D_dd, D_id, Hatrix::Right, Hatrix::Lower, false, true, 1.0);
+  CORE_solve_triangular_full(D_dd_nrows, D_dd_ncols, _D_dd,
+                         D_id_nrows, D_id_ncols, _D_id);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -77,10 +73,8 @@ task_syrk_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                          &D_id_nrows, &D_id_ncols, &_D_id,
                          &D_ij_nrows, &D_ij_ncols, &_D_ij);
 
-  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
-  MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
-
-  syrk(D_id, D_ij, Hatrix::Lower, false, -1.0, 1.0);
+  CORE_syrk_full(D_id_nrows, D_id_ncols, _D_id,
+                 D_ij_nrows, D_ij_ncols, _D_ij);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -99,11 +93,9 @@ task_matmul_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                          &D_jd_nrows, &D_jd_ncols, &_D_jd,
                          &D_ij_nrows, &D_ij_ncols, &_D_ij);
 
-  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
-  MatrixWrapper D_jd(_D_jd, D_jd_nrows, D_jd_ncols, D_jd_nrows);
-  MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
-
-  matmul(D_id, D_jd, D_ij, false, true, -1.0, 1.0);
+  CORE_matmul_full(D_id_nrows, D_id_ncols, _D_id,
+                   D_jd_nrows, D_jd_ncols, _D_jd,
+                   D_ij_nrows, D_ij_ncols, _D_ij);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
@@ -149,27 +141,8 @@ task_trsm(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                          &D_rows, &D_cols, &D_row_rank, &D_col_rank, &_diagonal,
                          &O_rows, &O_cols, &O_row_rank, &O_col_rank, &_other, &which);
 
-  MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
-  MatrixWrapper other(_other, O_rows, O_cols, O_rows);
-
-  auto diagonal_splits = split_dense(diagonal,
-                                     D_rows - D_row_rank,
-                                     D_cols - D_col_rank);
-  auto other_splits = split_dense(other,
-                                  O_rows - O_row_rank,
-                                  O_cols - O_col_rank);
-
-  if (which == 'T') {
-    solve_triangular(diagonal_splits[0], other_splits[0], Hatrix::Right, Hatrix::Lower,
-                     false, true, 1.0);
-    solve_triangular(diagonal_splits[0], other_splits[2], Hatrix::Right, Hatrix::Lower,
-                     false, true, 1.0);
-  }
-  else if (which == 'B') {
-    solve_triangular(diagonal_splits[0], other_splits[1], Hatrix::Left, Hatrix::Lower,
-                     false, false, 1.0);
-  }
-
+  CORE_trsm(D_rows, D_cols, D_row_rank, D_col_rank, _diagonal,
+            O_rows, O_cols, O_row_rank, O_col_rank, _other, which);
 
   return PARSEC_HOOK_RETURN_DONE;
 }

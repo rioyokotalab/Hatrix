@@ -66,3 +66,61 @@ void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
                    false, true, 1.0);
   syrk(D_splits[2], D_splits[3], Hatrix::Lower, false, -1, 1);
 }
+
+void CORE_cholesky_full(int64_t D_nrows, int64_t D_ncols, double* _D) {
+  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+
+  cholesky(D, Hatrix::Lower);
+}
+
+void CORE_solve_triangular_full(int64_t D_dd_nrows, int64_t D_dd_ncols, double* _D_dd,
+                                int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id) {
+  MatrixWrapper D_dd(_D_dd, D_dd_nrows, D_dd_ncols, D_dd_nrows);
+  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
+
+  solve_triangular(D_dd, D_id, Hatrix::Right, Hatrix::Lower, false, true, 1.0);
+}
+
+void CORE_syrk_full(int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
+                    int64_t D_ij_nrows, int64_t D_ij_ncols, double* _D_ij) {
+  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
+  MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
+
+  syrk(D_id, D_ij, Hatrix::Lower, false, -1.0, 1.0);
+}
+
+void CORE_matmul_full(int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
+                      int64_t D_jd_nrows, int64_t D_jd_ncols, double* _D_jd,
+                      int64_t D_ij_nrows, int64_t D_ij_ncols, double* _D_ij) {
+
+  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
+  MatrixWrapper D_jd(_D_jd, D_jd_nrows, D_jd_ncols, D_jd_nrows);
+  MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
+
+  matmul(D_id, D_jd, D_ij, false, true, -1.0, 1.0);
+}
+
+void CORE_trsm(int64_t D_rows, int64_t D_cols, int64_t D_row_rank, int64_t D_col_rank, double* _diagonal,
+               int64_t O_rows, int64_t O_cols, int64_t O_row_rank, int64_t O_col_rank, double* _other,
+               char which) {
+  MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
+  MatrixWrapper other(_other, O_rows, O_cols, O_rows);
+
+  auto diagonal_splits = split_dense(diagonal,
+                                     D_rows - D_row_rank,
+                                     D_cols - D_col_rank);
+  auto other_splits = split_dense(other,
+                                  O_rows - O_row_rank,
+                                  O_cols - O_col_rank);
+
+  if (which == 'T') {
+    solve_triangular(diagonal_splits[0], other_splits[0], Hatrix::Right, Hatrix::Lower,
+                     false, true, 1.0);
+    solve_triangular(diagonal_splits[0], other_splits[2], Hatrix::Right, Hatrix::Lower,
+                     false, true, 1.0);
+  }
+  else if (which == 'B') {
+    solve_triangular(diagonal_splits[0], other_splits[1], Hatrix::Left, Hatrix::Lower,
+                     false, false, 1.0);
+  }
+}

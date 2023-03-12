@@ -6,8 +6,8 @@ CXX            = clang++
 CC             = clang
 MPICXX         = mpicxx
 MPICC          = mpicc
-CFLAGS         = -O0 -g -Wall -Xpreprocessor -I"$(shell brew --prefix libomp)/include"
-CXXFLAGS       = -O0 -g -Wall --std=c++11 -Xpreprocessor -fopenmp \
+CFLAGS         = -O3 -g -Wall -Xpreprocessor -I"$(shell brew --prefix libomp)/include"
+CXXFLAGS       = -O3 -g -Wall --std=c++11 -Xpreprocessor -fopenmp \
                  -I"$(shell brew --prefix libomp)/include" \
                  -I. -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) $(LAPACK_INCLUDE) \
                  $(shell pkg-config --cflags gtest gtest_main)
