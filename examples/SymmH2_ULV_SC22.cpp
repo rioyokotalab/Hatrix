@@ -2184,7 +2184,7 @@ int main(int argc, char* argv[]) {
   getCommTime(&cm_time);
 
   if (mpi_rank == 0) {
-    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,",
+    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf\n",
            (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
            construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time);
     // printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
