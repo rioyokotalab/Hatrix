@@ -140,8 +140,6 @@ extern int info;
 extern int ZERO, ONE, MINUS_ONE;
 extern const char NOTRANS;
 extern const char TRANS;
-extern int DENSE_NBROW, DENSE_NBCOL;
-extern int DENSE_local_rows, DENSE_local_cols;
 
 constexpr int DESC_LEN = 9;
 

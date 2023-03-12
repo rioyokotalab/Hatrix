@@ -28,6 +28,7 @@
 #include <mkl.h>
 #endif
 
+
 using namespace Hatrix;
 
 static void
@@ -63,10 +64,10 @@ redistribute_vector2scalapack(std::vector<Matrix>& x,
     MPI_Status status;
     int x_rank = mpi_rank(i);
     int scalapack_rank = (i % MPIGRID[0]) * MPIGRID[1];
-    int index = (i / MPIGRID[0]) * DENSE_NBROW;
+    int index = (i / MPIGRID[0]) * opts.nleaf;
 
     if (MPIRANK == scalapack_rank) {
-      MPI_Recv(&x_mem[index], DENSE_NBROW, MPI_DOUBLE, x_rank,
+      MPI_Recv(&x_mem[index], opts.nleaf, MPI_DOUBLE, x_rank,
                i, MPI_COMM_WORLD, &status);
     }
   }
@@ -84,10 +85,10 @@ redistribute_scalapack2vector(std::vector<Matrix>& x,
     MPI_Request req;
     int x_rank = mpi_rank(i);
     int scalapack_rank = (i % MPIGRID[0]) * MPIGRID[1];
-    int index = (i / MPIGRID[0]) * DENSE_NBROW;
+    int index = (i / MPIGRID[0]) * opts.nleaf;
 
     if (MPIRANK == scalapack_rank) {
-      MPI_Isend(&x_mem[index], DENSE_NBROW, MPI_DOUBLE,
+      MPI_Isend(&x_mem[index], opts.nleaf, MPI_DOUBLE,
                 x_rank, i, MPI_COMM_WORLD, &req);
     }
   }
@@ -99,7 +100,7 @@ redistribute_scalapack2vector(std::vector<Matrix>& x,
     int index = i / MPISIZE;
 
     if (MPIRANK == x_rank) {
-      MPI_Recv(&x[index], DENSE_NBROW, MPI_DOUBLE, scalapack_rank,
+      MPI_Recv(&x[index], opts.nleaf, MPI_DOUBLE, scalapack_rank,
                i, MPI_COMM_WORLD, &status);
     }
   }
@@ -212,10 +213,10 @@ int main(int argc, char **argv) {
   Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
 
-  DENSE_NBROW = opts.nleaf;
-  DENSE_NBCOL = opts.nleaf;
-  DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
-  DENSE_local_cols = numroc_(&N, &DENSE_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
+  int DENSE_NBROW = opts.nleaf;
+  int DENSE_NBCOL = opts.nleaf;
+  int DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
+  int DENSE_local_cols = numroc_(&N, &DENSE_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
 
   descinit_(DENSE.data(), &N, &N, &DENSE_NBROW, &DENSE_NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &DENSE_local_rows, &info);

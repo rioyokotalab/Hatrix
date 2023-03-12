@@ -13,8 +13,6 @@ const char TRANS = 'T';
 
 double *DENSE_MEM = NULL;
 std::vector<int> DENSE(9);
-int DENSE_NBROW, DENSE_NBCOL;
-int DENSE_local_rows, DENSE_local_cols;
 
 int
 indxg2l(int INDXGLOB, int NB, int NPROCS) {
