@@ -25,7 +25,7 @@ max_rank=50
 ndim=3
 adm=0
 
-for N in 8192; do
+for N in 4096; do
     mpirun -n 4 ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \

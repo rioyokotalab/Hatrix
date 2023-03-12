@@ -19,7 +19,7 @@ int U[9];
 void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Domain& domain,
-                    const Args& opts) {
+                    const Args& opts, double* DENSE_MEM, std::vector<int>& DENSE) {
   int N = opts.N;
   int nleaf = opts.nleaf;
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
@@ -208,7 +208,7 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
 
 void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
-                           int64_t level) {
+                           int64_t level, double* DENSE_MEM, std::vector<int>& DENSE) {
   int INFO;
   int64_t child_level = level + 1;
   int64_t nblocks = pow(2, level);
@@ -572,7 +572,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 }
 
 void
-construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
+                        double* DENSE_MEM, std::vector<int>& DENSE) {
   // init global U matrix
   int nleaf = opts.nleaf; int N = opts.N; int INFO;
   int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
@@ -581,10 +582,10 @@ construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, con
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 
-  generate_leaf_nodes(A, domain, opts);
+  generate_leaf_nodes(A, domain, opts, DENSE_MEM, DENSE);
 
   for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
-    generate_transfer_matrices(A, domain, opts, level);
+    generate_transfer_matrices(A, domain, opts, level, DENSE_MEM, DENSE);
   }
 
   delete[] U_MEM;

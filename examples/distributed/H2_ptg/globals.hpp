@@ -141,7 +141,3 @@ extern const char NOTRANS;
 extern const char TRANS;
 
 constexpr int DESC_LEN = 9;
-
-// SCALAPACK data for the large dense matrix used for construction and verification.
-extern double* DENSE_MEM;
-extern std::vector<int> DENSE;

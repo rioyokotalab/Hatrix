@@ -11,9 +11,6 @@ int MINUS_ONE = -1;
 const char NOTRANS = 'N';
 const char TRANS = 'T';
 
-double *DENSE_MEM = NULL;
-std::vector<int> DENSE(9);
-
 int
 indxg2l(int INDXGLOB, int NB, int NPROCS) {
   return NB * ((INDXGLOB - 1) / ( NB * NPROCS)) + (INDXGLOB - 1) % NB + 1;
