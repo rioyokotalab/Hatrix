@@ -261,3 +261,141 @@ void CORE_fill_in_recompression(  int64_t block_size,
   U.copy_mem(Q);
   US.copy_mem(Si);
 }
+
+void CORE_project_S(  int64_t S_nrows,
+                      double *_S,
+                      int64_t proj_nrows,
+                      double *_proj,
+                      char which) {
+  MatrixWrapper S(_S, S_nrows, S_nrows, S_nrows);
+  MatrixWrapper proj(_proj, proj_nrows, proj_nrows, proj_nrows);
+
+  if (which == 'R') {           // fill in projection along the rows.
+    Matrix proj_S = matmul(proj, S);
+    S.copy_mem(proj_S);
+  }
+  else if (which == 'C') {       // fill in projection along the cols.
+    Matrix proj_S = matmul(S, proj, false, true);
+    S.copy_mem(proj_S);
+  }
+}
+
+void CORE_schurs_complement_1(int64_t D_block_block_nrows,
+                             int64_t D_block_rank,
+                             double *_D_block_block,
+                             int64_t D_i_block_nrows,
+                             int64_t D_i_block_ncols,
+                             double *_D_i_block) {
+  MatrixWrapper D_block_block(_D_block_block, D_block_block_nrows,
+                              D_block_block_nrows, D_block_block_nrows);
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_nrows, D_i_block_ncols, D_i_block_nrows);
+
+  auto D_block_block_split = split_dense(D_block_block,
+                                          D_block_block_nrows - D_block_rank,
+                                          D_block_block_nrows - D_block_rank);
+
+  auto D_i_block_split = D_i_block.split({},
+                                         std::vector<int64_t>(1,
+                                                              D_i_block_ncols - D_block_rank));
+
+  matmul(D_i_block_split[0], D_block_block_split[2], D_i_block_split[1], false, true, -1, 1);
+}
+
+void CORE_schurs_complement_3(int64_t D_block_block_nrows,
+                             int64_t D_block_j_ncols,
+                             int64_t D_block_rank,
+                             int64_t D_j_rank,
+                             double *_D_block_block, double *_D_block_j) {
+  MatrixWrapper D_block_block(_D_block_block,
+                              D_block_block_nrows, D_block_block_nrows, D_block_block_nrows);
+  MatrixWrapper D_block_j(_D_block_j, D_block_block_nrows, D_block_j_ncols, D_block_block_nrows);
+
+  auto D_block_block_split = split_dense(D_block_block,
+                                         D_block_block_nrows - D_block_rank,
+                                         D_block_block_nrows - D_block_rank);
+  auto D_block_j_split = split_dense(D_block_j,
+                                     D_block_block_nrows - D_block_rank,
+                                     D_block_j_ncols - D_j_rank);
+
+  matmul(D_block_block_split[2], D_block_j_split[1], D_block_j_split[3], false, false, -1, 1);
+}
+
+void CORE_schurs_complement_2(int64_t D_i_block_nrows, int64_t D_i_block_ncols, int64_t D_block_rank,
+                              double *_D_i_block,
+                              int64_t D_j_block_nrows, int64_t D_j_block_ncols, double *_D_j_block,
+                              int64_t D_i_j_nrows, int64_t D_i_j_ncols, double *_D_i_j) {
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_nrows, D_i_block_ncols, D_i_block_nrows);
+  MatrixWrapper D_j_block(_D_j_block, D_j_block_nrows, D_j_block_ncols, D_j_block_nrows);
+  MatrixWrapper D_i_j(_D_i_j, D_i_j_nrows, D_i_j_ncols, D_i_j_nrows);
+
+  auto D_i_block_split =
+    D_i_block.split({},
+                    std::vector<int64_t>(1,
+                                         D_i_block_ncols - D_block_rank));
+  auto D_j_block_split =
+    D_j_block.split({},
+                    std::vector<int64_t>(1,
+                                         D_j_block_ncols - D_block_rank));
+
+  matmul(D_i_block_split[0], D_j_block_split[0], D_i_j, false, true, -1, 1);
+}
+
+void CORE_syrk_2(int64_t D_i_block_nrows, int64_t D_i_block_ncols, int64_t D_block_rank,
+                 double *_D_i_block,
+                 int64_t D_i_j_nrows, int64_t D_i_j_ncols,
+                 double *_D_i_j) {
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_nrows, D_i_block_ncols, D_i_block_nrows);
+  MatrixWrapper D_i_j(_D_i_j, D_i_j_nrows, D_i_j_ncols, D_i_j_nrows);
+
+  auto D_i_block_split = D_i_block.split({},
+                                         std::vector<int64_t>(1, D_i_block_ncols - D_block_rank));
+
+  syrk(D_i_block_split[0], D_i_j, Hatrix::Lower, false, -1, 1);
+}
+
+void CORE_schurs_complement_4(int64_t D_i_dim, int64_t D_j_dim, int64_t D_block_dim,
+                              int64_t A_i_rank, int64_t A_j_rank, int64_t A_block_rank,
+                              double *_D_i_j, double *_D_block_j, double *_D_i_block) {
+    MatrixWrapper D_i_j(_D_i_j, D_i_dim, D_j_dim, D_i_dim);
+  MatrixWrapper D_i_block(_D_i_block, D_i_dim, D_block_dim, D_i_dim);
+  MatrixWrapper D_block_j(_D_block_j, D_block_dim, D_j_dim, D_block_dim);
+
+  auto D_i_block_split = D_i_block.split({},
+                                         std::vector<int64_t>(1, D_j_dim - A_j_rank));
+  auto D_block_j_split = split_dense(D_block_j,
+                                     D_block_dim - A_block_rank,
+                                     D_j_dim - A_j_rank);
+  auto D_i_j_split = D_i_j.split({},
+                                 std::vector<int64_t>(1, D_j_dim - A_j_rank));
+
+  matmul(D_i_block_split[0], D_block_j_split[1], D_i_j_split[1], false, false, -1, 1);
+}
+
+void CORE_transfer_basis_update(int64_t U_nrows, int64_t U_ncols, int64_t rank_c1, int64_t rank_c2,
+                                double *_proj_c1, double *_proj_c2, double *_U) {
+  MatrixWrapper proj_c1(_proj_c1, rank_c1, rank_c1, rank_c1);
+  MatrixWrapper proj_c2(_proj_c2, rank_c2, rank_c2, rank_c2);
+  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
+
+  Matrix Utransfer_new(U, true);
+
+  auto Utransfer_new_splits = Utransfer_new.split(std::vector<int64_t>(1, rank_c1),
+                                                  {});
+  auto Utransfer_splits     = U.split(std::vector<int64_t>(1, rank_c1),
+                                      {});
+
+  matmul(proj_c1, Utransfer_splits[0], Utransfer_new_splits[0], false, false, 1.0, 0.0);
+  matmul(proj_c2, Utransfer_splits[1], Utransfer_new_splits[1], false, false, 1.0, 0.0);
+  U.copy_mem(Utransfer_new);
+}
+
+void CORE_project_fill_in(int64_t nrows, int64_t ncols, int64_t rank_i, int64_t rank_j,
+                          double *_Ui, double *_Uj, double *_Fij, double *_Sij) {
+  MatrixWrapper Ui(_Ui, nrows, rank_i, nrows);
+  MatrixWrapper Uj(_Uj, ncols, rank_j, ncols);
+  MatrixWrapper Fij(_Fij, nrows, ncols, nrows);
+  MatrixWrapper Sij(_Sij, rank_i, rank_j, rank_i);
+
+  Matrix temp = matmul(matmul(Ui, Fij, true), Uj);
+  Sij += temp;
+}
