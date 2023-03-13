@@ -166,7 +166,6 @@ int main(int argc, char **argv) {
 
   int rc;
 
-
   std::cout << "init args.\n";
   Args opts(argc, argv);
 
@@ -253,9 +252,13 @@ int main(int argc, char **argv) {
   }
   if(!MPIRANK) A.print_structure();
   construct_h2_matrix(A, domain, opts, DENSE_MEM, DENSE); // construct H2 matrix.
+  std::cout << "MAIN CONSTRUCTION FINSIH\n";
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
+
+
+
 
   int64_t dense_blocks = A.leaf_dense_blocks();
   construct_max_rank = A.max_rank(); // get max rank of H2 matrix post construct.
@@ -268,6 +271,8 @@ int main(int argc, char **argv) {
     b.push_back(Matrix(opts.nleaf, 1));
     b_check.push_back(Matrix(opts.nleaf, 1));
   }
+
+  std::cout << "BEGIN SCALAPACK DATA STRUCTURES FOR X AND B\n";
 
   // scalapack data structures for x and b.
   std::vector<int> DESCB_CHECK(DESC_LEN), DESCX(DESC_LEN);
@@ -300,6 +305,8 @@ int main(int argc, char **argv) {
   }
 
   redistribute_vector2scalapack(x, X_mem, A, opts);
+
+  std::cout << "BEGIN MATMUL\n";
 
   auto start_matvec = std::chrono::system_clock::now();
   matmul(A, domain, x, b);      // H2 matrix matvec. H2_A * x = b.

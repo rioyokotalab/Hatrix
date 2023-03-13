@@ -1,3 +1,5 @@
+#include <cassert>
+
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 

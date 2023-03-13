@@ -1,6 +1,6 @@
 #!/bin/bash
 #$ -cwd
-#$ -l rt_F=1
+#$ -l rt_F=2
 #$ -l h_rt=2:00:00
 #$ -N H2
 #$ -o H2_out.log
@@ -17,39 +17,33 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/acb10922qh/gitrepos/parsec/build/l
 # put in bash_profile for remote MPI processes.
 # ulimit -c unlimited             # does not pass to remote child processes.
 
-export MKL_NUM_THREADS=40
-export OMP_NUM_THREADS=40
+# export MKL_NUM_THREADS=40
+# export OMP_NUM_THREADS=40
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
-make -j H2_main
+make -j H2_dtd
+# make -j H2_main
 
-nleaf=1024
-ndim=3
-max_rank=100
+for adm in 1; do
+    nleaf=32
+    ndim=3
+    max_rank=20
 
-for i in "16384 1 0" "65536 1 0"; do
-    set -- $i
-    N=$1
-    adm=$2
-    pert=$3
+    # gdb -q -iex "set auto-load safe-path /home/user/gdb" -ex run --args
 
-    ./bin/H2_main --N $N \
-                  --nleaf $nleaf \
-                  --kernel_func laplace \
-                  --kind_of_geometry grid \
-                  --ndim $ndim \
-                  --max_rank $max_rank \
-                  --accuracy -1 \
-                  --admis $adm \
-                  --admis_kind geometry \
-                  --construct_algorithm miro \
-                  --add_diag 1e-9 \
-                  --perturbation $pert \
-                  --use_nested_basis
-
+    for N in 65536; do
+        mpirun -l -n 64 ./bin/H2_dtd --N $N \
+                      --nleaf $nleaf \
+                      --kernel_func laplace \
+                      --kind_of_geometry grid \
+                      --ndim $ndim \
+                      --max_rank $max_rank \
+                      --accuracy -1 \
+                      --admis $adm \
+                      --admis_kind diagonal \
+                      --construct_algorithm miro \
+                      --add_diag 1e-9  \
+                      --kind_of_recompression 3
+    done
 done
-
-# gprof -s bin/H2_dtd gmon.out-*
-# gprof -q bin/H2_dtd gmon.sum > call_graph.out
-# gprof bin/H2_dtd gmon.sum > gprof_out.out

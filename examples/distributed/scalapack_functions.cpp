@@ -53,11 +53,11 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int IA = nleaf * block + 1;
       int JA = nleaf * j + 1;
 
-      pdgeadd_(&NOTRANS, &nleaf, &nleaf,
-               &ALPHA,
-               DENSE_MEM, &IA, &JA, DENSE.data(),
-               &BETA,
-               AY_MEM, &IA, &ONE, AY);
+      // pdgeadd_(&NOTRANS, &nleaf, &nleaf,
+      //          &ALPHA,
+      //          DENSE_MEM, &IA, &JA, DENSE.data(),
+      //          &BETA,
+      //          AY_MEM, &IA, &ONE, AY);
     }
   }
 
@@ -78,14 +78,14 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JU = 1;
       WORK = new double[1]();
 
-      pdgesvd_(&JOB_U, &JOB_VT,
-               &nleaf, &nleaf,
-               AY_MEM, &IAY, &JAY, AY,
-               S_MEM,
-               U_MEM, &IU, &ONE, U,
-               NULL, NULL, NULL, NULL,
-               WORK, &LWORK,
-               &INFO);
+      // pdgesvd_(&JOB_U, &JOB_VT,
+      //          &nleaf, &nleaf,
+      //          AY_MEM, &IAY, &JAY, AY,
+      //          S_MEM,
+      //          U_MEM, &IU, &ONE, U,
+      //          NULL, NULL, NULL, NULL,
+      //          WORK, &LWORK,
+      //          &INFO);
 
       LWORK = WORK[0] + nleaf * (AY_local_nrows + AY_local_ncols + 1) + AY_local_ncols;
       // workspace query throws a weird error so add nleaf*rank.
@@ -101,14 +101,16 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JU = 1;
       WORK =  new double[(int64_t)LWORK]();
 
-      pdgesvd_(&JOB_U, &JOB_VT,
-               &nleaf, &nleaf,
-               AY_MEM, &IAY, &JAY, AY,
-               S_MEM,
-               U_MEM, &IU, &ONE, U,
-               NULL, NULL, NULL, NULL,
-               WORK, &LWORK,
-               &INFO);
+      // std::cout << "IAY: " << IAY << std::endl;
+
+      // pdgesvd_(&JOB_U, &JOB_VT,
+      //          &nleaf, &nleaf,
+      //          AY_MEM, &IAY, &JAY, AY,
+      //          S_MEM,
+      //          U_MEM, &IU, &ONE, U,
+      //          NULL, NULL, NULL, NULL,
+      //          WORK, &LWORK,
+      //          &INFO);
       delete[] WORK;
     }
 
@@ -127,16 +129,19 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     int U_LOCAL[9];
     int U_LOCAL_nrows = nleaf, U_LOCAL_ncols = opts.max_rank;
     Matrix U_LOCAL_MEM(U_LOCAL_nrows, U_LOCAL_ncols);
+    if (IMAP[0] != MPIRANK) {
+      U_LOCAL_CONTEXT = -1;
+    }
     descset_(U_LOCAL,
              &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
              &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
 
     int IU = nleaf * block + 1;
     int JU = 1;
-    pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
-              U_MEM, &IU, &JU, U,
-              &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
-              &BLACS_CONTEXT);
+    // pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
+    //           U_MEM, &IU, &JU, U,
+    //           &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
+    //           &BLACS_CONTEXT);
 
     if (mpi_rank(block) == MPIRANK) {
       A.U.insert(block, A.max_level, std::move(U_LOCAL_MEM)); // store U in A.
@@ -156,23 +161,31 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
   }
 
+  std::cout << "BEGIN S generation.\n";
+
   // Generate S blocks for the lower triangle
-  for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < i; ++j) {
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < i; ++j) {
       if (exists_and_admissible(A, i, j, A.max_level)) {
         // send U(j) to where S(i,j) exists.
         if (mpi_rank(j) == MPIRANK) {
           MPI_Request request;
           Matrix& Uj = A.U(j, A.max_level);
-          MPI_Isend(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(i),
-                    j, MPI_COMM_WORLD, &request);
+          // std::cout << "\n\n@@@@ SENT TAG " << j << " @@@@\n\n";
+          // MPI_Isend(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(i),
+          //           j, MPI_COMM_WORLD, &request);
         }
 
+      }
+    }
+    for (int j = 0; j < i; ++j) {
+      if (exists_and_admissible(A, i, j, A.max_level)) {
         if (mpi_rank(i) == MPIRANK) {
           MPI_Status status;
           Matrix Uj(opts.nleaf, opts.max_rank);
-          MPI_Recv(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(j),
-                   j, MPI_COMM_WORLD, &status);
+          // std::cout << "\n\n@@@@ GOT TAG " << j << " @@@@\n\n";
+          // MPI_Recv(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(j),
+          //          j, MPI_COMM_WORLD, &status);
 
           Matrix Aij = generate_p2p_interactions(domain,
                                                  i, j, A.max_level,
@@ -183,6 +196,9 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       }
     }
   }
+
+
+  std::cout << "END S generation.\n";
 
   delete[] AY_MEM;
 }
@@ -205,6 +221,8 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
 void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
                            int64_t level, double* DENSE_MEM, std::vector<int>& DENSE) {
+   MPI_Barrier(MPI_COMM_WORLD);
+  std::cout << "START TRANSFER MATRIX: " << level << std::endl;
   int INFO;
   int N = opts.N;
   int64_t child_level = level + 1;
@@ -233,11 +251,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int IA = level_block_size * block + 1;
       int JA = level_block_size * j + 1;
 
-      pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
-               &ALPHA,
-               DENSE_MEM, &IA, &JA, DENSE.data(),
-               &BETA,
-               AY_MEM, &IA, &ONE, AY);
+      // pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
+      //          &ALPHA,
+      //          DENSE_MEM, &IA, &JA, DENSE.data(),
+      //          &BETA,
+      //          AY_MEM, &IA, &ONE, AY);
     }
   }
 
@@ -272,13 +290,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     int JA = 1;
     int ITEMP = c1 * rank + 1;
     int JTEMP = 1;
-    pdgemm_(&TRANS, &NOTRANS,
-            &rank, &child_block_size, &child_block_size,
-            &ALPHA,
-            U_MEM, &IU, &JU, U,
-            AY_MEM, &IA, &JA, AY,
-            &BETA,
-            TEMP_MEM, &ITEMP, &JTEMP, TEMP);
+    // pdgemm_(&TRANS, &NOTRANS,
+    //         &rank, &child_block_size, &child_block_size,
+    //         &ALPHA,
+    //         U_MEM, &IU, &JU, U,
+    //         AY_MEM, &IA, &JA, AY,
+    //         &BETA,
+    //         TEMP_MEM, &ITEMP, &JTEMP, TEMP);
 
     // Lower basis block.
     IU = c2 * child_block_size + 1;
@@ -287,13 +305,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     JA = 1;
     ITEMP = c2 * rank + 1;
     JTEMP = 1;
-    pdgemm_(&TRANS, &NOTRANS,
-            &rank, &child_block_size, &child_block_size,
-            &ALPHA,
-            U_MEM, &IU, &JU, U,
-            AY_MEM, &IA, &JA, AY,
-            &BETA,
-            TEMP_MEM, &ITEMP, &JTEMP, TEMP);
+    // pdgemm_(&TRANS, &NOTRANS,
+    //         &rank, &child_block_size, &child_block_size,
+    //         &ALPHA,
+    //         U_MEM, &IU, &JU, U,
+    //         AY_MEM, &IA, &JA, AY,
+    //         &BETA,
+    //         TEMP_MEM, &ITEMP, &JTEMP, TEMP);
   }
   // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
   // Allocate a global matrix to store the transfer matrices. The transfer matrices for the
@@ -324,14 +342,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
       WORK = new double[1]();
 
-      pdgesvd_(&JOB_U, &JOB_VT,
-               &block_nrows, &rank,
-               TEMP_MEM, &ITEMP, &JTEMP, TEMP,
-               S_MEM,
-               UTRANSFER_MEM, &IU, &JU, UTRANSFER,
-               NULL, NULL, NULL, NULL,
-               WORK, &LWORK,
-               &INFO);
+      // pdgesvd_(&JOB_U, &JOB_VT,
+      //          &block_nrows, &rank,
+      //          TEMP_MEM, &ITEMP, &JTEMP, TEMP,
+      //          S_MEM,
+      //          UTRANSFER_MEM, &IU, &JU, UTRANSFER,
+      //          NULL, NULL, NULL, NULL,
+      //          WORK, &LWORK,
+      //          &INFO);
       LWORK = WORK[0] + nleaf * (TEMP_local_nrows + TEMP_local_ncols + 1) + TEMP_local_ncols;
       delete[] WORK;
     }
@@ -344,14 +362,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int JU = 1;
       WORK = new double[(int64_t)LWORK]();
 
-      pdgesvd_(&JOB_U, &JOB_VT,
-               &block_nrows, &rank,
-               TEMP_MEM, &ITEMP, &JTEMP, TEMP,
-               S_MEM,
-               UTRANSFER_MEM, &IU, &JU, UTRANSFER,
-               NULL, NULL, NULL, NULL,
-               WORK, &LWORK,
-               &INFO);
+      // pdgesvd_(&JOB_U, &JOB_VT,
+      //          &block_nrows, &rank,
+      //          TEMP_MEM, &ITEMP, &JTEMP, TEMP,
+      //          S_MEM,
+      //          UTRANSFER_MEM, &IU, &JU, UTRANSFER,
+      //          NULL, NULL, NULL, NULL,
+      //          WORK, &LWORK,
+      //          &INFO);
       delete[] WORK;
     }
 
@@ -376,10 +394,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
     int IU = block * opts.max_rank * 2 + 1;
     int JU = 1;
-    pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
-              UTRANSFER_MEM, &IU, &JU, UTRANSFER,
-              &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
-              &BLACS_CONTEXT);
+    // pdgemr2d_(&U_LOCAL_nrows, &U_LOCAL_ncols,
+    //           UTRANSFER_MEM, &IU, &JU, UTRANSFER,
+    //           &U_LOCAL_MEM, &ONE, &ONE, U_LOCAL,
+    //           &BLACS_CONTEXT);
 
     if (mpi_rank(block) == MPIRANK) {
       if (row_has_admissible_blocks(A, block, level) && A.max_level != 1) {
@@ -427,13 +445,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int IU_REAL = c1 * child_block_size + 1;
       int JU_REAL = 1;
 
-      pdgemm_(&NOTRANS, &NOTRANS,
-              &child_block_size, &rank, &rank,
-              &ALPHA,
-              U_MEM, &IU, &JU, U,
-              UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
-              &BETA,
-              U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
+      // pdgemm_(&NOTRANS, &NOTRANS,
+      //         &child_block_size, &rank, &rank,
+      //         &ALPHA,
+      //         U_MEM, &IU, &JU, U,
+      //         UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
+      //         &BETA,
+      //         U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
     }
 
     // Compute lower part of the real basis for this level.
@@ -445,13 +463,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int IU_REAL = c2 * child_block_size + 1;
       int JU_REAL = 1;
 
-      pdgemm_(&NOTRANS, &NOTRANS,
-              &child_block_size, &rank, &rank,
-              &ALPHA,
-              U_MEM, &IU, &JU, U,
-              UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
-              &BETA,
-              U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
+      // pdgemm_(&NOTRANS, &NOTRANS,
+      //         &child_block_size, &rank, &rank,
+      //         &ALPHA,
+      //         U_MEM, &IU, &JU, U,
+      //         UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
+      //         &BETA,
+      //         U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
     }
   }
   // Free the real basis of the child level and set the U_REAL to real basis.
@@ -494,13 +512,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
         int ITEMP_PRODUCT = 1;
         int JTEMP_PRODUCT = j * level_block_size + 1;
-        pdgemm_(&TRANS, &NOTRANS,
-                &rank, &level_block_size, &level_block_size,
-                &ALPHA,
-                U_MEM, &IU, &JU, U,
-                DENSE_MEM, &IDENSE, &JDENSE, DENSE.data(),
-                &BETA,
-                TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
+        // pdgemm_(&TRANS, &NOTRANS,
+        //         &rank, &level_block_size, &level_block_size,
+        //         &ALPHA,
+        //         U_MEM, &IU, &JU, U,
+        //         DENSE_MEM, &IDENSE, &JDENSE, DENSE.data(),
+        //         &BETA,
+        //         TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
 
         IU = j * level_block_size + 1;
         JU = 1;
@@ -508,13 +526,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
         int IS_BLOCKS = i * rank + 1;
         int JS_BLOCKS = j * rank + 1;
 
-        pdgemm_(&NOTRANS, &NOTRANS,
-                &rank, &rank, &level_block_size,
-                &ALPHA,
-                TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT,
-                U_MEM, &IU, &JU, U,
-                &BETA,
-                S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
+        // pdgemm_(&NOTRANS, &NOTRANS,
+        //         &rank, &rank, &level_block_size,
+        //         &ALPHA,
+        //         TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT,
+        //         U_MEM, &IU, &JU, U,
+        //         &BETA,
+        //         S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
       }
     }
   }
@@ -530,36 +548,41 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
         int S_LOCAL_PNROWS, S_LOCAL_PNCOLS, S_LOCAL_PROW, S_LOCAL_PCOL;
         // specify the rank from the global grid for the local grid.
         IMAP[0] = mpi_rank(i);
+
         Cblacs_get(-1, 0, &S_LOCAL_CONTEXT);                    // init the new CBLACS context.
         Cblacs_gridmap(&S_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
         Cblacs_gridinfo(S_LOCAL_CONTEXT,                       // init grid params from the context.
                         &S_LOCAL_PNROWS, &S_LOCAL_PNCOLS, &S_LOCAL_PROW, &S_LOCAL_PCOL);
 
-        // Store the info for the S block to be copied into in S_LOCAL.
         int S_LOCAL[9];
         int S_LOCAL_nrows = opts.max_rank, S_LOCAL_ncols = opts.max_rank;
         Matrix S_LOCAL_MEM(S_LOCAL_nrows, S_LOCAL_ncols);
+
+        // Store the info for the S block to be copied into in S_LOCAL.
+        if (IMAP[0] != MPIRANK) {
+          S_LOCAL_CONTEXT=-1;   // processes that are not part of this context set the local context to -1.
+        }
         descset_(S_LOCAL,
-                 &S_LOCAL_nrows, &S_LOCAL_ncols, &S_LOCAL_nrows, &S_LOCAL_ncols,
-                 &S_LOCAL_PROW, &S_LOCAL_PCOL, &S_LOCAL_CONTEXT, &S_LOCAL_nrows, &INFO);
+                  &S_LOCAL_nrows, &S_LOCAL_ncols, &S_LOCAL_nrows, &S_LOCAL_ncols,
+                  &S_LOCAL_PROW, &S_LOCAL_PCOL, &S_LOCAL_CONTEXT, &S_LOCAL_nrows, &INFO);
 
         int IS_BLOCKS = i * rank + 1;
         int JS_BLOCKS = j * rank + 1;
-        pdgemr2d_(&S_LOCAL_nrows, &S_LOCAL_ncols,
-                  S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS,
-                  &S_LOCAL_MEM, &ONE, &ONE, S_LOCAL,
-                  &BLACS_CONTEXT);
+        // pdgemr2d_(&S_LOCAL_nrows, &S_LOCAL_ncols,
+        //           S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS,
+        //           &S_LOCAL_MEM, &ONE, &ONE, S_LOCAL,
+        //           &BLACS_CONTEXT);
 
         if (mpi_rank(i) == MPIRANK) {
           A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
-        }
-
-        if (IMAP[0] == MPIRANK) {
           Cblacs_gridexit(S_LOCAL_CONTEXT);
         }
       }
     }
   }
+   MPI_Barrier(MPI_COMM_WORLD);
+  std::cout << "END TRANSFER MATRIX: " << level << std::endl;
+
 
   delete[] S_BLOCKS_MEM;
   delete[] TEMP_PRODUCT_MEM;
@@ -580,10 +603,12 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
             &U_nrows, &INFO);
 
   generate_leaf_nodes(A, domain, opts, DENSE_MEM, DENSE);
+  MPI_Barrier(MPI_COMM_WORLD);
 
-  for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
-    generate_transfer_matrices(A, domain, opts, level, DENSE_MEM, DENSE);
-  }
+  // for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
+  //   generate_transfer_matrices(A, domain, opts, level, DENSE_MEM, DENSE);
+  //   MPI_Barrier(MPI_COMM_WORLD);
+  // }
 
   delete[] U_MEM;
 
@@ -604,4 +629,6 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
 
     A.ranks.insert(block, level, std::move(rank));
   }
+  MPI_Barrier(MPI_COMM_WORLD);
+  std::cout << "FINISH CONSTRUCTION. " << MPI_TAG_UB << std::endl;
 }
