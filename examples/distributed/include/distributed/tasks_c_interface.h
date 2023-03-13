@@ -65,6 +65,45 @@ extern "C" {
                                     double *_proj,
                                     char which);
 
+  void CORE_project_S(int64_t S_nrows,
+                        double *_S,
+                        int64_t proj_nrows,
+                        double *_proj,
+                        char which);
+
+  void CORE_schurs_complement_1(int64_t D_block_block_nrows,
+                                 int64_t D_block_rank,
+                                 double *_D_block_block,
+                                 int64_t D_i_block_nrows,
+                                 int64_t D_i_block_ncols,
+                               double *_D_i_block);
+
+  void CORE_schurs_complement_3(int64_t D_block_block_nrows,
+                               int64_t D_block_j_ncols,
+                               int64_t D_block_rank,
+                               int64_t D_j_rank,
+                               double *_D_block_block, double *_D_block_j);
+
+  void CORE_schurs_complement_2(int64_t D_i_block_nrows, int64_t D_i_block_ncols, int64_t D_block_rank,
+                                double *_D_i_block,
+                                int64_t D_j_block_nrows, int64_t D_j_block_ncols, double *_D_j_block,
+                                int64_t D_i_j_nrows, int64_t D_i_j_ncols, double *_D_i_j);
+
+  void CORE_syrk_2(int64_t D_i_block_nrows, int64_t D_i_block_ncols, int64_t D_block_rank,
+                   double *_D_i_block,
+                   int64_t D_i_j_nrows, int64_t D_i_j_ncols,
+                   double *_D_i_j);
+
+  void CORE_schurs_complement_4(int64_t D_i_dim, int64_t D_j_dim, int64_t D_block_dim,
+                                int64_t A_i_rank, int64_t A_j_rank, int64_t A_block_rank,
+                                double *_D_i_j, double *_D_block_j, double *_D_i_block);
+
+  void CORE_transfer_basis_update(int64_t U_nrows, int64_t U_ncols, int64_t rank_c1, int64_t rank_c2,
+                                  double *_proj_c1, double *_proj_c2, double *_U);
+
+  void CORE_project_fill_in(int64_t nrows, int64_t ncols, int64_t rank_i, int64_t rank_j,
+                            double *_Ui, double *_Uj, double *_Fij, double *_Sij);
+
 #ifdef __cplusplus
 }
 #endif
