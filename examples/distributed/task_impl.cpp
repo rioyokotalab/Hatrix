@@ -124,3 +124,86 @@ void CORE_trsm(int64_t D_rows, int64_t D_cols, int64_t D_row_rank, int64_t D_col
                      false, false, 1.0);
   }
 }
+
+void CORE_copy_blocks(bool copy_dense,
+                      double *_D_unelim,
+                      int64_t D_unelim_rows, int64_t D_unelim_cols, int64_t D_unelim_row_rank, int64_t D_unelim_col_rank,
+                      double *_D_c1c2,
+                      int64_t D_c1c2_rows, int64_t D_c1c2_cols, int64_t D_c1c2_row_rank, int64_t D_c1c2_col_rank,
+                      int D_unelim_split_index) {
+  MatrixWrapper D_unelim(_D_unelim, D_unelim_rows, D_unelim_cols, D_unelim_rows);
+  MatrixWrapper D_c1c2(_D_c1c2, D_c1c2_rows, D_c1c2_cols, D_c1c2_rows);
+
+  auto D_unelim_splits = split_dense(D_unelim,
+                                     D_unelim_row_rank,
+                                     D_unelim_col_rank);
+
+  if (copy_dense) {
+    auto D_c1c2_splits = split_dense(D_c1c2,
+                                     D_c1c2_rows - D_c1c2_row_rank,
+                                     D_c1c2_cols - D_c1c2_col_rank);
+    D_unelim_splits[D_unelim_split_index] = D_c1c2_splits[3];
+  }
+  else {
+    assert(D_c1c2_row_rank == -1);
+    assert(D_c1c2_col_rank == -1);
+
+    D_unelim_splits[D_unelim_split_index] = D_c1c2;
+  }
+}
+
+
+void CORE_nb_nb_fill_in(int64_t D_i_block_rows, int64_t D_i_block_cols,int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
+                        double *_D_i_block,
+                        int64_t D_j_block_rows, int64_t  D_j_block_cols,int64_t D_j_block_row_rank,int64_t D_j_block_col_rank,
+                        double *_D_j_block,
+                        int64_t F_ij_rows, int64_t F_ij_cols,int64_t  F_ij_row_rank,int64_t  F_ij_col_rank,
+                        double *_F_ij) {
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_rows, D_i_block_cols, D_i_block_rows);
+  MatrixWrapper D_j_block(_D_j_block, D_j_block_rows, D_j_block_cols, D_j_block_rows);
+  MatrixWrapper F_ij(_F_ij, F_ij_rows, F_ij_cols, F_ij_rows);
+
+  auto fill_in_splits = split_dense(F_ij,
+                                    F_ij_rows - F_ij_row_rank,
+                                    F_ij_cols - F_ij_col_rank);
+  auto D_i_block_splits = split_dense(D_i_block,
+                                      D_i_block_rows - D_i_block_row_rank,
+                                      D_j_block_cols - D_j_block_col_rank);
+  auto D_j_block_splits = split_dense(D_j_block,
+                                      D_j_block_rows - D_j_block_row_rank,
+                                      D_j_block_cols - D_j_block_col_rank);
+  matmul(D_i_block_splits[0], D_j_block_splits[0], fill_in_splits[0],
+         false, true, -1, 1); // cc
+  matmul(D_i_block_splits[2], D_j_block_splits[0], fill_in_splits[2],
+         false, true, -1, 1); // oc
+  matmul(D_i_block_splits[2], D_j_block_splits[2], fill_in_splits[3],
+         false, true, -1, 1); // oo
+}
+
+void CORE_nb_rank_fill_in(int64_t D_i_block_rows, int64_t D_i_block_cols, int64_t D_i_block_row_rank,
+                          int64_t D_i_block_col_rank,
+                          double *_D_i_block,
+                          int64_t D_block_j_rows, int64_t D_block_j_cols, int64_t D_block_j_row_rank, int64_t D_block_j_col_rank,
+                          double *_D_block_j,
+                          int64_t U_j_rows, int64_t U_j_cols,
+                          double *_U_j,
+                          int64_t F_ij_rows, int64_t F_ij_cols, int64_t F_ij_row_rank, int64_t F_ij_col_rank,
+                          double *_F_ij) {
+  MatrixWrapper D_i_block(_D_i_block, D_i_block_rows, D_i_block_cols, D_i_block_rows);
+  MatrixWrapper D_block_j(_D_block_j, D_block_j_rows, D_block_j_cols, D_block_j_rows);
+  MatrixWrapper U_j(_U_j, U_j_rows, U_j_cols, U_j_rows);
+  MatrixWrapper F_ij(_F_ij, F_ij_rows, F_ij_cols, F_ij_rows);
+
+  auto D_i_block_splits = D_i_block.split({},
+                                          std::vector<int64_t>(1,
+                                                               D_i_block_cols -
+                                                               D_i_block_col_rank));
+  auto D_block_j_splits = split_dense(D_block_j,
+                                      D_block_j_rows - D_block_j_row_rank,
+                                      D_block_j_cols - D_block_j_col_rank);
+
+  Matrix fill_in = matmul(D_i_block_splits[0], D_block_j_splits[1], false, false, -1);
+  Matrix projected_fill_in = matmul(fill_in, U_j, false, true);
+
+  F_ij += projected_fill_in;
+}

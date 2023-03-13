@@ -23,7 +23,7 @@ make -j H2_dtd
 nleaf=256
 max_rank=50
 ndim=3
-adm=0
+adm=1
 
 for N in 8192; do
     mpirun --oversubscribe -n 4 ./bin/H2_dtd --N $N \

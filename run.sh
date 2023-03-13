@@ -25,7 +25,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 make -j H2_dtd
 # make -j H2_main
 
-for adm in 0; do
+for adm in 1; do
     nleaf=32
     ndim=3
     max_rank=20

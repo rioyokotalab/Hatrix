@@ -25,6 +25,30 @@ extern "C" {
                  int64_t O_rows, int64_t O_cols, int64_t O_row_rank, int64_t O_col_rank, double* _other,
                  char which);
 
+  void CORE_copy_blocks(bool copy_dense,
+                        double *_D_unelim,
+                        int64_t D_unelim_rows, int64_t D_unelim_cols, int64_t D_unelim_row_rank, int64_t D_unelim_col_rank,
+                        double *_D_c1c2,
+                        int64_t D_c1c2_rows, int64_t D_c1c2_cols, int64_t D_c1c2_row_rank, int64_t D_c1c2_col_rank,
+                        int D_unelim_split_index);
+
+  void CORE_nb_nb_fill_in(int64_t D_i_block_rows, int64_t D_i_block_cols,int64_t D_i_block_row_rank, int64_t D_i_block_col_rank,
+                          double *_D_i_block,
+                          int64_t D_j_block_rows, int64_t  D_j_block_cols,int64_t D_j_block_row_rank,int64_t D_j_block_col_rank,
+                          double *_D_j_block,
+                          int64_t F_ij_rows, int64_t F_ij_cols,int64_t  F_ij_row_rank,int64_t  F_ij_col_rank,
+                          double *_F_ij);
+
+  void CORE_nb_rank_fill_in(int64_t D_i_block_rows, int64_t D_i_block_cols, int64_t D_i_block_row_rank,
+                            int64_t D_i_block_col_rank,
+                            double *_D_i_block,
+                            int64_t D_block_j_rows, int64_t D_block_j_cols, int64_t D_block_j_row_rank, int64_t D_block_j_col_rank,
+                            double *_D_block_j,
+                            int64_t U_j_rows, int64_t U_j_cols,
+                            double *_U_j,
+                            int64_t F_ij_rows, int64_t F_ij_cols, int64_t F_ij_row_rank, int64_t F_ij_col_rank,
+                            double *_F_ij);
+
 #ifdef __cplusplus
 }
 #endif
