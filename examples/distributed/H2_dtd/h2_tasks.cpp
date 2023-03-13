@@ -314,31 +314,7 @@ task_fill_in_recompression(parsec_execution_stream_t* es, parsec_task_t* this_ta
                          U_nrows, U_ncols, _U,
                          proj_nrows, _proj, which);
 
-  MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
-  MatrixWrapper US(_US, rank, rank, rank);
-  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
-  MatrixWrapper proj(_proj, proj_nrows, proj_nrows, proj_nrows);
 
-  Matrix Q, Si, VT; double err;
-
-  if (which == 'R') {           // row fill in recompresion
-    fill_in += matmul(matmul(U, US), U, false, true);
-
-    std::tie(Q, Si, VT, err) = truncated_svd(fill_in, rank);
-    Matrix proj_row = matmul(Q, U, true, false);
-    proj.copy_mem(proj_row);
-  }
-  else if (which == 'C') {      // col fill in recompression
-    fill_in += matmul(U, matmul(US, U, false, true));
-
-    Matrix fill_in_cols_T = transpose(fill_in);
-    std::tie(Q, Si, VT, err) = truncated_svd(fill_in_cols_T, rank);
-    Matrix proj_col = matmul(Q, U, true, false);
-    proj.copy_mem(proj_col);
-  }
-
-  U.copy_mem(Q);
-  US.copy_mem(Si);
 
   return PARSEC_HOOK_RETURN_DONE;
 }
