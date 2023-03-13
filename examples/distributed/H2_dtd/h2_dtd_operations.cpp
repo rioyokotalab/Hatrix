@@ -283,7 +283,6 @@ matmul(SymmetricSharedBasisMatrix& A,
        const Domain& domain,
        std::vector<Matrix>& x,
        std::vector<Matrix>& b) {
-  std::cout << "%%%% BEGIN MATVEC %%%%\n";
   int leaf_nblocks = pow(2, A.max_level);
   int nblocks_per_proc = ceil(leaf_nblocks / double(MPISIZE));
   std::vector<Matrix> x_hat;
@@ -483,10 +482,10 @@ matmul(SymmetricSharedBasisMatrix& A,
 
         if (proc_D == MPIRANK) {
           Matrix& Dblock = A.D(i, j, A.max_level);
-          std::cout << "5 TAG: " << D_tag << std::endl;
+          // std::cout << "5 TAG: " << D_tag << std::endl;
           MPI_Isend(&Dblock, D_nrows * D_ncols, MPI_DOUBLE, proc_i,
                     D_tag, MPI_COMM_WORLD, &i_request);
-          std::cout << "6 TAG: " << D_tag << std::endl;
+          // std::cout << "6 TAG: " << D_tag << std::endl;
           MPI_Isend(&Dblock, D_nrows * D_ncols, MPI_DOUBLE, proc_j,
                     D_tag, MPI_COMM_WORLD, &j_request);
         }
@@ -497,7 +496,7 @@ matmul(SymmetricSharedBasisMatrix& A,
           int x_index = i / MPISIZE;
           MPI_Isend(&x[x_index], x[x_index].numel(), MPI_DOUBLE, proc_j,
                     x_i_tag, MPI_COMM_WORLD, &j_request);
-          std::cout << "7 TAG: " << x_i_tag << std::endl;
+          // std::cout << "7 TAG: " << x_i_tag << std::endl;
         }
 
         int x_j_tag = i + D_tag + 1;
