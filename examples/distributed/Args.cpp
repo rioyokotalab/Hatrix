@@ -114,8 +114,8 @@ namespace Hatrix {
         else if (!strcmp(optarg, "circular")) {
           kind_of_geometry = CIRCULAR;
         }
-        else if (!strcmp(optarg, "col_file_3d")) {
-          kind_of_geometry = COL_FILE_3D;
+        else if (!strcmp(optarg, "col_file")) {
+          kind_of_geometry = COL_FILE;
         }
         else {
           throw std::invalid_argument("Cannot support " +
@@ -210,10 +210,9 @@ namespace Hatrix {
             "--nleaf (-l)                                : Max. number of points in a leaf node (%lld).\n"
             "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
             "--kind_of_geometry (-g) [circular|grid|       \n"
-            " 3d_col_fild]                               : Kind of geometry of the points (%s). \n"
-            "                                              If specifying 3d_col_file you must specify a geometry \n"
-            "                                              file with fields <x y z cluster_num> using. \n"
-            "                                              geometry_file or -f. \n"
+            " col_file]                                  : Kind of geometry of the points (%s). \n"
+            "                                              If specifying col_file you must specify a geometry \n"
+            "                                              file with fields <x y z> using --geometry_file or -f. \n"
             "--geometry_file (-f)                        : Geometry file. Reader format determined by --kind_of_geometry (%s). \n"
             "--ndim (-d)                                 : Number of dimensions of the geometry (%lld).\n"
             "--max_rank (-r)                             : Maximum rank (%lld).\n"
