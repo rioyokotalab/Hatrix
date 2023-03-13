@@ -207,3 +207,57 @@ void CORE_nb_rank_fill_in(int64_t D_i_block_rows, int64_t D_i_block_cols, int64_
 
   F_ij += projected_fill_in;
 }
+
+void CORE_fill_in_addition(int64_t F_nrows,  int64_t F_ncols,
+                             char which,
+                             double *_F,
+                             int64_t block_size,
+                             double *_fill_in) {
+  MatrixWrapper F(_F, F_nrows, F_ncols, F_ncols);
+  MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
+
+  switch(which) {
+  case 'R':
+    fill_in += matmul(F, F, false, true);
+    break;
+  case 'C':
+    fill_in += matmul(F, F, true, false);
+    break;
+  }
+}
+
+void CORE_fill_in_recompression(  int64_t block_size,
+                                  double *_fill_in,
+                                  int64_t rank,
+                                  double *_US,
+                                  int64_t U_nrows, int64_t U_ncols,
+                                  double *_U,
+                                  int64_t proj_nrows,
+                                  double *_proj,
+                                  char which) {
+  MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
+  MatrixWrapper US(_US, rank, rank, rank);
+  MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
+  MatrixWrapper proj(_proj, proj_nrows, proj_nrows, proj_nrows);
+
+  Matrix Q, Si, VT; double err;
+
+  if (which == 'R') {           // row fill in recompresion
+    fill_in += matmul(matmul(U, US), U, false, true);
+
+    std::tie(Q, Si, VT, err) = truncated_svd(fill_in, rank);
+    Matrix proj_row = matmul(Q, U, true, false);
+    proj.copy_mem(proj_row);
+  }
+  else if (which == 'C') {      // col fill in recompression
+    fill_in += matmul(U, matmul(US, U, false, true));
+
+    Matrix fill_in_cols_T = transpose(fill_in);
+    std::tie(Q, Si, VT, err) = truncated_svd(fill_in_cols_T, rank);
+    Matrix proj_col = matmul(Q, U, true, false);
+    proj.copy_mem(proj_col);
+  }
+
+  U.copy_mem(Q);
+  US.copy_mem(Si);
+}

@@ -49,6 +49,22 @@ extern "C" {
                             int64_t F_ij_rows, int64_t F_ij_cols, int64_t F_ij_row_rank, int64_t F_ij_col_rank,
                             double *_F_ij);
 
+  void CORE_fill_in_addition(  int64_t F_nrows,  int64_t F_ncols,
+                               char which,
+                               double *_F,
+                               int64_t block_size,
+                               double *_fill_in);
+
+  void CORE_fill_in_recompression(  int64_t block_size,
+                                    double *_fill_in,
+                                    int64_t rank,
+                                    double *_US,
+                                    int64_t U_nrows, int64_t U_ncols,
+                                    double *_U,
+                                    int64_t proj_nrows,
+                                    double *_proj,
+                                    char which);
+
 #ifdef __cplusplus
 }
 #endif

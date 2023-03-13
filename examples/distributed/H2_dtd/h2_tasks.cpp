@@ -275,17 +275,12 @@ task_fill_in_addition(parsec_execution_stream_t* es, parsec_task_t* this_task) {
                          &_F,
                          &block_size, &_fill_in);
 
-  MatrixWrapper F(_F, F_nrows, F_ncols, F_ncols);
-  MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
+  CORE_fill_in_addition(F_nrows, F_ncols,
+                         which,
+                         _F,
+                         block_size, _fill_in);
 
-  switch(which) {
-  case 'R':
-    fill_in += matmul(F, F, false, true);
-    break;
-  case 'C':
-    fill_in += matmul(F, F, true, false);
-    break;
-  }
+
   // parsec_data_copy_t* _F_block_j_tile, *_fill_in_tile;
   // parsec_dtd_unpack_refs(this_task, &_F_block_j_tile, &_fill_in_tile);
 
@@ -313,6 +308,11 @@ task_fill_in_recompression(parsec_execution_stream_t* es, parsec_task_t* this_ta
                          &rank, &_US,
                          &U_nrows, &U_ncols, &_U,
                          &proj_nrows, &_proj, &which);
+
+  CORE_fill_in_recompression(block_size, _fill_in,
+                         rank, _US,
+                         U_nrows, U_ncols, _U,
+                         proj_nrows, _proj, which);
 
   MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
   MatrixWrapper US(_US, rank, rank, rank);
