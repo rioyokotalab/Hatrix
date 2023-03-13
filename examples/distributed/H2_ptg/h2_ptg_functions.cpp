@@ -367,15 +367,7 @@ preallocate_blocks(SymmetricSharedBasisMatrix& A) {
 
 void
 factorize_setup(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                const Hatrix::Args& opts, parsec_h2_factorize_taskpool_t* h2_factorize_tasks) {
-  // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_D_ARENA_ADT_IDX],
-  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
-  //                  opts.nleaf, opts.nleaf, opts.nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
-
-  // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_U_ARENA_ADT_IDX],
-  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
-  //                  opts.nleaf, opts.max_rank, opts.nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
-
+                const Hatrix::Args& opts) {
   h2_dc_init_maps();
 
   preallocate_blocks(A);
@@ -413,13 +405,21 @@ h2_factorize_Destruct(parsec_h2_factorize_taskpool_t *h2_factorize) {
 
 parsec_h2_factorize_taskpool_t *
 h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                 const Hatrix::Args& opts, h2_factorize_params_t* h2_params) {
+                 h2_factorize_params_t* h2_params) {
   parsec_data_collection_t *parsec_D_dc = &parsec_D.super;
-  parsec_data_collection_t *parsec_U_dc = &parsec_D.super;
+  parsec_data_collection_t *parsec_U_dc = &parsec_U.super;
 
   parsec_h2_factorize_taskpool_t* h2_factorize = parsec_h2_factorize_new(parsec_D_dc,
                                                                          parsec_U_dc,
                                                                          h2_params);
+
+  // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_D_ARENA_ADT_IDX],
+  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+  //                  opts.nleaf, opts.nleaf, opts.nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
+
+  // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_U_ARENA_ADT_IDX],
+  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+  //                  opts.nleaf, opts.max_rank, opts.nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
   return h2_factorize;
 }

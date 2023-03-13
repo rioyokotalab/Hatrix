@@ -19,8 +19,9 @@ h2_params [ type="h2_factorize_params_t*" ]
 
 diagonal_multiply_complements(i, level)
 
+level = 2 .. 2
 i = 0 .. %{ return pow(2, level)-1; %}
-level = h2_params->max_level
+
 
 : parsec_D(i, i, level)
 
@@ -48,21 +49,21 @@ BODY
 END
 
 /* factorize_diagonal task */
-factorize_diagonal(i, level)
+/* factorize_diagonal(i, level) */
 
-i = 0 .. %{ return pow(2, level)-1; %}
-level = h2_params->max_level
+/* i = 0 .. %{ return pow(2, level)-1; %} */
+/* level = h2_params->max_level */
 
-: parsec_D(i, i, level)
+/* : parsec_D(i, i, level) */
 
-RW D <- D diagonal_multiply_complements(i, level)
-     -> parsec_D(i, i, level)
+/* RW D <- D diagonal_multiply_complements(i, level) */
+/*      -> parsec_D(i, i, level) */
 
-BODY
-{
-  int64_t D_nrows = get_dim(i, level, h2_params);
-  int64_t rank_nrows = h2_params->max_rank;
+/* BODY */
+/* { */
+/*   int64_t D_nrows = get_dim(i, level, h2_params); */
+/*   int64_t rank_nrows = h2_params->max_rank; */
 
-  CORE_factorize_diagonal(D_nrows, rank_nrows, D);
-}
-END
+/*   CORE_factorize_diagonal(D_nrows, rank_nrows, D); */
+/* } */
+/* END */

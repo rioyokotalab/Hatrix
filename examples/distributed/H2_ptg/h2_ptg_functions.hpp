@@ -41,12 +41,12 @@ uint32_t rank_of_2d(parsec_data_collection_t* desc, ...);
 
 void
 factorize_setup(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                const Hatrix::Args& opts, parsec_h2_factorize_taskpool_t* h2_factorize_tasks);
+                const Hatrix::Args& opts);
 void factorize_teardown();
 
 // make a task pool for this factorization.
 parsec_h2_factorize_taskpool_t *
 h2_factorize_New(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                 const Hatrix::Args& opts, h2_factorize_params_t* h2_factorize_tasks);
+                 h2_factorize_params_t* h2_factorize_tasks);
 void
 h2_factorize_Destruct(parsec_h2_factorize_taskpool_t *h2_factorize);

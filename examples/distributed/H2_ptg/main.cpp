@@ -331,8 +331,9 @@ int main(int argc, char **argv) {
   h2_factorize_params_t h2_params;
   h2_factorize_params_init(A, opts, &h2_params);
 
-  parsec_h2_factorize_taskpool_t* h2_factorize_tasks = h2_factorize_New(A, domain, opts, &h2_params);
-  factorize_setup(A, domain, opts, h2_factorize_tasks);
+  factorize_setup(A, domain, opts);
+  parsec_h2_factorize_taskpool_t* h2_factorize_tasks = h2_factorize_New(A, domain, &h2_params);
+
   parsec_context_add_taskpool(parsec, (parsec_taskpool_t*)h2_factorize_tasks);
 
   parsec_context_start(parsec);
