@@ -37,7 +37,7 @@ for N in 8192; do
                       --admis_kind diagonal \
                       --construct_algorithm miro \
                       --add_diag 1e-9  \
-                      --kind_of_recompression 3
+                      --kind_of_recompression 3 --use_nested_basis
 
     # ./bin/H2_ptg --N $N \
     #              --nleaf $nleaf \
