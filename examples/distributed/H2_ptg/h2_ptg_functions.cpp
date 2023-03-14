@@ -458,9 +458,11 @@ h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                  h2_factorize_params_t* h2_params) {
   parsec_data_collection_t *parsec_D_dc = &parsec_D.super;
   parsec_data_collection_t *parsec_U_dc = &parsec_U.super;
+  parsec_data_collection_t *parsec_S_dc = &parsec_S.super;
 
   parsec_h2_factorize_taskpool_t* h2_factorize = parsec_h2_factorize_new(parsec_D_dc,
                                                                          parsec_U_dc,
+                                                                         parsec_S_dc,
                                                                          h2_params);
 
   parsec_add2arena(&h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX],

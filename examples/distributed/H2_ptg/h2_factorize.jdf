@@ -13,6 +13,7 @@ extern "C" %{
 /* data descriptors */
 parsec_D [ type="parsec_data_collection_t*"]
 parsec_U [ type="parsec_data_collection_t*" aligned=parsec_D]
+parsec_S [ type="parsec_data_collection_t*" aligned=parsec_D]
 h2_params [ type="h2_factorize_params_t*" ]
 
 /* diagonal_multiply_complements task */
@@ -71,23 +72,45 @@ BODY
 END
 
 /* merge step for inadmissible. */
-merge_inadmissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level)
+/* merge_inadmissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level) */
 
-parent_level = h2_params->max_level .. h2_params->min_level
-parent_i = 0 .. %{ return h2_params->near_list[parent_level].length; %}
-parent_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[parent_i].length; %}
-child_level = h2_params->max_level-1 .. h2_params->min_level-1
-child_i = 0 .. %{ return h2_params->near_list[parent_level].length; %}
-child_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[child_i].length; %}
+/* parent_level = h2_params->max_level .. h2_params->min_level */
+/* parent_i = 0 .. %{ return h2_params->near_list[parent_level].length; %} */
+/* parent_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[parent_i].length; %} */
+/* child_level = h2_params->max_level-1 .. h2_params->min_level-1 */
+/* child_i = 0 .. %{ return h2_params->near_list[parent_level].length; %} */
+/* child_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[child_i].length; %} */
 
-  : parsec_D(child_i, child_j, child_level)
+/*   : parsec_D(child_i, child_j, child_level) */
 
-RW D <- D factorize_diagonal(parent_i, parent_level)
-     -> parsec_D(child_i, child_i, child_level)
+/* RW D <- D factorize_diagonal(parent_i, parent_level) */
+/*      -> parsec_D(child_i, child_i, child_level) */
 
-BODY
-{
-  printf("merge dense parent_l: %d parent_i: %d parent_j: %d child_l: %d child_i: %d child_j: %d\n",
-         parent_level, parent_i, parent_j, child_level, child_i, child_j);
-}
-END
+/* BODY */
+/* { */
+/*   printf("merge dense parent_l: %d parent_i: %d parent_j: %d child_l: %d child_i: %d child_j: %d\n", */
+/*          parent_level, parent_i, parent_j, child_level, child_i, child_j); */
+/* } */
+/* END */
+
+/* /\* merge step for admissible blocks. *\/ */
+/* merge_admissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level) */
+
+/* parent_level = h2_params->max_level .. h2_params->min_level */
+/* parent_i = 0 .. %{ return h2_params->far_list[parent_level].length; %} */
+/* parent_j = 0 .. %{ return h2_params->far_list[parent_level].level_block_list[parent_i].length; %} */
+/* child_level = h2_params->max_level-1 .. h2_params->min_level-1 */
+/* child_i = 0 .. %{ return h2_params->far_list[parent_level].length; %} */
+/* child_j = 0 .. %{ return h2_params->far_list[parent_level].level_block_list[child_i].length; %} */
+
+/*   : parsec_D(child_i, child_j, child_level) */
+
+/* READ S <- parsec_S(parent_i, parent_j, parent_level) */
+/* RW D <- parsec_D(child_i, child_j, child_level) */
+/*      -> parsec_D(child_i, child_j, child_level) */
+
+/* BODY */
+/* { */
+/*   printf("merge admissible blocks.\n"); */
+/* } */
+/* END */

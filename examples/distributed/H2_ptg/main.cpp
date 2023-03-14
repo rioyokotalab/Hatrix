@@ -36,7 +36,7 @@ h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize
   h2_params->max_rank = opts.max_rank;
   h2_params->nleaf = opts.nleaf;
 
-  h2_params->near_list = (h2_block_list*)malloc(A.max_level * sizeof(h2_block_list));
+  h2_params->near_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
   for (int level = A.max_level; level >= A.min_level-1; --level) {
     h2_params->near_list[level].length = pow(2, level);
     h2_params->near_list[level].level_block_list =
@@ -63,7 +63,7 @@ h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize
     }
   }
 
-  h2_params->far_list = (h2_block_list*)malloc(A.max_level * sizeof(h2_block_list));
+  h2_params->far_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
   for (int level = A.max_level; level >= A.min_level-1; --level) {
     h2_params->far_list[level].length = pow(2, level);
     h2_params->far_list[level].level_block_list =
