@@ -26,7 +26,7 @@ ndim=3
 adm=1
 
 for N in 1024; do
-    mpirun -n 1 ./bin/H2_ptg --N $N \
+    lldb -- ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \

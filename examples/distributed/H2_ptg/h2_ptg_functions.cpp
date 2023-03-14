@@ -25,16 +25,16 @@ data_of_key(parsec_data_collection_t* desc, parsec_data_key_t key) {
 
   if (NULL == data) {
     Matrix* mat = dc->matrix_map[key];
-    if (mat) {
+    // if (mat) {
       data = parsec_data_create(&dc->data_map[key], desc, key, &(*mat),
                                 mat->numel() *
                                 parsec_datadist_getsizeoftype(PARSEC_MATRIX_DOUBLE),
                                 PARSEC_DATA_FLAG_PARSEC_MANAGED);
-    }
-    else {
-      data = parsec_data_create(&dc->data_map[key], desc, key, NULL, 0,
-                                PARSEC_DATA_FLAG_PARSEC_MANAGED);
-    }
+    // }
+    // else {
+    //   data = parsec_data_create(&dc->data_map[key], desc, key, NULL, 0,
+    //                             PARSEC_DATA_FLAG_PARSEC_MANAGED);
+    // }
     dc->data_map[key] = data;
   }
 
@@ -135,7 +135,9 @@ data_of_2d(parsec_data_collection_t* desc, ...) {
     abort();
   }
 
-  parsec_data_key_t key = data_key_1d(desc, m, n, level);
+  parsec_data_key_t key = data_key_2d(desc, m, n, level);
+
+  std::cout << "m: " << m  << " n: " << n << " level: " << level <<  " data of 2d: " << key << std::endl;
 
   return data_of_key(desc, key);
 }
@@ -192,11 +194,55 @@ uint32_t rank_of_2d(parsec_data_collection_t* desc, ...) {
   return mpi_rank(m, n);
 }
 
+int32_t vpid_of_1d(parsec_data_collection_t* desc, ...) {
+  int b = -1, level = -1;
+
+  /* Get coordinates */
+  va_list ap;
+  va_start(ap, desc);
+  b = va_arg(ap, int);
+  level = va_arg(ap, int);
+  va_end(ap);
+
+  return (int32_t)rank_of_1d(desc, b, level);
+}
+
+int32_t vpid_of_2d_as_1d(parsec_data_collection_t* desc, ...) {
+  int m = -1, n = -1, level = -1;
+
+  va_list ap;
+  va_start(ap, desc);
+  m = va_arg(ap, int);
+  n = va_arg(ap, int);
+  level = va_arg(ap, int);
+  va_end(ap);
+
+  return (int32_t)vpid_of_1d(desc, m, level);
+}
+
+int32_t vpid_of_2d(parsec_data_collection_t* desc, ...) {
+  int m = -1, n = -1, level = -1;
+
+  va_list ap;
+  va_start(ap, desc);
+  m = va_arg(ap, int);
+  n = va_arg(ap, int);
+  level = va_arg(ap, int);
+  va_end(ap);
+
+  return (int32_t)rank_of_2d(desc, m, n, level);
+}
+
+int32_t vpid_of_key(parsec_data_collection_t *desc, parsec_data_key_t key) {
+  return (int32_t)rank_of_key(desc, key);
+}
+
 void
 h2_dc_init(h2_dc_t& parsec_data,
            parsec_data_key_t (*data_key_func)(parsec_data_collection_t*, ...),
            uint32_t (*rank_of_func)(parsec_data_collection_t*, ...),
-           parsec_data_t* (*data_of_func)(parsec_data_collection_t*, ...)) {
+           parsec_data_t* (*data_of_func)(parsec_data_collection_t*, ...),
+           int32_t (*vpid_of_func)(parsec_data_collection_t*, ...)) {
   parsec_data_collection_t *o = (parsec_data_collection_t*)(&parsec_data);
   parsec_data_collection_init(o, MPISIZE, MPIRANK);
 
@@ -205,6 +251,9 @@ h2_dc_init(h2_dc_t& parsec_data,
   o->rank_of = rank_of_func;
   o->rank_of_key = rank_of_key;
 
+  o->vpid_of = vpid_of_func;
+  o->vpid_of_key = vpid_of_key;
+
   o->data_of = data_of_func;
   o->data_of_key = data_of_key;
 
@@ -212,15 +261,15 @@ h2_dc_init(h2_dc_t& parsec_data,
 }
 
 void h2_dc_init_maps() {
-  h2_dc_init(parsec_U, data_key_1d, rank_of_1d, data_of_1d);
-  h2_dc_init(parsec_D, data_key_2d, rank_of_2d_as_1d, data_of_2d);
-  h2_dc_init(parsec_S, data_key_2d, rank_of_2d_as_1d, data_of_2d);
-  h2_dc_init(parsec_F, data_key_2d, rank_of_2d_as_1d, data_of_2d);
-  h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d, data_of_1d);
-  h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d, data_of_1d);
-  h2_dc_init(parsec_US, data_key_1d, rank_of_1d, data_of_1d);
-  h2_dc_init(parsec_r, data_key_1d, rank_of_1d, data_of_1d);
-  h2_dc_init(parsec_t, data_key_1d, rank_of_1d, data_of_1d);
+  h2_dc_init(parsec_U, data_key_1d, rank_of_1d, data_of_1d, vpid_of_1d);
+  h2_dc_init(parsec_D, data_key_2d, rank_of_2d_as_1d, data_of_2d, vpid_of_2d_as_1d);
+  h2_dc_init(parsec_S, data_key_2d, rank_of_2d_as_1d, data_of_2d, vpid_of_2d_as_1d);
+  h2_dc_init(parsec_F, data_key_2d, rank_of_2d_as_1d, data_of_2d, vpid_of_2d_as_1d);
+  h2_dc_init(parsec_temp_fill_in_rows, data_key_1d, rank_of_1d, data_of_1d, vpid_of_1d);
+  h2_dc_init(parsec_temp_fill_in_cols, data_key_1d, rank_of_1d, data_of_1d, vpid_of_1d);
+  h2_dc_init(parsec_US, data_key_1d, rank_of_1d, data_of_1d, vpid_of_1d);
+  h2_dc_init(parsec_r, data_key_1d, rank_of_1d, data_of_1d, vpid_of_1d);
+  h2_dc_init(parsec_t, data_key_1d, rank_of_1d, data_of_1d, vpid_of_1d);
 }
 
 void
@@ -397,6 +446,7 @@ void factorize_teardown() {
 
 void
 h2_factorize_Destruct(parsec_h2_factorize_taskpool_t *h2_factorize) {
+  parsec_del2arena( &h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX] );
   // parsec_del2arena( &h2_factorize->arenas_datatypes[PARSEC_h2_factorize_D_ARENA_ADT_IDX] );
   // parsec_del2arena( &h2_factorize->arenas_datatypes[PARSEC_h2_factorize_U_ARENA_ADT_IDX] );
 
@@ -413,13 +463,17 @@ h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                                                                          parsec_U_dc,
                                                                          h2_params);
 
+  parsec_add2arena(&h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX],
+                   parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+                   h2_params->nleaf, h2_params->nleaf, h2_params->nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
+
   // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_D_ARENA_ADT_IDX],
   //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
-  //                  opts.nleaf, opts.nleaf, opts.nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
+  //                  h2_params->nleaf, h2_params->nleaf, h2_params->nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
   // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_U_ARENA_ADT_IDX],
   //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
-  //                  opts.nleaf, opts.max_rank, opts.nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
+  //                  h2_params->nleaf, h2_params->max_rank, h2_params->nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
   return h2_factorize;
 }
