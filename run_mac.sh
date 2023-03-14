@@ -25,7 +25,7 @@ max_rank=50
 ndim=3
 adm=1
 
-for N in 8192; do
+for N in 2048; do
     ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \

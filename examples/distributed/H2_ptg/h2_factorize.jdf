@@ -48,6 +48,27 @@ BODY
 }
 END
 
+/* left multiply complements */
+left_multiply_complements(block, j, level)
+
+level = h2_params->max_level .. h2_params->max_level
+block = 0 .. %{ return h2_params->near_list[level].length-1; %} /* row iteration */
+j = 0 .. %{ return h2_params->near_list[level].level_block_list[block].length-1; %}
+
+: parsec_D(block, j, level)
+
+RW D <- block == 0 ? parsec_D(block, j, level)
+     -> parsec_D(block, j, level)
+READ U <- parsec_U(block, level)
+
+BODY
+{
+
+  printf("left multiply: %d %d %d\n", block, j, level);
+}
+END
+
+
 /* factorize_diagonal task */
 factorize_diagonal(i, level)
 
@@ -57,7 +78,6 @@ i = 0 .. %{ return pow(2, level)-1; %}
 : parsec_D(i, i, level)
 
 RW D <- D diagonal_multiply_complements(i, level)
-     -> D merge_inadmissible_blocks(i, i, level, i / 2, i / 2, level-1)
      -> parsec_D(i, i, level)
 
 BODY
