@@ -26,7 +26,7 @@ class Domain {
  public:
   int64_t N, ndim;
   int64_t ncells, tree_height;
-  double X0[MAX_NDIM], X0_min[MAX_NDIM], X0_max[MAX_NDIM], R0;  // Root level bounding box
+  double X0[MAX_NDIM], X0_min[MAX_NDIM], X0_max[MAX_NDIM], R0[MAX_NDIM];  // Root level bounding box
   std::vector<Body> bodies;
   std::vector<Cell> cells;
   Matrix p2p_matrix;
@@ -499,15 +499,15 @@ class Domain {
   // Get 3-D Hilbert index from coordinates
   void get3DIndex(const double X[MAX_NDIM], const int64_t level,
                   int64_t iX[MAX_NDIM]) {
-    const double dx = 2 * R0 / (1 << level);
     for (int64_t axis = 0; axis < 3; axis++) {
+      const double dx = 2 * R0[axis] / (1 << level);
       iX[axis] = floor((X[axis] - X0_min[axis]) / dx);
     }
   }
 
   int64_t getKey(int64_t iX[MAX_NDIM], const int64_t level,
                  const bool offset = true) {
-    // Preprocess
+    // Preprocess for Hilbert
     int64_t M = 1 << (level - 1);
     for (int64_t Q=M; Q>1; Q>>=1) {
       int64_t R = Q - 1;
@@ -1029,16 +1029,15 @@ class Domain {
     Cell root;
     root.body_offset = 0;
     root.nbodies = N;
-    R0 = 0;
     for (int64_t axis = 0; axis < ndim; axis++) {
       const auto Xmin = get_Xmin(bodies, root.get_bodies(), axis);
       const auto Xmax = get_Xmax(bodies, root.get_bodies(), axis);
       X0[axis] = (Xmin + Xmax) / 2.;
-      R0 = std::max(R0, (Xmax - Xmin) / 2.);
+      R0[axis] = (Xmax - Xmin) / 2.;
     }
     for (int64_t axis = 0; axis < ndim; axis++) {
-      X0_min[axis] = X0[axis] - R0;
-      X0_max[axis] = X0[axis] + R0;
+      X0_min[axis] = X0[axis] - R0[axis];
+      X0_max[axis] = X0[axis] + R0[axis];
     }
   }
 
@@ -1071,7 +1070,7 @@ class Domain {
   void build_cells(Body *bodies, Body *buffer,
                    const int64_t begin, const int64_t end,
                    Cell * cell, std::vector<Cell>& cells, const int64_t leaf_size,
-                   const double X[MAX_NDIM], const double R,
+                   const double X[MAX_NDIM], const double R[MAX_NDIM],
                    const int64_t level = 0, const bool direction = false) {
     // Create a tree cell
     cell->body_ptr = bodies + begin;
@@ -1081,11 +1080,11 @@ class Domain {
     cell->nchilds = 0;
     for (int64_t axis = 0; axis < ndim; axis++) {
       cell->center[axis] = X[axis];
-      cell->radius[axis] = R;
+      cell->radius[axis] = R[axis];
     }
     int64_t iX[MAX_NDIM];
     get3DIndex(X, level, iX);
-    cell->key = getKey(iX, level);
+    cell->key = getKey(iX, level, false);
     // Count number of bodies in each octant
     int64_t size[8] = {0,0,0,0,0,0,0,0};
     for (int64_t i = begin; i < end; i++) {
@@ -1128,12 +1127,13 @@ class Domain {
     cell->child_ptr = child;
     for (int64_t i = 0, c = 0; i < 8; i++) {
       double Xchild[MAX_NDIM];
+      double Rchild[MAX_NDIM];
       for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
         Xchild[axis] = X[axis];
+        Rchild[axis] = R[axis] / 2.;
       }
-      double Rchild = R / 2.;
       for (int64_t d = 0; d < 3; d++) {
-        Xchild[d] += Rchild * (((i & 1 << d) >> d) * 2 - 1);
+        Xchild[d] += Rchild[d] * (((i & 1 << d) >> d) * 2 - 1);
       }
       if (size[i]) {
         build_cells(buffer, bodies, offsets[i], offsets[i] + size[i],
