@@ -93,16 +93,8 @@ h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize
 
 static void
 h2_factorize_params_destroy(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize_params* h2_params) {
-  for (int level = A.max_level; level >= A.min_level-1; --level) {
-    for (int i = 0; i < h2_params->near_list[level].length; ++i) {
-      for (int j = 0; j < h2_params->near_list[level].level_block_list[i].length; ++j) {
-
-      }
-      // free(h2_params->near_list[level].level_block_list[i].indices);
-    }
-    // free(h2_params->near_list[level].level_block_list);
-  }
   // free(h2_params->far_list);
+  // free(h2_params->near_list);
 }
 
 static void

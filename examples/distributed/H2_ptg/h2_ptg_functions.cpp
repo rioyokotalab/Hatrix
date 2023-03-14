@@ -137,7 +137,7 @@ data_of_2d(parsec_data_collection_t* desc, ...) {
 
   parsec_data_key_t key = data_key_2d(desc, m, n, level);
 
-  std::cout << "m: " << m  << " n: " << n << " level: " << level <<  " data of 2d: " << key << std::endl;
+  // std::cout << "m: " << m  << " n: " << n << " level: " << level <<  " data of 2d: " << key << std::endl;
 
   return data_of_key(desc, key);
 }
@@ -251,11 +251,11 @@ h2_dc_init(h2_dc_t& parsec_data,
   o->rank_of = rank_of_func;
   o->rank_of_key = rank_of_key;
 
-  o->vpid_of = vpid_of_func;
-  o->vpid_of_key = vpid_of_key;
-
   o->data_of = data_of_func;
   o->data_of_key = data_of_key;
+
+  o->vpid_of = vpid_of_func;
+  o->vpid_of_key = vpid_of_key;
 
   parsec_dtd_data_collection_init(o);
 }

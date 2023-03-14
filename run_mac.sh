@@ -23,10 +23,10 @@ make -j H2_ptg
 nleaf=256
 max_rank=50
 ndim=3
-adm=1
+adm=0
 
 for N in 1024; do
-    ./bin/H2_ptg --N $N \
+    lldb -- ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \

@@ -56,6 +56,7 @@ i = 0 .. %{ return pow(2, level)-1; %}
 : parsec_D(i, i, level)
 
 RW D <- D diagonal_multiply_complements(i, level)
+     -> D merge_inadmissible_blocks(i, i, level, i / 2, i / 2, level-1)
      -> parsec_D(i, i, level)
 
 BODY
@@ -66,5 +67,27 @@ BODY
   printf("exec diag i : %d l: %d\n", i, level);
 
   CORE_factorize_diagonal(D_nrows, rank_nrows, (double*)D);
+}
+END
+
+/* merge step for inadmissible. */
+merge_inadmissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level)
+
+parent_level = h2_params->max_level .. h2_params->min_level
+parent_i = 0 .. %{ return h2_params->near_list[parent_level].length; %}
+parent_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[parent_i].length; %}
+child_level = h2_params->max_level-1 .. h2_params->min_level-1
+child_i = 0 .. %{ return h2_params->near_list[parent_level].length; %}
+child_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[child_i].length; %}
+
+  : parsec_D(child_i, child_j, child_level)
+
+RW D <- D factorize_diagonal(parent_i, parent_level)
+     -> parsec_D(child_i, child_i, child_level)
+
+BODY
+{
+  printf("merge dense parent_l: %d parent_i: %d parent_j: %d child_l: %d child_i: %d child_j: %d\n",
+         parent_level, parent_i, parent_j, child_level, child_i, child_j);
 }
 END
