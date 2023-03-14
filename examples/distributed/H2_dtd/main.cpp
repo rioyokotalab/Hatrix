@@ -205,6 +205,11 @@ int main(int argc, char **argv) {
   Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
 
+
+  if (!MPIRANK) {
+    std::cout << "Allocating dense matrix.\n";
+  }
+
   int DENSE_NBROW = opts.nleaf;
   int DENSE_NBCOL = opts.nleaf;
   int DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);

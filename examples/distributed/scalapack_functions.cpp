@@ -17,6 +17,9 @@ void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Domain& domain,
                     const Args& opts, double* DENSE_MEM, std::vector<int>& DENSE) {
+  if (!MPIRANK) {
+    std::cout << "generate leaf nodes.\n";
+  }
   int N = opts.N;
   int nleaf = opts.nleaf;
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
@@ -161,8 +164,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
   }
 
-  std::cout << "BEGIN S generation.\n";
-
   // Generate S blocks for the lower triangle
   for (int i = 0; i < nblocks; ++i) {
     for (int j = 0; j < i; ++j) {
@@ -197,9 +198,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
   }
 
-
-  std::cout << "END S generation.\n";
-
   delete[] AY_MEM;
 }
 
@@ -221,6 +219,9 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
 void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
                            int64_t level, double* DENSE_MEM, std::vector<int>& DENSE) {
+  if (!MPIRANK) {
+    std::cout << "generate transfer matrices level=" << level << std::endl;
+  }
   int INFO;
   int N = opts.N;
   int64_t child_level = level + 1;
@@ -235,9 +236,16 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int AY_local_ncols = fmax(numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
                                     &ONE), 1);
   int AY[9];
+  if (!MPIRANK) {
+    std::cout << "\t ALLOCATE AY_MEM" << std::endl;
+  }
   double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
   descinit_(AY, &N, &level_block_size, &nleaf, &nleaf,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
+
+  if (!MPIRANK) {
+    std::cout << "\t DONE ALLOCATE AY_MEM" << std::endl;
+  }
 
   // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
   double ALPHA = 1.0;
