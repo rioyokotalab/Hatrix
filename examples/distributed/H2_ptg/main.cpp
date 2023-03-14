@@ -35,6 +35,40 @@ h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize
   h2_params->max_level = A.max_level;
   h2_params->max_rank = opts.max_rank;
   h2_params->nleaf = opts.nleaf;
+
+  h2_params->near_list = (h2_block_list*)malloc(A.max_level * sizeof(h2_block_list));
+  for (int level = A.max_level; level >= A.min_level-1; --level) {
+    h2_params->near_list[level].length = pow(2, level);
+    h2_params->near_list[level].level_block_list =
+      (level_list*)malloc(h2_params->near_list[level].length * sizeof(level_list));
+
+    for (int i = 0; i < pow(2, level); ++i) {
+      int length = 0;
+      for (int j = 0; j <= i; ++j) {
+        if (A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level)) {
+          length++;
+        }
+      }
+
+      h2_params->near_list[level].level_block_list[i].length = length;
+      h2_params->near_list[level].level_block_list[i].indices = (int*)malloc(length * sizeof(int));
+
+      for (int j = 0; j <= i; ++j) {
+        if (A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level)) {
+          h2_params->near_list[level].level_block_list[i].indices[i] = j;
+        }
+      }
+    }
+  }
+
+  h2_params->far_list = (h2_block_list*)malloc(A.max_level * sizeof(h2_block_list));
+  for (int level = A.max_level; level >= A.min_level-1; --level) {
+  }
+}
+
+static void
+h2_factorize_params_destroy(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize_params* h2_params) {
+
 }
 
 static void

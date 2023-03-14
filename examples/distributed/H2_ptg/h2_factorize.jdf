@@ -19,7 +19,7 @@ h2_params [ type="h2_factorize_params_t*" ]
 
 diagonal_multiply_complements(i, level)
 
-level = h2_params->max_level .. h2_params->min_level
+level = h2_params->max_level .. (h2_params->min_level)
 i = 0 .. %{ return pow(2, level)-1; %}
 
 
@@ -40,12 +40,10 @@ BODY
   int64_t U_ncols = h2_params->max_rank;
   char which  = 'F';
 
-  printf("prod: %d level: %d\n", i, level);
+  printf("exec compl: i %d l: %d\n", i, level);
 
   CORE_multiply_complement(D_nrows, D_ncols, D_row_rank, D_col_rank,
                            U_nrows, U_ncols, (double*)D, (double*)U, which);
-
-
 }
 END
 
@@ -65,8 +63,8 @@ BODY
   int64_t D_nrows = get_dim(i, level, h2_params);
   int64_t rank_nrows = h2_params->max_rank;
 
-  printf("factorize diagonal i-> %d level-> %d\n", i, level);
+  printf("exec diag i : %d l: %d\n", i, level);
 
-  CORE_factorize_diagonal(D_nrows, rank_nrows, D);
+  CORE_factorize_diagonal(D_nrows, rank_nrows, (double*)D);
 }
 END
