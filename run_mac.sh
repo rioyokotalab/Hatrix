@@ -26,7 +26,7 @@ ndim=3
 adm=1
 
 for N in 1024; do
-    lldb -- ./bin/H2_ptg --N $N \
+    ./bin/H2_ptg --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \
                       --kind_of_geometry grid \

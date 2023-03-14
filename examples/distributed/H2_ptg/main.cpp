@@ -53,9 +53,11 @@ h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize
       h2_params->near_list[level].level_block_list[i].length = length;
       h2_params->near_list[level].level_block_list[i].indices = (int*)malloc(length * sizeof(int));
 
+      int j_index = 0;
       for (int j = 0; j <= i; ++j) {
         if (A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level)) {
-          h2_params->near_list[level].level_block_list[i].indices[i] = j;
+          h2_params->near_list[level].level_block_list[i].indices[j_index] = j;
+          j_index++;
         }
       }
     }
@@ -63,12 +65,44 @@ h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize
 
   h2_params->far_list = (h2_block_list*)malloc(A.max_level * sizeof(h2_block_list));
   for (int level = A.max_level; level >= A.min_level-1; --level) {
+    h2_params->far_list[level].length = pow(2, level);
+    h2_params->far_list[level].level_block_list =
+      (level_list*)malloc(h2_params->far_list[level].length * sizeof(level_list));
+
+    for (int i = 0; i < pow(2, level); ++i) {
+      int length = 0;
+      for (int j = 0; j <= i; ++j) {
+        if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
+          length++;
+        }
+      }
+
+      h2_params->far_list[level].level_block_list[i].length = length;
+      h2_params->far_list[level].level_block_list[i].indices = (int*)malloc(length * sizeof(int));
+
+      int j_index = 0;
+      for (int j = 0; j <= i; ++j) {
+        if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
+          h2_params->far_list[level].level_block_list[i].indices[j_index] = j;
+          j_index++;
+        }
+      }
+    }
   }
 }
 
 static void
 h2_factorize_params_destroy(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize_params* h2_params) {
+  for (int level = A.max_level; level >= A.min_level-1; --level) {
+    for (int i = 0; i < h2_params->near_list[level].length; ++i) {
+      for (int j = 0; j < h2_params->near_list[level].level_block_list[i].length; ++j) {
 
+      }
+      // free(h2_params->near_list[level].level_block_list[i].indices);
+    }
+    // free(h2_params->near_list[level].level_block_list);
+  }
+  // free(h2_params->far_list);
 }
 
 static void
@@ -375,6 +409,7 @@ int main(int argc, char **argv) {
   h2_factorize_Destruct(h2_factorize_tasks);
 
   factorize_teardown();
+  h2_factorize_params_destroy(A, opts, &h2_params);
 
   // parsec_profiling_start();
 
