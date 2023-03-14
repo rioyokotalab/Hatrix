@@ -23,7 +23,7 @@ make -j H2_ptg
 nleaf=256
 max_rank=50
 ndim=3
-adm=1
+adm=0
 
 for N in 2048; do
     ./bin/H2_ptg --N $N \
