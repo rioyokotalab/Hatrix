@@ -265,6 +265,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
 
+  if (!MPIRANK) {
+    std::cout << "\t DONE ADD" << std::endl;
+  }
+
   // Allocate a temporary global matrix to store the product of the real basis with the
   // summation of the admissible blocks.
 
@@ -425,6 +429,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     if (IMAP[0] == MPIRANK) {
       Cblacs_gridexit(U_LOCAL_CONTEXT);
     }
+
+    if (!MPIRANK) {
+      std::cout << "\t BLOCK " << block << " TRANSFER MATRIX GENERATE." << std::endl;
+    }
   }
 
   // 4. Generate the real basis at this level from the transfer matrices and the real basis one
@@ -543,6 +551,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
 
+  if (!MPIRANK) {
+    std::cout << "\tBEGIN S BLOCK " << level << std::endl;
+  }
+
   // Copy the S blocks to the H2 matrix data structure.
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
@@ -587,11 +599,15 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
 
+
   delete[] S_BLOCKS_MEM;
   delete[] TEMP_PRODUCT_MEM;
   delete[] UTRANSFER_MEM;
   delete[] TEMP_MEM;
   delete[] AY_MEM;
+  if (!MPIRANK) {
+    std::cout << "END TRANSFER MATRIX " << level << std::endl;
+  }
 }
 
 void
