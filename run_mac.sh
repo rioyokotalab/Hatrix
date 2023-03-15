@@ -17,28 +17,27 @@ cd $ROOT
 
 ulimit -c unlimited
 
-# make -j H2_ptg
 make -j H2_dtd
+# make -j H2_dtd
 
 nleaf=256
 max_rank=50
 ndim=3
-adm=1
+adm=0
 
-for N in 4096; do
-    mpirun --oversubscribe -n 16 ./bin/H2_dtd --N $N \
-                      --nleaf $nleaf \
-                      --kernel_func laplace \
-                      --kind_of_geometry grid \
-                      --ndim $ndim \
-                      --max_rank $max_rank \
-                      --accuracy -1 \
-                      --admis $adm \
-                      --admis_kind diagonal \
-                      --construct_algorithm miro \
-                      --add_diag 1e-9  \
-                      --kind_of_recompression 3 \
-                      --use_nested_basis
+for N in 8192; do
+    ./bin/H2_dtd --N $N \
+                 --nleaf $nleaf \
+                 --kernel_func laplace \
+                 --kind_of_geometry grid \
+                 --ndim $ndim \
+                 --max_rank $max_rank \
+                 --accuracy -1 \
+                 --admis $adm \
+                 --admis_kind diagonal \
+                 --construct_algorithm miro \
+                 --add_diag 1e-9  \
+                 --kind_of_recompression 3 --use_nested_basis
 
 
     # ./bin/H2_ptg --N $N \
