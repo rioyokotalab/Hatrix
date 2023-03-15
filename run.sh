@@ -28,7 +28,7 @@ make -j H2_dtd
 for adm in 1; do
     nleaf=32
     ndim=3
-    max_rank=20
+    max_rank=16
 
     # gdb -q -iex "set auto-load safe-path /home/user/gdb" -ex run --args
 
