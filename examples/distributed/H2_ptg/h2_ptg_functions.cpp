@@ -469,6 +469,14 @@ h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                    parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
                    h2_params->nleaf, h2_params->nleaf, h2_params->nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
+  // parsec_ create type vector . specify the stride as the nleaf.
+  // TR -> shift it by max_rank * 2
+  // then do a resize.
+
+  parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_BOTTOM_RIGHT_ADT_IDX],
+                   parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+                   h2_params->max_rank, h2_params->max_rank, h2_params->max_rank, PARSEC_ARENA_ALIGNMENT_SSE, -1);
+
   // parsec_add2arena(&h2_factorize_tasks->arenas_datatypes[PARSEC_h2_factorize_D_ARENA_ADT_IDX],
   //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
   //                  h2_params->nleaf, h2_params->nleaf, h2_params->nleaf, PARSEC_ARENA_ALIGNMENT_SSE, -1);

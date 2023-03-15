@@ -22,7 +22,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   }
   int N = opts.N;
   int nleaf = opts.nleaf;
-  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPISIZE);
   int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &ONE);
   int AY[9]; int INFO;
   double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
@@ -232,7 +232,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // 1. Generate blocks from the current admissible blocks for this level.
   int nleaf = opts.nleaf;
 
-  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPISIZE);
   int AY_local_ncols = fmax(numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
                                     &ONE), 1);
   int AY[9];

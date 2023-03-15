@@ -19,7 +19,7 @@ h2_params [ type="h2_factorize_params_t*" ]
 /* diagonal_multiply_complements task */
 diagonal_multiply_complements(i, level)
 
-level = h2_params->max_level .. (h2_params->min_level)
+level = h2_params->max_level .. (h2_params->min_level) .. -1
 i = 0 .. %{ return pow(2, level)-1; %}
 
 
@@ -76,7 +76,7 @@ i = 0 .. %{ return pow(2, level)-1; %}
 : parsec_D(i, i, level)
 
 RW D <- D diagonal_multiply_complements(i, level)
-     -> D merge_inadmissible_blocks(i, i, level, i/2, i/2, level-1)
+     /* -> BL merge_inadmissible_blocks(i, i, level, i/2, i/2, level-1) [type=BOTTOM_RIGHT] */
      -> parsec_D(i, i, level)
 
 BODY
@@ -95,26 +95,35 @@ END
 /* level = h2_params->max_level .. h2_params->min_level */
 
 /* merge step for inadmissible. */
-merge_inadmissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level)
+/* merge_inadmissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level) */
 
-parent_level = h2_params->max_level .. h2_params->min_level
-parent_i = 0 .. %{ return h2_params->near_list[parent_level].length-1; %}
-parent_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[parent_i].length-1; %}
-child_level = h2_params->max_level-1 .. h2_params->min_level-1
-child_i = 0 .. %{ return h2_params->near_list[child_level].length-1; %}
-child_j = 0 .. %{ return h2_params->near_list[child_level].level_block_list[child_i].length-1; %}
+/* parent_level = h2_params->max_level .. h2_params->min_level */
+/* parent_i = 0 .. %{ return h2_params->near_list[parent_level].length-1; %} */
+/* parent_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[parent_i].length-1; %} */
+/* child_level = h2_params->max_level-1 .. h2_params->min_level-1 */
+/* child_i = 0 .. %{ return h2_params->near_list[child_level].length-1; %} */
+/* child_j = 0 .. %{ return h2_params->near_list[child_level].level_block_list[child_i].length-1; %} */
 
-  : parsec_D(child_i, child_j, child_level)
+/*   : parsec_D(parent_i/2, parent_j/2, child_level) */
 
-RW D <- D factorize_diagonal(parent_i, parent_level)
-     -> parsec_D(child_i, child_i, child_level)
+/* READ TL <- parent_i == parent_j ? D factorize_diagonal(parent_i  , parent_j  , parent_level) [type_remote=SMALL_TILE] */
+/*         <- %{ return parent_is_inadmissible() %} ? D ... */
+/* READ TR <- D factorize_diagonal(parent_i  , parent_j+1, parent_level) [type_remote=SMALL_TILE] */
+/* READ BL <- D factorize_diagonal(parent_i+1, parent_j  , parent_level) [type_remote=SMALL_TILE] */
+/* READ BR <- D factorize_diagonal(parent_i+1, parent_j+1, parent_level) [type_remote=SMALL_TILE] */
+/* WRITE TILE <- NEW [type=TILE] */
+/*            -> D factorize_diagonal(parent_i/2, parent_j/2, parent_level+1) */
 
-BODY
-{
-  printf("merge dense parent_l: %d parent_i: %d parent_j: %d child_l: %d child_i: %d child_j: %d\n",
-         parent_level, parent_i, parent_j, child_level, child_i, child_j);
-}
-END
+/* BODY */
+/* { */
+/*   printf("merge dense parent_l: %d parent_i: %d parent_j: %d child_l: %d child_i: %d child_j: %d\n", */
+/*          parent_level, parent_i, parent_j, child_level, child_i, child_j); */
+
+/*   for (int i = 0; i < h2_params->max_rank; ++i) { */
+/*     memcpy(&TILE[i * h2_params->max_rank*2], &TL[i * max_rank], h2_params->max_rank * sizeof(double)); /\* copy the length *\/ */
+/*   } */
+/* } */
+/* END */
 
 /* /\* merge step for admissible blocks. *\/ */
 /* merge_admissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level) */
