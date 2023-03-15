@@ -22,7 +22,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   }
   int N = opts.N;
   int nleaf = opts.nleaf;
-  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPISIZE);
+  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &ONE);
   int AY[9]; int INFO;
   double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
@@ -103,8 +103,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int IU = nleaf * block + 1;
       int JU = 1;
       WORK =  new double[(int64_t)LWORK]();
-
-      std::cout << "IAY: " << IAY << " LWORK: " << LWORK << std::endl;
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &nleaf, &nleaf,
@@ -232,7 +230,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // 1. Generate blocks from the current admissible blocks for this level.
   int nleaf = opts.nleaf;
 
-  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPISIZE);
+  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int AY_local_ncols = fmax(numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
                                     &ONE), 1);
   int AY[9];
@@ -274,7 +272,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   int block_nrows = rank * 2;
   int TEMP_nrows = nblocks * block_nrows;
-  int TEMP_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPISIZE),1);
+  int TEMP_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]),1);
   int TEMP_local_ncols = fmax(numroc_(&level_block_size, &nleaf,
                                       &MYCOL, &ZERO, &ONE), 1);
   int TEMP[9];
@@ -326,7 +324,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
   // Allocate a global matrix to store the transfer matrices. The transfer matrices for the
   // entire level are stacked by row in this global matrix.
-  int UTRANSFER_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPISIZE), 1);
+  int UTRANSFER_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int UTRANSFER_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &ONE), 1);
   int UTRANSFER[9];
 
@@ -437,7 +435,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   // 4. Generate the real basis at this level from the transfer matrices and the real basis one
   // level below.
-  int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPISIZE);
+  int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int U_REAL_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &ONE), 1);
   int U_REAL[9];
   U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols]();
@@ -495,8 +493,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   // Allocate a (nblocks * max_rank) ** 2 global matrix for temporary storage of the S blocks.
   int S_BLOCKS_nrows = nblocks * rank;
-  int S_BLOCKS_local_nrows = fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPISIZE), 1);
-  int S_BLOCKS_local_ncols = fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &ONE), 1);
+  int S_BLOCKS_local_nrows = fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int S_BLOCKS_local_ncols = fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int S_BLOCKS[9];
   double *S_BLOCKS_MEM = new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
 
@@ -615,8 +613,8 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
                         const Args& opts, double* DENSE_MEM, std::vector<int>& DENSE) {
   // init global U matrix
   int nleaf = opts.nleaf; int N = opts.N; int INFO;
-  int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPISIZE);
-  int U_ncols = fmax(numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &ONE), 1);
+  int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int U_ncols = fmax(numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols]();
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);

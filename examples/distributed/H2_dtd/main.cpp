@@ -37,8 +37,8 @@ redistribute_vector2scalapack(std::vector<Matrix>& x,
   // send Matrix blocks to procs where scalapack blocks exist.
   for (int i = 0; i < nblocks; ++i) {
     int x_rank = mpi_rank(i);
-    int scalapack_rank = (i % MPISIZE) * ONE;
-    int index = i / MPISIZE;
+    int scalapack_rank = (i % MPIGRID[0]) * MPIGRID[1];
+    int index = i / MPIGRID[0];
     MPI_Request req;
 
     if (MPIRANK == x_rank) {
@@ -52,8 +52,8 @@ redistribute_vector2scalapack(std::vector<Matrix>& x,
   for (int i = 0; i < nblocks; ++i) {
     MPI_Status status;
     int x_rank = mpi_rank(i);
-    int scalapack_rank = (i % MPISIZE) * ONE;
-    int index = (i / MPISIZE) * opts.nleaf;
+    int scalapack_rank = (i % MPIGRID[0]) * MPIGRID[1];
+    int index = (i / MPIGRID[0]) * opts.nleaf;
 
     if (MPIRANK == scalapack_rank) {
       MPI_Recv(&x_mem[index], opts.nleaf, MPI_DOUBLE, x_rank,
@@ -73,8 +73,8 @@ redistribute_scalapack2vector(std::vector<Matrix>& x,
   for (int i = 0; i < nblocks; ++i) {
     MPI_Request req;
     int x_rank = mpi_rank(i);
-    int scalapack_rank = (i % MPISIZE) * ONE;
-    int index = (i / MPISIZE) * opts.nleaf;
+    int scalapack_rank = (i % MPIGRID[0]) * MPIGRID[1];
+    int index = (i / MPIGRID[0]) * opts.nleaf;
 
     if (MPIRANK == scalapack_rank) {
       // std::cout << "S2V TAG: " << i << std::endl;
@@ -86,8 +86,8 @@ redistribute_scalapack2vector(std::vector<Matrix>& x,
   for (int i = 0; i < nblocks; ++i) {
     MPI_Status status;
     int x_rank = mpi_rank(i);
-    int scalapack_rank = (i % MPISIZE) * ONE;
-    int index = i / MPISIZE;
+    int scalapack_rank = (i % MPIGRID[0]) * MPIGRID[1];
+    int index = i / MPIGRID[0];
 
     if (MPIRANK == x_rank) {
       MPI_Recv(&x[index], opts.nleaf, MPI_DOUBLE, scalapack_rank,
@@ -202,7 +202,7 @@ int main(int argc, char **argv) {
   auto start_construct = std::chrono::system_clock::now();
 
   Cblacs_get(-1, 0, &BLACS_CONTEXT );
-  Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPISIZE, ONE);
+  Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
 
 
@@ -212,8 +212,8 @@ int main(int argc, char **argv) {
 
   int DENSE_NBROW = opts.nleaf;
   int DENSE_NBCOL = opts.nleaf;
-  int DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPISIZE);
-  int DENSE_local_cols = numroc_(&N, &DENSE_NBCOL, &MYCOL, &ZERO, &ONE);
+  int DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
+  int DENSE_local_cols = numroc_(&N, &DENSE_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
   std::vector<int> DENSE(DESC_LEN);
 
   descinit_(DENSE.data(), &N, &N, &DENSE_NBROW, &DENSE_NBCOL, &ZERO, &ZERO,
@@ -230,8 +230,8 @@ int main(int argc, char **argv) {
   for (int64_t i = 0; i < DENSE_local_rows; ++i) {
 #pragma omp parallel for
     for (int64_t j = 0; j < DENSE_local_cols; ++j) {
-      int g_row = indxl2g(i + 1, DENSE_NBROW, MYROW, ZERO, MPISIZE) - 1;
-      int g_col = indxl2g(j + 1, DENSE_NBCOL, MYCOL, ZERO, ONE) - 1;
+      int g_row = indxl2g(i + 1, DENSE_NBROW, MYROW, ZERO, MPIGRID[0]) - 1;
+      int g_col = indxl2g(j + 1, DENSE_NBCOL, MYCOL, ZERO, MPIGRID[1]) - 1;
 
       DENSE_MEM[i + j * DENSE_local_rows] =
         opts.kernel(domain.particles[g_row].coords,
@@ -271,8 +271,8 @@ int main(int argc, char **argv) {
 
   // scalapack data structures for x and b.
   std::vector<int> DESCB_CHECK(DESC_LEN), DESCX(DESC_LEN);
-  int B_CHECK_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPISIZE);
-  int B_CHECK_local_cols = numroc_(&ONE, &ONE, &MYCOL, &ZERO, &ONE);
+  int B_CHECK_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
+  int B_CHECK_local_cols = numroc_(&ONE, &ONE, &MYCOL, &ZERO, &MPIGRID[1]);
   std::vector<double> B_CHECK_mem(B_CHECK_local_rows * B_CHECK_local_cols, 0),
     X_mem(B_CHECK_local_rows * B_CHECK_local_cols);
 
@@ -280,10 +280,6 @@ int main(int argc, char **argv) {
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
   descinit_(DESCX.data(), &N, &ONE, &DENSE_NBROW, &ONE,
             &ZERO, &ZERO, &BLACS_CONTEXT, &B_CHECK_local_rows, &info);
-
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  // std::cout << "@@@ DESCINIT X AND B @@@\n";
 
   std::mt19937 gen(MPIRANK);
   std::uniform_real_distribution<double> dist(0, 1);
@@ -303,16 +299,10 @@ int main(int argc, char **argv) {
     }
   }
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  // std::cout << "@@@ START V2S @@@ \n";
-
   redistribute_vector2scalapack(x, X_mem, A, opts);
 
   auto start_matvec = std::chrono::system_clock::now();
-  // MPI_Barrier(MPI_COMM_WORLD);
-  // std::cout << "!!! START MATMUL !!!\n";
   matmul(A, domain, x, b);      // H2 matrix matvec. H2_A * x = b.
-
   auto stop_matvec = std::chrono::system_clock::now();
   double matvec_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_matvec - start_matvec).count();
