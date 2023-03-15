@@ -33,7 +33,7 @@ for adm in 1; do
     # gdb -q -iex "set auto-load safe-path /home/user/gdb" -ex run --args
 
     for N in 65536; do
-        mpirun --oversubscribe -n 64 \
+        mpirun -tag-output --oversubscribe -n 64 \
                ./bin/H2_dtd --N $N \
                       --nleaf $nleaf \
                       --kernel_func laplace \

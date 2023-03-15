@@ -90,7 +90,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                WORK, &LWORK,
                &INFO);
 
-      LWORK = WORK[0] + nleaf * (AY_local_nrows + AY_local_ncols + 1) + AY_local_ncols;
+      LWORK = WORK[0] + nleaf * (AY_local_nrows + AY_local_ncols + 1) * nleaf + AY_local_ncols;
       // workspace query throws a weird error so add nleaf*rank.
 
       delete[] WORK;
@@ -104,7 +104,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       int JU = 1;
       WORK =  new double[(int64_t)LWORK]();
 
-      // std::cout << "IAY: " << IAY << std::endl;
+      std::cout << "IAY: " << IAY << " LWORK: " << LWORK << std::endl;
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &nleaf, &nleaf,

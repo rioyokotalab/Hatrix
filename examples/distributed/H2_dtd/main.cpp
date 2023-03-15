@@ -249,7 +249,7 @@ int main(int argc, char **argv) {
   else if (opts.admis_kind == DIAGONAL) {
     init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   }
-  if(!MPIRANK) A.print_structure();
+  // if(!MPIRANK) A.print_structure();
   construct_h2_matrix(A, domain, opts, DENSE_MEM, DENSE); // construct H2 matrix.
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
