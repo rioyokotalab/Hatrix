@@ -19,7 +19,7 @@ h2_params [ type="h2_factorize_params_t*" ]
 /* diagonal_multiply_complements task */
 diagonal_multiply_complements(i, level)
 
-level = h2_params->max_level .. (h2_params->min_level) .. -1
+level = h2_params->max_level .. h2_params->min_level
 i = 0 .. %{ return pow(2, level)-1; %}
 
 
@@ -47,26 +47,6 @@ BODY
 }
 END
 
-/* left multiply complements */
-/* left_multiply_complements(block, j, level) */
-
-/* level = h2_params->max_level .. h2_params->max_level */
-/* block = 0 .. %{ return h2_params->near_list[level].length-1; %} /\* row iteration *\/ */
-/* j = 0 .. %{ return h2_params->near_list[level].level_block_list[block].length-1; %} */
-
-/* : parsec_D(block, j, level) */
-
-/* RW D <- block == 0 ? parsec_D(block, j, level) */
-/*      -> parsec_D(block, j, level) */
-/* READ U <- parsec_U(block, level) */
-
-/* BODY */
-/* { */
-
-/*   printf("left multiply: %d %d %d\n", block, j, level); */
-/* } */
-/* END */
-
 /* factorize_diagonal task */
 factorize_diagonal(i, level)
 
@@ -76,7 +56,8 @@ i = 0 .. %{ return pow(2, level)-1; %}
 : parsec_D(i, i, level)
 
 RW D <- D diagonal_multiply_complements(i, level)
-     /* -> BL merge_inadmissible_blocks(i, i, level, i/2, i/2, level-1) [type=BOTTOM_RIGHT] */
+     -> i % 2 == 0 ? TL merge_blocks(0, i/2, i/2, level-1) [type=BOTTOM_RIGHT]
+     -> i % 2 == 1 ? BR merge_blocks(3, i/2, i/2, level-1) [type=BOTTOM_RIGHT]
      -> parsec_D(i, i, level)
 
 BODY
@@ -90,9 +71,26 @@ BODY
 }
 END
 
-/* triangle_reduce_cc_co(i, block, level) */
+merge_blocks(position, child_i, child_j, child_level)
 
-/* level = h2_params->max_level .. h2_params->min_level */
+child_level = h2_params->max_level-1 .. h2_params->min_level-1
+child_i = 0 .. %{ return h2_params->near_list[child_level].length-1; %}
+child_j = 0 .. %{ return h2_params->near_list[child_level].level_block_list[child_i].length-1; %}
+position = 0 .. 3               /* TL, TR, BL, BR */
+
+actual_i = %{ return h2_params->near_list[child_level].level_block_list[child_i].indices[child_i]; %}
+actual_j = %{ return h2_params->near_list[child_level].level_block_list[child_j].indices[child_j]; %}
+
+: parsec_D(actual_i, actual_j, child_level)
+
+READ TL <- position == 0 ? D factorize_diagonal(actual_i * 2, child_level+1)     [type=SMALL_TILE]
+READ BR <- position == 3 ? D factorize_diagonal(actual_i * 2 + 1, child_level+1) [type=SMALL_TILE]
+RW D <- parsec_D(actual_i, actual_j, child_level) [type=SMALL_TILE]
+     -> parsec_D(actual_i, actual_j, child_level)
+BODY
+{
+}
+END
 
 /* merge step for inadmissible. */
 /* merge_inadmissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level) */
@@ -124,6 +122,30 @@ END
 /*   } */
 /* } */
 /* END */
+
+/* left multiply complements */
+/* left_multiply_complements(block, j, level) */
+
+/* level = h2_params->max_level .. h2_params->max_level */
+/* block = 0 .. %{ return h2_params->near_list[level].length-1; %} /\* row iteration *\/ */
+/* j = 0 .. %{ return h2_params->near_list[level].level_block_list[block].length-1; %} */
+
+/* : parsec_D(block, j, level) */
+
+/* RW D <- block == 0 ? parsec_D(block, j, level) */
+/*      -> parsec_D(block, j, level) */
+/* READ U <- parsec_U(block, level) */
+
+/* BODY */
+/* { */
+
+/*   printf("left multiply: %d %d %d\n", block, j, level); */
+/* } */
+/* END */
+
+/* triangle_reduce_cc_co(i, block, level) */
+
+/* level = h2_params->max_level .. h2_params->min_level */
 
 /* /\* merge step for admissible blocks. *\/ */
 /* merge_admissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level) */
