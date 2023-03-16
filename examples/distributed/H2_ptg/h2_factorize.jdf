@@ -5,166 +5,284 @@ extern "C" %{
   #include "h2_ptg_internal.h"
   #include "tasks_c_interface.h"
 
-  int64_t get_dim(const int64_t block, const int64_t level, h2_factorize_params_t* params) {
+  int64_t get_dim(const int64_t block, const int64_t level,
+                  h2_factorize_params_t* params) {
     return level == params->max_level ? params->nleaf : params->max_rank * 2;
+  }
+
+  int has_inadmissible_blocks_below_diagonal(int i, int level,
+                                             h2_factorize_params_t* h2_params) {
+    if (i < h2_params->col_near_list[level].level_block_list[i].length-1) {
+      return 1;
+    }
+    return 0;
   }
 %}
 
 /* data descriptors */
 parsec_D [ type="parsec_data_collection_t*"]
-parsec_U [ type="parsec_data_collection_t*" aligned=parsec_D]
+parsec_U [ type="parsec_data_collection_t*"]
 parsec_S [ type="parsec_data_collection_t*" aligned=parsec_D]
+parsec_F [ type="parsec_data_collection_t*"]
+parsec_temp_fill_in_rows [ type="parsec_data_collection_t*" ]
 h2_params [ type="h2_factorize_params_t*" ]
 
-/* diagonal_multiply_complements task */
-diagonal_multiply_complements(i, level)
+/* ++++ BEGIN TASK DESCRIPTION ++++ */
+
+/* fill in recompression - row basis and skeleton matrix update */
+fill_in_addition(block, j, level)
 
 level = h2_params->max_level .. h2_params->min_level
-i = 0 .. %{ return pow(2, level)-1; %}
+block = 0 .. %{ return pow(2, level)-1; %}
+j = 0 .. %{ return h2_params->row_fill_in_list[level].level_block_list[block].length-1; %}
 
+actual_j = %{ return h2_params->row_fill_in_list[level].level_block_list[block].indices[j]; %}
 
-: parsec_D(i, i, level)
+  : parsec_F(block, actual_j, level)
 
-RW D <- parsec_D(i, i, level)
-     -> D factorize_diagonal(i, level)
-     -> parsec_D(i, i, level)
-READ U <- parsec_U(i, level)
+READ D <- parsec_F(block, actual_j, level)
 
 BODY
 {
-  int64_t D_nrows = get_dim(i, level, h2_params);
-  int64_t D_ncols = get_dim(i, level, h2_params);
+}
+END
+
+/* diagonal_multiply_complements task */
+diagonal_multiply_complements(block, level)
+
+level = h2_params->max_level .. h2_params->min_level
+block = 0 .. %{ return pow(2, level)-1; %}
+
+: parsec_D(block, block, level)
+
+RW D <- parsec_D(block, block, level)
+     -> D factorize_diagonal(block, level)
+     -> parsec_D(block, block, level)
+READ U <- parsec_U(block, level)
+
+BODY
+{
+  int64_t D_nrows = get_dim(block, level, h2_params);
+  int64_t D_ncols = get_dim(block, level, h2_params);
   int64_t D_row_rank = h2_params->max_rank;
   int64_t D_col_rank = h2_params->max_rank;
-  int64_t U_nrows = get_dim(i, level, h2_params);
+  int64_t U_nrows = get_dim(block, level, h2_params);
   int64_t U_ncols = h2_params->max_rank;
   char which  = 'F';
 
-  printf("exec compl: i %d l: %d\n", i, level);
+  printf("exec compl: blk %d l: %d\n", block, level);
 
   CORE_multiply_complement(D_nrows, D_ncols, D_row_rank, D_col_rank,
                            U_nrows, U_ncols, (double*)D, (double*)U, which);
 }
 END
 
-/* factorize_diagonal task */
-factorize_diagonal(i, level)
+left_multiply_complements(block, j, level)
 
 level = h2_params->max_level .. h2_params->min_level
-i = 0 .. %{ return pow(2, level)-1; %}
+block = 1 .. %{ return pow(2, level)-1; %}
+j = 0 .. %{ return h2_params->row_near_list[level].level_block_list[block].length-2; %} /* dont want to reach the diagonal */
 
-: parsec_D(i, i, level)
+actual_j = %{ return h2_params->row_near_list[level].level_block_list[block].indices[j]; %}
 
-RW D <- D diagonal_multiply_complements(i, level)
-     -> i % 2 == 0 ? TL merge_blocks(0, i/2, i/2, level-1) [type=BOTTOM_RIGHT]
-     -> i % 2 == 1 ? BR merge_blocks(3, i/2, i/2, level-1) [type=BOTTOM_RIGHT]
-     -> parsec_D(i, i, level)
+: parsec_D(block, actual_j, level)
+
+RW D <- parsec_D(block, actual_j, level)
+     -> parsec_D(block, actual_j, level)
+READ U <- parsec_U(block, level)
 
 BODY
 {
-  int64_t D_nrows = get_dim(i, level, h2_params);
+  int64_t D_nrows = get_dim(block, level, h2_params);
+  int64_t D_ncols = get_dim(block, level, h2_params);
+  int64_t D_row_rank = h2_params->max_rank;
+  int64_t D_col_rank = h2_params->max_rank;
+  int64_t U_nrows = get_dim(block, level, h2_params);
+  int64_t U_ncols = h2_params->max_rank;
+  char which  = 'L';
+
+  printf("left multiply complement: block -> %d actual_j -> %d\n", block, actual_j);
+
+  CORE_multiply_complement(D_nrows, D_ncols, D_row_rank, D_col_rank,
+                           U_nrows, U_ncols, (double*)D, (double*)U, which);
+}
+END
+
+right_multiply_complements(i, block, level)
+
+level = h2_params->max_level .. h2_params->min_level
+block = 0 .. %{ return pow(2, level) - 1; %}
+i = 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %} /* blocks below the diagonal */
+
+actual_i = %{ return h2_params->col_near_list[level].level_block_list[block].indices[i]; %}
+
+  : parsec_D(actual_i, block, level)
+
+RW D <- parsec_D(actual_i, block, level)
+     -> parsec_D(actual_i, block, level)
+READ U <- parsec_U(block, level)
+
+BODY
+{
+}
+END
+
+/* factorize_diagonal task */
+factorize_diagonal(block, level)
+
+level = h2_params->max_level .. h2_params->min_level
+block = 0 .. %{ return pow(2, level)-1; %}
+col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].length; %}
+row_blocks = %{ return h2_params->row_near_list[level].level_block_list[block].length; %}
+
+: parsec_D(block, block, level)
+
+RW D <- D diagonal_multiply_complements(block, level)
+     -> block < %{ return pow(2, level)-1; %} ? D triangle_reduce_cc_oc(1 .. col_blocks-1, block, level)
+     -> D triangle_reduce_co(block, 0 .. row_blocks-1 ,level)
+     -> D schurs_complement_1(0 .. col_blocks-1, block, level)
+     -> parsec_D(block, block, level)
+
+BODY
+{
+  int64_t D_nrows = get_dim(block, level, h2_params);
   int64_t rank_nrows = h2_params->max_rank;
 
-  printf("exec diag i : %d l: %d\n", i, level);
+  printf("exec diag block : %d l: %d col_block: %d\n", block, level, col_blocks);
 
   CORE_factorize_diagonal(D_nrows, rank_nrows, (double*)D);
 }
 END
 
-merge_blocks(position, child_i, child_j, child_level)
+/* triangle_reduction */
 
-child_level = h2_params->max_level-1 .. h2_params->min_level-1
-child_i = 0 .. %{ return h2_params->near_list[child_level].length-1; %}
-child_j = 0 .. %{ return h2_params->near_list[child_level].level_block_list[child_i].length-1; %}
-position = 0 .. 3               /* TL, TR, BL, BR */
+/* trsm reduce cc and co. */
+triangle_reduce_cc_oc(i, block, level)
 
-actual_i = %{ return h2_params->near_list[child_level].level_block_list[child_i].indices[child_i]; %}
-actual_j = %{ return h2_params->near_list[child_level].level_block_list[child_j].indices[child_j]; %}
+level = h2_params->max_level .. h2_params->min_level
+block = 0 .. %{ return pow(2, level)-1; %}
+i = 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
+/* i is not an actual index. It is a CSC index. */
 
-: parsec_D(actual_i, actual_j, child_level)
+actual_i = %{ return h2_params->col_near_list[level].level_block_list[block].indices[i]; %}
+col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
 
-READ TL <- position == 0 ? D factorize_diagonal(actual_i * 2, child_level+1)     [type=SMALL_TILE]
-READ BR <- position == 3 ? D factorize_diagonal(actual_i * 2 + 1, child_level+1) [type=SMALL_TILE]
-RW D <- parsec_D(actual_i, actual_j, child_level) [type=SMALL_TILE]
-     -> parsec_D(actual_i, actual_j, child_level)
+  : parsec_D(actual_i, block, level)
+
+READ D <- D factorize_diagonal(block, level)
+RW BLOCK <- parsec_D(actual_i, block, level)
+         -> BLOCK schurs_complement_1(i, block, level)
+         -> BLOCK syrk_2(i, block, level)
+         -> parsec_D(actual_i, block, level)
 BODY
 {
+  int64_t D_rows = get_dim(block, level, h2_params);
+  int64_t D_cols = D_rows;
+  int64_t D_row_rank = h2_params->max_rank;
+  int64_t D_col_rank = h2_params->max_rank;
+  int64_t O_rows = get_dim(actual_i, level, h2_params);
+  int64_t O_cols = D_cols;
+  int64_t O_row_rank = h2_params->max_rank;
+  int64_t O_col_rank = h2_params->max_rank;
+  char which = 'T';
+
+  CORE_trsm(D_rows, D_cols, D_row_rank, D_col_rank, (double*)D,
+            O_rows, O_cols, O_row_rank, O_col_rank, (double*)BLOCK, which);
+
+
+  printf("TRSM CC OC actual i: %d actual_block: %d\n", actual_i, block);
 }
 END
 
-/* merge step for inadmissible. */
-/* merge_inadmissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level) */
+/* trsm reduce co */
+triangle_reduce_co(block, j, level)
 
-/* parent_level = h2_params->max_level .. h2_params->min_level */
-/* parent_i = 0 .. %{ return h2_params->near_list[parent_level].length-1; %} */
-/* parent_j = 0 .. %{ return h2_params->near_list[parent_level].level_block_list[parent_i].length-1; %} */
-/* child_level = h2_params->max_level-1 .. h2_params->min_level-1 */
-/* child_i = 0 .. %{ return h2_params->near_list[child_level].length-1; %} */
-/* child_j = 0 .. %{ return h2_params->near_list[child_level].level_block_list[child_i].length-1; %} */
+level = h2_params->max_level .. h2_params->min_level
+block = 1 .. %{ return pow(2, level)-1;%}
+j = 0 .. %{ return h2_params->row_near_list[level].level_block_list[block].length-2;%} /* dont include diagonal */
 
-/*   : parsec_D(parent_i/2, parent_j/2, child_level) */
+actual_j = %{ return h2_params->row_near_list[level].level_block_list[block].indices[j]; %}
 
-/* READ TL <- parent_i == parent_j ? D factorize_diagonal(parent_i  , parent_j  , parent_level) [type_remote=SMALL_TILE] */
-/*         <- %{ return parent_is_inadmissible() %} ? D ... */
-/* READ TR <- D factorize_diagonal(parent_i  , parent_j+1, parent_level) [type_remote=SMALL_TILE] */
-/* READ BL <- D factorize_diagonal(parent_i+1, parent_j  , parent_level) [type_remote=SMALL_TILE] */
-/* READ BR <- D factorize_diagonal(parent_i+1, parent_j+1, parent_level) [type_remote=SMALL_TILE] */
-/* WRITE TILE <- NEW [type=TILE] */
-/*            -> D factorize_diagonal(parent_i/2, parent_j/2, parent_level+1) */
+  : parsec_D(block, actual_j, level)
 
-/* BODY */
-/* { */
-/*   printf("merge dense parent_l: %d parent_i: %d parent_j: %d child_l: %d child_i: %d child_j: %d\n", */
-/*          parent_level, parent_i, parent_j, child_level, child_i, child_j); */
+READ D <- D factorize_diagonal(block, level)
+RW BLOCK <- parsec_D(block, actual_j, level)
+         -> parsec_D(block, actual_j, level)
 
-/*   for (int i = 0; i < h2_params->max_rank; ++i) { */
-/*     memcpy(&TILE[i * h2_params->max_rank*2], &TL[i * max_rank], h2_params->max_rank * sizeof(double)); /\* copy the length *\/ */
-/*   } */
-/* } */
-/* END */
+BODY
+  {
+    int64_t D_rows = get_dim(block, level, h2_params);
+    int64_t D_cols = get_dim(block, level, h2_params);
+    int64_t D_row_rank = h2_params->max_rank;
+    int64_t D_col_rank = h2_params->max_rank;
 
-/* left multiply complements */
-/* left_multiply_complements(block, j, level) */
+    int64_t O_rows = get_dim(actual_j, level, h2_params);
+    int64_t O_cols = get_dim(block, level, h2_params);
+    int64_t O_row_rank = h2_params->max_rank;
+    int64_t O_col_rank = h2_params->max_rank;
 
-/* level = h2_params->max_level .. h2_params->max_level */
-/* block = 0 .. %{ return h2_params->near_list[level].length-1; %} /\* row iteration *\/ */
-/* j = 0 .. %{ return h2_params->near_list[level].level_block_list[block].length-1; %} */
+    char which = 'B';
 
-/* : parsec_D(block, j, level) */
+    CORE_trsm(D_rows, D_cols, D_row_rank, D_col_rank, (double*)D,
+              O_rows, O_cols, O_row_rank, O_col_rank, (double*)BLOCK, which);
+}
+END
 
-/* RW D <- block == 0 ? parsec_D(block, j, level) */
-/*      -> parsec_D(block, j, level) */
-/* READ U <- parsec_U(block, level) */
+/* compute_schurs_complement */
+schurs_complement_1(i, block, level)
 
-/* BODY */
-/* { */
+level = h2_params->max_level .. h2_params->min_level
+block = 0 .. %{ return pow(2, level)-1; %}
+i = 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
 
-/*   printf("left multiply: %d %d %d\n", block, j, level); */
-/* } */
-/* END */
+actual_i = %{ return h2_params->col_near_list[level].level_block_list[block].indices[i]; %}
 
-/* triangle_reduce_cc_co(i, block, level) */
+: parsec_D(actual_i, block, level)
 
-/* level = h2_params->max_level .. h2_params->min_level */
+READ D <- D factorize_diagonal(block, level)
+RW BLOCK <- BLOCK triangle_reduce_cc_oc(i, block, level)
+         -> parsec_D(actual_i, block, level)
 
-/* /\* merge step for admissible blocks. *\/ */
-/* merge_admissible_blocks(parent_i, parent_j, parent_level, child_i, child_j, child_level) */
+BODY
+{
+  int64_t D_block_block_nrows = get_dim(block, level, h2_params);
+  int64_t D_block_rank = h2_params->max_rank;
+  int64_t D_i_block_nrows = get_dim(actual_i, level, h2_params);
+  int64_t D_i_block_ncols = get_dim(block, level, h2_params);
 
-/* parent_level = h2_params->max_level .. h2_params->min_level */
-/* parent_i = 0 .. %{ return h2_params->far_list[parent_level].length; %} */
-/* parent_j = 0 .. %{ return h2_params->far_list[parent_level].level_block_list[parent_i].length; %} */
-/* child_level = h2_params->max_level-1 .. h2_params->min_level-1 */
-/* child_i = 0 .. %{ return h2_params->far_list[parent_level].length; %} */
-/* child_j = 0 .. %{ return h2_params->far_list[parent_level].level_block_list[child_i].length; %} */
+  CORE_schurs_complement_1(D_block_block_nrows,
+                           D_block_rank,
+                           (double*)D,
+                           D_i_block_nrows,
+                           D_i_block_ncols,
+                           (double*)BLOCK);
+  printf("schurs_complement_1 actual i: %d actual_block: %d\n", actual_i, block);
+}
+END
 
-/*   : parsec_D(child_i, child_j, child_level) */
+syrk_2(i, block, level)
 
-/* READ S <- parsec_S(parent_i, parent_j, parent_level) */
-/* RW D <- parsec_D(child_i, child_j, child_level) */
-/*      -> parsec_D(child_i, child_j, child_level) */
+level = h2_params->max_level .. h2_params->min_level
+block = 0 .. %{ return pow(2, level)-1; %}
+i = 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
 
-/* BODY */
-/* { */
-/*   printf("merge admissible blocks.\n"); */
-/* } */
-/* END */
+actual_i = %{ return h2_params->col_near_list[level].level_block_list[block].indices[i]; %}
+
+: parsec_D(actual_i, actual_i, level)
+
+READ BLOCK <- BLOCK triangle_reduce_cc_oc(i, block, level)
+RW D <- parsec_D(actual_i, actual_i, level)
+     -> parsec_D(actual_i, actual_i, level)
+
+BODY
+{
+  int64_t D_i_block_nrows = get_dim(actual_i, level, h2_params);
+  int64_t D_i_block_ncols = get_dim(block, level, h2_params);
+  int64_t D_block_rank = h2_params->max_rank;
+  int64_t D_i_j_nrows = get_dim(actual_i, level, h2_params);
+  int64_t D_i_j_ncols = get_dim(actual_i, level, h2_params);
+
+  CORE_syrk_2(D_i_block_nrows, D_i_block_ncols, D_block_rank, (double*)BLOCK,
+              D_i_j_nrows, D_i_j_ncols, (double*)D);
+}
+END

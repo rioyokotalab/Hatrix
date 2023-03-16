@@ -228,15 +228,15 @@ void CORE_fill_in_addition(int64_t F_nrows,  int64_t F_ncols,
   }
 }
 
-void CORE_fill_in_recompression(  int64_t block_size,
-                                  double *_fill_in,
-                                  int64_t rank,
-                                  double *_US,
-                                  int64_t U_nrows, int64_t U_ncols,
-                                  double *_U,
-                                  int64_t proj_nrows,
-                                  double *_proj,
-                                  char which) {
+void CORE_fill_in_recompression(int64_t block_size,
+                                double *_fill_in,
+                                int64_t rank,
+                                double *_US,
+                                int64_t U_nrows, int64_t U_ncols,
+                                double *_U,
+                                int64_t proj_nrows,
+                                double *_proj,
+                                char which) {
   MatrixWrapper fill_in(_fill_in, block_size, block_size, block_size);
   MatrixWrapper US(_US, rank, rank, rank);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
@@ -264,11 +264,11 @@ void CORE_fill_in_recompression(  int64_t block_size,
   US.copy_mem(Si);
 }
 
-void CORE_project_S(  int64_t S_nrows,
-                      double *_S,
-                      int64_t proj_nrows,
-                      double *_proj,
-                      char which) {
+void CORE_project_S(int64_t S_nrows,
+                    double *_S,
+                    int64_t proj_nrows,
+                    double *_proj,
+                    char which) {
   MatrixWrapper S(_S, S_nrows, S_nrows, S_nrows);
   MatrixWrapper proj(_proj, proj_nrows, proj_nrows, proj_nrows);
 

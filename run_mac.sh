@@ -10,6 +10,8 @@ ROOT=$PWD
 
 set -e
 
+make clean
+
 # export VECLIB_MAXIMUM_THREADS=1
 cd examples/distributed/H2_ptg
 ./compile_jdf.sh
@@ -17,16 +19,16 @@ cd $ROOT
 
 ulimit -c unlimited
 
-make -j H2_dtd
+make -j H2_ptg
 # make -j H2_dtd
 
 nleaf=256
 max_rank=50
 ndim=3
-adm=0
+adm=1
 
-for N in 8192; do
-    ./bin/H2_dtd --N $N \
+for N in 1024; do
+    ./bin/H2_ptg --N $N \
                  --nleaf $nleaf \
                  --kernel_func laplace \
                  --kind_of_geometry grid \
@@ -37,7 +39,7 @@ for N in 8192; do
                  --admis_kind diagonal \
                  --construct_algorithm miro \
                  --add_diag 1e-9  \
-                 --kind_of_recompression 3 --use_nested_basis
+                 --kind_of_recompression 3 --parsec_cores 1
 
 
     # ./bin/H2_ptg --N $N \

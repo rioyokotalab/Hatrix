@@ -29,18 +29,13 @@
 
 using namespace Hatrix;
 
-static void
-h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize_params* h2_params) {
-  h2_params->min_level = A.min_level;
-  h2_params->max_level = A.max_level;
-  h2_params->max_rank = opts.max_rank;
-  h2_params->nleaf = opts.nleaf;
-
-  h2_params->near_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
+static void init_near_lists(SymmetricSharedBasisMatrix& A, Domain& domain, Args& opts,
+                            h2_factorize_params* h2_params) {
+  h2_params->row_near_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
   for (int level = A.max_level; level >= A.min_level-1; --level) {
-    h2_params->near_list[level].length = pow(2, level);
-    h2_params->near_list[level].level_block_list =
-      (level_list*)malloc(h2_params->near_list[level].length * sizeof(level_list));
+    h2_params->row_near_list[level].length = pow(2, level);
+    h2_params->row_near_list[level].level_block_list =
+      (level_list*)malloc(h2_params->row_near_list[level].length * sizeof(level_list));
 
     for (int i = 0; i < pow(2, level); ++i) {
       int length = 0;
@@ -50,18 +45,128 @@ h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Args& opts, h2_factorize
         }
       }
 
-      h2_params->near_list[level].level_block_list[i].length = length;
-      h2_params->near_list[level].level_block_list[i].indices = (int*)malloc(length * sizeof(int));
+      h2_params->row_near_list[level].level_block_list[i].length = length;
+      h2_params->row_near_list[level].level_block_list[i].indices = (int*)malloc(length * sizeof(int));
 
       int j_index = 0;
       for (int j = 0; j <= i; ++j) {
         if (A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level)) {
-          h2_params->near_list[level].level_block_list[i].indices[j_index] = j;
+          h2_params->row_near_list[level].level_block_list[i].indices[j_index] = j;
           j_index++;
         }
       }
     }
   }
+
+  h2_params->col_near_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
+  for (int level = A.max_level; level>=A.min_level-1; --level) {
+    h2_params->col_near_list[level].length = pow(2, level);
+    h2_params->col_near_list[level].level_block_list =
+      (level_list*)malloc(h2_params->col_near_list[level].length * sizeof(level_list));
+
+    // lower triangle iterations column first.
+    for (int j = 0; j < pow(2, level); ++j) {
+      int length = 0;
+      for (int i = j; i < pow(2, level); ++i) {
+        if (A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level)) {
+          length++;
+        }
+      }
+      h2_params->col_near_list[level].level_block_list[j].length = length;
+      h2_params->col_near_list[level].level_block_list[j].indices = (int*)malloc(length * sizeof(int));
+      int i_index = 0;
+      for (int i = j; i < pow(2, level); ++i) {
+        if (A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level)) {
+          h2_params->col_near_list[level].level_block_list[j].indices[i_index] = i;
+          i_index++;
+        }
+      }
+    }
+  }
+}
+
+static void
+init_fill_in_lists(SymmetricSharedBasisMatrix& A, Domain& domain, Args& opts,
+                   h2_factorize_params* h2_params) {
+  // calculate list of fill-ins in the row.
+  h2_params->row_fill_in_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
+  for (int level = A.max_level; level >= A.min_level-1; --level) {
+    h2_params->row_fill_in_list[level].length = pow(2, level);
+    h2_params->row_fill_in_list[level].level_block_list =
+      (level_list*)malloc(h2_params->row_fill_in_list[level].length * sizeof(level_list));
+
+    int nblocks = pow(2, level);
+    for (int block = 0; block < nblocks; ++block) {
+      // nb * nb fill-in
+      for (int i = block+1; i < nblocks; ++i) {
+        int length = 0;
+        std::vector<int> indices_list;
+        for (int j = block+1; j < i; ++j) {
+          if (exists_and_inadmissible(A, i, block, level) &&
+              exists_and_inadmissible(A, j, block, level) &&
+              exists_and_inadmissible(A, i, j, level)) {
+            auto F_ij_key = parsec_F.super.data_key(&parsec_F.super, i, j, level);
+
+            if (mpi_rank(i) == MPIRANK) {
+              if (!F.exists(i, j, level)) {
+                Matrix fill_in = Matrix(get_dim(A, domain, i, level), get_dim(A, domain, j, level));
+                F.insert(i, j, level, std::move(fill_in));
+                Matrix& fill_in_ref = F(i, j, level);
+                parsec_F.matrix_map[F_ij_key] = std::addressof(fill_in_ref);
+              }
+            }
+            parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i);
+            indices_list.push_back(j);
+            length++;
+          }
+        }
+
+        // nb * rank fill-in
+        for (int j = 0; j < block; ++j) {
+          if (exists_and_inadmissible(A, i, block, level) &&
+              exists_and_inadmissible(A, block, j, level) &&
+              exists_and_inadmissible(A, i, j, level)) {
+            auto F_ij_key = parsec_F.super.data_key(&parsec_F.super, i, j, level);
+
+            if (mpi_rank(i) == MPIRANK) {
+              if (!F.exists(i, j, level)) {
+                Matrix fill_in = Matrix(get_dim(A, domain, i, level), get_dim(A, domain, j, level));
+                F.insert(i, j, level, std::move(fill_in));
+                Matrix& fill_in_ref = F(i, j, level);
+                parsec_F.matrix_map[F_ij_key] = std::addressof(fill_in_ref);
+              }
+            }
+            parsec_F.mpi_ranks[F_ij_key] = mpi_rank(i);
+            indices_list.push_back(j);
+            length++;
+          }
+        }
+        std::sort(indices_list.begin(), indices_list.end());
+        h2_params->row_fill_in_list[level].level_block_list[block].indices = (int*)malloc(length * sizeof(int));
+        memcpy(h2_params->row_fill_in_list[level].level_block_list[block].indices, indices_list.data(),
+               length * sizeof(int));
+      }
+    }
+  }
+
+  // calculate list of fill-ins in the col.
+  h2_params->col_fill_in_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
+  for (int level = A.max_level; level >= A.min_level-1; --level) {
+
+  }
+}
+
+static void
+h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Domain& domain, Args& opts,
+                         h2_factorize_params* h2_params) {
+  h2_params->min_level = A.min_level;
+  h2_params->max_level = A.max_level;
+  h2_params->max_rank = opts.max_rank;
+  h2_params->nleaf = opts.nleaf;
+
+  init_near_lists(A, domain, opts, h2_params);
+  init_fill_in_lists(A, domain, opts, h2_params);
+
 
   h2_params->far_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
   for (int level = A.max_level; level >= A.min_level-1; --level) {
@@ -318,8 +423,6 @@ int main(int argc, char **argv) {
     std::chrono::milliseconds>(stop_construct - start_construct).count();
 
 
-
-
   int64_t dense_blocks = A.leaf_dense_blocks();
   construct_max_rank = A.max_rank(); // get max rank of H2 matrix post construct.
 
@@ -389,10 +492,11 @@ int main(int argc, char **argv) {
     exit(-1);
   }
   h2_factorize_params_t h2_params;
-  h2_factorize_params_init(A, opts, &h2_params);
+  h2_factorize_params_init(A, domain, opts, &h2_params);
 
   factorize_setup(A, domain, opts);
-  parsec_h2_factorize_taskpool_t* h2_factorize_tasks = h2_factorize_New(A, domain, &h2_params);
+  parsec_h2_factorize_taskpool_t* h2_factorize_tasks =
+    h2_factorize_New(A, domain, &h2_params);
 
   parsec_context_add_taskpool(parsec, (parsec_taskpool_t*)h2_factorize_tasks);
 

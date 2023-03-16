@@ -16,8 +16,10 @@ typedef struct h2_factorize_params {
   int max_level;
   int max_rank;
   int nleaf;
-  h2_block_list *near_list;
+  h2_block_list *row_near_list;
+  h2_block_list *col_near_list;
   h2_block_list *far_list;
+  h2_block_list *row_fill_in_list, *col_fill_in_list;
 } h2_factorize_params_t;
 
 #endif
