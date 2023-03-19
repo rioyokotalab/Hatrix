@@ -140,7 +140,6 @@ row_blocks = %{ return h2_params->row_near_list[level].level_block_list[block].l
 RW D <- D diagonal_multiply_complements(block, level)
      -> block < %{ return pow(2, level)-1; %} ? D triangle_reduce_cc_oc(1 .. col_blocks-1, block, level)
      -> D triangle_reduce_co(block, 0 .. row_blocks-1 ,level)
-     -> D schurs_complement_1(0 .. col_blocks-1, block, level)
      -> parsec_D(block, block, level)
 
 BODY
@@ -171,7 +170,9 @@ col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].l
 
 READ D <- D factorize_diagonal(block, level)
 RW BLOCK <- parsec_D(actual_i, block, level)
-         -> BLOCK schurs_complement_1(i, block, level)
+         -> BLOCK schurs_complement_1(i .. col_blocks-1, block, level)
+         -> A schurs_complement_2(i, i+1 .. col_blocks, block, level)
+         -> B schurs_complement_2(i .. col_blocks, i, block, level)
          -> BLOCK syrk_2(i, block, level)
          -> parsec_D(actual_i, block, level)
 BODY
@@ -284,5 +285,23 @@ BODY
 
   CORE_syrk_2(D_i_block_nrows, D_i_block_ncols, D_block_rank, (double*)BLOCK,
               D_i_j_nrows, D_i_j_ncols, (double*)D);
+}
+END
+
+schurs_complement_2(i, j, block, level)
+
+level = h2_params->max_level .. h2_params->min_level
+block = 2 .. %{ return pow(2, level)-1; %}
+i = 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
+j = 2 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
+
+actual_i = %{ return h2_params->col_near_list[level].level_block_list[block].indices[i]; %}
+actual_j = %{ return h2_params->col_near_list[level].level_block_list[block].indices[j]; %}
+
+READ
+
+
+BODY
+{
 }
 END

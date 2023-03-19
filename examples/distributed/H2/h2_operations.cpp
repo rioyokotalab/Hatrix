@@ -93,10 +93,9 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
   }
 
   // b*c x (b*c).T -> b*b.
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    for (int64_t j = block+1; j < nblocks; ++j) {
-      if (exists_and_inadmissible(A, i, block, level) &&
-          exists_and_inadmissible(A, j, block, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    for (int64_t j : near_neighbours(block, level)) {
+      if (i >= block+1 && j >= block+1) {
         if (exists_and_inadmissible(A, i, j, level)) {
           auto D_i_block_split =
             A.D(i, block, level).split({},
@@ -123,8 +122,8 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
   // schur's complement behind the diagonal block.
 
   // (r*c) x (c*r) = (r*r)
-  for (int64_t j = 0; j < block; ++j) {
-    if (exists_and_inadmissible(A, j, block, level)) {
+  for (int64_t j : near_neighbours(block, level)) {
+    if (j < block) {
       auto D_block_block_split = split_dense(A.D(block, block, level),
                                              A.D(block, block, level).rows - A.ranks(block, level),
                                               A.D(block, block, level).cols - A.ranks(block, level));
@@ -137,10 +136,9 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
   }
 
   // (nb*c) x (c*r) -> (nb*r)
-  for (int64_t i = block+1; i < nblocks; ++i) {
-    for (int64_t j = 0; j < block; ++j) {
-      if (exists_and_inadmissible(A, i, block, level) &&
-          exists_and_inadmissible(A, block, j, level)) {
+  for (int64_t i : near_neighbours(block, level)) {
+    for (int64_t j : near_neighbours(block, level)) {
+      if (i >= block+1 && j < block) {
         if (exists_and_inadmissible(A, i, j, level)) {
           auto D_i_block_splits =
             A.D(i, block, level).split({},

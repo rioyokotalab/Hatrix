@@ -13,9 +13,9 @@ set -e
 make clean
 
 # export VECLIB_MAXIMUM_THREADS=1
-cd examples/distributed/H2_ptg
-./compile_jdf.sh
-cd $ROOT
+# cd examples/distributed/H2_ptg
+# ./compile_jdf.sh
+# cd $ROOT
 
 ulimit -c unlimited
 
@@ -25,21 +25,20 @@ make -j H2_main
 nleaf=256
 max_rank=50
 ndim=2
-adm=0
+adm=2
 
-for N in 40000; do
+for N in 4096; do
     ./bin/H2_main --N $N \
                  --nleaf $nleaf \
-                 --kernel_func gsl_matern \
+                 --kernel_func laplace \
                  --kind_of_geometry grid \
                  --ndim $ndim \
                  --max_rank $max_rank \
-                 --accuracy -1 \
+                 --accuracy -1 p\
                  --admis $adm \
                  --admis_kind diagonal \
                  --construct_algorithm miro \
-                 --geometry_file "/Users/sameer/Downloads/XY_40000_1" \
-                 --param_1 1e-4 --param_2 1 --param_3 0.9983  \
+                 --param_1 1e-9  \
                  --kind_of_recompression 3
 
 
@@ -53,6 +52,6 @@ for N in 40000; do
     #              --admis $adm \
     #              --admis_kind diagonal \
     #              --construct_algorithm miro \
-    #              --add_diag 1e-9  \
+    #              --param_1 1e-9  \
     #              --kind_of_recompression 3
 done

@@ -29,7 +29,7 @@ max_rank=50
 ndim=2
 adm=0
 
-for N in 40000; do
+for N in 125000; do
     for p1 in 1e-2 1e-3 1e-4 1e-5; do
         for p2 0.5 0.8 1; do
             for p3 in 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1; do
@@ -43,7 +43,7 @@ for N in 40000; do
                               --admis $adm \
                               --admis_kind diagonal \
                               --construct_algorithm miro \
-                              --geometry_file "/home/sameer.deshmukh/XY_40000_1" \
+                              --geometry_file "/home/sameer.deshmukh/soil_2b" \
                               --param_1 $p1 --param_2 $p2 --param_3 $p3  \
                               --kind_of_recompression 3
             done

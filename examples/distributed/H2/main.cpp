@@ -85,61 +85,61 @@ int main(int argc, char* argv[]) {
     x(i, 0) = dist(gen);
   }
 
-  // if (opts.is_symmetric) {
-    // auto begin_construct = std::chrono::system_clock::now();
-    // SymmetricSharedBasisMatrix A;
-    // if (opts.admis_kind == GEOMETRY) {
-    //   init_geometry_admis(A, domain, opts);
-    // }
-    // else if (opts.admis_kind == DIAGONAL) {
-    //   init_diagonal_admis(A, domain, opts);
-    // }
-    // A.print_structure();
+  if (opts.is_symmetric) {
+    auto begin_construct = std::chrono::system_clock::now();
+    SymmetricSharedBasisMatrix A;
+    if (opts.admis_kind == GEOMETRY) {
+      init_geometry_admis(A, domain, opts);
+    }
+    else if (opts.admis_kind == DIAGONAL) {
+      init_diagonal_admis(A, domain, opts);
+    }
+    A.print_structure();
 
 
-    // construct_h2_matrix_miro(A, domain, opts);
-    // auto stop_construct = std::chrono::system_clock::now();
-    // construct_time = std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_construct - begin_construct).count();
+    construct_h2_matrix_miro(A, domain, opts);
+    auto stop_construct = std::chrono::system_clock::now();
+    construct_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_construct - begin_construct).count();
 
-    // construct_max_rank = A.max_rank();
-    // construct_average_rank = A.average_rank();
-    // dense_blocks = A.leaf_dense_blocks();
+    construct_max_rank = A.max_rank();
+    construct_average_rank = A.average_rank();
+    dense_blocks = A.leaf_dense_blocks();
 
-    // auto begin_matvec = std::chrono::system_clock::now();
-    // b = matmul(A, x);
-    // auto stop_matvec = std::chrono::system_clock::now();
-    // matvec_time = std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
+    auto begin_matvec = std::chrono::system_clock::now();
+    b = matmul(A, x);
+    auto stop_matvec = std::chrono::system_clock::now();
+    matvec_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
 
-    // auto begin_factor = std::chrono::system_clock::now();
-    // fp_ops = factorize(A, opts);
-    // auto stop_factor = std::chrono::system_clock::now();
-    // factor_time = std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_factor - begin_factor).count();
+    auto begin_factor = std::chrono::system_clock::now();
+    fp_ops = factorize(A, opts);
+    auto stop_factor = std::chrono::system_clock::now();
+    factor_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_factor - begin_factor).count();
 
-    // post_factor_max_rank = A.max_rank();
-    // post_factor_average_rank = A.average_rank();
+    post_factor_max_rank = A.max_rank();
+    post_factor_average_rank = A.average_rank();
 
-    // auto begin_solve = std::chrono::system_clock::now();
-    // h2_solution = solve(A, b);
+    auto begin_solve = std::chrono::system_clock::now();
+    h2_solution = solve(A, b);
 
-    // auto stop_solve = std::chrono::system_clock::now();
-    // solve_time = std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_solve - begin_solve).count();
-  // }
-  // else {
-  //   std::cerr << "Not implemented for non-symmetric matrices." << std::endl;
-  //   abort();
-  // }
+    auto stop_solve = std::chrono::system_clock::now();
+    solve_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_solve - begin_solve).count();
+  }
+  else {
+    std::cerr << "Not implemented for non-symmetric matrices." << std::endl;
+    abort();
+  }
 
   // // ||x - A * (A^-1 * x)|| / ||x||
-  // solve_error = Hatrix::norm(h2_solution - x) / opts.N;
+  solve_error = Hatrix::norm(h2_solution - x) / opts.N;
 
-  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  Matrix bdense = matmul(Adense, x);
-  Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
-  solve_error = Hatrix::norm(dense_solution - x) / opts.N;
+  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  // Matrix bdense = matmul(Adense, x);
+  // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
+  // solve_error = Hatrix::norm(dense_solution - x) / opts.N;
 
 
   // double construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);

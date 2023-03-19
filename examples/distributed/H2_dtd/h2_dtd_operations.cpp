@@ -1563,7 +1563,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
     }
   }
 
-  // nb * rank fill-in.
+  // nb * rank fill-in. corresponds to schurs_complement_4 task as per loop structure.
   for (int i = block+1; i < nblocks; ++i) {
     for (int j = 0; j < block; ++j) {
       if (exists_and_inadmissible(A, i, block, level) &&
