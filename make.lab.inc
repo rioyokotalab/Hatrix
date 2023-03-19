@@ -7,10 +7,10 @@ BLAS_LIB     = ${MKLROOT}/lib/intel64/libmkl_scalapack_lp64.a \
 PAPI_INCLUDE = $(shell pkg-config --cflags papi)
 PAPI_LIBS    = $(shell pkg-config --libs papi)
 CXXFLAGS     = -std=c++14 -O3 -g -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
-               $(shell pkg-config --cflags gtest gtest_main) $(PAPI_INCLUDE) -DUSE_MKL
+               $(shell pkg-config --cflags gtest gtest_main gsl) $(PAPI_INCLUDE) -DUSE_MKL
 CXX          = g++
 MPICXX       = mpicxx
-LDFLAGS      = $(shell pkg-config --libs gtest_main gtest) $(BLAS_LIB) $(PAPI_LIBS) -lgfortran
+LDFLAGS      = $(shell pkg-config --libs gtest_main gtest gsl) $(BLAS_LIB) $(PAPI_LIBS) -lgfortran
 PARSEC_INCLUDE = $(shell pkg-config --cflags parsec)
 PARSEC_LIB     = $(shell pkg-config --libs parsec)
 SCALAPACK_LIB = $(BLAS_LIB)
