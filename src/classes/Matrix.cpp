@@ -88,6 +88,7 @@ Matrix::Matrix(const Matrix& A, bool copy)
     // // stride = A.rows;
     // // Need the for loop and cannot init directly in the initializer list because
     // // the object might be a view and therefore will not get copied properly.
+#pragma omp parallel for
     for (int i = 0; i < A.rows; ++i) {
       for (int j = 0; j < A.cols; ++j) {
         (*this)(i, j) = A(i, j);
