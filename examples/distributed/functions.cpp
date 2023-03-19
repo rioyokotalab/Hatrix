@@ -1,6 +1,8 @@
 #include <vector>
 #include <cassert>
 #include <cmath>
+#include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_sf_bessel.h>
 
 #include "distributed/distributed.hpp"
 
@@ -325,17 +327,76 @@ namespace Hatrix {
     return out;
   }
 
-  double laplace_kernel(const std::vector<double>& coords_row,
-                        const std::vector<double>& coords_col,
-                        const double eta) {
+  static double distance(const std::vector<double>& coords_row,
+                         const std::vector<double>& coords_col) {
     int64_t ndim = coords_row.size();
     double rij = 0;
     for (int64_t k = 0; k < ndim; ++k) {
       rij += pow(coords_row[k] - coords_col[k], 2);
     }
-    double out = 1 / (std::sqrt(rij) + eta);
 
+    return std::sqrt(rij);
+  }
+
+  double laplace_kernel(const std::vector<double>& coords_row,
+                        const std::vector<double>& coords_col,
+                        const double eta) {
+    double dist = distance(coords_row, coords_col);
+    double out = 1 / (dist + eta);
     return out;
+  }
+
+  // static double calculateDistance(location* l1, int l1_index, int l2_index) {
+  //   double x1 = l1->x[l1_index];
+  //   double y1 = l1->y[l1_index];
+  //   double x2 = l1->x[l2_index];
+  //   double y2 = l1->y[l2_index];
+  //   return sqrt(pow((x2 - x1), 2) + pow((y2 - y1), 2));
+  // }
+
+  // void core_matern(double* A, int m, int n, location* l1,  double sigma, double nu, double smoothness) {
+
+  //   int i, j;
+  //   double expr = 0.0;
+  //   double con = 0.0;
+  //   double sigma_square = sigma*sigma;
+
+  //   con = pow(2, (smoothness - 1)) * gsl_sf_tgamma(smoothness);
+  //   con = 1.0 / con;
+  //   con = sigma_square * con;
+
+  //   for (i = 0; i < m; i++) {
+  //     A[i + i * m] = sigma_square;
+  //     for (j = 0; j < n; j++) {
+  //       if (i != j) {
+  //         expr = calculateDistance(l1, i, j) / nu;
+  //         A[i + j * m] = con * pow(expr, smoothness)
+  //           * gsl_sf_bessel_Knu(smoothness, expr); // Matern Function
+  //       }
+  //     }
+  //   }
+  // }
+
+
+  double matern_kernel(const std::vector<double>& coords_row,
+                       const std::vector<double>& coords_col,
+                       const double sigma, const double nu, const double smoothness) {
+    double expr = 0.0;
+    double con = 0.0;
+    double sigma_square = sigma*sigma;
+    double dist = distance(coords_row, coords_col);
+
+    con = pow(2, (smoothness - 1)) * gsl_sf_gamma(smoothness);
+    con = 1.0 / con;
+    con = sigma_square * con;
+
+    if (dist != 0) {
+      expr = dist / nu;
+      return con * pow(expr, smoothness) * gsl_sf_bessel_Knu(smoothness, expr);
+    }
+    else {
+      return sigma_square;
+    }
   }
 
 

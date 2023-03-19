@@ -18,7 +18,9 @@ namespace Hatrix {
     {"perturbation",        required_argument, 0, 'p'},
     {"admis_kind",          required_argument, 0, 'm'},
     {"construct_algorithm", required_argument, 0, 'c'},
-    {"add_diag",            required_argument, 0, 'z'},
+    {"param_1",             required_argument, 0, 'x'},
+    {"param_2",             required_argument, 0, 'y'},
+    {"param_3",             required_argument, 0, 'z'},
     {"qr_accuracy",         required_argument, 0, 'q'},
     {"parsec_cores",        required_argument, 0, 'i'},
     {"kind_of_recompression", required_argument, 0, 's'},
@@ -69,7 +71,9 @@ namespace Hatrix {
       accuracy(1),
       qr_accuracy(1e-2),
       kind_of_recompression(1),
-      add_diag(1e-4),
+      param_1(1e-4),
+      param_2(0),
+      param_3(0),
       admis_kind(DIAGONAL),
       construct_algorithm(MIRO),
       use_nested_basis(false),
@@ -80,7 +84,7 @@ namespace Hatrix {
     KERNEL_FUNC kfunc;
     while(1) {
       int option_index;
-      int c = getopt_long(argc, argv, "n:l:k:f:g:d:r:e:a:m:c:z:bvh",
+      int c = getopt_long(argc, argv, "n:l:k:g:f:d:r:e:a:p:m:c:x:y:z:q:i:s:bvh",
                           long_options, &option_index);
 
       if (c == -1) break;
@@ -98,6 +102,11 @@ namespace Hatrix {
       case 'k':
         if (!strcmp(optarg, "laplace")) {
           kfunc = LAPLACE;
+          kernel_verbose = std::string(optarg);
+          is_symmetric = true;
+        }
+        else if (!strcmp(optarg, "gsl_matern")) {
+          kfunc = GSL_MATERN;
           kernel_verbose = std::string(optarg);
           is_symmetric = true;
         }
@@ -173,8 +182,14 @@ namespace Hatrix {
       case 'q':
         qr_accuracy = std::stod(optarg);
         break;
+      case 'x':
+        param_1 = std::stod(optarg);
+        break;
+      case 'y':
+        param_2 = std::stod(optarg);
+        break;
       case 'z':
-        add_diag = std::stod(optarg);
+        param_3 = std::stod(optarg);
         break;
       case 'b':
         use_nested_basis = true;
@@ -196,7 +211,14 @@ namespace Hatrix {
     if (kfunc == LAPLACE) {
       kernel = [&](const std::vector<double>& c_row,
                    const std::vector<double>& c_col) {
-        return laplace_kernel(c_row, c_col, add_diag);
+        return laplace_kernel(c_row, c_col, param_1); // add_diag
+      };
+    }
+    else if (kfunc == GSL_MATERN) {
+      kernel = [&](const std::vector<double>& c_row,
+                   const std::vector<double>& c_col) {
+        return matern_kernel(c_row, c_col, param_1, param_2,
+                             param_3); // sigma, nu, smoothness
       };
     }
   }
@@ -224,7 +246,9 @@ namespace Hatrix {
             "--parsec_cores (-i)                         : Parameter to control the number of physical cores used by a single process of PaRSEC. (%d) \n"
             "--admis_kind (-m) [diagonal|geometry]       : Whether geometry-based or diagonal-based admis (%s).\n"
             "--construct_algorithm (-c) [miro|id_random] : Construction algorithm to use (%s).\n"
-            "--add_diag (-z)                             : Value to add to the diagonal (%lf).\n"
+            "--param_1 (-x)                              : First parameter to the kernel. (%lf).\n"
+            "--param_2 (-y)                              : Second parameter to the kernel. (%lf).\n"
+            "--param_3 (-z)                              : Third parameter to the kernel. (%lf).\n"
             "--nested_basis (-b)                         : Whether to use nested basis (%d).\n"
             "--verbose (-v)                              : Verbose mode (%d).\n"
             "--help (-h)                                 : Show this help message.\n",
@@ -244,7 +268,9 @@ namespace Hatrix {
             parsec_cores,
             admis_kind_to_string(admis_kind).c_str(),
             construct_algorithm_to_string(construct_algorithm).c_str(),
-            add_diag,
+            param_1,
+            param_2,
+            param_3,
             use_nested_basis,
             verbose);
   }

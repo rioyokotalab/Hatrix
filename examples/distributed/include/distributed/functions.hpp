@@ -56,6 +56,10 @@ namespace Hatrix {
                         const std::vector<double>& coords_col,
                         const double eta);
 
+  double matern_kernel(const std::vector<double>& coords_row,
+                       const std::vector<double>& coords_col,
+                       const double sigma, const double nu, const double smoothness);
+
   void init_geometry_admis(SymmetricSharedBasisMatrix& A,
                            const Domain& domain, const Args& opts);
 
