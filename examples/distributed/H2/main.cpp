@@ -55,7 +55,6 @@ int main(int argc, char* argv[]) {
   int64_t construct_max_rank, construct_average_rank,
     post_factor_max_rank, post_factor_average_rank;
 
-  std::cout << "start args.\n";
   Args opts(argc, argv);
 
   auto start_domain = std::chrono::system_clock::now();
