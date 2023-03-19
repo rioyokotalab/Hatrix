@@ -8,6 +8,8 @@
 #include "string.h"
 #include "inttypes.h"
 #include <vector>
+#include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_sf_bessel.h>
 
 #ifdef USE_MKL
 #include "mkl.h"
@@ -111,10 +113,33 @@ void getCommTime(double* cmtime) {
 double _singularity = 1.e-9;
 double _alpha = 1.;
 
+double _sigma = 1e-2;
+double _nu = 1;
+double _smoothness = 0.9;
+
 void laplace3d(double* r2) {
   double _r2 = *r2;
   double r = sqrt(_r2) + _singularity;
   *r2 = 1. / r;
+}
+
+void gsl_matern(double *r2) {
+  double expr = 0.0;
+  double con = 0.0;
+  double sigma_square = sigma*sigma;
+  double dist = sqrt(*r2);
+
+  con = pow(2, (smoothness - 1)) * gsl_sf_gamma(smoothness);
+  con = 1.0 / con;
+  con = sigma_square * con;
+
+  if (dist != 0) {
+    expr = dist / nu;
+    *r2 =  con * pow(expr, smoothness) * gsl_sf_bessel_Knu(smoothness, expr);
+  }
+  else {
+    *r2 = sigma_square;
+  }
 }
 
 void yukawa3d(double* r2) {
@@ -128,7 +153,14 @@ void set_kernel_constants(double singularity, double alpha) {
   _alpha = alpha;
 }
 
-void gen_matrix(void(*ef)(double*), int64_t m, int64_t n, const struct Body* bi, const struct Body* bj, double Aij[], const int64_t sel_i[], const int64_t sel_j[]) {
+void set_matern_constants(double sigma, double nu, double smoothness) {
+  _sigma = sigma;
+  _nu = nu;
+  _smoothness = smoothness;
+}
+
+void gen_matrix(void(*ef)(double*), int64_t m, int64_t n,
+                const struct Body* bi, const struct Body* bj, double Aij[], const int64_t sel_i[], const int64_t sel_j[]) {
   for (int64_t i = 0; i < m * n; i++) {
     int64_t x = i / m;
     int64_t bx = sel_j == NULL ? x : sel_j[x];
@@ -1352,8 +1384,10 @@ void dist_double(double* arr[], const struct CellComm* comm) {
 #endif
 }
 
-void buildBasis(void(*ef)(double*), struct Base basis[], int64_t ncells, struct Cell* cells, const struct CSC* rel_near, int64_t levels,
-const struct CellComm* comm, const struct Body* bodies, int64_t nbodies, double epi, int64_t mrank, int64_t sp_pts) {
+void buildBasis(void(*ef)(double*), struct Base basis[], int64_t ncells,
+                struct Cell* cells, const struct CSC* rel_near, int64_t levels,
+                const struct CellComm* comm, const struct Body* bodies, int64_t nbodies,
+                double epi, int64_t mrank, int64_t sp_pts) {
 
   for (int64_t l = levels; l >= 0; l--) {
     int64_t xlen = 0;

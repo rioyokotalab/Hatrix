@@ -24,13 +24,13 @@ make -j H2_main
 
 nleaf=256
 max_rank=50
-ndim=3
-adm=1
+ndim=2
+adm=0
 
 for N in 1024; do
     ./bin/H2_main --N $N \
                  --nleaf $nleaf \
-                 --kernel_func laplace \
+                 --kernel_func gsl_matern \
                  --kind_of_geometry grid \
                  --ndim $ndim \
                  --max_rank $max_rank \
@@ -38,7 +38,7 @@ for N in 1024; do
                  --admis $adm \
                  --admis_kind diagonal \
                  --construct_algorithm miro \
-                 --param_1 1e-9  \
+                 --param_1 1e-4 --param_2 1 --param_3 0.9983  \
                  --kind_of_recompression 3
 
 
