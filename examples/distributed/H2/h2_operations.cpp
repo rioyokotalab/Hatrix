@@ -792,17 +792,17 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   timer[7] += std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_last - start_last).count();
 
-  std::cout << timer[0] << ","
-            << timer[1] << ","
-            << timer[2] << ","
-            << timer[3] << ","
-            << timer[4] << ","
-            << timer[5] << ","
-            << timer[6] << ","
-            << timer[7] << ","
-            << counts[0] << ","
-            << counts[1] <<
-    " --- ";
+  // std::cout << timer[0] << ","
+  //           << timer[1] << ","
+  //           << timer[2] << ","
+  //           << timer[3] << ","
+  //           << timer[4] << ","
+  //           << timer[5] << ","
+  //           << timer[6] << ","
+  //           << timer[7] << ","
+  //           << counts[0] << ","
+  //           << counts[1] <<
+  //   " --- ";
 
   auto fp_ops = papi.fp_ops();
   return fp_ops;

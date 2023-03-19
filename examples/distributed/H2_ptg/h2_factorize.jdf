@@ -300,7 +300,6 @@ actual_j = %{ return h2_params->col_near_list[level].level_block_list[block].ind
 
 READ
 
-
 BODY
 {
 }

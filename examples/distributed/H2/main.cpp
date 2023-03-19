@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
     else if (opts.admis_kind == DIAGONAL) {
       init_diagonal_admis(A, domain, opts);
     }
-    A.print_structure();
+    // A.print_structure();
 
 
     construct_h2_matrix_miro(A, domain, opts);
@@ -136,14 +136,14 @@ int main(int argc, char* argv[]) {
   // // ||x - A * (A^-1 * x)|| / ||x||
   solve_error = Hatrix::norm(h2_solution - x) / opts.N;
 
-  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  // Matrix bdense = matmul(Adense, x);
+  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  Matrix bdense = matmul(Adense, x);
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // solve_error = Hatrix::norm(dense_solution - x) / opts.N;
 
 
-  // double construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);
-  construct_error = 0;
+  construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);
+  // construct_error = 0;
 
   double h2_norm = Hatrix::norm(h2_solution);
   double x_norm = Hatrix::norm(x);
