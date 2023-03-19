@@ -27,7 +27,7 @@ max_rank=50
 ndim=2
 adm=0
 
-for N in 1024; do
+for N in 40000; do
     ./bin/H2_main --N $N \
                  --nleaf $nleaf \
                  --kernel_func gsl_matern \
@@ -38,6 +38,7 @@ for N in 1024; do
                  --admis $adm \
                  --admis_kind diagonal \
                  --construct_algorithm miro \
+                 --geometry_file "/Users/sameer/Downloads/XY_40000_1" \
                  --param_1 1e-4 --param_2 1 --param_3 0.9983  \
                  --kind_of_recompression 3
 

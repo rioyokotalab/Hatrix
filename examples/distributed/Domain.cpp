@@ -137,6 +137,20 @@ namespace Hatrix {
     file.close();
   }
 
+  void Domain::read_col_file_2d(const std::string& geometry_file) {
+    std::ifstream file;
+    file.open(geometry_file, std::ios::in);
+
+    double x, y;
+
+    for (int64_t line = 0; line < N; ++line) {
+      file >> x >> y;
+      particles.push_back(Hatrix::Particle(x, y));
+    }
+
+    file.close();
+  }
+
   void Domain::orb_split(Cell& cell,
                          const int64_t pstart,
                          const int64_t pend,

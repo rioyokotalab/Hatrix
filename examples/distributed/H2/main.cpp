@@ -48,8 +48,14 @@ generate_rhs_vector(Hatrix::Args& opts) {
 
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
+  long long int fp_ops;
+  int64_t dense_blocks;
+  double construct_time, matvec_time, factor_time,
+    solve_time, solve_error, construct_error;
+  int64_t construct_max_rank, construct_average_rank,
+    post_factor_max_rank, post_factor_average_rank;
 
-  std::cout << "start args.";
+  std::cout << "start args.\n";
   Args opts(argc, argv);
 
   auto start_domain = std::chrono::system_clock::now();
@@ -60,19 +66,19 @@ int main(int argc, char* argv[]) {
   else if (opts.kind_of_geometry == CIRCULAR) {
     domain.generate_circular_particles(0, opts.N);
   }
-  else if (opts.kind_of_geometry == COL_FILE) {
+  else if (opts.kind_of_geometry == COL_FILE && opts.ndim == 3) {
     domain.read_col_file_3d(opts.geometry_file);
   }
+  else if (opts.kind_of_geometry == COL_FILE && opts.ndim == 2) {
+    domain.read_col_file_2d(opts.geometry_file);
+  }
+
   domain.build_tree(opts.nleaf);
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
   Matrix b, h2_solution, x_regen;
-  double construct_time, matvec_time, factor_time, solve_time;
-  int64_t construct_max_rank, construct_average_rank,
-    post_factor_max_rank, post_factor_average_rank;
-
   std::mt19937 gen(0);
   std::uniform_real_distribution<double> dist(0, 1);
   Matrix x(opts.N, 1);
@@ -80,75 +86,68 @@ int main(int argc, char* argv[]) {
     x(i, 0) = dist(gen);
   }
 
-  long long int fp_ops;
-  int64_t dense_blocks;
-
-  if (opts.is_symmetric) {
-    auto begin_construct = std::chrono::system_clock::now();
-    SymmetricSharedBasisMatrix A;
-    if (opts.admis_kind == GEOMETRY) {
-      init_geometry_admis(A, domain, opts);
-    }
-    else if (opts.admis_kind == DIAGONAL) {
-      init_diagonal_admis(A, domain, opts);
-    }
-    A.print_structure();
+  // if (opts.is_symmetric) {
+    // auto begin_construct = std::chrono::system_clock::now();
+    // SymmetricSharedBasisMatrix A;
+    // if (opts.admis_kind == GEOMETRY) {
+    //   init_geometry_admis(A, domain, opts);
+    // }
+    // else if (opts.admis_kind == DIAGONAL) {
+    //   init_diagonal_admis(A, domain, opts);
+    // }
+    // A.print_structure();
 
 
-    construct_h2_matrix_miro(A, domain, opts);
-    auto stop_construct = std::chrono::system_clock::now();
-    construct_time = std::chrono::duration_cast<
-      std::chrono::milliseconds>(stop_construct - begin_construct).count();
+    // construct_h2_matrix_miro(A, domain, opts);
+    // auto stop_construct = std::chrono::system_clock::now();
+    // construct_time = std::chrono::duration_cast<
+    //   std::chrono::milliseconds>(stop_construct - begin_construct).count();
 
-    construct_max_rank = A.max_rank();
-    construct_average_rank = A.average_rank();
-    dense_blocks = A.leaf_dense_blocks();
+    // construct_max_rank = A.max_rank();
+    // construct_average_rank = A.average_rank();
+    // dense_blocks = A.leaf_dense_blocks();
+
+    // auto begin_matvec = std::chrono::system_clock::now();
+    // b = matmul(A, x);
+    // auto stop_matvec = std::chrono::system_clock::now();
+    // matvec_time = std::chrono::duration_cast<
+    //   std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
+
+    // auto begin_factor = std::chrono::system_clock::now();
+    // fp_ops = factorize(A, opts);
+    // auto stop_factor = std::chrono::system_clock::now();
+    // factor_time = std::chrono::duration_cast<
+    //   std::chrono::milliseconds>(stop_factor - begin_factor).count();
+
+    // post_factor_max_rank = A.max_rank();
+    // post_factor_average_rank = A.average_rank();
+
+    // auto begin_solve = std::chrono::system_clock::now();
+    // h2_solution = solve(A, b);
+
+    // auto stop_solve = std::chrono::system_clock::now();
+    // solve_time = std::chrono::duration_cast<
+    //   std::chrono::milliseconds>(stop_solve - begin_solve).count();
+  // }
+  // else {
+  //   std::cerr << "Not implemented for non-symmetric matrices." << std::endl;
+  //   abort();
+  // }
+
+  // // ||x - A * (A^-1 * x)|| / ||x||
+  // solve_error = Hatrix::norm(h2_solution - x) / opts.N;
+
+  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
+  Matrix bdense = matmul(Adense, x);
+  Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
+  solve_error = Hatrix::norm(dense_solution - x) / opts.N;
 
 
-    auto begin_matvec = std::chrono::system_clock::now();
-    b = matmul(A, x);
-    auto stop_matvec = std::chrono::system_clock::now();
-    matvec_time = std::chrono::duration_cast<
-      std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
-
-    auto begin_factor = std::chrono::system_clock::now();
-    fp_ops = factorize(A, opts);
-    auto stop_factor = std::chrono::system_clock::now();
-    factor_time = std::chrono::duration_cast<
-      std::chrono::milliseconds>(stop_factor - begin_factor).count();
-
-    post_factor_max_rank = A.max_rank();
-    post_factor_average_rank = A.average_rank();
-
-    auto begin_solve = std::chrono::system_clock::now();
-    h2_solution = solve(A, b);
-    // x_regen = matmul(A_orig, h2_solution);
-
-    auto stop_solve = std::chrono::system_clock::now();
-    solve_time = std::chrono::duration_cast<
-      std::chrono::milliseconds>(stop_solve - begin_solve).count();
-  }
-  else {
-    std::cerr << "Not implemented for non-symmetric matrices." << std::endl;
-    abort();
-  }
-
-  // ||x - A * (A^-1 * x)|| / ||x||
-  double solve_error = Hatrix::norm(h2_solution - x) / opts.N;
-
-  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  // Matrix dense_solution = cholesky_solve(Adense, b, Hatrix::Lower);
-  // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
-
-  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  // Matrix bdense = matmul(Adense, x);
   // double construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);
-  double construct_error = 0;
+  construct_error = 0;
 
   double h2_norm = Hatrix::norm(h2_solution);
   double x_norm = Hatrix::norm(x);
-
-  std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
 
   std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
             << opts.accuracy << ","
@@ -168,31 +167,11 @@ int main(int argc, char* argv[]) {
             << opts.kind_of_geometry << ","
             << opts.use_nested_basis << ","
             << dense_blocks << ","
-            << opts.perturbation
+            << opts.perturbation << ","
+            << opts.param_1  << ","
+            << opts.param_2 << ","
+            << opts.param_3
             << std::endl;
-
-  // std::cout << "----------------------------\n";
-  // std::cout << "N               : " << opts.N << std::endl;
-  // std::cout << "NDIM            : " << opts.ndim << std::endl;
-  // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-  // std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
-  // std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
-  // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-  // std::cout << "ADMIS           : " << opts.admis << std::endl;
-  // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-  // std::cout << "POST FACT. RANK : " << post_factor_max_rank << std::endl;
-  // std::cout << "NLEAF           : " << opts.nleaf << "\n"
-  //           << "Domain(ms)      : " << domain_time << "\n"
-  //           << "Contruct(ms)    : " << construct_time << "\n"
-  //           << "Factor(ms)      : " << factor_time << "\n"
-  //           << "Solve(ms)       : " << solve_time << "\n"
-  //           << "Solve error     : " << solve_error << "\n"
-  //           << "PAPI_FP_OPS     : " << fp_ops << "\n"
-  //           << "Kind of recomp. : " << opts.kind_of_recompression
-  //           << std::endl;
-  // std::cout << "----------------------------\n";
-
-
 
   Hatrix::Context::finalize();
   return 0;

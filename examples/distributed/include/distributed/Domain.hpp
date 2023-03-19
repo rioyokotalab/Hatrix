@@ -45,6 +45,7 @@ namespace Hatrix {
     void generate_circular_particles(double min_val, double max_val);
     void generate_grid_particles();
     void read_col_file_3d(const std::string& geometry_file);
+    void read_col_file_2d(const std::string& geometry_file);
     void print_file(std::string file_name);
 
     // Build tree using co-oridinate sorting similar to exafmm. Uses the new Cell struct.
