@@ -2216,20 +2216,22 @@ int main(int argc, char* argv[]) {
   getCommTime(&cm_time);
 
   if (mpi_rank == 0) {
-    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf\n",
+    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%e,%d\n",
            (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
-           construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time);
-    printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
-      "Factorize: %lf s. COMM: %lf s.\n"
-      "Solution: %lf s. COMM: %lf s.\n"
-      "Basis Memory: %lf GiB.\n"
-      "Matrix Memory: %lf GiB.\n"
-      "Vector Memory: %lf GiB.\n"
-      "Err: %e\n"
-      "Program: %lf s. COMM: %lf s.\n",
-      (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
-      construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
-      (double)mem_basis * 1.e-9, (double)mem_A * 1.e-9, (double)mem_X * 1.e-9, err, prog_time, cm_time);
+           construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
+           err,rank_max);
+
+    // printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
+    //   "Factorize: %lf s. COMM: %lf s.\n"
+    //   "Solution: %lf s. COMM: %lf s.\n"
+    //   "Basis Memory: %lf GiB.\n"
+    //   "Matrix Memory: %lf GiB.\n"
+    //   "Vector Memory: %lf GiB.\n"
+    //   "Err: %e\n"
+    //   "Program: %lf s. COMM: %lf s.\n",
+    //   (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
+    //   construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
+    //   (double)mem_basis * 1.e-9, (double)mem_A * 1.e-9, (double)mem_X * 1.e-9, err, prog_time, cm_time);
   }
 
   for (int64_t i = 0; i <= levels; i++) {

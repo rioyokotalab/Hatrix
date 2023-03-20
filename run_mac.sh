@@ -64,7 +64,7 @@ function benchmark_sc22() {
     for N in 32768; do
         for nleaf in 512 1024 2048; do
             for max_rank in 150 200 500; do
-                mpirun -n 8 bin/sc_22 32768 2 256 1.e-8 100 2000
+                mpirun -n 8 bin/sc_22 $N 2 $nleaf 1.e-8 $max_rank 2000
             done
         done
     done
