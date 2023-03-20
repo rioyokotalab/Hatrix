@@ -171,8 +171,8 @@ col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].l
 READ D <- D factorize_diagonal(block, level)
 RW BLOCK <- parsec_D(actual_i, block, level)
          -> BLOCK schurs_complement_1(i .. col_blocks-1, block, level)
-         -> A schurs_complement_2(i, i+1 .. col_blocks, block, level)
-         -> B schurs_complement_2(i .. col_blocks, i, block, level)
+         -> A schurs_complement_2(actual_i, i+1 .. col_blocks, level, 0)
+         -> B schurs_complement_2(actual_i, i+1 .. col_blocks, level, 1)
          -> BLOCK syrk_2(i, block, level)
          -> parsec_D(actual_i, block, level)
 BODY
@@ -288,19 +288,38 @@ BODY
 }
 END
 
-schurs_complement_2(i, j, block, level)
+schurs_complement_2(block, i, level, select) /* select needs to be like metadata and should not create a new task. */
 
 level = h2_params->max_level .. h2_params->min_level
 block = 2 .. %{ return pow(2, level)-1; %}
 i = 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
 j = 2 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
 
-actual_i = %{ return h2_params->col_near_list[level].level_block_list[block].indices[i]; %}
-actual_j = %{ return h2_params->col_near_list[level].level_block_list[block].indices[j]; %}
-
-READ
+  READ A <- select == 0 ? BLOCK triangle_reduce_cc_oc(block, i, level)
+  READ B <- select == 1 ? BLOCK triangle_reduce_cc_oc(block, i, level)
 
 BODY
 {
+  if (select == 0) {
+    /* use row_near_list and choose the row block. */
+  }
+  if (select == 1) {
+    /* use col_near_list and choose the col block. */
+  }
 }
 END
+
+/* final factorization */
+/* full_cholesky_dense(block, level) */
+
+/* level = A.min_level-1 */
+/* block = 0 .. %{ return pow(2, level)-1; %} */
+
+/*   : parsec_D(block, block, level) */
+
+/*   RW D <- merge_blocks() */
+
+/* BODY */
+/* { */
+/* } */
+/* END */

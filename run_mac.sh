@@ -26,37 +26,39 @@ max_rank=50
 ndim=2
 adm=2
 
-# for N in 32768; do
-#     for nleaf in 512 1024 2048; do
-#         for max_rank in 50 100 150 200; do
-#             ./bin/H2_main --N $N \
-#                           --nleaf $nleaf \
-#                           --kernel_func gsl_matern \
-#                           --kind_of_geometry grid \
-#                           --ndim $ndim \
-#                           --max_rank $max_rank \
-#                           --accuracy -1 \
-#                           --admis $adm \
-#                           --admis_kind geometry \
-#                           --construct_algorithm miro \
-#                           --param_1 1e-2 --param_2 0.5 --param_3 0.1 \
-#                           --kind_of_recompression 3 \
-#                           --use_nested_basis
-#         done
-#     done
-#     # ./bin/H2_ptg --N $N \
-#     #              --nleaf $nleaf \
-#     #              --kernel_func laplace \
-#     #              --kind_of_geometry grid \
-#     #              --ndim $ndim \
-#     #              --max_rank $max_rank \
-#     #              --accuracy -1 \
-#     #              --admis $adm \
-#     #              --admis_kind diagonal \
-#     #              --construct_algorithm miro \
-#     #              --param_1 1e-9  \
-#     #              --kind_of_recompression 3
-# done
+for N in 32768; do
+    for adm in 1 2 2.5 3; do
+        for nleaf in 512 1024 2048; do
+            for max_rank in 50 100 150 200; do
+                ./bin/H2_main --N $N \
+                              --nleaf $nleaf \
+                              --kernel_func gsl_matern \
+                              --kind_of_geometry grid \
+                              --ndim $ndim \
+                              --max_rank $max_rank \
+                              --accuracy -1 \
+                              --admis $adm \
+                              --admis_kind geometry \
+                              --construct_algorithm miro \
+                              --param_1 1e-2 --param_2 0.5 --param_3 0.1 \
+                              --kind_of_recompression 3 \
+                              --use_nested_basis
+            done
+        done
+    done
+    # ./bin/H2_ptg --N $N \
+    #              --nleaf $nleaf \
+    #              --kernel_func laplace \
+    #              --kind_of_geometry grid \
+    #              --ndim $ndim \
+    #              --max_rank $max_rank \
+    #              --accuracy -1 \
+    #              --admis $adm \
+    #              --admis_kind diagonal \
+    #              --construct_algorithm miro \
+    #              --param_1 1e-9  \
+    #              --kind_of_recompression 3
+done
 
 function benchmark_sc22() {
     mpicxx -I${VEC_LIB_INCLUDE} -I/opt/homebrew/opt/lapack/include -I/Users/sameer/gitrepos/gsl-2.7.1/build/include -framework Accelerate -L/Users/sameer/gitrepos/gsl-2.7.1/build/lib -lgsl -lm -L/opt/homebrew/opt/lapack/lib -llapacke -llapack examples/SymmH2_ULV_SC22.cpp -o bin/sc_22
@@ -70,4 +72,4 @@ function benchmark_sc22() {
     done
 }
 
-benchmark_sc22
+# benchmark_sc22
