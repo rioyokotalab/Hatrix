@@ -20,6 +20,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#define SQUARE_INITIAL_BOX 1
+
 namespace Hatrix {
 
 class Domain {
@@ -1036,6 +1038,15 @@ class Domain {
       X0[axis] = (Xmin + Xmax) / 2.;
       R0[axis] = (Xmax - Xmin) / 2.;
     }
+#if SQUARE_INITIAL_BOX
+    double R_max = 0;
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      R_max = std::max(R_max, R0[axis]);
+    }
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      R0[axis] = R_max;
+    }
+#endif
     for (int64_t axis = 0; axis < ndim; axis++) {
       X0_min[axis] = X0[axis] - R0[axis];
       X0_max[axis] = X0[axis] + R0[axis];
