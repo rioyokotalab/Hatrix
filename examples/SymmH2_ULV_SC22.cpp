@@ -126,16 +126,16 @@ void laplace3d(double* r2) {
 void gsl_matern(double *r2) {
   double expr = 0.0;
   double con = 0.0;
-  double sigma_square = sigma*sigma;
+  double sigma_square = _sigma*_sigma;
   double dist = sqrt(*r2);
 
-  con = pow(2, (smoothness - 1)) * gsl_sf_gamma(smoothness);
+  con = pow(2, (_smoothness - 1)) * gsl_sf_gamma(_smoothness);
   con = 1.0 / con;
   con = sigma_square * con;
 
   if (dist != 0) {
-    expr = dist / nu;
-    *r2 =  con * pow(expr, smoothness) * gsl_sf_bessel_Knu(smoothness, expr);
+    expr = dist / _nu;
+    *r2 =  con * pow(expr, _smoothness) * gsl_sf_bessel_Knu(_smoothness, expr);
   }
   else {
     *r2 = sigma_square;
@@ -194,12 +194,8 @@ void uniform_unit_cube(struct Body* bodies, int64_t nbodies, int64_t dim, unsign
   }
 }
 
-void uniform_unit_3d_cube_no_rnd(struct Body* bodies, int64_t N) {
-  int64_t ndim = 3;
-  int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
-  int64_t total = side;
-  for (int64_t i = 1; i < ndim; ++i) { total *= side; }
-
+void uniform_grid_no_rnd(struct Body* bodies, int64_t N, int64_t ndim) {
+  int64_t side = ceil(pow(N, 1.0 / ndim));
   int64_t ncoords = ndim * side;
   std::vector<double> coord(ncoords);
 
@@ -219,9 +215,9 @@ void uniform_unit_3d_cube_no_rnd(struct Body* bodies, int64_t N) {
       points[k] = coord[pivot[k] + k * side];
     }
 
-    bodies[i].X[0] = points[0];
-    bodies[i].X[1] = points[1];
-    bodies[i].X[2] = points[2];
+    for (k = 0; k < ndim; ++k) {
+      bodies[i].X[k] = points[k];
+    }
 
     k = ndim - 1;
     pivot[k]++;
@@ -2126,9 +2122,11 @@ int main(int argc, char* argv[]) {
   int64_t Nleaf = (int64_t)1 << levels;
   int64_t ncells = Nleaf + Nleaf - 1;
 
-  void(*ef)(double*) = laplace3d;
+  void(*ef)(double*) = gsl_matern;
+  // void(*ef)(double*) = laplace3d;
   //void(*ef)(double*) = yukawa3d;
-  set_kernel_constants(1.e-9, 1.);
+  // set_kernel_constants(1.e-9, 1.);
+  set_matern_constants(1e-2, 0.5, 0.1);
 
   struct Body* body = (struct Body*)malloc(sizeof(struct Body) * Nbody);
   struct Cell* cell = (struct Cell*)malloc(sizeof(struct Cell) * ncells);
@@ -2142,7 +2140,7 @@ int main(int argc, char* argv[]) {
 
   if (fname == NULL) {
     // mesh_unit_sphere(body, Nbody);
-    uniform_unit_3d_cube_no_rnd(body, Nbody);
+    uniform_grid_no_rnd(body, Nbody, 2);
     //mesh_unit_cube(body, Nbody);
     //uniform_unit_cube(body, Nbody, 3, 1234);
     buildTree(&ncells, cell, body, Nbody, levels);
@@ -2221,17 +2219,17 @@ int main(int argc, char* argv[]) {
     printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf\n",
            (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
            construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time);
-    // printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
-    //   "Factorize: %lf s. COMM: %lf s.\n"
-    //   "Solution: %lf s. COMM: %lf s.\n"
-    //   "Basis Memory: %lf GiB.\n"
-    //   "Matrix Memory: %lf GiB.\n"
-    //   "Vector Memory: %lf GiB.\n"
-    //   "Err: %e\n"
-    //   "Program: %lf s. COMM: %lf s.\n",
-    //   (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
-    //   construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
-    //   (double)mem_basis * 1.e-9, (double)mem_A * 1.e-9, (double)mem_X * 1.e-9, err, prog_time, cm_time);
+    printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
+      "Factorize: %lf s. COMM: %lf s.\n"
+      "Solution: %lf s. COMM: %lf s.\n"
+      "Basis Memory: %lf GiB.\n"
+      "Matrix Memory: %lf GiB.\n"
+      "Vector Memory: %lf GiB.\n"
+      "Err: %e\n"
+      "Program: %lf s. COMM: %lf s.\n",
+      (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
+      construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
+      (double)mem_basis * 1.e-9, (double)mem_A * 1.e-9, (double)mem_X * 1.e-9, err, prog_time, cm_time);
   }
 
   for (int64_t i = 0; i <= levels; i++) {
