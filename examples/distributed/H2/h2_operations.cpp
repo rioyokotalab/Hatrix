@@ -1065,7 +1065,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
       x(level_offset + i, 0) = x_level(i, 0);
     }
 
-
     level_offset = permute_forward(A, x, level, level_offset);
   }
 
@@ -1143,8 +1142,8 @@ multiply_S(const Hatrix::SymmetricSharedBasisMatrix& A,
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
         matmul(A.S(i, j, level), x_hat[x_hat_offset + j], b_hat[b_hat_offset + i]);
-        matmul(A.S(i, j, level), x_hat[x_hat_offset + i],
-               b_hat[b_hat_offset + j], true, false);
+        // matmul(A.S(i, j, level), x_hat[x_hat_offset + i],
+        //        b_hat[b_hat_offset + j], true, false);
       }
     }
   }
@@ -1223,12 +1222,12 @@ matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Matrix& x) {
 
 
   // Multiply with the dense blocks to obtain the final product in b_splits.
-  for (int i = 0; i < leaf_nblocks; ++i) {
-    matmul(A.D(i, i, A.max_level), x_splits[i], b_splits[i]);
-  }
+  // for (int i = 0; i < leaf_nblocks; ++i) {
+  //   matmul(A.D(i, i, A.max_level), x_splits[i], b_splits[i]);
+  // }
 
   for (int64_t i = 0; i < leaf_nblocks; ++i) {
-    for (int64_t j = 0; j < i; ++j) {
+    for (int64_t j = 0; j <= i; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           !A.is_admissible(i, j, A.max_level)) {
         // TODO: make the diagonal tringular and remove this.

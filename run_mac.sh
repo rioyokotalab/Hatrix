@@ -23,13 +23,13 @@ make -j H2_main
 # make -j H2_dtd
 
 max_rank=50
-ndim=2
+ndim=1
 # nleaf=256
 
 for N in 8192; do
-    for adm in 2; do
+    for adm in 1; do
         for nleaf in 512; do
-            for max_rank in 400; do
+            for max_rank in 200; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
@@ -38,10 +38,10 @@ for N in 8192; do
                               --max_rank $max_rank \
                               --accuracy -1 \
                               --admis $adm \
-                              --admis_kind diagonal \
+                              --admis_kind geometry \
                               --construct_algorithm miro \
                               --param_1 1e-2 --param_2 0.5 --param_3 0.1 \
-                              --kind_of_recompression 3 --use_nested_basis
+                              --kind_of_recompression 3
             done
         done
     done

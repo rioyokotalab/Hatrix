@@ -20,11 +20,13 @@ generate_column_block(int64_t block, int64_t block_size,
   auto dense_splits = dense.split(nblocks, nblocks);
   Matrix AY(block_size, block_size);
 
-  for (int64_t i = 0; i < block; ++i) {
+  for (int64_t i = 0; i < nblocks; ++i) {
     if (A.is_admissible.exists(i, block, level) &&
         !A.is_admissible(i, block, level)) { continue; }
     // AY += dense_splits[block * nblocks + j];
     AY += dense_splits[i * nblocks + block];
+
+    // std::cout << "DEnse norm: " << Hatrix::norm(dense_splits[i * nblocks + block]) << std::endl;
     // matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
     // AY = concat(AY, dense_splits[block * nblocks + j], 1);
   }
@@ -48,8 +50,8 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
     std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
   }
   else {
-    std::tie(Ui, pivots, rank) = error_pivoted_qr_max_rank(AY, opts.accuracy,
-                                                           (int64_t)opts.max_rank);
+    Matrix _S, _V;
+    std::tie(Ui, _S, _V, rank) = error_svd(AY, opts.accuracy, false, true);
   }
 
   Matrix _U, _S, _V; double _error;
@@ -96,7 +98,6 @@ generate_leaf_nodes(const Domain& domain,
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
-    // for (int64_t j : far_neighbours(i, A.max_level)) {
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
@@ -104,6 +105,9 @@ generate_leaf_nodes(const Domain& domain,
                                       dense_splits[i * nblocks + j], true, false),
                                A.U(j, A.max_level));
         A.S.insert(i, j, A.max_level, std::move(Sblock));
+
+        // double norm = Hatrix::norm(dense_splits[i * nblocks + j] - matmul(matmul(A.U(i, A.max_level), A.S(i, j, A.max_level)),
+        //                                                       A.U(j, A.max_level), false, true));
       }
     }
   }
