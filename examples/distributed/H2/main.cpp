@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
     else if (opts.admis_kind == DIAGONAL) {
       init_diagonal_admis(A, domain, opts);
     }
-    // A.print_structure();
+    A.print_structure();
 
 
     construct_h2_matrix_miro(A, domain, opts);

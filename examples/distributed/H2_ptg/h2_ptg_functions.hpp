@@ -9,6 +9,7 @@
 
 typedef struct h2_dc_t {
   parsec_data_collection_t super; // inherit from parsec_data_collection_t
+  parsec_datatype_t nleaf_size, rank_2_size;
   // map of parsec data descriptors.
   std::unordered_map<parsec_data_key_t, parsec_data_t*> data_map;
   // MPI rank of the corresponding data key.

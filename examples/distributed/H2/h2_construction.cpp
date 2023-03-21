@@ -20,14 +20,16 @@ generate_column_block(int64_t block, int64_t block_size,
   auto dense_splits = dense.split(nblocks, nblocks);
   Matrix AY(block_size, block_size);
 
-  for (int64_t j = 0; j < nblocks; ++j) {
-    if (A.is_admissible.exists(block, j, level) &&
-        !A.is_admissible(block, j, level)) { continue; }
-    AY += dense_splits[block * nblocks + j];
+  for (int64_t i = 0; i < block; ++i) {
+    if (A.is_admissible.exists(i, block, level) &&
+        !A.is_admissible(i, block, level)) { continue; }
+    // AY += dense_splits[block * nblocks + j];
+    AY += dense_splits[i * nblocks + block];
     // matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
+    // AY = concat(AY, dense_splits[block * nblocks + j], 1);
   }
 
-  return AY;
+  return transpose(AY);
 }
 
 static Matrix
@@ -46,7 +48,8 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
     std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
   }
   else {
-    std::tie(Ui, pivots, rank) = error_pivoted_qr_max_rank(AY, opts.accuracy, (int64_t)opts.max_rank);
+    std::tie(Ui, pivots, rank) = error_pivoted_qr_max_rank(AY, opts.accuracy,
+                                                           (int64_t)opts.max_rank);
   }
 
   Matrix _U, _S, _V; double _error;

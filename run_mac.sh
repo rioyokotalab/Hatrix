@@ -13,9 +13,9 @@ set -e
 make clean
 
 # export VECLIB_MAXIMUM_THREADS=1
-# cd examples/distributed/H2_ptg
-# ./compile_jdf.sh
-# cd $ROOT
+cd examples/distributed/H2_ptg
+./compile_jdf.sh
+cd $ROOT
 
 ulimit -c unlimited
 
@@ -24,12 +24,12 @@ make -j H2_main
 
 max_rank=50
 ndim=2
-adm=2
+# nleaf=256
 
-for N in 32768; do
-    for adm in 1 2 2.5 3; do
-        for nleaf in 512 1024 2048; do
-            for max_rank in 50 100 150 200; do
+for N in 8192; do
+    for adm in 2; do
+        for nleaf in 512; do
+            for max_rank in 400; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
@@ -38,11 +38,10 @@ for N in 32768; do
                               --max_rank $max_rank \
                               --accuracy -1 \
                               --admis $adm \
-                              --admis_kind geometry \
+                              --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1e-2 --param_2 0.5 --param_3 0.1 \
-                              --kind_of_recompression 3 \
-                              --use_nested_basis
+                              --kind_of_recompression 3 --use_nested_basis
             done
         done
     done
