@@ -317,9 +317,8 @@ h2_dc_destroy(h2_dc_t& parsec_data) {
     for (auto iter = parsec_data.data_map.begin(); iter != parsec_data.data_map.end(); ++iter) {
       parsec_data_destroy((iter->second));
     }
-
-    parsec_data_collection_destroy(o);
   }
+  parsec_data_collection_destroy(o);
 }
 
 
@@ -500,6 +499,7 @@ void factorize_teardown() {
 void
 h2_factorize_Destruct(parsec_h2_factorize_taskpool_t *h2_factorize) {
   parsec_del2arena( &h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX] );
+  parsec_del2arena( &h2_factorize->arenas_datatypes[PARSEC_h2_factorize_BASIS_LEAF_ADT_IDX] );
 
   parsec_taskpool_free((parsec_taskpool_t*)h2_factorize);
 }
@@ -529,7 +529,12 @@ h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                                                                          parsec_temp_fill_in_rows_dc,
                                                                          h2_params);
 
-  parsec_add2arena(&h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX],
+  // parsec_add2arena(&h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX],
+  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+  //                  h2_params->nleaf, h2_params->nleaf, h2_params->nleaf,
+  //                  PARSEC_ARENA_ALIGNMENT_SSE, -1);
+
+  parsec_add2arena(&h2_factorize->arenas_datatypes[PARSEC_h2_factorize_LEAF_SIZE_TILE_ADT_IDX],
                    parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
                    h2_params->nleaf, h2_params->nleaf, h2_params->nleaf,
                    PARSEC_ARENA_ALIGNMENT_SSE, -1);
@@ -539,15 +544,23 @@ h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                    h2_params->nleaf, h2_params->max_rank, h2_params->nleaf,
                    PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
+  // h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX] =
+  //   h2_factorize->arenas_datatypes[PARSEC_h2_factorize_LEAF_SIZE_TILE_ADT_IDX];
+
+    h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX].opaque_dtt =
+      parsec_D_leaf_dc->default_dtt;
+  h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX].arena =
+    PARSEC_OBJ_NEW(parsec_arena_t);
+  parsec_arena_construct(h2_factorize->arenas_datatypes[PARSEC_h2_factorize_DEFAULT_ADT_IDX].arena,
+                         h2_params->nleaf * h2_params->nleaf,
+                         PARSEC_ARENA_ALIGNMENT_SSE);
+
   // parsec_add2arena(&h2_factorize->arenas_datatypes[PARSEC_h2_factorize_SMALL_TILE_ADT_IDX],
   //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
   //                  h2_params->max_rank*2, h2_params->max_rank*2, h2_params->max_rank*2,
   //                  PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
-  parsec_add2arena(&h2_factorize->arenas_datatypes[PARSEC_h2_factorize_LEAF_SIZE_TILE_ADT_IDX],
-                   parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
-                   h2_params->nleaf, h2_params->nleaf, h2_params->nleaf,
-                   PARSEC_ARENA_ALIGNMENT_SSE, -1);
+
 
   parsec_add2arena(&h2_factorize->arenas_datatypes[PARSEC_h2_factorize_RANK_TILE_ADT_IDX],
                    parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,

@@ -32,7 +32,7 @@ block = 0 .. %{ return pow(2, level)-1; %}
 : parsec_D_leaf(block, block, level)
 
 RW D <- parsec_D_leaf(block, block, level)
-     -> D factorize_diagonal(block, level) [type=LEAF_SIZE_TILE]
+      -> D factorize_diagonal(block, level) [type=LEAF_SIZE_TILE]
 READ U <- parsec_U_leaf(block, level) [type=BASIS_LEAF]
 
 BODY
@@ -62,8 +62,8 @@ col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].l
 : parsec_D_leaf(block, block, level)
 
 RW D <- D diagonal_multiply_complements(block, level) /* no type cuz always on the same MPI rank. */
--> D merge_dense_blocks(0, block/2, 0, level-1) [type_remote=BOTTOM_RIGHT]
-     -> parsec_D_leaf(block, block, level) [type=LEAF_SIZE]
+     -> D merge_dense_blocks(0, block/2, 0, level-1) [type_remote=BOTTOM_RIGHT]
+     -> parsec_D_leaf(block, block, level) [type=LEAF_SIZE_TILE]
 
 BODY
 {
@@ -88,8 +88,8 @@ actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].ind
 : parsec_D_non_leaf(block, actual_i, level)
 
 READ D <- D factorize_diagonal(block*2, level+1) [type_remote=RANK_TILE]
-WRITE BLOCK -> parsec_D_non_leaf(block, i, level)
-
+RW BLOCK <- parsec_D_non_leaf(block, i, level)
+         -> parsec_D_non_leaf(block, i, level)
 BODY
 {
   printf("merge dense blocks: block-> %d actual_i -> %d level -> %d submat -> %d\n",
