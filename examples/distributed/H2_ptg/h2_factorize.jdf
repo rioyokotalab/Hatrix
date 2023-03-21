@@ -12,11 +12,13 @@ extern "C" %{
 %}
 
 /* data descriptors */
-parsec_D [ type="parsec_data_collection_t*"]
-parsec_U [ type="parsec_data_collection_t*"]
+parsec_D_leaf [ type="parsec_data_collection_t*"]
+parsec_D_non_leaf [ type="parsec_data_collection_t*"]
+parsec_U_leaf [ type="parsec_data_collection_t*"]
+parsec_U_non_leaf [ type="parsec_data_collection_t*"]
 parsec_US [ type="parsec_data_collection_t*"]
 parsec_r [ type="parsec_data_collection_t*"]
-parsec_S [ type="parsec_data_collection_t*" aligned=parsec_D]
+parsec_S [ type="parsec_data_collection_t*" aligned=parsec_D_non_leaf]
 parsec_F [ type="parsec_data_collection_t*"]
 parsec_temp_fill_in_rows [ type="parsec_data_collection_t*" ]
 h2_params [ type="h2_factorize_params_t*" ]
@@ -27,11 +29,11 @@ diagonal_multiply_complements(block, level)
 level = h2_params->max_level .. h2_params->min_level
 block = 0 .. %{ return pow(2, level)-1; %}
 
-: parsec_D(block, block, level)
+: parsec_D_leaf(block, block, level)
 
-RW D <- parsec_D(block, block, level)
+RW D <- parsec_D_leaf(block, block, level)
      -> D factorize_diagonal(block, level) [type=LEAF_SIZE_TILE]
-READ U <- parsec_U(block, level)
+READ U <- parsec_U_leaf(block, level) [type=BASIS_LEAF]
 
 BODY
 {
@@ -57,11 +59,11 @@ level = h2_params->max_level .. h2_params->min_level
 block = 0 .. %{ return pow(2, level)-1; %}
 col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].length; %}
 
-: parsec_D(block, block, level)
+: parsec_D_leaf(block, block, level)
 
 RW D <- D diagonal_multiply_complements(block, level) /* no type cuz always on the same MPI rank. */
-     -> D merge_dense_blocks(0, block/2, 0, level-1) [type_local=BOTTOM_RIGHT type=BOTTOM_RIGHT]
-     -> parsec_D(block, block, level) [type=LEAF_SIZE]
+-> D merge_dense_blocks(0, block/2, 0, level-1) [type_remote=BOTTOM_RIGHT]
+     -> parsec_D_leaf(block, block, level) [type=LEAF_SIZE]
 
 BODY
 {
@@ -83,10 +85,10 @@ submatrix = 0 .. 0
 
 actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %}
 
-: parsec_D(block, actual_i, level)
+: parsec_D_non_leaf(block, actual_i, level)
 
-READ D <- D factorize_diagonal(block*2, level+1) [type=RANK_TILE]
-WRITE BLOCK -> parsec_D(block, i, level) [type=SMALL_TILE]
+READ D <- D factorize_diagonal(block*2, level+1) [type_remote=RANK_TILE]
+WRITE BLOCK -> parsec_D_non_leaf(block, i, level)
 
 BODY
 {

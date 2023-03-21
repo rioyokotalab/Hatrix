@@ -144,8 +144,6 @@ int main(int argc, char* argv[]) {
   }
   Matrix bdense = matmul(Adense, x);
   Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
-  double dense_solve_error = Hatrix::norm(dense_solution - x) / opts.N;
-  std::cout << "DENSE SOLVE ERROR: " << dense_solve_error << std::endl;
   construct_error = Hatrix::norm(bdense - b) / opts.N;
   // construct_error = 0;
 
