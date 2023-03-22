@@ -62,8 +62,8 @@ col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].l
 : parsec_D_leaf(block, block, level)
 
 RW D <- D diagonal_multiply_complements(block, level) /* no type cuz always on the same MPI rank. */
-     -> block % 2 == 0 ? TL merge_diagonal_blocks(block/2, 0, level-1) [type_remote=TOP_LEFT]
-     -> block % 2 == 1 ? BR merge_diagonal_blocks(block/2, 0, level-1) [type_remote=BOTTOM_RIGHT]
+     -> block % 2 == 0 ? TL merge_diagonal_blocks(block/2, level-1) [type_remote=TOP_LEFT]
+     -> block % 2 == 1 ? BR merge_diagonal_blocks(block/2, level-1) [type_remote=BOTTOM_RIGHT]
      -> parsec_D_leaf(block, block, level) [type=LEAF_SIZE_TILE]
 
 BODY
@@ -78,24 +78,22 @@ BODY
 END
 
 /* merge blocks to lower level. */
-merge_diagonal_blocks(block, i, level) /* choose the i'th block on row 'block'. */
+merge_diagonal_blocks(block, level) /* choose the i'th block on row 'block'. */
 
 level = h2_params->min_level-1 .. h2_params->min_level-1
 block = 0 .. %{ return pow(2, level)-1; %}
-i = 0 .. %{ return h2_params->row_near_list[level].length-1; %}
-actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %}
 
-: parsec_D_non_leaf(block, actual_i, level)
+: parsec_D_non_leaf(block, block, level)
 
 READ TL <- D factorize_diagonal(block*2, level+1) [type_remote=RANK_TILE]
 READ BR <- D factorize_diagonal(block*2+1, level+1) [type_remote=RANK_TILE]
 READ BL <- parsec_S(block*2+1, block*2, level+1) [type=RANK_TILE]
-RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
-         -> parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
+RW BLOCK <- parsec_D_non_leaf(block, block, level) [type=SMALL_TILE]
+         -> parsec_D_non_leaf(block, block, level) [type=SMALL_TILE]
 BODY
 {
   printf("merge dense blocks: block-> %d actual_i -> %d level -> %d\n",
-         block, actual_i, level);
+         block, block, level);
   int LD_BLOCK = h2_params->max_rank * 2;
   int LD_RANK_TILE = h2_params->max_rank;
   double *_BLOCK = (double*)BLOCK;
@@ -127,27 +125,26 @@ BODY
 }
 END
 
-merge_non_diagonal_blocks(block, i, level)
+/* merge_non_diagonal_blocks(block, i, level) */
 
-level = h2_params->min_level-1 .. h2_params->min_level-1
-block = 1 .. %{ return pow(2, level)-1; %}
-i = 0 .. %{ return h2_params->row_far_list[level].length-1; %}
+/* level = h2_params->min_level-1 .. h2_params->min_level-1 */
+/* block = 1 .. %{ return pow(2, level)-1; %} */
+/* i = 0 .. %{ return h2_params->row_near_list[level].length-1; %} */
+/* actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %} */
 
-actual_i = %{ return h2_params->row_far_list[level].level_block_list[block].indices[i]; %}
+/* : parsec_D_non_leaf(block, actual_i, level) */
 
-: parsec_D_non_leaf(block, actual_i, level)
+/* READ TL <- parsec_S(block * 2, actual_i * 2, level+1) [type=RANK_TILE] */
+/* READ TR <- parsec_S(block * 2, actual_i * 2 + 1, level+1) [type=RANK_TILE] */
+/* READ BL <- parsec_S(block * 2 + 1, actual_i * 2, level+1) [type=RANK_TILE] */
+/* READ BR <- parsec_S(block * 2 + 1, actual_i * 2 + 1, level+1) [type=RANK_TILE] */
+/* RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE] */
+/*          -> parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE] */
 
-READ TL <- parsec_S(block * 2, actual_i * 2, level+1) [type=RANK_TILE]
-READ TR <- parsec_S(block * 2, actual_i * 2 + 1, level+1) [type=RANK_TILE]
-READ BL <- parsec_S(block * 2 + 1, actual_i * 2, level+1) [type=RANK_TILE]
-READ BR <- parsec_S(block * 2 + 1, actual_i * 2 + 1, level+1) [type=RANK_TILE]
-RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
-         -> parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
-
-BODY
-{
-  printf("merge lr\n");
-}
-END
+/* BODY */
+/* { */
+/*   printf("merge lr b-> %d actual_i: %d\n", block, actual_i); */
+/* } */
+/* END */
 
 /* factorize lower block matrix. */

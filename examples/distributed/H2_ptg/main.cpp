@@ -180,6 +180,7 @@ init_far_lists(SymmetricSharedBasisMatrix& A, Domain& domain, Args& opts,
       for (int j = 0; j <= i; ++j) {
         if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
           h2_params->row_far_list[level].level_block_list[i].indices[j_index] = j;
+          std::cout << " lvl: " << level  << " i: " <<  i << " -- row list: j-> " << j << std::endl;
           j_index++;
         }
       }
