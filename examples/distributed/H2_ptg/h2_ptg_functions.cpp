@@ -567,20 +567,20 @@ h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                    h2_params->max_rank, h2_params->max_rank, h2_params->max_rank,
                    PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
+  // BOTTOM_RIGHT type
   MPI_Datatype MPI_BOTTOM_RIGHT;
-  const int array_of_sizes[2] = {h2_params->nleaf, h2_params->nleaf};
-  const int array_of_subsizes[2] = {h2_params->max_rank, h2_params->max_rank};
-  const int array_of_starts[2] =
+  const int array_of_sizes_br[2] = {h2_params->nleaf, h2_params->nleaf};
+  const int array_of_subsizes_br[2] = {h2_params->max_rank, h2_params->max_rank};
+  const int array_of_starts_br[2] =
     {h2_params->nleaf - h2_params->max_rank, h2_params->nleaf - h2_params->max_rank};
   MPI_Type_create_subarray(2,
-                           array_of_sizes,
-                           array_of_subsizes,
-                           array_of_starts,
+                           array_of_sizes_br,
+                           array_of_subsizes_br,
+                           array_of_starts_br,
                            MPI_ORDER_FORTRAN,
                            MPI_DOUBLE,
                            &MPI_BOTTOM_RIGHT);
   MPI_Type_commit(&MPI_BOTTOM_RIGHT);
-
   h2_factorize->arenas_datatypes[PARSEC_h2_factorize_BOTTOM_RIGHT_ADT_IDX].opaque_dtt = MPI_BOTTOM_RIGHT;
   h2_factorize->arenas_datatypes[PARSEC_h2_factorize_BOTTOM_RIGHT_ADT_IDX].arena =
     PARSEC_OBJ_NEW(parsec_arena_t);
@@ -588,6 +588,25 @@ h2_factorize_New(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                          h2_params->max_rank * h2_params->max_rank,
                          PARSEC_ARENA_ALIGNMENT_SSE);
 
+  // TOP_LEFT type
+  MPI_Datatype MPI_TOP_LEFT;
+  const int array_of_sizes_tl[2] = {h2_params->nleaf, h2_params->nleaf};
+  const int array_of_subsizes_tl[2] = {h2_params->max_rank, h2_params->max_rank};
+  const int array_of_starts_tl[2] = {0, 0};
+  MPI_Type_create_subarray(2,
+                           array_of_sizes_tl,
+                           array_of_subsizes_tl,
+                           array_of_starts_tl,
+                           MPI_ORDER_FORTRAN,
+                           MPI_DOUBLE,
+                           &MPI_TOP_LEFT);
+  MPI_Type_commit(&MPI_TOP_LEFT);
+  h2_factorize->arenas_datatypes[PARSEC_h2_factorize_TOP_LEFT_ADT_IDX].opaque_dtt = MPI_TOP_LEFT;
+  h2_factorize->arenas_datatypes[PARSEC_h2_factorize_TOP_LEFT_ADT_IDX].arena =
+    PARSEC_OBJ_NEW(parsec_arena_t);
+  parsec_arena_construct(h2_factorize->arenas_datatypes[PARSEC_h2_factorize_TOP_LEFT_ADT_IDX].arena,
+                         h2_params->max_rank * h2_params->max_rank,
+                         PARSEC_ARENA_ALIGNMENT_SSE);
 
   // + TILE -> nleaf * nleaf (stride=nleaf)
   // + SMALL_TILE -> max_rank * max_rank (stride=max_rank)

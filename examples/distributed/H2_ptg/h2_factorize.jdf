@@ -45,7 +45,7 @@ BODY
   int64_t U_ncols = h2_params->max_rank;
   char which  = 'F';
 
-  printf("exec compl: blk %d l: %d\n", block, level);
+  printf("exec multiply complement: block -> %d level -> %d\n", block, level);
 
   CORE_multiply_complement(D_nrows, D_ncols, D_row_rank, D_col_rank,
                            U_nrows, U_ncols, (double*)D, (double*)U, which);
@@ -62,7 +62,8 @@ col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].l
 : parsec_D_leaf(block, block, level)
 
 RW D <- D diagonal_multiply_complements(block, level) /* no type cuz always on the same MPI rank. */
-     -> D merge_dense_blocks(0, block/2, 0, level-1) [type_remote=BOTTOM_RIGHT]
+     -> BR merge_dense_blocks(block/2, 0, level-1) [type_remote=BOTTOM_RIGHT]
+     -> TL merge_dense_blocks(block/2, 0, level-1) [type_remote=TOP_LEFT]
      -> parsec_D_leaf(block, block, level) [type=LEAF_SIZE_TILE]
 
 BODY
@@ -76,23 +77,44 @@ BODY
 }
 END
 
-merge_dense_blocks(submatrix, block, i, level) /* choose the i'th block on row 'block'. */
+/* merge blocks to lower level. */
+merge_dense_blocks(block, i, level) /* choose the i'th block on row 'block'. */
 
 level = 1 .. 1
 block = 0 .. %{ return pow(2, level)-1; %}
 i = 0 .. %{ return h2_params->row_near_list[level].length-1; %}
-submatrix = 0 .. 0
 
 actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %}
 
 : parsec_D_non_leaf(block, actual_i, level)
 
-READ D <- D factorize_diagonal(block*2, level+1) [type_remote=RANK_TILE]
+READ TL <- D factorize_diagonal(block*2+1, level+1) [type_remote=RANK_TILE]
+READ BR <- D factorize_diagonal(block*2, level+1) [type_remote=RANK_TILE]
 RW BLOCK <- parsec_D_non_leaf(block, i, level)
          -> parsec_D_non_leaf(block, i, level)
 BODY
 {
-  printf("merge dense blocks: block-> %d actual_i -> %d level -> %d submat -> %d\n",
-         block, actual_i, level, submatrix);
+  printf("merge dense blocks: block-> %d actual_i -> %d level -> %d\n",
+         block, actual_i, level);
 }
 END
+
+/* merge_lr_blocks(submatrix, block, i, level) */
+
+/* level = 1 .. 1 */
+/* block = 0 .. %{ return pow(2, level)-1; %} */
+/* i = 0 .. %{ return h2_params->row_near_list[level].length-1; %} */
+/* submatrix = 0 .. 1 */
+
+/* actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %} */
+
+/* : parsec_S(block, actual_i, level) */
+
+/* READ S0 <- parsec_S(block*2, actual_i, level) */
+
+/* BODY */
+/* { */
+/* } */
+/* END */
+
+/* factorize lower block matrix. */

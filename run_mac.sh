@@ -46,7 +46,7 @@ for N in 1024; do
     #         done
     #     done
     # done
-    lldb -- ./bin/H2_ptg --N $N \
+    ./bin/H2_ptg --N $N \
                  --nleaf $nleaf \
                  --kernel_func laplace \
                  --kind_of_geometry grid \
