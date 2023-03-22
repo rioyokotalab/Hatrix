@@ -90,8 +90,8 @@ actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].ind
 READ TL <- D factorize_diagonal(block*2, level+1) [type_remote=RANK_TILE]
 READ BR <- D factorize_diagonal(block*2+1, level+1) [type_remote=RANK_TILE]
 READ BL <- parsec_S(block*2+1, block*2, level+1) [type=RANK_TILE]
-RW BLOCK <- parsec_D_non_leaf(block, i, level)
-         -> parsec_D_non_leaf(block, i, level)
+RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
+         -> parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
 BODY
 {
   printf("merge dense blocks: block-> %d actual_i -> %d level -> %d\n",
@@ -127,22 +127,27 @@ BODY
 }
 END
 
-/* merge_lr_blocks(submatrix, block, i, level) */
+merge_non_diagonal_blocks(block, i, level)
 
-/* level = 1 .. 1 */
-/* block = 0 .. %{ return pow(2, level)-1; %} */
-/* i = 0 .. %{ return h2_params->row_near_list[level].length-1; %} */
-/* submatrix = 0 .. 1 */
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 1 .. %{ return pow(2, level)-1; %}
+i = 0 .. %{ return h2_params->row_far_list[level].length-1; %}
 
-/* actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %} */
+actual_i = %{ return h2_params->row_far_list[level].level_block_list[block].indices[i]; %}
 
-/* : parsec_S(block, actual_i, level) */
+: parsec_D_non_leaf(block, actual_i, level)
 
-/* READ S0 <- parsec_S(block*2, actual_i, level) */
+READ TL <- parsec_S(block * 2, actual_i * 2, level+1) [type=RANK_TILE]
+READ TR <- parsec_S(block * 2, actual_i * 2 + 1, level+1) [type=RANK_TILE]
+READ BL <- parsec_S(block * 2 + 1, actual_i * 2, level+1) [type=RANK_TILE]
+READ BR <- parsec_S(block * 2 + 1, actual_i * 2 + 1, level+1) [type=RANK_TILE]
+RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
+         -> parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
 
-/* BODY */
-/* { */
-/* } */
-/* END */
+BODY
+{
+  printf("merge lr\n");
+}
+END
 
 /* factorize lower block matrix. */
