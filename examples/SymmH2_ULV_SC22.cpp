@@ -2140,7 +2140,7 @@ int main(int argc, char* argv[]) {
 
   if (fname == NULL) {
     // mesh_unit_sphere(body, Nbody);
-    uniform_grid_no_rnd(body, Nbody, 2);
+    uniform_grid_no_rnd(body, Nbody, 1);
     //mesh_unit_cube(body, Nbody);
     //uniform_unit_cube(body, Nbody, 3, 1234);
     buildTree(&ncells, cell, body, Nbody, levels);

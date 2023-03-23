@@ -90,6 +90,18 @@ void cholesky(Matrix& A, Mode uplo) {
   LAPACKE_dpotrf(LAPACK_COL_MAJOR, uplo == Lower ? 'L' : 'U', A.rows, &A, A.stride);
 }
 
+std::vector<int> cholesky_piv(Matrix& A, Mode uplo) {
+  std::vector<int> pivots(A.rows);
+  int rank;
+  double tol = -1;
+  double WORK[A.rows * 2];
+  int INFO;
+
+  LAPACKE_dpstrf(LAPACK_COL_MAJOR, uplo == Lower ? 'L' : 'U', A.rows, &A, A.stride, pivots.data(),
+                 &rank, tol);
+  return pivots;
+}
+
 std::vector<int> lup(Matrix& A) {
   std::vector<int> ipiv(A.rows);
   LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, ipiv.data());

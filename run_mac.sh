@@ -27,22 +27,22 @@ ndim=1
 nleaf=256
 adm=0
 
-for N in 128; do
+for N in 8192; do
     for adm in 1; do
-        for nleaf in 32; do
-            for max_rank in 20; do
+        for nleaf in 256; do
+            for max_rank in 50; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
-                              --accuracy -1 \
+                              --accuracy 1e-8 \
                               --admis $adm \
                               --admis_kind geometry \
                               --construct_algorithm miro \
-                              --param_1 1e-2 --param_2 0.5 --param_3 0.1 \
-                              --kind_of_recompression 3
+                              --param_1 1 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3 --use_nested_basis
             done
         done
     done

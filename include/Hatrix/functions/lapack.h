@@ -24,6 +24,8 @@ void lu(Matrix& A);
 // Compute in-place Cholesky factorization fo A with LAPACK DPOTRF.
 void cholesky(Matrix& A, Mode uplo);
 
+std::vector<int> cholesky_piv(Matrix& A, Mode uplo);
+
 // Compute pivoted LU factorization using LAPACK.
 std::vector<int> lup(Matrix& A);
 

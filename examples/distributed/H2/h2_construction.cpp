@@ -101,18 +101,16 @@ generate_leaf_nodes(const Domain& domain,
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
-        // Matrix Sblock = matmul(matmul(A.U(i, A.max_level),
-        //                               dense_splits[i * nblocks + j], true, false),
-        //                        A.U(j, A.max_level));
-        Matrix _U, _S, _V; double error;
-        std::tie(_U, _S, _V, error) = truncated_svd(dense_splits[i * nblocks + j], opts.max_rank);
-        A.S.insert(i, j, A.max_level, std::move(_S));
+        Matrix Sblock = matmul(matmul(A.U(i, A.max_level),
+                                      dense_splits[i * nblocks + j], true, false),
+                               A.U(j, A.max_level));
+        A.S.insert(i, j, A.max_level, std::move(Sblock));
 
-        double norm = Hatrix::norm(dense_splits[i * nblocks + j] -
-                                   matmul(matmul(A.U(i, A.max_level), A.S(i, j, A.max_level)),
-                                          A.U(j, A.max_level), false, true));
+        // double norm = Hatrix::norm(dense_splits[i * nblocks + j] -
+        //                            matmul(matmul(A.U(i, A.max_level), A.S(i, j, A.max_level)),
+        //                                   A.U(j, A.max_level), false, true));
 
-        std::cout << "i: " << i << " j: " << j << " norm: " << norm << std::endl;
+        // std::cout << "i: " << i << " j: " << j << " norm: " << norm << std::endl;
       }
     }
   }
