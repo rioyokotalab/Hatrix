@@ -102,7 +102,8 @@ namespace Hatrix {
       dual_tree_traversal(A, Ci.cells[0], Cj, domain, opts);
       dual_tree_traversal(A, Ci.cells[1], Cj, domain, opts);
     }
-    else if (j_level <= i_level && Cj.cells.size() > 0 && (!well_separated || !opts.use_nested_basis)) {
+    else if (j_level <= i_level && Cj.cells.size() > 0 &&
+             (!well_separated || !opts.use_nested_basis)) {
       // i is at a higheer level and j is not leaf.
       dual_tree_traversal(A, Ci, Cj.cells[0], domain, opts);
       dual_tree_traversal(A, Ci, Cj.cells[1], domain, opts);

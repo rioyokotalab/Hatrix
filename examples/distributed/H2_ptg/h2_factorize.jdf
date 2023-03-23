@@ -26,7 +26,7 @@ h2_params [ type="h2_factorize_params_t*" ]
 /* diagonal_multiply_complements task */
 diagonal_multiply_complements(block, level)
 
-level = h2_params->max_level .. h2_params->min_level
+level = h2_params->max_level .. h2_params->min_level .. -1
 block = 0 .. %{ return pow(2, level)-1; %}
 
 : parsec_D_leaf(block, block, level)
@@ -125,26 +125,26 @@ BODY
 }
 END
 
-/* merge_non_diagonal_blocks(block, i, level) */
+merge_non_diagonal_blocks(block, i, level)
 
-/* level = h2_params->min_level-1 .. h2_params->min_level-1 */
-/* block = 1 .. %{ return pow(2, level)-1; %} */
-/* i = 0 .. %{ return h2_params->row_near_list[level].length-1; %} */
-/* actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %} */
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 0 .. %{ return pow(2, level)-1; %}
+i = 0 .. %{ return h2_params->row_near_list[level].length-1; %}
+actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %}
 
-/* : parsec_D_non_leaf(block, actual_i, level) */
+: parsec_D_non_leaf(block, actual_i, level)
 
-/* READ TL <- parsec_S(block * 2, actual_i * 2, level+1) [type=RANK_TILE] */
-/* READ TR <- parsec_S(block * 2, actual_i * 2 + 1, level+1) [type=RANK_TILE] */
-/* READ BL <- parsec_S(block * 2 + 1, actual_i * 2, level+1) [type=RANK_TILE] */
-/* READ BR <- parsec_S(block * 2 + 1, actual_i * 2 + 1, level+1) [type=RANK_TILE] */
-/* RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE] */
-/*          -> parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE] */
+READ TL <- parsec_S(block * 2, actual_i * 2, level+1) [type=RANK_TILE]
+READ TR <- parsec_S(block * 2, actual_i * 2 + 1, level+1) [type=RANK_TILE]
+READ BL <- parsec_S(block * 2 + 1, actual_i * 2, level+1) [type=RANK_TILE]
+READ BR <- parsec_S(block * 2 + 1, actual_i * 2 + 1, level+1) [type=RANK_TILE]
+RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
+         -> parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
 
-/* BODY */
-/* { */
-/*   printf("merge lr b-> %d actual_i: %d\n", block, actual_i); */
-/* } */
-/* END */
+BODY
+{
+  printf("merge lr b-> %d actual_i: %d\n", block, actual_i);
+}
+END
 
 /* factorize lower block matrix. */
