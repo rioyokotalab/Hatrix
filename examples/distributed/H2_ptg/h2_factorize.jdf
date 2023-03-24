@@ -26,7 +26,7 @@ h2_params [ type="h2_factorize_params_t*" ]
 /* diagonal_multiply_complements task */
 diagonal_multiply_complements(block, level)
 
-level = h2_params->max_level .. h2_params->min_level .. -1
+level = h2_params->max_level .. h2_params->min_level
 block = 0 .. %{ return pow(2, level)-1; %}
 
 : parsec_D_leaf(block, block, level)
@@ -128,8 +128,8 @@ END
 merge_non_diagonal_blocks(block, i, level)
 
 level = h2_params->min_level-1 .. h2_params->min_level-1
-block = 0 .. %{ return pow(2, level)-1; %}
-i = 0 .. %{ return h2_params->row_near_list[level].length-1; %}
+block = 1 .. %{ return pow(2, level)-1; %}
+i = 0 .. %{ return h2_params->row_near_list[level].level_block_list[block].length-2; %}
 actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %}
 
 : parsec_D_non_leaf(block, actual_i, level)
@@ -143,7 +143,43 @@ RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
 
 BODY
 {
-  printf("merge lr b-> %d actual_i: %d\n", block, actual_i);
+  int LD_BLOCK = h2_params->max_rank * 2;
+  int LD_RANK_TILE = h2_params->max_rank;
+  double *_BLOCK = (double*)BLOCK;
+  double *_TL = (double*)TL;
+  double *_TR = (double*)TR;
+  double *_BL = (double*)BL;
+  double *_BR = (double*)BR;
+
+  /* copy top left block. */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[i + j * LD_BLOCK] = _TL[i + j * LD_RANK_TILE];
+    }
+  }
+
+  /* copy top right block. */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[i + (j + h2_params->max_rank) * LD_BLOCK] =
+        _TR[i + j * LD_RANK_TILE];
+    }
+  }
+
+  /* copy bottom right */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[(i + h2_params->max_rank) + (j + h2_params->max_rank) * LD_BLOCK] =
+        _BR[i + j * LD_RANK_TILE];
+    }
+  }
+
+  /* copy bottom left */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[(i + h2_params->max_rank) + j * LD_BLOCK] = _BL[i + j * LD_RANK_TILE];
+    }
+  }
 }
 END
 

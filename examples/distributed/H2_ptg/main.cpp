@@ -58,6 +58,17 @@ static void init_near_lists(SymmetricSharedBasisMatrix& A, Domain& domain, Args&
     }
   }
 
+  // for (int level = A.max_level; level >= A.min_level-1; --level) {
+  //   std::cout << "level: " << level << std::endl;
+  //   for (int i = 0; i < h2_params->row_near_list[level].length; ++i) {
+  //     std::cout << "\t row "<< i << "  :: ";
+  //     for (int ind = 0; ind < h2_params->row_near_list[level].level_block_list[i].length; ++ind) {
+  //       std::cout << h2_params->row_near_list[level].level_block_list[i].indices[ind] << " ";
+  //     }
+  //     std::cout << std::endl;
+  //   }
+  // }
+
   h2_params->col_near_list = (h2_block_list*)malloc((A.max_level+1) * sizeof(h2_block_list));
   for (int level = A.max_level; level>=A.min_level-1; --level) {
     h2_params->col_near_list[level].length = pow(2, level);
@@ -224,7 +235,7 @@ h2_factorize_params_init(SymmetricSharedBasisMatrix& A, Domain& domain, Args& op
   h2_params->nleaf = opts.nleaf;
 
   init_near_lists(A, domain, opts, h2_params);
-  init_fill_in_lists(A, domain, opts, h2_params);
+  // init_fill_in_lists(A, domain, opts, h2_params);
   init_far_lists(A, domain, opts, h2_params);
 }
 

@@ -45,14 +45,16 @@ namespace Hatrix {
   }
 
   void Domain::generate_grid_particles() {
-    std::vector<int64_t> sides(ndim, 0);
-    sides[0] = ceil(pow(N, 1.0 / ndim));
-    int64_t total = sides[0];
-    int64_t temp_N = N;
-    for (int k = 1; k < ndim; ++k) {
-      sides[k] = temp_N / sides[k-1];
-      temp_N = sides[k];
-    }
+    // std::vector<int64_t> sides(ndim, 0);
+    // sides[0] = ceil(pow(N, 1.0 / ndim));
+    // int64_t total = sides[0];
+    // int64_t temp_N = N;
+    // for (int k = 1; k < ndim; ++k) {
+    //   sides[k] = temp_N / sides[k-1];
+    //   temp_N = sides[k];
+    // }
+    // int64_t side = ceil()
+    int64_t side = ceil(pow(N, 1.0 / ndim));
 
     int64_t total = side;
     for (int64_t i = 1; i < ndim; ++i) { total *= side; }
