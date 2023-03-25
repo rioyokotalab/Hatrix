@@ -113,6 +113,16 @@ H2_main : % : dirs examples/distributed/H2
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
+# non-distributed dense matrix verification code
+.PHONY: examples/distributed/Dense
+examples/distributed/Dense:
+	$(MAKE) -C $@
+
+Dense : % : dirs examples/distributed/Dense
+	$(CXX) libDense.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
 UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 

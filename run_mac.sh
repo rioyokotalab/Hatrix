@@ -19,33 +19,33 @@ set -e
 
 # ulimit -c unlimited
 
-make -j H2_main
+make -j Dense
 # make -j H2_dtd
 
 max_rank=50
-ndim=2
+ndim=1
 nleaf=512
 adm=0
 
-for N in 4096; do
-    for adm in 1.7; do
-        for nleaf in 256; do
-            for max_rank in 50; do
-                ./bin/H2_main --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func yukawa \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy 1e-8 \
-                              --admis $adm \
-                              --admis_kind geometry \
-                              --construct_algorithm miro \
-                              --param_1 1e-4 --param_2 1 --param_3 0.5 \
-                              --kind_of_recompression 3
-            done
-        done
-    done
+# for N in 4096; do
+#     for adm in 1; do
+#         for nleaf in 256; do
+#             for max_rank in 50; do
+#                 ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func laplace \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy -1 \
+#                               --admis $adm \
+#                               --admis_kind geometry \
+#                               --construct_algorithm miro \
+#                               --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
+#                               --kind_of_recompression 3
+#             done
+#         done
+#     done
     # lldb -- ./bin/H2_ptg --N $N \
     #              --nleaf $nleaf \
     #              --kernel_func laplace \
@@ -58,7 +58,7 @@ for N in 4096; do
     #              --construct_algorithm miro \
     #              --param_1 1e-9  \
     #              --kind_of_recompression 3
-done
+# done
 
 function benchmark_sc22() {
     mpicxx -I${VEC_LIB_INCLUDE} -I/opt/homebrew/opt/lapack/include -I/Users/sameer/gitrepos/gsl-2.7.1/build/include -framework Accelerate -L/Users/sameer/gitrepos/gsl-2.7.1/build/lib -lgsl -lm -L/opt/homebrew/opt/lapack/lib -llapacke -llapack examples/SymmH2_ULV_SC22.cpp -o bin/sc_22
