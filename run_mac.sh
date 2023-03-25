@@ -13,51 +13,51 @@ set -e
 # make clean
 
 # export VECLIB_MAXIMUM_THREADS=1
-cd examples/distributed/H2_ptg
-./compile_jdf.sh
-cd $ROOT
+# cd examples/distributed/H2_ptg
+# ./compile_jdf.sh
+# cd $ROOT
 
-ulimit -c unlimited
+# ulimit -c unlimited
 
-make -j H2_ptg
+make -j H2_main
 # make -j H2_dtd
 
 max_rank=50
-ndim=1
-nleaf=256
+ndim=2
+nleaf=512
 adm=0
 
-for N in 2048; do
-    # for adm in 1; do
-    #     for nleaf in 256; do
-    #         for max_rank in 50; do
-    #             ./bin/H2_main --N $N \
-    #                           --nleaf $nleaf \
-    #                           --kernel_func laplace \
-    #                           --kind_of_geometry grid \
-    #                           --ndim $ndim \
-    #                           --max_rank $max_rank \
-    #                           --accuracy 1e-8 \
-    #                           --admis $adm \
-    #                           --admis_kind geometry \
-    #                           --construct_algorithm miro \
-    #                           --param_1 1 --param_2 0.03 --param_3 0.5 \
-    #                           --kind_of_recompression 3 --use_nested_basis
-    #         done
-    #     done
-    # done
-    lldb -- ./bin/H2_ptg --N $N \
-                 --nleaf $nleaf \
-                 --kernel_func laplace \
-                 --kind_of_geometry grid \
-                 --ndim $ndim \
-                 --max_rank $max_rank \
-                 --accuracy -1 \
-                 --admis $adm \
-                 --admis_kind diagonal \
-                 --construct_algorithm miro \
-                 --param_1 1e-9  \
-                 --kind_of_recompression 3
+for N in 4096; do
+    for adm in 1.2; do
+        for nleaf in 256; do
+            for max_rank in 50; do
+                ./bin/H2_main --N $N \
+                              --nleaf $nleaf \
+                              --kernel_func laplace \
+                              --kind_of_geometry grid \
+                              --ndim $ndim \
+                              --max_rank $max_rank \
+                              --accuracy 1e-8 \
+                              --admis $adm \
+                              --admis_kind geometry \
+                              --construct_algorithm miro \
+                              --param_1 1 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3 --use_nested_basis
+            done
+        done
+    done
+    # lldb -- ./bin/H2_ptg --N $N \
+    #              --nleaf $nleaf \
+    #              --kernel_func laplace \
+    #              --kind_of_geometry grid \
+    #              --ndim $ndim \
+    #              --max_rank $max_rank \
+    #              --accuracy -1 \
+    #              --admis $adm \
+    #              --admis_kind diagonal \
+    #              --construct_algorithm miro \
+    #              --param_1 1e-9  \
+    #              --kind_of_recompression 3
 done
 
 function benchmark_sc22() {

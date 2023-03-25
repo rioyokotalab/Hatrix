@@ -45,50 +45,44 @@ namespace Hatrix {
   }
 
   void Domain::generate_grid_particles() {
-    // std::vector<int64_t> sides(ndim, 0);
-    // sides[0] = ceil(pow(N, 1.0 / ndim));
-    // int64_t total = sides[0];
-    // int64_t temp_N = N;
-    // for (int k = 1; k < ndim; ++k) {
-    //   sides[k] = temp_N / sides[k-1];
-    //   temp_N = sides[k];
-    // }
-    // int64_t side = ceil()
-    int64_t side = ceil(pow(N, 1.0 / ndim));
+    std::vector<int64_t> sides(ndim, 0);
+    sides[0] = ceil(pow(N, 1.0 / ndim));
+    int64_t total = sides[0];
+    int64_t temp_N = N;
+    for (int k = 1; k < ndim; ++k) {
+      sides[k] = temp_N / sides[k-1];
+      temp_N = sides[k];
+    }
+    for (int k = 1; k < ndim; ++k) { total += sides[k]; }
+    int64_t extra = N - total;
+    particles.resize(N, Particle(std::vector<double>(ndim), 0));
 
-    int64_t total = side;
-    for (int64_t i = 1; i < ndim; ++i) { total *= side; }
-
-    int64_t ncoords = ndim * side;
-    std::vector<double> coord(ncoords);
-
-    for (int64_t i = 0; i < side; ++i) {
-      double val = double(i) / side;
-      for (int64_t j = 0; j < ndim; ++j) {
-        coord[j * side + i] = val;
+    // caveman loop. make nicer.
+    if (ndim == 1) {
+      double space_0 = 1.0 / N;
+      for (int64_t i = 0; i < sides[0]; ++i) {
+        std::vector<double> point(ndim);
+        point[0] = i * space_0;
+        particles[i] = Hatrix::Particle(point, 0);
       }
     }
-
-    std::vector<int64_t> pivot(ndim, 0);
-
-    int64_t k = 0;
-    for (int64_t i = 0; i < N; ++i) {
-      std::vector<double> points(ndim);
-      for (k = 0; k < ndim; ++k) {
-        points[k] = coord[pivot[k] + k * side];
-      }
-      particles.push_back(Hatrix::Particle(points, 0));
-
-      k = ndim - 1;
-      pivot[k]++;
-
-      while(pivot[k] == side) {
-        pivot[k] = 0;
-        if (k > 0) {
-          --k;
-          pivot[k]++;
+    else if (ndim == 2) {
+      double space_0 = 1.0 / sides[0], space_1 = 1.0 / sides[1];
+      for (int64_t i = 0; i < sides[0]; ++i) {
+        for (int64_t j = 0; j < sides[1]; ++j) {
+          std::vector<double> point(ndim);
+          point[0] = i * space_0;
+          point[1] = j * space_1;
+          particles[j + i * sides[0]] = Hatrix::Particle(point, 0);
         }
       }
+      // std::cout << "total : " << sides[0] * sides[1] << std::endl;
+      // for (int64_t i = 0; i < extra; ++i) {
+      //   particles[i] = Hatrix::Particle(particles[(sides[0]-1) * (sides[1]-1)].coords, 0);
+      // }
+    }
+    else if (ndim == 3) {
+      abort();
     }
   }
 
