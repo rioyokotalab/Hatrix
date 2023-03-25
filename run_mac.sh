@@ -33,7 +33,7 @@ for N in 4096; do
             for max_rank in 50; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
-                              --kernel_func laplace \
+                              --kernel_func yukawa \
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
@@ -41,7 +41,7 @@ for N in 4096; do
                               --admis $adm \
                               --admis_kind geometry \
                               --construct_algorithm miro \
-                              --param_1 1e-4 --param_2 0.03 --param_3 0.5 \
+                              --param_1 1e-4 --param_2 1 --param_3 0.5 \
                               --kind_of_recompression 3
             done
         done

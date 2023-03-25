@@ -60,6 +60,10 @@ namespace Hatrix {
                        const std::vector<double>& coords_col,
                        const double sigma, const double nu, const double smoothness);
 
+  double yukawa(const std::vector<double>& coords_row,
+                const std::vector<double>& coords_col,
+                const double alpha, double singularity);
+
   void init_geometry_admis(SymmetricSharedBasisMatrix& A,
                            const Domain& domain, const Args& opts);
 

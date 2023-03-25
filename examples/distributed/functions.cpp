@@ -368,6 +368,13 @@ namespace Hatrix {
     }
   }
 
+  double yukawa(const std::vector<double>& coords_row,
+                const std::vector<double>& coords_col,
+                const double alpha, const double singularity) {
+    double dist = distance(coords_row, coords_col);
+    double r = dist + singularity;
+    return exp(alpha * -r) / r;
+  }
 
   // double
   // block_sin(const std::vector<double>& coords_row,

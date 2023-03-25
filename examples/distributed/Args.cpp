@@ -110,6 +110,11 @@ namespace Hatrix {
           kernel_verbose = std::string(optarg);
           is_symmetric = true;
         }
+        else if (!strcmp(optarg, "yukawa")) {
+          kfunc = YUKAWA;
+          kernel_verbose = std::string(optarg);
+          is_symmetric = true;
+        }
         else {
           throw std::invalid_argument("Cannot support "
                                       + std::string(optarg)
@@ -221,6 +226,12 @@ namespace Hatrix {
                              param_3); // sigma, nu, smoothness
       };
     }
+    else if (kfunc == YUKAWA) {
+      kernel = [&](const std::vector<double>& c_row,
+                   const std::vector<double>& c_col) {
+        return yukawa(c_row, c_col, param_1, param_2); // alpha, singularity
+      };
+    }
   }
 
   void
@@ -240,7 +251,7 @@ namespace Hatrix {
             "--max_rank (-r)                             : Maximum rank (%lld).\n"
             "--accuracy (-e)                             : Desired accuracy for construction. > 0 for constant rank construction. (%lf).\n"
             "--qr_accuracy (-q)                          : Desired accuracy for QR. (%lf).\n"
-            "--kind_of_recompression (-s)                : Recompression scheme (0,1,2,3) (%lld). \n"
+            "--kind_of_recompression (-s)                : Recompression scheme (0,1,2,3) (%d). \n"
             "--admis (-a)                                : Admissibility constant (%lf).\n"
             "--pertubation (-p)                          : Parameter to add to the admissibility (%lf).\n"
             "--parsec_cores (-i)                         : Parameter to control the number of physical cores used by a single process of PaRSEC. (%d) \n"
