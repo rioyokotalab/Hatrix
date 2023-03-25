@@ -556,7 +556,8 @@ matmul(SymmetricSharedBasisMatrix& A,
 
 // Copy blocks from the child level into level.
 void
-merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, int64_t level, parsec_taskpool_t* dtd_tp) {
+merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain,
+                          int64_t level, parsec_taskpool_t* dtd_tp) {
   const int64_t parent_level = level - 1;
   const int64_t parent_nblocks = pow(2, parent_level);
 
