@@ -28,10 +28,16 @@ namespace Hatrix {
     file << std::endl;
 
     for (int64_t i = 0; i < N; ++i) {
-      for (int64_t k = 0; k < ndim; ++k) {
-        file << particles[i].coords[k] << ",";
+      if (ndim == 1) {
+        file << particles[i].coords[0] <<  std::endl;
       }
-      file << std::endl;
+      else if (ndim == 2) {
+        file << particles[i].coords[0] << "," << particles[i].coords[1] << std::endl;
+      }
+      else if (ndim == 3) {
+        file << particles[i].coords[0] << "," << particles[i].coords[1]
+             << "," << particles[i].coords[2] << std::endl;
+      }
     }
 
     file.close();
@@ -73,7 +79,7 @@ namespace Hatrix {
           std::vector<double> point(ndim);
           point[0] = i * space_0;
           point[1] = j * space_1;
-          particles[j + i * sides[0]] = Hatrix::Particle(point, 0);
+          particles[i + j * sides[0]] = Hatrix::Particle(point, 0);
         }
       }
       // std::cout << "total : " << sides[0] * sides[1] << std::endl;

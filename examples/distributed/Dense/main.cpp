@@ -82,11 +82,6 @@ int main(int argc, char* argv[]) {
   }
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  for (int i = 0; i < Adense.rows; ++i) {
-    for (int j = i+1; j < Adense.cols; ++j) {
-      Adense(i, j) = 0.0;
-    }
-  }
   Matrix bdense = matmul(Adense, x);
   Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   solve_error = Hatrix::norm(dense_solution - x) / Hatrix::norm(x);

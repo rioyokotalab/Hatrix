@@ -23,9 +23,17 @@ make -j Dense
 # make -j H2_dtd
 
 max_rank=50
-ndim=1
 nleaf=512
 adm=0
+ndim=1
+N=4096
+
+./bin/Dense --N $N --kernel_func laplace --kind_of_geometry grid --ndim $ndim --param_1 1e-9
+./bin/Dense --N $N --kernel_func laplace --kind_of_geometry grid --ndim $ndim --param_1 1e-4
+./bin/Dense --N $N --kernel_func gsl_matern --kind_of_geometry grid --ndim $ndim --param_1 1 --param_2 0.03 --param_3 0.5
+./bin/Dense --N $N --kernel_func gsl_matern --kind_of_geometry grid --ndim $ndim --param_1 1 --param_2 0.1 --param_3 1
+./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-9 --param_2 1
+./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-9 --param_2 1
 
 # for N in 4096; do
 #     for adm in 1; do
