@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
 
     auto begin_factor = std::chrono::system_clock::now();
-    fp_ops = factorize(A, opts);
+    // fp_ops = factorize(A, opts);
     auto stop_factor = std::chrono::system_clock::now();
     factor_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_factor - begin_factor).count();
@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
     post_factor_average_rank = A.average_rank();
 
     auto begin_solve = std::chrono::system_clock::now();
-    h2_solution = solve(A, b);
+    // h2_solution = solve(A, b);
 
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
@@ -134,7 +134,7 @@ int main(int argc, char* argv[]) {
   }
 
   // // ||x - A * (A^-1 * x)|| / ||x||
-  solve_error = Hatrix::norm(h2_solution - x) / opts.N;
+  // solve_error = Hatrix::norm(h2_solution - x) / opts.N;
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   for (int i = 0; i < Adense.rows; ++i) {
@@ -143,12 +143,16 @@ int main(int argc, char* argv[]) {
     }
   }
   Matrix bdense = matmul(Adense, x);
-  Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
-  construct_error = Hatrix::norm(bdense - b) / opts.N;
+  // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;
+  // std::cout << "DIFF:\n";
+  construct_error = Hatrix::norm(bdense - b) / opts.N;
+
 
   double h2_norm = Hatrix::norm(h2_solution);
   double x_norm = Hatrix::norm(x);
+  std::cout << "CONST. ERR: " << construct_error
+            << " MAX RANK: " << construct_max_rank << std::endl;
 
   std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
             << opts.accuracy << ","

@@ -28,7 +28,7 @@ nleaf=512
 adm=0
 
 for N in 4096; do
-    for adm in 1.2; do
+    for adm in 1.7; do
         for nleaf in 256; do
             for max_rank in 50; do
                 ./bin/H2_main --N $N \
@@ -41,8 +41,8 @@ for N in 4096; do
                               --admis $adm \
                               --admis_kind geometry \
                               --construct_algorithm miro \
-                              --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
+                              --param_1 1e-4 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3
             done
         done
     done

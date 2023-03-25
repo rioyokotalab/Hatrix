@@ -30,8 +30,8 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
                                      diagonal.rows - A.ranks(block, level),
                                      diagonal.cols - A.ranks(block, level));
 
-  auto pivots = cholesky_piv(diagonal_splits[0], Hatrix::Lower);
-  pivot_map.insert(block, level, std::move(pivots));
+  cholesky(diagonal_splits[0], Hatrix::Lower);
+  // pivot_map.insert(block, level, std::move(pivots));
   // for (int i = 0; i < pivots.size(); ++i) {
   //   std::cout << pivots[i] << " ";
   // }
@@ -804,11 +804,11 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
-    auto pivots = cholesky_piv(A.D(d, d, level), Hatrix::Lower);
-    for (int i = 0; i < pivots.size(); ++i) {
-      std::cout << pivots[i] << " ";
-    }
-    std::cout << std::endl;
+    cholesky(A.D(d, d, level), Hatrix::Lower);
+    // for (int i = 0; i < pivots.size(); ++i) {
+    //   std::cout << pivots[i] << " ";
+    // }
+    // std::cout << std::endl;
     for (int i = d+1; i < last_nodes; ++i) {
       solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
                        false, true, 1.0);
@@ -1247,21 +1247,12 @@ matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Matrix& x) {
     matmul(A.U(i, A.max_level), b_hat[b_hat_offset + i], b_splits[i]);
   }
 
-
-  // Multiply with the dense blocks to obtain the final product in b_splits.
-  // for (int i = 0; i < leaf_nblocks; ++i) {
-  //   matmul(A.D(i, i, A.max_level), x_splits[i], b_splits[i]);
-  // }
-
   for (int64_t i = 0; i < leaf_nblocks; ++i) {
     for (int64_t j = 0; j <= i; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           !A.is_admissible(i, j, A.max_level)) {
         // TODO: make the diagonal tringular and remove this.
         matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
-        if (i != j) {
-          matmul(A.D(i, j, A.max_level), x_splits[i], b_splits[j], true, false);
-        }
       }
     }
   }

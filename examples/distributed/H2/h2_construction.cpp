@@ -20,18 +20,13 @@ generate_column_block(int64_t block, int64_t block_size,
   auto dense_splits = dense.split(nblocks, nblocks);
   Matrix AY(block_size, block_size);
 
-  for (int64_t i = 0; i < nblocks; ++i) {
-    if (A.is_admissible.exists(i, block, level) &&
-        !A.is_admissible(i, block, level)) { continue; }
-    // AY += dense_splits[block * nblocks + j];
-    AY += dense_splits[i * nblocks + block];
-
-    // std::cout << "DEnse norm: " << Hatrix::norm(dense_splits[i * nblocks + block]) << std::endl;
-    // matmul(dense_splits[block * nblocks + j], rand_splits[j], AY, false, false, 1.0, 1.0);
-    // AY = concat(AY, dense_splits[block * nblocks + j], 1);
+  for (int64_t j = 0; j < nblocks; ++j) {
+    if (A.is_admissible.exists(block, j, level) &&
+        !A.is_admissible(block, j, level)) { continue; }
+    AY += dense_splits[block * nblocks + j];
   }
 
-  return transpose(AY);
+  return AY;
 }
 
 static Matrix
@@ -48,15 +43,22 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
     rank = opts.max_rank;
     Matrix Si, Vi; double error;
     std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
+    US.insert(block, level, std::move(Si));
   }
   else {
     Matrix _S, _V;
     std::tie(Ui, _S, _V, rank) = error_svd(AY, opts.accuracy * 1e-2, false, true);
+    if (rank == Ui.rows) {
+      std::cout << "@@@ COMPRESSION FAILED! @@@\n";
+      abort();
+    }
+    if (rank > opts.max_rank) {
+      Ui.shrink(Ui.rows, opts.max_rank);
+      _S.shrink(opts.max_rank, opts.max_rank);
+      rank = opts.max_rank;
+    }
+    US.insert(block, level, std::move(_S));
   }
-
-  Matrix _U, _S, _V; double _error;
-  std::tie(_U, _S, _V, _error) = truncated_svd(AY, rank);
-  US.insert(block, level, std::move(_S));
 
   A.ranks.insert(block, level, std::move(rank));
 
@@ -75,13 +77,13 @@ generate_leaf_nodes(const Domain& domain,
     for (int64_t j : near_neighbours(i, A.max_level)) {
       Matrix Aij(dense_splits[i * nblocks + j], true);
 
-      for (int64_t i = 0; i < Aij.rows; ++i) {
-        for (int64_t j = i+1; j < Aij.cols; ++j) {
-          Aij(i, j) = 0;
+      if (i == j) {
+        for (int64_t i = 0; i < Aij.rows; ++i) {
+          for (int64_t j = i+1; j < Aij.cols; ++j) {
+            Aij(i, j) = 0;
+          }
         }
       }
-
-      // Aij.print();
       A.D.insert(i, j, A.max_level, std::move(Aij));
     }
   }
