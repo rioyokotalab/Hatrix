@@ -7,6 +7,7 @@
 #include "math.h"
 #include "string.h"
 #include "inttypes.h"
+#include "omp.h"
 #include <vector>
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_sf_bessel.h>
@@ -2203,10 +2204,10 @@ int main(int argc, char* argv[]) {
   getCommTime(&cm_time);
 
   if (mpi_rank == 0) {
-    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%e,%lld,%lld\n",
+    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%e,%lld,%lld,%d\n",
            (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
            construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
-           err,rank_max,kernel);
+           err,rank_max,kernel,omp_get_max_threads());
 
     // printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
     //   "Factorize: %lf s. COMM: %lf s.\n"
