@@ -34,7 +34,7 @@ N=4096
 # ./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-9 --param_2 1
 # ./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-9 --param_2 1
 
-for N in 1024; do
+for N in 4096; do
     for adm in 1; do
         for nleaf in 512; do
             for max_rank in 50; do
@@ -44,11 +44,11 @@ for N in 1024; do
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
-                              --accuracy -1 \
+                              --accuracy 1e-8 \
                               --admis $adm \
                               --admis_kind geometry \
                               --construct_algorithm miro \
-                              --param_1 1e-4 --param_2 0.03 --param_3 0.5 \
+                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
                               --kind_of_recompression 3
             done
         done

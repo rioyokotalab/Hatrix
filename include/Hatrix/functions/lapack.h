@@ -12,7 +12,7 @@ namespace Lapack {
   enum QR_ret { QAndR, OnlyQ };
 }
 
-// Compute condition number
+// Compute condition number with dgecon.
 double cond(const Matrix& A);
 
 // Compute in-place inverse using GETRF + GETRI.

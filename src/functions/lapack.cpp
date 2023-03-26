@@ -26,12 +26,11 @@ namespace Hatrix {
 
 double cond(const Matrix& A) {
   double cond_number;
-  char nrm = 'O';
+  char nrm = '1';
   double one_nrm = Hatrix::one_norm(A);
+  int info = LAPACKE_dgecon(LAPACK_COL_MAJOR, nrm, A.rows, &A, A.stride, one_nrm, &cond_number);
 
-  LAPACKE_dgecon(LAPACK_COL_MAJOR, nrm, A.rows, &A, A.stride, one_nrm, &cond_number);
-
-  return cond_number;
+  return 1.0 / cond_number;
 }
 
 void inverse(Matrix& A) {

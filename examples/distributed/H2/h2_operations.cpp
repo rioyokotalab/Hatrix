@@ -23,12 +23,24 @@ Hatrix::RowColMap<std::vector<int> > pivot_map;
 
 Matrix orig(32, 32);
 
+static double cond_2norm(const Matrix& A) {
+  Matrix copy(A, true);
+  inverse(copy);
+
+  double nrm = Hatrix::norm(A);
+  double inv_nrm = Hatrix::norm(copy);
+
+  return nrm / inv_nrm;
+}
+
 void
 factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
   Matrix& diagonal = A.D(block, block, level);
   auto diagonal_splits = split_dense(diagonal,
                                      diagonal.rows - A.ranks(block, level),
                                      diagonal.cols - A.ranks(block, level));
+
+  std::cout << "condition number: " << cond(diagonal) << std::endl;
 
   cholesky(diagonal_splits[0], Hatrix::Lower);
   // pivot_map.insert(block, level, std::move(pivots));
@@ -39,6 +51,8 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Lower,
                    false, true, 1.0);
   syrk(diagonal_splits[2], diagonal_splits[3], Hatrix::Lower, false, -1, 1);
+
+
 }
 
 void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
@@ -804,11 +818,9 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
+    std::cout << "d: " << d << " lvl: " << level << " " << cond(A.D(d, d, level)) << std::endl;
+
     cholesky(A.D(d, d, level), Hatrix::Lower);
-    // for (int i = 0; i < pivots.size(); ++i) {
-    //   std::cout << pivots[i] << " ";
-    // }
-    // std::cout << std::endl;
     for (int i = d+1; i < last_nodes; ++i) {
       solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
                        false, true, 1.0);
