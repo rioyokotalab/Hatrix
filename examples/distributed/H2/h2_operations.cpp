@@ -1181,8 +1181,6 @@ multiply_S(const Hatrix::SymmetricSharedBasisMatrix& A,
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
         matmul(A.S(i, j, level), x_hat[x_hat_offset + j], b_hat[b_hat_offset + i]);
-        // matmul(A.S(i, j, level), x_hat[x_hat_offset + i],
-        //        b_hat[b_hat_offset + j], true, false);
       }
     }
   }

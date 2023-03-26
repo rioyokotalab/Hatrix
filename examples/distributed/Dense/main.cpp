@@ -87,6 +87,7 @@ int main(int argc, char* argv[]) {
   solve_error = Hatrix::norm(dense_solution - x) / Hatrix::norm(x);
 
   std::cout << "DENSE SOLVER: N->" << opts.N
+            << " COND -> " << Hatrix::cond(Adense)
             << " KERNEL -> " << opts.kernel_verbose
             << " SOLVE ERR. -> " << std::scientific << solve_error << std::fixed
             << " PARAMS -> " << std::scientific << opts.param_1 << std::fixed
