@@ -2104,8 +2104,11 @@ int main(int argc, char* argv[]) {
   int64_t Nleaf = (int64_t)1 << levels;
   int64_t ncells = Nleaf + Nleaf - 1;
 
-  set_laplace_constants(1.e-9);
-  void(*ef)(double*) = laplace;
+  void(*ef)(double*);
+  if (kernel == 0) {
+    set_laplace_constants(1.e-9);
+    ef = laplace;
+  }
   if (kernel == 1) {
     set_matern_constants(1e-2, 0.5, 0.1);
     ef = gsl_matern;
