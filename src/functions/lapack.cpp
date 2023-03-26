@@ -24,6 +24,16 @@
 
 namespace Hatrix {
 
+double cond(const Matrix& A) {
+  double cond_number;
+  char nrm = 'O';
+  double one_nrm = Hatrix::one_norm(A);
+
+  LAPACKE_dgecon(LAPACK_COL_MAJOR, nrm, A.rows, &A, A.stride, one_nrm, &cond_number);
+
+  return cond_number;
+}
+
 void inverse(Matrix& A) {
   std::vector<int> ipiv(A.min_dim());
   int info;
@@ -530,6 +540,10 @@ std::tuple<Matrix, Matrix, int64_t> error_pivoted_qr(Matrix& A, double eps,
 
 double norm(const Matrix& A) {
   return LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', A.rows, A.cols, &A, A.stride);
+}
+
+double one_norm(const Matrix& A) {
+  return LAPACKE_dlange(LAPACK_COL_MAJOR, 'O', A.rows, A.cols, &A, A.stride);
 }
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T) {

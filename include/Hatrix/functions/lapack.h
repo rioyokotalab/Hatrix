@@ -12,6 +12,9 @@ namespace Lapack {
   enum QR_ret { QAndR, OnlyQ };
 }
 
+// Compute condition number
+double cond(const Matrix& A);
+
 // Compute in-place inverse using GETRF + GETRI.
 void inverse(Matrix& A);
 
@@ -102,6 +105,9 @@ std::tuple<Matrix, Matrix, int64_t> error_pivoted_qr(Matrix& A, double eps,
 
 // Compute the Frobenius norm of a matrix
 double norm(const Matrix& A);
+
+// Compute the Frobenius norm of a matrix
+double one_norm(const Matrix& A);
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T);
 void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,
