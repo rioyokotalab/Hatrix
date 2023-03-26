@@ -112,15 +112,24 @@ void getCommTime(double* cmtime) {
 
 double _singularity = 1.e-9;
 double _alpha = 1.;
+void set_yukawa_constants(double singularity, double alpha) {
+  _singularity = singularity;
+  _alpha = alpha;
+}
+
+void yukawa(double* r2) {
+  double _r2 = *r2;
+  double r = sqrt(_r2) + _singularity;
+  *r2 = exp(_alpha * -r) / r;
+}
 
 double _sigma = 1e-2;
 double _nu = 1;
 double _smoothness = 0.9;
-
-void laplace3d(double* r2) {
-  double _r2 = *r2;
-  double r = sqrt(_r2) + _singularity;
-  *r2 = 1. / r;
+void set_matern_constants(double sigma, double nu, double smoothness) {
+  _sigma = sigma;
+  _nu = nu;
+  _smoothness = smoothness;
 }
 
 void gsl_matern(double *r2) {
@@ -142,21 +151,15 @@ void gsl_matern(double *r2) {
   }
 }
 
-void yukawa3d(double* r2) {
+double _eta = 1.e-9;
+void set_laplace_constants(double eta) {
+  _eta = eta;
+}
+
+void laplace(double* r2) {
   double _r2 = *r2;
-  double r = sqrt(_r2) + _singularity;
-  *r2 = exp(_alpha * -r) / r;
-}
-
-void set_kernel_constants(double singularity, double alpha) {
-  _singularity = singularity;
-  _alpha = alpha;
-}
-
-void set_matern_constants(double sigma, double nu, double smoothness) {
-  _sigma = sigma;
-  _nu = nu;
-  _smoothness = smoothness;
+  double r = sqrt(_r2) + _eta;
+  *r2 = 1. / r;
 }
 
 void gen_matrix(void(*ef)(double*), int64_t m, int64_t n,
@@ -194,39 +197,17 @@ void uniform_unit_cube(struct Body* bodies, int64_t nbodies, int64_t dim, unsign
   }
 }
 
-void uniform_grid_no_rnd(struct Body* bodies, int64_t N, int64_t ndim) {
-  int64_t side = ceil(pow(N, 1.0 / ndim));
-  int64_t ncoords = ndim * side;
-  std::vector<double> coord(ncoords);
+void uniform_unit_2d_grid(struct Body* bodies, int64_t nbodies) {
+  int64_t side = ceil(pow(nbodies, 1. / 2.)); // size of each size of the grid.
+  double step = 1. / side; // interval distance
 
   for (int64_t i = 0; i < side; ++i) {
-    double val = double(i) / side;
-    for (int64_t j = 0; j < ndim; ++j) {
-      coord[j * side + i] = val;
-    }
-  }
-
-  std::vector<int64_t> pivot(ndim, 0);
-
-  int64_t k = 0;
-  for (int64_t i = 0; i < N; ++i) {
-    std::vector<double> points(ndim);
-    for (k = 0; k < ndim; ++k) {
-      points[k] = coord[pivot[k] + k * side];
-    }
-
-    for (k = 0; k < ndim; ++k) {
-      bodies[i].X[k] = points[k];
-    }
-
-    k = ndim - 1;
-    pivot[k]++;
-
-    while(pivot[k] == side) {
-      pivot[k] = 0;
-      if (k > 0) {
-        --k;
-        pivot[k]++;
+    for (int64_t j = 0; j < side; ++j) {
+      int64_t sum = i + side * j;
+      if (sum < nbodies) {
+        bodies[sum].X[0] = i * step;
+        bodies[sum].X[1] = j * step;
+        bodies[sum].X[2] = 0;
       }
     }
   }
@@ -2116,17 +2097,23 @@ int main(int argc, char* argv[]) {
   double epi = argc > 4 ? atof(argv[4]) : 1.e-10;
   int64_t rank_max = argc > 5 ? atol(argv[5]) : 100;
   int64_t sp_pts = argc > 6 ? atol(argv[6]) : 2000;
-  const char* fname = argc > 7 ? argv[7] : NULL;
+  int64_t kernel = argc > 7 ? atol(argv[7]) : 0;
+  const char* fname = argc > 8 ? argv[8] : NULL;
 
   int64_t levels = (int64_t)log2((double)Nbody / leaf_size);
   int64_t Nleaf = (int64_t)1 << levels;
   int64_t ncells = Nleaf + Nleaf - 1;
 
-  void(*ef)(double*) = gsl_matern;
-  // void(*ef)(double*) = laplace3d;
-  //void(*ef)(double*) = yukawa3d;
-  // set_kernel_constants(1.e-9, 1.);
-  set_matern_constants(1e-2, 0.5, 0.1);
+  set_laplace_constants(1.e-9);
+  void(*ef)(double*) = laplace;
+  if (kernel == 1) {
+    set_matern_constants(1e-2, 0.5, 0.1);
+    ef = gsl_matern;
+  }
+  else if (kernel == 2) {
+    set_yukawa_constants(1.e-9, 1.);
+    ef = yukawa;
+  }
 
   struct Body* body = (struct Body*)malloc(sizeof(struct Body) * Nbody);
   struct Cell* cell = (struct Cell*)malloc(sizeof(struct Cell) * ncells);
@@ -2139,10 +2126,7 @@ int main(int argc, char* argv[]) {
   struct RightHandSides* rhs = (struct RightHandSides*)malloc(sizeof(struct RightHandSides) * (levels + 1));
 
   if (fname == NULL) {
-    // mesh_unit_sphere(body, Nbody);
-    uniform_grid_no_rnd(body, Nbody, 1);
-    //mesh_unit_cube(body, Nbody);
-    //uniform_unit_cube(body, Nbody, 3, 1234);
+    uniform_unit_2d_grid(body, Nbody);
     buildTree(&ncells, cell, body, Nbody, levels);
   }
   else {
@@ -2216,10 +2200,10 @@ int main(int argc, char* argv[]) {
   getCommTime(&cm_time);
 
   if (mpi_rank == 0) {
-    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%e,%d\n",
+    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%e,%lld,%lld\n",
            (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
            construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
-           err,rank_max);
+           err,rank_max,kernel);
 
     // printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
     //   "Factorize: %lf s. COMM: %lf s.\n"
