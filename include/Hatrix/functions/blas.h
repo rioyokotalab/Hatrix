@@ -3,6 +3,10 @@
 #include "Hatrix/functions/math_common.h"
 
 namespace Hatrix {
+void swap_row(Matrix& A, int64_t r1, int64_t r2);
+
+void swap_col(Matrix& A, int64_t c1, int64_t c2);
+
 void array_copy(const double* from, double* to, int64_t size);
 
 // Perform a matrix multiplication C = beta * C + alpha * A * B.

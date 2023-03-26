@@ -29,6 +29,8 @@ generate_column_block(int64_t block, int64_t block_size,
   return AY;
 }
 
+std::vector<int64_t> ipiv_0;
+
 static Matrix
 generate_column_bases(int64_t block, int64_t block_size, int64_t level,
                       SymmetricSharedBasisMatrix& A,
@@ -36,14 +38,27 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
                       const Args& opts) {
   Matrix AY = generate_column_block(block, block_size, level, A, dense);
   Matrix Ui;
-  std::vector<int64_t> pivots;
   int64_t rank;
 
   if (opts.accuracy == -1) {        // constant rank compression
     rank = opts.max_rank;
-    Matrix Si, Vi; double error;
-    std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
-    US.insert(block, level, std::move(Si));
+    if (block == 0) {
+      std::tie(Ui, ipiv_0) = pivoted_qr(AY, opts.max_rank);
+      for (int i = 0; i < ipiv_0.size(); ++i) {
+        std::cout << ipiv_0[i] << " ";
+      }
+      std::cout << std::endl;
+
+      Matrix _U, _S, _V;
+      double error;
+      std::tie(_U, _S, _V, error) = truncated_svd(AY, opts.max_rank);
+      US.insert(block, level, std::move(_S));
+    }
+    else {
+      Matrix Si, Vi; double error;
+      std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
+      US.insert(block, level, std::move(Si));
+    }
   }
   else {
     Matrix _S, _V;
@@ -98,6 +113,16 @@ generate_leaf_nodes(const Domain& domain,
                                      dense,
                                      opts));
   }
+
+  // for (int i = 0; i < opts.max_rank; ++i) {
+  //   swap_row(A.D(0, 0, A.max_level), ipiv_0[i], i+(opts.nleaf-opts.max_rank)-1);
+  // }
+
+  // for (int i = 0; i < opts.max_rank; ++i) {
+  //   swap_col(A.D(0, 0, A.max_level), ipiv_0[i], i+(opts.nleaf-opts.max_rank)-1);
+  // }
+
+  A.D(0, 0, A.max_level).print();
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {

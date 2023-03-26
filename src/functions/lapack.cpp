@@ -24,6 +24,10 @@
 
 namespace Hatrix {
 
+void swap_rows(Matrix& A, std::vector<int> pivots) {
+  LAPACKE_dlaswp(LAPACK_COL_MAJOR, A.cols, &A, A.stride, 0, pivots.size(), pivots.data(), 1);
+}
+
 double cond(const Matrix& A) {
   double cond_number;
   char nrm = '1';

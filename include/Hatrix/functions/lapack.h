@@ -12,6 +12,9 @@ namespace Lapack {
   enum QR_ret { QAndR, OnlyQ };
 }
 
+// Call LASWP for swapping the rows.
+void swap_rows(Matrix& A, std::vector<int> pivots);
+
 // Compute condition number with dgecon.
 double cond(const Matrix& A);
 
@@ -48,7 +51,8 @@ std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t ran
 
 std::tuple<Matrix,Matrix> pivoted_qr_nopiv_return(const Matrix& A, int64_t rank);
 
-// Returns <Q, pivots, rank>
+// Returns <Q, pivots, rank> by computing the first 'rank' orthogonal factors of A
+// until the error 'error' has been met.
 std::tuple<Matrix, std::vector<int64_t>, int64_t> error_pivoted_qr_max_rank(const Matrix& A,
                                                                    double error,
                                                                    int64_t max_rank=-1);
