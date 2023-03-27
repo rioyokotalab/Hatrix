@@ -965,7 +965,7 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
 
   // cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, 20, 12, -1,
   //             D001, 32, 1.0, D001 + 32 * 12 + 12, 32);
-  std::cout << "cond 0: " << cond_svd(A.D(0,0,1)) << std::endl;
+  // std::cout << "cond 0: " << cond_svd(A.D(0,0,1)) << std::endl;
 
   double *D111 = new double[32 * 32];
   auto UF1 = make_complement(A.U(1, 1));
@@ -1015,7 +1015,7 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   // cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, 20, 12, -1,
   //             D111, 32, 1.0, D111 + 32 * 12 + 12, 32);
 
-  std::cout << "cond 1: " << cond_svd(A.D(1,1,1)) << std::endl;
+  // std::cout << "cond 1: " << cond_svd(A.D(1,1,1)) << std::endl;
 
   double *merge = new double[40 * 40]();
   for (int i = 0; i < 20; ++i) {
@@ -1044,7 +1044,7 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   }
   A.D.insert(0,0,0, std::move(d_merge));
 
-  std::cout << "cond last: " << cond_svd(A.D(0,0,0)) << std::endl;
+  // std::cout << "cond last: " << cond_svd(A.D(0,0,0)) << std::endl;
 }
 
 void

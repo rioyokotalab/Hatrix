@@ -5,32 +5,34 @@
 #SBATCH --time=24:00:00
 
 source ~/.bashrc
-source /home/sameer.deshmukh/gitrepos/parsec/build/bin/parsec.env.sh
+# source /home/sameer.deshmukh/gitrepos/parsec/build/bin/parsec.env.sh
 
 source /etc/profile.d/modules.sh
 module purge
-module load cuda intel/2022/mkl gcc/10.4 cmake lapack/3.9.0 openmpi/4.0.5
+module load cuda intel/2022/mkl gcc cmake intel/2022/mpi
 
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib
+# export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
+# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib
 
-# export MKL_NUM_THREADS=1
-# export OMP_NUM_THREADS=1
-# export OMP_PLACES=cores
-# export OMP_PROC_BIND=close
+export MKL_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export OMP_PLACES=cores
+export OMP_PROC_BIND=close
 
 
 make -j H2_main
 
 nleaf=256
 max_rank=50
-ndim=2
+ndim=1
 adm=0
 
-for N in 125000; do
-    for p1 in 1e-2 1e-3 1e-4 1e-5; do
-        for p2 in 0.5 0.8 1; do
-            for p3 in 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1; do
+# valgrind --leak-check=full --track-origins=yes
+
+for N in 64; do
+    for adm in 1; do
+        for nleaf in 32; do
+            for max_rank in 20; do
                 gdb --args ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
@@ -39,10 +41,9 @@ for N in 125000; do
                               --max_rank $max_rank \
                               --accuracy -1 \
                               --admis $adm \
-                              --admis_kind diagonal \
+                              --admis_kind geometry \
                               --construct_algorithm miro \
-                              --geometry_file "/home/sameer.deshmukh/soil_2b" \
-                              --param_1 $p1 --param_2 $p2 --param_3 $p3  \
+                              --param_1 1 --param_2 0.03 --param_3 0.5 \
                               --kind_of_recompression 3
             done
         done

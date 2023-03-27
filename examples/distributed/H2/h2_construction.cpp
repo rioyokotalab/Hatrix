@@ -43,7 +43,7 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
   if (opts.accuracy == -1) {        // constant rank compression
     rank = opts.max_rank;
     // if (block == 0) {
-      std::tie(Ui, ipiv_0) = pivoted_qr(AY, opts.max_rank);
+      // std::tie(Ui, ipiv_0) = pivoted_qr(AY, opts.max_rank);
       // for (int i = 0; i < ipiv_0.size(); ++i) {
       //   std::cout << ipiv_0[i] << " ";
       // }
@@ -51,7 +51,7 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
 
       Matrix _U, _S, _V;
       double error;
-      std::tie(_U, _S, _V, error) = truncated_svd(AY, opts.max_rank);
+      std::tie(Ui, _S, _V, error) = truncated_svd(AY, opts.max_rank);
       US.insert(block, level, std::move(_S));
     // }
     // else {
