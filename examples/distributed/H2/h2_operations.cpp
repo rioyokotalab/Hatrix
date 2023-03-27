@@ -921,6 +921,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 void
 factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   double *D001 = new double[32 * 32];
+  std::cout << "pre mult cond 0: " << cond_svd(A.D(0,0,1)) << std::endl;
   auto UF0 = make_complement(A.U(0, 1));
   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
               32, 32, 32, 1.0,
@@ -936,6 +937,8 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
               0.0,
               &A.D(0,0,1), A.D(0,0,1).stride);
 
+  delete[] D001;
+
   D001 = &A.D(0,0,1);
   for (int i = 0; i < 32; ++i) {
     for (int j = i+1; j < 32; ++j) {
@@ -943,29 +946,32 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
     }
   }
 
-  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', 32, D001, 32);
+  std::cout << "pre cond 0: " << cond_svd(A.D(0,0,1)) << std::endl;
   double *temp = new double[20 * 20];
-  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
-              20, 20, 20, 1.0,
-              D001+ (32 * 20) + 12, 32,
-              D001+ (32 * 20) + 12, 32,
-              0.0,
-              temp, 20);
-  for (int i = 0; i < 20; ++i) {
-    for (int j =0; j < 20; ++j) {
-      D001[(i+20) + (j+20) * 32] = temp[i + j * 20];
-    }
-  }
 
-  // LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', 12, D001, 32);
-  // cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasNoTrans,
-  //             CblasNonUnit,
-  //             20, 12, 1.0,
-  //             D001, 32, D001+12, 32);
+  // LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', 32, D001, 32);
+  // cblas_dgemm(CblasColMajor, CblasNoTrans, CblasTrans,
+  //             20, 20, 20, 1.0,
+  //             D001+ (32 * 12) + 12, 32,
+  //             D001+ (32 * 12) + 12, 32,
+  //             0.0,
+  //             temp, 20);
+  // for (int i = 0; i < 20; ++i) {
+  //   for (int j =0; j < 20; ++j) {
+  //     D001[(i+12) + (j+12) * 32] = temp[i + j * 20];
+  //   }
+  // }
 
-  // cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, 20, 12, -1,
-  //             D001, 32, 1.0, D001 + 32 * 12 + 12, 32);
-  // std::cout << "cond 0: " << cond_svd(A.D(0,0,1)) << std::endl;
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', 12, D001, 32);
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasTrans,
+              CblasNonUnit,
+              20, 12, 1.0,
+              D001, 32, D001+12, 32);
+
+  cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, 20, 12, -1,
+              D001+12, 32, 1.0, D001 + 32 * 12 + 12, 32);
+
+  std::cout << "post cond 0: " << cond_svd(A.D(0,0,1)) << std::endl;
 
   double *D111 = new double[32 * 32];
   auto UF1 = make_complement(A.U(1, 1));
@@ -982,40 +988,43 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
               &UF1, UF1.stride,
               0.0,
               &A.D(1,1,1), A.D(1,1,1).stride);
+  delete[] D111;
+
 
   D111 = &A.D(1,1,1);
-
-  D111 = &A.D(0,0,1);
   for (int i = 0; i < 32; ++i) {
     for (int j = i+1; j < 32; ++j) {
       D111[i + j * 32] = 0;
     }
   }
 
-  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', 32, D111, 32);
-  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
-              20, 20, 20, 1.0,
-              D111+ (32 * 20) + 12, 32,
-              D111+ (32 * 20) + 12, 32,
-              0.0,
-              temp, 20);
-  for (int i = 0; i < 20; ++i) {
-    for (int j =0; j < 20; ++j) {
-      D111[(i+20) + (j+20) * 32] = temp[i + j * 20];
-    }
-  }
+  std::cout << "pre cond 1: " << cond_svd(A.D(1,1,1)) << std::endl;
+
+  // LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', 32, D111, 32);
+  // cblas_dgemm(CblasColMajor, CblasNoTrans, CblasTrans,
+  //             20, 20, 20, 1.0,
+  //             D111+ (32 * 12) + 12, 32,
+  //             D111+ (32 * 12) + 12, 32,
+  //             0.0,
+  //             temp, 20);
+  // for (int i = 0; i < 20; ++i) {
+  //   for (int j =0; j < 20; ++j) {
+  //     D111[(i+12) + (j+12) * 32] = temp[i + j * 20];
+  //   }
+  // }
 
 
-  // LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', 12, D111, 32);
-  // cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasNoTrans,
-  //             CblasNonUnit,
-  //             20, 12, 1.0,
-  //             D111, 32, D111+12, 32);
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', 12, D111, 32);
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasTrans,
+              CblasNonUnit,
+              20, 12, 1.0,
+              D111, 32, D111+12, 32);
+  cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, 20, 12, -1,
+              D111+12, 32, 1.0, D111 + 32 * 12 + 12, 32);
 
-  // cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, 20, 12, -1,
-  //             D111, 32, 1.0, D111 + 32 * 12 + 12, 32);
 
-  // std::cout << "cond 1: " << cond_svd(A.D(1,1,1)) << std::endl;
+
+  std::cout << "post cond 1: " << cond_svd(A.D(1,1,1)) << std::endl;
 
   double *merge = new double[40 * 40]();
   for (int i = 0; i < 20; ++i) {
@@ -1044,7 +1053,9 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   }
   A.D.insert(0,0,0, std::move(d_merge));
 
-  // std::cout << "cond last: " << cond_svd(A.D(0,0,0)) << std::endl;
+  delete[] merge;
+
+  std::cout << "cond last: " << cond_svd(A.D(0,0,0)) << std::endl;
 }
 
 void
@@ -1285,11 +1296,10 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   int64_t level;
 
   double res[64];
-
   double *x_ptr = &x;
   Matrix UF0 = make_complement(A.U(0, 1));
   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, 32, 1, 32,
-              1, &UF0, UF0.stride, x_ptr, 64, 0, res, 64);
+              1, &UF0, UF0.stride, &b, 64, 0, res, 64);
 
   cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
               CblasNonUnit, 12, 1, 1.0,
@@ -1302,7 +1312,7 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
 
   Matrix UF1 = make_complement(A.U(1, 1));
   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, 32, 1, 32,
-              1, &UF1, UF1.stride, x_ptr+32, x.stride, 0, res+32, 64);
+              1, &UF1, UF1.stride, &b+32, x.stride, 0, res+32, 64);
 
   cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
               CblasNonUnit, 12, 1, 1.0,
@@ -1319,8 +1329,15 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
     copy[i+20] = res[32+12+i];
   }
 
-  LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', 40, 1, &A.D(0,0,0),
-                 40, copy, 40);
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
+              CblasNonUnit, 40, 1, 1.0,
+              &A.D(0,0,0), A.D(0,0,0).stride,
+              copy, 40);
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
+              CblasNonUnit, 40, 1, 1.0,
+              &A.D(0,0,0), A.D(0,0,0).stride,
+              copy, 40);
+
 
   for (int i = 0; i < 20; ++i) {
     res[12 + i] = copy[i];
@@ -1455,6 +1472,8 @@ multiply_S(const Hatrix::SymmetricSharedBasisMatrix& A,
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
         matmul(A.S(i, j, level), x_hat[x_hat_offset + j], b_hat[b_hat_offset + i]);
+        matmul(A.S(i, j, level), x_hat[x_hat_offset + i], b_hat[b_hat_offset + j],
+               true, false);
       }
     }
   }
@@ -1466,7 +1485,7 @@ matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Matrix& x) {
   std::vector<Matrix> x_hat;
   auto x_splits = x.split(leaf_nblocks, 1);
 
-  // V leaf nodes
+  // // V leaf nodes
   for (int i = 0; i < leaf_nblocks; ++i) {
     x_hat.push_back(matmul(A.U(i, A.max_level), x_splits[i], true, false, 1.0));
   }

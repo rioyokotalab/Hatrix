@@ -1,8 +1,8 @@
 #include <vector>
 #include <cassert>
 #include <cmath>
-// #include <gsl/gsl_sf_gamma.h>
-// #include <gsl/gsl_sf_bessel.h>
+#include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_sf_bessel.h>
 
 #include "distributed/distributed.hpp"
 
@@ -350,23 +350,22 @@ namespace Hatrix {
   double matern_kernel(const std::vector<double>& coords_row,
                        const std::vector<double>& coords_col,
                        const double sigma, const double nu, const double smoothness) {
-    return 0;
-    // double expr = 0.0;
-    // double con = 0.0;
-    // double sigma_square = sigma*sigma;
-    // double dist = distance(coords_row, coords_col);
+    double expr = 0.0;
+    double con = 0.0;
+    double sigma_square = sigma*sigma;
+    double dist = distance(coords_row, coords_col);
 
-    // con = pow(2, (smoothness - 1)) * gsl_sf_gamma(smoothness);
-    // con = 1.0 / con;
-    // con = sigma_square * con;
+    con = pow(2, (smoothness - 1)) * gsl_sf_gamma(smoothness);
+    con = 1.0 / con;
+    con = sigma_square * con;
 
-    // if (dist != 0) {
-    //   expr = dist / nu;
-    //   return con * pow(expr, smoothness) * gsl_sf_bessel_Knu(smoothness, expr);
-    // }
-    // else {
-    //   return sigma_square;
-    // }
+    if (dist != 0) {
+      expr = dist / nu;
+      return con * pow(expr, smoothness) * gsl_sf_bessel_Knu(smoothness, expr);
+    }
+    else {
+      return sigma_square;
+    }
   }
 
   double yukawa(const std::vector<double>& coords_row,

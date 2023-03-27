@@ -80,10 +80,14 @@ int main(int argc, char* argv[]) {
   Matrix b, h2_solution, x_regen;
   std::mt19937 gen(0);
   std::uniform_real_distribution<double> dist(0, 1);
-  Matrix x(opts.N, 1);
-  for (int64_t i = 0; i < opts.N; ++i) {
-    x(i, 0) = dist(gen);
-  }
+  // Matrix x(opts.N, 1);
+  // for (int64_t i = 0; i < opts.N; ++i) {
+  //   x(i, 0) = dist(gen);
+  // }
+  Matrix x = generate_rhs_vector(opts);
+
+
+  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
 
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
@@ -96,7 +100,6 @@ int main(int argc, char* argv[]) {
     }
     A.print_structure();
 
-
     construct_h2_matrix_miro(A, domain, opts);
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
@@ -107,7 +110,7 @@ int main(int argc, char* argv[]) {
     dense_blocks = A.leaf_dense_blocks();
 
     auto begin_matvec = std::chrono::system_clock::now();
-    b = matmul(A, x);
+    b = matmul(Adense, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
@@ -136,15 +139,13 @@ int main(int argc, char* argv[]) {
 
   // ||x - A * (A^-1 * x)|| / ||x||
   // h2_solution.print();
-  // (x).print();
+  std::cout << "--- B ---\n";
+  b.print();
+  std::cout << "--- B ---\n";
+  std::cout << "--- x ---\n";
+  (x).print();
+  std::cout << "--- x ---\n";
   solve_error = Hatrix::norm(h2_solution - x) / opts.N;
-
-  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  for (int i = 0; i < Adense.rows; ++i) {
-    for (int j = i+1; j < Adense.cols; ++j) {
-      Adense(i, j) = 0.0;
-    }
-  }
   Matrix bdense = matmul(Adense, x);
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;

@@ -92,13 +92,13 @@ generate_leaf_nodes(const Domain& domain,
     for (int64_t j : near_neighbours(i, A.max_level)) {
       Matrix Aij(dense_splits[i * nblocks + j], true);
 
-      if (i == j) {
-        for (int64_t i = 0; i < Aij.rows; ++i) {
-          for (int64_t j = i+1; j < Aij.cols; ++j) {
-            Aij(i, j) = 0;
-          }
-        }
-      }
+      // if (i == j) {
+      //   for (int64_t i = 0; i < Aij.rows; ++i) {
+      //     for (int64_t j = i+1; j < Aij.cols; ++j) {
+      //       Aij(i, j) = 0;
+      //     }
+      //   }
+      // }
       A.D.insert(i, j, A.max_level, std::move(Aij));
     }
   }
