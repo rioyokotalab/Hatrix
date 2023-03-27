@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
     dense_blocks = A.leaf_dense_blocks();
 
     auto begin_matvec = std::chrono::system_clock::now();
-    b = matmul(A, x);
+    b = matmul(Adense, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();

@@ -32,10 +32,10 @@ adm=0
 
 # valgrind --leak-check=full --track-origins=yes
 
-for N in 1024; do
+for N in 64; do
     for adm in 1; do
-        for nleaf in 128; do
-            for max_rank in 50; do
+        for nleaf in 16; do
+            for max_rank in 10; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \

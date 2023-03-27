@@ -29,7 +29,6 @@ generate_column_block(int64_t block, int64_t block_size,
   return AY;
 }
 
-std::vector<int64_t> ipiv_0;
 
 static Matrix
 generate_column_bases(int64_t block, int64_t block_size, int64_t level,
@@ -42,6 +41,8 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
 
   if (opts.accuracy == -1) {        // constant rank compression
     rank = opts.max_rank;
+    std::vector<int64_t> ipiv_0;
+
     // if (block == 0) {
       // std::tie(Ui, ipiv_0) = pivoted_qr(AY, opts.max_rank);
       // for (int i = 0; i < ipiv_0.size(); ++i) {
@@ -79,6 +80,17 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
 
   return Ui;
 }
+
+static double cond_svd(const Matrix& A) {
+  Matrix copy(A, true);
+  Matrix _U(A, true), _S(A, true), _V(A, true);
+  double error;
+
+  svd(copy, _U, _S, _V);
+
+  return _S(0,0) / _S(_S.rows-1, _S.cols-1);
+}
+
 
 static void
 generate_leaf_nodes(const Domain& domain,
@@ -132,6 +144,11 @@ generate_leaf_nodes(const Domain& domain,
                                       dense_splits[i * nblocks + j], true, false),
                                A.U(j, A.max_level));
         A.S.insert(i, j, A.max_level, std::move(Sblock));
+
+
+        std::cout << "i: " << i << " j: " << j << " cond: "
+                  << Hatrix::norm(A.S(i, j, A.max_level)) << std::endl;
+        // A.S(i, j, A.max_level).print();
 
         // double norm = Hatrix::norm(dense_splits[i * nblocks + j] -
         //                            matmul(matmul(A.U(i, A.max_level), A.S(i, j, A.max_level)),

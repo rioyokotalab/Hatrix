@@ -77,7 +77,8 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   // cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, rank, nleaf-rank, -1,
   //             _D+(nleaf-rank), nleaf, 1.0, _D + nleaf * (nleaf-rank) + (nleaf-rank),
   //             nleaf);
-  // std::cout << "POST SYRK: " << cond_svd(A.D(block, block, level)) << std::endl;
+
+  std::cout << "POST SYRK: " << cond_svd(A.D(block, block, level)) << std::endl;
 }
 
 void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
@@ -318,11 +319,16 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
                 D_unelim_splits[ic1 * 2 + jc2] = D_c1c2_splits[3];
               }
               else {
+                std::cout << "c1: " << c1 << " c2: " << c2 << " lvl: " << level << std::endl;
                 D_unelim_splits[ic1 * 2 + jc2] = A.S(c1, c2, level);
               }
             }
           }
         }
+
+        std::cout << "i : " << i << " j: " << j << " parent level: " << parent_level << std::endl;
+        // D_unelim.print();
+
 
         A.D.insert(i, j, parent_level, std::move(D_unelim));
       }
@@ -506,11 +512,10 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
 
   auto U_F = make_complement(A.U(block, level));
 
-
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
   auto post_diagonal_splits = split_dense(A.D(block, block, level),
-                                     A.D(block, block, level).rows - A.ranks(block, level),
-                                     A.D(block, block, level).cols - A.ranks(block, level));
+                                          A.D(block, block, level).rows - A.ranks(block, level),
+                                          A.D(block, block, level).cols - A.ranks(block, level));
 
 
   // std::cout << "@@@ PRODUCT @@@ "  << cond_svd(post_diagonal_splits[0]) << std::endl;
@@ -840,42 +845,60 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
   F.erase_all();
 
-  // for (int64_t i = 0; i < A.D(0, 0, 1).rows; ++i) {
-  //   for (int64_t j = i+1; j < A.D(0, 0, 1).cols; ++j) {
-  //     A.D(0, 0, 1)(i, j) = 0;
-  //   }
-  // }
-  // std::cout << "---- D(0,0,0,1) ----\n";
-  // A.D(0, 0, 1).print();
-  // Matrix pre_fac = A.D(0, 0, 1);
-  // pre_fac.print();
-  // cholesky(A.D(0, 0, 1), Hatrix::Lower);
+  Matrix dense(opts.max_rank * 4, opts.max_rank * 4);
+  auto d_splits = split_dense(dense,
+                              opts.max_rank * 2,
+                              opts.max_rank * 2);
 
+  // A.D(1, 0, 1).print();
+
+  d_splits[0] = A.D(0, 0, 1);
+  d_splits[2] = A.D(1, 0, 1);
+  d_splits[3] = A.D(1, 1, 1);
+
+  // dense.print();
+
+  std::cout << "full dense cond: " << cond_svd(dense) << std::endl;
+  cholesky(dense, Hatrix::Lower);
+
+  A.D(0, 0, 1) = d_splits[0];
+  A.D(1, 0, 1) = d_splits[2];
+  A.D(1, 1, 1) = d_splits[3];
+
+  // dense.print();
 
   auto start_last = std::chrono::system_clock::now();
-  int64_t last_nodes = pow(2, level);
-  for (int d = 0; d < last_nodes; ++d) {
-    std::cout << "d: " << d << " lvl: " << level << " "
-              << cond_svd(A.D(d, d, level)) << std::endl;
+  // int64_t last_nodes = pow(2, level);
+  // for (int d = 0; d < last_nodes; ++d) {
+  //   std::cout << "pre d: " << d << " lvl: " << level << " "
+  //             << cond_svd(A.D(d, d, level)) << std::endl;
 
-    cholesky(A.D(d, d, level), Hatrix::Lower);
-    for (int i = d+1; i < last_nodes; ++i) {
-      solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
-                       false, true, 1.0);
-    }
+  //   cholesky(A.D(d, d, level), Hatrix::Lower);
+  //   for (int i = d+1; i < last_nodes; ++i) {
+  //     solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
+  //                      false, true, 1.0);
 
-    for (int i = d+1; i < last_nodes; ++i) {
-      for (int j = d+1; j <= i; ++j) {
-        if (i == j) {
-          syrk(A.D(i, d, level), A.D(i, j, level), Hatrix::Lower, false, -1.0, 1.0);
-        }
-        else {
-          matmul(A.D(i, d, level), A.D(j, d, level),
-                 A.D(i, j, level), false, true, -1.0, 1.0);
-        }
-      }
-    }
-  }
+  //     std::cout << "post d: " << d << " lvl: " << level << " "
+  //               << cond_svd(A.D(d, d, level)) << " "
+  //               << cond_svd(A.D(i, d, level))
+  //               << std::endl;
+  //   }
+
+  //   for (int i = d+1; i < last_nodes; ++i) {
+  //     for (int j = d+1; j <= i; ++j) {
+  //       if (i == j) {
+  //         syrk(A.D(i, d, level), A.D(i, j, level), Hatrix::Lower, false, -1.0, 1.0);
+  //         std::cout << "post i: " << i << " j: " << j << " lvl: " << level << " "
+  //                   << cond_svd(A.D(i, j, level))
+  //                   << std::endl;
+  //       }
+  //       else {
+  //         matmul(A.D(i, d, level), A.D(j, d, level),
+  //                A.D(i, j, level), false, true, -1.0, 1.0);
+  //       }
+  //     }
+  //   }
+  // }
 
   auto stop_last = std::chrono::system_clock::now();
   timer[7] += std::chrono::duration_cast<
