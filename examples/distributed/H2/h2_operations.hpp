@@ -5,6 +5,9 @@
 extern Hatrix::RowLevelMap US;
 
 void
+factorize_raw(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Args& opts);
+
+void
 factorize_diagonal(Hatrix::SymmetricSharedBasisMatrix& A, int64_t block,
                    int64_t level);
 

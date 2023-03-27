@@ -42,23 +42,23 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
 
   if (opts.accuracy == -1) {        // constant rank compression
     rank = opts.max_rank;
-    if (block == 0) {
+    // if (block == 0) {
       std::tie(Ui, ipiv_0) = pivoted_qr(AY, opts.max_rank);
-      for (int i = 0; i < ipiv_0.size(); ++i) {
-        std::cout << ipiv_0[i] << " ";
-      }
-      std::cout << std::endl;
+      // for (int i = 0; i < ipiv_0.size(); ++i) {
+      //   std::cout << ipiv_0[i] << " ";
+      // }
+      // std::cout << std::endl;
 
       Matrix _U, _S, _V;
       double error;
       std::tie(_U, _S, _V, error) = truncated_svd(AY, opts.max_rank);
       US.insert(block, level, std::move(_S));
-    }
-    else {
-      Matrix Si, Vi; double error;
-      std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
-      US.insert(block, level, std::move(Si));
-    }
+    // }
+    // else {
+    //   Matrix Si, Vi; double error;
+    //   std::tie(Ui, Si, Vi, error) = truncated_svd(AY, rank);
+    //   US.insert(block, level, std::move(Si));
+    // }
   }
   else {
     Matrix _S, _V;
@@ -122,7 +122,7 @@ generate_leaf_nodes(const Domain& domain,
   //   swap_col(A.D(0, 0, A.max_level), ipiv_0[i], i+(opts.nleaf-opts.max_rank)-1);
   // }
 
-  A.D(0, 0, A.max_level).print();
+  // A.D(0, 0, A.max_level).print();
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {

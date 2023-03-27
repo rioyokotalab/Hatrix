@@ -113,7 +113,8 @@ int main(int argc, char* argv[]) {
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
 
     auto begin_factor = std::chrono::system_clock::now();
-    fp_ops = factorize(A, opts);
+    // fp_ops = factorize(A, opts);
+    factorize_raw(A, opts);
     auto stop_factor = std::chrono::system_clock::now();
     factor_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_factor - begin_factor).count();
@@ -134,6 +135,8 @@ int main(int argc, char* argv[]) {
   }
 
   // ||x - A * (A^-1 * x)|| / ||x||
+  // h2_solution.print();
+  // (x).print();
   solve_error = Hatrix::norm(h2_solution - x) / opts.N;
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
@@ -143,7 +146,7 @@ int main(int argc, char* argv[]) {
     }
   }
   Matrix bdense = matmul(Adense, x);
-  Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
+  // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;
   // std::cout << "DIFF:\n";
   construct_error = Hatrix::norm(bdense - b) / opts.N;
