@@ -917,90 +917,119 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 void
 factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   int nleaf = 32; int rank = 20;
-  double *D001 = new double[nleaf * nleaf];
-  auto UF0 = make_complement(A.U(0, 1));
+  double *D002 = new double[nleaf * nleaf];
+  auto UF0 = make_complement(A.U(0, 2));
   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
               nleaf, nleaf, nleaf, 1.0,
               &UF0, UF0.stride,
-              &A.D(0,0,1), A.D(0,0,1).stride,
+              &A.D(0,0,2), A.D(0,0,2).stride,
               0.0,
-              D001, nleaf);
+              D002, nleaf);
 
   cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
               nleaf, nleaf, nleaf, 1.0,
-              D001, nleaf,
+              D002, nleaf,
               &UF0, UF0.stride,
               0.0,
-              &A.D(0,0,1), A.D(0,0,1).stride);
+              &A.D(0,0,2), A.D(0,0,2).stride);
 
-  delete[] D001;
+  delete[] D002;
 
-  D001 = &A.D(0,0,1);
+  D002 = &A.D(0,0,2);
   double *temp = new double[rank * rank];
 
-  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (nleaf-rank), D001, nleaf);
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (nleaf-rank), D002, nleaf);
   cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasTrans,
               CblasNonUnit,
               rank, (nleaf-rank), 1.0,
-              D001, nleaf, D001+(nleaf-rank), nleaf);
+              D002, nleaf, D002+(nleaf-rank), nleaf);
 
   cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, rank, (nleaf-rank), -1,
-              D001+(nleaf-rank), nleaf, 1.0, D001 + nleaf * (nleaf-rank) + (nleaf-rank), nleaf);
+              D002+(nleaf-rank), nleaf, 1.0, D002 + nleaf * (nleaf-rank) + (nleaf-rank), nleaf);
 
-  double *D111 = new double[nleaf * nleaf];
-  auto UF1 = make_complement(A.U(1, 1));
+  double *D112 = new double[nleaf * nleaf];
+  auto UF1 = make_complement(A.U(1, 2));
   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
               nleaf, nleaf, nleaf, 1.0,
               &UF1, UF1.stride,
-              &A.D(1,1,1), A.D(1,1,1).stride,
+              &A.D(1,1,2), A.D(1,1,2).stride,
               0.0,
-              D111, nleaf);
+              D112, nleaf);
 
   cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
               nleaf, nleaf, nleaf, 1.0,
-              D111, nleaf,
+              D112, nleaf,
               &UF1, UF1.stride,
               0.0,
-              &A.D(1,1,1), A.D(1,1,1).stride);
-  delete[] D111;
+              &A.D(1,1,2), A.D(1,1,2).stride);
+  delete[] D112;
 
+  D112 = &A.D(1,1,2);
 
-  D111 = &A.D(1,1,1);
-
-  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (nleaf-rank), D111, nleaf);
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (nleaf-rank), D112, nleaf);
   cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasTrans,
               CblasNonUnit,
               rank, (nleaf-rank), 1.0,
-              D111, nleaf, D111+(nleaf-rank), nleaf);
+              D112, nleaf, D112+(nleaf-rank), nleaf);
   cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, rank, (nleaf-rank), -1,
-              D111+(nleaf-rank), nleaf, 1.0, D111 + nleaf * (nleaf-rank) + (nleaf-rank), nleaf);
+              D112+(nleaf-rank), nleaf, 1.0, D112 + nleaf * (nleaf-rank) + (nleaf-rank), nleaf);
 
-  double *merge = new double[(rank*2) * (rank*2)]();
-  for (int i = 0; i < rank; ++i) {
+
+  double *D222= new double[nleaf * nleaf];
+  auto UF2 = make_complement(A.U(2, 1));
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
+              nleaf, nleaf, nleaf, 1.0,
+              &UF2, UF2.stride,
+              &A.D(2,2,2), A.D(2,2,2).stride,
+              0.0,
+              D222, nleaf);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+              nleaf, nleaf, nleaf, 1.0,
+              D222, nleaf,
+              &UF0, UF0.stride,
+              0.0,
+              &A.D(2,2,2), A.D(2,2,2).stride);
+  delete[] D222;
+
+  D222 = &A.D(2,2,2);
+
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (nleaf-rank), D222, nleaf);
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasTrans,
+              CblasNonUnit,
+              rank, (nleaf-rank), 1.0,
+              D222, nleaf, D222+(nleaf-rank), nleaf);
+
+  cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, rank, (nleaf-rank), -1,
+              D222+(nleaf-rank), nleaf, 1.0, D222 + nleaf * (nleaf-rank) + (nleaf-rank), nleaf);
+
+
+  double *merge = new double[(rank*4) * (rank*4)]();
+  for (int i = 0; i < rank; ++i) { // 0,0
     for (int j = 0; j < rank; ++j) {
       // merge[i + j * (rank*2)] = A.D(0, 0, 1)(i+(nleaf-rank), j+(nleaf-rank));
-      merge[i + j * (rank*2)] = D001[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
+      merge[i + j * (rank*2)] = D002[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
     }
   }
-  for (int i = 0; i < rank; ++i) {
+  for (int i = 0; i < rank; ++i) { // 0,0
     for (int j = 0; j < rank; ++j) {
       merge[(i+rank) + j * (rank*2)] = A.S(1, 0, 1)(i, j);
     }
   }
-  for (int i = 0; i < rank; ++i) {
+  for (int i = 0; i < rank; ++i) { // 0,0
     for (int j = 0; j < rank; ++j) {
-      merge[(i+rank) + (j+rank) * (rank*2)] = D111[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];// A.D(1, 1, 1)(i+(nleaf-rank), j+(nleaf-rank));
+      merge[(i+rank) + (j+rank) * (rank*2)] = D112[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
     }
   }
 
-  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (rank*2), merge, (rank*2));
-  Matrix d_merge((rank*2), (rank*2));
-  for (int i = 0; i < (rank*2); ++i) {
-    for (int j = 0; j < (rank*2) ; ++j) {
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (rank*4), merge, (rank*4));
+  Matrix d_merge((rank*4), (rank*4));
+  for (int i = 0; i < (rank*4); ++i) {
+    for (int j = 0; j < (rank*4) ; ++j) {
       d_merge(i, j) = merge[i + j * (rank*2)];
     }
   }
-  A.D.insert(0,0,0, std::move(d_merge));
+  A.D.insert(0,0,1, std::move(d_merge));
 
   delete[] merge;
 
