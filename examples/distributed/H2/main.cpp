@@ -110,14 +110,14 @@ int main(int argc, char* argv[]) {
     dense_blocks = A.leaf_dense_blocks();
 
     auto begin_matvec = std::chrono::system_clock::now();
-    b = matmul(Adense, x);
+    b = matmul(A, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
 
     auto begin_factor = std::chrono::system_clock::now();
-    // fp_ops = factorize(A, opts);
-    factorize_raw(A, opts);
+    fp_ops = factorize(A, opts);
+    // factorize_raw(A, opts);
     auto stop_factor = std::chrono::system_clock::now();
     factor_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_factor - begin_factor).count();
@@ -126,8 +126,8 @@ int main(int argc, char* argv[]) {
     post_factor_average_rank = A.average_rank();
 
     auto begin_solve = std::chrono::system_clock::now();
-    // h2_solution = solve(A, b);
-    h2_solution = solve_raw(A, b);
+    h2_solution = solve(A, b);
+    // h2_solution = solve_raw(A, b);
 
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
@@ -140,13 +140,7 @@ int main(int argc, char* argv[]) {
 
   // ||x - A * (A^-1 * x)|| / ||x||
   // h2_solution.print();
-  std::cout << "-- DIFF --\n";
-  auto diff = (h2_solution - x);
-  for (int i = 0; i < 32; ++i) {
-    std::cout << std::setw(12) << diff(i, 0) << " " << std::setw(12) << h2_solution(i, 0)
-              << " " << std::setw(12) << x(i, 0) <<  " " << std::setw(12) << b(i, 0) << std::endl;
-  }
-  solve_error = Hatrix::norm(h2_solution - x) / opts.N;
+  solve_error = Hatrix::norm(h2_solution - x) / Hatrix::norm(x);
   Matrix bdense = matmul(Adense, x);
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;

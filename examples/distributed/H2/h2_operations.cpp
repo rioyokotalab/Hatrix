@@ -848,55 +848,19 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
   F.erase_all();
 
-  // Matrix dense(opts.max_rank * 4, opts.max_rank * 4);
-  // auto d_splits = split_dense(dense,
-  //                             opts.max_rank * 2,
-  //                             opts.max_rank * 2);
-
-  // d_splits[0] = A.D(0, 0, 1);
-  // d_splits[2] = A.D(1, 0, 1);
-  // d_splits[1] = transpose(A.D(1, 0, 1));
-  // d_splits[3] = A.D(1, 1, 1);
-
-  // for (int i = 0; i < dense.rows; ++i) {
-  //   for (int j = i+1; j < dense.cols; ++j) {
-  //     dense(i, j) = 0;
-  //   }
-  // }
-
-
-  // std::cout << "full dense cond: " << cond_svd(dense) << std::endl;
-  // cholesky(dense, Hatrix::Lower);
-  // std::cout << "full dense post factor xcond: " << cond_svd(dense) << std::endl;
-
-  // A.D(0, 0, 1) = d_splits[0];
-  // A.D(1, 0, 1) = d_splits[2];
-  // A.D(1, 1, 1) = d_splits[3];
-
   auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
-    std::cout << "pre d: " << d << " lvl: " << level << " "
-              << cond_svd(A.D(d, d, level)) << std::endl;
-
     cholesky(A.D(d, d, level), Hatrix::Lower);
     for (int i = d+1; i < last_nodes; ++i) {
       solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
                        false, true, 1.0);
-
-      std::cout << "post d: " << d << " lvl: " << level << " "
-                << cond_svd(A.D(d, d, level)) << " "
-                << cond_svd(A.D(i, d, level))
-                << std::endl;
     }
 
     for (int i = d+1; i < last_nodes; ++i) {
       for (int j = d+1; j <= i; ++j) {
         if (i == j) {
           syrk(A.D(i, d, level), A.D(i, j, level), Hatrix::Lower, false, -1.0, 1.0);
-          std::cout << "post i: " << i << " j: " << j << " lvl: " << level << " "
-                    << cond_svd(A.D(i, j, level))
-                    << std::endl;
         }
         else {
           matmul(A.D(i, d, level), A.D(j, d, level),
@@ -1383,26 +1347,80 @@ solve_raw(const Hatrix::SymmetricSharedBasisMatrix& A,
               -1, &A.D(1,1,2) + (nleaf-rank), A.D(1,1,2).stride,
               res+nleaf, N, 1, res+nleaf+(nleaf-rank), N);
 
-  double copy[rank*2];
+  Matrix UF2 = make_complement(A.U(2, 2));
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, nleaf, 1, nleaf,
+              1, &UF2, UF2.stride, x_ptr+2*nleaf, x.stride, 0, res+nleaf*2, N);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
+              CblasNonUnit, (nleaf-rank), 1, 1.0,
+              &A.D(2,2,2), A.D(2,2,2).stride,
+              res+2*nleaf, N);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, 1, (nleaf-rank),
+              -1, &A.D(2,2,2) + (nleaf-rank), A.D(2,2,2).stride,
+              res+2*nleaf, N, 1, res+2*nleaf+(nleaf-rank), N);
+
+  Matrix UF3 = make_complement(A.U(3, 2));
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, nleaf, 1, nleaf,
+              1, &UF3, UF3.stride, x_ptr+3*nleaf, x.stride, 0, res+3*nleaf, N);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
+              CblasNonUnit, (nleaf-rank), 1, 1.0,
+              &A.D(3,3,2), A.D(3,3,2).stride,
+              res+3*nleaf, N);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, 1, (nleaf-rank),
+              -1, &A.D(3,3,2) + (nleaf-rank), A.D(3,3,2).stride,
+              res+3*nleaf, N, 1, res+3*nleaf+(nleaf-rank), N);
+
+  double copy[rank*4];
   for (int i = 0; i < rank; ++i) {
     copy[i] = res[(nleaf-rank) + i];
     copy[i+rank] = res[nleaf+(nleaf-rank)+i];
+    copy[i+2*rank] = res[2*nleaf+(nleaf-rank)+i];
+    copy[i+3*rank] = res[3*nleaf+(nleaf-rank)+i];
   }
 
-  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
-              CblasNonUnit, 20, 1, 1.0,
-              &A.D(0,0,1), A.D(0,0,1).stride,
-              copy, rank*2);
-  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
-              CblasNonUnit, 20, 1, 1.0,
-              &A.D(0,0,1), A.D(0,0,1).stride,
-              copy, rank*2);
+  Matrix merge(4*rank, 4*rank);
+  auto m_splits = split_dense(merge, 2*rank, 2*rank);
+  m_splits[0] = A.D(0,0,1);
+  m_splits[2] = A.D(1,0,1);
+  m_splits[3] = A.D(1,1,1);
 
+  LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', 4*rank, 1, &merge, merge.stride, copy, 4 * rank);
 
   for (int i = 0; i < rank; ++i) {
     res[(nleaf-rank) + i] = copy[i];
     res[nleaf+(nleaf-rank)+i] = copy[i + rank];
+    res[2*nleaf+(nleaf-rank)+i] = copy[i + 2*rank];
+    res[3*nleaf+(nleaf-rank)+i] = copy[i + 3*rank];
   }
+
+  // Backward. (3,3,2)
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, (nleaf-rank), 1, rank,
+              -1, &A.D(3,3,2) + (nleaf-rank), A.D(3,3,2).stride,
+              res+3*nleaf+(nleaf-rank), N, 1, res+3*nleaf, N);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
+              CblasNonUnit, (nleaf-rank), 1, 1.0,
+              &A.D(3,3,2), A.D(3,3,2).stride,
+              res+3*nleaf, N);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, nleaf, 1, nleaf,
+              1, &UF3, UF3.stride, res+3*nleaf, N, 0, x_ptr+3*nleaf, N);
+
+  // Backward. (2,2,2)
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, (nleaf-rank), 1, rank,
+              -1, &A.D(2,2,2) + (nleaf-rank), A.D(2,2,2).stride,
+              res+2*nleaf+(nleaf-rank), N, 1, res+2*nleaf, N);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
+              CblasNonUnit, (nleaf-rank), 1, 1.0,
+              &A.D(2,2,2), A.D(2,2,2).stride,
+              res+2*nleaf, N);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, nleaf, 1, nleaf,
+              1, &UF2, UF2.stride, res+2*nleaf, N, 0, x_ptr+2*nleaf, N);
 
   // Backward. (1,1,2)
   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, (nleaf-rank), 1, rank,
@@ -1441,9 +1459,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   int64_t level_offset = 0;
   std::vector<Matrix> x_splits;
   int64_t level;
-
-
-
 
   // forward substitution.
   for (level = A.max_level; level >= A.min_level; --level) {
@@ -1495,18 +1510,25 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   }
   auto x_last_splits = x_last.split(vector_splits, {});
 
-  // LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', 20, 1, &A.D(0,0,0), A.D(0,0,0).stride, &x + 6 * 2, 64);
+  // int rank = 10;
+  // Matrix merge(4*rank, 4*rank);
+  // auto m_splits = split_dense(merge, 2*rank, 2*rank);
+  // m_splits[0] = A.D(0,0,1);
+  // m_splits[2] = A.D(1,0,1);
+  // m_splits[3] = A.D(1,1,1);
+
+  // LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', 4*rank, 1, &merge, merge.stride, &x_last, 4*rank);
 
   // forward for the last blocks
   for (int i = 0; i < last_nodes; ++i) {
-    solve_triangular(A.D(i, i, level), x_last_splits[i],
-                     Hatrix::Left, Hatrix::Lower,
-                     false, false, 1.0);
     for (int j = 0; j < i; ++j) {
       matmul(A.D(i, j, level), x_last_splits[j],
              x_last_splits[i],
              false, false, -1.0, 1.0);
     }
+    solve_triangular(A.D(i, i, level), x_last_splits[i],
+                     Hatrix::Left, Hatrix::Lower,
+                     false, false, 1.0);
   }
 
   // backward for the last blocks.

@@ -31,10 +31,10 @@ adm=0
 
 # valgrind --leak-check=full --track-origins=yes
 
-for N in 64; do
-    for adm in 1; do
-        for nleaf in 16; do
-            for max_rank in 10; do
+for N in 1024; do
+    for adm in 0; do
+        for nleaf in 128; do
+            for max_rank in 100; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
@@ -43,7 +43,7 @@ for N in 64; do
                               --max_rank $max_rank \
                               --accuracy -1 \
                               --admis $adm \
-                              --admis_kind geometry \
+                              --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
                               --kind_of_recompression 3
