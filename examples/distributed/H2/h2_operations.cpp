@@ -507,20 +507,13 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                                      A.D(block, block, level).rows - A.ranks(block, level),
                                      A.D(block, block, level).cols - A.ranks(block, level));
 
-  std::cout << "@@@ PRE-PRODUCT @@@ " << cond_svd(A.D(block, block, level))
+  std::cout << "@@@ PRE-PRODUCT @@@ " << " lvl: " << level << " cond: " << cond_svd(A.D(block, block, level))
             << " " << cond_svd(diagonal_splits[3]) << std::endl;
-    // A.D(block, block, level).print();
-
-
-
   auto U_F = make_complement(A.U(block, level));
 
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
 
-
-  // std::cout << "@@@ PRODUCT @@@ "  << cond_svd(post_diagonal_splits[0]) << std::endl;
   std::cout << "@@@ PRODUCT @@@ "  << cond_svd(A.D(block, block, level)) << std::endl;
-  // A.D(block, block, level).print();
 
   // for (int64_t j : near_neighbours(block, level)) {
   //   if (j < block) {
@@ -1473,11 +1466,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
       x_level(i, 0) = x(level_offset + i, 0);
     }
 
-    // std::cout << "X(1) BEFORE\n";
-    // for (int i = 0; i < 16; ++i) {
-    //   std::cout << x_level(i+16, 0) << std::endl;
-    // }
-
     solve_forward_level(A, x_level, level);
     // copy back into x from x_level
     for (int64_t i = 0; i < x_level.rows; ++i) {
@@ -1490,9 +1478,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   x_splits = x.split(std::vector<int64_t>(1, level_offset),
                      {});
   Matrix x_last(x_splits[1]);
-
-  // std::cout << "x last:\n";
-  // x_last.print();
 
   int64_t last_nodes = pow(2, level);
   std::vector<int64_t> vector_splits;
@@ -1510,7 +1495,7 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   // m_splits[2] = A.D(1,0,1);
   // m_splits[3] = A.D(1,1,1);
 
-  // LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', 4*rank, 1, &merge, merge.stride, &x_last, 4*rank);
+  // LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', 2*rank, 1, &A.D(0,0,0), A.D(0,0,0).stride, &x_last, 2*rank);
 
   // forward for the last blocks
   for (int i = 0; i < last_nodes; ++i) {

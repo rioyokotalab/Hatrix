@@ -140,11 +140,18 @@ int main(int argc, char* argv[]) {
 
   // ||x - A * (A^-1 * x)|| / ||x||
   // h2_solution.print();
-  solve_error = Hatrix::norm(h2_solution - x) / Hatrix::norm(x);
+  auto diff = h2_solution - x;
+  solve_error = Hatrix::norm(diff) / Hatrix::norm(x);
   Matrix bdense = matmul(Adense, x);
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;
-  // std::cout << "DIFF:\n";
+  std::cout << "DIFF:\n";
+  for (int i = 0; i < 64; ++i) {
+    std::cout << std::setw(12) << diff(i, 0) << " "
+              << std::setw(12) << h2_solution(i, 0) << " "
+              << std::setw(12) << x(i, 0) << " "
+              << std::setw(12)  << b(i, 0) << std::endl;
+  }
   construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);
 
 
