@@ -145,7 +145,7 @@ int main(int argc, char* argv[]) {
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;
   // std::cout << "DIFF:\n";
-  construct_error = Hatrix::norm(bdense - b) / opts.N;
+  construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);
 
 
   double h2_norm = Hatrix::norm(h2_solution);
