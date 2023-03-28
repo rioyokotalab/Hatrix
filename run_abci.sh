@@ -34,8 +34,8 @@ adm=0
 
 for N in 64; do
     for adm in 1; do
-        for nleaf in 16; do
-            for max_rank in 10; do
+        for nleaf in 32; do
+            for max_rank in 20; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
