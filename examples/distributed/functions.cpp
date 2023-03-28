@@ -44,7 +44,7 @@ namespace Hatrix {
 
     for (int64_t i = 0; i < Q_F.rows; ++i) {
       for (int64_t j = 0; j < Q.cols; ++j) {
-        Q_F(i, j + (Q_F.cols - Q.cols)) = Q_full(i, j);
+        Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
       }
     }
     return Q_F;

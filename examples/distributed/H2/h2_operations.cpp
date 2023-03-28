@@ -916,7 +916,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
 void
 factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
-  int nleaf = 32; int rank = 20;
+  int nleaf = 16; int rank = 10;
   double *D002 = new double[nleaf * nleaf];
   auto UF0 = make_complement(A.U(0, 2));
   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
@@ -936,7 +936,6 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   delete[] D002;
 
   D002 = &A.D(0,0,2);
-  double *temp = new double[rank * rank];
 
   LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (nleaf-rank), D002, nleaf);
   cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasTrans,
@@ -976,7 +975,7 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
 
 
   double *D222= new double[nleaf * nleaf];
-  auto UF2 = make_complement(A.U(2, 1));
+  auto UF2 = make_complement(A.U(2, 2));
   cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
               nleaf, nleaf, nleaf, 1.0,
               &UF2, UF2.stride,
@@ -987,7 +986,7 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
               nleaf, nleaf, nleaf, 1.0,
               D222, nleaf,
-              &UF0, UF0.stride,
+              &UF2, UF2.stride,
               0.0,
               &A.D(2,2,2), A.D(2,2,2).stride);
   delete[] D222;
@@ -1003,22 +1002,94 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, rank, (nleaf-rank), -1,
               D222+(nleaf-rank), nleaf, 1.0, D222 + nleaf * (nleaf-rank) + (nleaf-rank), nleaf);
 
+  double *D332= new double[nleaf * nleaf];
+  auto UF3 = make_complement(A.U(3, 2));
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
+              nleaf, nleaf, nleaf, 1.0,
+              &UF3, UF3.stride,
+              &A.D(3,3,2), A.D(3,3,2).stride,
+              0.0,
+              D332, nleaf);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+              nleaf, nleaf, nleaf, 1.0,
+              D332, nleaf,
+              &UF3, UF3.stride,
+              0.0,
+              &A.D(3,3,2), A.D(3,3,2).stride);
+  delete[] D332;
+
+  D332 = &A.D(3, 3, 2);
+
+  LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', (nleaf-rank), D332, nleaf);
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasTrans,
+              CblasNonUnit,
+              rank, (nleaf-rank), 1.0,
+              D332, nleaf, D332+(nleaf-rank), nleaf);
+  cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, rank, (nleaf-rank), -1,
+              D332+(nleaf-rank), nleaf, 1.0, D332 + nleaf * (nleaf-rank) + (nleaf-rank), nleaf);
+
 
   double *merge = new double[(rank*4) * (rank*4)]();
+  int LDM = rank * 4;
   for (int i = 0; i < rank; ++i) { // 0,0
     for (int j = 0; j < rank; ++j) {
       // merge[i + j * (rank*2)] = A.D(0, 0, 1)(i+(nleaf-rank), j+(nleaf-rank));
-      merge[i + j * (rank*2)] = D002[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
+      merge[i + j * LDM] = D002[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
     }
   }
-  for (int i = 0; i < rank; ++i) { // 0,0
+  for (int i = 0; i < rank; ++i) { // 1,0
     for (int j = 0; j < rank; ++j) {
-      merge[(i+rank) + j * (rank*2)] = A.S(1, 0, 1)(i, j);
+      merge[(i+rank) + j * LDM] = A.S(1, 0, 2)(i, j);
     }
   }
-  for (int i = 0; i < rank; ++i) { // 0,0
+  for (int i = 0; i < rank; ++i) { // 1,1
     for (int j = 0; j < rank; ++j) {
-      merge[(i+rank) + (j+rank) * (rank*2)] = D112[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
+      merge[(i+rank) + (j+rank) * LDM] = D112[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
+    }
+  }
+
+
+  for (int i = 0; i < rank; ++i) { // 2,0
+    for (int j = 0; j < rank; ++j) {
+      merge[(i+rank*2) + j * LDM] = A.S(2,0,2)(i, j);
+    }
+  }
+
+  for (int i = 0; i < rank; ++i) { // 2,1
+    for (int j = 0; j < rank; ++j) {
+      merge[(i+rank*2) + (j+rank) * LDM] = A.S(2,1,2)(i, j);
+    }
+  }
+
+
+  for (int i = 0; i < rank; ++i) { // 2,2
+    for (int j = 0; j < rank; ++j) {
+      merge[(i+rank*2) + (j+rank*2) * LDM] = D222[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
+    }
+  }
+
+ for (int i = 0; i < rank; ++i) { // 3,0
+    for (int j = 0; j < rank; ++j) {
+      merge[(i+rank*3) + j * LDM] = A.S(3,0,2)(i, j);
+    }
+  }
+
+  for (int i = 0; i < rank; ++i) { // 3,1
+    for (int j = 0; j < rank; ++j) {
+      merge[(i+rank*3) + (j+rank) * LDM] = A.S(3,1,2)(i, j);
+    }
+  }
+
+  for (int i = 0; i < rank; ++i) { // 3,2
+    for (int j = 0; j < rank; ++j) {
+      merge[(i+rank*3) + (j+rank*2) * LDM] = A.S(3,2,2)(i, j);
+    }
+  }
+
+  for (int i = 0; i < rank; ++i) { // 3,3
+    for (int j = 0; j < rank; ++j) {
+      merge[(i+rank*3) + (j+rank*3) * LDM] = D332[(i+(nleaf-rank)) + (j+(nleaf-rank)) * nleaf];
     }
   }
 
@@ -1026,14 +1097,23 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
   Matrix d_merge((rank*4), (rank*4));
   for (int i = 0; i < (rank*4); ++i) {
     for (int j = 0; j < (rank*4) ; ++j) {
-      d_merge(i, j) = merge[i + j * (rank*2)];
+      d_merge(i, j) = merge[i + j * LDM];
     }
   }
-  A.D.insert(0,0,1, std::move(d_merge));
+  auto d_splits = split_dense(d_merge, rank*2, rank*2);
+  std::cout << "cond last: " << cond_svd(d_merge) << std::endl;
+
+  Matrix d0(d_splits[0], true);
+  Matrix d1(d_splits[2], true);
+  Matrix d3(d_splits[3], true);
+
+  A.D.insert(0,0,1, std::move(d0));
+  A.D.insert(1,0,1, std::move(d1));
+  A.D.insert(1,1,1, std::move(d3));
 
   delete[] merge;
 
-  std::cout << "cond last: " << cond_svd(A.D(0,0,0)) << std::endl;
+
 }
 
 void
@@ -1264,6 +1344,95 @@ permute_backward(const SymmetricSharedBasisMatrix& A,
   return c_offset;
 }
 
+Hatrix::Matrix
+solve_raw(const Hatrix::SymmetricSharedBasisMatrix& A,
+          const Hatrix::Matrix& b) {
+  Matrix x(b, true);
+  int64_t level_offset = 0;
+  int N = 64;
+  int nleaf = 16;
+  int rank = 10;
+
+  double res[N];
+  double *x_ptr = &x;
+
+  // Forward.
+  Matrix UF0 = make_complement(A.U(0, 2));
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, nleaf, 1, nleaf,
+              1, &UF0, UF0.stride, x_ptr, N, 0, res, N);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
+              CblasNonUnit, (nleaf-rank), 1, 1.0,
+              &A.D(0,0,2), A.D(0,0,2).stride,
+              res, N);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, 1, (nleaf-rank),
+              -1, &A.D(0,0,2) + (nleaf-rank), A.D(0,0,2).stride,
+              res, N, 1, res+(nleaf-rank), N);
+
+  Matrix UF1 = make_complement(A.U(1, 2));
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, nleaf, 1, nleaf,
+              1, &UF1, UF1.stride, x_ptr+nleaf, x.stride, 0, res+nleaf, N);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
+              CblasNonUnit, (nleaf-rank), 1, 1.0,
+              &A.D(1,1,2), A.D(1,1,2).stride,
+              res+nleaf, N);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, 1, (nleaf-rank),
+              -1, &A.D(1,1,2) + (nleaf-rank), A.D(1,1,2).stride,
+              res+nleaf, N, 1, res+nleaf+(nleaf-rank), N);
+
+  double copy[rank*2];
+  for (int i = 0; i < rank; ++i) {
+    copy[i] = res[(nleaf-rank) + i];
+    copy[i+rank] = res[nleaf+(nleaf-rank)+i];
+  }
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
+              CblasNonUnit, 20, 1, 1.0,
+              &A.D(0,0,1), A.D(0,0,1).stride,
+              copy, rank*2);
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
+              CblasNonUnit, 20, 1, 1.0,
+              &A.D(0,0,1), A.D(0,0,1).stride,
+              copy, rank*2);
+
+
+  for (int i = 0; i < rank; ++i) {
+    res[(nleaf-rank) + i] = copy[i];
+    res[nleaf+(nleaf-rank)+i] = copy[i + rank];
+  }
+
+  // Backward. (1,1,2)
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, (nleaf-rank), 1, rank,
+              -1, &A.D(1,1,2) + (nleaf-rank), A.D(1,1,2).stride,
+              res+nleaf+(nleaf-rank), N, 1, res+nleaf, N);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
+              CblasNonUnit, (nleaf-rank), 1, 1.0,
+              &A.D(1,1,2), A.D(1,1,2).stride,
+              res+nleaf, N);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, nleaf, 1, nleaf,
+              1, &UF1, UF1.stride, res+nleaf, N, 0, x_ptr+nleaf, N);
+
+  // Backward. (0,0,2)
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, (nleaf-rank), 1, rank,
+              -1, &A.D(0,0,2) + (nleaf-rank), A.D(0,0,2).stride,
+              res+(nleaf-rank), N, 1, res, N);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
+              CblasNonUnit, (nleaf-rank), 1, 1.0,
+              &A.D(0,0,2), A.D(0,0,2).stride,
+              res, N);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, nleaf, 1, nleaf,
+              1, &UF0, UF0.stride, res, x.stride, 0, x_ptr, N);
+
+  return x;
+}
+
 
 Hatrix::Matrix
 solve(const Hatrix::SymmetricSharedBasisMatrix& A,
@@ -1273,79 +1442,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   std::vector<Matrix> x_splits;
   int64_t level;
 
-  // double res[64];
-  // double *x_ptr = &x;
-  // Matrix UF0 = make_complement(A.U(0, 1));
-  // cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, 32, 1, 32,
-  //             1, &UF0, UF0.stride, &b, 64, 0, res, 64);
-
-  // cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
-  //             CblasNonUnit, 12, 1, 1.0,
-  //             &A.D(0,0,1), A.D(0,0,1).stride,
-  //             res, 64);
-
-  // cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 20, 1, 12,
-  //             -1, &A.D(0,0,1) + 12, A.D(0,0,1).stride,
-  //             res, 64, 1, res+12, 64);
-
-  // Matrix UF1 = make_complement(A.U(1, 1));
-  // cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, 32, 1, 32,
-  //             1, &UF1, UF1.stride, &b+32, x.stride, 0, res+32, 64);
-
-  // cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
-  //             CblasNonUnit, 12, 1, 1.0,
-  //             &A.D(1,1,1), A.D(1,1,1).stride,
-  //             res+32, 64);
-
-  // cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 20, 1, 12,
-  //             -1, &A.D(1,1,1) + 12, A.D(1,1,1).stride,
-  //             res+32, 64, 1, res+32+12, 64);
-
-  // double copy[40];
-  // for (int i = 0; i < 20; ++i) {
-  //   copy[i] = res[12 + i];
-  //   copy[i+20] = res[32+12+i];
-  // }
-
-  // cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
-  //             CblasNonUnit, 40, 1, 1.0,
-  //             &A.D(0,0,0), A.D(0,0,0).stride,
-  //             copy, 40);
-  // cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
-  //             CblasNonUnit, 40, 1, 1.0,
-  //             &A.D(0,0,0), A.D(0,0,0).stride,
-  //             copy, 40);
-
-
-  // for (int i = 0; i < 20; ++i) {
-  //   res[12 + i] = copy[i];
-  //   res[32+12+i] = copy[i + 20];
-  // }
-
-  // cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, 12, 1, 20,
-  //             -1, &A.D(1,1,1) + 12, A.D(1,1,1).stride,
-  //             res+32+12, 64, 1, res+32, 64);
-
-  // cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
-  //             CblasNonUnit, 12, 1, 1.0,
-  //             &A.D(1,1,1), A.D(1,1,1).stride,
-  //             res+32, 64);
-
-  // cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 32, 1, 32,
-  //             1, &UF1, UF1.stride, res+32, 64, 0, x_ptr+32, 64);
-
-
-  // cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, 12, 1, 20,
-  //             -1, &A.D(0,0,1) + 12, A.D(0,0,1).stride,
-  //             res+12, 64, 1, res, 64);
-
-  // cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
-  //             CblasNonUnit, 12, 1, 1.0,
-  //             &A.D(0,0,1), A.D(0,0,1).stride,
-  //             res, 64);
-
-  // cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, 32, 1, 32,
-  //             1, &UF0, UF0.stride, res, x.stride, 0, x_ptr, 64);
 
 
 
