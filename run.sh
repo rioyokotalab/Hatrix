@@ -11,6 +11,8 @@ source /etc/profile.d/modules.sh
 module purge
 module load cuda intel/2022/mkl gcc cmake intel/2022/mpi
 
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gsl-2.7.1/build/lib
+
 # export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
 # export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib
 
@@ -31,9 +33,9 @@ adm=0
 
 for N in 64; do
     for adm in 1; do
-        for nleaf in 32; do
-            for max_rank in 20; do
-                gdb --args ./bin/H2_main --N $N \
+        for nleaf in 16; do
+            for max_rank in 10; do
+                ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
