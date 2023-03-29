@@ -78,7 +78,7 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   //             _D+(nleaf-rank), nleaf, 1.0, _D + nleaf * (nleaf-rank) + (nleaf-rank),
   //             nleaf);
 
-  std::cout << "POST SYRK: " << cond_svd(A.D(block, block, level)) << std::endl;
+  // std::cout << "POST SYRK: " << cond_svd(A.D(block, block, level)) << std::endl;
 }
 
 void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
@@ -507,13 +507,13 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                                      A.D(block, block, level).rows - A.ranks(block, level),
                                      A.D(block, block, level).cols - A.ranks(block, level));
 
-  std::cout << "@@@ PRE-PRODUCT @@@ " << " lvl: " << level << " cond: " << cond_svd(A.D(block, block, level))
-            << " " << cond_svd(diagonal_splits[3]) << std::endl;
+  // std::cout << "@@@ PRE-PRODUCT @@@ " << " lvl: " << level << " cond: " << cond_svd(A.D(block, block, level))
+            // << " " << cond_svd(diagonal_splits[3]) << std::endl;
   auto U_F = make_complement(A.U(block, level));
 
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
 
-  std::cout << "@@@ PRODUCT @@@ "  << cond_svd(A.D(block, block, level)) << std::endl;
+  // std::cout << "@@@ PRODUCT @@@ "  << cond_svd(A.D(block, block, level)) << std::endl;
 
   // for (int64_t j : near_neighbours(block, level)) {
   //   if (j < block) {
@@ -841,7 +841,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
-    std::cout << "@@@ CHOL @@@ "  << cond_svd(A.D(d, d, level)) << std::endl;
+        // std::cout << "@@@ CHOL @@@ "  << cond_svd(A.D(d, d, level)) << std::endl;
     cholesky(A.D(d, d, level), Hatrix::Lower);
     for (int i = d+1; i < last_nodes; ++i) {
       solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
@@ -1056,7 +1056,7 @@ factorize_raw(SymmetricSharedBasisMatrix& A, Hatrix::Args& opts) {
     }
   }
   auto d_splits = split_dense(d_merge, rank*2, rank*2);
-  std::cout << "cond last: " << cond_svd(d_merge) << std::endl;
+  // std::cout << "cond last: " << cond_svd(d_merge) << std::endl;
 
   Matrix d0(d_splits[0], true);
   Matrix d1(d_splits[2], true);
@@ -1488,7 +1488,7 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   }
   auto x_last_splits = x_last.split(vector_splits, {});
 
-  // int rank = 10;
+  int rank = 10;
   // Matrix merge(4*rank, 4*rank);
   // auto m_splits = split_dense(merge, 2*rank, 2*rank);
   // m_splits[0] = A.D(0,0,1);
@@ -1504,6 +1504,8 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
              x_last_splits[i],
              false, false, -1.0, 1.0);
     }
+
+    std::cout << "i: " << i << " lvl: " << level << std::endl;
     solve_triangular(A.D(i, i, level), x_last_splits[i],
                      Hatrix::Left, Hatrix::Lower,
                      false, false, 1.0);
@@ -1516,6 +1518,7 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
              x_last_splits[j],
              true, false, -1.0, 1.0);
     }
+    std::cout << "j: " << j << " lvl: " << level << std::endl;
     solve_triangular(A.D(j, j, level), x_last_splits[j],
                      Hatrix::Left, Hatrix::Lower,
                      false, true, 1.0);
@@ -1571,7 +1574,7 @@ matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Matrix& x) {
   std::vector<Matrix> x_hat;
   auto x_splits = x.split(leaf_nblocks, 1);
 
-  // // V leaf nodes
+  // V leaf nodes
   for (int i = 0; i < leaf_nblocks; ++i) {
     x_hat.push_back(matmul(A.U(i, A.max_level), x_splits[i], true, false, 1.0));
   }
@@ -1641,7 +1644,13 @@ matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Matrix& x) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           !A.is_admissible(i, j, A.max_level)) {
         // TODO: make the diagonal tringular and remove this.
-        matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+        if (i == j) {
+          matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+        }
+        else {
+          matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+          matmul(A.D(i, j, A.max_level), x_splits[i], b_splits[j], true, false);
+        }
       }
     }
   }
