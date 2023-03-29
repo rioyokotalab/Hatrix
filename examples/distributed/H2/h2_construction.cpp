@@ -103,14 +103,6 @@ generate_leaf_nodes(const Domain& domain,
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j : near_neighbours(i, A.max_level)) {
       Matrix Aij(dense_splits[i * nblocks + j], true);
-
-      // if (i == j) {
-      //   for (int64_t i = 0; i < Aij.rows; ++i) {
-      //     for (int64_t j = i+1; j < Aij.cols; ++j) {
-      //       Aij(i, j) = 0;
-      //     }
-      //   }
-      // }
       A.D.insert(i, j, A.max_level, std::move(Aij));
     }
   }
@@ -125,16 +117,6 @@ generate_leaf_nodes(const Domain& domain,
                                      dense,
                                      opts));
   }
-
-  // for (int i = 0; i < opts.max_rank; ++i) {
-  //   swap_row(A.D(0, 0, A.max_level), ipiv_0[i], i+(opts.nleaf-opts.max_rank)-1);
-  // }
-
-  // for (int i = 0; i < opts.max_rank; ++i) {
-  //   swap_col(A.D(0, 0, A.max_level), ipiv_0[i], i+(opts.nleaf-opts.max_rank)-1);
-  // }
-
-  // A.D(0, 0, A.max_level).print();
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
@@ -278,6 +260,13 @@ generate_transfer_matrices(const Domain& domain,
                                       dense_splits[i * nblocks + j], true, false),
                                Ubig_parent(j, level));
         A.S.insert(i, j, level, std::move(Sdense));
+
+        double norm = Hatrix::norm(dense_splits[i * nblocks + j] -
+                                   matmul(matmul(Ubig_parent(i, level), A.S(i, j, level)),
+                                          Ubig_parent(j, level), false, true));
+
+        std::cout << "i: " << i << " j: " << j << " norm: " << norm << std::endl;
+
       }
     }
   }

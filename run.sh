@@ -26,71 +26,71 @@ make -j H2_main
 
 nleaf=256
 max_rank=50
-ndim=2
+ndim=1
 adm=0
 
 # valgrind --leak-check=full --track-origins=yes
 
-for N in 16384; do
-    for adm in 1 1.2 1.4; do
-        for nleaf in 256; do
-            for max_rank in 200; do
-                ./bin/H2_main --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func laplace \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy 1e-8 \
-                              --admis $adm \
-                              --admis_kind geometry \
-                              --construct_algorithm miro \
-                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3
-            done
-        done
-    done
-done
-
-
-for N in 16384; do
-    for adm in 1 1.2 1.4; do
-        for nleaf in 256; do
-            for max_rank in 200; do
+for N in 64; do
+    for adm in 1; do
+        for nleaf in 16; do
+            for max_rank in 10; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
-                              --accuracy 1e-8 \
+                              --accuracy -1 \
                               --admis $adm \
                               --admis_kind geometry \
                               --construct_algorithm miro \
-                              --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3
+                              --param_1 1e-4 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3 --use_nested_basis
             done
         done
     done
 done
 
-for N in 16384; do
-    for adm in 1 1.2 1.4; do
-        for nleaf in 256; do
-            for max_rank in 200; do
-                ./bin/H2_main --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func yukawa \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy 1e-8 \
-                              --admis $adm \
-                              --admis_kind geometry \
-                              --construct_algorithm miro \
-                              --param_1 1 --param_2 1e-9 --param_3 0.5 \
-                              --kind_of_recompression 3
-            done
-        done
-    done
-done
+
+# for N in 16384; do
+#     for adm in 1 1.2 1.4 1.8; do
+#         for nleaf in 256; do
+#             for max_rank in 200; do
+#                 ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func gsl_matern \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy 1e-8 \
+#                               --admis $adm \
+#                               --admis_kind geometry \
+#                               --construct_algorithm miro \
+#                               --param_1 1 --param_2 0.03 --param_3 0.5 \
+#                               --kind_of_recompression 3 --use_nested_basis
+#             done
+#         done
+#     done
+# done
+
+# for N in 16384; do
+#     for adm in 1 1.2 1.4 1.8; do
+#         for nleaf in 256; do
+#             for max_rank in 200; do
+#                 ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func yukawa \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy 1e-8 \
+#                               --admis $adm \
+#                               --admis_kind geometry \
+#                               --construct_algorithm miro \
+#                               --param_1 1 --param_2 1e-9 --param_3 0.5 \
+#                               --kind_of_recompression 3 --use_nested_basis
+#             done
+#         done
+#     done
+# done
