@@ -181,7 +181,8 @@ int main(int argc, char* argv[]) {
             << opts.perturbation << ","
             << std::scientific << opts.param_1 << std::fixed  << ","
             << opts.param_2 << ","
-            << opts.param_3
+            << opts.param_3 << ","
+            << opts.kernel_verbose
             << std::endl;
 
   Hatrix::Context::finalize();
