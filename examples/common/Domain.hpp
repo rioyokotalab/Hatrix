@@ -562,7 +562,7 @@ class Domain {
           const int64_t num_far_nodes = cell.far_list.size();
           // 1. Find centroid of each far-node's sample bodies
           // Store centers in column major, each column is a coordinate
-          std::vector<double> centers(ndim * num_far_nodes);  
+          std::vector<double> centers(ndim * num_far_nodes);
           for (int64_t i = 0; i < num_far_nodes; i++) {
             const auto far_idx = cell.far_list[i];
             const auto& far_cell = cells[far_idx];
@@ -830,39 +830,61 @@ class Domain {
   }
 
   void initialize_starsh_uniform_grid() {
-    const int64_t side = std::ceil(
-        std::pow((double)N, 1. / (double)ndim)); // size of each side of the grid
-    int64_t total = side;
-    for (int64_t i = 1; i < ndim; i++) {
-      total *= side;
+    // const int64_t side = std::ceil(
+    //     std::pow((double)N, 1. / (double)ndim)); // size of each side of the grid
+    // int64_t total = side;
+    // for (int64_t i = 1; i < ndim; i++) {
+    //   total *= side;
+    // }
+
+    // const int64_t ncoords = ndim * side;
+    // std::vector<double> coord(ncoords);
+    // for (int64_t i = 0; i < side; i++) {
+    //   const double val = (double)i / side;
+    //   for (int64_t j = 0; j < ndim; j++) {
+    //     coord[j * side + i] = val;
+    //   }
+    // }
+
+    // std::vector<int64_t> pivot(ndim, 0);
+    // int64_t k = 0;
+    // for (int64_t i = 0; i < N; i++) {
+    //   std::vector<double> points(ndim);
+    //   for (k = 0; k < ndim; k++) {
+    //     points[k] = coord[pivot[k] + k * side];
+    //   }
+    //   bodies.emplace_back(Body(points, 0));
+
+    //   k = ndim - 1;
+    //   pivot[k]++;
+    //   while(pivot[k] == side) {
+    //     pivot[k] = 0;
+    //     if (k > 0) {
+    //       k--;
+    //       pivot[k]++;
+    //     }
+    //   }
+    // }
+
+    std::vector<int64_t> sides(ndim, 0);
+    sides[0] = ceil(pow((double)N, 1.0 / ndim));
+    int64_t total = sides[0];
+    int64_t temp_N = N;
+    for (int k = 1; k < ndim; ++k) {
+      sides[k] = temp_N / sides[k-1];
+      temp_N = sides[k];
     }
+    for (int k = 1; k < ndim; ++k) { total += sides[k]; }
+    int64_t extra = N - total;
+    bodies.resize(N, Body(std::vector<double>(ndim), 0));
 
-    const int64_t ncoords = ndim * side;
-    std::vector<double> coord(ncoords);
-    for (int64_t i = 0; i < side; i++) {
-      const double val = (double)i / side;
-      for (int64_t j = 0; j < ndim; j++) {
-        coord[j * side + i] = val;
-      }
-    }
-
-    std::vector<int64_t> pivot(ndim, 0);
-    int64_t k = 0;
-    for (int64_t i = 0; i < N; i++) {
-      std::vector<double> points(ndim);
-      for (k = 0; k < ndim; k++) {
-        points[k] = coord[pivot[k] + k * side];
-      }
-      bodies.emplace_back(Body(points, 0));
-
-      k = ndim - 1;
-      pivot[k]++;
-      while(pivot[k] == side) {
-        pivot[k] = 0;
-        if (k > 0) {
-          k--;
-          pivot[k]++;
-        }
+    double space_0 = 1.0 / sides[0], space_1 = 1.0 / sides[1];
+    for (int64_t i = 0; i < sides[0]; ++i) {
+      for (int64_t j = 0; j < sides[1]; ++j) {
+        std::vector<double> point(ndim);
+        point[0] = i * space_0;
+        point[1] = j * space_1;
+        bodies[i + j * sides[0]] = Body(point, 0);
       }
     }
   }
@@ -891,4 +913,3 @@ class Domain {
 };
 
 } // namespace Hatrix
-

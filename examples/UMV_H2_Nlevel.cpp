@@ -1633,6 +1633,7 @@ int main(int argc, char ** argv) {
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
+  // 2: Matern kernel
   const int64_t kernel_type = argc > 7 ? atol(argv[7]) : 0;
 
   // Specify underlying geometry
@@ -1652,20 +1653,25 @@ int main(int argc, char ** argv) {
   Hatrix::set_kernel_constants(1e-3 / (double)N, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
-    case 0: {
-      Hatrix::kernel_function = Hatrix::laplace_kernel;
-      kernel_name = "laplace";
-      break;
-    }
-    case 1: {
-      Hatrix::kernel_function = Hatrix::yukawa_kernel;
-      kernel_name = "yukawa";
-      break;
-    }
-    default: {
-      Hatrix::kernel_function = Hatrix::laplace_kernel;
-      kernel_name = "laplace";
-    }
+  case 0: {
+    Hatrix::kernel_function = Hatrix::laplace_kernel;
+    kernel_name = "laplace";
+    break;
+  }
+  case 1: {
+    Hatrix::kernel_function = Hatrix::yukawa_kernel;
+    kernel_name = "yukawa";
+    break;
+  }
+  case 2: {
+    Hatrix::kernel_function = Hatrix::matern_kernel;
+    kernel_name = "matern";
+    break;
+  }
+  default: {
+    Hatrix::kernel_function = Hatrix::laplace_kernel;
+    kernel_name = "laplace";
+  }
   }
 
   const auto start_particles = std::chrono::system_clock::now();

@@ -78,7 +78,7 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   //             _D+(nleaf-rank), nleaf, 1.0, _D + nleaf * (nleaf-rank) + (nleaf-rank),
   //             nleaf);
 
-  // std::cout << "POST SYRK: " << cond_svd(A.D(block, block, level)) << std::endl;
+  std::cout << "\tPOST SYRK: " << cond_svd(A.D(block, block, level)) << std::endl;
 }
 
 void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
@@ -1208,7 +1208,8 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     int64_t row_split = A.D(block, block, level).rows - rank;
     int64_t col_split = A.D(block, block, level).cols - rank;
     auto block_splits = split_dense(A.D(block, block, level),
-                                    row_split, col_split);
+                                    row_split,
+                                    col_split);
 
     Matrix x_block(x_level_split[block], true);
     auto x_block_splits = x_block.split(std::vector<int64_t>(1,
