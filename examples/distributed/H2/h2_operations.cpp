@@ -507,8 +507,9 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                                      A.D(block, block, level).rows - A.ranks(block, level),
                                      A.D(block, block, level).cols - A.ranks(block, level));
 
-  // std::cout << "@@@ PRE-PRODUCT @@@ " << " lvl: " << level << " cond: " << cond_svd(A.D(block, block, level))
-            // << " " << cond_svd(diagonal_splits[3]) << std::endl;
+  std::cout << "@@@ PRE-PRODUCT @@@ block: " << block
+            << " lvl: " << level
+            << " cond: " << cond_svd(A.D(block, block, level)) << std::endl;
   auto U_F = make_complement(A.U(block, level));
 
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
@@ -838,7 +839,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
-        // std::cout << "@@@ CHOL @@@ "  << cond_svd(A.D(d, d, level)) << std::endl;
+    std::cout << "@@@ CHOL @@@ "  << cond_svd(A.D(d, d, level)) << std::endl;
     cholesky(A.D(d, d, level), Hatrix::Lower);
     for (int i = d+1; i < last_nodes; ++i) {
       solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
@@ -1361,27 +1362,88 @@ solve_raw(const Hatrix::SymmetricSharedBasisMatrix& A,
               -1, &A.D(3,3,2) + (nleaf-rank), A.D(3,3,2).stride,
               res+3*nleaf, N, 1, res+3*nleaf+(nleaf-rank), N);
 
-  double copy[rank*4];
+  double level1[4 * rank], level1_res[4*rank];
   for (int i = 0; i < rank; ++i) {
-    copy[i] = res[(nleaf-rank) + i];
-    copy[i+rank] = res[nleaf+(nleaf-rank)+i];
-    copy[i+2*rank] = res[2*nleaf+(nleaf-rank)+i];
-    copy[i+3*rank] = res[3*nleaf+(nleaf-rank)+i];
+    level1[i]        = res[(nleaf-rank) + i];
+    level1[i+rank]   = res[nleaf+(nleaf-rank)+i];
+    level1[i+2*rank] = res[2*nleaf+(nleaf-rank)+i];
+    level1[i+3*rank] = res[3*nleaf+(nleaf-rank)+i];
   }
 
-  Matrix merge(4*rank, 4*rank);
-  auto m_splits = split_dense(merge, 2*rank, 2*rank);
-  m_splits[0] = A.D(0,0,1);
-  m_splits[2] = A.D(1,0,1);
-  m_splits[3] = A.D(1,1,1);
+  int rank2 = 2 * rank;
+  Matrix UF0_1 = make_complement(A.U(0, 1));
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, rank2, 1, rank2,
+              1, &UF0_1, UF0_1.stride, level1, 4*rank, 0, level1_res, 4*rank);
 
-  LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', 4*rank, 1, &merge, merge.stride, copy, 4 * rank);
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
+              CblasNonUnit, (rank2-rank), 1, 1.0,
+              &A.D(0,0,1), A.D(0,0,1).stride,
+              level1_res, 4*rank);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, 1, (rank2-rank),
+              -1, &A.D(0,0,1) + (rank2-rank), A.D(0,0,1).stride,
+              level1_res, 4*rank, 1, level1_res+(rank2-rank), 4*rank);
+
+  Matrix UF1_1 = make_complement(A.U(1, 1));
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, rank2, 1, rank2,
+              1, &UF1_1, UF1_1.stride, level1 + rank2, 4*rank, 0, level1_res+rank2, 4*rank);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasNoTrans,
+              CblasNonUnit, (rank2-rank), 1, 1.0,
+              &A.D(1,1,1), A.D(1,1,1).stride,
+              level1_res+rank2, 4*rank);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank, 1, (rank2-rank),
+              -1, &A.D(1,1,1) + (rank2-rank), A.D(1,1,1).stride,
+              level1_res+rank2, 4*rank, 1, level1_res+rank2+(rank2-rank), 4*rank);
+
+  double level0[rank*2];
 
   for (int i = 0; i < rank; ++i) {
-    res[(nleaf-rank) + i] = copy[i];
-    res[nleaf+(nleaf-rank)+i] = copy[i + rank];
-    res[2*nleaf+(nleaf-rank)+i] = copy[i + 2*rank];
-    res[3*nleaf+(nleaf-rank)+i] = copy[i + 3*rank];
+    level0[i] = level1_res[i+rank];
+    level0[i+rank] = level1_res[i+2*rank+rank];
+  }
+
+  LAPACKE_dpotrs(LAPACK_COL_MAJOR, 'L', 2*rank, 1, &A.D(0,0,0), A.D(0,0,0).stride, level0, 2 * rank);
+
+  for (int i = 0; i < rank; ++i) {
+    level1_res[i+rank] = level0[i];
+    level1_res[i+2*rank+rank] = level0[i+rank];
+  }
+
+  // Backward. (1,1,1)
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, (rank2-rank), 1, rank,
+              -1, &A.D(1,1,1) + (rank2-rank), A.D(1,1,1).stride,
+              level1_res+3*rank, 4*rank, 1, level1_res+2*rank, 4*rank);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
+              CblasNonUnit, (rank2-rank), 1, 1.0,
+              &A.D(1,1,1), A.D(1,1,1).stride,
+              level1_res+2*rank, 4*rank);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank2, 1, rank2,
+              1, &UF1_1, UF1_1.stride, level1_res+2*rank, 4*rank, 0, level1+2*rank,
+              4*rank);
+
+  // Backward. (0,0,1)
+  cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans, (rank2-rank), 1, rank,
+              -1, &A.D(0,0,1) + (rank2-rank), A.D(0,0,1).stride,
+              level1_res+rank, 4*rank, 1, level1_res, 4*rank);
+
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasLower, CblasTrans,
+              CblasNonUnit, (rank2-rank), 1, 1.0,
+              &A.D(0,0,1), A.D(0,0,1).stride,
+              level1_res, 4*rank);
+
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, rank2, 1, rank2,
+              1, &UF0_1, UF0_1.stride, level1_res, 4*rank, 0, level1,
+              4*rank);
+
+  for (int i = 0; i < rank; ++i) {
+    res[(nleaf-rank) + i]       = level1[i];
+    res[nleaf+(nleaf-rank)+i]   = level1[i + rank];
+    res[2*nleaf+(nleaf-rank)+i] = level1[i + 2*rank];
+    res[3*nleaf+(nleaf-rank)+i] = level1[i + 3*rank];
   }
 
   // Backward. (3,3,2)

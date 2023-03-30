@@ -45,7 +45,7 @@ for N in 64; do
                               --admis $adm \
                               --admis_kind geometry \
                               --construct_algorithm miro \
-                              --param_1 1e-4 --param_2 0.03 --param_3 0.5 \
+                              --param_1 1 --param_2 0.03 --param_3 0.5 \
                               --kind_of_recompression 3 --use_nested_basis
             done
         done

@@ -126,8 +126,8 @@ int main(int argc, char* argv[]) {
     post_factor_average_rank = A.average_rank();
 
     auto begin_solve = std::chrono::system_clock::now();
-    h2_solution = solve(A, b);
-    // h2_solution = solve_raw(A, b);
+    // h2_solution = solve(A, b);
+    h2_solution = solve_raw(A, b);
 
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
@@ -145,8 +145,15 @@ int main(int argc, char* argv[]) {
   Matrix bdense = matmul(Adense, x);
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;
-  std::cout << "DIFF:\n";
-  for (int i = 0; i < 64; ++i) {
+  std::cout << "DIFF: 32-48\n";
+  for (int i = 32; i < 48; ++i) {
+    std::cout << std::setw(12) << diff(i, 0) << " "
+              << std::setw(12) << h2_solution(i, 0) << " "
+              << std::setw(12) << x(i, 0) << " "
+              << std::setw(12)  << b(i, 0) << std::endl;
+  }
+  std::cout << "DIFF 48-64:\n";
+  for (int i = 48; i < 64; ++i) {
     std::cout << std::setw(12) << diff(i, 0) << " "
               << std::setw(12) << h2_solution(i, 0) << " "
               << std::setw(12) << x(i, 0) << " "
