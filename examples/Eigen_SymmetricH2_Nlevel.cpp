@@ -81,7 +81,7 @@ class SymmetricH2 {
   void initialize_geometry_admissibility(const Domain& domain);
 
   int64_t get_block_size(const Domain& domain, const int64_t node, const int64_t level) const;
-  std::tuple<Matrix, Matrix, Matrix, int64_t> svd_like_compression(Matrix& A) const;
+  std::tuple<Matrix, Matrix, int64_t> svd_like_compression(Matrix& A) const;
 
   std::tuple<Matrix, Matrix>
   generate_row_cluster_basis(const Domain& domain,
@@ -196,7 +196,7 @@ int64_t SymmetricH2::get_block_size(const Domain& domain,
   return domain.cells[idx].nbodies;
 }
 
-std::tuple<Matrix, Matrix, Matrix, int64_t>
+std::tuple<Matrix, Matrix, int64_t>
 SymmetricH2::svd_like_compression(Matrix& A) const {
   Matrix Ui, Si, Vi;
   int64_t rank;
@@ -211,13 +211,13 @@ SymmetricH2::svd_like_compression(Matrix& A) const {
   Vi = Matrix(R.rows, R.cols);
   rq(R, Si, Vi);
 #else
-  std::tie(Ui, Si, Vi, rank) = error_svd(A, accuracy, use_rel_acc, false);
+  std::tie(Ui, Si, rank) = error_svd_U(A, accuracy, use_rel_acc, false);
 #endif
 
   // Fixed-accuracy with bounded rank
   rank = max_rank > 0 ? std::min(max_rank, rank) : rank;
 
-  return std::make_tuple(std::move(Ui), std::move(Si), std::move(Vi), std::move(rank));
+  return std::make_tuple(std::move(Ui), std::move(Si), std::move(rank));
 }
 
 std::tuple<Matrix, Matrix>
@@ -228,9 +228,9 @@ SymmetricH2::generate_row_cluster_basis(const Domain& domain,
   const auto& cell = domain.cells[idx];
   Matrix block_row = generate_p2p_matrix(domain, cell.get_bodies(), cell.sample_farfield);
 
-  Matrix Ui, Si, Vi_T;
+  Matrix Ui, Si;
   int64_t rank;
-  std::tie(Ui, Si, Vi_T, rank) = svd_like_compression(block_row);
+  std::tie(Ui, Si, rank) = svd_like_compression(block_row);
 
   Matrix UxS = matmul(Ui, Si);
   Ui.shrink(Ui.rows, rank);
@@ -285,9 +285,9 @@ SymmetricH2::generate_U_transfer_matrix(const Domain& domain,
   matmul(Ubig_child1, block_row_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Ubig_child2, block_row_splits[1], temp_splits[1], true, false, 1, 0);
 
-  Matrix Ui, Si, Vi;
+  Matrix Ui, Si;
   int64_t rank;
-  std::tie(Ui, Si, Vi, rank) = svd_like_compression(temp);
+  std::tie(Ui, Si, rank) = svd_like_compression(temp);
 
   Matrix UxS = matmul(Ui, Si);
   Ui.shrink(Ui.rows, rank);
@@ -608,9 +608,9 @@ void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t leve
     block_row = concat(block_row, F(row, j, level), 1);
   }
 
-  Matrix Ui, Si, Vi;
+  Matrix Ui, Si;
   int64_t rank;
-  std::tie(Ui, Si, Vi, rank) = svd_like_compression(block_row);
+  std::tie(Ui, Si, rank) = svd_like_compression(block_row);
   Matrix US = matmul(Ui, Si);
   Ui.shrink(Ui.rows, rank);
 

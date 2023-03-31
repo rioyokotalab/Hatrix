@@ -335,17 +335,25 @@ std::vector<double> get_singular_values(Matrix& A) {
   return Sdiag;
 }
 
-void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
+void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, bool compute_U, bool compute_V) {
   // check dimensions
-  assert(U.rows == A.rows);
   assert(S.cols == S.rows && S.cols == A.min_dim());
-  assert(U.cols == S.cols && V.rows == S.rows);
-  assert(V.cols == A.cols);
+  if (compute_U) {
+    assert(U.rows == A.rows);
+    assert(U.cols == S.cols);
+  }
+  if (compute_V) {
+    assert(V.rows == S.rows);
+    assert(V.cols == A.cols);
+  }
 
   std::vector<double> Sdiag(S.rows);
   std::vector<double> work(S.rows - 1);
-  LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', A.rows, A.cols, &A, A.stride,
-                 Sdiag.data(), &U, U.stride, &V, V.stride, work.data());
+  LAPACKE_dgesvd(LAPACK_COL_MAJOR, compute_U ? 'S' : 'N', compute_V ? 'S' : 'N',
+                 A.rows, A.cols, &A, A.stride, Sdiag.data(),
+                 compute_U ? &U : nullptr, compute_U ? U.stride : A.stride,
+                 compute_V ? &V : nullptr, compute_V ? V.stride : A.stride,
+                 work.data());
   S = 0;
   for (int64_t i = 0; i < S.rows; i++) {
     S(i, i) = Sdiag[i];
@@ -403,6 +411,32 @@ std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
   }
 
   return std::make_tuple(std::move(U), std::move(S), std::move(V), rank);
+}
+
+std::tuple<Matrix, Matrix, int64_t> error_svd_U(Matrix& A, double eps,
+                                                bool relative,
+                                                bool ret_truncated) {
+  const int64_t k = A.min_dim();
+  Matrix U(A.rows, k);
+  Matrix S(k, k);
+  Matrix V(0, 0);
+
+  svd(A, U, S, V, true, false);
+
+  double error = eps;
+  if(relative) error *= S(0, 0);
+
+  int64_t rank = 1;
+  while (rank < k && S(rank, rank) > error) {
+    rank += 1;
+  }
+
+  if (ret_truncated) {
+    U.shrink(U.rows, rank);
+    S.shrink(rank, rank);
+  }
+
+  return std::make_tuple(std::move(U), std::move(S), rank);
 }
 
 std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>

@@ -67,7 +67,7 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A,
 
 std::vector<double> get_singular_values(Matrix& A);
 
-void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
+void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, bool compute_U = true, bool compute_V = true);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
@@ -91,6 +91,9 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
 std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
                                                       bool relative=true,
                                                       bool ret_truncated=true);
+std::tuple<Matrix, Matrix, int64_t> error_svd_U(Matrix& A, double eps,
+                                                bool relative=true,
+                                                bool ret_truncated=true);
 
 /*
   Compute truncated pivoted QR that stops as soon as the desired accuracy
