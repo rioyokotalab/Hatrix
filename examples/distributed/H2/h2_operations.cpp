@@ -70,8 +70,8 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   // syrk(diagonal_splits[2], diagonal_splits[3], Hatrix::Lower, false, -1, 1);
 
   lu(diagonal_splits[0]);
-  solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false);
   solve_triangular(diagonal_splits[0], diagonal_splits[1], Hatrix::Left, Hatrix::Lower, true);
+  solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false);
   matmul(diagonal_splits[2], diagonal_splits[1], diagonal_splits[3], false, false, -1, 1);
 
   // double *_D = &A.D(block, block, level);
@@ -758,7 +758,7 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     //   std::chrono::milliseconds>(stop_cluster_update - start_cluster_update).count();
 
     // auto start_multiply_complements = std::chrono::system_clock::now();
-    //multiply_complements(A, block, level);
+    multiply_complements(A, block, level);
     // auto stop_multiply_complements = std::chrono::system_clock::now();
     // timer[1] += std::chrono::duration_cast<
     //   std::chrono::milliseconds>(stop_multiply_complements - start_multiply_complements).count();
@@ -906,10 +906,10 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
     // cholesky(A.D(d, d, level), Hatrix::Lower);
     lu(A.D(d, d, level));
     for (int i = d+1; i < last_nodes; ++i) {
-      solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Left, Hatrix::Lower,
+      solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Upper,
                        false, false, 1.0);
 
-      solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Right, Hatrix::Upper,
+      solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Left, Hatrix::Lower,
                        false, false, 1.0);
     }
 
@@ -1152,9 +1152,9 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
   std::vector<Matrix> x_level_split = x_level.split(row_offsets, {});
 
   for (int64_t block = 0; block < nblocks; ++block) {
-    // Matrix U_F = make_complement(A.U(block, level));
-    // Matrix prod = matmul(U_F, x_level_split[block], true);
-    // x_level_split[block] = prod;
+    Matrix U_F = make_complement(A.U(block, level));
+    Matrix prod = matmul(U_F, x_level_split[block], true);
+    x_level_split[block] = prod;
     Matrix x_block(x_level_split[block], true);
 
     int64_t rank = A.ranks(block, level);
@@ -1294,9 +1294,9 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
                      Hatrix::Left, Hatrix::Upper, false, false, 1.0);
     x_level_split[block] = x_block;
 
-    // auto V_F = make_complement(A.U(block, level));
-    // Matrix prod = matmul(V_F, x_level_split[block]);
-    // x_level_split[block] = prod;
+    auto V_F = make_complement(A.U(block, level));
+    Matrix prod = matmul(V_F, x_level_split[block]);
+    x_level_split[block] = prod;
   }
 }
 

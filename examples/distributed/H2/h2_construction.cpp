@@ -119,9 +119,8 @@ generate_leaf_nodes(const Domain& domain,
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, A.max_level) &&
-          A.is_admissible(i, j, A.max_level)) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (exists_and_admissible(A, i, j, A.max_level)) {
         Matrix Sblock = matmul(matmul(A.U(i, A.max_level),
                                       dense_splits[i * nblocks + j], true, false),
                                A.U(j, A.max_level));
