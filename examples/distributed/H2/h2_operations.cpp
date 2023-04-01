@@ -85,7 +85,7 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   //             nleaf);
 
   // std::cout << "\tPOST SYRK: " << cond_svd(A.D(block, block, level)) << std::endl;
-  std::cout << "SAM POST NORM: " << Hatrix::norm(A.D(block, block, level)) << std::endl;
+  std::cout << "SAM POST NORM: " << block << " " << Hatrix::norm(A.D(block, block, level)) << std::endl;
 }
 
 void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
@@ -301,7 +301,8 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
 using vec = std::vector<int64_t>;
 
 void
-merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
+merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
+                          const Hatrix::Args& opts, int64_t level) {
   int64_t parent_level = level - 1;
   // // Merge the unfactorized parts and prepare for the next level.
   // for (int i = 0; i < pow(2, parent_level); ++i) {
@@ -356,21 +357,19 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
         std::vector<int64_t> i_children, j_children;
         std::vector<int64_t> row_split, col_split;
         int64_t nrows=0, ncols=0;
-        for (int64_t n = 0; n < pow(2, parent_level); ++n) {
-          i_children.push_back(n);
-          j_children.push_back(n);
+        if (!opts.use_nested_basis) {
+          for (int64_t n = 0; n < pow(2, parent_level); ++n) {
+            i_children.push_back(i * 2 + n);
+            j_children.push_back(j * 2 + n);
 
-          nrows += A.U(n, level).cols;
-          ncols += A.U(n, level).cols;
-          if(n < (pow(2, level) - 1)) {
-            row_split.push_back(nrows);
-            col_split.push_back(ncols);
+            nrows += A.U(n, level).cols;
+            ncols += A.U(n, level).cols;
+            if(n < (pow(2, level) - 1)) {
+              row_split.push_back(nrows);
+              col_split.push_back(ncols);
+            }
           }
         }
-
-        std::cout << "i: " << i <<  " rows: " << nrows
-                  << " j: " << j << " ncols: "<< ncols << std::endl;
-
         Matrix D_unelim(nrows, ncols);
         auto D_unelim_splits = D_unelim.split(row_split, col_split);
 
@@ -386,12 +385,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
               D_unelim_splits[ic1 * j_children.size() + jc2] = D_splits[3];
             }
             else {
-              if (c1 > c2) {
-                D_unelim_splits[ic1 * j_children.size() + jc2] = A.S(c1, c2, level);
-              }
-              else {
-                D_unelim_splits[ic1 * j_children.size() + jc2] = transpose(A.S(c2, c1, level));
-              }
+              D_unelim_splits[ic1 * j_children.size() + jc2] = A.S(c1, c2, level);
             }
           }
         }
@@ -400,6 +394,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, int64_t level) {
       }
     }
   }
+
 }
 
 void
@@ -570,9 +565,9 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                                      A.D(block, block, level).rows - A.ranks(block, level),
                                      A.D(block, block, level).cols - A.ranks(block, level));
 
-  std::cout << "@@@ PRE-PRODUCT @@@ block: " << block
-            << " lvl: " << level
-            << " cond: " << cond_svd(A.D(block, block, level)) << std::endl;
+  // std::cout << "@@@ PRE-PRODUCT @@@ block: " << block
+  //           << " lvl: " << level
+  //           << " cond: " << cond_svd(A.D(block, block, level)) << std::endl;
   auto U_F = make_complement(A.U(block, level));
 
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
@@ -890,7 +885,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
     r.erase_all();
     t.erase_all();
 
-    merge_unfactorized_blocks(A, level);
+    merge_unfactorized_blocks(A, opts, level);
 
     auto stop_merge = std::chrono::system_clock::now();
     timer[6] += std::chrono::duration_cast<
@@ -899,34 +894,57 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
   F.erase_all();
 
+
+
+
   auto start_last = std::chrono::system_clock::now();
-  int64_t last_nodes = pow(2, level);
-  for (int d = 0; d < last_nodes; ++d) {
-    std::cout << "@@@ CHOL @@@ "  << cond_svd(A.D(d, d, level)) << std::endl;
-    // cholesky(A.D(d, d, level), Hatrix::Lower);
-    lu(A.D(d, d, level));
-    for (int i = d+1; i < last_nodes; ++i) {
-      solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Upper,
-                       false, false, 1.0);
+  // int64_t last_nodes = pow(2, level);
+  // for (int d = 0; d < last_nodes; ++d) {
+  //   // cholesky(A.D(d, d, level), Hatrix::Lower);
+  //   lu(A.D(d, d, level));
+  //   for (int i = d+1; i < last_nodes; ++i) {
+  //     solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Upper,
+  //                      true, false, 1.0);
 
-      solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Left, Hatrix::Lower,
-                       false, false, 1.0);
-    }
+  //     solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Left, Hatrix::Lower,
+  //                      false, false, 1.0);
+  //   }
 
-    for (int i = d+1; i < last_nodes; ++i) {
-      for (int j = d+1; j < last_nodes; ++j) {
-        // if (i == j) {
-        //   syrk(A.D(i, d, level), A.D(i, j, level), Hatrix::Lower, false, -1.0, 1.0);
-        // }
-        // else {
-          // matmul(A.D(i, d, level), A.D(j, d, level),
-          //        A.D(i, j, level), false, true, -1.0, 1.0);
-        matmul(A.D(i, d, level), A.D(d, j, level),
-                 A.D(i, j, level), false, false, -1.0, 1.0);
-        // }
-      }
-    }
-  }
+  //   for (int i = d+1; i < last_nodes; ++i) {
+  //     for (int j = d+1; j < last_nodes; ++j) {
+  //       // if (i == j) {
+  //       //   syrk(A.D(i, d, level), A.D(i, j, level), Hatrix::Lower, false, -1.0, 1.0);
+  //       // }
+  //       // else {
+  //         // matmul(A.D(i, d, level), A.D(j, d, level),
+  //         //        A.D(i, j, level), false, true, -1.0, 1.0);
+  //       matmul(A.D(i, d, level), A.D(d, j, level),
+  //                A.D(i, j, level), false, false, -1.0, 1.0);
+  //       // }
+  //     }
+  //   }
+  // }
+
+  Matrix merge(10 * 4, 10 * 4);
+  auto merge_splits = merge.split(2,2);
+
+  merge_splits[0] = A.D(0,0,1);
+  merge_splits[1] = A.D(0,1,1);
+  merge_splits[2] = A.D(1,0,1);
+  merge_splits[3] = A.D(1,1,1);
+  // std::cout << "SAMEER last merge PRE factorization: " << Hatrix::norm(merge) << std::endl;
+  // merge.print();
+  lu(merge);
+
+  auto m2_split = merge.split(2, 2);
+
+  A.D(0,0,1) = m2_split[0];
+  A.D(0,1,1) = m2_split[1];
+  A.D(1,0,1) = m2_split[2];
+  A.D(1,1,1) = m2_split[3];
+
+
+  // std::cout << "SAMEER last merge factorization: " << Hatrix::norm(merge) << std::endl;
 
   auto stop_last = std::chrono::system_clock::now();
   timer[7] += std::chrono::duration_cast<
@@ -1170,12 +1188,12 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     // Forward substitution with cc and oc blocks on the
     // diagonal dense block.
     solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, false,
+                     Hatrix::Left, Hatrix::Lower, true,
                      false, 1.0);
     matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
            false, false, -1.0, 1.0);
     x_level_split[block] = x_block;
-    std::cout << "__SAM__ block: " << block <<  " level: " << level
+    std::cout << "__SAM__ block: " << block <<  " level: " << level << " "
               << Hatrix::norm(x_block) << std::endl;
     // x_block.print();
 
@@ -1293,6 +1311,8 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     solve_triangular(block_splits[0], x_block_splits[0],
                      Hatrix::Left, Hatrix::Upper, false, false, 1.0);
     x_level_split[block] = x_block;
+
+    std::cout << "SAM BACK BLOCK: " << block << " " << Hatrix::norm(x_block) << std::endl;
 
     auto V_F = make_complement(A.U(block, level));
     Matrix prod = matmul(V_F, x_level_split[block]);
@@ -1630,37 +1650,53 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   }
   auto x_last_splits = x_last.split(vector_splits, {});
 
+  std::cout << "SAMEER @@@ BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
+
+  Matrix merge(10 * 4, 10 * 4);
+  auto merge_splits = merge.split(2,2);
+
+  merge_splits[0] = A.D(0,0,1);
+  merge_splits[1] = A.D(0,1,1);
+  merge_splits[2] = A.D(1,0,1);
+  merge_splits[3] = A.D(1,1,1);
+
+  std::vector<int> ipiv(merge.rows);
+  for (int i = 0; i < merge.rows; ++i) { ipiv[i]= i+1; }
+
+  solve_triangular(merge, x_last, Hatrix::Left, Hatrix::Lower, true, false);
+  std::cout << "SAMEER POST FORWARD SOLVE NORM: " << Hatrix::norm(merge) << " " << Hatrix::norm(x) << std::endl;
+  solve_triangular(merge, x_last, Hatrix::Left, Hatrix::Upper, false, false);
+
   // forward for the last blocks
-  for (int i = 0; i < last_nodes; ++i) {
-    for (int j = 0; j < i; ++j) {
-      matmul(A.D(i, j, level), x_last_splits[j],
-             x_last_splits[i],
-             false, false, -1.0, 1.0);
-    }
-    solve_triangular(A.D(i, i, level), x_last_splits[i],
-                     Hatrix::Left, Hatrix::Lower,
-                     false, false, 1.0);
-  }
+  // for (int i = 0; i < last_nodes; ++i) {
+  //   for (int j = 0; j < i; ++j) {
+  //     matmul(A.D(i, j, level), x_last_splits[j],
+  //            x_last_splits[i],
+  //            false, false, -1.0, 1.0);
+  //   }
+  //   solve_triangular(A.D(i, i, level), x_last_splits[i],
+  //                    Hatrix::Left, Hatrix::Lower, true, false);
+  // }
 
-  // backward for the last blocks.
-  for (int j = last_nodes-1; j >= 0; --j) {
-    for (int i = last_nodes-1; i > j; --i) {
-      // matmul(A.D(i, j, level), x_last_splits[i],
-      //        x_last_splits[j],
-      //        true, false, -1.0, 1.0);
 
-      matmul(A.D(i, j, level), x_last_splits[j],
-             x_last_splits[i],
-             false, false, -1.0, 1.0);
-    }
-    solve_triangular(A.D(j, j, level), x_last_splits[j],
-                     Hatrix::Left, Hatrix::Upper,
-                     false, false, 1.0);
-  }
+  // std::cout << "SAMEER POST SOLVE NORM: " << Hatrix::norm(x_last) << std::endl;
+
+  // // backward for the last blocks.
+  // for (int i = last_nodes-1; i >= 0; --i) {
+  //   for (int j = last_nodes-1; j > i; --j) {
+  //     matmul(A.D(i, j, level), x_last_splits[j],
+  //            x_last_splits[i],
+  //            false, false, -1.0, 1.0);
+  //   }
+  //   solve_triangular(A.D(i, i, level), x_last_splits[i],
+  //                    Hatrix::Left, Hatrix::Upper,
+  //                    false, false);
+  // }
 
   x_splits[1] = x_last;
   ++level;
 
+  std::cout << "SAMEER PRE BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
 
 
   // backward substitution.

@@ -355,6 +355,10 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
         S.insert(i, j, height,
                  matmul(matmul(U(i, height), dense, true, false),
                         V(j, height)));
+
+
+        // std::cout << "RIDWAN COUPLING " << i << " " << j << " " << Hatrix::norm(S(i, j, height)) << std::endl;
+        // S(i, j, height).print();
       }
     }
   }
@@ -1217,7 +1221,7 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
       }
     }
 
-    std::cout << "\nRIDWAN POST NORM: " << Hatrix::norm(D(block, block, level)) << std::endl;
+    std::cout << "RIDWAN POST NORM: " << Hatrix::norm(D(block, block, level)) << std::endl;
   } // for (int block = 0; block < nblocks; ++block)
 }
 
@@ -1317,7 +1321,7 @@ void H2::factorize() {
           int64_t rank_c2 = U(c2, level).cols;
           int64_t rank_parent = std::max(rank_c1, rank_c2);
           Matrix Utransfer =
-              generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
+            generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
 
           if (r.exists(c1)) r.erase(c1);
           if (r.exists(c2)) r.erase(c2);
@@ -1331,7 +1335,7 @@ void H2::factorize() {
           int64_t rank_c2 = V(c2, level).cols;
           int64_t rank_parent = std::max(rank_c1, rank_c2);
           Matrix Vtransfer =
-              generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
+            generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
 
           if (t.exists(c1)) t.erase(c1);
           if (t.exists(c2)) t.erase(c2);
@@ -1396,6 +1400,7 @@ void H2::factorize() {
             }
           }
 
+          std::cout << "RIDWAN insert: " << i << " " << j << " " << parent_level << " " << Hatrix::norm(D_unelim) << std::endl;
           D.insert(i, j, parent_level, std::move(D_unelim));
         }
       }
@@ -1404,7 +1409,12 @@ void H2::factorize() {
   F.erase_all();
 
   // Factorize remaining root level
+  std::cout << "last merge PRE factorization: " << Hatrix::norm(D(0,0,level)) << std::endl;
+  // D(0,0,level).print();
   lu(D(0, 0, level));
+
+
+  std::cout << "last merge factorization: " << Hatrix::norm(D(0,0,level)) << std::endl;
 }
 
 // Permute the vector forward and return the offset at which the new vector begins.
@@ -1516,7 +1526,7 @@ void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
     // }
     // Write x_block
 
-    std::cout << "__RID__ block: " << block <<  " level: " << level
+    std::cout << "__RID__ block: " << block <<  " level: " << level << " "
               << Hatrix::norm(x_block) << std::endl;
     x_level_split[block] = x_block;
   }
@@ -1563,6 +1573,8 @@ void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
     matmul(U_block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
     solve_triangular(U_block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
     // Multiply with V_F
+    std::cout << "RIDWAN BACK BLOCK: " <<  block << " "  << Hatrix::norm(x_block) << std::endl;
+
     Matrix V_F = prepend_complement_basis(V(block, level));
     x_block = matmul(V_F, x_block);
     // Write x_block
@@ -1603,13 +1615,17 @@ Matrix H2::solve(const Matrix& b) const {
   // x.print();
 
   // Solve with root level LU
+  std::cout << "RIDWAN @@@ BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
   auto x_splits = x.split(vec{rhs_offset}, vec{});
   const int64_t last_nodes = level_blocks[level];
   assert(level == 0);
   assert(last_nodes == 1);
   solve_triangular(D(0, 0, level), x_splits[1], Hatrix::Left, Hatrix::Lower, true, false);
+  std::cout << "RIDWAN POST FORWARD SOLVE NORM: " << Hatrix::norm(D(0,0,level)) << " " << Hatrix::norm(x) << std::endl;
   solve_triangular(D(0, 0, level), x_splits[1], Hatrix::Left, Hatrix::Upper, false, false);
   level++;
+
+  std::cout << "RIDWAN PRE BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
 
   // Backward
   for (; level <= height; ++level) {
