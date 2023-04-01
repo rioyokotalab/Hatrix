@@ -41,7 +41,6 @@ generate_column_bases(int64_t block, int64_t block_size, int64_t level,
 
   if (opts.accuracy == -1) {        // constant rank compression
     rank = opts.max_rank;
-    std::vector<int64_t> ipiv_0;
 
     // if (block == 0) {
       // std::tie(Ui, ipiv_0) = pivoted_qr(AY, opts.max_rank);
