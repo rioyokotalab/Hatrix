@@ -78,14 +78,14 @@ int main(int argc, char* argv[]) {
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
   Matrix b, h2_solution, x_regen;
-  std::mt19937 gen(0);
-  std::uniform_real_distribution<double> dist(0, 1);
-  Matrix x(opts.N, 1);
-  for (int64_t i = 0; i < opts.N; ++i) {
-    x(i, 0) = dist(gen);
-  }
+  // std::mt19937 gen(0);
+  // std::uniform_real_distribution<double> dist(0, 1);
+  // Matrix x(opts.N, 1);
+  // for (int64_t i = 0; i < opts.N; ++i) {
+  //   x(i, 0) = dist(gen);
+  // }
   // Matrix x = generate_rhs_vector(opts);
-
+  Matrix x = Hatrix::generate_random_matrix(opts.N, 1);
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
 
@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
     dense_blocks = A.leaf_dense_blocks();
 
     auto begin_matvec = std::chrono::system_clock::now();
-    b = matmul(A, x);
+    b = matmul(Adense, x);
     auto stop_matvec = std::chrono::system_clock::now();
     matvec_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_matvec - begin_matvec).count();
@@ -126,8 +126,8 @@ int main(int argc, char* argv[]) {
     post_factor_average_rank = A.average_rank();
 
     auto begin_solve = std::chrono::system_clock::now();
-    // h2_solution = solve(A, b);
-    h2_solution = solve_raw(A, b);
+    h2_solution = solve(A, b);
+    // h2_solution = solve_raw(A, b);
 
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<

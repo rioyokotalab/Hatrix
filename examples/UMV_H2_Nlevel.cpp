@@ -1563,9 +1563,12 @@ void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
 }
 
 Matrix H2::solve(const Matrix& b) const {
-  Matrix x(b);
+  Matrix x(b, true);
   int64_t level = height;
   int64_t rhs_offset = 0;
+
+  std::cout << "X PRE SOLVE:\n";
+  x.print();
 
   // Forward
   for (; level > 0; --level) {
@@ -1586,6 +1589,9 @@ Matrix H2::solve(const Matrix& b) const {
 
     rhs_offset = permute_forward(x, level, rhs_offset);
   }
+
+  std::cout << "X POST FORWARD:\n";
+  x.print();
 
   // Solve with root level LU
   auto x_splits = x.split(vec{rhs_offset}, vec{});

@@ -874,17 +874,27 @@ class Domain {
       sides[k] = temp_N / sides[k-1];
       temp_N = sides[k];
     }
-    for (int k = 1; k < ndim; ++k) { total += sides[k]; }
-    int64_t extra = N - total;
     bodies.resize(N, Body(std::vector<double>(ndim), 0));
 
-    double space_0 = 1.0 / sides[0], space_1 = 1.0 / sides[1];
-    for (int64_t i = 0; i < sides[0]; ++i) {
-      for (int64_t j = 0; j < sides[1]; ++j) {
+    if (ndim == 1) {
+      double space_0 = 1.0 / N;
+      for (int64_t i = 0; i < sides[0]; ++i) {
         std::vector<double> point(ndim);
         point[0] = i * space_0;
-        point[1] = j * space_1;
-        bodies[i + j * sides[0]] = Body(point, 0);
+        bodies[i] = Body(point, 0);
+      }
+    }
+    else if (ndim == 2) {
+      for (int k = 1; k < ndim; ++k) { total += sides[k]; }
+
+      double space_0 = 1.0 / sides[0], space_1 = 1.0 / sides[1];
+      for (int64_t i = 0; i < sides[0]; ++i) {
+        for (int64_t j = 0; j < sides[1]; ++j) {
+          std::vector<double> point(ndim);
+          point[0] = i * space_0;
+          point[1] = j * space_1;
+          bodies[i + j * sides[0]] = Body(point, 0);
+        }
       }
     }
   }

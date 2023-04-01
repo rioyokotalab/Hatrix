@@ -1511,7 +1511,8 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   std::vector<Matrix> x_splits;
   int64_t level;
 
-  std::cout << "-- BEGIN SOLVE -- \n";
+  std::cout << "X PRE SOLVE:\n";
+  x.print();
 
   // forward substitution.
   for (level = A.max_level; level >= A.min_level; --level) {
@@ -1535,9 +1536,10 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
     }
 
     level_offset = permute_forward(A, x, level, level_offset);
-
-    std::cout << " level offset: " << level_offset << std::endl;
   }
+
+  std::cout << "X POST FORWARD:\n";
+  x.print();
 
   x_splits = x.split(std::vector<int64_t>(1, level_offset),
                      {});

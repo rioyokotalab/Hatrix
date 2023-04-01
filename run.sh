@@ -30,6 +30,11 @@ ndim=1
 adm=0
 
 # valgrind --leak-check=full --track-origins=yes
+cd build
+make -j UMV_H2_Nlevel
+cd ..
+
+./build/examples/UMV_H2_Nlevel 64 16 1e-8 10 60 0.2 2 2 1 1
 
 for N in 64; do
     for adm in 1; do
