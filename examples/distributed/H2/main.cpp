@@ -146,7 +146,7 @@ int main(int argc, char* argv[]) {
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;
   std::cout << "DIFF: 32-48\n";
-  for (int i = 32; i < 48; ++i) {
+  for (int i = 0; i < 64; ++i) {
     std::cout << std::setw(12) << diff(i, 0) << " "
               << std::setw(12) << h2_solution(i, 0) << " "
               << std::setw(12) << x(i, 0) << " "

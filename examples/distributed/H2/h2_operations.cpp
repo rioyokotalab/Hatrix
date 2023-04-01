@@ -898,52 +898,41 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
 
   auto start_last = std::chrono::system_clock::now();
-  // int64_t last_nodes = pow(2, level);
-  // for (int d = 0; d < last_nodes; ++d) {
-  //   // cholesky(A.D(d, d, level), Hatrix::Lower);
-  //   lu(A.D(d, d, level));
-  //   for (int i = d+1; i < last_nodes; ++i) {
-  //     solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Upper,
-  //                      true, false, 1.0);
+  int64_t last_nodes = pow(2, level);
+  for (int d = 0; d < last_nodes; ++d) {
+    lu(A.D(d, d, level));
+    for (int i = d+1; i < last_nodes; ++i) {
+      solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Left, Hatrix::Lower,
+                       true, false, 1.0);
+      solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Upper,
+                       false, false, 1.0);
+    }
 
-  //     solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Left, Hatrix::Lower,
-  //                      false, false, 1.0);
-  //   }
+    for (int i = d+1; i < last_nodes; ++i) {
+      for (int j = d+1; j < last_nodes; ++j) {
+        matmul(A.D(i, d, level), A.D(d, j, level), A.D(i, j, level), false, false, -1.0, 1.0);
+      }
+    }
+  }
 
-  //   for (int i = d+1; i < last_nodes; ++i) {
-  //     for (int j = d+1; j < last_nodes; ++j) {
-  //       // if (i == j) {
-  //       //   syrk(A.D(i, d, level), A.D(i, j, level), Hatrix::Lower, false, -1.0, 1.0);
-  //       // }
-  //       // else {
-  //         // matmul(A.D(i, d, level), A.D(j, d, level),
-  //         //        A.D(i, j, level), false, true, -1.0, 1.0);
-  //       matmul(A.D(i, d, level), A.D(d, j, level),
-  //                A.D(i, j, level), false, false, -1.0, 1.0);
-  //       // }
-  //     }
-  //   }
-  // }
+  // Matrix merge(10 * 4, 10 * 4);
+  // auto merge_splits = merge.split(2,2);
 
-  Matrix merge(10 * 4, 10 * 4);
-  auto merge_splits = merge.split(2,2);
+  // merge_splits[0] = A.D(0,0,1);
+  // merge_splits[1] = A.D(0,1,1);
+  // merge_splits[2] = A.D(1,0,1);
+  // merge_splits[3] = A.D(1,1,1);
+  // lu(merge);
 
-  merge_splits[0] = A.D(0,0,1);
-  merge_splits[1] = A.D(0,1,1);
-  merge_splits[2] = A.D(1,0,1);
-  merge_splits[3] = A.D(1,1,1);
+  // auto m2_split = merge.split(2, 2);
+
+  // A.D(0,0,1) = m2_split[0];
+  // A.D(0,1,1) = m2_split[1];
+  // A.D(1,0,1) = m2_split[2];
+  // A.D(1,1,1) = m2_split[3];
+
   // std::cout << "SAMEER last merge PRE factorization: " << Hatrix::norm(merge) << std::endl;
   // merge.print();
-  lu(merge);
-
-  auto m2_split = merge.split(2, 2);
-
-  A.D(0,0,1) = m2_split[0];
-  A.D(0,1,1) = m2_split[1];
-  A.D(1,0,1) = m2_split[2];
-  A.D(1,1,1) = m2_split[3];
-
-
   // std::cout << "SAMEER last merge factorization: " << Hatrix::norm(merge) << std::endl;
 
   auto stop_last = std::chrono::system_clock::now();
@@ -1663,35 +1652,35 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   std::vector<int> ipiv(merge.rows);
   for (int i = 0; i < merge.rows; ++i) { ipiv[i]= i+1; }
 
-  solve_triangular(merge, x_last, Hatrix::Left, Hatrix::Lower, true, false);
-  std::cout << "SAMEER POST FORWARD SOLVE NORM: " << Hatrix::norm(merge) << " " << Hatrix::norm(x) << std::endl;
-  solve_triangular(merge, x_last, Hatrix::Left, Hatrix::Upper, false, false);
+  // solve_triangular(merge, x_last, Hatrix::Left, Hatrix::Lower, true, false);
+  // std::cout << "SAMEER POST FORWARD SOLVE NORM: " << Hatrix::norm(merge) << " " << Hatrix::norm(x) << std::endl;
+  // solve_triangular(merge, x_last, Hatrix::Left, Hatrix::Upper, false, false);
 
   // forward for the last blocks
-  // for (int i = 0; i < last_nodes; ++i) {
-  //   for (int j = 0; j < i; ++j) {
-  //     matmul(A.D(i, j, level), x_last_splits[j],
-  //            x_last_splits[i],
-  //            false, false, -1.0, 1.0);
-  //   }
-  //   solve_triangular(A.D(i, i, level), x_last_splits[i],
-  //                    Hatrix::Left, Hatrix::Lower, true, false);
-  // }
+  for (int i = 0; i < last_nodes; ++i) {
+    for (int j = 0; j < i; ++j) {
+      matmul(A.D(i, j, level), x_last_splits[j],
+             x_last_splits[i],
+             false, false, -1.0, 1.0);
+    }
+    solve_triangular(A.D(i, i, level), x_last_splits[i],
+                     Hatrix::Left, Hatrix::Lower, true, false);
+  }
 
 
   // std::cout << "SAMEER POST SOLVE NORM: " << Hatrix::norm(x_last) << std::endl;
 
-  // // backward for the last blocks.
-  // for (int i = last_nodes-1; i >= 0; --i) {
-  //   for (int j = last_nodes-1; j > i; --j) {
-  //     matmul(A.D(i, j, level), x_last_splits[j],
-  //            x_last_splits[i],
-  //            false, false, -1.0, 1.0);
-  //   }
-  //   solve_triangular(A.D(i, i, level), x_last_splits[i],
-  //                    Hatrix::Left, Hatrix::Upper,
-  //                    false, false);
-  // }
+  // backward for the last blocks.
+  for (int i = last_nodes-1; i >= 0; --i) {
+    for (int j = last_nodes-1; j > i; --j) {
+      matmul(A.D(i, j, level), x_last_splits[j],
+             x_last_splits[i],
+             false, false, -1.0, 1.0);
+    }
+    solve_triangular(A.D(i, i, level), x_last_splits[i],
+                     Hatrix::Left, Hatrix::Upper,
+                     false, false);
+  }
 
   x_splits[1] = x_last;
   ++level;
