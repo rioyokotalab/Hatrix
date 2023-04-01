@@ -34,7 +34,7 @@ cd build
 make -j UMV_H2_Nlevel
 cd ..
 
-./build/examples/UMV_H2_Nlevel 64 16 0 10 60 0.2 2 2 1 0
+./build/examples/UMV_H2_Nlevel 64 16 0 10 60 0.2 2 2 1 1
 
 for N in 64; do
     for adm in 1; do
@@ -51,7 +51,7 @@ for N in 64; do
                               --admis_kind geometry \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 #--use_nested_basis
+                              --kind_of_recompression 3 --use_nested_basis
             done
         done
     done

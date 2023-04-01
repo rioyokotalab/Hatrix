@@ -370,6 +370,19 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
             }
           }
         }
+        else {
+          for (int64_t n = 0; n < 2; ++n) {
+            i_children.push_back(i * 2 + n);
+            j_children.push_back(j * 2 + n);
+
+            nrows += A.U(n, level).cols;
+            ncols += A.U(n, level).cols;
+            if(n < (pow(2, level) - 1)) {
+              row_split.push_back(nrows);
+              col_split.push_back(ncols);
+            }
+          }
+        }
         Matrix D_unelim(nrows, ncols);
         auto D_unelim_splits = D_unelim.split(row_split, col_split);
 
@@ -569,7 +582,7 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
   //           << " lvl: " << level
   //           << " cond: " << cond_svd(A.D(block, block, level)) << std::endl;
   auto U_F = make_complement(A.U(block, level));
-
+  A.D(block, block, level).print_meta();
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
 
   // std::cout << "@@@ PRODUCT @@@ "  << cond_svd(A.D(block, block, level)) << std::endl;
@@ -1648,9 +1661,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   // merge_splits[1] = A.D(0,1,1);
   // merge_splits[2] = A.D(1,0,1);
   // merge_splits[3] = A.D(1,1,1);
-
-  std::vector<int> ipiv(merge.rows);
-  for (int i = 0; i < merge.rows; ++i) { ipiv[i]= i+1; }
 
   // forward for the last blocks
   for (int i = 0; i < last_nodes; ++i) {
