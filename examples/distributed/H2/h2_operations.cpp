@@ -1170,7 +1170,7 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     // Forward substitution with cc and oc blocks on the
     // diagonal dense block.
     solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, true,
+                     Hatrix::Left, Hatrix::Lower, false,
                      false, 1.0);
     matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
            false, false, -1.0, 1.0);

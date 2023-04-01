@@ -847,37 +847,37 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
       }
     }
 
-    // // Multiplication with U_F and V_F
-    // Matrix U_F = prepend_complement_basis(U(block, level));
-    // // Multiply (U_F)^T to dense blocks along the row in current level
-    // for (int j = 0; j < nblocks; ++j) {
-    //   if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
-    //     if (j < block) {
-    //       // Do not touch the eliminated part (cc and oc)
-    //       int64_t left_col_split = D(block, j, level).cols - U(j, level).cols;
-    //       auto D_splits = D(block, j, level).split(vec{}, vec{left_col_split});
-    //       D_splits[1] = matmul(U_F, D_splits[1], true);
-    //     }
-    //     else {
-    //       D(block, j, level) = matmul(U_F, D(block, j, level), true);
-    //     }
-    //   }
-    // }
-    // Matrix V_F = prepend_complement_basis(V(block, level));
-    // // Multiply V_F to dense blocks along the column in current level
-    // for (int i = 0; i < nblocks; ++i) {
-    //   if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
-    //     if (i < block) {
-    //       // Do not touch the eliminated part (cc and co)
-    //       int64_t up_row_split = D(i, block, level).rows - U(i, level).cols;
-    //       auto D_splits = D(i, block, level).split(vec{up_row_split}, vec{});
-    //       D_splits[1] = matmul(D_splits[1], V_F);
-    //     }
-    //     else {
-    //       D(i, block, level) = matmul(D(i, block, level), V_F);
-    //     }
-    //   }
-    // }
+    // Multiplication with U_F and V_F
+    Matrix U_F = prepend_complement_basis(U(block, level));
+    // Multiply (U_F)^T to dense blocks along the row in current level
+    for (int j = 0; j < nblocks; ++j) {
+      if (is_admissible.exists(block, j, level) && !is_admissible(block, j, level)) {
+        if (j < block) {
+          // Do not touch the eliminated part (cc and oc)
+          int64_t left_col_split = D(block, j, level).cols - U(j, level).cols;
+          auto D_splits = D(block, j, level).split(vec{}, vec{left_col_split});
+          D_splits[1] = matmul(U_F, D_splits[1], true);
+        }
+        else {
+          D(block, j, level) = matmul(U_F, D(block, j, level), true);
+        }
+      }
+    }
+    Matrix V_F = prepend_complement_basis(V(block, level));
+    // Multiply V_F to dense blocks along the column in current level
+    for (int i = 0; i < nblocks; ++i) {
+      if (is_admissible.exists(i, block, level) && !is_admissible(i, block, level)) {
+        if (i < block) {
+          // Do not touch the eliminated part (cc and co)
+          int64_t up_row_split = D(i, block, level).rows - U(i, level).cols;
+          auto D_splits = D(i, block, level).split(vec{up_row_split}, vec{});
+          D_splits[1] = matmul(D_splits[1], V_F);
+        }
+        else {
+          D(i, block, level) = matmul(D(i, block, level), V_F);
+        }
+      }
+    }
     std::cout << "\nRIDWAN PRE NORM: " << Hatrix::norm(D(block, block, level)) << std::endl;
 
     // The diagonal block is split along the row and column.
@@ -1484,10 +1484,10 @@ void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
     assert(diag_row_split == diag_col_split); // Row bases rank = column bases rank
 
     // Multiply with (U_F)^T
-    // Matrix U_F = prepend_complement_basis(U(block, level));
-    // Matrix x_block = matmul(U_F, x_level_split[block], true);
+    Matrix U_F = prepend_complement_basis(U(block, level));
+    Matrix x_block = matmul(U_F, x_level_split[block], true);
 
-    Matrix x_block(x_level_split[block], true);
+    // Matrix x_block(x_level_split[block], true);
     auto x_block_splits = x_block.split(vec{diag_col_split}, vec{});
     // Solve forward with diagonal L
     auto L_block_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
@@ -1563,8 +1563,8 @@ void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
     matmul(U_block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
     solve_triangular(U_block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
     // Multiply with V_F
-    // Matrix V_F = prepend_complement_basis(V(block, level));
-    // x_block = matmul(V_F, x_block);
+    Matrix V_F = prepend_complement_basis(V(block, level));
+    x_block = matmul(V_F, x_block);
     // Write x_block
     x_level_split[block] = x_block;
   }
