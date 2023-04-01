@@ -13,8 +13,8 @@ module load cuda intel/2022/mkl gcc cmake intel/2022/mpi
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gsl-2.7.1/build/lib
 
-# export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
-# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib
 
 # export MKL_NUM_THREADS=1
 # export OMP_NUM_THREADS=1
@@ -34,7 +34,7 @@ cd build
 make -j UMV_H2_Nlevel
 cd ..
 
-./build/examples/UMV_H2_Nlevel 64 16 1e-8 10 60 0.2 2 2 1 1
+./build/examples/UMV_H2_Nlevel 64 16 0 10 60 0.2 2 2 1 0
 
 for N in 64; do
     for adm in 1; do
@@ -51,7 +51,7 @@ for N in 64; do
                               --admis_kind geometry \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
+                              --kind_of_recompression 3 #--use_nested_basis
             done
         done
     done
