@@ -1639,22 +1639,18 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   }
   auto x_last_splits = x_last.split(vector_splits, {});
 
-  std::cout << "SAMEER @@@ BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
+  // std::cout << "SAMEER @@@ BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
 
-  Matrix merge(10 * 4, 10 * 4);
-  auto merge_splits = merge.split(2,2);
+  // Matrix merge(10 * 4, 10 * 4);
+  // auto merge_splits = merge.split(2,2);
 
-  merge_splits[0] = A.D(0,0,1);
-  merge_splits[1] = A.D(0,1,1);
-  merge_splits[2] = A.D(1,0,1);
-  merge_splits[3] = A.D(1,1,1);
+  // merge_splits[0] = A.D(0,0,1);
+  // merge_splits[1] = A.D(0,1,1);
+  // merge_splits[2] = A.D(1,0,1);
+  // merge_splits[3] = A.D(1,1,1);
 
   std::vector<int> ipiv(merge.rows);
   for (int i = 0; i < merge.rows; ++i) { ipiv[i]= i+1; }
-
-  // solve_triangular(merge, x_last, Hatrix::Left, Hatrix::Lower, true, false);
-  // std::cout << "SAMEER POST FORWARD SOLVE NORM: " << Hatrix::norm(merge) << " " << Hatrix::norm(x) << std::endl;
-  // solve_triangular(merge, x_last, Hatrix::Left, Hatrix::Upper, false, false);
 
   // forward for the last blocks
   for (int i = 0; i < last_nodes; ++i) {
