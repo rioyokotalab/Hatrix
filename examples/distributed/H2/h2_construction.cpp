@@ -120,29 +120,10 @@ generate_leaf_nodes(const Domain& domain,
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
       if (exists_and_admissible(A, i, j, A.max_level)) {
-        // if (i < j) {            // upper T
-        //   Matrix Sblock = matmul(matmul(A.U(j, A.max_level),
-        //                                 dense_splits[i * nblocks + j], true, false),
-        //                          A.U(i, A.max_level));
-        //   A.S.insert(i, j, A.max_level, std::move(Sblock));
-        // }
-        // else {                  // lower T
-          Matrix Sblock = matmul(matmul(A.U(i, A.max_level),
-                                        dense_splits[i * nblocks + j], true, false),
-                                 A.U(j, A.max_level));
-          A.S.insert(i, j, A.max_level, std::move(Sblock));
-
-        // }
-
-
-        // std::cout << "SAMEER COUPLING " << i << " " << j << " " << Hatrix::norm(A.S(i, j, A.max_level)) << std::endl;
-        // A.S(i, j, A.max_level).print();
-
-        // double norm = Hatrix::norm(dense_splits[i * nblocks + j] -
-        //                            matmul(matmul(A.U(i, A.max_level), A.S(i, j, A.max_level)),
-        //                                   A.U(j, A.max_level), false, true));
-
-        // std::cout << "i: " << i << " j: " << j << " norm: " << norm << std::endl;
+        Matrix Sblock = matmul(matmul(A.U(i, A.max_level),
+                                      dense_splits[i * nblocks + j], true, false),
+                               A.U(j, A.max_level));
+        A.S.insert(i, j, A.max_level, std::move(Sblock));
       }
     }
   }

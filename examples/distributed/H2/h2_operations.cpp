@@ -67,11 +67,6 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Lower,
                    false, true, 1.0);
   syrk(diagonal_splits[2], diagonal_splits[3], Hatrix::Lower, false, -1, 1);
-
-  // lu(diagonal_splits[0]);
-  // solve_triangular(diagonal_splits[0], diagonal_splits[1], Hatrix::Left, Hatrix::Lower, true);
-  // solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false);
-  // matmul(diagonal_splits[2], diagonal_splits[1], diagonal_splits[3], false, false, -1, 1);
 }
 
 void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
@@ -514,25 +509,22 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
   auto U_F = make_complement(A.U(block, level));
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
 
+  for (int64_t j : near_neighbours(block, level)) {
+    if (j < block) {
+      auto D_splits =
+        A.D(block, j, level).split({},
+                                   std::vector<int64_t>(1,
+                                                        A.D(block, j, level).cols -
+                                                        A.ranks(j, level)));
+      D_splits[1] = matmul(U_F, D_splits[1], true);
+    }
+  }
 
-  // std::cout << "@@@ PRODUCT @@@ "  << cond_svd(A.D(block, block, level)) << std::endl;
-
-  // for (int64_t j : near_neighbours(block, level)) {
-  //   if (j < block) {
-  //     auto D_splits =
-  //       A.D(block, j, level).split({},
-  //                                  std::vector<int64_t>(1,
-  //                                                       A.D(block, j, level).cols -
-  //                                                       A.ranks(j, level)));
-  //     D_splits[1] = matmul(U_F, D_splits[1], true);
-  //   }
-  // }
-
-  // for (int64_t i : near_neighbours(block, level)) {
-  //   if (i > block) {
-  //     A.D(i, block, level) = matmul(A.D(i, block, level), U_F);
-  //   }
-  // }
+  for (int64_t i : near_neighbours(block, level)) {
+    if (i > block) {
+      A.D(i, block, level) = matmul(A.D(i, block, level), U_F);
+    }
+  }
 }
 
 void
