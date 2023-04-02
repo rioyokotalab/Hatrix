@@ -286,54 +286,11 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A, int64_t block,
 
 using vec = std::vector<int64_t>;
 
+// Merge the unfactorized parts and prepare for the next level.
 void
 merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
                           const Hatrix::Args& opts, int64_t level) {
   int64_t parent_level = level - 1;
-  // // Merge the unfactorized parts and prepare for the next level.
-  // for (int i = 0; i < pow(2, parent_level); ++i) {
-  //   for (int j = 0; j <= i; ++j) {
-  //     if (exists_and_inadmissible(A, i, j, parent_level)) {
-  //       std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
-  //       const int64_t D_unelim_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
-  //       const int64_t D_unelim_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
-  //       Matrix D_unelim = generate_identity_matrix(D_unelim_rows, D_unelim_cols);
-  //       auto D_unelim_splits = split_dense(D_unelim,
-  //                                          A.ranks(i_children[0], level),
-  //                                          A.ranks(j_children[0], level));
-
-  //       for (int ic1 = 0; ic1 < 2; ++ic1) {
-  //         for (int jc2 = 0; jc2 < ((i == j) ? (ic1+1) : 2); ++jc2) {
-  //           int64_t c1 = i_children[ic1], c2 = j_children[jc2];
-
-  //           if (A.is_admissible.exists(c1, c2, level)) {
-  //             if (!A.is_admissible(c1, c2, level)) {
-  //               Matrix& D_c1c2 = A.D(c1, c2, level);
-  //               auto D_c1c2_splits = split_dense(D_c1c2,
-  //                                                D_c1c2.rows - A.ranks(c1, level),
-  //                                                D_c1c2.cols - A.ranks(c2, level));
-  //               D_unelim_splits[ic1 * 2 + jc2] = D_c1c2_splits[3];
-  //             }
-  //             else {
-  //               D_unelim_splits[ic1 * 2 + jc2] = A.S(c1, c2, level);
-  //               D_unelim_splits[jc2 * 2 + ic1] = transpose(A.S(c1, c2, level));
-  //             }
-  //           }
-  //         }
-  //       }
-
-  //       // if (i == j) {
-  //       //   for (int ii = 0; ii < D_unelim.rows; ++ii) {
-  //       //     for (int jj = ii+1; jj < D_unelim.cols; ++jj) {
-  //       //       D_unelim(ii, jj) = 0;
-  //       //     }
-  //       //   }
-  //       // }
-
-  //       A.D.insert(i, j, parent_level, std::move(D_unelim));
-  //     }
-  //   }
-  // }
   int parent_nblocks = pow(2, parent_level);
 
   for (int64_t i = 0; i < parent_nblocks; ++i) {
@@ -343,33 +300,18 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
         std::vector<int64_t> i_children, j_children;
         std::vector<int64_t> row_split, col_split;
         int64_t nrows=0, ncols=0;
-        if (!opts.use_nested_basis) {
-          for (int64_t n = 0; n < pow(2, parent_level); ++n) {
-            i_children.push_back(i * 2 + n);
-            j_children.push_back(j * 2 + n);
+        for (int64_t n = 0; n < 2; ++n) {
+          i_children.push_back(i * 2 + n);
+          j_children.push_back(j * 2 + n);
 
-            nrows += A.U(n, level).cols;
-            ncols += A.U(n, level).cols;
-            if(n < (pow(2, level) - 1)) {
-              row_split.push_back(nrows);
-              col_split.push_back(ncols);
-            }
+          nrows += A.U(n, level).cols;
+          ncols += A.U(n, level).cols;
+          if(n < (pow(2, level) - 1)) {
+            row_split.push_back(nrows);
+            col_split.push_back(ncols);
           }
         }
-        else {
-          for (int64_t n = 0; n < 2; ++n) {
-            i_children.push_back(i * 2 + n);
-            j_children.push_back(j * 2 + n);
-
-            nrows += A.U(n, level).cols;
-            ncols += A.U(n, level).cols;
-            if(n < (pow(2, level) - 1)) {
-              row_split.push_back(nrows);
-              col_split.push_back(ncols);
-            }
-          }
-        }
-        Matrix D_unelim(nrows, ncols);
+        Matrix D_unelim = generate_identity_matrix(nrows, ncols);
         auto D_unelim_splits = D_unelim.split(row_split, col_split);
 
         for (int64_t ic1 = 0; ic1 < i_children.size(); ++ic1) {
@@ -897,23 +839,6 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
   auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
-  // for (int d = 0; d < last_nodes; ++d) {
-  //   lu(A.D(d, d, level));
-  //   for (int i = d+1; i < last_nodes; ++i) {
-  //     solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Left, Hatrix::Lower,
-  //                      true, false, 1.0);
-  //     solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Upper,
-  //                      false, false, 1.0);
-  //   }
-
-  //   for (int i = d+1; i < last_nodes; ++i) {
-  //     for (int j = d+1; j < last_nodes; ++j) {
-  //       matmul(A.D(i, d, level), A.D(d, j, level), A.D(i, j, level), false, false, -1.0, 1.0);
-  //     }
-  //   }
-  // }
-
-  // int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
     cholesky(A.D(d, d, level), Hatrix::Lower);
     for (int i = d+1; i < last_nodes; ++i) {
