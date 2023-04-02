@@ -173,7 +173,7 @@ int main(int argc, char* argv[]) {
             << dense_blocks << ","
             << opts.perturbation << ","
             << std::scientific << opts.param_1 << std::fixed  << ","
-            << opts.param_2 << ","
+            << std::scientific << opts.param_2 << std::fixed << ","
             << opts.param_3 << ","
             << opts.kernel_verbose
             << std::endl;

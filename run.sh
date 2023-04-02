@@ -63,7 +63,7 @@ for N in 16384; do
     for adm in 0.1; do
         for nleaf in 256; do
             for max_rank in 150; do
-                gdb --args ./bin/H2_main --N $N \
+                ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
