@@ -41,7 +41,7 @@ for N in 64; do
     for adm in 1; do
         for nleaf in 16; do
             for max_rank in 10; do
-                ./bin/H2_main --N $N \
+                ./bin/Dense --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \
