@@ -60,7 +60,7 @@ cd ..
 
 
 for N in 4096; do
-    for adm in 0.1 1.4; do
+    for adm in 0.2; do
         for nleaf in 256; do
             for max_rank in 200; do
                 ./bin/H2_main --N $N \
@@ -69,12 +69,12 @@ for N in 4096; do
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
-                              --accuracy 1e-8 \
+                              --accuracy -1 \
                               --admis $adm \
                               --admis_kind geometry \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
+                              --kind_of_recompression 3  --use_nested_basis
             done
         done
     done
