@@ -62,6 +62,7 @@ void block_lu(Matrix& A, Args& opts) {
   }
 }
 
+
 Matrix solve_lu(Matrix& A, const Matrix& b, Args& opts) {
   Matrix x(b, true);
   int64_t NB = opts.N / opts.nleaf;
@@ -83,6 +84,26 @@ Matrix solve_lu(Matrix& A, const Matrix& b, Args& opts) {
   }
 
   return x;
+}
+
+
+void block_cholesky(Matrix& A, Args& opts) {
+  int NB = opts.N / opts.nleaf;
+  auto A_splits = A.split(NB, NB);
+  for (int d = 0; d < NB; ++d) {
+    cholesky(A_splits[d*NB + d], Hatrix::Lower);
+    for (int i = d+1; i < NB; ++i) {
+      solve_triangular(A_splits[d*NB + d], A_splits[i*NB + d], Hatrix::Right, Hatrix::Lower,
+                       false, true, 1.0);
+    }
+
+    for (int i = d+1; i < NB; ++i) {
+      syrk(A_splits[i * NB + d], A_splits[i * NB + i], Hatrix::Lower, false, -1, 1);
+      for (int j = i+1; j < NB; ++j) {
+        matmul(A_splits[j*NB + d], A_splits[i*NB + d], A_splits[j*NB + i], false, true, -1.0, 1.0);
+      }
+    }
+  }
 }
 
 Matrix solve_chol(Matrix& A, const Matrix& b, Args& opts) {
@@ -149,8 +170,9 @@ int main(int argc, char* argv[]) {
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
-  block_lu(Adense, opts);
-  Matrix dense_solution = solve_lu(Adense, bdense, opts);
+  block_cholesky(Adense, opts);
+  // cholesky(Adense, Hatrix::Lower);
+  Matrix dense_solution = solve_chol(Adense, bdense, opts);
   solve_error = Hatrix::norm(dense_solution - x) / Hatrix::norm(x);
 
   std::cout << "DENSE SOLVER: N->" << opts.N
