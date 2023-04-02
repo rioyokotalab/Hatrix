@@ -76,12 +76,16 @@ Matrix solve_lu(Matrix& A, const Matrix& b, Args& opts) {
     solve_triangular(A_splits[i * NB + i], x_splits[i], Hatrix::Left, Hatrix::Lower, true, false);
   }
 
+  std::cout << "LU POST FORWARD: " << Hatrix::norm(x) << std::endl;
+
   for (int i = NB-1; i >= 0; --i) {
     for (int j = NB-1; j > i; --j) {
       matmul(A_splits[i * NB + j], x_splits[j], x_splits[i], false, false, -1, 1);
     }
     solve_triangular(A_splits[i * NB + i], x_splits[i], Hatrix::Left, Hatrix::Upper, false, false);
   }
+
+  std::cout << "LU POST BACK: " << Hatrix::norm(x) << std::endl;
 
   return x;
 }
@@ -119,12 +123,16 @@ Matrix solve_chol(Matrix& A, const Matrix& b, Args& opts) {
     solve_triangular(A_splits[i * NB + i], x_splits[i], Hatrix::Left, Hatrix::Lower, false, false);
   }
 
+  std::cout << "CHOL POST FORWARD: " << Hatrix::norm(x) << std::endl;
+
   for (int i = NB-1; i >= 0; --i) {
     for (int j = NB-1; j > i; --j) {
       matmul(A_splits[j * NB + i], x_splits[j], x_splits[i], true, false, -1, 1);
     }
     solve_triangular(A_splits[i * NB + i], x_splits[i], Hatrix::Left, Hatrix::Lower, false, true);
   }
+
+  std::cout << "CHOL POST BACK: " << Hatrix::norm(x) << std::endl;
 
   return x;
 }
@@ -170,9 +178,12 @@ int main(int argc, char* argv[]) {
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
+  // block_lu(Adense, opts);
+  // Matrix dense_solution = solve_lu(Adense, bdense, opts);
+
   block_cholesky(Adense, opts);
-  // cholesky(Adense, Hatrix::Lower);
   Matrix dense_solution = solve_chol(Adense, bdense, opts);
+
   solve_error = Hatrix::norm(dense_solution - x) / Hatrix::norm(x);
 
   std::cout << "DENSE SOLVER: N->" << opts.N

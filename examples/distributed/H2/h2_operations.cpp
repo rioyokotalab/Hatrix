@@ -58,7 +58,6 @@ static double cond_svd(const Matrix& A) {
 
 void
 factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) {
-  std::cout << "\nSAM PRE NORM: " << Hatrix::norm(A.D(block, block, level)) << std::endl;
   int nleaf = A.D(block, block, level).rows, rank = A.ranks(block,level);
   Matrix& diagonal = A.D(block, block, level);
   auto diagonal_splits = split_dense(diagonal,
@@ -338,7 +337,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
   int parent_nblocks = pow(2, parent_level);
 
   for (int64_t i = 0; i < parent_nblocks; ++i) {
-    for (int64_t j = 0; j < parent_nblocks; ++j) {
+    for (int64_t j = 0; j <= i; ++j) {
       if (exists_and_inadmissible(A, i, j, parent_level)) {
         // TODO: need to switch to morton indexing so finding the parent is straightforward.
         std::vector<int64_t> i_children, j_children;
@@ -374,7 +373,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
         auto D_unelim_splits = D_unelim.split(row_split, col_split);
 
         for (int64_t ic1 = 0; ic1 < i_children.size(); ++ic1) {
-          for (int64_t jc2 = 0; jc2 < j_children.size(); ++jc2) {
+          for (int64_t jc2 = 0; jc2 < ((i == j) ? (ic1+1) : 2); ++jc2) {
             int64_t c1 = i_children[ic1], c2 = j_children[jc2];
             if (!A.U.exists(c1, level)) { continue; }
 
@@ -394,7 +393,6 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
       }
     }
   }
-
 }
 
 void
@@ -565,11 +563,15 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                                      A.D(block, block, level).rows - A.ranks(block, level),
                                      A.D(block, block, level).cols - A.ranks(block, level));
 
-  // std::cout << "@@@ PRE-PRODUCT @@@ block: " << block
-  //           << " lvl: " << level
-  //           << " cond: " << cond_svd(A.D(block, block, level)) << std::endl;
+  for (int i = 0; i < A.D(block, block, level).rows; ++i) {
+    for (int j = i+1; j < A.D(block, block, level).cols; ++j) {
+      A.D(block, block, level)(i,j) = A.D(block, block, level)(j,i);
+    }
+  }
+
   auto U_F = make_complement(A.U(block, level));
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
+
 
   // std::cout << "@@@ PRODUCT @@@ "  << cond_svd(A.D(block, block, level)) << std::endl;
 
@@ -1174,8 +1176,8 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
            false, false, -1.0, 1.0);
     x_level_split[block] = x_block;
-    std::cout << "__SAM__ block: " << block <<  " level: " << level << " "
-              << Hatrix::norm(x_block) << std::endl;
+    // std::cout << "__SAM__ block: " << block <<  " level: " << level << " "
+    //           << Hatrix::norm(x_block) << std::endl;
     // x_block.print();
 
     // apply the oc blocks that are actually in the upper triangular matrix.
@@ -1625,7 +1627,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   std::vector<int64_t> vector_splits;
   int64_t nrows = 0;
   for (int64_t i = 0; i < last_nodes; ++i) {
-    A.D(i,i,level).print_meta();
     vector_splits.push_back(nrows + A.D(i, i, level).rows);
     nrows += A.D(i, i, level).rows;
   }
@@ -1642,6 +1643,8 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
                      Hatrix::Left, Hatrix::Lower, false, false);
   }
 
+  std::cout << "CHOL FRONT NORM: " << Hatrix::norm(x) << std::endl;
+
   // backward for the last blocks.
   for (int i = last_nodes-1; i >= 0; --i) {
     for (int j = last_nodes-1; j > i; --j) {
@@ -1656,8 +1659,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
 
   x_splits[1] = x_last;
   ++level;
-
-  std::cout << "SAMEER PRE BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
 
 
   // backward substitution.
@@ -1680,7 +1681,7 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
       x(level_offset + i, 0) = x_level(i, 0);
     }
   }
-  std::cout << "SAMEER SOLVE NORM : " << Hatrix::norm(x) << std::endl;
+  std::cout << "CHOL FRONT+BACK NORM : " << Hatrix::norm(x) << std::endl;
 
   return x;
 }
