@@ -64,15 +64,15 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   auto diagonal_splits = split_dense(diagonal,
                                      nleaf-rank,
                                      nleaf-rank);
-  // cholesky(diagonal_splits[0], Hatrix::Lower);
-  // solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Lower,
-  //                  false, true, 1.0);
-  // syrk(diagonal_splits[2], diagonal_splits[3], Hatrix::Lower, false, -1, 1);
+  cholesky(diagonal_splits[0], Hatrix::Lower);
+  solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Lower,
+                   false, true, 1.0);
+  syrk(diagonal_splits[2], diagonal_splits[3], Hatrix::Lower, false, -1, 1);
 
-  lu(diagonal_splits[0]);
-  solve_triangular(diagonal_splits[0], diagonal_splits[1], Hatrix::Left, Hatrix::Lower, true);
-  solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false);
-  matmul(diagonal_splits[2], diagonal_splits[1], diagonal_splits[3], false, false, -1, 1);
+  // lu(diagonal_splits[0]);
+  // solve_triangular(diagonal_splits[0], diagonal_splits[1], Hatrix::Left, Hatrix::Lower, true);
+  // solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false);
+  // matmul(diagonal_splits[2], diagonal_splits[1], diagonal_splits[3], false, false, -1, 1);
 }
 
 void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
@@ -569,7 +569,6 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
   //           << " lvl: " << level
   //           << " cond: " << cond_svd(A.D(block, block, level)) << std::endl;
   auto U_F = make_complement(A.U(block, level));
-  A.D(block, block, level).print_meta();
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
 
   // std::cout << "@@@ PRODUCT @@@ "  << cond_svd(A.D(block, block, level)) << std::endl;
@@ -896,41 +895,37 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
   auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
-  for (int d = 0; d < last_nodes; ++d) {
-    lu(A.D(d, d, level));
-    for (int i = d+1; i < last_nodes; ++i) {
-      solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Left, Hatrix::Lower,
-                       true, false, 1.0);
-      solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Upper,
-                       false, false, 1.0);
-    }
-
-    for (int i = d+1; i < last_nodes; ++i) {
-      for (int j = d+1; j < last_nodes; ++j) {
-        matmul(A.D(i, d, level), A.D(d, j, level), A.D(i, j, level), false, false, -1.0, 1.0);
-      }
-    }
-  }
-
-  // int64_t last_nodes = pow(2, level);
   // for (int d = 0; d < last_nodes; ++d) {
-  //   cholesky(A.D(d, d, level), Hatrix::Lower);
+  //   lu(A.D(d, d, level));
   //   for (int i = d+1; i < last_nodes; ++i) {
-  //     solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
-  //                      false, true, 1.0);
+  //     solve_triangular(A.D(d, d, level), A.D(d, i, level), Hatrix::Left, Hatrix::Lower,
+  //                      true, false, 1.0);
+  //     solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Upper,
+  //                      false, false, 1.0);
   //   }
 
   //   for (int i = d+1; i < last_nodes; ++i) {
   //     for (int j = d+1; j < last_nodes; ++j) {
-  //       if (i == j) {
-  //         syrk(A.D(i,d,level), A.D(i,j,level), Hatrix::Lower, false, -1, 1);
-  //       }
-  //       else {
-  //         matmul(A.D(i, d, level), A.D(j, d, level), A.D(i, j, level), false, true, -1.0, 1.0);
-  //       }
+  //       matmul(A.D(i, d, level), A.D(d, j, level), A.D(i, j, level), false, false, -1.0, 1.0);
   //     }
   //   }
   // }
+
+  // int64_t last_nodes = pow(2, level);
+  for (int d = 0; d < last_nodes; ++d) {
+    cholesky(A.D(d, d, level), Hatrix::Lower);
+    for (int i = d+1; i < last_nodes; ++i) {
+      solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
+                       false, true, 1.0);
+    }
+
+    for (int i = d+1; i < last_nodes; ++i) {
+      syrk(A.D(i,d,level), A.D(i,i,level), Hatrix::Lower, false, -1, 1);
+      for (int j = i+1; j < last_nodes; ++j) {
+        matmul(A.D(j, d, level), A.D(i, d, level), A.D(j, i, level), false, true, -1.0, 1.0);
+      }
+    }
+  }
 
   auto stop_last = std::chrono::system_clock::now();
   timer[7] += std::chrono::duration_cast<
@@ -1174,7 +1169,7 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     // Forward substitution with cc and oc blocks on the
     // diagonal dense block.
     solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, true,
+                     Hatrix::Left, Hatrix::Lower, false,
                      false, 1.0);
     matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
            false, false, -1.0, 1.0);
@@ -1292,10 +1287,10 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     auto x_block_splits = x_block.split(std::vector<int64_t>(1,
                                                              row_split),
                                         {});
-    matmul(block_splits[1], x_block_splits[1], x_block_splits[0],
-           false, false, -1.0, 1.0);
+    matmul(block_splits[2], x_block_splits[1], x_block_splits[0],
+           true, false, -1.0, 1.0);
     solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Upper, false, false, 1.0);
+                     Hatrix::Left, Hatrix::Lower, false, true, 1.0);
     x_level_split[block] = x_block;
 
     std::cout << "SAM BACK BLOCK: " << block << " " << Hatrix::norm(x_block) << std::endl;
@@ -1644,19 +1639,19 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
              false, false, -1.0, 1.0);
     }
     solve_triangular(A.D(i, i, level), x_last_splits[i],
-                     Hatrix::Left, Hatrix::Lower, true, false);
+                     Hatrix::Left, Hatrix::Lower, false, false);
   }
 
   // backward for the last blocks.
   for (int i = last_nodes-1; i >= 0; --i) {
     for (int j = last_nodes-1; j > i; --j) {
-      matmul(A.D(i, j, level), x_last_splits[j],
+      matmul(A.D(j, i, level), x_last_splits[j],
              x_last_splits[i],
-             false, false, -1.0, 1.0);
+             true, false, -1.0, 1.0);
     }
     solve_triangular(A.D(i, i, level), x_last_splits[i],
-                     Hatrix::Left, Hatrix::Upper,
-                     false, false);
+                     Hatrix::Left, Hatrix::Lower,
+                     false, true);
   }
 
   x_splits[1] = x_last;

@@ -23,7 +23,7 @@ export OMP_PROC_BIND=close
 
 
 make -j Dense
-# make -j H2_main
+make -j H2_main
 
 nleaf=256
 max_rank=50
@@ -41,7 +41,7 @@ for N in 64; do
     for adm in 1; do
         for nleaf in 16; do
             for max_rank in 10; do
-                ./bin/Dense --N $N \
+                ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \
@@ -52,7 +52,7 @@ for N in 64; do
                               --admis_kind geometry \
                               --construct_algorithm miro \
                               --param_1 1e-4 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
+                              --kind_of_recompression 3   --use_nested_basis
             done
         done
     done
