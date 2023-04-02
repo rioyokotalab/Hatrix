@@ -81,7 +81,7 @@ class SymmetricH2 {
   void initialize_geometry_admissibility(const Domain& domain);
 
   int64_t get_block_size(const Domain& domain, const int64_t node, const int64_t level) const;
-  std::tuple<Matrix, Matrix, int64_t> svd_like_compression(Matrix& A) const;
+  std::tuple<Matrix, Matrix, int64_t> svd_like_compression(Matrix& A, const bool compute_S = true) const;
 
   std::tuple<Matrix, Matrix>
   generate_row_cluster_basis(const Domain& domain,
@@ -197,7 +197,7 @@ int64_t SymmetricH2::get_block_size(const Domain& domain,
 }
 
 std::tuple<Matrix, Matrix, int64_t>
-SymmetricH2::svd_like_compression(Matrix& A) const {
+SymmetricH2::svd_like_compression(Matrix& A, const bool compute_S) const {
   Matrix Ui, Si, Vi;
   int64_t rank;
 #ifdef USE_QR_COMPRESSION
@@ -209,7 +209,9 @@ SymmetricH2::svd_like_compression(Matrix& A) const {
   }
   Si = Matrix(R.rows, R.rows);
   Vi = Matrix(R.rows, R.cols);
-  rq(R, Si, Vi);
+  if (compute_S) {
+    rq(R, Si, Vi);
+  }
 #else
   std::tie(Ui, Si, rank) = error_svd_U(A, accuracy, use_rel_acc, false);
 #endif
@@ -610,8 +612,7 @@ void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t leve
 
   Matrix Ui, Si;
   int64_t rank;
-  std::tie(Ui, Si, rank) = svd_like_compression(block_row);
-  Matrix US = matmul(Ui, Si);
+  std::tie(Ui, Si, rank) = svd_like_compression(block_row, false);
   Ui.shrink(Ui.rows, rank);
 
   Matrix r_row = matmul(Ui, U(row, level), true, false);
@@ -622,9 +623,6 @@ void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t leve
 
   U.erase(row, level);
   U.insert(row, level, std::move(Ui));
-
-  US_row.erase(row, level);
-  US_row.insert(row, level, std::move(US));
 }
 
 void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
