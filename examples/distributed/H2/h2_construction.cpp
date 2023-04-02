@@ -118,7 +118,7 @@ generate_leaf_nodes(const Domain& domain,
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < nblocks; ++j) {
+    for (int64_t j = 0; j < i; ++j) {
       if (exists_and_admissible(A, i, j, A.max_level)) {
         Matrix Sblock = matmul(matmul(A.U(i, A.max_level),
                                       dense_splits[i * nblocks + j], true, false),
@@ -245,7 +245,7 @@ generate_transfer_matrices(const Domain& domain,
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < nblocks; ++j) {
+    for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) &&
           A.is_admissible(i, j, level)) {
         Matrix Sdense = matmul(matmul(Ubig_parent(i, level),
@@ -253,11 +253,11 @@ generate_transfer_matrices(const Domain& domain,
                                Ubig_parent(j, level));
         A.S.insert(i, j, level, std::move(Sdense));
 
-        double norm = Hatrix::norm(dense_splits[i * nblocks + j] -
-                                   matmul(matmul(Ubig_parent(i, level), A.S(i, j, level)),
-                                          Ubig_parent(j, level), false, true));
+        // double norm = Hatrix::norm(dense_splits[i * nblocks + j] -
+        //                            matmul(matmul(Ubig_parent(i, level), A.S(i, j, level)),
+        //                                   Ubig_parent(j, level), false, true));
 
-        std::cout << "i: " << i << " j: " << j << " norm: " << norm << std::endl;
+        // std::cout << "i: " << i << " j: " << j << " norm: " << norm << std::endl;
 
       }
     }

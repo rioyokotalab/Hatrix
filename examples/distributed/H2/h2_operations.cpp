@@ -291,23 +291,13 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
   for (int64_t i = 0; i < parent_nblocks; ++i) {
     for (int64_t j = 0; j <= i; ++j) {
       if (exists_and_inadmissible(A, i, j, parent_level)) {
-        // TODO: need to switch to morton indexing so finding the parent is straightforward.
-        std::vector<int64_t> i_children, j_children;
-        std::vector<int64_t> row_split, col_split;
-        int64_t nrows=0, ncols=0;
-        for (int64_t n = 0; n < 2; ++n) {
-          i_children.push_back(i * 2 + n);
-          j_children.push_back(j * 2 + n);
-
-          nrows += A.U(n, level).cols;
-          ncols += A.U(n, level).cols;
-          if(n < (pow(2, level) - 1)) {
-            row_split.push_back(nrows);
-            col_split.push_back(ncols);
-          }
-        }
-        Matrix D_unelim = generate_identity_matrix(nrows, ncols);
-        auto D_unelim_splits = D_unelim.split(row_split, col_split);
+        std::vector<int64_t> i_children({i * 2, i * 2 + 1}), j_children({j * 2, j * 2 + 1});
+        const int64_t D_unelim_rows = A.ranks(i_children[0], level) + A.ranks(i_children[1], level);
+        const int64_t D_unelim_cols = A.ranks(j_children[0], level) + A.ranks(j_children[1], level);
+        Matrix D_unelim = generate_identity_matrix(D_unelim_rows, D_unelim_cols);
+        auto D_unelim_splits = split_dense(D_unelim,
+                                           A.ranks(i_children[0], level),
+                                           A.ranks(j_children[0], level));
 
         for (int64_t ic1 = 0; ic1 < i_children.size(); ++ic1) {
           for (int64_t jc2 = 0; jc2 < ((i == j) ? (ic1+1) : 2); ++jc2) {
@@ -1212,8 +1202,6 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
                      Hatrix::Left, Hatrix::Lower, false, true, 1.0);
     x_level_split[block] = x_block;
 
-    std::cout << "SAM BACK BLOCK: " << block << " " << Hatrix::norm(x_block) << std::endl;
-
     auto V_F = make_complement(A.U(block, level));
     Matrix prod = matmul(V_F, x_level_split[block]);
     x_level_split[block] = prod;
@@ -1504,11 +1492,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   std::vector<Matrix> x_splits;
   int64_t level;
 
-  std::cout << "___SAMEER BEGIN SOLVE___\n";
-
-  // std::cout << "X PRE SOLVE:\n";
-  // x.print();
-
   // forward substitution.
   for (level = A.max_level; level >= A.min_level; --level) {
     int nblocks = pow(2, level);
@@ -1533,9 +1516,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
     level_offset = permute_forward(A, x, level, level_offset);
   }
 
-  // std::cout << "X POST FORWARD:\n";
-  // x.print();
-
   x_splits = x.split(std::vector<int64_t>(1, level_offset),
                      {});
   Matrix x_last(x_splits[1]);
@@ -1559,8 +1539,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
     solve_triangular(A.D(i, i, level), x_last_splits[i],
                      Hatrix::Left, Hatrix::Lower, false, false);
   }
-
-  std::cout << "CHOL FRONT NORM: " << Hatrix::norm(x) << std::endl;
 
   // backward for the last blocks.
   for (int i = last_nodes-1; i >= 0; --i) {
@@ -1598,7 +1576,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
       x(level_offset + i, 0) = x_level(i, 0);
     }
   }
-  std::cout << "CHOL FRONT+BACK NORM : " << Hatrix::norm(x) << std::endl;
 
   return x;
 }

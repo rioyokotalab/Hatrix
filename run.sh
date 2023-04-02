@@ -37,39 +37,39 @@ cd ..
 
 # ./build/examples/UMV_H2_Nlevel 64 16 0 10 60 0.2 0 2 1 1
 
-for N in 16384; do
-    for adm in 0.1; do
-        for nleaf in 256; do
-            for max_rank in 150; do
-                ./bin/H2_main --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func laplace \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy -1 \
-                              --admis $adm \
-                              --admis_kind geometry \
-                              --construct_algorithm miro \
-                              --param_1 1e-9 \
-                              --kind_of_recompression 3   --use_nested_basis
-            done
-        done
-    done
-done
+# for N in 16384; do
+#     for adm in 0.1; do
+#         for nleaf in 256; do
+#             for max_rank in 150; do
+#                 ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func laplace \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy -1 \
+#                               --admis $adm \
+#                               --admis_kind geometry \
+#                               --construct_algorithm miro \
+#                               --param_1 1e-9 \
+#                               --kind_of_recompression 3   --use_nested_basis
+#             done
+#         done
+#     done
+# done
 
 
-for N in 16384; do
-    for adm in 0.1; do
+for N in 4096; do
+    for adm in 0.1 1.4; do
         for nleaf in 256; do
-            for max_rank in 150; do
+            for max_rank in 200; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
-                              --accuracy -1 \
+                              --accuracy 1e-8 \
                               --admis $adm \
                               --admis_kind geometry \
                               --construct_algorithm miro \
@@ -80,23 +80,23 @@ for N in 16384; do
     done
 done
 
-for N in 16384; do
-    for adm in 0.1; do
-        for nleaf in 256; do
-            for max_rank in 150; do
-                ./bin/H2_main --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func yukawa \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy -1 \
-                              --admis $adm \
-                              --admis_kind geometry \
-                              --construct_algorithm miro \
-                              --param_1 1 --param_2 1e-9 \
-                              --kind_of_recompression 3 --use_nested_basis
-            done
-        done
-    done
-done
+# for N in 16384; do
+#     for adm in 0.1; do
+#         for nleaf in 256; do
+#             for max_rank in 150; do
+#                 ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func yukawa \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy -1 \
+#                               --admis $adm \
+#                               --admis_kind geometry \
+#                               --construct_algorithm miro \
+#                               --param_1 1 --param_2 1e-9 \
+#                               --kind_of_recompression 3 --use_nested_basis
+#             done
+#         done
+#     done
+# done
