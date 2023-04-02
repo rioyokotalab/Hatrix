@@ -907,9 +907,6 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
   F.erase_all();
 
-
-
-
   auto start_last = std::chrono::system_clock::now();
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
@@ -928,25 +925,25 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
     }
   }
 
-  // Matrix merge(10 * 4, 10 * 4);
-  // auto merge_splits = merge.split(2,2);
+  // int64_t last_nodes = pow(2, level);
+  // for (int d = 0; d < last_nodes; ++d) {
+  //   cholesky(A.D(d, d, level), Hatrix::Lower);
+  //   for (int i = d+1; i < last_nodes; ++i) {
+  //     solve_triangular(A.D(d, d, level), A.D(i, d, level), Hatrix::Right, Hatrix::Lower,
+  //                      false, true, 1.0);
+  //   }
 
-  // merge_splits[0] = A.D(0,0,1);
-  // merge_splits[1] = A.D(0,1,1);
-  // merge_splits[2] = A.D(1,0,1);
-  // merge_splits[3] = A.D(1,1,1);
-  // lu(merge);
-
-  // auto m2_split = merge.split(2, 2);
-
-  // A.D(0,0,1) = m2_split[0];
-  // A.D(0,1,1) = m2_split[1];
-  // A.D(1,0,1) = m2_split[2];
-  // A.D(1,1,1) = m2_split[3];
-
-  // std::cout << "SAMEER last merge PRE factorization: " << Hatrix::norm(merge) << std::endl;
-  // merge.print();
-  // std::cout << "SAMEER last merge factorization: " << Hatrix::norm(merge) << std::endl;
+  //   for (int i = d+1; i < last_nodes; ++i) {
+  //     for (int j = d+1; j < last_nodes; ++j) {
+  //       if (i == j) {
+  //         syrk(A.D(i,d,level), A.D(i,j,level), Hatrix::Lower, false, -1, 1);
+  //       }
+  //       else {
+  //         matmul(A.D(i, d, level), A.D(j, d, level), A.D(i, j, level), false, true, -1.0, 1.0);
+  //       }
+  //     }
+  //   }
+  // }
 
   auto stop_last = std::chrono::system_clock::now();
   timer[7] += std::chrono::duration_cast<
@@ -1652,16 +1649,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   }
   auto x_last_splits = x_last.split(vector_splits, {});
 
-  // std::cout << "SAMEER @@@ BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
-
-  // Matrix merge(10 * 4, 10 * 4);
-  // auto merge_splits = merge.split(2,2);
-
-  // merge_splits[0] = A.D(0,0,1);
-  // merge_splits[1] = A.D(0,1,1);
-  // merge_splits[2] = A.D(1,0,1);
-  // merge_splits[3] = A.D(1,1,1);
-
   // forward for the last blocks
   for (int i = 0; i < last_nodes; ++i) {
     for (int j = 0; j < i; ++j) {
@@ -1672,9 +1659,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
     solve_triangular(A.D(i, i, level), x_last_splits[i],
                      Hatrix::Left, Hatrix::Lower, true, false);
   }
-
-
-  // std::cout << "SAMEER POST SOLVE NORM: " << Hatrix::norm(x_last) << std::endl;
 
   // backward for the last blocks.
   for (int i = last_nodes-1; i >= 0; --i) {

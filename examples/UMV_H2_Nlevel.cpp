@@ -1684,7 +1684,7 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::init();
 
-  Hatrix::set_kernel_constants(1e-3 / (double)N, 1.);
+  Hatrix::set_kernel_constants(1e-4, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
   case 0: {
