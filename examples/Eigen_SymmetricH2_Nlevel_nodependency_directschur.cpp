@@ -1032,10 +1032,13 @@ int main(int argc, char ** argv) {
   std::tie(v_a, temp1, temp2) = M.inertia(domain, a, s);
   std::tie(v_b, temp1, temp2) = M.inertia(domain, b, s);
   if(v_a != 0 || v_b != N) {
-    std::cerr << "Warning: starting interval does not contain the whole spectrum "
+#ifndef OUTPUT_CSV
+    std::cerr << std::endl
+              << "Warning: starting interval does not contain the whole spectrum "
               << "(v(a)=v(" << a << ")=" << v_a << ","
               << " v(b)=v(" << b << ")=" << v_b << ")"
               << std::endl;
+#endif
   }
   // Determine which eigenvalue(s) to approximate
   std::vector<int64_t> target_m;
@@ -1071,7 +1074,7 @@ int main(int argc, char ** argv) {
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
               << ",dense_eig_time,build_basis_time"
-              << ",m,a0,b0,ev_tol,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,a0,b0,v_a0,v_b0,ev_tol,h2_eig_time,ldl_min_rank,ldl_max_rank,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
@@ -1092,6 +1095,8 @@ int main(int argc, char ** argv) {
     std::cout << "m=" << m
               << " a0=" << a
               << " b0=" << b
+              << " v_a0=" << v_a
+              << " v_b0=" << v_b
               << " ev_tol=" << ev_tol
               << " h2_eig_time=" << h2_eig_time
               << " ldl_min_rank=" << ldl_min_rank
@@ -1134,6 +1139,8 @@ int main(int argc, char ** argv) {
               << "," << m
               << "," << a
               << "," << b
+              << "," << v_a
+              << "," << v_b
               << "," << ev_tol
               << "," << h2_eig_time
               << "," << ldl_min_rank

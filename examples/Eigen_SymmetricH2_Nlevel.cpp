@@ -1231,7 +1231,7 @@ int main(int argc, char ** argv) {
               << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
               << ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,construct_min_rank_leaf,construct_max_rank_leaf"
               << ",dense_eig_time"
-              << ",m,a0,b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,a0,b0,v_a0,v_b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
@@ -1394,10 +1394,13 @@ int main(int argc, char ** argv) {
   std::tie(v_a, temp1, temp2, temp3) = A.inertia(domain, a, s);
   std::tie(v_b, temp1, temp2, temp3) = A.inertia(domain, b, s);
   if(v_a != 0 || v_b != N) {
-    std::cerr << "Warning: starting interval does not contain the whole spectrum "
+#ifndef OUTPUT_CSV
+    std::cerr << std::endl
+              << "Warning: starting interval does not contain the whole spectrum "
               << "(v(a)=v(" << a << ")=" << v_a << ","
               << " v(b)=v(" << b << ")=" << v_b << ")"
               << std::endl;
+#endif
   }
   // Determine which eigenvalue(s) to approximate
   std::vector<int64_t> target_m;
@@ -1445,6 +1448,8 @@ int main(int argc, char ** argv) {
     std::cout << "m=" << m
               << " a0=" << a
               << " b0=" << b
+              << " v_a0=" << v_a
+              << " v_b0=" << v_b
               << " ev_tol=" << ev_tol
               << " h2_eig_ops=" << h2_eig_ops
               << " h2_eig_time=" << h2_eig_time
@@ -1489,6 +1494,8 @@ int main(int argc, char ** argv) {
               << "," << m
               << "," << a
               << "," << b
+              << "," << v_a
+              << "," << v_b
               << "," << ev_tol
               << "," << h2_eig_ops
               << "," << h2_eig_time
