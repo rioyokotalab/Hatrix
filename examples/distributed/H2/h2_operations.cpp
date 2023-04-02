@@ -921,7 +921,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   //   }
 
   //   for (int i = d+1; i < last_nodes; ++i) {
-  //     for (int j = d+1; j <= i; ++j) {
+  //     for (int j = d+1; j < last_nodes; ++j) {
   //       if (i == j) {
   //         syrk(A.D(i,d,level), A.D(i,j,level), Hatrix::Lower, false, -1, 1);
   //       }
@@ -1174,7 +1174,7 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     // Forward substitution with cc and oc blocks on the
     // diagonal dense block.
     solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, false,
+                     Hatrix::Left, Hatrix::Lower, true,
                      false, 1.0);
     matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
            false, false, -1.0, 1.0);
@@ -1292,10 +1292,10 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     auto x_block_splits = x_block.split(std::vector<int64_t>(1,
                                                              row_split),
                                         {});
-    matmul(block_splits[2], x_block_splits[1], x_block_splits[0],
-           true, false, -1.0, 1.0);
+    matmul(block_splits[1], x_block_splits[1], x_block_splits[0],
+           false, false, -1.0, 1.0);
     solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, true, true, 1.0);
+                     Hatrix::Left, Hatrix::Upper, false, false, 1.0);
     x_level_split[block] = x_block;
 
     std::cout << "SAM BACK BLOCK: " << block << " " << Hatrix::norm(x_block) << std::endl;
@@ -1619,6 +1619,9 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
     level_offset = permute_forward(A, x, level, level_offset);
   }
 
+  // std::cout << "X POST FORWARD:\n";
+  // x.print();
+
   x_splits = x.split(std::vector<int64_t>(1, level_offset),
                      {});
   Matrix x_last(x_splits[1]);
@@ -1641,19 +1644,19 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
              false, false, -1.0, 1.0);
     }
     solve_triangular(A.D(i, i, level), x_last_splits[i],
-                     Hatrix::Left, Hatrix::Lower, false, false);
+                     Hatrix::Left, Hatrix::Lower, true, false);
   }
 
   // backward for the last blocks.
   for (int i = last_nodes-1; i >= 0; --i) {
     for (int j = last_nodes-1; j > i; --j) {
-      matmul(A.D(j, i, level), x_last_splits[j],
+      matmul(A.D(i, j, level), x_last_splits[j],
              x_last_splits[i],
-             true, false, -1.0, 1.0);
+             false, false, -1.0, 1.0);
     }
     solve_triangular(A.D(i, i, level), x_last_splits[i],
-                     Hatrix::Left, Hatrix::Lower,
-                     true, true);
+                     Hatrix::Left, Hatrix::Upper,
+                     false, false);
   }
 
   x_splits[1] = x_last;

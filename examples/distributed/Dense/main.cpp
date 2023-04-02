@@ -62,8 +62,25 @@ void block_lu(Matrix& A, Args& opts) {
   }
 }
 
-Matrix solve_lu(Matrix& A, Matrix& b, Args& opts) {
+Matrix solve_lu(Matrix& A, const Matrix& b, Args& opts) {
   Matrix x(b, true);
+  int64_t NB = opts.N / opts.nleaf;
+  auto x_splits = x.split(NB, 1);
+  auto A_splits = A.split(NB, NB);
+
+  for (int i = 0; i < NB; ++i) {
+    for (int j = 0; j < i; ++j) {
+      matmul(A_splits[i * NB + j], x_splits[j], x_splits[i], false, false, -1, 1);
+    }
+    solve_triangular(A_splits[i * NB + i], x_splits[i], Hatrix::Left, Hatrix::Lower, true, false);
+  }
+
+  for (int i = NB-1; i >= 0; --i) {
+    for (int j = NB-1; j > i; --j) {
+      matmul(A_splits[i * NB + j], x_splits[j], x_splits[i], false, false, -1, 1);
+    }
+    solve_triangular(A_splits[i * NB + i], x_splits[i], Hatrix::Left, Hatrix::Upper, false, false);
+  }
 
   return x;
 }
@@ -109,7 +126,8 @@ int main(int argc, char* argv[]) {
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
-  block_lu(Adense, opts);
+  // block_lu(Adense, opts);
+  lu(Adense);
   Matrix dense_solution = solve_lu(Adense, bdense, opts);
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   solve_error = Hatrix::norm(dense_solution - x) / Hatrix::norm(x);
