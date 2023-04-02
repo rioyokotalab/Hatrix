@@ -238,13 +238,6 @@ generate_transfer_matrices(const Domain& domain,
                                       dense_splits[i * nblocks + j], true, false),
                                Ubig_parent(j, level));
         A.S.insert(i, j, level, std::move(Sdense));
-
-        // double norm = Hatrix::norm(dense_splits[i * nblocks + j] -
-        //                            matmul(matmul(Ubig_parent(i, level), A.S(i, j, level)),
-        //                                   Ubig_parent(j, level), false, true));
-
-        // std::cout << "i: " << i << " j: " << j << " norm: " << norm << std::endl;
-
       }
     }
   }

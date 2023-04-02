@@ -117,7 +117,6 @@ int main(int argc, char* argv[]) {
 
     auto begin_factor = std::chrono::system_clock::now();
     fp_ops = factorize(A, opts);
-    // factorize_raw(A, opts);
     auto stop_factor = std::chrono::system_clock::now();
     factor_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_factor - begin_factor).count();
@@ -127,7 +126,6 @@ int main(int argc, char* argv[]) {
 
     auto begin_solve = std::chrono::system_clock::now();
     h2_solution = solve(A, b);
-    // h2_solution = solve_raw(A, b);
 
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
@@ -142,6 +140,11 @@ int main(int argc, char* argv[]) {
   // h2_solution.print();
   auto diff = h2_solution - x;
   solve_error = Hatrix::norm(diff) / Hatrix::norm(x);
+  for (int i = 0; i < 64; ++i) {
+    std::cout << std::setprecision(8) << std::setw(15) << diff(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << h2_solution(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << x(i, 0) << std::endl;
+  }
   Matrix bdense = matmul(Adense, x);
   // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   // construct_error = 0;
