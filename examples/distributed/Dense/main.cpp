@@ -42,6 +42,32 @@ generate_rhs_vector(Hatrix::Args& opts) {
   return x;
 }
 
+void block_lu(Matrix& A, Args& opts) {
+  int NB = opts.N / opts.nleaf;
+  auto A_splits = A.split(NB, NB);
+  for (int d = 0; d < NB; ++d) {
+    lu(A_splits[d*NB + d]);
+    for (int i = d+1; i < NB; ++i) {
+      solve_triangular(A_splits[d*NB + d], A_splits[d*NB + i], Hatrix::Left, Hatrix::Lower,
+                       true, false, 1.0);
+      solve_triangular(A_splits[d*NB + d], A_splits[i*NB + d], Hatrix::Right, Hatrix::Upper,
+                       false, false, 1.0);
+    }
+
+    for (int i = d+1; i < NB; ++i) {
+      for (int j = d+1; j < NB; ++j) {
+        matmul(A_splits[i*NB + d], A_splits[d*NB + j], A_splits[i*NB + j], false, false, -1.0, 1.0);
+      }
+    }
+  }
+}
+
+Matrix solve_lu(Matrix& A, Matrix& b, Args& opts) {
+  Matrix x(b, true);
+
+  return x;
+}
+
 
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
@@ -83,7 +109,9 @@ int main(int argc, char* argv[]) {
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
-  Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
+  block_lu(Adense, opts);
+  Matrix dense_solution = solve_lu(Adense, bdense, opts);
+  // Matrix dense_solution = cholesky_solve(Adense, bdense, Hatrix::Lower);
   solve_error = Hatrix::norm(dense_solution - x) / Hatrix::norm(x);
 
   std::cout << "DENSE SOLVER: N->" << opts.N

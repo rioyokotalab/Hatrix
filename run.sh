@@ -22,7 +22,7 @@ export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
 
-make -j H2_main
+make -j Dense
 
 nleaf=256
 max_rank=50
@@ -40,7 +40,7 @@ for N in 64; do
     for adm in 1; do
         for nleaf in 16; do
             for max_rank in 10; do
-                ./bin/H2_main --N $N \
+                ./bin/Dense --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \
