@@ -73,19 +73,6 @@ factorize_diagonal(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   solve_triangular(diagonal_splits[0], diagonal_splits[1], Hatrix::Left, Hatrix::Lower, true);
   solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Upper, false);
   matmul(diagonal_splits[2], diagonal_splits[1], diagonal_splits[3], false, false, -1, 1);
-
-  // double *_D = &A.D(block, block, level);
-  // LAPACKE_dpotrf(LAPACK_COL_MAJOR, 'L', nleaf-rank, _D, nleaf);
-  // cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasTrans,
-  //             CblasNonUnit,
-  //             rank, nleaf-rank, 1.0,
-  //             _D, nleaf, _D+(nleaf-rank), nleaf);
-  // cblas_dsyrk(CblasColMajor, CblasLower, CblasNoTrans, rank, nleaf-rank, -1,
-  //             _D+(nleaf-rank), nleaf, 1.0, _D + nleaf * (nleaf-rank) + (nleaf-rank),
-  //             nleaf);
-
-  // std::cout << "\tPOST SYRK: " << cond_svd(A.D(block, block, level)) << std::endl;
-  std::cout << "SAM POST NORM: " << block << " " << Hatrix::norm(A.D(block, block, level)) << std::endl;
 }
 
 void partial_triangle_reduce(SymmetricSharedBasisMatrix& A,
