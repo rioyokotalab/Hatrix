@@ -59,10 +59,10 @@ cd ..
 # done
 
 
-for N in 4096; do
-    for adm in 0.2; do
-        for nleaf in 256; do
-            for max_rank in 200; do
+for N in 256; do
+    for adm in 1; do
+        for nleaf in 64; do
+            for max_rank in 20; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
@@ -71,10 +71,10 @@ for N in 4096; do
                               --max_rank $max_rank \
                               --accuracy -1 \
                               --admis $adm \
-                              --admis_kind geometry \
+                              --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3  --use_nested_basis
+                              --kind_of_recompression 3
             done
         done
     done
