@@ -40,7 +40,20 @@ cd ..
 for N in 64; do
     for adm in 1; do
         for nleaf in 16; do
-            for max_rank in 10; do
+            for max_rank in 13; do
+                # ./bin/Dense --N $N \
+                #               --nleaf $nleaf \
+                #               --kernel_func laplace \
+                #               --kind_of_geometry grid \
+                #               --ndim $ndim \
+                #               --max_rank $max_rank \
+                #               --accuracy -1 \
+                #               --admis $adm \
+                #               --admis_kind diagonal \
+                #               --construct_algorithm miro \
+                #               --param_1 1e-9 \
+                #               --kind_of_recompression 3
+
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \

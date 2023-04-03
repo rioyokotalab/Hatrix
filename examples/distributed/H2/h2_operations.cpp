@@ -868,6 +868,26 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     Matrix prod = matmul(U_F, x_level_split[block], true);
     x_level_split[block] = prod;
 
+    Matrix x_block(x_level_split[block], true);
+
+    int64_t rank = A.ranks(block, level);
+    const int64_t row_split = A.D(block, block, level).rows - rank;
+    auto block_splits = split_dense(A.D(block, block, level),
+                                    row_split,
+                                    A.D(block, block, level).cols - rank);
+
+    auto x_block_splits =
+      x_block.split(std::vector<int64_t>(1, row_split), {});
+
+    // Forward substitution with cc and oc blocks on the
+    // diagonal dense block.
+    solve_triangular(block_splits[0], x_block_splits[0],
+                     Hatrix::Left, Hatrix::Lower, false,
+                     false, 1.0);
+    matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
+           false, false, -1.0, 1.0);
+    x_level_split[block] = x_block;
+
     // apply the oc blocks that are actually in the upper triangular matrix.
     for (int64_t irow = 0; irow < block; ++irow) {
       // need to take the symmetric block
@@ -904,26 +924,6 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
         x_level_split[irow] = x_irow;
       }
     }
-
-    Matrix x_block(x_level_split[block], true);
-
-    int64_t rank = A.ranks(block, level);
-    const int64_t row_split = A.D(block, block, level).rows - rank;
-    auto block_splits = split_dense(A.D(block, block, level),
-                                    row_split,
-                                    A.D(block, block, level).cols - rank);
-
-    auto x_block_splits =
-      x_block.split(std::vector<int64_t>(1, row_split), {});
-
-    // Forward substitution with cc and oc blocks on the
-    // diagonal dense block.
-    solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, false,
-                     false, 1.0);
-    matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
-           false, false, -1.0, 1.0);
-    x_level_split[block] = x_block;
   }
 }
 

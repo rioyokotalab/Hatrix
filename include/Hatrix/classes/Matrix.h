@@ -141,6 +141,8 @@ class Matrix {
 
   // Destructively resize.
   void destructive_resize(const int64_t nrows, const int64_t ncols);
+
+  Matrix tril(const int64_t diag);
 };
 
 }  // namespace Hatrix

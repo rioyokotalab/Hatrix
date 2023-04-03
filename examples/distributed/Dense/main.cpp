@@ -169,12 +169,7 @@ int main(int argc, char* argv[]) {
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
-  std::mt19937 gen(0);
-  std::uniform_real_distribution<double> dist(0, 1);
-  Matrix x(opts.N, 1);
-  for (int64_t i = 0; i < opts.N; ++i) {
-    x(i, 0) = dist(gen);
-  }
+  Matrix x = Hatrix::generate_random_matrix(opts.N, 1);
 
   Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
   Matrix bdense = matmul(Adense, x);
@@ -183,6 +178,14 @@ int main(int argc, char* argv[]) {
 
   block_cholesky(Adense, opts);
   Matrix dense_solution = solve_chol(Adense, bdense, opts);
+
+  auto diff = dense_solution - x;
+
+  for (int i = 0; i < 64; ++i) {
+    std::cout << std::setprecision(8) << std::setw(15) << diff(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << dense_solution(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << x(i, 0) << std::endl;
+  }
 
   solve_error = Hatrix::norm(dense_solution - x) / Hatrix::norm(x);
 
