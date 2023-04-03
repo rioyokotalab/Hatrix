@@ -46,6 +46,55 @@ generate_rhs_vector(Hatrix::Args& opts) {
   return x;
 }
 
+void
+block_chol(SymmetricSharedBasisMatrix& A, Args& opts, const Domain& domain) {
+  int level = A.max_level;
+  int64_t nblocks = pow(2, level);
+
+    for (int i = 0; i < nblocks; ++i) {
+      for (int j = i + 1; j < nblocks; ++j) {
+        if (A.is_admissible.exists(i, j, level)) {
+          A.is_admissible.erase(i, j, level);
+          A.is_admissible.insert(i, j, level, false);
+        }
+      }
+    }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j <= i; ++j) {
+      A.D.erase(i, j, level);
+      A.D.insert(i, j, level, generate_p2p_interactions(domain, i, j,
+                                                        level, opts.kernel));
+    }
+  }
+
+
+  for (int64_t block = 0; block < nblocks; ++block) {
+    // complement product
+    auto U_F = make_complement(A.U(block, level));
+    for (int64_t i = block; i < nblocks; ++i) {
+      A.D(i, block, level) = matmul(U_F, A.D(i, block, level), true);
+    }
+    for (int64_t j = 0; j <= block; ++j) {
+      A.D(block, j, level) = matmul(A.D(block, j, level), U_F);
+    }
+
+    // block cholesky factorization
+    cholesky(A.D(block, block, level), Hatrix::Lower);
+    for (int64_t i = block+1; i < nblocks; ++i) {
+      solve_triangular(A.D(block, block, level), A.D(i, block, level), Hatrix::Right, Hatrix::Lower,
+                       false, true);
+    }
+
+    for (int64_t i = block+1; i < nblocks; ++i) {
+      syrk(A.D(i, block, level), A.D(block, block, level), Hatrix::Lower, false, -1, 1);
+      for (int64_t j = i+1; j < nblocks; ++j) {
+        matmul(A.D(j, block, level), A.D(i, block, level), A.D(j, i, level), false, true, -1, 1);
+      }
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
   long long int fp_ops;

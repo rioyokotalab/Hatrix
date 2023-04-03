@@ -318,7 +318,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
           }
         }
 
-        D_unelim.print();
+        // D_unelim.print();
         A.D.insert(i, j, parent_level, std::move(D_unelim));
       }
     }
@@ -912,7 +912,6 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     auto block_splits = split_dense(A.D(block, block, level),
                                     row_split,
                                     A.D(block, block, level).cols - rank);
-
 
     auto x_block_splits =
       x_block.split(std::vector<int64_t>(1, row_split), {});
