@@ -1215,6 +1215,55 @@ class Domain {
       }
       count += molecule_size;
     }
+    // Sort electrons within each molecule using cardinal recursive bisection
+    auto get_sort_axis = [this](const int64_t begin, const int64_t end) {
+      std::vector<int64_t> bodies_idx(end - begin);
+      for (int64_t idx = begin; idx < end; idx++) {
+        bodies_idx[idx - begin] = idx;
+      }
+      double max_radius = 0;
+      int64_t sort_axis = 0;
+      for (int64_t axis = 0; axis < ndim; axis++) {
+        const auto Xmin = get_Xmin(bodies, bodies_idx, axis);
+        const auto Xmax = get_Xmax(bodies, bodies_idx, axis);
+        const auto radius = (Xmax - Xmin) / 2.;
+        if (radius > max_radius) {
+          max_radius = radius;
+          sort_axis = axis;
+        }
+      }
+      return sort_axis;
+    };
+    for (int64_t i = 0; i < nmols; i++) {
+      // Level 1
+      {
+        const auto mol_begin = i * molecule_size;
+        const auto mol_end = mol_begin + molecule_size;
+        const auto sort_axis = get_sort_axis(mol_begin, mol_end);
+        std::sort(bodies.begin() + mol_begin, bodies.begin() + mol_end,
+                  [sort_axis](const Body& lhs, const Body& rhs) {
+                    return lhs.X[sort_axis] < rhs.X[sort_axis];
+                  });
+      }
+      // Level 2
+      {
+        const auto mol_begin = i * molecule_size;
+        const auto mol_mid = mol_begin + molecule_size / 2;
+        const auto mol_end = mol_begin + molecule_size;
+        // Sort left part
+        const auto sort_axis_left = get_sort_axis(mol_begin, mol_mid);
+        std::sort(bodies.begin() + mol_begin, bodies.begin() + mol_mid,
+                  [sort_axis=sort_axis_left](const Body& lhs, const Body& rhs) {
+                    return lhs.X[sort_axis] < rhs.X[sort_axis];
+                  });
+        // Sort right part
+        const auto sort_axis_right = get_sort_axis(mol_mid, mol_end);
+        std::sort(bodies.begin() + mol_mid, bodies.begin() + mol_end,
+                  [sort_axis=sort_axis_right](const Body& lhs, const Body& rhs) {
+                    return lhs.X[sort_axis] < rhs.X[sort_axis];
+                  });
+      }
+    }
   }
 
   void build_tree_from_sorted_bodies(const int64_t leaf_size,
