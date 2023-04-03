@@ -207,9 +207,9 @@ SymmetricH2::svd_like_compression(Matrix& A, const bool compute_S) const {
   if (R.rows > R.cols) {
     R.shrink(R.cols, R.cols);  // Ignore zero entries below
   }
-  Si = Matrix(R.rows, R.rows);
-  Vi = Matrix(R.rows, R.cols);
   if (compute_S) {
+    Si = Matrix(R.rows, R.rows);
+    Vi = Matrix(R.rows, R.cols);
     rq(R, Si, Vi);
   }
 #else
