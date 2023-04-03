@@ -972,16 +972,21 @@ int main(int argc, char ** argv) {
 
   // Pre-processing step for ELSES geometry
   if (geom_type == 3) {
+    const int64_t num_atoms_per_molecule = 60;
+    const int64_t num_electrons_per_atom = kernel_type == 2 ? 4 : 1;
+    const int64_t molecule_size = num_atoms_per_molecule * num_electrons_per_atom;
     assert(file_name.length() > 0);
-    domain.read_bodies_ELSES(file_name + ".xyz");
+    domain.read_bodies_ELSES(file_name + ".xyz", num_electrons_per_atom);
     assert(N == domain.N);
 
     if (sort_bodies) {
-      domain.sort_bodies_ELSES();
-      geom_name = file_name + "_sorted";
+      domain.sort_bodies_ELSES(molecule_size);
+      geom_name = geom_name + "_sorted";
     }
     domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
-    domain.read_p2p_matrix_ELSES(file_name + ".dat");
+    if (kernel_type == 2) {
+      domain.read_p2p_matrix_ELSES(file_name + ".dat");
+    }
   }
   else {
     domain.build_tree(leaf_size);
