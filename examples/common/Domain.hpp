@@ -1154,7 +1154,7 @@ class Domain {
     }
   }
 
-  void sort_bodies_ELSES(const int64_t molecule_size = 240) {
+  void sort_bodies_ELSES(const int64_t molecule_size) {
     // Calculate root level bounding box
     calculate_bounding_box();
     // Every leaf_size consecutive electrons comprise a molecule

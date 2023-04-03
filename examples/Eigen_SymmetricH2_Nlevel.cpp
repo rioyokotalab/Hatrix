@@ -1299,12 +1299,11 @@ int main(int argc, char ** argv) {
     const int64_t num_electrons_per_atom = kernel_type == 2 ? 4 : 1;
     const int64_t molecule_size = num_atoms_per_molecule * num_electrons_per_atom;
     assert(file_name.length() > 0);
-    assert(leaf_size == molecule_size);
     domain.read_bodies_ELSES(file_name + ".xyz", num_electrons_per_atom);
     assert(N == domain.N);
 
     if (sort_bodies) {
-      domain.sort_bodies_ELSES(leaf_size);
+      domain.sort_bodies_ELSES(molecule_size);
       geom_name = geom_name + "_sorted";
     }
     domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
