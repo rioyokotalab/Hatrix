@@ -46,6 +46,16 @@ generate_rhs_vector(Hatrix::Args& opts) {
   return x;
 }
 
+static double cond_svd(const Matrix& A) {
+  Matrix copy(A, true);
+  Matrix _U(A, true), _S(A, true), _V(A, true);
+  double error;
+
+  svd(copy, _U, _S, _V);
+
+  return _S(0,0) / _S(_S.rows-1, _S.cols-1);
+}
+
 void
 block_chol(SymmetricSharedBasisMatrix& A, Args& opts, const Domain& domain) {
   int level = A.max_level;
@@ -84,6 +94,7 @@ block_chol(SymmetricSharedBasisMatrix& A, Args& opts, const Domain& domain) {
       A.D(i, block, level) = matmul(A.D(i, block, level), U_F);
     }
 
+    std::cout << "cond block -> " << block <<  " " << cond_svd(A.D(block, block, level)) << std::endl;
     cholesky(A.D(block, block, level), Hatrix::Lower);
     for (int64_t i = block+1; i < nblocks; ++i) {
       solve_triangular(A.D(block, block, level), A.D(i, block, level), Hatrix::Right, Hatrix::Lower,
@@ -257,7 +268,7 @@ int main(int argc, char* argv[]) {
   // h2_solution.print();
   auto diff = h2_solution - x;
   solve_error = Hatrix::norm(diff) / Hatrix::norm(x);
-  for (int i = 0; i < 64; ++i) {
+  for (int i = 0; i < opts.N; ++i) {
     std::cout << std::setprecision(8) << std::setw(15) << diff(i, 0) << " "
               << std::setprecision(8) << std::setw(15) << h2_solution(i, 0) << " "
               << std::setprecision(8) << std::setw(15) << x(i, 0) << std::endl;

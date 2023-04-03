@@ -27,7 +27,7 @@ make -j H2_main
 
 nleaf=256
 max_rank=50
-ndim=2
+ndim=1
 adm=0
 
 # valgrind --leak-check=full --track-origins=yes
@@ -40,7 +40,7 @@ cd ..
 for N in 64; do
     for adm in 1; do
         for nleaf in 16; do
-            for max_rank in 13; do
+            for max_rank in 10; do
                 # ./bin/Dense --N $N \
                 #               --nleaf $nleaf \
                 #               --kernel_func laplace \
@@ -56,7 +56,7 @@ for N in 64; do
 
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
-                              --kernel_func laplace \
+                              --kernel_func gsl_matern \
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
@@ -64,7 +64,7 @@ for N in 64; do
                               --admis $adm \
                               --admis_kind diagonal \
                               --construct_algorithm miro \
-                              --param_1 1e-9 \
+                              --param_1 1 --param_2 0.03 --param_3 0.5 \
                               --kind_of_recompression 3
             done
         done
