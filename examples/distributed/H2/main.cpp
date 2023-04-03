@@ -268,7 +268,28 @@ int main(int argc, char* argv[]) {
   // h2_solution.print();
   auto diff = h2_solution - x;
   solve_error = Hatrix::norm(diff) / Hatrix::norm(x);
-  for (int i = 0; i < opts.N; ++i) {
+  for (int i = 0; i < 16; ++i) {
+    std::cout << std::setprecision(8) << std::setw(15) << diff(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << h2_solution(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << x(i, 0) << std::endl;
+  }
+
+  std::cout << "16: \n";
+  for (int i = 16; i < 32; ++i) {
+    std::cout << std::setprecision(8) << std::setw(15) << diff(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << h2_solution(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << x(i, 0) << std::endl;
+  }
+
+  std::cout << "32: \n";
+  for (int i = 32; i < 48; ++i) {
+    std::cout << std::setprecision(8) << std::setw(15) << diff(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << h2_solution(i, 0) << " "
+              << std::setprecision(8) << std::setw(15) << x(i, 0) << std::endl;
+  }
+
+  std::cout << "48: \n";
+  for (int i = 48; i < 64; ++i) {
     std::cout << std::setprecision(8) << std::setw(15) << diff(i, 0) << " "
               << std::setprecision(8) << std::setw(15) << h2_solution(i, 0) << " "
               << std::setprecision(8) << std::setw(15) << x(i, 0) << std::endl;

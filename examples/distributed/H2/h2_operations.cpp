@@ -1009,7 +1009,7 @@ int64_t
 permute_forward(const SymmetricSharedBasisMatrix& A,
                 Matrix& x, int64_t level,
                 int64_t permute_offset) {
-  Matrix copy(x);
+  Matrix copy(x, true);
   int64_t num_nodes = pow(2, level);
   int64_t c_offset = permute_offset;
   for (int64_t block = 0; block < num_nodes; ++block) {
@@ -1046,7 +1046,7 @@ int64_t
 permute_backward(const SymmetricSharedBasisMatrix& A,
                  Matrix& x, const int64_t level,
                  int64_t rank_offset) {
-  Matrix copy(x);
+  Matrix copy(x, true);
   int64_t num_nodes = pow(2, level);
   int64_t c_offset = rank_offset;
   for (int64_t block = 0; block < num_nodes; ++block) {
@@ -1110,7 +1110,7 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
 
   x_splits = x.split(std::vector<int64_t>(1, level_offset),
                      {});
-  Matrix x_last(x_splits[1]);
+  Matrix x_last(x_splits[1], true);
 
   int64_t last_nodes = pow(2, level);
   std::vector<int64_t> vector_splits;
@@ -1121,12 +1121,10 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   }
   auto x_last_splits = x_last.split(vector_splits, {});
 
-
   // forward for the last blocks
   for (int i = 0; i < last_nodes; ++i) {
     for (int j = 0; j < i; ++j) {
-      matmul(A.D(i, j, level), x_last_splits[j],
-             x_last_splits[i],
+      matmul(A.D(i, j, level), x_last_splits[j], x_last_splits[i],
              false, false, -1.0, 1.0);
     }
     solve_triangular(A.D(i, i, level), x_last_splits[i],
@@ -1136,18 +1134,15 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
   // backward for the last blocks.
   for (int i = last_nodes-1; i >= 0; --i) {
     for (int j = last_nodes-1; j > i; --j) {
-      matmul(A.D(j, i, level), x_last_splits[j],
-             x_last_splits[i],
+      matmul(A.D(j, i, level), x_last_splits[j], x_last_splits[i],
              true, false, -1.0, 1.0);
     }
     solve_triangular(A.D(i, i, level), x_last_splits[i],
-                     Hatrix::Left, Hatrix::Lower,
-                     false, true);
+                     Hatrix::Left, Hatrix::Lower, false, true);
   }
 
   x_splits[1] = x_last;
   ++level;
-
 
   // backward substitution.
   for (; level <= A.max_level; ++level) {
