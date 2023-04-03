@@ -32,10 +32,6 @@ Hatrix::RowLevelMap US;
 std::vector<double> timer;
 std::vector<int64_t> counts;
 
-Hatrix::RowColMap<std::vector<int> > pivot_map;
-
-Matrix orig(32, 32);
-
 static double cond_2norm(const Matrix& A) {
   Matrix copy(A, true);
   inverse(copy);
@@ -135,28 +131,32 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
   }
 
   // b*c x (b*c).T -> b*b.
-  for (int64_t i : near_neighbours(block, level)) {
-    for (int64_t j : near_neighbours(block, level)) {
-      if (i >= block+1 && j >= block+1) {
-        if (exists_and_inadmissible(A, i, j, level)) {
-          auto D_i_block_split =
-            A.D(i, block, level).split({},
-                                       std::vector<int64_t>(1,
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (exists_and_inadmissible(A, i, block, level)) {
+      auto D_i_block_split =
+        A.D(i, block, level).split({},
+                                   std::vector<int64_t>(1,
                                                         A.D(i, block, level).cols -
-                                                            A.ranks(block, level)));
-          auto D_j_block_split =
-            A.D(j, block, level).split({},
-                                       std::vector<int64_t>(1,
-                                                            A.D(j, block, level).cols -
-                                                            A.ranks(block, level)));
+                                                        A.ranks(block, level)));
 
-          if (i == j) {
-            syrk(D_i_block_split[0], A.D(i, j, level), Hatrix::Lower, false, -1, 1);
-          }
-          else {
-            matmul(D_i_block_split[0], D_j_block_split[0], A.D(i, j, level), false, true, -1, 1);
-          }
-        }
+      syrk(D_i_block_split[0], A.D(block, block, level), Hatrix::Lower, false, -1, 1);
+    }
+    for (int64_t j = i+1; j < nblocks; ++j) {
+      if (exists_and_inadmissible(A, j, block, level) &&
+          exists_and_inadmissible(A, i, block, level) &&
+          exists_and_inadmissible(A, j, i, level)) {
+        auto D_i_block_split =
+          A.D(i, block, level).split({},
+                                     std::vector<int64_t>(1,
+                                                          A.D(i, block, level).cols -
+                                                          A.ranks(block, level)));
+        auto D_j_block_split =
+          A.D(j, block, level).split({},
+                                     std::vector<int64_t>(1,
+                                                          A.D(j, block, level).cols -
+                                                          A.ranks(block, level)));
+
+        matmul(D_j_block_split[0], D_i_block_split[0], A.D(j, i, level), false, true, -1, 1);
       }
     }
   }
@@ -164,11 +164,11 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
   // schur's complement behind the diagonal block.
 
   // (r*c) x (c*r) = (r*r)
-  for (int64_t j : near_neighbours(block, level)) {
-    if (j < block) {
+  for (int64_t j = 0; j < block; ++j) {
+    if (exists_and_inadmissible(A, block, j, level)) {
       auto D_block_block_split = split_dense(A.D(block, block, level),
                                              A.D(block, block, level).rows - A.ranks(block, level),
-                                              A.D(block, block, level).cols - A.ranks(block, level));
+                                             A.D(block, block, level).cols - A.ranks(block, level));
       auto D_block_j_split = split_dense(A.D(block, j, level),
                                          A.D(block, j, level).rows - A.ranks(block, level),
                                          A.D(block, j, level).cols - A.ranks(j, level));
@@ -178,26 +178,27 @@ compute_schurs_complement(SymmetricSharedBasisMatrix& A, int64_t block, int64_t 
   }
 
   // (nb*c) x (c*r) -> (nb*r)
-  for (int64_t i : near_neighbours(block, level)) {
-    for (int64_t j : near_neighbours(block, level)) {
-      if (i >= block+1 && j < block) {
-        if (exists_and_inadmissible(A, i, j, level)) {
-          auto D_i_block_splits =
-            A.D(i, block, level).split({},
-                                       std::vector<int64_t>(1,
-                                                            A.D(i, block, level).cols -
-                                                            A.ranks(block, level)));
-          auto D_block_j_splits =
-            split_dense(A.D(block, j, level),
-                        A.D(block, j, level).rows - A.ranks(block, level),
-                        A.D(block, j, level).cols - A.ranks(j, level));
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    for (int64_t j = 0; j < block; ++j) {
+      if (exists_and_inadmissible(A, i, j, level) &&
+          exists_and_inadmissible(A, i, block, level) &&
+          exists_and_inadmissible(A, j, block, level)) {
+        auto D_i_block_splits =
+          A.D(i, block, level).split({},
+                                     std::vector<int64_t>(1,
+                                                          A.D(i, block, level).cols -
+                                                          A.ranks(block, level)));
+        auto D_block_j_splits =
+          split_dense(A.D(block, j, level),
+                      A.D(block, j, level).rows - A.ranks(block, level),
+                      A.D(block, j, level).cols - A.ranks(j, level));
 
-          auto D_ij_splits =
-            A.D(i, j, level).split({},
-                                   std::vector<int64_t>(1, A.D(i, j, level).cols -
-                                                        A.ranks(j, level)));
-          matmul(D_i_block_splits[0], D_block_j_splits[1], D_ij_splits[1], false, false, -1, 1);
-        }
+        auto D_ij_splits =
+          A.D(i, j, level).split({},
+                                 std::vector<int64_t>(1, A.D(i, j, level).cols -
+                                                      A.ranks(j, level)));
+        matmul(D_i_block_splits[0], D_block_j_splits[1], D_ij_splits[1], false, false, -1, 1);
+
       }
     }
   }
@@ -317,6 +318,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
           }
         }
 
+        D_unelim.print();
         A.D.insert(i, j, parent_level, std::move(D_unelim));
       }
     }
@@ -491,6 +493,7 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
                                      A.D(block, block, level).rows - A.ranks(block, level),
                                      A.D(block, block, level).cols - A.ranks(block, level));
 
+  // copy the upper triangle into the lower triangle.
   for (int i = 0; i < A.D(block, block, level).rows; ++i) {
     for (int j = i+1; j < A.D(block, block, level).cols; ++j) {
       A.D(block, block, level)(i,j) = A.D(block, block, level)(j,i);
@@ -500,19 +503,20 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
   auto U_F = make_complement(A.U(block, level));
   A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
 
-  for (int64_t j : near_neighbours(block, level)) {
-    if (j < block) {
-      auto D_splits =
-        A.D(block, j, level).split({},
-                                   std::vector<int64_t>(1,
-                                                        A.D(block, j, level).cols -
-                                                        A.ranks(j, level)));
-      D_splits[1] = matmul(U_F, D_splits[1], true);
+  for (int64_t j = 0; j < block; ++j) {
+    if (exists_and_inadmissible(A, block, j, level)) {
+      A.D(block, j, level) = matmul(U_F, A.D(block, j, level), true);
+      // auto D_splits =
+      //   A.D(block, j, level).split({},
+      //                              std::vector<int64_t>(1,
+      //                                                   A.D(block, j, level).cols -
+      //                                                   A.ranks(j, level)));
+      // D_splits[1] = matmul(U_F, D_splits[1], true);
     }
   }
 
-  for (int64_t i : near_neighbours(block, level)) {
-    if (i > block) {
+  for (int64_t i = block+1; i < pow(2, level); ++i) {
+    if (exists_and_inadmissible(A, i, block, level)) {
       A.D(i, block, level) = matmul(A.D(i, block, level), U_F);
     }
   }
@@ -672,8 +676,8 @@ factorize_level(SymmetricSharedBasisMatrix& A,
 
   for (int64_t block = 0; block < nblocks; ++block) {
     // auto start_cluster_update = std::chrono::system_clock::now();
-    update_row_cluster_basis_and_S_blocks(A, F, r, opts, block, level);
-    update_col_cluster_basis_and_S_blocks(A, F, t, opts, block, level);
+    // update_row_cluster_basis_and_S_blocks(A, F, r, opts, block, level);
+    // update_col_cluster_basis_and_S_blocks(A, F, t, opts, block, level);
     // auto stop_cluster_update = std::chrono::system_clock::now();
     // timer[0] += std::chrono::duration_cast<
     //   std::chrono::milliseconds>(stop_cluster_update - start_cluster_update).count();
@@ -703,7 +707,7 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     //   std::chrono::milliseconds>(stop_schurs - start_schurs).count();
 
     // auto start_fill_ins = std::chrono::system_clock::now();
-    compute_fill_ins(A, block, level, F);
+    // compute_fill_ins(A, block, level, F);
     // auto stop_fill_ins = std::chrono::system_clock::now();
     // timer[5] += std::chrono::duration_cast<
     //   std::chrono::milliseconds>(stop_fill_ins - start_fill_ins).count();
@@ -821,6 +825,7 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
   F.erase_all();
 
   auto start_last = std::chrono::system_clock::now();
+
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
     cholesky(A.D(d, d, level), Hatrix::Lower);
@@ -862,26 +867,6 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     Matrix U_F = make_complement(A.U(block, level));
     Matrix prod = matmul(U_F, x_level_split[block], true);
     x_level_split[block] = prod;
-    Matrix x_block(x_level_split[block], true);
-
-    int64_t rank = A.ranks(block, level);
-    const int64_t row_split = A.D(block, block, level).rows - rank;
-    auto block_splits = split_dense(A.D(block, block, level),
-                                    row_split,
-                                    A.D(block, block, level).cols - rank);
-
-
-    auto x_block_splits =
-      x_block.split(std::vector<int64_t>(1, row_split), {});
-
-    // Forward substitution with cc and oc blocks on the
-    // diagonal dense block.
-    solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, false,
-                     false, 1.0);
-    matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
-           false, false, -1.0, 1.0);
-    x_level_split[block] = x_block;
 
     // apply the oc blocks that are actually in the upper triangular matrix.
     for (int64_t irow = 0; irow < block; ++irow) {
@@ -919,6 +904,27 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
         x_level_split[irow] = x_irow;
       }
     }
+
+    Matrix x_block(x_level_split[block], true);
+
+    int64_t rank = A.ranks(block, level);
+    const int64_t row_split = A.D(block, block, level).rows - rank;
+    auto block_splits = split_dense(A.D(block, block, level),
+                                    row_split,
+                                    A.D(block, block, level).cols - rank);
+
+
+    auto x_block_splits =
+      x_block.split(std::vector<int64_t>(1, row_split), {});
+
+    // Forward substitution with cc and oc blocks on the
+    // diagonal dense block.
+    solve_triangular(block_splits[0], x_block_splits[0],
+                     Hatrix::Left, Hatrix::Lower, false,
+                     false, 1.0);
+    matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
+           false, false, -1.0, 1.0);
+    x_level_split[block] = x_block;
   }
 }
 
@@ -935,8 +941,6 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
   std::vector<Matrix> x_level_split = x_level.split(col_offsets, {});
 
   for (int64_t block = nblocks-1; block >= 0; --block) {
-    // backward substitution
-
     // apply the tranpose of the oc block that is actually in the lower triangle.
     for (int64_t icol = 0; icol < block; ++icol) {
       if (exists_and_inadmissible(A, block, icol, level)) {
@@ -957,8 +961,7 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
       }
     }
 
-    // apply the cc and oc blocks (transposed) to the respective slice
-    // of the vector.
+    // Apply the cc and oc blocks (transposed) to the respective slice of the vector.
     for (int64_t icol = nblocks-1; icol > block; --icol) {
       if (exists_and_inadmissible(A, icol, block, level)) {
         const Matrix& D_icol_block = A.D(icol, block, level);
@@ -1118,6 +1121,7 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
     nrows += A.D(i, i, level).rows;
   }
   auto x_last_splits = x_last.split(vector_splits, {});
+
 
   // forward for the last blocks
   for (int i = 0; i < last_nodes; ++i) {
