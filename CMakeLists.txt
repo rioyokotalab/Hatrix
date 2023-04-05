@@ -43,6 +43,7 @@ add_library(Hatrix
   src/util/matrix_generators.cpp
   src/util/helpers.cpp
   src/util/profiling.cpp
+  src/util/timer.cpp
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
 
