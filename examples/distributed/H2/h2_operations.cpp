@@ -307,8 +307,10 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A,
 
             if (exists_and_inadmissible(A, c1, c2, level)) {
               auto D_splits = A.D(c1, c2, level).split(
-                                                     vec{A.D(c1, c2, level).rows - A.U(c1, level).cols},
-                                                     vec{A.D(c1, c2, level).cols - A.U(c2, level).cols});
+                                                     vec{A.D(c1, c2, level).rows -
+                                                       A.U(c1, level).cols},
+                                                     vec{A.D(c1, c2, level).cols -
+                                                       A.U(c2, level).cols});
               D_unelim_splits[ic1 * j_children.size() + jc2] = D_splits[3];
             }
             else {
@@ -500,7 +502,6 @@ multiply_complements(SymmetricSharedBasisMatrix& A, const int64_t block,
 
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_inadmissible(A, block, j, level)) {
-      // A.D(block, j, level) = matmul(U_F, A.D(block, j, level), true);
       auto D_splits =
         A.D(block, j, level).split({},
                                    std::vector<int64_t>(1,
@@ -864,7 +865,6 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     x_level_split[block] = prod;
 
     Matrix x_block(x_level_split[block], true);
-
     int64_t rank = A.ranks(block, level);
     const int64_t row_split = A.D(block, block, level).rows - rank;
     const int64_t col_split = A.D(block, block, level).cols - rank;
