@@ -86,9 +86,11 @@ generate_leaf_nodes(const Domain& domain,
   auto dense_splits = dense.split(nblocks, nblocks);
 
   for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j : near_neighbours(i, A.max_level)) {
-      Matrix Aij(dense_splits[i * nblocks + j], true);
-      A.D.insert(i, j, A.max_level, std::move(Aij));
+    for (int64_t j = 0; j <= i; ++j) {
+      if (exists_and_inadmissible(A, i, j, A.max_level)) {
+        Matrix Aij(dense_splits[i * nblocks + j], true);
+        A.D.insert(i, j, A.max_level, std::move(Aij));
+      }
     }
   }
 
