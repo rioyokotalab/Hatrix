@@ -84,13 +84,13 @@ triangle_reduction(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
       solve_triangular(Dcc, D_i_block_splits[0], Hatrix::Right, Hatrix::Lower, false, true, 1);
     }
 
-    if (exists_and_inadmissible(A, i, block, level)) {
-      auto D_i_block_splits =
-        A.D(i, block, level).split(
-                                   vec{A.D(i, block, level).cols - A.ranks(i, level)},
-                                   vec{A.D(i, block, level).cols - A.ranks(block, level)});
-      // D_i_block_splits[2] = Matrix(A.ranks(i, level), A.D(i, block, level).cols - A.ranks(block, level));
-    }
+    // if (exists_and_inadmissible(A, i, block, level)) {
+    //   auto D_i_block_splits =
+    //     A.D(i, block, level).split(
+    //                                vec{A.D(i, block, level).cols - A.ranks(i, level)},
+    //                                vec{A.D(i, block, level).cols - A.ranks(block, level)});
+    //   D_i_block_splits[2] = Matrix(A.ranks(i, level), A.D(i, block, level).cols - A.ranks(block, level));
+    // }
   }
 
   // TRSM with co blocks behind the diagonal on the 'block' row.
@@ -904,9 +904,6 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
 
         Matrix x_j(x_level_split[j], true);
         auto x_j_splits = x_j.split(std::vector<int64_t>{col_split}, {});
-
-        std::cout << "FORWARD : block -> " << block << " j-> " << j << std::endl;
-        D_block_j_splits[1].print();
         matmul(D_block_j_splits[1], x_block_splits[0], x_j_splits[1],
                true, false, -1.0, 1.0);
         x_level_split[j] = x_j;
@@ -917,8 +914,6 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     for (int64_t i = block+1; i < nblocks; ++i) {
       if (exists_and_inadmissible(A, i, block, level)) {
         auto lower_splits = A.D(i, block, level).split({}, vec{col_split});
-        std::cout << "FORWARD(CC;OC) : i -> " << i << " block-> " << block << std::endl;
-        lower_splits[0].print();
         matmul(lower_splits[0], x_block_splits[0], x_level_split[i], false, false, -1.0, 1.0);
       }
     }
@@ -1110,8 +1105,6 @@ solve(const Hatrix::SymmetricSharedBasisMatrix& A,
       matmul(A.D(i, j, level), x_last_splits[j], x_last_splits[i],
              false, false, -1.0, 1.0);
     }
-    std::cout << "FWD LAST -> i: " << i << " lvl: " << level << std::endl;
-    A.D(i, i, level).print();
     solve_triangular(A.D(i, i, level), x_last_splits[i],
                      Hatrix::Left, Hatrix::Lower, false, false);
   }
