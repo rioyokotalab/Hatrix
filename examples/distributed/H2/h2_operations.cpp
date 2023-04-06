@@ -859,14 +859,6 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     auto x_block_splits =
       x_block.split(std::vector<int64_t>(1, row_split), {});
 
-    // Forward substitution with cc and oc blocks on the
-    // diagonal dense block.
-    solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, false,
-                     false, 1.0);
-    matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
-           false, false, -1.0, 1.0);
-
     // apply the co blocks behind the diagonal
     for (int64_t j = 0; j < block; ++j) {
       if (exists_and_inadmissible(A, block, j, level)) {
@@ -880,6 +872,16 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
         x_level_split[j] = x_j;
       }
     }
+
+
+    // Forward substitution with cc and oc blocks on the
+    // diagonal dense block.
+    solve_triangular(block_splits[0], x_block_splits[0],
+                     Hatrix::Left, Hatrix::Lower, false,
+                     false, 1.0);
+    matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
+           false, false, -1.0, 1.0);
+
 
     // forward subsitute with (cc;oc) blocks below the diagonal.
     for (int64_t i = block+1; i < nblocks; ++i) {
@@ -913,16 +915,6 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     Matrix x_block(x_level_split[block], true);
     auto x_block_splits = x_block.split(vec{row_split}, {});
 
-    // Apply the cc and oc blocks (transposed) to the respective slice of the vector.
-    for (int64_t icol = nblocks-1; icol > block; --icol) {
-      if (exists_and_inadmissible(A, icol, block, level)) {
-        auto D_icol_block_splits =
-          A.D(icol, block, level).split({},
-                                        vec{col_split});
-        matmul(D_icol_block_splits[0], x_level_split[icol], x_block_splits[0],
-               true, false, -1.0, 1.0);
-      }
-    }
 
     // apply the tranpose of the oc block that is actually in the lower triangle.
     for (int64_t j = 0; j < block; ++j) {
@@ -936,6 +928,16 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
       }
     }
 
+    // Apply the cc and oc blocks (transposed) to the respective slice of the vector.
+    for (int64_t icol = nblocks-1; icol > block; --icol) {
+      if (exists_and_inadmissible(A, icol, block, level)) {
+        auto D_icol_block_splits =
+          A.D(icol, block, level).split({},
+                                        vec{col_split});
+        matmul(D_icol_block_splits[0], x_level_split[icol], x_block_splits[0],
+               true, false, -1.0, 1.0);
+      }
+    }
     // backward substition using the diagonal block.
     auto block_splits = split_dense(A.D(block, block, level),
                                     row_split,
