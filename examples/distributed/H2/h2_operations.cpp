@@ -911,8 +911,7 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     int64_t col_split = A.D(block, block, level).cols - rank;
 
     Matrix x_block(x_level_split[block], true);
-    auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split),
-                                        {});
+    auto x_block_splits = x_block.split(vec{row_split}, {});
 
     // Apply the cc and oc blocks (transposed) to the respective slice of the vector.
     for (int64_t icol = nblocks-1; icol > block; --icol) {
@@ -932,11 +931,8 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
         auto D_block_j_splits = A.D(block, j, level).split(vec{row_split}, vec{col_split});
         Matrix x_j(x_level_split[j], true);
         auto x_j_splits = x_j.split(vec{col_split}, {});
-        std::cout << "block -> " << block << " j -> " << j << std::endl;
-        D_block_j_splits[1].print();
         matmul(D_block_j_splits[1], x_j_splits[1], x_block_splits[0],
                false, false, -1.0, 1.0);
-        x_level_split[block] = x_block;
       }
     }
 
@@ -949,7 +945,6 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
            true, false, -1.0, 1.0);
     solve_triangular(block_splits[0], x_block_splits[0],
                      Hatrix::Left, Hatrix::Lower, false, true, 1.0);
-
 
     auto V_F = make_complement(A.U(block, level));
     Matrix prod = matmul(V_F, x_block);
