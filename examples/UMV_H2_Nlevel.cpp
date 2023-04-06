@@ -1505,25 +1505,25 @@ void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
     // Forward substitution with oc block on the diagonal
     matmul(L_block_splits[2], x_block_splits[0], x_block_splits[1], false, false, -1.0, 1.0);
     // Forward substitution with cc and oc blocks below the diagonal
-    // for (int64_t irow = block+1; irow < nblocks; ++irow) {
-    //   if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
-    //     auto lower_splits = D(irow, block, level).split(vec{}, vec{diag_col_split});
-    //     matmul(lower_splits[0], x_block_splits[0], x_level_split[irow], false, false, -1.0, 1.0);
-    //   }
-    // }
-    // // Forward substitution with oc blocks above the diagonal
-    // for (int64_t irow = 0; irow < block; ++irow) {
-    //   if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
-    //     const int64_t top_row_split = D(irow, block, level).rows - U(irow, level).cols;
-    //     const int64_t top_col_split = diag_col_split;
-    //     auto top_splits = D(irow, block, level).split(vec{top_row_split}, vec{top_col_split});
+    for (int64_t irow = block+1; irow < nblocks; ++irow) {
+      if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
+        auto lower_splits = D(irow, block, level).split(vec{}, vec{diag_col_split});
+        matmul(lower_splits[0], x_block_splits[0], x_level_split[irow], false, false, -1.0, 1.0);
+      }
+    }
+    // Forward substitution with oc blocks above the diagonal
+    for (int64_t irow = 0; irow < block; ++irow) {
+      if (is_admissible.exists(irow, block, level) && !is_admissible(irow, block, level)) {
+        const int64_t top_row_split = D(irow, block, level).rows - U(irow, level).cols;
+        const int64_t top_col_split = diag_col_split;
+        auto top_splits = D(irow, block, level).split(vec{top_row_split}, vec{top_col_split});
 
-    //     Matrix x_irow(x_level_split[irow], true);  // Deep-copy of view
-    //     auto x_irow_splits = x_irow.split(vec{top_row_split}, vec{});
-    //     matmul(top_splits[2], x_block_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
-    //     x_level_split[irow] = x_irow;
-    //   }
-    // }
+        Matrix x_irow(x_level_split[irow], true);  // Deep-copy of view
+        auto x_irow_splits = x_irow.split(vec{top_row_split}, vec{});
+        matmul(top_splits[2], x_block_splits[0], x_irow_splits[1], false, false, -1.0, 1.0);
+        x_level_split[irow] = x_irow;
+      }
+    }
     // Write x_block
 
     std::cout << "__RID__ block: " << block <<  " level: " << level << " "

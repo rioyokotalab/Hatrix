@@ -819,6 +819,10 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
     }
   }
 
+  // auto D10_splits = A.D(1, 0, 2).split(vec{A.D(1, 0, 2).rows - opts.max_rank},
+  //                                      vec{A.D(1, 0, 2).cols - opts.max_rank});
+  // D10_splits[1] = Matrix(A.D(1, 0, 2).rows - opts.max_rank, opts.max_rank);
+
   auto stop_last = std::chrono::system_clock::now();
   timer[7] += std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_last - start_last).count();
@@ -910,7 +914,6 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     auto x_block_splits = x_block.split(std::vector<int64_t>(1, row_split),
                                         {});
 
-
     // Apply the cc and oc blocks (transposed) to the respective slice of the vector.
     for (int64_t icol = nblocks-1; icol > block; --icol) {
       if (exists_and_inadmissible(A, icol, block, level)) {
@@ -931,9 +934,9 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
         auto x_j_splits = x_j.split(vec{col_split}, {});
         std::cout << "block -> " << block << " j -> " << j << std::endl;
         D_block_j_splits[1].print();
-        matmul(D_block_j_splits[1], x_block_splits[1], x_j_splits[0],
+        matmul(D_block_j_splits[1], x_j_splits[1], x_block_splits[0],
                false, false, -1.0, 1.0);
-        x_level_split[j] = x_j;
+        x_level_split[block] = x_block;
       }
     }
 
