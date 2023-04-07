@@ -876,6 +876,8 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
         auto x_j_splits = x_j.split(vec{col_split}, {});
         matmul(D_block_j_splits[1], x_block_splits[0], x_j_splits[1],
                true, false, -1.0, 1.0);
+
+        D_block_j_splits[1].print();
         x_level_split[j] = x_j;
       }
     }
@@ -928,7 +930,7 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
       if (exists_and_inadmissible(A, i, block, level)) {
         auto D_i_block_splits =
           A.D(i, block, level).split({},
-                                        vec{col_split});
+                                     vec{col_split});
         matmul(D_i_block_splits[0], x_level_split[i], x_block_splits[0],
                true, false, -1.0, 1.0);
       }
