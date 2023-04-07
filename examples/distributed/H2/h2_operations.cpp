@@ -88,8 +88,9 @@ triangle_reduction(SymmetricSharedBasisMatrix& A, int64_t block, int64_t level) 
   // TRSM with co blocks behind the diagonal on the 'block' row.
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_inadmissible(A, block, j, level)) {
-      auto D_block_j_splits = A.D(block, j, level).split(vec{A.D(block, j, level).rows - A.ranks(block, level)},
-                                                         vec{A.D(block, j, level).rows - A.ranks(j, level)});
+      auto D_block_j_splits =
+        A.D(block, j, level).split(vec{A.D(block, j, level).rows - A.ranks(block, level)},
+                                   vec{A.D(block, j, level).cols - A.ranks(j, level)});
       solve_triangular(Dcc, D_block_j_splits[1], Hatrix::Left, Hatrix::Lower, false, false, 1.0);
     }
   }
@@ -875,7 +876,6 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
         auto x_j_splits = x_j.split(vec{col_split}, {});
         matmul(D_block_j_splits[1], x_block_splits[0], x_j_splits[1],
                true, false, -1.0, 1.0);
-        D_block_j_splits[1].print();
         x_level_split[j] = x_j;
       }
     }
@@ -924,12 +924,12 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
            true, false, -1.0, 1.0);
 
     // Apply the cc and oc blocks (transposed) to the respective slice of the vector.
-    for (int64_t icol = nblocks-1; icol > block; --icol) {
-      if (exists_and_inadmissible(A, icol, block, level)) {
-        auto D_icol_block_splits =
-          A.D(icol, block, level).split({},
+    for (int64_t i = nblocks-1; i > block; --i) {
+      if (exists_and_inadmissible(A, i, block, level)) {
+        auto D_i_block_splits =
+          A.D(i, block, level).split({},
                                         vec{col_split});
-        matmul(D_icol_block_splits[0], x_level_split[icol], x_block_splits[0],
+        matmul(D_i_block_splits[0], x_level_split[i], x_block_splits[0],
                true, false, -1.0, 1.0);
       }
     }
