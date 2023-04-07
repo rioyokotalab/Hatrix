@@ -915,6 +915,24 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
     Matrix x_block(x_level_split[block], true);
     auto x_block_splits = x_block.split(vec{row_split}, {});
 
+    // backward substition using the diagonal block.
+    auto block_splits = split_dense(A.D(block, block, level),
+                                    row_split,
+                                    col_split);
+
+    matmul(block_splits[2], x_block_splits[1], x_block_splits[0],
+           true, false, -1.0, 1.0);
+
+    // Apply the cc and oc blocks (transposed) to the respective slice of the vector.
+    for (int64_t icol = nblocks-1; icol > block; --icol) {
+      if (exists_and_inadmissible(A, icol, block, level)) {
+        auto D_icol_block_splits =
+          A.D(icol, block, level).split({},
+                                        vec{col_split});
+        matmul(D_icol_block_splits[0], x_level_split[icol], x_block_splits[0],
+               true, false, -1.0, 1.0);
+      }
+    }
 
     // apply the tranpose of the oc block that is actually in the lower triangle.
     for (int64_t j = 0; j < block; ++j) {
@@ -928,23 +946,6 @@ solve_backward_level(const SymmetricSharedBasisMatrix& A, Matrix& x_level,
       }
     }
 
-    // Apply the cc and oc blocks (transposed) to the respective slice of the vector.
-    for (int64_t icol = nblocks-1; icol > block; --icol) {
-      if (exists_and_inadmissible(A, icol, block, level)) {
-        auto D_icol_block_splits =
-          A.D(icol, block, level).split({},
-                                        vec{col_split});
-        matmul(D_icol_block_splits[0], x_level_split[icol], x_block_splits[0],
-               true, false, -1.0, 1.0);
-      }
-    }
-    // backward substition using the diagonal block.
-    auto block_splits = split_dense(A.D(block, block, level),
-                                    row_split,
-                                    col_split);
-
-    matmul(block_splits[2], x_block_splits[1], x_block_splits[0],
-           true, false, -1.0, 1.0);
     solve_triangular(block_splits[0], x_block_splits[0],
                      Hatrix::Left, Hatrix::Lower, false, true, 1.0);
 
