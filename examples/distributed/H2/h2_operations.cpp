@@ -859,6 +859,12 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
     auto x_block_splits =
       x_block.split(std::vector<int64_t>(1, row_split), {});
 
+    // Forward substitution with cc and oc blocks on the
+    // diagonal dense block.
+    solve_triangular(block_splits[0], x_block_splits[0],
+                     Hatrix::Left, Hatrix::Lower, false,
+                     false, 1.0);
+
     // apply the co blocks behind the diagonal
     for (int64_t j = 0; j < block; ++j) {
       if (exists_and_inadmissible(A, block, j, level)) {
@@ -869,19 +875,10 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
         auto x_j_splits = x_j.split(vec{col_split}, {});
         matmul(D_block_j_splits[1], x_block_splits[0], x_j_splits[1],
                true, false, -1.0, 1.0);
+        D_block_j_splits[1].print();
         x_level_split[j] = x_j;
       }
     }
-
-
-    // Forward substitution with cc and oc blocks on the
-    // diagonal dense block.
-    solve_triangular(block_splits[0], x_block_splits[0],
-                     Hatrix::Left, Hatrix::Lower, false,
-                     false, 1.0);
-    matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
-           false, false, -1.0, 1.0);
-
 
     // forward subsitute with (cc;oc) blocks below the diagonal.
     for (int64_t i = block+1; i < nblocks; ++i) {
@@ -890,6 +887,9 @@ solve_forward_level(const SymmetricSharedBasisMatrix& A,
         matmul(lower_splits[0], x_block_splits[0], x_level_split[i], false, false, -1.0, 1.0);
       }
     }
+
+    matmul(block_splits[2], x_block_splits[0], x_block_splits[1],
+           false, false, -1.0, 1.0);
 
     x_level_split[block] = x_block;
   }
