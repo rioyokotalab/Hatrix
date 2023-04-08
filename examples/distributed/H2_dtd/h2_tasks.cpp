@@ -81,21 +81,21 @@ task_syrk_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
 
 parsec_hook_return_t
 task_matmul_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
-  int64_t D_id_nrows, D_id_ncols;
-  double *_D_id;
   int64_t D_jd_nrows, D_jd_ncols;
   double *_D_jd;
-  int64_t D_ij_nrows, D_ij_ncols;
-  double *_D_ij;
+  int64_t D_id_nrows, D_id_ncols;
+  double *_D_id;
+  int64_t D_ji_nrows, D_ji_ncols;
+  double *_D_ji;
 
   parsec_dtd_unpack_args(this_task,
                          &D_id_nrows, &D_id_ncols, &_D_id,
                          &D_jd_nrows, &D_jd_ncols, &_D_jd,
-                         &D_ij_nrows, &D_ij_ncols, &_D_ij);
+                         &D_ji_nrows, &D_ji_ncols, &_D_ji);
 
-  CORE_matmul_full(D_id_nrows, D_id_ncols, _D_id,
-                   D_jd_nrows, D_jd_ncols, _D_jd,
-                   D_ij_nrows, D_ij_ncols, _D_ij);
+  CORE_matmul_full(D_jd_nrows, D_jd_ncols, _D_jd,
+                   D_id_nrows, D_id_ncols, _D_id,
+                   D_ji_nrows, D_ji_ncols, _D_ji);
 
   return PARSEC_HOOK_RETURN_DONE;
 }

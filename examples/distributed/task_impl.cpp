@@ -96,15 +96,15 @@ void CORE_syrk_full(int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
   syrk(D_id, D_ij, Hatrix::Lower, false, -1.0, 1.0);
 }
 
-void CORE_matmul_full(int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
-                      int64_t D_jd_nrows, int64_t D_jd_ncols, double* _D_jd,
-                      int64_t D_ij_nrows, int64_t D_ij_ncols, double* _D_ij) {
+void CORE_matmul_full(int64_t D_jd_nrows, int64_t D_jd_ncols, double* _D_jd,
+                      int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
+                      int64_t D_ji_nrows, int64_t D_ji_ncols, double* _D_ji) {
 
-  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
   MatrixWrapper D_jd(_D_jd, D_jd_nrows, D_jd_ncols, D_jd_nrows);
-  MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
+  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
+  MatrixWrapper D_ji(_D_ji, D_ji_nrows, D_ji_ncols, D_ji_nrows);
 
-  matmul(D_id, D_jd, D_ij, false, true, -1.0, 1.0);
+  matmul(D_jd, D_id, D_ji, false, true, -1.0, 1.0);
 }
 
 void CORE_trsm(int64_t D_rows, int64_t D_cols, int64_t D_row_rank, int64_t D_col_rank, double* _diagonal,

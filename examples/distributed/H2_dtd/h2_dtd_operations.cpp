@@ -1731,24 +1731,26 @@ final_dense_factorize(SymmetricSharedBasisMatrix& A,
         }
         else {
           auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
-          auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
+          auto D_ji_key = parsec_D.super.data_key(&parsec_D.super, j, i, level);
           auto D_jd_key = parsec_D.super.data_key(&parsec_D.super, j, d, level);
           int64_t D_jd_nrows = get_dim(A, domain, j, level);
           int64_t D_jd_ncols = get_dim(A, domain, d, level);
+          int64_t D_ji_nrows = get_dim(A, domain, j, level);
+          int64_t D_ji_ncols = get_dim(A, domain, i, level);
 
           parsec_dtd_insert_task(dtd_tp, task_matmul_full, 80, PARSEC_DEV_CPU,
             "matmul_full_task",
+                                 sizeof(int64_t), &D_jd_nrows, PARSEC_VALUE,
+                                 sizeof(int64_t), &D_jd_ncols, PARSEC_VALUE,
+                                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_jd_key),
+                                 PARSEC_INPUT | FINAL_DENSE_ARENA,
             sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
             sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
                                  PARSEC_INPUT | FINAL_DENSE_ARENA,
-            sizeof(int64_t), &D_jd_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_jd_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_jd_key),
-                                 PARSEC_INPUT | FINAL_DENSE_ARENA,
-            sizeof(int64_t), &D_ij_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_ij_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
+            sizeof(int64_t), &D_ji_nrows, PARSEC_VALUE,
+            sizeof(int64_t), &D_ji_ncols, PARSEC_VALUE,
+            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ji_key),
                                  PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
             PARSEC_DTD_ARG_END);
         }
