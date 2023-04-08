@@ -42,6 +42,11 @@ void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols, int64_t D_row_ra
   std::vector<Matrix> D_splits;
 
   if (which == 'F') {           // multiply complements from the left and right
+    for (int i = 0; i < D.rows; ++i) {
+      for (int j = i+1; j < D.cols; ++j) {
+        D(i, j) = D(j, i);
+      }
+    }
     Matrix product = matmul(matmul(UF, D, true), UF);
     D.copy_mem(product);
   }

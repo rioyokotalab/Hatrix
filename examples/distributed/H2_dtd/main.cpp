@@ -344,78 +344,79 @@ int main(int argc, char **argv) {
 
 
   /* Initializing parsec context */
-//   parsec_context_t* parsec = parsec_init( cores, NULL, NULL);
-//   if( NULL == parsec ) {
-//     printf("Cannot initialize PaRSEC\n");
-//     exit(-1);
-//   }
+  parsec_context_t* parsec = parsec_init( cores, NULL, NULL);
+  if( NULL == parsec ) {
+    printf("Cannot initialize PaRSEC\n");
+    exit(-1);
+  }
 
-//   parsec_profiling_start();
+  parsec_profiling_start();
 
-//   parsec_taskpool_t* dtd_tp = parsec_dtd_taskpool_new();
-//   rc = parsec_context_add_taskpool( parsec, dtd_tp );
+  parsec_taskpool_t* dtd_tp = parsec_dtd_taskpool_new();
+  rc = parsec_context_add_taskpool( parsec, dtd_tp );
 
-//   rc = parsec_context_start( parsec );
-//   PARSEC_CHECK_ERROR(rc, "parsec_context_start");
+  rc = parsec_context_start( parsec );
+  PARSEC_CHECK_ERROR(rc, "parsec_context_start");
 
-//   std::vector<Matrix> h2_solution;
-//   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
-//     h2_solution.push_back(Matrix(opts.nleaf, 1));
-//   }
+  std::vector<Matrix> h2_solution;
+  for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
+    h2_solution.push_back(Matrix(opts.nleaf, 1));
+  }
 
-// #ifdef USE_MKL
-//   mkl_set_num_threads(1);
-// #endif
-//   int max_threads = omp_get_max_threads();
+#ifdef USE_MKL
+  mkl_set_num_threads(1);
+#endif
+  int max_threads = omp_get_max_threads();
 
-//   omp_set_num_threads(1);
+  omp_set_num_threads(1);
 
-//   if (!MPIRANK) {
-//   std::cout << "factor begin:\n";
-//   }
+  if (!MPIRANK) {
+  std::cout << "factor begin:\n";
+  }
 
-//   factorize_setup(A, domain, opts, parsec);
+  factorize_setup(A, domain, opts, parsec);
 
-//   auto start_factorize = std::chrono::system_clock::now();
-//   fp_ops = factorize(A, domain, opts, dtd_tp);
-//   auto stop_factorize = std::chrono::system_clock::now();
-//   factorize_time = std::chrono::duration_cast<
-//     std::chrono::milliseconds>(stop_factorize -
-//                                start_factorize).count();
+  auto start_factorize = std::chrono::system_clock::now();
+  fp_ops = factorize(A, domain, opts, dtd_tp);
+  auto stop_factorize = std::chrono::system_clock::now();
+  factorize_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_factorize -
+                               start_factorize).count();
 
-//   factorize_teardown(parsec);
+  factorize_teardown(parsec);
 
-//   if (!MPIRANK) {
-//     std::cout << "factor end\n";
-//   }
+  if (!MPIRANK) {
+    std::cout << "factor end\n";
+  }
 
-//   parsec_context_wait(parsec);
-//   parsec_taskpool_free( dtd_tp );
+  parsec_context_wait(parsec);
+  parsec_taskpool_free( dtd_tp );
 
-//   omp_set_num_threads(max_threads);
+  omp_set_num_threads(max_threads);
 
-//   if (!MPIRANK) {
-//     std::cout << "H2 solve begin\n";
-//   }
+  if (!MPIRANK) {
+    std::cout << "H2 solve begin\n";
+  }
 
-//   solve(A, b, h2_solution, domain); // h2_solution = H2_A^(-1) * b
-//   if (!MPIRANK) {
-//     std::cout << "H2 solve end\n";
-//   }
+  solve(A, b, h2_solution, domain); // h2_solution = H2_A^(-1) * b
+  if (!MPIRANK) {
+    std::cout << "H2 solve end\n";
+  }
 
-//   // ||x - A * (A^-1 * x)|| / ||x||
+  // ||x - A * (A^-1 * x)|| / ||x||
 
-//   std::vector<Matrix> h2_solve_diff;
-//   for (int i = 0; i < x.size(); ++i) {
-//     h2_solve_diff.push_back(h2_solution[i] - x[i]);
-//   }
+  std::vector<Matrix> h2_solve_diff;
+  for (int i = 0; i < x.size(); ++i) {
+    h2_solve_diff.push_back(h2_solution[i] - x[i]);
+    h2_solve_diff[i].print();
+  }
 
-//   double h2_norm = dist_norm2(h2_solution);
-//   double x_norm = dist_norm2(x);
+  double h2_norm = dist_norm2(h2_solution);
+  double x_norm = dist_norm2(x);
 
-//   // std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
+  // std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
 
-//   solve_error = dist_norm2(h2_solve_diff) / x_norm;
+  solve_error = dist_norm2(h2_solve_diff) / x_norm;
 
 
 
