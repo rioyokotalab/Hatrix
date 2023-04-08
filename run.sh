@@ -9,7 +9,7 @@ source ~/.bashrc
 
 source /etc/profile.d/modules.sh
 module purge
-module load cuda intel/2022/mkl gcc cmake intel/2022/mpi
+module load gcc/12.2 cuda intel/2022/mkl cmake intel/2022/mpi
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gsl-2.7.1/build/lib
 
@@ -21,40 +21,20 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
-
-make -j Dense
-make -j H2_main
+make -j H2_dtd
 
 nleaf=256
 max_rank=50
 ndim=1
 adm=0
 
-# valgrind --leak-check=full --track-origins=yes
-cd build
-make -j UMV_H2_Nlevel
-cd ..
-
 # ./build/examples/UMV_H2_Nlevel 64 16 0 10 60 1.9 0 2 2 0
 
-for N in 64; do
+for N in 1024; do
     for adm in 1; do
-        for nleaf in 16; do
-            for max_rank in 10; do
-                # ./bin/Dense --N $N \
-                #               --nleaf $nleaf \
-                #               --kernel_func laplace \
-                #               --kind_of_geometry grid \
-                #               --ndim $ndim \
-                #               --max_rank $max_rank \
-                #               --accuracy -1 \
-                #               --admis $adm \
-                #               --admis_kind diagonal \
-                #               --construct_algorithm miro \
-                #               --param_1 1e-9 \
-                #               --kind_of_recompression 3
-
-                ./bin/H2_main --N $N \
+        for nleaf in 128; do
+            for max_rank in 50; do
+                ./bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
@@ -65,7 +45,7 @@ for N in 64; do
                               --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3
+                              --kind_of_recompression 3 --use_nested_basis
             done
         done
     done
