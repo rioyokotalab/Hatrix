@@ -220,7 +220,6 @@ int main(int argc, char **argv) {
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
   double* DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
 
-
   if (!MPIRANK) {
     std::cout << "begin data init.\n";
   }
@@ -249,7 +248,7 @@ int main(int argc, char **argv) {
   else if (opts.admis_kind == DIAGONAL) {
     init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   }
-  // if(!MPIRANK) A.print_structure();
+  if(!MPIRANK) A.print_structure();
   construct_h2_matrix(A, domain, opts, DENSE_MEM, DENSE); // construct H2 matrix.
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
@@ -307,116 +306,116 @@ int main(int argc, char **argv) {
   double matvec_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_matvec - start_matvec).count();
 
-  delete[] DENSE_MEM;           // free dense matrix to free space for parsec.
+  //delete[] DENSE_MEM;           // free dense matrix to free space for parsec.
 
   // H2 matvec verification.
 
-  // double ALPHA = 1.0;
-  // double BETA = 0.0;
+  double ALPHA = 1.0;
+  double BETA = 0.0;
 
-  // int IA = 1, JA = 1;
-  // int IX = 1, JX = 1;
-  // int IY = 1, JY = 1;
-  // pdgemv_(&NOTRANS, &N, &N,     // dense_A * x = b_check.
-  //         &ALPHA,
-  //         DENSE_MEM, &IA, &JA, DENSE.data(),
-  //         X_mem.data(), &IX, &JX, DESCX.data(),
-  //         &ONE,
-  //         &BETA,
-  //         B_CHECK_mem.data(), &IY, &JY, DESCB_CHECK.data(),
-  //         &ONE);
+  int IA = 1, JA = 1;
+  int IX = 1, JX = 1;
+  int IY = 1, JY = 1;
+  pdgemv_(&NOTRANS, &N, &N,     // dense_A * x = b_check.
+          &ALPHA,
+          DENSE_MEM, &IA, &JA, DENSE.data(),
+          X_mem.data(), &IX, &JX, DESCX.data(),
+          &ONE,
+          &BETA,
+          B_CHECK_mem.data(), &IY, &JY, DESCB_CHECK.data(),
+          &ONE);
 
 
-  // const char nn = 'F';
-  // double nrm = pdlange_(&nn, &N, &ONE, B_CHECK_mem.data(), &ONE, &ONE, DESCB_CHECK.data(), NULL);
+  const char nn = 'F';
+  double nrm = pdlange_(&nn, &N, &ONE, B_CHECK_mem.data(), &ONE, &ONE, DESCB_CHECK.data(), NULL);
 
-  // redistribute_scalapack2vector(b_check, B_CHECK_mem, A, opts);
+  redistribute_scalapack2vector(b_check, B_CHECK_mem, A, opts);
 
-  // std::vector<Matrix> difference;
-  // for (int i = 0; i < b.size(); ++i) {
-  //   difference.push_back(b_check[i] - b[i]);
-  // }
+  std::vector<Matrix> difference;
+  for (int i = 0; i < b.size(); ++i) {
+    difference.push_back(b_check[i] - b[i]);
+  }
 
-  // double diff_norm = dist_norm2(difference);
-  // double b_check_norm = dist_norm2(b_check);
-  // construction_error = diff_norm / b_check_norm;
+  double diff_norm = dist_norm2(difference);
+  double b_check_norm = dist_norm2(b_check);
+  construction_error = diff_norm / b_check_norm;
 
   // ---- BEGIN PARSEC ----
 
 
   /* Initializing parsec context */
-  parsec_context_t* parsec = parsec_init( cores, NULL, NULL);
-  if( NULL == parsec ) {
-    printf("Cannot initialize PaRSEC\n");
-    exit(-1);
-  }
+//   parsec_context_t* parsec = parsec_init( cores, NULL, NULL);
+//   if( NULL == parsec ) {
+//     printf("Cannot initialize PaRSEC\n");
+//     exit(-1);
+//   }
 
-  parsec_profiling_start();
+//   parsec_profiling_start();
 
-  parsec_taskpool_t* dtd_tp = parsec_dtd_taskpool_new();
-  rc = parsec_context_add_taskpool( parsec, dtd_tp );
+//   parsec_taskpool_t* dtd_tp = parsec_dtd_taskpool_new();
+//   rc = parsec_context_add_taskpool( parsec, dtd_tp );
 
-  rc = parsec_context_start( parsec );
-  PARSEC_CHECK_ERROR(rc, "parsec_context_start");
+//   rc = parsec_context_start( parsec );
+//   PARSEC_CHECK_ERROR(rc, "parsec_context_start");
 
-  std::vector<Matrix> h2_solution;
-  for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
-    h2_solution.push_back(Matrix(opts.nleaf, 1));
-  }
+//   std::vector<Matrix> h2_solution;
+//   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
+//     h2_solution.push_back(Matrix(opts.nleaf, 1));
+//   }
 
-#ifdef USE_MKL
-  mkl_set_num_threads(1);
-#endif
-  int max_threads = omp_get_max_threads();
+// #ifdef USE_MKL
+//   mkl_set_num_threads(1);
+// #endif
+//   int max_threads = omp_get_max_threads();
 
-  omp_set_num_threads(1);
+//   omp_set_num_threads(1);
 
-  if (!MPIRANK) {
-  std::cout << "factor begin:\n";
-  }
+//   if (!MPIRANK) {
+//   std::cout << "factor begin:\n";
+//   }
 
-  factorize_setup(A, domain, opts, parsec);
+//   factorize_setup(A, domain, opts, parsec);
 
-  auto start_factorize = std::chrono::system_clock::now();
-  fp_ops = factorize(A, domain, opts, dtd_tp);
-  auto stop_factorize = std::chrono::system_clock::now();
-  factorize_time = std::chrono::duration_cast<
-    std::chrono::milliseconds>(stop_factorize -
-                               start_factorize).count();
+//   auto start_factorize = std::chrono::system_clock::now();
+//   fp_ops = factorize(A, domain, opts, dtd_tp);
+//   auto stop_factorize = std::chrono::system_clock::now();
+//   factorize_time = std::chrono::duration_cast<
+//     std::chrono::milliseconds>(stop_factorize -
+//                                start_factorize).count();
 
-  factorize_teardown(parsec);
+//   factorize_teardown(parsec);
 
-  if (!MPIRANK) {
-    std::cout << "factor end\n";
-  }
+//   if (!MPIRANK) {
+//     std::cout << "factor end\n";
+//   }
 
-  parsec_context_wait(parsec);
-  parsec_taskpool_free( dtd_tp );
+//   parsec_context_wait(parsec);
+//   parsec_taskpool_free( dtd_tp );
 
-  omp_set_num_threads(max_threads);
+//   omp_set_num_threads(max_threads);
 
-  if (!MPIRANK) {
-    std::cout << "H2 solve begin\n";
-  }
+//   if (!MPIRANK) {
+//     std::cout << "H2 solve begin\n";
+//   }
 
-  solve(A, b, h2_solution, domain); // h2_solution = H2_A^(-1) * b
-  if (!MPIRANK) {
-    std::cout << "H2 solve end\n";
-  }
+//   solve(A, b, h2_solution, domain); // h2_solution = H2_A^(-1) * b
+//   if (!MPIRANK) {
+//     std::cout << "H2 solve end\n";
+//   }
 
-  // ||x - A * (A^-1 * x)|| / ||x||
+//   // ||x - A * (A^-1 * x)|| / ||x||
 
-  std::vector<Matrix> h2_solve_diff;
-  for (int i = 0; i < x.size(); ++i) {
-    h2_solve_diff.push_back(h2_solution[i] - x[i]);
-  }
+//   std::vector<Matrix> h2_solve_diff;
+//   for (int i = 0; i < x.size(); ++i) {
+//     h2_solve_diff.push_back(h2_solution[i] - x[i]);
+//   }
 
-  double h2_norm = dist_norm2(h2_solution);
-  double x_norm = dist_norm2(x);
+//   double h2_norm = dist_norm2(h2_solution);
+//   double x_norm = dist_norm2(x);
 
-  // std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
+//   // std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
 
-  solve_error = dist_norm2(h2_solve_diff) / opts.N;
+//   solve_error = dist_norm2(h2_solve_diff) / x_norm;
 
 
 
@@ -457,7 +456,7 @@ int main(int argc, char **argv) {
               << std::endl;
   }
 
-  parsec_fini(&parsec);
+  // parsec_fini(&parsec);
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);
   MPI_Finalize();
