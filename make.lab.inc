@@ -11,7 +11,7 @@ MPICXX       = mpicxx
 LDFLAGS      = $(BLAS_LIB) $(shell pkg-config --libs gtest_main gtest) $(PAPI_LIBS) -lgfortran \
                -L/home/sameer.deshmukh/gsl-2.7.1/build/lib -lgsl
 PARSEC_INCLUDE = $(shell pkg-config --cflags parsec)
-PARSEC_LIB     = $(shell pkg-config --libs parsec)
+PARSEC_LIB     = -L/home/sameer.deshmukh/gitrepos/parsec/build/lib -lparsec
 SCALAPACK_LIB = $(BLAS_LIB)
 RM           = rm -rf
 AR           = ar
