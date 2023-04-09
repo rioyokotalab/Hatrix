@@ -89,8 +89,8 @@ task_matmul_full(parsec_execution_stream_t* es, parsec_task_t* this_task) {
   double *_D_ji;
 
   parsec_dtd_unpack_args(this_task,
-                         &D_id_nrows, &D_id_ncols, &_D_id,
                          &D_jd_nrows, &D_jd_ncols, &_D_jd,
+                         &D_id_nrows, &D_id_ncols, &_D_id,
                          &D_ji_nrows, &D_ji_ncols, &_D_ji);
 
   CORE_matmul_full(D_jd_nrows, D_jd_ncols, _D_jd,

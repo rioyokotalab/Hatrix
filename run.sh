@@ -33,11 +33,12 @@ ndim=2
 
 # ./build/examples/UMV_H2_Nlevel 64 16 0 10 60 1.9 0 2 2 0
 
-for N in 64; do
+for N in 1024; do
     for adm in 0; do
-        for nleaf in 16; do
+        for nleaf in 128; do
             for max_rank in 10; do
-                mpirun -n 2 ./bin/H2_dtd --N $N \
+                # mpirun -n 8 xterm -e gdb -ex "set auto-load safe-path /" -ex run --args ./bin/H2_dtd --N $N \
+                    mpirun -n 8 ./bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
@@ -47,8 +48,8 @@ for N in 64; do
                               --admis $adm \
                               --admis_kind diagonal \
                               --construct_algorithm miro \
-                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
+                              --param_1 1 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3
             done
         done
     done

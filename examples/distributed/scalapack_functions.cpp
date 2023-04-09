@@ -25,7 +25,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int N = opts.N;
   int nleaf = opts.nleaf;
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &ONE);
+  int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
   int AY[9]; int INFO;
   double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
   descinit_(AY, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
@@ -36,8 +36,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j <= i; ++j) {
-      if (A.is_admissible.exists(i, j, A.max_level) &&
-          !A.is_admissible(i, j, A.max_level)) {
+      if (exists_and_inadmissible(A, i, j, A.max_level)) {
         if (mpi_rank(i) == MPIRANK) { // row-cyclic process distribution.
           Matrix Aij = generate_p2p_interactions(domain,
                                                  i, j, A.max_level,
@@ -64,6 +63,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                AY_MEM, &IA, &ONE, AY);
     }
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   int LWORK; double *WORK;
   const char JOB_U = 'V';

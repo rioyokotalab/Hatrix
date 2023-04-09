@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
   }
   MPI_Comm_size(MPI_COMM_WORLD, &MPISIZE);
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
-  MPI_Dims_create(MPISIZE, 2, MPIGRID);
+  MPIGRID[0] = MPISIZE; MPIGRID[1] = 1;
   int N = opts.N;
   int cores = opts.parsec_cores;
   if (!MPIRANK) {
@@ -256,6 +256,10 @@ int main(int argc, char **argv) {
 
   int64_t dense_blocks = A.leaf_dense_blocks();
   construct_max_rank = A.max_rank(); // get max rank of H2 matrix post construct.
+
+  if (!MPIRANK) {
+    std::cout << "end construction.\n";
+  }
 
   // Allocate the vectors as a vector of Matrix objects of the form H2_A * x = b,
   // and dense_A * x = b_check.
