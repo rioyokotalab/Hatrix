@@ -55,7 +55,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     int IA = nleaf * block + 1;
     for (int64_t j = 0; j < nblocks; ++j) {
       if (exists_and_inadmissible(A, block, j, A.max_level)) { continue; }
-      std::cout << "block -> " << block << " j -> " << j << std::endl;
       int JA = nleaf * j + 1;
 
       pdgeadd_(&NOTRANS, &nleaf, &nleaf,
@@ -172,7 +171,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
         if (mpi_rank(j) == MPIRANK) {
           MPI_Request request;
           Matrix& Uj = A.U(j, A.max_level);
-          // std::cout << "\n\n@@@@ SENT TAG " << j << " @@@@\n\n";
           MPI_Isend(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(i),
                     j, MPI_COMM_WORLD, &request);
         }
