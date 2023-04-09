@@ -333,7 +333,9 @@ int main(int argc, char **argv) {
   std::vector<Matrix> difference;
   for (int i = 0; i < b.size(); ++i) {
     difference.push_back(b_check[i] - b[i]);
+    // difference[i].print();
   }
+
 
   double diff_norm = dist_norm2(difference);
   double b_check_norm = dist_norm2(b_check);
@@ -433,21 +435,30 @@ int main(int argc, char **argv) {
     //           << "CORES           : " << cores << std::endl
     //           << "\n";
     // std::cout << "----------------------------\n";
-    std::cout << "RESULT: "
-              << opts.N << ","
+
+    std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
               << opts.accuracy << ","
+              << opts.qr_accuracy << ","
+              << opts.kind_of_recompression << ","
               << opts.max_rank << ","
               << opts.admis << ","
               << construct_max_rank << ","
-              << MPISIZE << ","
-              << opts.nleaf << ","
-              << construction_error <<  ","
-              << solve_error << ","
+              << opts.nleaf <<  ","
+              << domain_time <<  ","
               << construct_time  << ","
-              << factorize_time << ","
-              << fp_ops << ","
-              << cores << ","
-              << dense_blocks
+              << factor_time << ","
+              << solve_time << ","
+              << construct_error << ","
+              << std::scientific << solve_error << ","
+              << std::fixed << fp_ops << ","
+              << opts.kind_of_geometry << ","
+              << opts.use_nested_basis << ","
+              << dense_blocks << ","
+              << opts.perturbation << ","
+              << std::scientific << opts.param_1 << std::fixed  << ","
+              << std::scientific << opts.param_2 << std::fixed << ","
+              << opts.param_3 << ","
+              << opts.kernel_verbose
               << std::endl;
   }
 
