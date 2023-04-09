@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <new>
+#include <bits/stdc++.h>
 
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
