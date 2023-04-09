@@ -309,7 +309,6 @@ int main(int argc, char **argv) {
   //delete[] DENSE_MEM;           // free dense matrix to free space for parsec.
 
   // H2 matvec verification.
-
   double ALPHA = 1.0;
   double BETA = 0.0;
 
@@ -334,7 +333,6 @@ int main(int argc, char **argv) {
   std::vector<Matrix> difference;
   for (int i = 0; i < b.size(); ++i) {
     difference.push_back(b_check[i] - b[i]);
-    difference[i].print();
   }
 
   double diff_norm = dist_norm2(difference);

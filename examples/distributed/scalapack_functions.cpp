@@ -370,10 +370,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       delete[] WORK;
     }
 
-    if (!MPIRANK) {
-      // std::cout << "\t DONE SVD " << block << std::endl;
-    }
-
     // Init CBLACS info for the local U block.
     int U_LOCAL_CONTEXT;
     int IMAP[1];                // workspace to map the original grid.
