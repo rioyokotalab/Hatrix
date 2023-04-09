@@ -249,7 +249,7 @@ int main(int argc, char **argv) {
     init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   }
   if(!MPIRANK) A.print_structure();
-  construct_h2_matrix(A, domain, opts, DENSE_MEM, DENSE); // construct H2 matrix.
+  construct_h2_matrix(A, domain, opts); // construct H2 matrix.
   auto stop_construct =  std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
@@ -310,8 +310,6 @@ int main(int argc, char **argv) {
   double matvec_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_matvec - start_matvec).count();
 
-  //delete[] DENSE_MEM;           // free dense matrix to free space for parsec.
-
   // H2 matvec verification.
   double ALPHA = 1.0;
   double BETA = 0.0;
@@ -340,13 +338,12 @@ int main(int argc, char **argv) {
     // difference[i].print();
   }
 
-
   double diff_norm = dist_norm2(difference);
   double b_check_norm = dist_norm2(b_check);
   construction_error = diff_norm / b_check_norm;
+  delete[] DENSE_MEM;           // free dense matrix to free space for parsec.
 
   // ---- BEGIN PARSEC ----
-
 
   /* Initializing parsec context */
   parsec_context_t* parsec = parsec_init( cores, NULL, NULL);

@@ -18,7 +18,7 @@ int U[9];
 void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Domain& domain,
-                    const Args& opts,  double* DENSE_MEM, std::vector<int>& DENSE) {
+                    const Args& opts) {
   int N = opts.N;
   int nleaf = opts.nleaf;
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
@@ -66,7 +66,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
   }
 
-  MPI_Barrier(MPI_COMM_WORLD);
 
   int LWORK; double *WORK;
   const char JOB_U = 'V';
@@ -166,6 +165,8 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
   }
 
+  delete[] AY_MEM;
+
   // Generate S blocks for the lower triangle
   for (int i = 0; i < nblocks; ++i) {
     for (int j = 0; j < i; ++j) {
@@ -198,8 +199,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       }
     }
   }
-
-  delete[] AY_MEM;
 }
 
 static bool
@@ -219,7 +218,7 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
 
 void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
-                           int64_t level, double* DENSE_MEM, std::vector<int>& DENSE) {
+                           int64_t level) {
   if (!MPIRANK) {
     std::cout << "generate transfer matrices level=" << level << std::endl;
   }
@@ -316,6 +315,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
             &BETA,
             TEMP_MEM, &ITEMP, &JTEMP, TEMP);
   }
+
+  delete[] AY_MEM;
   // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
   // Allocate a global matrix to store the transfer matrices. The transfer matrices for the
   // entire level are stacked by row in this global matrix.
@@ -353,7 +354,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      LWORK = WORK[0] + nleaf * (TEMP_local_nrows + TEMP_local_ncols + 1) * nleaf + TEMP_local_ncols;
+      LWORK = WORK[0] + nleaf * (TEMP_local_nrows + TEMP_local_ncols + 1) * nleaf +
+        TEMP_local_ncols;
       delete[] WORK;
     }
 
@@ -484,10 +486,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   // Allocate a (nblocks * max_rank) ** 2 global matrix for temporary storage of the S blocks.
   int S_BLOCKS_nrows = nblocks * rank;
-  int S_BLOCKS_local_nrows = fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
-  int S_BLOCKS_local_ncols = fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
+  int S_BLOCKS_local_nrows =
+    fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int S_BLOCKS_local_ncols =
+    fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int S_BLOCKS[9];
-  double *S_BLOCKS_MEM = new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
+  double *S_BLOCKS_MEM =
+    new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
 
   descinit_(S_BLOCKS, &S_BLOCKS_nrows, &S_BLOCKS_nrows, &rank, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &S_BLOCKS_local_nrows, &INFO);
@@ -502,18 +507,40 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   descinit_(TEMP_PRODUCT, &rank, &N, &rank, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
 
+  // Allocate dense block.
+  int DENSE_local_rows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int DENSE_local_cols = numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  std::vector<int> DENSE(DESC_LEN);
+
+  descinit_(DENSE.data(), &N, &N, &nleaf, &nleaf, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &DENSE_local_rows, &info);
+  double* DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)]();
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < DENSE_local_rows; ++i) {
+#pragma omp parallel for
+    for (int64_t j = 0; j < DENSE_local_cols; ++j) {
+      int g_row = indxl2g(i + 1, nleaf, MYROW, MPIGRID[0]) - 1;
+      int g_col = indxl2g(j + 1, nleaf, MYCOL, MPIGRID[1]) - 1;
+
+      DENSE_MEM[i + j * DENSE_local_rows] =
+        opts.kernel(domain.particles[g_row].coords,
+                    domain.particles[g_col].coords);
+    }
+  }
+
   for (int64_t i = 0; i < nblocks; ++i) {
+    int ITEMP_PRODUCT = 1;
+    int IU = i * level_block_size + 1;
+    int JU = 1;
+    int IDENSE = i * level_block_size + 1;
+
     for (int64_t j = 0; j < i; ++j) {
       if (exists_and_admissible(A, i, j, level)) {
         // Multiply the real basis with the admissible block and store it in a temporary matrix.
-        int IU = i * level_block_size + 1;
-        int JU = 1;
-
-        int IDENSE = i * level_block_size + 1;
         int JDENSE = j * level_block_size + 1;
-
-        int ITEMP_PRODUCT = 1;
         int JTEMP_PRODUCT = j * level_block_size + 1;
+
         pdgemm_(&TRANS, &NOTRANS,
                 &rank, &level_block_size, &level_block_size,
                 &ALPHA,
@@ -523,7 +550,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                 TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
 
         IU = j * level_block_size + 1;
-        JU = 1;
 
         int IS_BLOCKS = i * rank + 1;
         int JS_BLOCKS = j * rank + 1;
@@ -535,14 +561,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                 U_MEM, &IU, &JU, U,
                 &BETA,
                 S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
-        // MPI_Barrier(MPI_COMM_WORLD);
       }
     }
-
-  }
-
-  if (!MPIRANK) {
-    // std::cout << "\tBEGIN S BLOCK " << level << std::endl;
   }
 
   // Copy the S blocks to the H2 matrix data structure.
@@ -593,12 +613,12 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   delete[] TEMP_PRODUCT_MEM;
   delete[] UTRANSFER_MEM;
   delete[] TEMP_MEM;
-  delete[] AY_MEM;
+  delete[] DENSE_MEM;
 }
 
 void
 construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
-                        const Args& opts, double* DENSE_MEM, std::vector<int>& DENSE) {
+                    const Args& opts) {
   // init global U matrix
   int nleaf = opts.nleaf; int N = opts.N; int INFO;
   int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
@@ -607,14 +627,14 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 
-  generate_leaf_nodes(A, domain, opts, DENSE_MEM, DENSE);
+  generate_leaf_nodes(A, domain, opts);
 
   if (!MPIRANK) {
     // std::cout << "FINISH LEAF NODE\n";
   }
 
   for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
-    generate_transfer_matrices(A, domain, opts, level, DENSE_MEM, DENSE);
+    generate_transfer_matrices(A, domain, opts, level);
   }
 
   delete[] U_MEM;
