@@ -26,7 +26,7 @@ cd examples/distributed/H2_ptg
 ./compile_jdf.sh
 cd $ROOT
 
-make -j H2_ptg
+make -j H2_dtd
 # make -j H2_dtd
 
 ndim=1
@@ -37,7 +37,7 @@ for N in 64; do
     for adm in 0; do
         for nleaf in 16; do
             for max_rank in 10; do
-                ./bin/H2_ptg --N $N \
+                ./bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
