@@ -398,8 +398,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      LWORK = WORK[0] + nleaf * (TEMP_local_nrows + TEMP_local_ncols + 1) * nleaf +
-        TEMP_local_ncols;
+      int64_t lwork_space = (int64_t)WORK[0] + nleaf * ((int64_t)TEMP_local_nrows + TEMP_local_ncols + 1) * (int64_t)nleaf + (int64_t)TEMP_local_ncols;
+      LWORK = (int)std::fmin(INT_MAX, lwork_space);
       delete[] WORK;
     }
 
