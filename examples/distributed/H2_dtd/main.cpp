@@ -158,11 +158,11 @@ int main(int argc, char **argv) {
 
   int rc;
   double solve_error, construction_error, factorize_time, fp_ops, solve_time;
-  int DENSE_NBROW = opts.nleaf;
-  int DENSE_NBCOL = opts.nleaf;
+
 
   // std::cout << "init args.\n"
   Args opts(argc, argv);
+
 
   {
     int provided;
@@ -172,6 +172,9 @@ int main(int argc, char **argv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
   MPIGRID[0] = MPISIZE; MPIGRID[1] = 1;
   int N = opts.N;
+  int DENSE_NBROW = opts.nleaf;
+  int DENSE_NBCOL = opts.nleaf;
+
   int cores = opts.parsec_cores;
   if (!MPIRANK) {
     std::cout << "MPIGRID g[0] : " << MPIGRID[0]
