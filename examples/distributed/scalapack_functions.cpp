@@ -25,7 +25,15 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
   int AY[9]; int INFO;
-  double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  double* AY_MEM;
+  try {
+    AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate AY_MEM in LEAF of size:  "
+              << (int64_t)AY_local_nrows * (int64_t)AY_local_ncols
+              << " " << exception.what() << std::endl;
+  }
   descinit_(AY, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &AY_local_nrows, &INFO);
 
@@ -363,7 +371,15 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   const char JOB_VT = 'N';
 
   for (int64_t block = 0; block < nblocks; ++block) {
-    double *S_MEM = new double[(int64_t)rank]();
+    double *S_MEM;
+    try {
+      S_MEM = new double[(int64_t)rank]();
+    }
+    catch (std::bad_alloc & exception) {
+      std::cerr << "tried to allocate S_MEM of size:  "
+                << (int64_t)rank
+                << " " << exception.what() << std::endl;
+    }
     // SVD workspace query.
     {
       LWORK = -1;
@@ -393,7 +409,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int JTEMP = 1;
       int IU = block * block_nrows + 1;
       int JU = 1;
-      WORK = new double[(int64_t)LWORK]();
+      try {
+        WORK = new double[(int64_t)LWORK]();
+      }
+      catch (std::bad_alloc & exception) {
+        std::cerr << "tried to allocate WORK in TRANSFER of size:  "
+                  << (int64_t)LWORK
+                  << " " << exception.what() << std::endl;
+      }
 
       pdgesvd_(&JOB_U, &JOB_VT,
                &block_nrows, &rank,
@@ -546,8 +569,18 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int TEMP_PRODUCT_local_nrows = fmax(numroc_(&rank, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int TEMP_PRODUCT_local_ncols = fmax(numroc_(&N, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int TEMP_PRODUCT[9];
-  double *TEMP_PRODUCT_MEM =
-    new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
+
+  double *TEMP_PRODUCT_MEM;
+  try {
+    TEMP_PRODUCT_MEM =
+      new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate TEMP_PRODUCT_MEM of size: "
+              << (int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
   descinit_(TEMP_PRODUCT, &rank, &N, &rank, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
 
@@ -563,7 +596,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)]();
   }
   catch (std::bad_alloc & exception) {
-    std::cerr << "tried to allocate DENSE_MEM of size: "
+    std::cerr << "tried to allocate DENSE_MEM TRANSFER of size: "
               << (int64_t)DENSE_local_rows * (int64_t)DENSE_local_cols
               << " " << exception.what() << std::endl;
   }
