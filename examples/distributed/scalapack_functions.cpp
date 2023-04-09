@@ -56,11 +56,16 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       if (exists_and_inadmissible(A, block, j, A.max_level)) { continue; }
       int JA = nleaf * j + 1;
 
-      pdgeadd_(&NOTRANS, &nleaf, &nleaf,
-               &ALPHA,
-               DENSE_MEM, &IA, &JA, DENSE.data(),
-               &BETA,
-               AY_MEM, &IA, &ONE, AY);
+      for (int ii = 0; ii < nleaf; ++ii) {
+        for (int jj = 0; jj < nleaf; ++jj) {
+          int AY_local_i = indxg2l(IA + ii, nleaf, MPIGRID[0])-1;
+          int AY_local_j = indxg2l(JA + jj, nleaf, MPIGRID[1])-1;
+
+          AY_MEM[AY_local_i + jj * AY_local_nrows] +=
+            opts.kernel(domain.particles[IA + ii - 1].coords,
+                        domain.particles[JA + jj - 1].coords);
+        }
+      }
     }
   }
 
@@ -248,11 +253,16 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       if (exists_and_inadmissible(A, block, j, level)) { continue; }
       int JA = level_block_size * j + 1;
 
-      pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
-               &ALPHA,
-               DENSE_MEM, &IA, &JA, DENSE.data(),
-               &BETA,
-               AY_MEM, &IA, &ONE, AY);
+      for (int ii = 0; ii < level_block_size; ++ii) {
+        for (int jj = 0; jj < level_block_size; ++jj) {
+          int AY_local_i = indxg2l(IA + ii, nleaf, MPIGRID[0])-1;
+          int AY_local_j = indxg2l(JA + jj, nleaf, MPIGRID[1])-1;
+
+          AY_MEM[AY_local_i + jj * AY_local_nrows] +=
+            opts.kernel(domain.particles[IA + ii - 1].coords,
+                        domain.particles[JA + jj - 1].coords);
+        }
+      }
     }
   }
 

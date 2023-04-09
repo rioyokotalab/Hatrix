@@ -229,8 +229,8 @@ int main(int argc, char **argv) {
   for (int64_t i = 0; i < DENSE_local_rows; ++i) {
 #pragma omp parallel for
     for (int64_t j = 0; j < DENSE_local_cols; ++j) {
-      int g_row = indxl2g(i + 1, DENSE_NBROW, MYROW, ZERO, MPIGRID[0]) - 1;
-      int g_col = indxl2g(j + 1, DENSE_NBCOL, MYCOL, ZERO, MPIGRID[1]) - 1;
+      int g_row = indxl2g(i + 1, DENSE_NBROW, MYROW, MPIGRID[0]) - 1;
+      int g_col = indxl2g(j + 1, DENSE_NBCOL, MYCOL, MPIGRID[1]) - 1;
 
       DENSE_MEM[i + j * DENSE_local_rows] =
         opts.kernel(domain.particles[g_row].coords,

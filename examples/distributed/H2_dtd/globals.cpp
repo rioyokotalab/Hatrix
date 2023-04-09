@@ -15,9 +15,9 @@ indxg2l(int INDXGLOB, int NB, int NPROCS) {
 }
 
 int
-indxl2g(int indxloc, int nb, int iproc, int isrcproc, int nprocs) {
+indxl2g(int indxloc, int nb, int iproc, int nprocs) {
   return nprocs * nb * ((indxloc - 1) / nb) +
-    (indxloc-1) % nb + ((nprocs + iproc - isrcproc) % nprocs) * nb + 1;
+    (indxloc-1) % nb + ((nprocs + iproc) % nprocs) * nb + 1;
 }
 
 int

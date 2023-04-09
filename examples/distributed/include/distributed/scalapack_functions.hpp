@@ -127,7 +127,7 @@ extern "C" {
 // row/col. Returns the local FORTRAN-style index. NPROCS is the number of processes
 // in that row or col.
 int indxg2l(int INDXGLOB, int NB, int NPROCS);
-int indxl2g(int indxloc, int nb, int iproc, int isrcproc, int nprocs);
+int indxl2g(int indxloc, int nb, int iproc, int nprocs);
 int indxg2p(int INDXGLOB, int NB, int ISRCPROC, int NPROCS);
 
 extern int BLACS_CONTEXT;

@@ -668,13 +668,13 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     //   std::chrono::milliseconds>(stop_factorize_diag - start_factorize_diag).count();
 
     // auto start_triangle = std::chrono::system_clock::now();
-    triangle_reduction(A, block, level);
+    // triangle_reduction(A, block, level);
     // auto stop_triangle = std::chrono::system_clock::now();
     // timer[3] += std::chrono::duration_cast<
     //   std::chrono::milliseconds>(stop_triangle - start_triangle).count();
 
     // auto start_schurs = std::chrono::system_clock::now();
-    compute_schurs_complement(A, block, level);
+    // compute_schurs_complement(A, block, level);
     // auto stop_schurs = std::chrono::system_clock::now();
     // timer[4] += std::chrono::duration_cast<
     //   std::chrono::milliseconds>(stop_schurs - start_schurs).count();
