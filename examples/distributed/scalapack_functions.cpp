@@ -4,6 +4,7 @@
 #include <set>
 #include <cmath>
 #include <cstring>
+#include <new>
 
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
@@ -236,7 +237,15 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int AY_local_ncols = fmax(numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO,
                                     &MPIGRID[1]), 1);
   int AY[9];
-  double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  try {
+    double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate AY_MEM of size:  "
+              << (int64_t)AY_local_nrows * (int64_t)AY_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
   descinit_(AY, &N, &level_block_size, &level_block_size, &level_block_size,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
@@ -268,12 +277,21 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int TEMP_nrows = nblocks * block_nrows;
   int TEMP_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int TEMP_local_ncols = fmax(numroc_(&level_block_size, &nleaf,
-                                      &MYCOL, &ZERO, &ONE), 1);
+                                      &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int TEMP[9];
   // Use rank as NB cuz it throws a 806 error for an unknown reason.
   descinit_(TEMP, &TEMP_nrows, &level_block_size, &rank, &rank, &ZERO, &ZERO,
             &BLACS_CONTEXT, &TEMP_local_nrows, &INFO);
-  double *TEMP_MEM = new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+  double *TEMP_MEM;
+  try {
+    TEMP_MEM = new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate TEMP_MEM of size : "
+              << (int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
   int child_block_size = N / child_nblocks;
 
   // 2. Apply the real basis U to the summation of the admissible blocks.
@@ -326,8 +344,17 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   descinit_(UTRANSFER, &TEMP_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
             &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
-  double *UTRANSFER_MEM =
-    new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+  double *UTRANSFER_MEM;
+  try {
+    UTRANSFER_MEM =
+      new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate UTRANSFER_MEM of size: "
+              << (int64_t)AY_local_nrows * (int64_t)AY_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
 
   int LWORK; double *WORK;
 
@@ -431,7 +458,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int U_REAL_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int U_REAL[9];
-  U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols]();
+  try {
+    U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate UREAL_MEM of size: "
+              << (int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols
+              << " " << exception.what() << std::endl;
+  }
   descinit_(U_REAL, &N, &rank, &nleaf, &rank, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_REAL_local_nrows, &INFO);
 
@@ -478,6 +512,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
   // Free the real basis of the child level and set the U_REAL to real basis.
+  delete[] UTRANSFER_MEM;
   delete[] U_MEM;
   U_MEM = U_REAL_MEM;
   memcpy(U, U_REAL, sizeof(int) * 9);
@@ -491,8 +526,16 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int S_BLOCKS_local_ncols =
     fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int S_BLOCKS[9];
-  double *S_BLOCKS_MEM =
+  double *S_BLOCKS_MEM;
+  try {
+  S_BLOCKS_MEM =
     new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate S_BLOCKS_MEM of size: "
+              << (int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols
+              << " " << exception.what() << std::endl;
+  }
 
   descinit_(S_BLOCKS, &S_BLOCKS_nrows, &S_BLOCKS_nrows, &rank, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &S_BLOCKS_local_nrows, &INFO);
@@ -514,7 +557,15 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   descinit_(DENSE.data(), &N, &N, &nleaf, &nleaf, &ZERO, &ZERO,
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
-  double* DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)]();
+  double* DENSE_MEM;
+  try {
+    DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate DENSE_MEM of size: "
+              << (int64_t)DENSE_local_nrows * (int64_t)DENSE_local_ncols
+              << " " << exception.what() << std::endl;
+  }
 
 #pragma omp parallel for
   for (int64_t i = 0; i < DENSE_local_rows; ++i) {
@@ -565,6 +616,9 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
 
+  delete[] TEMP_PRODUCT_MEM;
+  delete[] DENSE_MEM;
+
   // Copy the S blocks to the H2 matrix data structure.
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
@@ -610,10 +664,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   }
 
   delete[] S_BLOCKS_MEM;
-  delete[] TEMP_PRODUCT_MEM;
-  delete[] UTRANSFER_MEM;
   delete[] TEMP_MEM;
-  delete[] DENSE_MEM;
 }
 
 void
