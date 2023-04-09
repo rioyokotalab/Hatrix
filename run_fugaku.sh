@@ -17,7 +17,7 @@
 
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/hp190122/u01594/gitrepos/googletest/build/lib64/pkgconfig:/vol0003/hp190122/u01594/gitrepos/lorapo/stars-h-rio/build/installdir/lib/pkgconfig
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/hp190122/u01594/gitrepos/parsec/build/lib64/pkgconfig:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64/pkgconfig
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64:/home/hp190122/u01594/gsl-2.7.1/build/lib
 
 export PARALLEL=1
 export OMP_NUM_THREADS=1
@@ -43,7 +43,7 @@ for adm in 0; do
 
     for max_rank in 50 100 150; do
         for N in 4096; do
-                ./bin/H2_dtd --N $N \
+                mpiexec bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \
