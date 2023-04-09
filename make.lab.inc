@@ -8,6 +8,8 @@ CXXFLAGS     = -std=c++17 -O3 -g -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ \
                $(shell pkg-config --cflags gtest gtest_main) $(PAPI_INCLUDE) -DUSE_MKL
 CXX          = mpicxx
 MPICXX       = mpicxx
+CC           = mpicc
+MPICC        = mpicc
 LDFLAGS      = $(BLAS_LIB) $(shell pkg-config --libs gtest_main gtest) $(PAPI_LIBS) -lgfortran \
                -L/home/sameer.deshmukh/gsl-2.7.1/build/lib -lgsl
 PARSEC_INCLUDE = $(shell pkg-config --cflags parsec)

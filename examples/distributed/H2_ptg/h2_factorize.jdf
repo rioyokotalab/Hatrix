@@ -236,5 +236,3 @@ BODY
   printf("full trsm: i -> %d block-> %d lvl -> %d\n", actual_i, block, level);
 }
 END
-
-syrk_full(blcok)

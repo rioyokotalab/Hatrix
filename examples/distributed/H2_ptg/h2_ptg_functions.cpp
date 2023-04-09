@@ -4,6 +4,8 @@
 #include "h2_factorize.h"
 #include "h2_operations.hpp"
 
+#include <cmath>
+
 h2_dc_t parsec_U_leaf, parsec_U_non_leaf, parsec_S, parsec_D_leaf,
   parsec_D_non_leaf, parsec_F, parsec_temp_fill_in_rows, parsec_temp_fill_in_cols,
   parsec_US, parsec_r, parsec_t;

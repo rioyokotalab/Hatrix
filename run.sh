@@ -16,15 +16,20 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gsl-2.7.1/build/li
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib
 
-# export MKL_NUM_THREADS=1
-# export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OMP_NUM_THREADS=1
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
-make -j H2_main
-make -j H2_dtd
+ROOT=$PWD
+cd examples/distributed/H2_ptg
+./compile_jdf.sh
+cd $ROOT
 
-ndim=2
+make -j H2_ptg
+# make -j H2_dtd
+
+ndim=1
 
 # ./build/examples/UMV_H2_Nlevel 64 16 0 10 60 1.9 0 2 2 0
 
@@ -32,7 +37,7 @@ for N in 64; do
     for adm in 0; do
         for nleaf in 16; do
             for max_rank in 10; do
-                ./bin/H2_dtd --N $N \
+                ./bin/H2_ptg --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
@@ -43,7 +48,7 @@ for N in 64; do
                               --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
+                              --kind_of_recompression 3
             done
         done
     done
