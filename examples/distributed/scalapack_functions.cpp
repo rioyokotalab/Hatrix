@@ -237,8 +237,9 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int AY_local_ncols = fmax(numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO,
                                     &MPIGRID[1]), 1);
   int AY[9];
+  double *AY_MEM;
   try {
-    double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+    AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
   }
   catch (std::bad_alloc & exception) {
     std::cerr << "tried to allocate AY_MEM of size:  "
@@ -563,7 +564,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   }
   catch (std::bad_alloc & exception) {
     std::cerr << "tried to allocate DENSE_MEM of size: "
-              << (int64_t)DENSE_local_nrows * (int64_t)DENSE_local_ncols
+              << (int64_t)DENSE_local_rows * (int64_t)DENSE_local_cols
               << " " << exception.what() << std::endl;
   }
 
