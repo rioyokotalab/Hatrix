@@ -158,6 +158,8 @@ int main(int argc, char **argv) {
 
   int rc;
   double solve_error, construction_error, factorize_time, fp_ops, solve_time;
+  int DENSE_NBROW = opts.nleaf;
+  int DENSE_NBCOL = opts.nleaf;
 
   // std::cout << "init args.\n"
   Args opts(argc, argv);
@@ -283,9 +285,6 @@ int main(int argc, char **argv) {
     std::chrono::milliseconds>(stop_matvec - start_matvec).count();
 
   // BEGIN CONSTRUCTION VERIFICATION.
-
-  int DENSE_NBROW = opts.nleaf;
-  int DENSE_NBCOL = opts.nleaf;
   int DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
   int DENSE_local_cols = numroc_(&N, &DENSE_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
   std::vector<int> DENSE(DESC_LEN);
