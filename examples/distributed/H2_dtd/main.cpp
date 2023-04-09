@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
   Hatrix::Context::init();
 
   int rc;
-  double solve_error, construction_error, factorize_time, fp_ops;
+  double solve_error, construction_error, factorize_time, fp_ops, solve_time;
 
   // std::cout << "init args.\n"
   Args opts(argc, argv);
@@ -446,9 +446,9 @@ int main(int argc, char **argv) {
               << opts.nleaf <<  ","
               << domain_time <<  ","
               << construct_time  << ","
-              << factor_time << ","
+              << factorize_time << ","
               << solve_time << ","
-              << construct_error << ","
+              << construction_error << ","
               << std::scientific << solve_error << ","
               << std::fixed << fp_ops << ","
               << opts.kind_of_geometry << ","
