@@ -218,7 +218,7 @@ int main(int argc, char **argv) {
 
   descinit_(DENSE.data(), &N, &N, &DENSE_NBROW, &DENSE_NBCOL, &ZERO, &ZERO,
             &BLACS_CONTEXT, &DENSE_local_rows, &info);
-  double* DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)];
+  double* DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)]();
 
   if (!MPIRANK) {
     std::cout << "begin data init.\n";
@@ -334,6 +334,7 @@ int main(int argc, char **argv) {
   std::vector<Matrix> difference;
   for (int i = 0; i < b.size(); ++i) {
     difference.push_back(b_check[i] - b[i]);
+    difference[i].print();
   }
 
   double diff_norm = dist_norm2(difference);
@@ -408,17 +409,12 @@ int main(int argc, char **argv) {
   std::vector<Matrix> h2_solve_diff;
   for (int i = 0; i < x.size(); ++i) {
     h2_solve_diff.push_back(h2_solution[i] - x[i]);
-    h2_solve_diff[i].print();
   }
 
   double h2_norm = dist_norm2(h2_solution);
   double x_norm = dist_norm2(x);
 
-  // std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
-
   solve_error = dist_norm2(h2_solve_diff) / x_norm;
-
-
 
   Hatrix::Context::finalize();
 

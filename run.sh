@@ -21,12 +21,10 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
+make -j H2_main
 make -j H2_dtd
 
-nleaf=256
-max_rank=50
-ndim=1
-adm=0
+ndim=2
 
 # ./build/examples/UMV_H2_Nlevel 64 16 0 10 60 1.9 0 2 2 0
 
@@ -45,7 +43,7 @@ for N in 64; do
                               --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 #  --use_nested_basis
+                              --kind_of_recompression 3 --use_nested_basis
             done
         done
     done

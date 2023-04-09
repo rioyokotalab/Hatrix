@@ -1361,14 +1361,14 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                 const Hatrix::Args& opts, parsec_taskpool_t* dtd_tp) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts, dtd_tp);
-    update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts, dtd_tp);
+    // update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts, dtd_tp);
+    // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts, dtd_tp);
 
     multiply_complements(A, domain, block, level, dtd_tp);
     factorize_diagonal(A, domain, block, level, dtd_tp);
-    triangle_reduction(A, domain, block, level, dtd_tp);
-    compute_schurs_complement(A, domain, block, level, dtd_tp);
-    compute_fill_ins(A, domain, block, level, dtd_tp);
+    // triangle_reduction(A, domain, block, level, dtd_tp);
+    // compute_schurs_complement(A, domain, block, level, dtd_tp);
+    // compute_fill_ins(A, domain, block, level, dtd_tp);
   }
 }
 
@@ -1912,7 +1912,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
     int64_t block_index = block / MPISIZE;
     if (mpi_rank(block) == MPIRANK) {
       Matrix U_F = make_complement(A.U(block, level));
-      Matrix prod = matmul(U_F, x_level[block_index]);
+      Matrix prod = matmul(U_F, x_level[block_index], true);
       x_level[block_index] = prod;
     }
 
@@ -2163,7 +2163,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
   for (int64_t block = nblocks-1; block >=0; --block) {
     int64_t block_index = block / MPISIZE;
 
-    // apply the tranpose of the oc block that is actually in the lower triangle.
+    // apply the transpose of the oc block that is actually in the lower triangle.
     for (int64_t icol = 0; icol < block; ++icol) {
       if (exists_and_inadmissible(A, block, icol, level)) {
         int64_t icol_index = icol / MPISIZE;
@@ -2282,7 +2282,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
 
     if (mpi_rank(block) == MPIRANK) {
       Matrix V_F = make_complement(A.U(block, level));
-      Matrix prod = matmul(V_F, x_level[block_index], true);
+      Matrix prod = matmul(V_F, x_level[block_index]);
       x_level[block_index] = prod;
     }
   }
@@ -2441,6 +2441,4 @@ solve(SymmetricSharedBasisMatrix& A,
   for (int64_t i = 0; i < x_levels[0].size(); ++i) {
     h2_solution[i] = x_levels[0][i];
   }
-
-  MPI_Barrier(MPI_COMM_WORLD);
 }

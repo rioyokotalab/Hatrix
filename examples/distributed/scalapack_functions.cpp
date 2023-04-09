@@ -52,10 +52,10 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   double BETA = 1.0;
   // Accumulate admissible blocks from the large distributed dense matrix.
   for (int64_t block = 0; block < nblocks; ++block) {
+    int IA = nleaf * block + 1;
     for (int64_t j = 0; j < nblocks; ++j) {
       if (exists_and_inadmissible(A, block, j, A.max_level)) { continue; }
-
-      int IA = nleaf * block + 1;
+      std::cout << "block -> " << block << " j -> " << j << std::endl;
       int JA = nleaf * j + 1;
 
       pdgeadd_(&NOTRANS, &nleaf, &nleaf,
@@ -71,7 +71,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   const char JOB_VT = 'N';
   // obtain the shared basis of each row.
   for (int64_t block = 0; block < nblocks; ++block) {
-    Cblacs_barrier(BLACS_CONTEXT, &ALL_GRID);
     // init global S vector for this block.
     double *S_MEM = new double[(int64_t)nleaf]();
 
@@ -163,8 +162,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     if (MPIRANK == IMAP[0]) {
       Cblacs_gridexit(U_LOCAL_CONTEXT);
     }
-
-    Cblacs_barrier(BLACS_CONTEXT, &ALL_GRID);
   }
 
   // Generate S blocks for the lower triangle
@@ -239,25 +236,17 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int AY_local_ncols = fmax(numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
                                     &MPIGRID[1]), 1);
   int AY[9];
-  // if (!MPIRANK) {
-  //   std::cout << "\t ALLOCATE AY_MEM" << std::endl;
-  // }
   double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
   descinit_(AY, &N, &level_block_size, &nleaf, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
-
-  // if (!MPIRANK) {
-  //   std::cout << "\t DONE ALLOCATE AY_MEM" << std::endl;
-  // }
 
   // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
   double ALPHA = 1.0;
   double BETA = 1.0;
   for (int64_t block = 0; block < nblocks; ++block) {
+    int IA = level_block_size * block + 1;
     for (int64_t j = 0; j < nblocks; ++j) {
       if (exists_and_inadmissible(A, block, j, level)) { continue; }
-
-      int IA = level_block_size * block + 1;
       int JA = level_block_size * j + 1;
 
       pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
@@ -268,16 +257,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
 
-  // if (!MPIRANK) {
-  //   std::cout << "\t DONE ADD" << std::endl;
-  // }
-
   // Allocate a temporary global matrix to store the product of the real basis with the
   // summation of the admissible blocks.
-
   int block_nrows = rank * 2;
   int TEMP_nrows = nblocks * block_nrows;
-  int TEMP_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]),1);
+  int TEMP_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int TEMP_local_ncols = fmax(numroc_(&level_block_size, &nleaf,
                                       &MYCOL, &ZERO, &ONE), 1);
   int TEMP[9];
@@ -602,7 +586,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       }
     }
   }
-
 
   delete[] S_BLOCKS_MEM;
   delete[] TEMP_PRODUCT_MEM;

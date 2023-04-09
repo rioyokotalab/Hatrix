@@ -6,7 +6,7 @@ PAPI_LIBS    = $(shell pkg-config --libs papi)
 CXXFLAGS     = -std=c++17 -O3 -g -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ \
                $(BLAS_INCLUDE) -I/home/sameer.deshmukh/gsl-2.7.1/build/include \
                $(shell pkg-config --cflags gtest gtest_main) $(PAPI_INCLUDE) -DUSE_MKL
-CXX          = g++
+CXX          = mpicxx
 MPICXX       = mpicxx
 LDFLAGS      = $(BLAS_LIB) $(shell pkg-config --libs gtest_main gtest) $(PAPI_LIBS) -lgfortran \
                -L/home/sameer.deshmukh/gsl-2.7.1/build/lib -lgsl
