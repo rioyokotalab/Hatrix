@@ -233,7 +233,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // 1. Generate blocks from the current admissible blocks for this level.
   int nleaf = opts.nleaf;
 
-  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int AY_local_nrows = fmax(numroc_(&N, &level_block_size, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int AY_local_ncols = fmax(numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO,
                                     &MPIGRID[1]), 1);
   int AY[9];
