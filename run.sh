@@ -38,7 +38,7 @@ for N in 1024; do
         for nleaf in 128; do
             for max_rank in 30; do
                 # mpirun -n 8 xterm -e gdb -ex "set auto-load safe-path /" -ex run --args ./bin/H2_dtd --N $N \
-                    ./bin/H2_dtd --N $N \
+                    mpirun -n 2 ./bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \

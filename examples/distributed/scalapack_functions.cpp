@@ -18,10 +18,7 @@ int U[9];
 void
 generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     const Domain& domain,
-                    const Args& opts, double* DENSE_MEM, std::vector<int>& DENSE) {
-  if (!MPIRANK) {
-    // std::cout << "generate leaf nodes.\n";
-  }
+                    const Args& opts) {
   int N = opts.N;
   int nleaf = opts.nleaf;
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
@@ -59,13 +56,18 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       for (int ii = 0; ii < nleaf; ++ii) {
         for (int jj = 0; jj < nleaf; ++jj) {
           int AY_local_i = indxg2l(IA + ii, nleaf, MPIGRID[0])-1;
-          int AY_local_j = indxg2l(JA + jj, nleaf, MPIGRID[1])-1;
 
           AY_MEM[AY_local_i + jj * AY_local_nrows] +=
             opts.kernel(domain.particles[IA + ii - 1].coords,
                         domain.particles[JA + jj - 1].coords);
         }
       }
+
+      // pdgeadd_(&NOTRANS, &nleaf, &nleaf,
+      //          &ALPHA,
+      //          DENSE_MEM, &IA, &JA, DENSE.data(),
+      //          &BETA,
+      //          AY_MEM, &IA, &ONE, AY);
     }
   }
 
@@ -237,11 +239,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   int nleaf = opts.nleaf;
 
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  int AY_local_ncols = fmax(numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
-                                    &MPIGRID[1]), 1);
+  int AY_local_ncols = fmax(numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int AY[9];
   double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
-  descinit_(AY, &N, &level_block_size, &nleaf, &rank,
+  descinit_(AY, &N, &level_block_size, &nleaf, &level_block_size,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
   // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
@@ -253,10 +254,16 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       if (exists_and_inadmissible(A, block, j, level)) { continue; }
       int JA = level_block_size * j + 1;
 
+      // pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
+      //          &ALPHA,
+      //          DENSE_MEM, &IA, &JA, DENSE.data(),
+      //          &BETA,
+      //          AY_MEM, &IA, &ONE, AY);
+
       for (int ii = 0; ii < level_block_size; ++ii) {
         for (int jj = 0; jj < level_block_size; ++jj) {
           int AY_local_i = indxg2l(IA + ii, nleaf, MPIGRID[0])-1;
-          int AY_local_j = indxg2l(JA + jj, nleaf, MPIGRID[1])-1;
+          int AY_local_j = indxg2l(jj+1, level_block_size, MPIGRID[1])-1;
 
           AY_MEM[AY_local_i + jj * AY_local_nrows] +=
             opts.kernel(domain.particles[IA + ii - 1].coords,
@@ -610,7 +617,7 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 
-  generate_leaf_nodes(A, domain, opts, DENSE_MEM, DENSE);
+  generate_leaf_nodes(A, domain, opts);
 
   if (!MPIRANK) {
     // std::cout << "FINISH LEAF NODE\n";
