@@ -36,7 +36,7 @@ ndim=2
 for N in 1024; do
     for adm in 0; do
         for nleaf in 128; do
-            for max_rank in 30; do
+            for max_rank in 30 40 50; do
                 # mpirun -n 8 xterm -e gdb -ex "set auto-load safe-path /" -ex run --args ./bin/H2_dtd --N $N \
                     mpirun -n 2 ./bin/H2_dtd --N $N \
                               --nleaf $nleaf \
