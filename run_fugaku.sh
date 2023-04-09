@@ -19,11 +19,11 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/hp190122/u01594/gitrepos/googletes
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/hp190122/u01594/gitrepos/parsec/build/lib64/pkgconfig:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64:/home/hp190122/u01594/gsl-2.7.1/build/lib
 
-export PARALLEL=1
-export OMP_NUM_THREADS=1
+# export PARALLEL=1
+# export OMP_NUM_THREADS=1
 export PLE_MPI_STD_EMPTYFILE=off
 export FLIB_SCCR_CNTL=FALSE
-export FLIB_PTHREAD=1
+# export FLIB_PTHREAD=1
 
 export OMP_PLACES=cores
 export OMP_DISPLAY_AFFINITY=TRUE
@@ -54,7 +54,7 @@ for adm in 0; do
                               --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis 
+                              --kind_of_recompression 3 --use_nested_basis
         done
     done
 done

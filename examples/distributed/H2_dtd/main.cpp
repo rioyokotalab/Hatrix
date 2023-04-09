@@ -210,34 +210,6 @@ int main(int argc, char **argv) {
     std::cout << "Allocating dense matrix.\n";
   }
 
-  int DENSE_NBROW = opts.nleaf;
-  int DENSE_NBCOL = opts.nleaf;
-  int DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
-  int DENSE_local_cols = numroc_(&N, &DENSE_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
-  std::vector<int> DENSE(DESC_LEN);
-
-  descinit_(DENSE.data(), &N, &N, &DENSE_NBROW, &DENSE_NBCOL, &ZERO, &ZERO,
-            &BLACS_CONTEXT, &DENSE_local_rows, &info);
-  double* DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)]();
-
-  if (!MPIRANK) {
-    std::cout << "begin data init.\n";
-  }
-
-  // generate the distributed P2P matrix.
-#pragma omp parallel for
-  for (int64_t i = 0; i < DENSE_local_rows; ++i) {
-#pragma omp parallel for
-    for (int64_t j = 0; j < DENSE_local_cols; ++j) {
-      int g_row = indxl2g(i + 1, DENSE_NBROW, MYROW, MPIGRID[0]) - 1;
-      int g_col = indxl2g(j + 1, DENSE_NBCOL, MYCOL, MPIGRID[1]) - 1;
-
-      DENSE_MEM[i + j * DENSE_local_rows] =
-        opts.kernel(domain.particles[g_row].coords,
-                    domain.particles[g_col].coords);
-    }
-  }
-
   if (!MPIRANK) {
     std::cout << "begin construction.\n";
   }
@@ -310,6 +282,36 @@ int main(int argc, char **argv) {
   double matvec_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_matvec - start_matvec).count();
 
+  // BEGIN CONSTRUCTION VERIFICATION.
+
+  int DENSE_NBROW = opts.nleaf;
+  int DENSE_NBCOL = opts.nleaf;
+  int DENSE_local_rows = numroc_(&N, &DENSE_NBROW, &MYROW, &ZERO, &MPIGRID[0]);
+  int DENSE_local_cols = numroc_(&N, &DENSE_NBCOL, &MYCOL, &ZERO, &MPIGRID[1]);
+  std::vector<int> DENSE(DESC_LEN);
+
+  descinit_(DENSE.data(), &N, &N, &DENSE_NBROW, &DENSE_NBCOL, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &DENSE_local_rows, &info);
+  double* DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)]();
+
+  if (!MPIRANK) {
+    std::cout << "begin data init.\n";
+  }
+
+  // generate the distributed P2P matrix.
+#pragma omp parallel for
+  for (int64_t i = 0; i < DENSE_local_rows; ++i) {
+#pragma omp parallel for
+    for (int64_t j = 0; j < DENSE_local_cols; ++j) {
+      int g_row = indxl2g(i + 1, DENSE_NBROW, MYROW, MPIGRID[0]) - 1;
+      int g_col = indxl2g(j + 1, DENSE_NBCOL, MYCOL, MPIGRID[1]) - 1;
+
+      DENSE_MEM[i + j * DENSE_local_rows] =
+        opts.kernel(domain.particles[g_row].coords,
+                    domain.particles[g_col].coords);
+    }
+  }
+
   // H2 matvec verification.
   double ALPHA = 1.0;
   double BETA = 0.0;
@@ -335,7 +337,6 @@ int main(int argc, char **argv) {
   std::vector<Matrix> difference;
   for (int i = 0; i < b.size(); ++i) {
     difference.push_back(b_check[i] - b[i]);
-    // difference[i].print();
   }
 
   double diff_norm = dist_norm2(difference);
