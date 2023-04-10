@@ -242,7 +242,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // 1. Generate blocks from the current admissible blocks for this level.
   int nleaf = opts.nleaf;
 
-  int AY_local_nrows = fmax(numroc_(&N, &level_block_size, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int AY_local_nrows = fmax(numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int AY_local_ncols = fmax(numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO,
                                     &MPIGRID[1]), 1);
   int AY[9];
@@ -256,26 +256,27 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
               << " " << exception.what() << std::endl;
   }
 
-  if (!MPIRANK) {
-    std::cout << "\t AY MEM: " <<  (int64_t)AY_local_nrows * (int64_t)AY_local_ncols << std::endl;
- }
-
-  descinit_(AY, &N, &level_block_size, &level_block_size, &level_block_size,
+  descinit_(AY, &N, &level_block_size, &nleaf, &level_block_size,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
   // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
   double ALPHA = 1.0;
   double BETA = 1.0;
-  for (int64_t block = MYROW; block < nblocks; block += MPIGRID[0]) {
-    int IA = level_block_size * block + 1;
+  int64_t leaf_nblocks = N / nleaf;
+  for (int64_t block = MYROW; block < leaf_nblocks; block += MPIGRID[0]) {
+    // int IA = level_block_size * block + 1;
+    int64_t level_block = block / (leaf_nblocks / nblocks);
+    int IA = level_block_size * level_block +
+      (block % (leaf_nblocks / nblocks)) * nleaf + 1;
+
+
     for (int64_t j = MYCOL; j < nblocks; j += MPIGRID[1]) {
-      if (exists_and_inadmissible(A, block, j, level)) { continue; }
+      if (exists_and_inadmissible(A, level_block, j, level)) { continue; }
       int JA = level_block_size * j + 1;
 
-      for (int ii = 0; ii < level_block_size; ++ii) {
+      for (int ii = 0; ii < nleaf; ++ii) {
         for (int jj = 0; jj < level_block_size; ++jj) {
-          int AY_local_i = indxg2l(IA + ii, level_block_size, MPIGRID[0])-1;
-          int AY_local_j = indxg2l(jj+1, level_block_size, MPIGRID[1])-1;
+          int AY_local_i = indxg2l(IA + ii, nleaf, MPIGRID[0])-1;
 
           AY_MEM[AY_local_i + jj * AY_local_nrows] +=
             opts.kernel(domain.particles[IA + ii - 1].coords,
