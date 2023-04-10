@@ -281,6 +281,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
 
+  if (!MPIRANK) {
+    std::cout << "\t Done AY.\n" << std::endl;
+  }
+
   // Allocate a temporary global matrix to store the product of the real basis with the
   // summation of the admissible blocks.
   int block_nrows = rank * 2;
@@ -342,6 +346,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
             AY_MEM, &IA, &JA, AY,
             &BETA,
             TEMP_MEM, &ITEMP, &JTEMP, TEMP);
+  }
+
+  if (!MPIRANK) {
+    std::cout << "\t Apply real basis U.\n" << std::endl;
   }
 
   delete[] AY_MEM;
@@ -535,6 +543,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
               &BETA,
               U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
     }
+
+
+    if (!MPIRANK) {
+      std::cout << "\t Generate transfer matrix block= " << block << std::endl;
+    }
   }
   // Free the real basis of the child level and set the U_REAL to real basis.
   delete[] UTRANSFER_MEM;
@@ -615,6 +628,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
 
+  if (!MPIRANK) {
+    std::cout << "\t Done DENSE_MEM generation." << std::endl;
+  }
+
   for (int64_t i = 0; i < nblocks; ++i) {
     int ITEMP_PRODUCT = 1;
     int IU = i * level_block_size + 1;
@@ -647,6 +664,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                 U_MEM, &IU, &JU, U,
                 &BETA,
                 S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
+
+        if (!MPIRANK) {
+          std::cout << "\t Done TEMP_PRODUCT : " << i << " " << j << std::endl;
+        }
       }
     }
   }
@@ -693,6 +714,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
         if (mpi_rank(i) == MPIRANK) {
           A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
           Cblacs_gridexit(S_LOCAL_CONTEXT);
+        }
+
+        if (!MPIRANK) {
+          std::cout << "\t Done S_LOCAL : " << i << " " << j << std::endl;
         }
       }
     }
