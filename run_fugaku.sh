@@ -1,13 +1,13 @@
 #!/bin/bash
-#PJM -L "node=32"
+#PJM -L "node=128"
 #PJM -L "rscunit=rscunit_ft01"
 #PJM -L "rscgrp=small"
-#PJM -L "elapse=3:00:00"
+#PJM -L "elapse=24:00:00"
 #PJM -L "freq=2200"
 #PJM -L "throttling_state=0"
 #PJM -L "issue_state=0"
 #PJM -L "ex_pipe_state=0"
-#PJM --mpi "proc=32"
+#PJM --mpi "proc=128"
 #PJM --mpi "max-proc-per-node=1"
 #PJM -s
 
@@ -42,7 +42,7 @@ for adm in 0; do
     ndim=2
 
     for max_rank in 100; do
-        for N in 65536; do
+        for N in 262144; do
                 mpiexec bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \

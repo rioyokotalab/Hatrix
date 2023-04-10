@@ -256,6 +256,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
               << " " << exception.what() << std::endl;
   }
 
+  if (!MPIRANK) {
+    std::cout << "\t AY MEM: " <<  (int64_t)AY_local_nrows * (int64_t)AY_local_ncols << std::endl;
+ }
+
   descinit_(AY, &N, &level_block_size, &level_block_size, &level_block_size,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
@@ -280,6 +284,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       }
     }
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
 
   if (!MPIRANK) {
     std::cout << "\t Done AY.\n" << std::endl;
