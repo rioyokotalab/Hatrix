@@ -48,6 +48,7 @@ else()
     UMV_H2_Nlevel
     Construction_SymmetricH2_Nlevel_with_sampling
     LDL_SymmetricH2_Nlevel
+    LDL_SymmetricH2_Nlevel_Ma2019
     ULV_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency_directschur
