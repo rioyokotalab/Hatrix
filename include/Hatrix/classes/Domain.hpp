@@ -21,6 +21,12 @@ namespace Hatrix {
               const int64_t dim,
               const int64_t level,
               const uint32_t level_index);
+
+    void
+    search_tree_for_nodes(const Cell& tree,
+                          const int64_t level_index,
+                          const int64_t level,
+                          int64_t &pstart, int64_t &pend) const;
   public:
     Domain(int64_t N, int64_t ndim);
     void generate_circular_particles(double min_val, double max_val);

@@ -7,9 +7,25 @@
 #include "Hatrix/Hatrix.h"
 
 namespace Hatrix {
+  void
+  Domain::search_tree_for_nodes(const Cell& tree, const int64_t level_index, const int64_t level,
+                                int64_t &pstart, int64_t &pend) const {
+    if (tree.level == level && tree.level_index == level_index) {
+      pstart = tree.start_index;
+      pend = tree.end_index;
+      return;
+    }
+
+    if (tree.cells.size() > 0) {
+      search_tree_for_nodes(tree.cells[0], level_index, level, pstart, pend);
+      search_tree_for_nodes(tree.cells[1], level_index, level, pstart, pend);
+    }
+  }
+
   int64_t
   Domain::cell_size(int64_t level_index, int64_t level) const {
     int64_t pstart, pend;
+
     search_tree_for_nodes(tree, level_index, level, pstart, pend);
 
     return pend - pstart;
@@ -49,7 +65,7 @@ namespace Hatrix {
     }
   }
 
-  void Domain::generate_uniform_grid_particles() {
+  void Domain::generate_grid_particles() {
     std::vector<int64_t> sides(ndim, 0);
     sides[0] = ceil(pow(N, 1.0 / ndim));
     int64_t total = sides[0];

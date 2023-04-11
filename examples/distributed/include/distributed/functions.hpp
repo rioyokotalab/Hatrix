@@ -2,7 +2,6 @@
 
 #include "Hatrix/Hatrix.h"
 
-#include "Domain.hpp"
 #include "internal_types.hpp"
 #include "SymmetricSharedBasisMatrix.hpp"
 
