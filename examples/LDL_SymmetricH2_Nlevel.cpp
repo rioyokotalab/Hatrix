@@ -1643,7 +1643,7 @@ int main(int argc, char ** argv) {
   std::cout << "factor_min_rank=" << factor_min_rank
             << " factor_max_rank=" << factor_max_rank
             << " factor_mem=" << factor_mem
-            << " factor_fp_ops=" << factor_fp_ops
+            << " factor_fp_ops=" << std::scientific << static_cast<double>(factor_fp_ops) << std::defaultfloat
             << " factor_time=" << factor_time
             << std::endl;
 #endif
@@ -1706,6 +1706,7 @@ int main(int argc, char ** argv) {
             << "," << std::scientific << solve_error << std::defaultfloat
             << std::endl;
 #endif
+  // std::cout << std::endl;
   // Hatrix::timing::printTime("generalized_ldl_factorize", 5);
 
   Hatrix::Context::finalize();
