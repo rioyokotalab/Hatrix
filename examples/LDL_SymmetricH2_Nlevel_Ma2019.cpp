@@ -370,28 +370,30 @@ SymmetricH2::SymmetricH2(const Domain& domain,
   for (int64_t level = height - 1; level > 0; level--) {
     Uchild = generate_transfer_matrices(domain, level, Uchild);
   }
-  // // Put dummy identity basis to all dense block rows (if any)
-  // for (int64_t level = height; level >= min_adm_level; level--) {
-  //   const int64_t num_nodes = level_blocks[level];
-  //   for (int64_t node = 0; node < num_nodes; node++) {
-  //     if (!U.exists(node, level)) {
-  //       if (level == height) {
-  //         const int64_t nrows = leaf_size;
-  //         const int64_t rank = 1;
-  //         U.insert(node, level, generate_identity_matrix(nrows, rank));
-  //       }
-  //       else {
-  //         const int64_t c1 = 2 * node + 0;
-  //         const int64_t c2 = 2 * node + 1;
-  //         const int64_t rank_c1 = U(c1, level + 1).cols;
-  //         const int64_t rank_c2 = U(c2, level + 1).cols;
-  //         const int64_t nrows = rank_c1 + rank_c2;
-  //         const int64_t rank = std::max(rank_c1, rank_c2);
-  //         U.insert(node, level, generate_identity_matrix(nrows, rank));
-  //       }
-  //     }
-  //   }
-  // }
+  // Put dummy identity basis to all dense block rows (if any)
+  for (int64_t level = height; level >= min_adm_level; level--) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      if (!U.exists(node, level)) {
+        if (level == height) {
+          const int64_t nrows = leaf_size;
+          const int64_t rank = 1;
+          U.insert(node, level, generate_identity_matrix(nrows, rank));
+          US_row.insert(node, level, generate_identity_matrix(nrows, rank));  // TODO Remove
+        }
+        else {
+          const int64_t c1 = 2 * node + 0;
+          const int64_t c2 = 2 * node + 1;
+          const int64_t rank_c1 = U(c1, level + 1).cols;
+          const int64_t rank_c2 = U(c2, level + 1).cols;
+          const int64_t nrows = rank_c1 + rank_c2;
+          const int64_t rank = std::max(rank_c1, rank_c2);
+          U.insert(node, level, generate_identity_matrix(nrows, rank));
+          US_row.insert(node, level, generate_identity_matrix(nrows, rank));  // TODO Remove
+        }
+      }
+    }
+  }
 }
 
 int64_t SymmetricH2::get_basis_min_rank(const int64_t level_begin,
@@ -696,7 +698,7 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
       timing::start("update_transfer_matrix");
       const auto parent_idx = domain.get_cell_idx(parent_node, parent_level);
       const auto& parent_cell = domain.cells[parent_idx];
-      if (parent_cell.sample_farfield.size() > 0) {
+      if (parent_level >= min_adm_level) {
         const int64_t c1 = parent_node * 2;
         const int64_t c2 = parent_node * 2 + 1;
         Matrix& Utransfer = U(parent_node, parent_level);
@@ -1051,24 +1053,6 @@ long long int SymmetricH2::factorize(const Domain& domain) {
                    U(j2, level), fill_in_splits[3], false, false, 1, 0);
           }
           F.insert(i, j, parent_level, std::move(fill_in));
-        }
-      }
-      // Put identity bases when all dense is encountered in parent level
-      for (int64_t node = 0; node < num_nodes; node += 2) {
-        int64_t parent_node = node / 2;
-        if (!U.exists(parent_node, parent_level)) {
-          // Use identity matrix as U bases whenever all dense row is encountered
-          int64_t c1 = node;
-          int64_t c2 = node + 1;
-          int64_t rank_c1 = U(c1, level).cols;
-          int64_t rank_c2 = U(c2, level).cols;
-          int64_t rank_parent = std::max(rank_c1, rank_c2);
-          Matrix Utransfer =
-              generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
-
-          if (r.exists(c1)) r.erase(c1);
-          if (r.exists(c2)) r.erase(c2);
-          U.insert(parent_node, parent_level, std::move(Utransfer));
         }
       }
     }
