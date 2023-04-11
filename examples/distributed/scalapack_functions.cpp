@@ -5,7 +5,10 @@
 #include <cmath>
 #include <cstring>
 #include <new>
+
+#if !defined(__clang__)
 #include <bits/stdc++.h>
+#endif
 
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"

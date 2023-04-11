@@ -20,7 +20,7 @@ set -e
 # ulimit -c unlimited
 
 make -j H2_main
-make -j Dense
+# make -j Dense
 
 max_rank=50
 nleaf=512
