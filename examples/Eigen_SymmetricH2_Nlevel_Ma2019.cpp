@@ -258,12 +258,16 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain) {
     }
   }
   // Generate leaf level cluster basis
+  #pragma omp parallel for
   for (int64_t i = 0; i < num_nodes; i++) {
     const auto idx = domain.get_cell_idx(i, leaf_level);
     const auto& cell = domain.cells[idx];
     if (cell.sample_farfield.size() > 0) {
       Matrix Ui = generate_row_cluster_basis(domain, i, height);
-      U.insert(i, height, std::move(Ui));
+      #pragma omp critical
+      {
+        U.insert(i, height, std::move(Ui));
+      }
     }
   }
   // Generate S coupling matrices
@@ -307,6 +311,7 @@ SymmetricH2::generate_transfer_matrices(const Domain& domain,
   RowLevelMap Ubig_parent;
 
   const int64_t num_nodes = level_blocks[level];
+  #pragma omp parallel for
   for (int64_t node = 0; node < num_nodes; node++) {
     const auto idx = domain.get_cell_idx(node, level);
     const auto& cell = domain.cells[idx];
@@ -320,16 +325,18 @@ SymmetricH2::generate_transfer_matrices(const Domain& domain,
       const Matrix& Ubig_child1 = Uchild(child1, child_level);
       const Matrix& Ubig_child2 = Uchild(child2, child_level);
       Matrix Utransfer = generate_U_transfer_matrix(domain, node, level, Ubig_child1, Ubig_child2);
-      U.insert(node, level, std::move(Utransfer));
 
       // Generate the full bases to pass onto the parent.
-      auto Utransfer_splits = U(node, level).split(vec{Ubig_child1.cols}, vec{});
-      Matrix Ubig(block_size, U(node, level).cols);
+      auto Utransfer_splits = Utransfer.split(vec{Ubig_child1.cols}, vec{});
+      Matrix Ubig(block_size, Utransfer.cols);
       auto Ubig_splits = Ubig.split(vec{Ubig_child1.rows}, vec{});
-
       matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
-      Ubig_parent.insert(node, level, std::move(Ubig));
+      #pragma omp critical
+      {
+        U.insert(node, level, std::move(Utransfer));
+        Ubig_parent.insert(node, level, std::move(Ubig));
+      }
     }
   }
 
@@ -894,6 +901,7 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
       // Schur's complement into admissible block (fill-in)
       START_TIMER("compute_fill_ins");
+      #pragma omp parallel for collapse(2)
       for (int64_t i: near_neighbors(node, level)) {
         for (int64_t j: near_neighbors(node, level)) {
           const bool is_admissible_ij =
@@ -967,12 +975,15 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
                              U(j, level), false, true);
             }
             // Save or accumulate with existing fill-in block that has been propagated from lower level
-            if (!F.exists(i, j, level)) {
-              F.insert(i, j, level, std::move(F_ij));
-              fill_in_neighbors(i, level).push_back(j);
-            }
-            else {
-              F(i, j, level) += F_ij;
+            #pragma omp critical
+            {
+              if (!F.exists(i, j, level)) {
+                F.insert(i, j, level, std::move(F_ij));
+                fill_in_neighbors(i, level).push_back(j);
+              }
+              else {
+                F(i, j, level) += F_ij;
+              }
             }
           }
         }
