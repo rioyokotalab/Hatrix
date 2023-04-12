@@ -216,20 +216,20 @@ namespace Hatrix {
     if (kfunc == LAPLACE) {
       kernel = [&](const std::vector<double>& c_row,
                    const std::vector<double>& c_col) {
-        return laplace_kernel(c_row, c_col, param_1); // add_diag
+        return Hatrix::greens_functions::laplace_kernel(c_row, c_col, param_1); // add_diag
       };
     }
     else if (kfunc == GSL_MATERN) {
       kernel = [&](const std::vector<double>& c_row,
                    const std::vector<double>& c_col) {
-        return matern_kernel(c_row, c_col, param_1, param_2,
+        return Hatrix::greens_functions::matern_kernel(c_row, c_col, param_1, param_2,
                              param_3); // sigma, nu, smoothness
       };
     }
     else if (kfunc == YUKAWA) {
       kernel = [&](const std::vector<double>& c_row,
                    const std::vector<double>& c_col) {
-        return yukawa(c_row, c_col, param_1, param_2); // alpha, singularity
+        return Hatrix::greens_functions::yukawa_kernel(c_row, c_col, param_1, param_2); // alpha, singularity
       };
     }
   }

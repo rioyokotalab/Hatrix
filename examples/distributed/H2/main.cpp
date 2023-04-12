@@ -301,7 +301,7 @@ int main(int argc, char* argv[]) {
             << std::scientific << opts.param_1 << std::fixed  << ","
             << std::scientific << opts.param_2 << std::fixed << ","
             << opts.param_3 << ","
-            << opts.kernel_verbose
+            << opts.kernel_verbose << ",1" // fake MPISIZE
             << std::endl;
 
   Hatrix::Context::finalize();
