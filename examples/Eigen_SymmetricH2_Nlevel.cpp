@@ -861,6 +861,7 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
       // Schur's complement into admissible block (fill-in)
       START_TIMER("compute_fill_ins");
+      #pragma omp parallel for collapse(2)
       for (int64_t i: near_neighbors(node, level)) {
         for (int64_t j: near_neighbors(node, level)) {
           const bool is_admissible_ij =
@@ -934,12 +935,15 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
                              U(j, level), false, true);
             }
             // Save or accumulate with existing fill-in block that has been propagated from lower level
-            if (!F.exists(i, j, level)) {
-              F.insert(i, j, level, std::move(F_ij));
-              fill_in_neighbors(i, level).push_back(j);
-            }
-            else {
-              F(i, j, level) += F_ij;
+            #pragma omp critical
+            {
+              if (!F.exists(i, j, level)) {
+                F.insert(i, j, level, std::move(F_ij));
+                fill_in_neighbors(i, level).push_back(j);
+              }
+              else {
+                F(i, j, level) += F_ij;
+              }
             }
           }
         }
