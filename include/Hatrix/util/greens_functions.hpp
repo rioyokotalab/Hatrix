@@ -3,7 +3,11 @@
 #include "Hatrix/Hatrix.h"
 namespace Hatrix {
   namespace greens_functions {
-    double laplace_kernel(const std::vector<double>& coords_row,
+    double laplace_2d_kernel(const std::vector<double>& coords_row,
+                          const std::vector<double>& coords_col,
+                          const double eta);
+
+    double laplace_3d_kernel(const std::vector<double>& coords_row,
                           const std::vector<double>& coords_col,
                           const double eta);
 

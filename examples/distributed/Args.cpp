@@ -214,10 +214,19 @@ namespace Hatrix {
     }
 
     if (kfunc == LAPLACE) {
-      kernel = [&](const std::vector<double>& c_row,
-                   const std::vector<double>& c_col) {
-        return Hatrix::greens_functions::laplace_kernel(c_row, c_col, param_1); // add_diag
-      };
+      switch (ndim) {
+      case 2:
+        kernel = [&](const std::vector<double>& c_row,
+                     const std::vector<double>& c_col) {
+          return Hatrix::greens_functions::laplace_2d_kernel(c_row, c_col, param_1); // add_diag
+        };
+        break;
+      default:
+        kernel = [&](const std::vector<double>& c_row,
+                     const std::vector<double>& c_col) {
+          return Hatrix::greens_functions::laplace_3d_kernel(c_row, c_col, param_1); // add_diag
+        };
+      }
     }
     else if (kfunc == GSL_MATERN) {
       kernel = [&](const std::vector<double>& c_row,

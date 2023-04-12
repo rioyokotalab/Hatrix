@@ -35,13 +35,13 @@ N=4096
 # ./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-9 --param_2 1
 # ./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-4 --param_2 1
 
-for N in 1024; do
+for N in 64; do
     for adm in 0; do
-        for nleaf in 128; do
-            for max_rank in 100; do
+        for nleaf in 16; do
+            for max_rank in 10; do
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
-                              --kernel_func gsl_matern \
+                              --kernel_func laplace \
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
@@ -49,8 +49,8 @@ for N in 1024; do
                               --admis $adm \
                               --admis_kind diagonal \
                               --construct_algorithm miro \
-                              --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
+                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3
             done
         done
     done
