@@ -69,3 +69,8 @@ find_package(MPI REQUIRED)
 add_executable(SymmH2_ULV_SC22 SymmH2_ULV_SC22.cpp)
 target_compile_options(SymmH2_ULV_SC22 PRIVATE -DUSE_MKL -D_PROF)
 target_link_libraries(SymmH2_ULV_SC22 MPI::MPI_CXX Hatrix)
+
+add_executable(ParSlicing ParSlicing.cpp)
+target_compile_options(ParSlicing PRIVATE -DUSE_MKL -D_PROF)
+target_link_libraries(ParSlicing MPI::MPI_CXX)
+
