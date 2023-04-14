@@ -219,8 +219,9 @@ actual_i = %{ return h2_params->col_near_list[level].level_block_list[block].ind
 : parsec_D_non_leaf(actual_i, block, level)
 
 READ BLOCK <- BLOCK cholesky_full(block, level) [type=SMALL_TILE]
-RW A <- parsec_D_non_leaf(actual_i, block, level) [type=SMALL_TILE]
+RW A <- BLOCK merge_non_diagonal_blocks(actual_i, block, level) [type=SMALL_TILE]
      -> syrk_full(actual_i, level)
+
 BODY
 {
   int64_t D_dd_nrows = get_dim(block, level, h2_params);
@@ -246,6 +247,26 @@ block = 1 .. %{ return pow(2, level)-1; %}
 
   RW A <- solve_triangular_full(block, 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}, level)
        -> BLOCK cholesky_full(block, level)
+
+BODY
+{
+}
+END
+
+matmul_full(block, i, level)
+
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 2 .. %{ return pow(2, level)-1; %}
+i = 1 .. %{ return h2_params->row_near_list[level].level_block_list[block].length-2; %}
+actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %}
+
+  : parsec_D_non_leaf(block, )
+
+  READ A <- A solve_triangular_full()
+  READ B <- A solve_triangular_full()
+  RW C <- (block == 0) ? BLOCK merge_non_diagonal_blocks(actual_i, block, level)
+       <- (block != 0) ? C matmul_full(block, actual_i, level)
+       -> (n == k+1) ? C potrf_ztrsm(m, n) : C potrf_zgemm(m, n, k+1)
 
 BODY
 {
