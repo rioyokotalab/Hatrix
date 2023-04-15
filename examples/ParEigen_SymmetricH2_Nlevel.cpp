@@ -1506,8 +1506,8 @@ int main(int argc, char ** argv) {
             const double new_k0_ev = get_kth_eigenvalue(A, domain, new_k0, ev_tol, task.a, task.b);
             const double new_k1_ev = get_kth_eigenvalue(A, domain, new_k1, ev_tol, task.a, task.b);
             // Split into two tasks
-            Task task_left   { task.k0, new_k0 - 1, task.a, new_k0_ev };
-            Task task_right  { new_k1 + 1, task.k1, new_k1_ev, task.b };
+            Task task_left   { task.k0, new_k0 - 1, task.a, new_k0_ev + ev_tol };
+            Task task_right  { new_k1 + 1, task.k1, new_k1_ev - ev_tol, task.b };
             out_task_buffer[0] = (double)task_left.k0;
             out_task_buffer[1] = (double)task_left.k1;
             out_task_buffer[2] = task_left.a;
