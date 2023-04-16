@@ -129,7 +129,9 @@ void id_row(Matrix& U, std::vector<int64_t>& ipiv);
 std::tuple<Matrix, std::vector<int64_t>> truncated_id_row(Matrix& A, int64_t rank);
 std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double error, bool relative);
 
-std::vector<double> get_eigenvalues(const Matrix& A);
+std::vector<double> get_eigenvalues(Matrix& A);
+std::vector<double> get_selected_eigenvalues(Matrix& A, const int64_t k0, const int64_t k1,
+                                             const double abs_tol);
 
 std::tuple<int64_t, std::vector<int64_t>, std::vector<double>> partial_pivoted_qr(Matrix& A, const int64_t rank);
 std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, const int64_t rank);
