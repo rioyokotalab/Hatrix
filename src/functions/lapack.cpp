@@ -749,11 +749,21 @@ std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double eps, boo
   return std::make_tuple(std::move(PU), std::move(skel_rows));
 }
 
-std::vector<double> get_eigenvalues(const Matrix& A) {
+std::vector<double> get_eigenvalues(Matrix& A) {
   assert(A.rows == A.cols);
-  Matrix Ac(A);
-  std::vector<double> eigv(Ac.rows, 0);
-  LAPACKE_dsyev(LAPACK_COL_MAJOR, 'N', 'L', Ac.rows, &Ac, Ac.stride, eigv.data());
+  std::vector<double> eigv(A.rows, 0);
+  LAPACKE_dsyev(LAPACK_COL_MAJOR, 'N', 'L', A.rows, &A, A.stride, eigv.data());
+  return eigv;
+}
+
+std::vector<double> get_selected_eigenvalues(Matrix& A, const int64_t k0, const int64_t k1,
+                                             const double abstol) {
+  assert(A.rows == A.cols);
+  int m, tmp;
+  std::vector<double> eigv(A.rows, 0);
+  LAPACKE_dsyevx(LAPACK_COL_MAJOR, 'N', 'I', 'L', A.rows, &A, A.stride, 0, 0,
+                 k0, k1, abstol, &m, eigv.data(), nullptr, 1, &tmp);
+  eigv.resize(m);
   return eigv;
 }
 
