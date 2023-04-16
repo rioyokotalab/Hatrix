@@ -30,7 +30,7 @@ constexpr double EPS = std::numeric_limits<double>::epsilon();
 using vec = std::vector<int64_t>;
 
 // Uncomment the following line to print output in CSV format
-// #define OUTPUT_CSV
+#define OUTPUT_CSV
 // Uncomment the following line to enable debug output
 // #define DEBUG_OUTPUT
 // Uncomment the following line to enable timer
@@ -1095,20 +1095,31 @@ int inertia(const SymmetricH2& A, const Domain& domain,
 }
 
 double get_kth_eigenvalue(const SymmetricH2& A, const Domain& domain,
-                          const int64_t k, const double ev_tol,
-                          double left, double right) {
+                          const double ev_tol, const int idx_k,
+                          const int k_list_size, const std::vector<int>& k_list,
+                          std::vector<double>& a,
+                          std::vector<double>& b) {
+  const auto k = k_list[idx_k];
   bool singular = false;
-  while((right - left) >= ev_tol) {
-    const auto mid = (left + right) / 2;
-    const auto value = inertia(A, domain, mid, singular);
+  while((b[idx_k] - a[idx_k]) >= ev_tol) {
+    const auto mid = (a[idx_k] + b[idx_k]) / 2;
+    const int v_mid = inertia(A, domain, mid, singular);
     if(singular) {
       printf("Shifted matrix becomes singular (shift=%.5lf)\n", mid);
       break;
     }
-    if(value >= k) right = mid;
-    else left = mid;
+    // Update intervals accordingly
+    for (int idx = 0; idx < k_list_size; idx++) {
+      const auto ki = k_list[idx];
+      if (ki <= v_mid && mid < b[idx]) {
+        b[idx] = mid;
+      }
+      if (ki > v_mid && mid > a[idx]) {
+        a[idx] = mid;
+      }
+    }
   }
-  return (left + right) / 2.;
+  return (a[idx_k] + b[idx_k]) / 2.;
 }
 
 } // namespace Hatrix
@@ -1270,24 +1281,23 @@ int main(int argc, char ** argv) {
   const auto start_construct = MPI_Wtime();
   Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type);
   const auto stop_construct = MPI_Wtime();
-  const double construct_time = stop_construct - start_construct;
+  const auto construct_min_rank = A.get_basis_min_rank(1, A.height);
+  const auto construct_max_rank = A.get_basis_max_rank(1, A.height);
+  const auto construct_time = stop_construct - start_construct;
+  const auto construct_error = A.construction_error(domain);
+  const auto construct_mem = A.memory_usage();
+  const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
+  const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
+  const auto csp = A.get_level_max_nblocks('a', 1, A.height);
+  const auto csp_dense_leaf = A.get_level_max_nblocks('n', A.height, A.height);
+  const auto csp_dense_all = A.get_level_max_nblocks('n', 1, A.height);
+  const auto csp_lr_all = A.get_level_max_nblocks('f', 1, A.height);
 
   // All processes finished construction
   MPI_Barrier(MPI_COMM_WORLD);
 
 #ifndef OUTPUT_CSV
   if (mpi_rank == 0) {
-      const auto construct_min_rank = A.get_basis_min_rank(1, A.height);
-      const auto construct_max_rank = A.get_basis_max_rank(1, A.height);
-      const auto construct_error = A.construction_error(domain);
-      const auto construct_mem = A.memory_usage();
-      const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
-      const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
-      const auto csp = A.get_level_max_nblocks('a', 1, A.height);
-      const auto csp_dense_leaf = A.get_level_max_nblocks('n', A.height, A.height);
-      const auto csp_dense_all = A.get_level_max_nblocks('n', 1, A.height);
-      const auto csp_lr_all = A.get_level_max_nblocks('f', 1, A.height);
-
       printf("N=%d leaf_size=%d accuracy=%.1e acc_type=%d max_rank=%d"
              " admis=%.1lf matrix_type=%d kernel=%s geometry=%s height=%d"
              " construct_min_rank=%d construct_max_rank=%d construct_mem=%d"
@@ -1478,7 +1488,8 @@ int main(int argc, char ** argv) {
     std::vector<MPI_Request> send_requests(2);
     std::vector<double> in_task_buffer(TASK_LEN);
     std::vector<double> out_task_buffer(2 * TASK_LEN);
-    bool split_task;
+    std::vector<int> local_k (2 * m);  // Local target eigenvalue indices
+    std::vector<double> local_a(2 * m), local_b(2 * m);  // Local starting intervals
     is_finished = false;
     while(!is_finished) {
       // Wait for message from master
@@ -1497,14 +1508,22 @@ int main(int argc, char ** argv) {
             (int)in_task_buffer[0], (int)in_task_buffer[1],
             in_task_buffer[2], in_task_buffer[3]
           };
-          const int task_size = task.k1 - task.k0 + 1;
-          split_task = task_size > 2 * m;
+          std::fill(local_a.begin(), local_a.end(), task.a);
+          std::fill(local_b.begin(), local_b.end(), task.b);
+          int task_size = task.k1 - task.k0 + 1;
+          const bool split_task = task_size > 2 * m;
           if (split_task) {
             // Compute only m inner eigenvalues
             const int new_k0 = task.k0 + (task_size / 2) - (m / 2);
             const int new_k1 = new_k0 + m - 1;
-            const double new_k0_ev = get_kth_eigenvalue(A, domain, new_k0, ev_tol, task.a, task.b);
-            const double new_k1_ev = get_kth_eigenvalue(A, domain, new_k1, ev_tol, task.a, task.b);
+            task_size = new_k1 - new_k0 + 1;
+            for (int k = new_k0; k <= new_k1; k++) {
+              local_k[k - new_k0] = k;
+            }
+            const double new_k0_ev = get_kth_eigenvalue(A, domain, ev_tol, 0, task_size,
+                                                        local_k, local_a, local_b);
+            const double new_k1_ev = get_kth_eigenvalue(A, domain, ev_tol, task_size - 1, task_size,
+                                                        local_k, local_a, local_b);
             // Split into two tasks
             Task task_left   { task.k0, new_k0 - 1, task.a, new_k0_ev + ev_tol };
             Task task_right  { new_k1 + 1, task.k1, new_k1_ev - ev_tol, task.b };
@@ -1531,21 +1550,28 @@ int main(int argc, char ** argv) {
                    (int)out_task_buffer[4], (int)out_task_buffer[5], out_task_buffer[6], out_task_buffer[7]);
 #endif
           }
+          else {
+            // Initialize local_k
+            for (int k = task.k0; k <= task.k1; k++) {
+              local_k[k - task.k0] = k;
+            }
+          }
           // Perform current task
           result_count = 2 + (task.k1 - task.k0 + 1);  // First two numbers are k0 and k1
           result_buffer[0] = task.k0;
           result_buffer[1] = task.k1;
-          int k_begin = task.k0;
-          int k_end = task.k1;
+          int idx_k_begin = 0;
+          int idx_k_end = task_size - 1;
           if (split_task) {
             // First and last eigenvalues have been computed during split process. Save them
-            result_buffer[2 + k_begin - task.k0] = task.a;
-            result_buffer[2 + k_end   - task.k0] = task.b;
-            k_begin++;
-            k_end--;
+            result_buffer[2 + idx_k_begin] = task.a;
+            result_buffer[2 + idx_k_end] = task.b;
+            idx_k_begin++;
+            idx_k_end--;
           }
-          for (int k = k_begin; k <= k_end; k++) {
-            result_buffer[2 + k - task.k0] = get_kth_eigenvalue(A, domain, k, ev_tol, task.a, task.b);
+          for (int idx_k = idx_k_begin; idx_k <= idx_k_end; idx_k++) {
+            result_buffer[2 + idx_k] = get_kth_eigenvalue(A, domain, ev_tol, idx_k, task_size,
+                                                          local_k, local_a, local_b);
           }
           // Send result of current task
           MPI_Isend(result_buffer.data(), result_count, MPI_DOUBLE,
