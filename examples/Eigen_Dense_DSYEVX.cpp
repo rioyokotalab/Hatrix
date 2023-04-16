@@ -39,11 +39,16 @@ int main(int argc, char ** argv) {
   // 2: StarsH Uniform Grid
   // 3: ELSES Geometry (ndim = 3)
   const int64_t geom_type = argc > 3 ? atol(argv[3]) : 0;
-  const int64_t ndim  = argc > 4 ? atol(argv[4]) : 1;
-  const int64_t print_csv_header = argc > 5 ? atol(argv[5]) : 1;
+  int64_t ndim  = argc > 4 ? atol(argv[4]) : 1;
+  // Eigenvalue computation parameters
+  const double abs_tol = argc > 5 ? atof(argv[5]) : 1e-3;
+  const int64_t k_begin = argc > 6 ? atol(argv[6]) : 1;
+  const int64_t k_end = argc > 7 ? atol(argv[7]) : k_begin;
+  const bool compute_eig_acc = argc > 8 ? (atol(argv[8]) == 1) : true;
+  const int64_t print_csv_header = argc > 9 ? atol(argv[9]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 6 ? std::string(argv[6]) : "";
+  const std::string file_name = argc > 10 ? std::string(argv[10]) : "";
 
   Hatrix::Context::init();
 
@@ -114,33 +119,78 @@ int main(int argc, char ** argv) {
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
 
-  // Compute all eigenvalues
-  const auto dense_eig_start = std::chrono::system_clock::now();
-  const auto dense_eigv = Hatrix::get_eigenvalues(A);
-  const auto dense_eig_stop = std::chrono::system_clock::now();
-  const double dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                (dense_eig_stop - dense_eig_start).count();
+  std::vector<double> dense_eigv;
+  double dense_eig_time = 0;
+  if (compute_eig_acc) {
+    Hatrix::Matrix Acopy(A);
+    const auto dense_eig_start = std::chrono::system_clock::now();
+    dense_eigv = Hatrix::get_eigenvalues(Acopy);
+    const auto dense_eig_stop = std::chrono::system_clock::now();
+    dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                     (dense_eig_stop - dense_eig_start).count();
+  }
+
+  // Compute selected eigenvalues
+  const auto actual_eig_start = std::chrono::system_clock::now();
+  const auto actual_eigv = Hatrix::get_selected_eigenvalues(A, k_begin, k_end, abs_tol);
+  const auto actual_eig_stop = std::chrono::system_clock::now();
+  const double actual_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                 (actual_eig_stop - actual_eig_start).count();
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
+            << " abs_tol=" << abs_tol
+            << " k_begin=" << k_begin
+            << " k_end=" << k_end
             << " construct_time=" << construct_time
             << " dense_eig_time=" << dense_eig_time
+            << " actual_eig_time=" << actual_eig_time
             << std::endl;
 #else
   if (print_csv_header == 1) {
     // Print CSV header
-    std::cout << "N,kernel,geometry,construct_time,dense_eig_time"
+    std::cout << "N,kernel,geometry,abs_tol,k_begin,k_end"
+              << ",construct_time,dense_eig_time,actual_eig_time"
+              << ",k,dense_eigv,actual_eigv,eig_abs_err"
               << std::endl;
   }
-  std::cout << N
-            << "," << kernel_name
-            << "," << geom_name
-            << "," << construct_time
-            << "," << dense_eig_time
-            << std::endl;
 #endif
+
+  for (int64_t k = k_begin; k <= k_end; k++) {
+    const auto dense_eigv_k = compute_eig_acc ? dense_eigv[k - 1] : -1;
+    const auto actual_eigv_k = actual_eigv[k - k_begin];
+    const auto eig_abs_err = compute_eig_acc ? std::abs(dense_eigv_k - actual_eigv_k) : -1;
+#ifndef OUTPUT_CSV
+    std::cout << "k=" << k
+              << std::setprecision(8)
+              << " dense_eigv=" << dense_eigv_k
+              << " actual_eigv=" << actual_eigv_k
+              << std::setprecision(3)
+              << " eig_abs_err=" << std::scientific << eig_abs_err << std::defaultfloat
+              << std::setprecision(1)
+              << std::endl;
+#else
+    std::cout << N
+              << "," << kernel_name
+              << "," << geom_name
+              << "," << abs_tol
+              << "," << k_begin
+              << "," << k_end
+              << "," << construct_time
+              << "," << dense_eig_time
+              << "," << actual_eig_time
+              << "," << k
+              << std::setprecision(8)
+              << "," << dense_eigv_k
+              << "," << actual_eigv_k
+              << std::setprecision(3)
+              << "," << std::scientific << eig_abs_err << std::defaultfloat
+              << std::setprecision(1)
+              << std::endl;
+#endif
+  }
 
   Hatrix::Context::finalize();
   return 0;
