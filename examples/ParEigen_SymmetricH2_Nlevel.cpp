@@ -1298,12 +1298,12 @@ int main(int argc, char ** argv) {
 
 #ifndef OUTPUT_CSV
   if (mpi_rank == 0) {
-      printf("N=%d leaf_size=%d accuracy=%.1e acc_type=%d max_rank=%d"
+      printf("mpi_nprocs=%d N=%d leaf_size=%d accuracy=%.1e acc_type=%d max_rank=%d"
              " admis=%.1lf matrix_type=%d kernel=%s geometry=%s height=%d"
              " construct_min_rank=%d construct_max_rank=%d construct_mem=%d"
              " construct_time=%.3lf construct_error=%.5e"
              " csp=%d csp_dense_leaf=%d csp_dense_all=%d csp_lr_all=%d\n",
-             (int)N, (int)leaf_size, accuracy, (int)use_rel_acc, (int)max_rank, admis,
+             mpi_nprocs, (int)N, (int)leaf_size, accuracy, (int)use_rel_acc, (int)max_rank, admis,
              (int)matrix_type, kernel_name.c_str(), geom_name.c_str(), (int)A.height,
              (int)construct_min_rank, (int)construct_max_rank, (int)construct_mem, construct_time,
              construct_error, (int)csp, (int)csp_dense_leaf, (int)csp_dense_all, (int)csp_lr_all);
@@ -1345,7 +1345,7 @@ int main(int argc, char ** argv) {
 #ifdef OUTPUT_CSV
   if (mpi_rank == 0 && print_csv_header == 1) {
     // Print CSV header
-    printf("N,leaf_size,accuracy,acc_type,max_rank,admis,matrix_type,kernel,geometry"
+    printf("mpi_nprocs,N,leaf_size,accuracy,acc_type,max_rank,admis,matrix_type,kernel,geometry"
            ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
            ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,dense_eig_time_all,h2_eig_time_all"
            ",m,k,a,b,v_a,v_b,ev_tol,dense_ev,h2_ev,eig_abs_err,success\n");
@@ -1619,17 +1619,18 @@ int main(int argc, char ** argv) {
       const double eig_abs_err = compute_eig_acc ? std::abs(dense_ev_k - h2_ev_k) : -1;
       const std::string success = eig_abs_err < (0.5 * ev_tol) ? "TRUE" : "FALSE";
 #ifndef OUTPUT_CSV
-      printf("h2_eig_time_all=%.3lf m=%d k=%d a=%.2lf b=%.2lf ev_tol=%.1e"
+      printf("h2_eig_time_all=%.3lf m=%d k=%d a=%.2lf b=%.2lf v_a=%d v_b=%d ev_tol=%.1e"
              " dense_ev=%.8lf h2_ev=%.8lf eig_abs_err=%.2e success=%s\n",
-             h2_ev_time, (int)m, k, a, b, ev_tol, dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
+             h2_ev_time, (int)m, k, a, b, v_a, v_b, ev_tol,
+             dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #else
-      printf("%d,%d,%.1e,%d,%d,%.1lf,%d,%s,%s,%d,%d,%d,%d,%.3lf,%.5e,%d,%d,%d,%d"
-             ",%.3lf,%.3lf,%d,%d,%.2lf,%.2lf,%.1e,%.8lf,%.8lf,%.2e,%s\n",
-             (int)N, (int)leaf_size, accuracy, (int)use_rel_acc, (int)max_rank,
+      printf("%d,%d,%d,%.1e,%d,%d,%.1lf,%d,%s,%s,%d,%d,%d,%d,%.3lf,%.5e,%d,%d,%d,%d"
+             ",%.3lf,%.3lf,%d,%d,%.2lf,%.2lf,%d,%d,%.1e,%.8lf,%.8lf,%.2e,%s\n",
+             mpi_nprocs,(int)N, (int)leaf_size, accuracy, (int)use_rel_acc, (int)max_rank,
              admis, (int)matrix_type, kernel_name.c_str(), geom_name.c_str(), (int)A.height,
              (int)construct_min_rank, (int)construct_max_rank, (int)construct_mem, construct_time,
              construct_error, (int)csp, (int)csp_dense_leaf, (int)csp_dense_all, (int)csp_lr_all,
-             dense_eig_time, h2_ev_time, (int)m, k, a, b, ev_tol,
+             dense_eig_time, h2_ev_time, (int)m, k, a, b, v_a, v_b, ev_tol,
              dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #endif
     }
