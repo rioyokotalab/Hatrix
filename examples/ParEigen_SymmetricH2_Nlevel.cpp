@@ -1053,8 +1053,8 @@ void shift_diag(Matrix& A, const double shift) {
   }
 }
 
-int inertia(const SymmetricH2& A, const Domain& domain,
-            const double lambda, bool &singular) {
+int64_t inertia(const SymmetricH2& A, const Domain& domain,
+                const double lambda, bool &singular) {
   SymmetricH2 A_shifted(A);
   // Shift leaf level diagonal blocks
   const int64_t leaf_num_nodes = A.level_blocks[A.height];
@@ -1064,7 +1064,7 @@ int inertia(const SymmetricH2& A, const Domain& domain,
   // LDL Factorize
   A_shifted.factorize(domain);
   // Count negative entries in D
-  int negative_elements_count = 0;
+  int64_t negative_elements_count = 0;
   for(int64_t level = A.height; level >= A.min_adm_level; level--) {
     const int64_t num_nodes = A.level_blocks[level];
     for(int64_t node = 0; node < num_nodes; node++) {
@@ -1095,21 +1095,20 @@ int inertia(const SymmetricH2& A, const Domain& domain,
 }
 
 double get_kth_eigenvalue(const SymmetricH2& A, const Domain& domain,
-                          const double ev_tol, const int idx_k,
-                          const int k_list_size, const std::vector<int>& k_list,
+                          const double ev_tol, const int64_t idx_k,
+                          const std::vector<int64_t>& k_list,
                           std::vector<double>& a,
                           std::vector<double>& b) {
-  const auto k = k_list[idx_k];
   bool singular = false;
   while((b[idx_k] - a[idx_k]) >= ev_tol) {
     const auto mid = (a[idx_k] + b[idx_k]) / 2;
-    const int v_mid = inertia(A, domain, mid, singular);
+    const auto v_mid = inertia(A, domain, mid, singular);
     if(singular) {
       printf("Shifted matrix becomes singular (shift=%.5lf)\n", mid);
       break;
     }
     // Update intervals accordingly
-    for (int idx = 0; idx < k_list_size; idx++) {
+    for (int64_t idx = 0; idx < k_list.size(); idx++) {
       const auto ki = k_list[idx];
       if (ki <= v_mid && mid < b[idx]) {
         b[idx] = mid;
@@ -1144,11 +1143,7 @@ int main(int argc, char ** argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
-  if (mpi_nprocs < 2) {
-    printf("Error: number of processes has to be larger than 1\n");
-    exit(EXIT_FAILURE);
-  }
-
+  // Parse Inputs
   int64_t N = argc > 1 ? atol(argv[1]) : 256;
   int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1e-8;
@@ -1254,7 +1249,6 @@ int main(int argc, char ** argv) {
 
   // Construct H2-Matrix
   // At the moment all processes redundantly construct the same instance of H2-Matrix
-  // TODO make only master construct and broadcast to all slaves
   const bool is_non_synthetic = (geom_type == 3);
   if (is_non_synthetic) {
     const int64_t num_atoms_per_molecule = 60;
@@ -1348,264 +1342,98 @@ int main(int argc, char ** argv) {
     printf("mpi_nprocs,N,leaf_size,accuracy,acc_type,max_rank,admis,matrix_type,kernel,geometry"
            ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
            ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,dense_eig_time_all,h2_eig_time_all"
-           ",m,k,a,b,v_a,v_b,ev_tol,dense_ev,h2_ev,eig_abs_err,success\n");
+           ",k,a,b,v_a,v_b,ev_tol,dense_ev,h2_ev,eig_abs_err,success\n");
   }
 #endif
 
   // Initialize variables
-  MPI_Status status;
-  bool is_finished;
-  int result_count;
   double h2_ev_time = 0;
   std::vector<double> h2_ev;
-  std::vector<double> result_buffer(2 + (2 * m)); // First two numbers are k0 and k1
-
   // Begin computing target eigenvalues
   MPI_Barrier(MPI_COMM_WORLD);
   h2_ev_time -= MPI_Wtime();
-
-  if (mpi_rank == 0) {  // Master
-    std::queue<Task> task_pool;
-    std::vector<bool> is_idle(mpi_nprocs, true);
-    std::vector<double> in_task_buffer(2 * TASK_LEN);
-    std::vector<double> out_task_buffer(mpi_nprocs * TASK_LEN);
-    std::vector<MPI_Request> out_task_requests(mpi_nprocs-1), finish_requests(mpi_nprocs-1);
-    h2_ev.assign(N, -1);
-    is_idle[mpi_rank] = false;  // Set master node as working
-
-    const int64_t target_count = k_end - k_begin + 1;
-    task_pool.push(Task{(int)k_begin, (int)k_end, a, b});
+  // Get task for current process
+  const int64_t num_ev = k_end - k_begin + 1;
+  const int64_t ev_per_process = mpi_nprocs >= num_ev ? 1 : num_ev / mpi_nprocs;
+  const int64_t num_working_procs = num_ev / ev_per_process;
 #ifdef DEBUG_OUTPUT
-    printf("Master: Inserted task (%d, %d, %.5lf, %.5lf) into task_pool\n",
-           (int)k_begin, (int)k_end, a, b);
-#endif
-    int64_t finished_count = 0;
-    while (finished_count < target_count) {
-      for (int i = 1; (i < mpi_nprocs) && (!task_pool.empty()); i++) {
-        if (is_idle[i]) {
-          // Send task to process number i
-          const auto task = task_pool.front();
-          out_task_buffer[i * TASK_LEN + 0] = (double)task.k0;
-          out_task_buffer[i * TASK_LEN + 1] = (double)task.k1;
-          out_task_buffer[i * TASK_LEN + 2] = task.a;
-          out_task_buffer[i * TASK_LEN + 3] = task.b;
-
-          MPI_Isend(out_task_buffer.data() + i * TASK_LEN, TASK_LEN, MPI_DOUBLE,
-                    i, MPI_TAG_TASK, MPI_COMM_WORLD, &out_task_requests[i-1]);
-          MPI_Request_free(&out_task_requests[i-1]);
-          task_pool.pop();
-          is_idle[i] = false;  // Set process i as working
-#ifdef DEBUG_OUTPUT
-          printf("Master: Sent task (%d, %d, %.5lf, %.5lf) to Slave-%d\n",
-                 task.k0, task.k1, task.a, task.b, i);
-#endif
-        }
-      }
-      // Receive message from slave
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-      switch (status.MPI_TAG) {
-        case MPI_TAG_SPLIT_TASK: {
-          // Receive 8 numbers denoting two new tasks
-          MPI_Recv(in_task_buffer.data(), 2 * TASK_LEN, MPI_DOUBLE,
-                   status.MPI_SOURCE, MPI_TAG_SPLIT_TASK, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-#ifdef DEBUG_OUTPUT
-          printf("Master: Received split task from Slave-%d\n", status.MPI_SOURCE);
-#endif
-          // Insert two new tasks into task_pool
-          Task task_left  {
-            (int)in_task_buffer[0], (int)in_task_buffer[1],
-            in_task_buffer[2], in_task_buffer[3]
-          };
-          Task task_right {
-            (int)in_task_buffer[4], (int)in_task_buffer[5],
-            in_task_buffer[6], in_task_buffer[7]
-          };
-          const auto left_size = task_left.k1 - task_left.k0 + 1;
-          const auto right_size = task_right.k1 - task_right.k0 + 1;
-          if (left_size > 0) {
-            task_pool.push(task_left);
-#ifdef DEBUG_OUTPUT
-            printf("Master: Inserted task (%d, %d, %.5lf, %.5lf) into task_pool\n",
-                   task_left.k0, task_left.k1, task_left.a, task_left.b);
-#endif
-          }
-          if (right_size > 0) {
-            task_pool.push(task_right);
-#ifdef DEBUG_OUTPUT
-            printf("Master: Inserted task (%d, %d, %.5lf. %.5lf) into task_pool\n",
-                   task_right.k0, task_right.k1, task_right.a, task_right.b);
-#endif
-          }
-          break;
-        }
-        case MPI_TAG_RESULT: {
-          // Receive a number of eigenvalues from slave
-          MPI_Get_count(&status, MPI_DOUBLE, &result_count);
-          MPI_Recv(result_buffer.data(), result_count, MPI_DOUBLE,
-                   status.MPI_SOURCE, MPI_TAG_RESULT, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-          // The first two numbers are the order of the eigenvalues
-          const int k0 = (int)result_buffer[0];
-          const int k1 = (int)result_buffer[1];
-          int k = k0;
-          for (int j = 2; j < result_count; j++) {
-            h2_ev[k - 1] = result_buffer[j];
-            k++;
-          }
-#ifdef DEBUG_OUTPUT
-          char outBuffer[1024];
-          int offset = 0;
-          int charsWritten;
-          for (int j = 2; j < result_count; j++) {
-            charsWritten = snprintf(outBuffer+offset, 1024-offset, "%.5lf ", result_buffer[j]);
-            offset += charsWritten;
-          }
-          printf("Master: Received %d to %d eigenvalues=[ %s] from Slave-%d\n",
-                 k0, k1, outBuffer, status.MPI_SOURCE);
-#endif
-          finished_count += result_count - 2;
-          is_idle[status.MPI_SOURCE] = true;
-          break;
-        }
-      }
-    }
-#ifdef DEBUG_OUTPUT
-    printf("Master: All %d eigenvalues have been received\n", (int)finished_count);
-#endif
-    // Send finish signal to all process
-    is_finished = true;
-    for (int i = 1; i < mpi_nprocs; i++) {
-      MPI_Isend(&is_finished, 1, MPI_C_BOOL, i, MPI_TAG_FINISH, MPI_COMM_WORLD, &finish_requests[i-1]);
-      MPI_Request_free(&finish_requests[i-1]);
-#ifdef DEBUG_OUTPUT
-      printf("Master: Sent finish signal to Slave-%d\n", i);
-#endif
-    }
-#ifdef DEBUG_OUTPUT
-    printf("Master: Finished\n");
-#endif
+  if (mpi_rank == 0) {
+    printf("\nProcess-%d: num_ev=%d, ev_per_process=%d, num_working_procs=%d\n",
+           mpi_rank, (int)num_ev, (int)ev_per_process, (int)num_working_procs);
   }
-  else {  // Slave
-    std::vector<MPI_Request> send_requests(2);
-    std::vector<double> in_task_buffer(TASK_LEN);
-    std::vector<double> out_task_buffer(2 * TASK_LEN);
-    std::vector<int> local_k (2 * m);  // Local target eigenvalue indices
-    std::vector<double> local_a(2 * m), local_b(2 * m);  // Local starting intervals
-    is_finished = false;
-    while(!is_finished) {
-      // Wait for message from master
-      MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-      switch (status.MPI_TAG) {
-        case MPI_TAG_TASK: {
-          // Receive task from master
-          MPI_Recv(in_task_buffer.data(), TASK_LEN, MPI_DOUBLE,
-                   0, MPI_TAG_TASK, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-#ifdef DEBUG_OUTPUT
-          printf("Slave-%d: Received task (%d, %d, %.5lf, %.5lf) from Master\n",
-                 mpi_rank, (int)in_task_buffer[0], (int)in_task_buffer[1],
-                 in_task_buffer[2], in_task_buffer[3]);
 #endif
-          Task task {
-            (int)in_task_buffer[0], (int)in_task_buffer[1],
-            in_task_buffer[2], in_task_buffer[3]
-          };
-          std::fill(local_a.begin(), local_a.end(), task.a);
-          std::fill(local_b.begin(), local_b.end(), task.b);
-          int task_size = task.k1 - task.k0 + 1;
-          const bool split_task = task_size > 2 * m;
-          if (split_task) {
-            // Compute only m inner eigenvalues
-            const int new_k0 = task.k0 + (task_size / 2) - (m / 2);
-            const int new_k1 = new_k0 + m - 1;
-            task_size = new_k1 - new_k0 + 1;
-            for (int k = new_k0; k <= new_k1; k++) {
-              local_k[k - new_k0] = k;
-            }
-            const double new_k0_ev = get_kth_eigenvalue(A, domain, ev_tol, 0, task_size,
-                                                        local_k, local_a, local_b);
-            const double new_k1_ev = get_kth_eigenvalue(A, domain, ev_tol, task_size - 1, task_size,
-                                                        local_k, local_a, local_b);
-            // Split into two tasks
-            Task task_left   { task.k0, new_k0 - 1, task.a, new_k0_ev + ev_tol };
-            Task task_right  { new_k1 + 1, task.k1, new_k1_ev - ev_tol, task.b };
-            out_task_buffer[0] = (double)task_left.k0;
-            out_task_buffer[1] = (double)task_left.k1;
-            out_task_buffer[2] = task_left.a;
-            out_task_buffer[3] = task_left.b;
-            out_task_buffer[4] = (double)task_right.k0;
-            out_task_buffer[5] = (double)task_right.k1;
-            out_task_buffer[6] = task_right.a;
-            out_task_buffer[7] = task_right.b;
-            // Update current task
-            task.k0 = new_k0;
-            task.k1 = new_k1;
-            task.a = new_k0_ev;
-            task.b = new_k1_ev;
-            // Send split task to master
-            MPI_Isend(out_task_buffer.data(), 2 * TASK_LEN, MPI_DOUBLE,
-                      0, MPI_TAG_SPLIT_TASK, MPI_COMM_WORLD, &send_requests[1]);
+  // Create communicator for working processes
+  MPI_Comm comm;
+  int color = (mpi_rank < num_working_procs);
+  int key = mpi_rank;
+  MPI_Comm_split(MPI_COMM_WORLD, color, key, &comm);
+  // Compute eigenvalues
+  if (mpi_rank < num_working_procs) {
+    const int64_t remainder_ev = num_ev % ev_per_process;
+    const int64_t local_num_ev = ev_per_process +
+                                 ((mpi_rank == (num_working_procs-1)) ? remainder_ev : 0);
+    const int64_t k0 = mpi_rank * ev_per_process + 1;
+    const int64_t k1 = k0 + local_num_ev - 1;
 #ifdef DEBUG_OUTPUT
-            printf("Slave-%d: Return split task (%d, %d, %.5lf, %.5lf) and "
-                   "(%d, %d, %.5lf, %.5lf) to Master\n", mpi_rank,
-                   (int)out_task_buffer[0], (int)out_task_buffer[1], out_task_buffer[2], out_task_buffer[3],
-                   (int)out_task_buffer[4], (int)out_task_buffer[5], out_task_buffer[6], out_task_buffer[7]);
+    printf("Process-%d: local_num_ev=%d, k0=%d, k1=%d\n",
+           mpi_rank, (int)local_num_ev, (int)k0, (int)k1);
 #endif
-          }
-          else {
-            // Initialize local_k
-            for (int k = task.k0; k <= task.k1; k++) {
-              local_k[k - task.k0] = k;
-            }
-          }
-          // Perform current task
-          result_count = 2 + (task.k1 - task.k0 + 1);  // First two numbers are k0 and k1
-          result_buffer[0] = task.k0;
-          result_buffer[1] = task.k1;
-          int idx_k_begin = 0;
-          int idx_k_end = task_size - 1;
-          if (split_task) {
-            // First and last eigenvalues have been computed during split process. Save them
-            result_buffer[2 + idx_k_begin] = task.a;
-            result_buffer[2 + idx_k_end] = task.b;
-            idx_k_begin++;
-            idx_k_end--;
-          }
-          for (int idx_k = idx_k_begin; idx_k <= idx_k_end; idx_k++) {
-            result_buffer[2 + idx_k] = get_kth_eigenvalue(A, domain, ev_tol, idx_k, task_size,
-                                                          local_k, local_a, local_b);
-          }
-          // Send result of current task
-          MPI_Isend(result_buffer.data(), result_count, MPI_DOUBLE,
-                    0, MPI_TAG_RESULT, MPI_COMM_WORLD, &send_requests[0]);
-#ifdef DEBUG_OUTPUT
-          char outBuffer[1024];
-          int offset = 0;
-          int charsWritten;
-          for (int j = 2; j < result_count; j++) {
-            charsWritten = snprintf(outBuffer+offset, 1024-offset, "%.5lf ", result_buffer[j]);
-            offset += charsWritten;
-          }
-          printf("Slave-%d: Sent %d eigenvalues=[ %s] to Master\n",
-                 mpi_rank, result_count - 2, outBuffer);
-#endif
-          // Wait until all sends are done
-          int ready = 0;
-          while (!ready) {
-            MPI_Testall(split_task ? 2 : 1, send_requests.data(), &ready, MPI_STATUS_IGNORE);
-          }
-          break;
-        }
-        case MPI_TAG_FINISH: {
-          // Receive finish signal
-          MPI_Recv(&is_finished, 1, MPI_C_BOOL, 0, MPI_TAG_FINISH, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-#ifdef DEBUG_OUTPUT
-          printf("Slave-%d: Received finish signal from Master\n", mpi_rank);
-#endif
-          break;
-        }
-      }
+    std::vector<int64_t> local_k(local_num_ev);  // Local target eigenvalue indices
+    std::vector<double> local_a(local_num_ev, a), local_b(local_num_ev, b);  // Local starting intervals
+    std::vector<double> local_ev(local_num_ev);
+    for (int64_t idx_k = 0; idx_k < local_num_ev; idx_k++) {
+      local_k[idx_k] = k0 + idx_k;
     }
+    int64_t idx_k_start = 0;
+    int64_t idx_k_finish = local_num_ev-1;
+    // Compute largest and smallest eigenvalues in the set
 #ifdef DEBUG_OUTPUT
-    printf("Slave-%d: Finished\n", mpi_rank);
+    printf("Process-%d: Computing %d-th eigenvalue\n",
+           mpi_rank, (int)local_k[idx_k_start]);
+#endif
+    local_ev[idx_k_start] = get_kth_eigenvalue(A, domain, ev_tol, idx_k_start,
+                                               local_k, local_a, local_b);
+    if (idx_k_start < idx_k_finish) {
+#ifdef DEBUG_OUTPUT
+      printf("Process-%d: Computing %d-th eigenvalue\n",
+             mpi_rank, (int)local_k[idx_k_finish]);
+#endif
+      local_ev[idx_k_finish] = get_kth_eigenvalue(A, domain, ev_tol, idx_k_finish,
+                                                  local_k, local_a, local_b);
+    }
+    idx_k_start++;
+    idx_k_finish--;
+#ifdef DEBUG_OUTPUT
+    printf("Process-%d: Computing %d inner eigenvalues between [%d, %d]-th eigenvalue\n",
+           mpi_rank, (int)std::max((int64_t)0, idx_k_finish - idx_k_start + 1),
+           (int)local_k[idx_k_start-1], (int)local_k[idx_k_finish+1]);
+#endif
+    // Compute the rest of eigenvalues
+    for (int64_t idx_k = idx_k_start; idx_k <= idx_k_finish; idx_k++) {
+      local_ev[idx_k] = get_kth_eigenvalue(A, domain, ev_tol, idx_k,
+                                           local_k, local_a, local_b);
+    }
+    // Gather results at process 0
+    if (mpi_rank == 0) {
+      h2_ev.assign(num_ev, 0);
+      std::vector<int> offset(num_working_procs, 0), count(num_working_procs, 0);
+      offset[0] = 0;
+      count[0] = local_num_ev;
+      for (int i = 1; i < num_working_procs; i++) {
+        count[i] = ev_per_process + ((i == (num_working_procs-1)) ? remainder_ev : 0);
+        offset[i] = offset[i - 1] + count[i - 1];
+      }
+      MPI_Gatherv(local_ev.data(), local_num_ev, MPI_DOUBLE,
+                  h2_ev.data(), count.data(), offset.data(), MPI_DOUBLE, 0, comm);
+    }
+    else {
+      MPI_Gatherv(local_ev.data(), local_num_ev, MPI_DOUBLE,
+                  nullptr, nullptr, nullptr, MPI_DOUBLE, 0, comm);
+    }
+  }
+  else {
+#ifdef DEBUG_OUTPUT
+    printf("Process-%d: Not working\n", mpi_rank);
 #endif
   }
 
@@ -1615,28 +1443,29 @@ int main(int argc, char ** argv) {
   if (mpi_rank == 0) {
     for (int k = k_begin; k <= k_end; k++) {
       const double dense_ev_k = compute_eig_acc ? dense_ev[k-1] : -1;
-      const double h2_ev_k = h2_ev[k-1];
+      const double h2_ev_k = h2_ev[k - k_begin];
       const double eig_abs_err = compute_eig_acc ? std::abs(dense_ev_k - h2_ev_k) : -1;
       const std::string success = eig_abs_err < (0.5 * ev_tol) ? "TRUE" : "FALSE";
 #ifndef OUTPUT_CSV
-      printf("h2_eig_time_all=%.3lf m=%d k=%d a=%.2lf b=%.2lf v_a=%d v_b=%d ev_tol=%.1e"
+      printf("h2_eig_time_all=%.3lf k=%d a=%.2lf b=%.2lf v_a=%d v_b=%d ev_tol=%.1e"
              " dense_ev=%.8lf h2_ev=%.8lf eig_abs_err=%.2e success=%s\n",
-             h2_ev_time, (int)m, k, a, b, v_a, v_b, ev_tol,
+             h2_ev_time, k, a, b, v_a, v_b, ev_tol,
              dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #else
       printf("%d,%d,%d,%.1e,%d,%d,%.1lf,%d,%s,%s,%d,%d,%d,%d,%.3lf,%.5e,%d,%d,%d,%d"
-             ",%.3lf,%.3lf,%d,%d,%.2lf,%.2lf,%d,%d,%.1e,%.8lf,%.8lf,%.2e,%s\n",
+             ",%.3lf,%.3lf,%d,%.2lf,%.2lf,%d,%d,%.1e,%.8lf,%.8lf,%.2e,%s\n",
              mpi_nprocs,(int)N, (int)leaf_size, accuracy, (int)use_rel_acc, (int)max_rank,
              admis, (int)matrix_type, kernel_name.c_str(), geom_name.c_str(), (int)A.height,
              (int)construct_min_rank, (int)construct_max_rank, (int)construct_mem, construct_time,
              construct_error, (int)csp, (int)csp_dense_leaf, (int)csp_dense_all, (int)csp_lr_all,
-             dense_eig_time, h2_ev_time, (int)m, k, a, b, v_a, v_b, ev_tol,
+             dense_eig_time, h2_ev_time, k, a, b, v_a, v_b, ev_tol,
              dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #endif
     }
   }
 
   Hatrix::Context::finalize();
+  MPI_Comm_free(&comm);
   MPI_Finalize();
   return 0;
 }
