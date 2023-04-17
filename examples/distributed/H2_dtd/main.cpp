@@ -372,7 +372,7 @@ int main(int argc, char **argv) {
   omp_set_num_threads(1);
 
   if (!MPIRANK) {
-  std::cout << "factor begin:\n";
+    std::cout << "factor begin:\n";
   }
 
   factorize_setup(A, domain, opts, parsec);

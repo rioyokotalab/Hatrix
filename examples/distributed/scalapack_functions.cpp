@@ -290,9 +290,9 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  if (!MPIRANK) {
-    std::cout << "\t Done AY.\n" << std::endl;
-  }
+  // if (!MPIRANK) {
+  //   std::cout << "\t Done AY.\n" << std::endl;
+  // }
 
   // Allocate a temporary global matrix to store the product of the real basis with the
   // summation of the admissible blocks.
@@ -365,7 +365,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   }
 
   if (!MPIRANK) {
-    std::cout << "\t Apply real basis U.\n" << std::endl;
+    // std::cout << "\t Apply real basis U.\n" << std::endl;
   }
 
   delete[] AY_MEM;
@@ -545,21 +545,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
               UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
               &BETA,
               U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
-      const char nn = 'F';
-      double u_norm =
-        pdlange_(&nn, &child_block_size, &rank, U_MEM, &IU,
-                 &JU, U, NULL);
-      std::cout << "U 0: " << u_norm << std::endl;
-
-      double u_trans_norm =
-        pdlange_(&nn, &rank, &rank, UTRANSFER_MEM, &IUTRANSFER,
-                 &JUTRANSFER, U, NULL);
-      std::cout << "U transfer 0: " << u_trans_norm << std::endl;
-
-      double u_real_norm =
-        pdlange_(&nn, &child_block_size, &rank, U_REAL_MEM, &IU_REAL,
-                 &JU_REAL, U_REAL, NULL);
-      std::cout << "U big 0: " << u_real_norm << std::endl;
     }
 
     // Compute lower part of the real basis for this level.
@@ -578,29 +563,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
               UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
               &BETA,
               U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
-      const char nn = 'F';
-      double u_norm =
-        pdlange_(&nn, &child_block_size, &rank, U_MEM, &IU,
-                 &JU, U, NULL);
-      std::cout << "U 0: " << u_norm << std::endl;
-
-      double u_trans_norm =
-        pdlange_(&nn, &rank, &rank, UTRANSFER_MEM, &IUTRANSFER,
-                 &JUTRANSFER, U, NULL);
-      std::cout << "U transfer 1: " << u_trans_norm << std::endl;
-
-      double u_real_norm =
-        pdlange_(&nn, &child_block_size, &rank, U_REAL_MEM, &IU_REAL,
-                 &JU_REAL, U_REAL, NULL);
-      std::cout << "U big 1: " << u_real_norm << std::endl;
-      std::cout << std::endl;
     }
 
-
-
-
     if (!MPIRANK) {
-      std::cout << "\t Generate transfer matrix block= " << block << std::endl;
+      // std::cout << "\t Generate transfer matrix block= " << block << std::endl;
     }
   }
   // Free the real basis of the child level and set the U_REAL to real basis.
@@ -683,7 +649,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   }
 
   if (!MPIRANK) {
-    std::cout << "\t Done DENSE_MEM generation." << std::endl;
+    // std::cout << "\t Done DENSE_MEM generation." << std::endl;
   }
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -720,7 +686,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
                 S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
 
         if (!MPIRANK) {
-          std::cout << "\t Done TEMP_PRODUCT : " << i << " " << j << std::endl;
+          // std::cout << "\t Done TEMP_PRODUCT : " << i << " " << j << std::endl;
         }
       }
     }
@@ -772,29 +738,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
         }
 
         if (!MPIRANK) {
-          std::cout << "\t Done S_LOCAL : " << i << " " << j << std::endl;
+          // std::cout << "\t Done S_LOCAL : " << i << " " << j << std::endl;
         }
       }
     }
   }
-
-  Matrix Ubig0_1(opts.nleaf * 2, opts.max_rank);
-  auto Ubig0_1_splits = Ubig0_1.split(2,1);
-  auto U1_0_splits = A.U(0, 1).split(2, 1);
-  matmul(A.U(0, 2), U1_0_splits[0], Ubig0_1_splits[0], false, false, 1, 0);
-  matmul(A.U(1, 2), U1_0_splits[1], Ubig0_1_splits[1], false, false, 1, 0);
-
-  Matrix Ubig1_1(opts.nleaf * 2, opts.max_rank);
-  auto Ubig1_1_splits = Ubig1_1.split(2,1);
-  auto U1_1_splits = A.U(1, 1).split(2, 1);
-  matmul(A.U(2, 2), U1_1_splits[0], Ubig1_1_splits[0], false, false, 1, 0);
-  matmul(A.U(3, 2), U1_1_splits[1], Ubig1_1_splits[1], false, false, 1, 0);
-
-  auto A10_1 = generate_p2p_interactions(domain, 1, 0, 1, opts.kernel);
-
-  std::cout << "1,0,1 = " << Hatrix::norm(A10_1 -
-                                          matmul(matmul(Ubig1_1, A.S(1, 0, 1)), Ubig0_1, false, true))
-            << std::endl;
 
   delete[] S_BLOCKS_MEM;
   delete[] TEMP_MEM;
@@ -813,22 +761,6 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
 
 
   generate_leaf_nodes(A, domain, opts);
-
-  // double U_leaf_norm_total = 0;
-  // for (int b = 0; b < 4; ++b) {
-  //   for (int i = 0; i < A.U(b, 2).rows; ++i) {
-  //     for (int j = 0; j < A.U(b, 2).cols; ++j) {
-  //       U_leaf_norm_total += pow(A.U(b, 2)(i, j), 2);
-  //     }
-  //   }
-  // }
-
-  // std::cout << "SCALAPACK H2 LEAF NORM CONSTRUCT: " << std::sqrt(U_leaf_norm_total) << std::endl;
-
-  // const char nn = 'F';
-  // double u_mem_norm =
-  //   pdlange_(&nn, &N, &nleaf, U_MEM, &ONE, &ONE, U, NULL);
-  // std::cout << "U MEM norm: " << u_mem_norm << std::endl;
 
   if (!MPIRANK) {
     // std::cout << "FINISH LEAF NODE\n";

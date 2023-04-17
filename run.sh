@@ -71,7 +71,7 @@ ndim=2
 #     done
 # done
 
-for N in 64; do
+for N in 1024; do
     for adm in 0; do
         # for nleaf in 256; do
         #     for max_rank in 50 150 200; do
@@ -90,12 +90,12 @@ for N in 64; do
         #     done
         # done
 
-        for nleaf in 16; do
-            for max_rank in 10; do
+        for nleaf in 32; do
+            for max_rank in 25; do
                 echo "--- MAIN ---"
                 ./bin/H2_main --N $N \
                               --nleaf $nleaf \
-                              --kernel_func gsl_matern \
+                              --kernel_func laplace \
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
@@ -103,13 +103,13 @@ for N in 64; do
                               --admis $adm \
                               --admis_kind diagonal \
                               --construct_algorithm miro \
-                              --param_1 1 --param_2 0.03 --param_3 0.5 \
+                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
                               --kind_of_recompression 3 --use_nested_basis
 
                 echo "--- DTD ---"
-                mpirun -n 1 ./bin/H2_dtd --N $N \
+                mpirun -n 4 ./bin/H2_dtd --N $N \
                               --nleaf $nleaf \
-                              --kernel_func gsl_matern \
+                              --kernel_func laplace \
                               --kind_of_geometry grid \
                               --ndim $ndim \
                               --max_rank $max_rank \
@@ -117,7 +117,7 @@ for N in 64; do
                               --admis $adm \
                               --admis_kind diagonal \
                               --construct_algorithm miro \
-                              --param_1 1 --param_2 0.03 --param_3 0.5 \
+                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
                               --kind_of_recompression 3 --use_nested_basis
             done
         done

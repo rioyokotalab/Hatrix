@@ -249,14 +249,6 @@ generate_transfer_matrices(const Domain& domain,
       matmul(Ubig_c1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_c2, Utransfer_splits[1], Ubig_splits[1]);
 
-      std::cout << "U 0: " << Hatrix::norm(Ubig_c1) << std::endl;
-      std::cout << "U transfer 0: " << Hatrix::norm(Utransfer_splits[0]) << std::endl;
-      std::cout << "U big 0: " << Hatrix::norm(Ubig_splits[0]) << std::endl;
-
-      std::cout << "U 1: " << Hatrix::norm(Ubig_c2) << std::endl;
-      std::cout << "U transfer 1: " << Hatrix::norm(Utransfer_splits[1]) << std::endl;
-      std::cout << "U big 1: " << Hatrix::norm(Ubig_splits[1]) << std::endl;
-
       A.U.insert(node, level, std::move(Utransfer));
       Ubig_parent.insert(node, level, std::move(Ubig));
     }
@@ -273,10 +265,6 @@ generate_transfer_matrices(const Domain& domain,
     }
   }
 
-  // std::cout << "H2 AY norm: " << std::setprecision(18)
-  //           << std::sqrt(AY_norm) << std::endl;
-  // std::cout << "H2 temp norm: " << std::setprecision(18) << std::sqrt(temp_norm) << std::endl;
-
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
       if (A.is_admissible.exists(i, j, level) &&
@@ -289,26 +277,6 @@ generate_transfer_matrices(const Domain& domain,
     }
   }
 
-  Matrix Ubig0_1(opts.nleaf * 2, opts.max_rank);
-  auto Ubig0_1_splits = Ubig0_1.split(2,1);
-  auto U1_0_splits = A.U(0, 1).split(2, 1);
-  matmul(A.U(0, 2), U1_0_splits[0], Ubig0_1_splits[0], false, false, 1, 0);
-  matmul(A.U(1, 2), U1_0_splits[1], Ubig0_1_splits[1], false, false, 1, 0);
-
-  Matrix Ubig1_1(opts.nleaf * 2, opts.max_rank);
-  auto Ubig1_1_splits = Ubig1_1.split(2,1);
-  auto U1_1_splits = A.U(1, 1).split(2, 1);
-  matmul(A.U(2, 2), U1_1_splits[0], Ubig1_1_splits[0], false, false, 1, 0);
-  matmul(A.U(3, 2), U1_1_splits[1], Ubig1_1_splits[1], false, false, 1, 0);
-
-  auto A10_1 = generate_p2p_interactions(domain, 1, 0, 1, opts.kernel);
-
-  std::cout << "1,0,1 = "
-            << Hatrix::norm(A10_1 -
-                            matmul(matmul(Ubig1_1, A.S(1, 0, 1)), Ubig0_1, false, true))
-            << std::endl;
-
-
   return Ubig_parent;
 }
 
@@ -317,17 +285,6 @@ construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A, const Domain& domain, co
   int64_t P = opts.max_rank;
   Matrix dense = generate_p2p_matrix(domain, opts.kernel);
   generate_leaf_nodes(domain, A, dense, opts);
-
-  // double U_leaf_norm_total = 0;
-  // for (int b = 0; b < 4; ++b) {
-  //   for (int i = 0; i < A.U(b, 2).rows; ++i) {
-  //     for (int j = 0; j < A.U(b, 2).cols; ++j) {
-  //       U_leaf_norm_total += pow(A.U(b, 2)(i, j), 2);
-  //     }
-  //   }
-  // }
-
-  // std::cout << "H2 LEAF NORM CONSTRUCT: " << std::sqrt(U_leaf_norm_total) << std::endl;
 
   RowLevelMap Uchild = A.U;
 
