@@ -2,6 +2,7 @@
 #include <exception>
 #include <cmath>
 #include <random>
+#include <iomanip>
 
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
@@ -12,10 +13,12 @@
 using namespace Hatrix;
 
 static Matrix
-generate_column_block(int64_t block, int64_t block_size,
+generate_column_block(const Domain& domain,
+                      int64_t block, int64_t block_size,
                       int64_t level,
                       const SymmetricSharedBasisMatrix& A,
-                      const Matrix& dense) {
+                      const Matrix& dense,
+                      const Args& opts) {
   int64_t nblocks = pow(2, level);
   auto dense_splits = dense.split(nblocks, nblocks);
   Matrix AY(block_size, block_size);
@@ -23,19 +26,29 @@ generate_column_block(int64_t block, int64_t block_size,
   for (int64_t j = 0; j < nblocks; ++j) {
     if (A.is_admissible.exists(block, j, level) &&
         !A.is_admissible(block, j, level)) { continue; }
-    AY += dense_splits[block * nblocks + j];
+    // AY += dense_splits[block * nblocks + j];
+    for (int ii = 0; ii < block_size; ++ii) {
+      for (int jj = 0; jj < block_size; ++jj) {
+
+        AY(ii, jj) += opts.kernel(domain.particles[block * block_size + ii].coords,
+                                  domain.particles[j * block_size + jj].coords);
+      }
+    }
   }
 
   return AY;
 }
 
+double AY_norm = 0;
+double temp_norm = 0;
 
 static Matrix
-generate_column_bases(int64_t block, int64_t block_size, int64_t level,
+generate_column_bases(const Domain& domain,
+                      int64_t block, int64_t block_size, int64_t level,
                       SymmetricSharedBasisMatrix& A,
                       const Matrix& dense,
                       const Args& opts) {
-  Matrix AY = generate_column_block(block, block_size, level, A, dense);
+  Matrix AY = generate_column_block(domain, block, block_size, level, A, dense, opts);
   Matrix Ui;
   int64_t rank;
 
@@ -97,7 +110,8 @@ generate_leaf_nodes(const Domain& domain,
   for (int64_t i = 0; i < nblocks; ++i) {
     A.U.insert(i,
                A.max_level,
-               generate_column_bases(i,
+               generate_column_bases(domain,
+                                     i,
                                      domain.cell_size(i, A.max_level),
                                      A.max_level,
                                      A,
@@ -118,7 +132,8 @@ generate_leaf_nodes(const Domain& domain,
 }
 
 static Matrix
-generate_U_transfer_matrix(const Matrix& Ubig_c1,
+generate_U_transfer_matrix(const Domain& domain,
+                           const Matrix& Ubig_c1,
                            const Matrix& Ubig_c2,
                            const int64_t node,
                            const int64_t block_size,
@@ -126,7 +141,14 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
                            SymmetricSharedBasisMatrix& A,
                            const Matrix& dense,
                            const Args& opts) {
-  Matrix col_block = generate_column_block(node, block_size, level, A, dense);
+  Matrix col_block = generate_column_block(domain, node, block_size, level, A, dense, opts);
+  if (level == 1) {
+    for (int i = 0; i < col_block.rows; ++i) {
+      for (int j = 0; j < col_block.cols; ++j) {
+        AY_norm += pow(col_block(i, j), 2);
+      }
+    }
+  }
   auto col_block_splits = col_block.split(2, 1);
 
   int64_t c1 = node * 2;
@@ -140,6 +162,13 @@ generate_U_transfer_matrix(const Matrix& Ubig_c1,
 
   matmul(Ubig_c1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Ubig_c2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
+
+  for (int i = 0; i < temp.rows; ++i) {
+    for (int j = 0; j < temp.cols; ++j) {
+      temp_norm += pow(temp(i, j), 2);
+    }
+  }
+
 
   Matrix Utransfer;
   std::vector<int64_t> pivots;
@@ -169,7 +198,8 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
   bool has_admis = false;
 
   for (int64_t i = 0; i < pow(2, level); ++i) {
-    if (!A.is_admissible.exists(row, i, level) || exists_and_admissible(A, row, i, level)) {
+    if (!A.is_admissible.exists(row, i, level) ||
+        exists_and_admissible(A, row, i, level)) {
       has_admis = true;
       break;
     }
@@ -200,7 +230,8 @@ generate_transfer_matrices(const Domain& domain,
     int64_t block_size = Ubig_c1.rows + Ubig_c2.rows;
 
     if (row_has_admissible_blocks(A, node, level) && A.max_level != 1) {
-      Matrix Utransfer = generate_U_transfer_matrix(Ubig_c1,
+      Matrix Utransfer = generate_U_transfer_matrix(domain,
+                                                    Ubig_c1,
                                                     Ubig_c2,
                                                     node,
                                                     block_size,
@@ -208,14 +239,23 @@ generate_transfer_matrices(const Domain& domain,
                                                     A,
                                                     dense,
                                                     opts);
-      auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, A.ranks(c1, child_level)),
-                                              {});
+      auto Utransfer_splits =
+        Utransfer.split(std::vector<int64_t>{A.ranks(c1, child_level)},
+                        {});
 
       Matrix Ubig(block_size, A.ranks(node, level));
       auto Ubig_splits = Ubig.split(2, 1);
 
       matmul(Ubig_c1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_c2, Utransfer_splits[1], Ubig_splits[1]);
+
+      std::cout << "U 0: " << Hatrix::norm(Ubig_c1) << std::endl;
+      std::cout << "U transfer 0: " << Hatrix::norm(Utransfer_splits[0]) << std::endl;
+      std::cout << "U big 0: " << Hatrix::norm(Ubig_splits[0]) << std::endl;
+
+      std::cout << "U 1: " << Hatrix::norm(Ubig_c2) << std::endl;
+      std::cout << "U transfer 1: " << Hatrix::norm(Utransfer_splits[1]) << std::endl;
+      std::cout << "U big 1: " << Hatrix::norm(Ubig_splits[1]) << std::endl;
 
       A.U.insert(node, level, std::move(Utransfer));
       Ubig_parent.insert(node, level, std::move(Ubig));
@@ -225,12 +265,17 @@ generate_transfer_matrices(const Domain& domain,
       Ubig_parent.insert(node, level,
                          generate_identity_matrix(block_size, rank));
       A.U.insert(node, level,
-                 generate_identity_matrix(A.ranks(c1, child_level) + A.ranks(c2, child_level),
+                 generate_identity_matrix(A.ranks(c1, child_level) +
+                                          A.ranks(c2, child_level),
                                           rank));
 
       A.ranks.insert(node, level, std::move(rank));
     }
   }
+
+  // std::cout << "H2 AY norm: " << std::setprecision(18)
+  //           << std::sqrt(AY_norm) << std::endl;
+  // std::cout << "H2 temp norm: " << std::setprecision(18) << std::sqrt(temp_norm) << std::endl;
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < i; ++j) {
@@ -244,6 +289,26 @@ generate_transfer_matrices(const Domain& domain,
     }
   }
 
+  Matrix Ubig0_1(opts.nleaf * 2, opts.max_rank);
+  auto Ubig0_1_splits = Ubig0_1.split(2,1);
+  auto U1_0_splits = A.U(0, 1).split(2, 1);
+  matmul(A.U(0, 2), U1_0_splits[0], Ubig0_1_splits[0], false, false, 1, 0);
+  matmul(A.U(1, 2), U1_0_splits[1], Ubig0_1_splits[1], false, false, 1, 0);
+
+  Matrix Ubig1_1(opts.nleaf * 2, opts.max_rank);
+  auto Ubig1_1_splits = Ubig1_1.split(2,1);
+  auto U1_1_splits = A.U(1, 1).split(2, 1);
+  matmul(A.U(2, 2), U1_1_splits[0], Ubig1_1_splits[0], false, false, 1, 0);
+  matmul(A.U(3, 2), U1_1_splits[1], Ubig1_1_splits[1], false, false, 1, 0);
+
+  auto A10_1 = generate_p2p_interactions(domain, 1, 0, 1, opts.kernel);
+
+  std::cout << "1,0,1 = "
+            << Hatrix::norm(A10_1 -
+                            matmul(matmul(Ubig1_1, A.S(1, 0, 1)), Ubig0_1, false, true))
+            << std::endl;
+
+
   return Ubig_parent;
 }
 
@@ -252,6 +317,17 @@ construct_h2_matrix_miro(SymmetricSharedBasisMatrix& A, const Domain& domain, co
   int64_t P = opts.max_rank;
   Matrix dense = generate_p2p_matrix(domain, opts.kernel);
   generate_leaf_nodes(domain, A, dense, opts);
+
+  // double U_leaf_norm_total = 0;
+  // for (int b = 0; b < 4; ++b) {
+  //   for (int i = 0; i < A.U(b, 2).rows; ++i) {
+  //     for (int j = 0; j < A.U(b, 2).cols; ++j) {
+  //       U_leaf_norm_total += pow(A.U(b, 2)(i, j), 2);
+  //     }
+  //   }
+  // }
+
+  // std::cout << "H2 LEAF NORM CONSTRUCT: " << std::sqrt(U_leaf_norm_total) << std::endl;
 
   RowLevelMap Uchild = A.U;
 

@@ -158,11 +158,7 @@ int main(int argc, char **argv) {
 
   int rc;
   double solve_error, construction_error, factorize_time, fp_ops, solve_time;
-
-
-  // std::cout << "init args.\n"
   Args opts(argc, argv);
-
 
   {
     int provided;

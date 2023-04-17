@@ -220,7 +220,8 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
   bool has_admis = false;
 
   for (int64_t i = 0; i < pow(2, level); ++i) {
-    if (!A.is_admissible.exists(row, i, level) || exists_and_admissible(A, row, i, level)) {
+    if (!A.is_admissible.exists(row, i, level) ||
+        exists_and_admissible(A, row, i, level)) {
       has_admis = true;
       break;
     }
@@ -230,7 +231,8 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
 }
 
 void
-generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
+generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
+                           const Domain& domain, const Args& opts,
                            int64_t level) {
   if (!MPIRANK) {
     std::cout << "generate transfer matrices level=" << level << std::endl;
@@ -267,11 +269,9 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   double BETA = 1.0;
   int64_t leaf_nblocks = N / nleaf;
   for (int64_t block = MYROW; block < leaf_nblocks; block += MPIGRID[0]) {
-    // int IA = level_block_size * block + 1;
     int64_t level_block = block / (leaf_nblocks / nblocks);
     int IA = level_block_size * level_block +
       (block % (leaf_nblocks / nblocks)) * nleaf + 1;
-
 
     for (int64_t j = MYCOL; j < nblocks; j += MPIGRID[1]) {
       if (exists_and_inadmissible(A, level_block, j, level)) { continue; }
@@ -280,7 +280,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       for (int ii = 0; ii < nleaf; ++ii) {
         for (int jj = 0; jj < level_block_size; ++jj) {
           int AY_local_i = indxg2l(IA + ii, nleaf, MPIGRID[0])-1;
-
           AY_MEM[AY_local_i + jj * AY_local_nrows] +=
             opts.kernel(domain.particles[IA + ii - 1].coords,
                         domain.particles[JA + jj - 1].coords);
@@ -299,13 +298,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // summation of the admissible blocks.
   int block_nrows = rank * 2;
   int TEMP_nrows = nblocks * block_nrows;
-  int TEMP_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
-  int TEMP_local_ncols = fmax(numroc_(&level_block_size, &nleaf,
+  int TEMP_local_nrows =
+    fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int TEMP_local_ncols = fmax(numroc_(&level_block_size, &rank,
                                       &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int TEMP[9];
   // Use rank as NB cuz it throws a 806 error for an unknown reason.
   descinit_(TEMP, &TEMP_nrows, &level_block_size, &rank, &rank, &ZERO, &ZERO,
-            &BLACS_CONTEXT, &TEMP_local_nrows, &INFO);
+             &BLACS_CONTEXT, &TEMP_local_nrows, &INFO);
   double *TEMP_MEM;
   try {
     TEMP_MEM = new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
@@ -334,8 +334,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     int JA = 1;
     int ITEMP = c1 * rank + 1;
     int JTEMP = 1;
+
+    // std::cout << "FIRST IU: " << IU << " JU: " << JU
+    //           << " IA: " << IA << " JA: " << JA
+    //           << " ITEMP: " << ITEMP << " JTEMP: " << JTEMP
+    //           << std::endl;
     pdgemm_(&TRANS, &NOTRANS,
-            &rank, &child_block_size, &child_block_size,
+            &rank, &level_block_size, &child_block_size,
             &ALPHA,
             U_MEM, &IU, &JU, U,
             AY_MEM, &IA, &JA, AY,
@@ -349,8 +354,9 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     JA = 1;
     ITEMP = c2 * rank + 1;
     JTEMP = 1;
+
     pdgemm_(&TRANS, &NOTRANS,
-            &rank, &child_block_size, &child_block_size,
+            &rank, &level_block_size, &child_block_size,
             &ALPHA,
             U_MEM, &IU, &JU, U,
             AY_MEM, &IA, &JA, AY,
@@ -363,10 +369,12 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   }
 
   delete[] AY_MEM;
+
   // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
-  // Allocate a global matrix to store the transfer matrices. The transfer matrices for the
-  // entire level are stacked by row in this global matrix.
-  int UTRANSFER_local_nrows = fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  // Allocate a global matrix to store the transfer matrices.
+  // The transfer matrices for the entire level are stacked by row in this global matrix.
+  int UTRANSFER_local_nrows =
+    fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
   int UTRANSFER_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int UTRANSFER[9];
 
@@ -417,7 +425,9 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      int64_t lwork_space = (int64_t)WORK[0] + nleaf * ((int64_t)TEMP_local_nrows + TEMP_local_ncols + 1) * (int64_t)nleaf + (int64_t)TEMP_local_ncols;
+      int64_t lwork_space = (int64_t)WORK[0] +
+        nleaf * ((int64_t)TEMP_local_nrows + TEMP_local_ncols + 1) *
+        (int64_t)nleaf + (int64_t)TEMP_local_ncols;
       LWORK = (int)std::fmin(INT_MAX, lwork_space);
       delete[] WORK;
     }
@@ -534,6 +544,21 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
               UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
               &BETA,
               U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
+      const char nn = 'F';
+      double u_norm =
+        pdlange_(&nn, &child_block_size, &rank, U_MEM, &IU,
+                 &JU, U, NULL);
+      std::cout << "U 0: " << u_norm << std::endl;
+
+      double u_trans_norm =
+        pdlange_(&nn, &rank, &rank, UTRANSFER_MEM, &IUTRANSFER,
+                 &JUTRANSFER, U, NULL);
+      std::cout << "U transfer 0: " << u_trans_norm << std::endl;
+
+      double u_real_norm =
+        pdlange_(&nn, &child_block_size, &rank, U_REAL_MEM, &IU_REAL,
+                 &JU_REAL, U_REAL, NULL);
+      std::cout << "U big 0: " << u_real_norm << std::endl;
     }
 
     // Compute lower part of the real basis for this level.
@@ -552,7 +577,25 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
               UTRANSFER_MEM, &IUTRANSFER, &JUTRANSFER, UTRANSFER,
               &BETA,
               U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
+      const char nn = 'F';
+      double u_norm =
+        pdlange_(&nn, &child_block_size, &rank, U_MEM, &IU,
+                 &JU, U, NULL);
+      std::cout << "U 0: " << u_norm << std::endl;
+
+      double u_trans_norm =
+        pdlange_(&nn, &rank, &rank, UTRANSFER_MEM, &IUTRANSFER,
+                 &JUTRANSFER, U, NULL);
+      std::cout << "U transfer 1: " << u_trans_norm << std::endl;
+
+      double u_real_norm =
+        pdlange_(&nn, &child_block_size, &rank, U_REAL_MEM, &IU_REAL,
+                 &JU_REAL, U_REAL, NULL);
+      std::cout << "U big 1: " << u_real_norm << std::endl;
+      std::cout << std::endl;
     }
+
+
 
 
     if (!MPIRANK) {
@@ -708,7 +751,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
         // Store the info for the S block to be copied into in S_LOCAL.
         if (IMAP[0] != MPIRANK) {
-          S_LOCAL_CONTEXT=-1;   // processes that are not part of this context set the local context to -1.
+          S_LOCAL_CONTEXT=-1;
+          // processes that are not part of this context set the local context to -1.
         }
         descset_(S_LOCAL,
                  &S_LOCAL_nrows, &S_LOCAL_ncols, &S_LOCAL_nrows, &S_LOCAL_ncols,
@@ -733,6 +777,24 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     }
   }
 
+  Matrix Ubig0_1(opts.nleaf * 2, opts.max_rank);
+  auto Ubig0_1_splits = Ubig0_1.split(2,1);
+  auto U1_0_splits = A.U(0, 1).split(2, 1);
+  matmul(A.U(0, 2), U1_0_splits[0], Ubig0_1_splits[0], false, false, 1, 0);
+  matmul(A.U(1, 2), U1_0_splits[1], Ubig0_1_splits[1], false, false, 1, 0);
+
+  Matrix Ubig1_1(opts.nleaf * 2, opts.max_rank);
+  auto Ubig1_1_splits = Ubig1_1.split(2,1);
+  auto U1_1_splits = A.U(1, 1).split(2, 1);
+  matmul(A.U(2, 2), U1_1_splits[0], Ubig1_1_splits[0], false, false, 1, 0);
+  matmul(A.U(3, 2), U1_1_splits[1], Ubig1_1_splits[1], false, false, 1, 0);
+
+  auto A10_1 = generate_p2p_interactions(domain, 1, 0, 1, opts.kernel);
+
+  std::cout << "1,0,1 = " << Hatrix::norm(A10_1 -
+                                          matmul(matmul(Ubig1_1, A.S(1, 0, 1)), Ubig0_1, false, true))
+            << std::endl;
+
   delete[] S_BLOCKS_MEM;
   delete[] TEMP_MEM;
 }
@@ -748,7 +810,24 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 
+
   generate_leaf_nodes(A, domain, opts);
+
+  // double U_leaf_norm_total = 0;
+  // for (int b = 0; b < 4; ++b) {
+  //   for (int i = 0; i < A.U(b, 2).rows; ++i) {
+  //     for (int j = 0; j < A.U(b, 2).cols; ++j) {
+  //       U_leaf_norm_total += pow(A.U(b, 2)(i, j), 2);
+  //     }
+  //   }
+  // }
+
+  // std::cout << "SCALAPACK H2 LEAF NORM CONSTRUCT: " << std::sqrt(U_leaf_norm_total) << std::endl;
+
+  // const char nn = 'F';
+  // double u_mem_norm =
+  //   pdlange_(&nn, &N, &nleaf, U_MEM, &ONE, &ONE, U, NULL);
+  // std::cout << "U MEM norm: " << u_mem_norm << std::endl;
 
   if (!MPIRANK) {
     // std::cout << "FINISH LEAF NODE\n";

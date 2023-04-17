@@ -27,6 +27,7 @@ export OMP_PROC_BIND=close
 # cd $ROOT
 
 make -j H2_dtd
+make -j H2_main
 
 ndim=2
 
@@ -70,7 +71,7 @@ ndim=2
 #     done
 # done
 
-for N in 4096; do
+for N in 64; do
     for adm in 0; do
         # for nleaf in 256; do
         #     for max_rank in 50 150 200; do
@@ -89,9 +90,10 @@ for N in 4096; do
         #     done
         # done
 
-        for nleaf in 256; do
-            for max_rank in 100; do
-                mpirun -n 4 ./bin/H2_dtd --N $N \
+        for nleaf in 16; do
+            for max_rank in 10; do
+                echo "--- MAIN ---"
+                ./bin/H2_main --N $N \
                               --nleaf $nleaf \
                               --kernel_func gsl_matern \
                               --kind_of_geometry grid \
@@ -102,7 +104,21 @@ for N in 4096; do
                               --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3
+                              --kind_of_recompression 3 --use_nested_basis
+
+                echo "--- DTD ---"
+                mpirun -n 1 ./bin/H2_dtd --N $N \
+                              --nleaf $nleaf \
+                              --kernel_func gsl_matern \
+                              --kind_of_geometry grid \
+                              --ndim $ndim \
+                              --max_rank $max_rank \
+                              --accuracy -1 \
+                              --admis $adm \
+                              --admis_kind diagonal \
+                              --construct_algorithm miro \
+                              --param_1 1 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3 --use_nested_basis
             done
         done
     done
