@@ -375,10 +375,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   // The transfer matrices for the entire level are stacked by row in this global matrix.
   int UTRANSFER_local_nrows =
     fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
-  int UTRANSFER_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
+  int UTRANSFER_local_ncols = fmax(numroc_(&level_block_size,
+                                           &nleaf, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int UTRANSFER[9];
 
-  descinit_(UTRANSFER, &TEMP_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
+  descinit_(UTRANSFER, &TEMP_nrows, &level_block_size, &rank, &nleaf, &ZERO, &ZERO,
             &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
   double *UTRANSFER_MEM;
   try {
@@ -400,11 +401,11 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   for (int64_t block = 0; block < nblocks; ++block) {
     double *S_MEM;
     try {
-      S_MEM = new double[(int64_t)rank]();
+      S_MEM = new double[(int64_t)level_block_size]();
     }
     catch (std::bad_alloc & exception) {
       std::cerr << "tried to allocate S_MEM of size:  "
-                << (int64_t)rank
+                << (int64_t)level_block_size
                 << " " << exception.what() << std::endl;
     }
     // SVD workspace query.
@@ -418,7 +419,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
       WORK = new double[1]();
 
       pdgesvd_(&JOB_U, &JOB_VT,
-               &block_nrows, &rank,
+               &block_nrows, &level_block_size,
                TEMP_MEM, &ITEMP, &JTEMP, TEMP,
                S_MEM,
                UTRANSFER_MEM, &IU, &JU, UTRANSFER,
@@ -448,7 +449,7 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
       }
 
       pdgesvd_(&JOB_U, &JOB_VT,
-               &block_nrows, &rank,
+               &block_nrows, &level_block_size,
                TEMP_MEM, &ITEMP, &JTEMP, TEMP,
                S_MEM,
                UTRANSFER_MEM, &IU, &JU, UTRANSFER,
