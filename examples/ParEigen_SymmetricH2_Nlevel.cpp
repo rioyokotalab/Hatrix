@@ -1356,7 +1356,7 @@ int main(int argc, char ** argv) {
   const int64_t num_ev = k_end - k_begin + 1;
   const int64_t num_working_procs = mpi_nprocs > num_ev ? num_ev : mpi_nprocs;
   const int64_t ev_per_process = num_ev / num_working_procs;
-  const int64_t remainder_ev = num_ev % ev_per_process;
+  const int64_t remainder_ev = num_ev % num_working_procs;
 #ifdef DEBUG_OUTPUT
   if (mpi_rank == 0) {
     printf("\nProcess-%d: num_ev=%d, ev_per_process=%d, num_working_procs=%d\n",
