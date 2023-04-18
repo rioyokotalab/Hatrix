@@ -1372,7 +1372,7 @@ int main(int argc, char ** argv) {
   if (mpi_rank < num_working_procs) {
     const int64_t local_num_ev = ev_per_process +
                                  (mpi_rank == (num_working_procs-1) ? remainder_ev : 0);
-    const int64_t k0 = mpi_rank * ev_per_process + 1;
+    const int64_t k0 = k_begin + mpi_rank * ev_per_process;
     const int64_t k1 = k0 + local_num_ev - 1;
 #ifdef DEBUG_OUTPUT
     printf("Process-%d: local_num_ev=%d, k0=%d, k1=%d\n",
