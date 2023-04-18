@@ -136,6 +136,9 @@ int main(int argc, char ** argv) {
   const auto actual_eig_stop = std::chrono::system_clock::now();
   const double actual_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                  (actual_eig_stop - actual_eig_start).count();
+  // Also include dsyevx work arrays in memory consumption
+  // https://netlib.org/lapack/explore-html/d2/d8a/group__double_s_yeigen_ga68612cdf4ed1051c08f0b0735b8dfdea.html#ga68612cdf4ed1051c08f0b0735b8dfdea
+  const auto actual_eig_mem = A.memory_used() + sizeof(double) * (8*N + 5*N);
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -147,12 +150,13 @@ int main(int argc, char ** argv) {
             << " construct_time=" << construct_time
             << " dense_eig_time=" << dense_eig_time
             << " actual_eig_time=" << actual_eig_time
+            << " actual_eig_mem=" << actual_eig_mem
             << std::endl;
 #else
   if (print_csv_header == 1) {
     // Print CSV header
     std::cout << "N,kernel,geometry,abs_tol,k_begin,k_end"
-              << ",construct_time,dense_eig_time,actual_eig_time"
+              << ",construct_time,dense_eig_time,actual_eig_time,actual_eig_mem"
               << ",k,dense_eigv,actual_eigv,eig_abs_err"
               << std::endl;
   }
@@ -181,6 +185,7 @@ int main(int argc, char ** argv) {
               << "," << construct_time
               << "," << dense_eig_time
               << "," << actual_eig_time
+              << "," << actual_eig_mem
               << "," << k
               << std::setprecision(8)
               << "," << dense_eigv_k

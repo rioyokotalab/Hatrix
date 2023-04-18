@@ -120,6 +120,9 @@ int main(int argc, char ** argv) {
   const auto dense_eig_stop = std::chrono::system_clock::now();
   const double dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (dense_eig_stop - dense_eig_start).count();
+  // Also include dsyev work array in memory consumption
+  // https://netlib.org/lapack/explore-html/d2/d8a/group__double_s_yeigen_ga442c43fca5493590f8f26cf42fed4044.html
+  const auto dense_eig_mem = A.memory_used() + sizeof(double) * (3*N - 1);
 
 #ifndef OUTPUT_CSV
   std::cout << "N=" << N
@@ -127,11 +130,12 @@ int main(int argc, char ** argv) {
             << " geometry=" << geom_name
             << " construct_time=" << construct_time
             << " dense_eig_time=" << dense_eig_time
+            << " dense_eig_mem=" << dense_eig_mem
             << std::endl;
 #else
   if (print_csv_header == 1) {
     // Print CSV header
-    std::cout << "N,kernel,geometry,construct_time,dense_eig_time"
+    std::cout << "N,kernel,geometry,construct_time,dense_eig_time,dense_eig_mem"
               << std::endl;
   }
   std::cout << N
@@ -139,6 +143,7 @@ int main(int argc, char ** argv) {
             << "," << geom_name
             << "," << construct_time
             << "," << dense_eig_time
+            << "," << dense_eig_mem
             << std::endl;
 #endif
 
