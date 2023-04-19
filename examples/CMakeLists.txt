@@ -80,3 +80,6 @@ target_link_libraries(MSParEigen_SymmetricH2_Nlevel Hatrix MPI::MPI_CXX)
 
 add_executable(ParEigen_SymmetricH2_Nlevel ParEigen_SymmetricH2_Nlevel.cpp)
 target_link_libraries(ParEigen_SymmetricH2_Nlevel Hatrix MPI::MPI_CXX)
+
+add_executable(ParEigen_Dense_PDSYEVX ParEigen_Dense_PDSYEVX.cpp)
+target_link_libraries(ParEigen_Dense_PDSYEVX Hatrix MPI::MPI_CXX -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lmkl_blacs_intelmpi_lp64 -liomp5 -lpthread -lm -ldl)
