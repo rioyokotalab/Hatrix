@@ -1355,12 +1355,10 @@ int main(int argc, char ** argv) {
   // Get task for current process
   const int64_t num_ev = k_end - k_begin + 1;
   const int64_t num_working_procs = mpi_nprocs > num_ev ? num_ev : mpi_nprocs;
-  const int64_t ev_per_process = num_ev / num_working_procs;
-  const int64_t remainder_ev = num_ev % num_working_procs;
 #ifdef DEBUG_OUTPUT
   if (mpi_rank == 0) {
-    printf("\nProcess-%d: num_ev=%d, ev_per_process=%d, num_working_procs=%d\n",
-           mpi_rank, (int)num_ev, (int)ev_per_process, (int)num_working_procs);
+    printf("\nProcess-%d: num_ev=%d, num_working_procs=%d\n",
+           mpi_rank, (int)num_ev, (int)num_working_procs);
   }
 #endif
   // Create communicator for working processes
@@ -1368,11 +1366,17 @@ int main(int argc, char ** argv) {
   int color = (mpi_rank < num_working_procs);
   int key = mpi_rank;
   MPI_Comm_split(MPI_COMM_WORLD, color, key, &comm);
+
+  std::vector<int> offset(num_working_procs + 1, 0), count(num_working_procs, 0);
+  for (int i = 0; i < (int)offset.size(); i++)
+    offset[i] = (i * num_ev) / num_working_procs;
+  for (int i = 0; i < (int)count.size(); i++)
+    count[i] = offset[i + 1] - offset[i];
+
   // Compute eigenvalues
   if (mpi_rank < num_working_procs) {
-    const int64_t local_num_ev = ev_per_process +
-                                 (mpi_rank == (num_working_procs-1) ? remainder_ev : 0);
-    const int64_t k0 = k_begin + mpi_rank * ev_per_process;
+    const int64_t local_num_ev = count[mpi_rank];
+    const int64_t k0 = k_begin + offset[mpi_rank];
     const int64_t k1 = k0 + local_num_ev - 1;
 #ifdef DEBUG_OUTPUT
     printf("Process-%d: local_num_ev=%d, k0=%d, k1=%d\n",
@@ -1416,13 +1420,6 @@ int main(int argc, char ** argv) {
     // Gather results at process 0
     if (mpi_rank == 0) {
       h2_ev.assign(num_ev, 0);
-      std::vector<int> offset(num_working_procs, 0), count(num_working_procs, 0);
-      offset[0] = 0;
-      count[0] = local_num_ev;
-      for (int i = 1; i < num_working_procs; i++) {
-        count[i] = ev_per_process + (i == (num_working_procs-1) ? remainder_ev : 0);
-        offset[i] = offset[i - 1] + count[i - 1];
-      }
       MPI_Gatherv(local_ev.data(), local_num_ev, MPI_DOUBLE,
                   h2_ev.data(), count.data(), offset.data(), MPI_DOUBLE, 0, comm);
     }
