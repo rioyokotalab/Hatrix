@@ -155,10 +155,14 @@ cholesky_solve(SymmetricSharedBasisMatrix& A,
 
 int main(int argc, char **argv) {
   Hatrix::Context::init();
+  task_time.resize(3);
 
   int rc;
   double solve_error, construction_error, factorize_time, fp_ops, solve_time;
   Args opts(argc, argv);
+  task_time[0] = 0;
+  task_time[1] = 0;
+  task_time[2] = 0;
 
   {
     int provided;
@@ -171,7 +175,7 @@ int main(int argc, char **argv) {
   int DENSE_NBROW = opts.nleaf;
   int DENSE_NBCOL = opts.nleaf;
 
-  int cores = opts.parsec_cores;
+  int cores = 1;
   if (!MPIRANK) {
     std::cout << "MPIGRID g[0] : " << MPIGRID[0]
               << " g[1]: " << MPIGRID[1]
@@ -419,6 +423,15 @@ int main(int argc, char **argv) {
 
   Hatrix::Context::finalize();
 
+  for (int i = 0; i < 3; ++i) {
+    double global_sum = 0;
+    MPI_Allreduce(&task_time[0], &global_sum, 1, MPI_DOUBLE, MPI_SUM,
+                  MPI_COMM_WORLD);
+    task_time[i] = global_sum;
+  }
+
+  double total_task_time = task_time[0] + task_time[1] + task_time[2];
+
   if (!MPIRANK) {
     // std::cout << "----------------------------\n";
     // std::cout << "N               : " << opts.N << std::endl;
@@ -460,7 +473,8 @@ int main(int argc, char **argv) {
               << std::scientific << opts.param_2 << std::fixed << ","
               << opts.param_3 << ","
               << opts.kernel_verbose << ","
-              << MPISIZE
+              << MPISIZE << ","
+              << std::fixed << std::setprecision(15) << total_task_time / 1e3
               << std::endl;
   }
 

@@ -8,3 +8,5 @@
 #include "scalapack_functions.hpp"
 #include "tasks_c_interface.h"
 #include "SymmetricSharedBasisMatrix.hpp"
+
+extern std::vector<double> task_time;

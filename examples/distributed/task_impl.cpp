@@ -32,8 +32,11 @@ public:
   }
 };
 
-void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols, int64_t D_row_rank, int64_t D_col_rank,
-                              int64_t U_nrows, int64_t U_ncols, double* _D, double* _U, char which) {
+void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols,
+                              int64_t D_row_rank, int64_t D_col_rank,
+                              int64_t U_nrows, int64_t U_ncols,
+                              double* _D, double* _U, char which) {
+  auto start_t = std::chrono::system_clock::now();
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
@@ -60,9 +63,14 @@ void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols, int64_t D_row_ra
     Matrix product = matmul(D, UF);
     D.copy_mem(product);
   }
+  auto stop_t = std::chrono::system_clock::now();
+  double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
+
+  task_time[0] += t;
 }
 
 void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
+  auto start_t = std::chrono::system_clock::now();
   MatrixWrapper D(_D, D_nrows, D_nrows, D_nrows);
   auto D_splits = split_dense(D,
                               D_nrows - rank_nrows,
@@ -72,12 +80,20 @@ void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
   solve_triangular(D_splits[0], D_splits[2], Hatrix::Right, Hatrix::Lower,
                    false, true, 1.0);
   syrk(D_splits[2], D_splits[3], Hatrix::Lower, false, -1, 1);
+
+  auto stop_t = std::chrono::system_clock::now();
+  double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
+  task_time[1] += t;
 }
 
 void CORE_cholesky_full(int64_t D_nrows, int64_t D_ncols, double* _D) {
+  auto start_t = std::chrono::system_clock::now();
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
 
   cholesky(D, Hatrix::Lower);
+  auto stop_t = std::chrono::system_clock::now();
+  double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
+  task_time[2] += t;
 }
 
 void CORE_solve_triangular_full(int64_t D_dd_nrows, int64_t D_dd_ncols, double* _D_dd,
@@ -107,9 +123,12 @@ void CORE_matmul_full(int64_t D_jd_nrows, int64_t D_jd_ncols, double* _D_jd,
   matmul(D_jd, D_id, D_ji, false, true, -1.0, 1.0);
 }
 
-void CORE_trsm(int64_t D_rows, int64_t D_cols, int64_t D_row_rank, int64_t D_col_rank, double* _diagonal,
-               int64_t O_rows, int64_t O_cols, int64_t O_row_rank, int64_t O_col_rank, double* _other,
-               char which) {
+void CORE_trsm(int64_t D_rows, int64_t D_cols,
+               int64_t D_row_rank, int64_t D_col_rank,
+               double* _diagonal,
+               int64_t O_rows, int64_t O_cols,
+               int64_t O_row_rank, int64_t O_col_rank,
+               double* _other, char which) {
   MatrixWrapper diagonal(_diagonal, D_rows, D_cols, D_rows);
   MatrixWrapper other(_other, O_rows, O_cols, O_rows);
 

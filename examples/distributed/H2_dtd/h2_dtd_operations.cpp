@@ -8,6 +8,8 @@
 
 using namespace Hatrix;
 
+std::vector<double> task_time;
+
 static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F,
   parsec_temp_fill_in_rows, parsec_temp_fill_in_cols,
   parsec_US, parsec_r, parsec_t;

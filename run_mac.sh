@@ -19,7 +19,7 @@ set -e
 
 # ulimit -c unlimited
 
-make -j H2_main
+make -j H2_dtd
 # make -j Dense
 
 max_rank=50
@@ -35,11 +35,11 @@ N=4096
 # ./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-9 --param_2 1
 # ./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-4 --param_2 1
 
-for N in 64; do
+for N in 1024; do
     for adm in 0; do
-        for nleaf in 16; do
-            for max_rank in 10; do
-                ./bin/H2_main --N $N \
+        for nleaf in 32; do
+            for max_rank in 15; do
+                ./bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
                               --kind_of_geometry grid \
@@ -50,7 +50,8 @@ for N in 64; do
                               --admis_kind diagonal \
                               --construct_algorithm miro \
                               --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3
+                              --kind_of_recompression 3 --use_nested_basis \
+                              --parsec_cores 1
             done
         done
     done
