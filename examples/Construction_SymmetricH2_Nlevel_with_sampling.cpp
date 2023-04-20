@@ -16,7 +16,9 @@
 #include <chrono>
 #include <stdexcept>
 
+#ifdef USE_JSON
 #include "nlohmann/json.hpp"
+#endif
 
 #include "Hatrix/Hatrix.h"
 #include "Domain.hpp"
@@ -65,9 +67,11 @@ class SymmetricH2 {
   void generate_coupling_matrices(const Domain& domain);
 
   Matrix get_Ubig(const int64_t node, const int64_t level) const;
+#ifdef USE_JSON
   void fill_JSON(const Domain& domain,
                  const int64_t i, const int64_t j,
                  const int64_t level, nlohmann::json& json) const;
+#endif
 
  public:
   SymmetricH2(const Domain& domain,
@@ -82,7 +86,9 @@ class SymmetricH2 {
   void print_structure(const int64_t level) const;
   void print_ranks() const;
   double low_rank_block_ratio() const;
+#ifdef USE_JSON
   void write_JSON(const Domain& domain, const std::string filename) const;
+#endif
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
@@ -390,6 +396,7 @@ double SymmetricH2::low_rank_block_ratio() const {
   return low_rank / total;
 }
 
+#ifdef USE_JSON
 void SymmetricH2::fill_JSON(const Domain& domain,
                             const int64_t i, const int64_t j,
                             const int64_t level,
@@ -443,6 +450,7 @@ void SymmetricH2::write_JSON(const Domain& domain,
   std::ofstream out_file(filename);
   out_file << json << std::endl;
 }
+#endif
 
 } // namespace Hatrix
 
@@ -587,9 +595,11 @@ int main(int argc, char ** argv) {
   double lr_ratio = A.low_rank_block_ratio();
   A.print_structure(A.height);
 
+#ifdef USE_JSON
   if (out_filename.length() > 0) {
     A.write_JSON(domain, out_filename);
   }
+#endif
 
   std::cout << "N=" << N
             << " leaf_size=" << leaf_size

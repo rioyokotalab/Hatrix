@@ -17,8 +17,6 @@
 #include <stdexcept>
 #include <cstdio>
 
-#include "nlohmann/json.hpp"
-
 #include "Hatrix/Hatrix.h"
 #include "Domain.hpp"
 #include "functions.hpp"

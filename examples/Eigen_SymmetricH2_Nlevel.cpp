@@ -18,7 +18,9 @@
 #include <cstdio>
 #include <set>
 
+#ifdef USE_JSON
 #include "nlohmann/json.hpp"
+#endif
 
 #include "Hatrix/Hatrix.h"
 #include "Domain.hpp"
@@ -109,9 +111,11 @@ class SymmetricH2 {
                              RowLevelMap& Uchild);
 
   Matrix get_Ubig(const int64_t node, const int64_t level) const;
+#ifdef USE_JSON
   void fill_JSON(const Domain& domain,
                  const int64_t i, const int64_t j,
                  const int64_t level, nlohmann::json& json) const;
+#endif
 
   void update_row_cluster_bases(const int64_t row, const int64_t level,
                                 RowMap<Matrix>& r);
@@ -133,7 +137,9 @@ class SymmetricH2 {
   int64_t memory_usage() const;
   void print_structure(const int64_t level) const;
   void print_ranks() const;
+#ifdef USE_JSON
   void write_JSON(const Domain& domain, const std::string filename) const;
+#endif
 
   void factorize(const Domain& domain);
   std::tuple<int64_t, int64_t, int64_t, int64_t>
@@ -554,6 +560,7 @@ void SymmetricH2::print_ranks() const {
   }
 }
 
+#ifdef USE_JSON
 void SymmetricH2::fill_JSON(const Domain& domain,
                             const int64_t i, const int64_t j,
                             const int64_t level,
@@ -613,6 +620,7 @@ void SymmetricH2::write_JSON(const Domain& domain,
   std::ofstream out_file(filename);
   out_file << json << std::endl;
 }
+#endif
 
 void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t level,
                                            RowMap<Matrix>& r) {
