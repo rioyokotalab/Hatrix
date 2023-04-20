@@ -107,7 +107,11 @@ target_link_libraries(Hatrix GSL::gsl)
 
 include(find_or_download)
 # JSON writer
-find_or_download(nlohmann_json)
+option(USE_JSON "Enable matrix dump to JSON file" OFF)
+if(USE_JSON)
+  find_or_download(nlohmann_json)
+  add_definitions(-DUSE_JSON)
+endif()
 
 add_subdirectory(examples)
 

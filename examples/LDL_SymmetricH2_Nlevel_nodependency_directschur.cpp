@@ -17,7 +17,9 @@
 #include <stdexcept>
 #include <cstdio>
 
+#ifdef USE_JSON
 #include "nlohmann/json.hpp"
+#endif
 
 #include "Hatrix/Hatrix.h"
 #include "Domain.hpp"
@@ -69,9 +71,11 @@ class SymmetricH2 {
   void generate_near_coupling_matrices(const Domain& domain);
   void generate_far_coupling_matrices(const Domain& domain, const int64_t level);
   Matrix get_Ubig(const int64_t node, const int64_t level) const;
+#ifdef USE_JSON
   void fill_JSON(const Domain& domain,
                  const int64_t i, const int64_t j,
                  const int64_t level, nlohmann::json& json) const;
+#endif
 
   Matrix get_dense_skeleton(const Domain& domain,
                             const int64_t i, const int64_t j, const int64_t level) const;
@@ -101,7 +105,9 @@ class SymmetricH2 {
   void print_structure(const int64_t level) const;
   void print_ranks() const;
   double low_rank_block_ratio() const;
+#ifdef USE_JSON
   void write_JSON(const Domain& domain, const std::string filename) const;
+#endif
 
   void factorize(const Domain& domain);
   void solve(Matrix& b) const;
@@ -465,6 +471,7 @@ double SymmetricH2::low_rank_block_ratio() const {
   return low_rank / total;
 }
 
+#ifdef USE_JSON
 void SymmetricH2::fill_JSON(const Domain& domain,
                             const int64_t i, const int64_t j,
                             const int64_t level,
@@ -524,6 +531,7 @@ void SymmetricH2::write_JSON(const Domain& domain,
   std::ofstream out_file(filename);
   out_file << json << std::endl;
 }
+#endif
 
 Matrix SymmetricH2::get_dense_skeleton(const Domain& domain,
                                        const int64_t i, const int64_t j, const int64_t level) const {

@@ -64,7 +64,10 @@ endif()
 
 foreach(EXAMPLE ${HATRIX_EXAMPLES})
   add_executable(${EXAMPLE} ${EXAMPLE}.cpp)
-  target_link_libraries(${EXAMPLE} Hatrix nlohmann_json::nlohmann_json)
+  target_link_libraries(${EXAMPLE} Hatrix)
+  if(USE_JSON)
+    target_link_libraries(${EXAMPLE} nlohmann_json::nlohmann_json)
+  endif()
 endforeach()
 
 find_package(MPI)
