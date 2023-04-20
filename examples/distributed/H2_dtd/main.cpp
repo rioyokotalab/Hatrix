@@ -478,7 +478,7 @@ int main(int argc, char **argv) {
               << std::endl;
   }
 
-  // parsec_fini(&parsec);
+  parsec_fini(&parsec);
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);
   MPI_Finalize();

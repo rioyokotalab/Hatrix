@@ -36,7 +36,7 @@ void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols,
                               int64_t D_row_rank, int64_t D_col_rank,
                               int64_t U_nrows, int64_t U_ncols,
                               double* _D, double* _U, char which) {
-  auto start_t = std::chrono::system_clock::now();
+  // auto start_t = std::chrono::system_clock::now();
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
 
@@ -63,14 +63,14 @@ void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols,
     Matrix product = matmul(D, UF);
     D.copy_mem(product);
   }
-  auto stop_t = std::chrono::system_clock::now();
-  double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
+  // auto stop_t = std::chrono::system_clock::now();
+  // double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
 
-  task_time[0] += t;
+  // task_time[0] += t;
 }
 
 void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
-  auto start_t = std::chrono::system_clock::now();
+  // auto start_t = std::chrono::system_clock::now();
   MatrixWrapper D(_D, D_nrows, D_nrows, D_nrows);
   auto D_splits = split_dense(D,
                               D_nrows - rank_nrows,
@@ -81,19 +81,19 @@ void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
                    false, true, 1.0);
   syrk(D_splits[2], D_splits[3], Hatrix::Lower, false, -1, 1);
 
-  auto stop_t = std::chrono::system_clock::now();
-  double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
-  task_time[1] += t;
+  // auto stop_t = std::chrono::system_clock::now();
+  // double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
+  // task_time[1] += t;
 }
 
 void CORE_cholesky_full(int64_t D_nrows, int64_t D_ncols, double* _D) {
-  auto start_t = std::chrono::system_clock::now();
+  // auto start_t = std::chrono::system_clock::now();
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
 
   cholesky(D, Hatrix::Lower);
-  auto stop_t = std::chrono::system_clock::now();
-  double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
-  task_time[2] += t;
+  // auto stop_t = std::chrono::system_clock::now();
+  // double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
+  // task_time[2] += t;
 }
 
 void CORE_solve_triangular_full(int64_t D_dd_nrows, int64_t D_dd_ncols, double* _D_dd,
