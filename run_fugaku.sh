@@ -1,5 +1,5 @@
 #!/bin/bash
-#PJM -L "node=128"
+#PJM -L "node=8"
 #PJM -L "rscunit=rscunit_ft01"
 #PJM -L "rscgrp=small"
 #PJM -L "elapse=24:00:00"
@@ -7,7 +7,7 @@
 #PJM -L "throttling_state=0"
 #PJM -L "issue_state=0"
 #PJM -L "ex_pipe_state=0"
-#PJM --mpi "proc=32"
+#PJM --mpi "proc=8"
 #PJM --mpi "max-proc-per-node=1"
 #PJM -s
 
@@ -17,7 +17,7 @@
 
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/hp190122/u01594/gitrepos/googletest/build/lib64/pkgconfig:/vol0003/hp190122/u01594/gitrepos/lorapo/stars-h-rio/build/installdir/lib/pkgconfig
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/hp190122/u01594/gitrepos/parsec/build/lib64/pkgconfig:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64/pkgconfig
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64:/home/hp190122/u01594/gsl-2.7.1/build/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64:/vol0003/hp190122/u01594/gitrepos/parsec/build/lib64:/home/hp190122/u01594/gsl-2.7.1/build/lib
 
 # export PARALLEL=1
 # export OMP_NUM_THREADS=1
@@ -42,7 +42,7 @@ for adm in 0; do
     ndim=2
 
     for max_rank in 100; do
-        for N in 65536; do
+        for N in 16384; do
                 mpiexec bin/H2_dtd --N $N \
                               --nleaf $nleaf \
                               --kernel_func laplace \
@@ -55,6 +55,9 @@ for adm in 0; do
                               --construct_algorithm miro \
                               --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
                               --kind_of_recompression 3 --use_nested_basis
+
+		mkdir profiles
+		mv hatrix_profile-* profiles/
         done
     done
 done
