@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 3.9)
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(policies)
+include(host_specific_settings)
 set_policies()
+host_specific_settings()
+
+project(Hatrix
+  VERSION 1.0
+  LANGUAGES CXX
+)
 
 # Use Release build by default
 if(NOT CMAKE_BUILD_TYPE)
@@ -9,11 +17,6 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
 option(Hatrix_CPU_ONLY "Build Hatrix without GPU usage." ON)
-
-project(NewStructure
-  LANGUAGES CXX
-  VERSION 1.0
-)
 
 if(Hatrix_CPU_ONLY)
   message(STATUS "Will not compile code for GPU.")
@@ -47,10 +50,6 @@ add_library(Hatrix
 )
 target_compile_features(Hatrix PUBLIC cxx_std_11)
 
-# Adding this here because it finds openMP and does not work without a CXX.
-include(host_specific_settings)
-host_specific_settings()
-
 target_include_directories(Hatrix
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
@@ -58,6 +57,11 @@ target_include_directories(Hatrix
   PRIVATE
     ${BLAS_INCLUDE_DIR}
 )
+
+option(USE_OPENMP "Multithreading with OpenMP" ON)
+if(USE_OPENMP)
+  find_package(OpenMP REQUIRED)
+endif()
 
 option(USE_PAPI "Use PAPI to get CPU performance counters" OFF)
 if(USE_PAPI)
