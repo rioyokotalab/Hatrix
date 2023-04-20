@@ -425,7 +425,7 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < 3; ++i) {
     double global_sum = 0;
-    MPI_Allreduce(&task_time[0], &global_sum, 1, MPI_DOUBLE, MPI_SUM,
+    MPI_Allreduce(&task_time[i], &global_sum, 1, MPI_DOUBLE, MPI_SUM,
                   MPI_COMM_WORLD);
     task_time[i] = global_sum;
   }
