@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
