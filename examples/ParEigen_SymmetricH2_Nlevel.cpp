@@ -1178,13 +1178,12 @@ int main(int argc, char ** argv) {
   int64_t k_end = argc > 13 ? atol(argv[13]) : k_begin;
   const double a = argc > 14 ? atof(argv[14]) : 0;
   const double b = argc > 15 ? atof(argv[15]) : N;
-  const int64_t m = argc > 16 ? atol(argv[16]) : 2;
-  const bool compute_eig_acc = argc > 17 ? (atol(argv[17]) == 1) : true;
-  const int64_t print_csv_header = argc > 18 ? atol(argv[18]) : 1;
+  const bool compute_eig_acc = argc > 16 ? (atol(argv[16]) == 1) : true;
+  const int64_t print_csv_header = argc > 17 ? atol(argv[17]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 19 ? std::string(argv[19]) : "";
-  const int64_t sort_bodies = argc > 20 ? atol(argv[20]) : 0;
+  const std::string file_name = argc > 18 ? std::string(argv[18]) : "";
+  const int64_t sort_bodies = argc > 19 ? atol(argv[19]) : 0;
 
   Hatrix::Context::init();
 
