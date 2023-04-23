@@ -1102,6 +1102,13 @@ double get_kth_eigenvalue(const SymmetricH2& A, const Domain& domain,
   const auto k = k_list[idx_k];
   bool singular = false;
   while((b[idx_k] - a[idx_k]) >= ev_tol) {
+#ifdef DEBUG_OUTPUT
+    printf("Local starting intervals:\n");
+    for (int64_t idx = 0; idx < k_list_size; idx++) {
+      printf("k=%5d a=%10.5lf b=%10.5lf\n",
+             (int)k_list[idx], a[idx], b[idx]);
+    }
+#endif
     const auto mid = (a[idx_k] + b[idx_k]) / 2;
     const int v_mid = inertia(A, domain, mid, singular);
     if(singular) {
@@ -1380,8 +1387,9 @@ int main(int argc, char ** argv) {
            (int)k_begin, (int)k_end, a, b);
 #endif
     int64_t finished_count = 0;
+    int64_t n_idle_procs = mpi_nprocs - 1;
     while (finished_count < target_count) {
-      for (int i = 1; (i < mpi_nprocs) && (!task_pool.empty()); i++) {
+      for (int i = 1; (i < mpi_nprocs) && (n_idle_procs > 0) && (!task_pool.empty()); i++) {
         if (is_idle[i]) {
           // Send task to process number i
           const auto task = task_pool.front();
@@ -1395,6 +1403,7 @@ int main(int argc, char ** argv) {
           MPI_Request_free(&out_task_requests[i-1]);
           task_pool.pop();
           is_idle[i] = false;  // Set process i as working
+          n_idle_procs--;
 #ifdef DEBUG_OUTPUT
           printf("Master: Sent task (%d, %d, %.5lf, %.5lf) to Slave-%d\n",
                  task.k0, task.k1, task.a, task.b, i);
@@ -1464,6 +1473,7 @@ int main(int argc, char ** argv) {
 #endif
           finished_count += result_count - 2;
           is_idle[status.MPI_SOURCE] = true;
+          n_idle_procs++;
           break;
         }
       }
