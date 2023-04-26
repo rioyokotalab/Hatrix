@@ -26,7 +26,6 @@ generate_column_block(const Domain& domain,
   for (int64_t j = 0; j < nblocks; ++j) {
     if (A.is_admissible.exists(block, j, level) &&
         !A.is_admissible(block, j, level)) { continue; }
-    // AY += dense_splits[block * nblocks + j];
     for (int ii = 0; ii < block_size; ++ii) {
       for (int jj = 0; jj < block_size; ++jj) {
 
@@ -38,9 +37,6 @@ generate_column_block(const Domain& domain,
 
   return AY;
 }
-
-double AY_norm = 0;
-double temp_norm = 0;
 
 static Matrix
 generate_column_bases(const Domain& domain,
@@ -142,13 +138,6 @@ generate_U_transfer_matrix(const Domain& domain,
                            const Matrix& dense,
                            const Args& opts) {
   Matrix col_block = generate_column_block(domain, node, block_size, level, A, dense, opts);
-  if (level == 1) {
-    for (int i = 0; i < col_block.rows; ++i) {
-      for (int j = 0; j < col_block.cols; ++j) {
-        AY_norm += pow(col_block(i, j), 2);
-      }
-    }
-  }
   auto col_block_splits = col_block.split(2, 1);
 
   int64_t c1 = node * 2;
@@ -162,13 +151,6 @@ generate_U_transfer_matrix(const Domain& domain,
 
   matmul(Ubig_c1, col_block_splits[0], temp_splits[0], true, false, 1, 0);
   matmul(Ubig_c2, col_block_splits[1], temp_splits[1], true, false, 1, 0);
-
-  for (int i = 0; i < temp.rows; ++i) {
-    for (int j = 0; j < temp.cols; ++j) {
-      temp_norm += pow(temp(i, j), 2);
-    }
-  }
-
 
   Matrix Utransfer;
   std::vector<int64_t> pivots;
@@ -207,7 +189,6 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
 
   return has_admis;
 }
-
 
 static RowLevelMap
 generate_transfer_matrices(const Domain& domain,

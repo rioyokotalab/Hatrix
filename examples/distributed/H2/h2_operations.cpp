@@ -323,7 +323,6 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
   }
 
   fill_in += matmul(A.U(block, level), matmul(US(block, level), A.U(block, level), false, true));
-  // fill_in = concat(fill_in, matmul(A.U(block, level), US(block, level)), 1);
 
   Matrix col_concat_T = transpose(fill_in);
   Matrix Q,R;
@@ -403,9 +402,6 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
   }
 
   fill_in += matmul(matmul(A.U(block, level), US(block, level)), A.U(block, level), false, true);
-
-  // fill_in = concat(fill_in, matmul(A.U(block, level), US(block, level)), 0);
-
   Matrix Q,R;
   Matrix Si, Vi;
 
@@ -648,42 +644,42 @@ factorize_level(SymmetricSharedBasisMatrix& A,
   const int64_t nblocks = pow(2, level);
 
   for (int64_t block = 0; block < nblocks; ++block) {
-    // auto start_cluster_update = std::chrono::system_clock::now();
-    // update_row_cluster_basis_and_S_blocks(A, F, r, opts, block, level);
-    // update_col_cluster_basis_and_S_blocks(A, F, t, opts, block, level);
-    // auto stop_cluster_update = std::chrono::system_clock::now();
-    // timer[0] += std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_cluster_update - start_cluster_update).count();
+    auto start_cluster_update = std::chrono::system_clock::now();
+    update_row_cluster_basis_and_S_blocks(A, F, r, opts, block, level);
+    update_col_cluster_basis_and_S_blocks(A, F, t, opts, block, level);
+    auto stop_cluster_update = std::chrono::system_clock::now();
+    timer[0] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_cluster_update - start_cluster_update).count();
 
-    // auto start_multiply_complements = std::chrono::system_clock::now();
+    auto start_multiply_complements = std::chrono::system_clock::now();
     multiply_complements(A, block, level);
-    // auto stop_multiply_complements = std::chrono::system_clock::now();
-    // timer[1] += std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_multiply_complements - start_multiply_complements).count();
+    auto stop_multiply_complements = std::chrono::system_clock::now();
+    timer[1] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_multiply_complements - start_multiply_complements).count();
 
-    // auto start_factorize_diag = std::chrono::system_clock::now();
+    auto start_factorize_diag = std::chrono::system_clock::now();
     factorize_diagonal(A, block, level);
-    // auto stop_factorize_diag = std::chrono::system_clock::now();
-    // timer[2] += std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_factorize_diag - start_factorize_diag).count();
+    auto stop_factorize_diag = std::chrono::system_clock::now();
+    timer[2] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_factorize_diag - start_factorize_diag).count();
 
-    // auto start_triangle = std::chrono::system_clock::now();
-    // triangle_reduction(A, block, level);
-    // auto stop_triangle = std::chrono::system_clock::now();
-    // timer[3] += std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_triangle - start_triangle).count();
+    auto start_triangle = std::chrono::system_clock::now();
+    triangle_reduction(A, block, level);
+    auto stop_triangle = std::chrono::system_clock::now();
+    timer[3] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_triangle - start_triangle).count();
 
-    // auto start_schurs = std::chrono::system_clock::now();
-    // compute_schurs_complement(A, block, level);
-    // auto stop_schurs = std::chrono::system_clock::now();
-    // timer[4] += std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_schurs - start_schurs).count();
+    auto start_schurs = std::chrono::system_clock::now();
+    compute_schurs_complement(A, block, level);
+    auto stop_schurs = std::chrono::system_clock::now();
+    timer[4] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_schurs - start_schurs).count();
 
-    // auto start_fill_ins = std::chrono::system_clock::now();
-    // compute_fill_ins(A, block, level, F);
-    // auto stop_fill_ins = std::chrono::system_clock::now();
-    // timer[5] += std::chrono::duration_cast<
-    //   std::chrono::milliseconds>(stop_fill_ins - start_fill_ins).count();
+    auto start_fill_ins = std::chrono::system_clock::now();
+    compute_fill_ins(A, block, level, F);
+    auto stop_fill_ins = std::chrono::system_clock::now();
+    timer[5] += std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_fill_ins - start_fill_ins).count();
   } // for (int block = 0; block < nblocks; ++block)
 }
 
@@ -799,11 +795,6 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
 
   auto start_last = std::chrono::system_clock::now();
 
-  // std::cout << "--- PRE factorize final(Loo_11, 0;Loo_21,Loo_22): --\n";
-  // A.D(0, 0, 1).print();
-  // A.D(1, 0, 1).print();
-  // A.D(1, 1, 1).print();
-
   int64_t last_nodes = pow(2, level);
   for (int d = 0; d < last_nodes; ++d) {
     cholesky(A.D(d, d, level), Hatrix::Lower);
@@ -819,10 +810,6 @@ factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts) {
       }
     }
   }
-
-  // auto D10_splits = A.D(1, 0, 2).split(vec{A.D(1, 0, 2).rows - opts.max_rank},
-  //                                      vec{A.D(1, 0, 2).cols - opts.max_rank});
-  // D10_splits[1] = Matrix(A.D(1, 0, 2).rows - opts.max_rank, opts.max_rank);
 
   auto stop_last = std::chrono::system_clock::now();
   timer[7] += std::chrono::duration_cast<
