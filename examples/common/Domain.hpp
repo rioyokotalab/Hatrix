@@ -830,42 +830,6 @@ class Domain {
   }
 
   void initialize_starsh_uniform_grid() {
-    // const int64_t side = std::ceil(
-    //     std::pow((double)N, 1. / (double)ndim)); // size of each side of the grid
-    // int64_t total = side;
-    // for (int64_t i = 1; i < ndim; i++) {
-    //   total *= side;
-    // }
-
-    // const int64_t ncoords = ndim * side;
-    // std::vector<double> coord(ncoords);
-    // for (int64_t i = 0; i < side; i++) {
-    //   const double val = (double)i / side;
-    //   for (int64_t j = 0; j < ndim; j++) {
-    //     coord[j * side + i] = val;
-    //   }
-    // }
-
-    // std::vector<int64_t> pivot(ndim, 0);
-    // int64_t k = 0;
-    // for (int64_t i = 0; i < N; i++) {
-    //   std::vector<double> points(ndim);
-    //   for (k = 0; k < ndim; k++) {
-    //     points[k] = coord[pivot[k] + k * side];
-    //   }
-    //   bodies.emplace_back(Body(points, 0));
-
-    //   k = ndim - 1;
-    //   pivot[k]++;
-    //   while(pivot[k] == side) {
-    //     pivot[k] = 0;
-    //     if (k > 0) {
-    //       k--;
-    //       pivot[k]++;
-    //     }
-    //   }
-    // }
-
     std::vector<int64_t> sides(ndim, 0);
     sides[0] = ceil(pow((double)N, 1.0 / ndim));
     int64_t total = sides[0];
@@ -896,6 +860,9 @@ class Domain {
           bodies[i + j * sides[0]] = Body(point, 0);
         }
       }
+    }
+    else {
+      abort();
     }
   }
 
