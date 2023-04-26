@@ -11,3 +11,5 @@ hatrix_deps.sh
 run.sh
 *.data
 *.csv
+
+make.inc
