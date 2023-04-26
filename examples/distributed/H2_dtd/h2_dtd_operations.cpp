@@ -216,8 +216,6 @@ multiply_S(SymmetricSharedBasisMatrix& A,
           int x_hat_index = x_hat_offset + i / MPISIZE;
           MPI_Isend(&x_hat[x_hat_index], x_hat[x_hat_index].numel(), MPI_DOUBLE,
                     proc_j, x_hat_i_tag, MPI_COMM_WORLD, &j_request);
-          // std::cout << "2 tag: " << x_hat_i_tag << std::endl;
-
         }
 
         int x_hat_j_tag = i + S_tag;
@@ -226,7 +224,6 @@ multiply_S(SymmetricSharedBasisMatrix& A,
           int x_hat_index = x_hat_offset + j / MPISIZE;
           MPI_Isend(&x_hat[x_hat_index], x_hat[x_hat_index].numel(), MPI_DOUBLE,
                     proc_i, x_hat_j_tag, MPI_COMM_WORLD, &i_request);
-          // std::cout << "3 tag: " << x_hat_j_tag << std::endl;
 
         }
       }
@@ -319,7 +316,6 @@ matmul(SymmetricSharedBasisMatrix& A,
       int x_hat_c1_nrows = A.ranks(c1, child_level);
       if (proc_c1 == MPIRANK) {
         int x_hat_index = x_hat_offset + c1 / MPISIZE;
-        // std::cout << "1 TAG: " << c1 << std::endl;
         MPI_Isend(&x_hat[x_hat_index], x_hat_c1_nrows, MPI_DOUBLE,
                   proc_block, c1, MPI_COMM_WORLD, &c1_request);
       }
@@ -327,7 +323,6 @@ matmul(SymmetricSharedBasisMatrix& A,
       int x_hat_c2_nrows = A.ranks(c2, child_level);
       if (proc_c2 == MPIRANK) {
         int x_hat_index = x_hat_offset + c2 / MPISIZE;
-        // std::cout << "2 TAG: " << c2 << std::endl; //
         MPI_Isend(&x_hat[x_hat_index], x_hat_c2_nrows, MPI_DOUBLE,
                   proc_block, c2, MPI_COMM_WORLD, &c2_request);
       }
@@ -351,9 +346,8 @@ matmul(SymmetricSharedBasisMatrix& A,
     x_hat_offset += ceil(pow(2, child_level) / double(MPISIZE));
   }
 
-  // // allocate b_hat blocks for the lowest level on each process.
+  // allocate b_hat blocks for the lowest level on each process.
   int nblocks = pow(2, A.min_level);
-  // nblocks_per_proc = ceil(nblocks / double(MPISIZE));
   std::vector<Matrix> b_hat;
   for (int i = MPIRANK; i < nblocks; i += MPISIZE) {
     b_hat.push_back(Matrix(A.ranks(i, A.min_level), 1));
@@ -404,10 +398,8 @@ matmul(SymmetricSharedBasisMatrix& A,
 
         MPI_Isend(&Ub_ref(0,0), c1_block_size, MPI_DOUBLE,
                   p_c1, c1, MPI_COMM_WORLD, &r1);
-        // std::cout << "3 TAG: " << c1 << std::endl;
         MPI_Isend(&Ub_ref(c1_block_size, 0), c2_block_size, MPI_DOUBLE,
                   p_c2, c2, MPI_COMM_WORLD, &r2);
-        // std::cout << "4 TAG: " << c1 << std::endl;
         Ub_index++;
       }
     }
@@ -459,13 +451,11 @@ matmul(SymmetricSharedBasisMatrix& A,
     matmul(A.U(index, A.max_level), b_hat[b_hat_offset + i], b[i]);
   }
 
-  // // multiply the x with the dense blocks and add to the b
+  // multiply the x with the dense blocks and add to the b
   for (int i = 0; i < nblocks_per_proc; ++i) {
     int index = i * MPISIZE + MPIRANK;
     matmul(A.D(index, index, A.max_level), x[i], b[i]);
   }
-
-  // --- problem below---
 
   for (int i = 0; i < leaf_nblocks; ++i) {
     int proc_i = mpi_rank(i);
@@ -484,10 +474,8 @@ matmul(SymmetricSharedBasisMatrix& A,
 
         if (proc_D == MPIRANK) {
           Matrix& Dblock = A.D(i, j, A.max_level);
-          // std::cout << "5 TAG: " << D_tag << std::endl;
           MPI_Isend(&Dblock, D_nrows * D_ncols, MPI_DOUBLE, proc_i,
                     D_tag, MPI_COMM_WORLD, &i_request);
-          // std::cout << "6 TAG: " << D_tag << std::endl;
           MPI_Isend(&Dblock, D_nrows * D_ncols, MPI_DOUBLE, proc_j,
                     D_tag, MPI_COMM_WORLD, &j_request);
         }
@@ -498,7 +486,6 @@ matmul(SymmetricSharedBasisMatrix& A,
           int x_index = i / MPISIZE;
           MPI_Isend(&x[x_index], x[x_index].numel(), MPI_DOUBLE, proc_j,
                     x_i_tag, MPI_COMM_WORLD, &j_request);
-          // std::cout << "7 TAG: " << x_i_tag << std::endl;
         }
 
         int x_j_tag = i + D_tag + 1;
@@ -507,7 +494,6 @@ matmul(SymmetricSharedBasisMatrix& A,
           int x_index = j / MPISIZE;
           MPI_Isend(&x[x_index], x[x_index].numel(), MPI_DOUBLE, proc_i,
                     x_j_tag, MPI_COMM_WORLD, &i_request);
-          // std::cout << "7 TAG: " << x_j_tag << std::endl;
         }
       }
     }

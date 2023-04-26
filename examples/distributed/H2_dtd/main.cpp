@@ -409,11 +409,9 @@ int main(int argc, char **argv) {
   }
 
   // ||x - A * (A^-1 * x)|| / ||x||
-
   std::vector<Matrix> h2_solve_diff;
   for (int i = 0; i < x.size(); ++i) {
     h2_solve_diff.push_back(h2_solution[i] - x[i]);
-    // h2_solve_diff[i].print();
   }
 
   double h2_norm = dist_norm2(h2_solution);

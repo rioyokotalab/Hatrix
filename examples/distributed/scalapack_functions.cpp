@@ -63,7 +63,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   double BETA = 1.0;
   // Accumulate admissible blocks from the large distributed dense matrix.
   for (int64_t block = MYROW; block < nblocks; block += MPIGRID[0]) {
-    // for (int64_t block = 0; block < nblocks; block += 1) {
     int IA = nleaf * block + 1;
     for (int64_t j = MYCOL; j < nblocks; j += MPIGRID[1]) {
       if (exists_and_inadmissible(A, block, j, A.max_level)) { continue; }
@@ -201,7 +200,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
         if (mpi_rank(i) == MPIRANK) {
           MPI_Status status;
           Matrix Uj(opts.nleaf, opts.max_rank);
-          // std::cout << "\n\n@@@@ GOT TAG " << j << " @@@@\n\n";
           MPI_Recv(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(j),
                    j, MPI_COMM_WORLD, &status);
 
@@ -292,9 +290,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
 
   MPI_Barrier(MPI_COMM_WORLD);
 
-  // if (!MPIRANK) {
-  //   std::cout << "\t Done AY.\n" << std::endl;
-  // }
 
   // Allocate a temporary global matrix to store the product of the real basis with the
   // summation of the admissible blocks.
