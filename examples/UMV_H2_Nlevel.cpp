@@ -355,10 +355,6 @@ void H2::generate_leaf_nodes(const Domain& domain, const Matrix& rand) {
         S.insert(i, j, height,
                  matmul(matmul(U(i, height), dense, true, false),
                         V(j, height)));
-
-
-        // std::cout << "RIDWAN COUPLING " << i << " " << j << " " << Hatrix::norm(S(i, j, height)) << std::endl;
-        // S(i, j, height).print();
       }
     }
   }
@@ -882,7 +878,6 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
         }
       }
     }
-    std::cout << "\nRIDWAN PRE NORM: " << Hatrix::norm(D(block, block, level)) << std::endl;
 
     // The diagonal block is split along the row and column.
     int64_t diag_row_split = D(block, block, level).rows - U(block, level).cols;
@@ -1220,8 +1215,6 @@ void H2::factorize_level(const int64_t level, const int64_t nblocks,
         }
       }
     }
-
-    std::cout << "RIDWAN POST NORM: " << Hatrix::norm(D(block, block, level)) << std::endl;
   } // for (int block = 0; block < nblocks; ++block)
 }
 
@@ -1399,8 +1392,6 @@ void H2::factorize() {
               }
             }
           }
-
-          std::cout << "RIDWAN insert: " << i << " " << j << " " << parent_level << " " << Hatrix::norm(D_unelim) << std::endl;
           D.insert(i, j, parent_level, std::move(D_unelim));
         }
       }
@@ -1409,12 +1400,7 @@ void H2::factorize() {
   F.erase_all();
 
   // Factorize remaining root level
-  std::cout << "last merge PRE factorization: " << Hatrix::norm(D(0,0,level)) << std::endl;
-  // D(0,0,level).print();
   lu(D(0, 0, level));
-
-
-  std::cout << "last merge factorization: " << Hatrix::norm(D(0,0,level)) << std::endl;
 }
 
 // Permute the vector forward and return the offset at which the new vector begins.
@@ -1525,9 +1511,6 @@ void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
       }
     }
     // Write x_block
-
-    std::cout << "__RID__ block: " << block <<  " level: " << level << " "
-              << Hatrix::norm(x_block) << std::endl;
     x_level_split[block] = x_block;
   }
 }
@@ -1550,31 +1533,29 @@ void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
     Matrix x_block(x_level_split[block], true);
     auto x_block_splits = x_block.split(vec{diag_row_split}, vec{});
     // Backward substitution with co blocks in the left of diagonal
-    // for (int64_t jcol = block-1; jcol >= 0; --jcol) {
-    //   if (is_admissible.exists(block, jcol, level) && !is_admissible(block, jcol, level)) {
-    //     const int64_t left_row_split = diag_row_split;
-    //     const int64_t left_col_split = D(block, jcol, level).cols - V(jcol, level).cols;
-    //     auto left_splits = D(block, jcol, level).split(vec{left_row_split}, vec{left_col_split});
+    for (int64_t jcol = block-1; jcol >= 0; --jcol) {
+      if (is_admissible.exists(block, jcol, level) && !is_admissible(block, jcol, level)) {
+        const int64_t left_row_split = diag_row_split;
+        const int64_t left_col_split = D(block, jcol, level).cols - V(jcol, level).cols;
+        auto left_splits = D(block, jcol, level).split(vec{left_row_split}, vec{left_col_split});
 
-    //     Matrix x_jcol(x_level_split[jcol], true);  // Deep-copy of view
-    //     auto x_jcol_splits = x_jcol.split(vec{left_col_split}, vec{});
-    //     matmul(left_splits[1], x_jcol_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
-    //   }
-    // }
-    // // Backward substitution with cc and co blocks in the right of diagonal
-    // for (int64_t jcol = nblocks-1; jcol > block; --jcol) {
-    //   if (is_admissible.exists(block, jcol, level) && !is_admissible(block, jcol, level)) {
-    //     auto right_splits = D(block, jcol, level).split(vec{diag_row_split}, vec{});
-    //     matmul(right_splits[0], x_level_split[jcol], x_block_splits[0], false, false, -1.0, 1.0);
-    //   }
-    // }
+        Matrix x_jcol(x_level_split[jcol], true);  // Deep-copy of view
+        auto x_jcol_splits = x_jcol.split(vec{left_col_split}, vec{});
+        matmul(left_splits[1], x_jcol_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
+      }
+    }
+    // Backward substitution with cc and co blocks in the right of diagonal
+    for (int64_t jcol = nblocks-1; jcol > block; --jcol) {
+      if (is_admissible.exists(block, jcol, level) && !is_admissible(block, jcol, level)) {
+        auto right_splits = D(block, jcol, level).split(vec{diag_row_split}, vec{});
+        matmul(right_splits[0], x_level_split[jcol], x_block_splits[0], false, false, -1.0, 1.0);
+      }
+    }
     // Solve backward with diagonal U
     auto U_block_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
     matmul(U_block_splits[1], x_block_splits[1], x_block_splits[0], false, false, -1.0, 1.0);
     solve_triangular(U_block_splits[0], x_block_splits[0], Hatrix::Left, Hatrix::Upper, false);
     // Multiply with V_F
-    std::cout << "RIDWAN BACK BLOCK: " <<  block << " "  << Hatrix::norm(x_block) << std::endl;
-
     Matrix V_F = prepend_complement_basis(V(block, level));
     x_block = matmul(V_F, x_block);
     // Write x_block
@@ -1586,10 +1567,6 @@ Matrix H2::solve(const Matrix& b) const {
   Matrix x(b, true);
   int64_t level = height;
   int64_t rhs_offset = 0;
-  std::cout << "___RIDWAN BEGIN SOLVE___\n";
-
-  // std::cout << "X PRE SOLVE:\n";
-  // x.print();
 
   // Forward
   for (; level > 0; --level) {
@@ -1611,21 +1588,14 @@ Matrix H2::solve(const Matrix& b) const {
     rhs_offset = permute_forward(x, level, rhs_offset);
   }
 
-  // std::cout << "X POST FORWARD:\n";
-  // x.print();
-
   // Solve with root level LU
-  std::cout << "RIDWAN @@@ BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
   auto x_splits = x.split(vec{rhs_offset}, vec{});
   const int64_t last_nodes = level_blocks[level];
   assert(level == 0);
   assert(last_nodes == 1);
   solve_triangular(D(0, 0, level), x_splits[1], Hatrix::Left, Hatrix::Lower, true, false);
-  std::cout << "RIDWAN POST FORWARD SOLVE NORM: " << Hatrix::norm(D(0,0,level)) << " " << Hatrix::norm(x) << std::endl;
   solve_triangular(D(0, 0, level), x_splits[1], Hatrix::Left, Hatrix::Upper, false, false);
   level++;
-
-  std::cout << "RIDWAN PRE BACK SOLVE NORM: " << Hatrix::norm(x) << std::endl;
 
   // Backward
   for (; level <= height; ++level) {
@@ -1647,9 +1617,6 @@ Matrix H2::solve(const Matrix& b) const {
       x(rhs_offset + i, 0) = x_level(i, 0);
     }
   }
-
-
-  std::cout << "RIDWAN SOLVE NORM: " << Hatrix::norm(x) << std::endl;
 
   return x;
 }
