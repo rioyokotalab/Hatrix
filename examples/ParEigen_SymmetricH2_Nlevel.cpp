@@ -1101,13 +1101,6 @@ double get_kth_eigenvalue(const SymmetricH2& A, const Domain& domain,
                           std::vector<double>& b) {
   bool singular = false;
   while((b[idx_k] - a[idx_k]) >= ev_tol) {
-#ifdef DEBUG_OUTPUT
-    printf("Local starting intervals:\n");
-    for (int64_t idx = 0; idx < k_list.size(); idx++) {
-      printf("k=%5d a=%10.5lf b=%10.5lf\n",
-             (int)k_list[idx], a[idx], b[idx]);
-    }
-#endif
     const auto mid = (a[idx_k] + b[idx_k]) / 2;
     const auto v_mid = inertia(A, domain, mid, singular);
     if(singular) {
