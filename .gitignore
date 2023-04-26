@@ -17,3 +17,6 @@ h2_factorize.h
 jdf_sources.mk
 a.out
 Dense
+
+make.inc
+
