@@ -5,9 +5,6 @@
 extern Hatrix::RowLevelMap US;
 
 void
-factorize_raw(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Args& opts);
-
-void
 factorize_diagonal(Hatrix::SymmetricSharedBasisMatrix& A, int64_t block,
                    int64_t level);
 
@@ -33,8 +30,6 @@ merge_unfactorized_blocks(Hatrix::SymmetricSharedBasisMatrix& A, int64_t level);
 long long int factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts);
 
 Hatrix::Matrix solve(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x);
-Hatrix::Matrix
-solve_raw(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x);
 
 int64_t
 permute_backward(const Hatrix::SymmetricSharedBasisMatrix& A,

@@ -42,7 +42,6 @@ redistribute_vector2scalapack(std::vector<Matrix>& x,
     MPI_Request req;
 
     if (MPIRANK == x_rank) {
-      // std::cout << "V2S TAG: " << i << std::endl;
       MPI_Isend(&x[index], x[index].numel(), MPI_DOUBLE,
                 scalapack_rank, i, MPI_COMM_WORLD, &req);
     }
@@ -77,7 +76,6 @@ redistribute_scalapack2vector(std::vector<Matrix>& x,
     int index = (i / MPIGRID[0]) * opts.nleaf;
 
     if (MPIRANK == scalapack_rank) {
-      // std::cout << "S2V TAG: " << i << std::endl;
       MPI_Isend(&x_mem[index], opts.nleaf, MPI_DOUBLE,
                 x_rank, i, MPI_COMM_WORLD, &req);
     }
