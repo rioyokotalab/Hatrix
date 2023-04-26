@@ -62,16 +62,6 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-# parsec HSS matrix
-.PHONY: examples/distributed/HSS_dtd
-examples/distributed/HSS_dtd:
-	$(MAKE) -C $@
-
-HSS_dtd : % : dirs examples/distributed/HSS_dtd
-	$(MPICXX) libHSS_dtd.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
-
 # parsec H2 matrix
 .PHONY: examples/distributed/H2_dtd
 examples/distributed/H2_dtd:
@@ -90,16 +80,6 @@ examples/distributed/H2_ptg:
 
 H2_ptg : % : dirs examples/distributed/H2_ptg
 	$(MPICXX) libH2_ptg.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
-
-# non-distributed HSS code.
-.PHONY: examples/distributed/HSS
-examples/distributed/HSS:
-	$(MAKE) -C $@
-
-HSS_main : % : dirs examples/distributed/HSS
-	$(CXX) libHSS_main.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
@@ -123,9 +103,6 @@ Dense : % : dirs examples/distributed/Dense
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
-	$(LINK_EXECUTABLE)
-
 test: $(TEST_EXECUTABLES)
 	for e in $(TEST_EXECUTABLES); do \
 		./bin/$$e; \
@@ -134,8 +111,8 @@ test: $(TEST_EXECUTABLES)
 .PHONY: clean
 .SILENT: clean
 clean:
-	for dir in $(DIRS) examples/distributed/HSS \
-		examples/distributed/H2 examples/distributed/HSS_dtd \
+	for dir in $(DIRS)  \
+		examples/distributed/H2 \
 		examples/distributed/H2_dtd examples/distributed/H2_ptg \
 		$(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
