@@ -118,3 +118,38 @@ clean:
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/ *.a
+
+EIGEN_EXAMPLE_EXECUTABLES := Eigen_Dense \
+	Eigen_Dense_DSYEV \
+	Eigen_Dense_DSYEVX \
+	Eigen_SymmetricH2_Nlevel \
+	Eigen_SymmetricH2_Nlevel_Ma2019 \
+	Eigen_SymmetricH2_Nlevel_nodependency \
+	Eigen_SymmetricH2_Nlevel_nodependency_directschur
+
+$(EIGEN_EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
+	$(LINK_EXECUTABLE)
+
+ParEigen_SymmetricH2_Nlevel : % : examples/ParEigen_SymmetricH2_Nlevel.o dirs
+	$(MPICXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+MSParEigen_SymmetricH2_Nlevel : % : examples/MSParEigen_SymmetricH2_Nlevel.o dirs
+	$(MPICXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+ParEigen_Dense_PDSYEV : % : examples/ParEigen_Dense_PDSYEV.o dirs
+	$(MPICXX) $< $(OBJLIBS) $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+ParEigen_Dense_PDSYEVX : % : examples/ParEigen_Dense_PDSYEVX.o dirs
+	$(MPICXX) $< $(OBJLIBS) $(LDFLAGS) $(SCALAPACK_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+eigen: $(EIGEN_EXAMPLE_EXECUTABLES) \
+	ParEigen_SymmetricH2_Nlevel MSParEigen_SymmetricH2_Nlevel \
+	ParEigen_Dense_PDSYEV ParEigen_Dense_PDSYEVX
