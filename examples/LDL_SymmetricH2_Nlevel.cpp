@@ -249,6 +249,7 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain) {
     }
   }
   // Generate leaf level cluster basis
+  #pragma omp parallel for
   for (int64_t i = 0; i < num_nodes; i++) {
     const auto idx = domain.get_cell_idx(i, leaf_level);
     const auto& cell = domain.cells[idx];
@@ -256,8 +257,11 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain) {
       Matrix Ui, UxS;
       std::tie(Ui, UxS) =
           generate_row_cluster_basis(domain, i, height);
-      U.insert(i, height, std::move(Ui));
-      US_row.insert(i, height, std::move(UxS));
+      #pragma omp critical
+      {
+        U.insert(i, height, std::move(Ui));
+        US_row.insert(i, height, std::move(UxS));
+      }
     }
   }
   // Generate S coupling matrices
@@ -303,6 +307,7 @@ SymmetricH2::generate_transfer_matrices(const Domain& domain,
   RowLevelMap Ubig_parent;
 
   const int64_t num_nodes = level_blocks[level];
+  #pragma omp parallel for
   for (int64_t node = 0; node < num_nodes; node++) {
     const auto idx = domain.get_cell_idx(node, level);
     const auto& cell = domain.cells[idx];
@@ -318,17 +323,19 @@ SymmetricH2::generate_transfer_matrices(const Domain& domain,
       Matrix Utransfer, UxS;
       std::tie(Utransfer, UxS) =
           generate_U_transfer_matrix(domain, node, level, Ubig_child1, Ubig_child2);
-      U.insert(node, level, std::move(Utransfer));
-      US_row.insert(node, level, std::move(UxS));
 
       // Generate the full bases to pass onto the parent.
-      auto Utransfer_splits = U(node, level).split(vec{Ubig_child1.cols}, vec{});
-      Matrix Ubig(block_size, U(node, level).cols);
+      auto Utransfer_splits = Utransfer.split(vec{Ubig_child1.cols}, vec{});
+      Matrix Ubig(block_size, Utransfer.cols);
       auto Ubig_splits = Ubig.split(vec{Ubig_child1.rows}, vec{});
-
       matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
-      Ubig_parent.insert(node, level, std::move(Ubig));
+      #pragma omp critical
+      {
+        U.insert(node, level, std::move(Utransfer));
+        Ubig_parent.insert(node, level, std::move(Ubig));
+        US_row.insert(node, level, std::move(UxS));
+      }
     }
   }
 
@@ -659,7 +666,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
       // Current level: update coupling matrix
       // timing::start("update_coupling_matrices");
       #pragma omp parallel for
-      for (int64_t j: far_neighbors(node, level)) {
+      for (int64_t idx_j = 0; idx_j < far_neighbors(node, level).size(); idx_j++) {
+        const auto j = far_neighbors(node, level)[idx_j];
         S(node, j, level) = matmul(r(node), S(node, j, level), false, false);
         S(j, node, level) = matmul(S(j, node, level), r(node), false, true );
       }
@@ -716,7 +724,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
     // Multiply to dense blocks along the row in current level
     // timing::start("apply_U_F");
     #pragma omp parallel for
-    for (int64_t j: near_neighbors(node, level)) {
+    for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
+      const auto j = near_neighbors(node, level)[idx_j];
       if (j < node) {
         // Do not touch the eliminated part (cc and oc)
         int64_t left_col_split = D(node, j, level).cols - U(j, level).cols;
@@ -729,7 +738,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
     }
     // Multiply to dense blocks along the column in current level
     #pragma omp parallel for
-    for (int64_t i: near_neighbors(node, level)) {
+    for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
+      const auto i = near_neighbors(node, level)[idx_i];
       if (i < node) {
         // Do not touch the eliminated part (cc and co)
         int64_t top_row_split = D(i, node, level).rows - U(i, level).cols;
@@ -755,7 +765,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
       // Lower elimination
       // timing::start("lower_elimination");
       #pragma omp parallel for
-      for (int64_t i: near_neighbors(node, level)) {
+      for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
+        const auto i = near_neighbors(node, level)[idx_i];
         Matrix& D_i = D(i, node, level);
         const auto lower_o_size =
             (i <= node || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
@@ -775,7 +786,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
       // Right elimination
       // timing::start("right_elimination");
       #pragma omp parallel for
-      for (int64_t j: near_neighbors(node, level)) {
+      for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
+        const auto j = near_neighbors(node, level)[idx_j];
         Matrix& D_j = D(node, j, level);
         const auto right_o_size =
             (j <= node || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
@@ -795,8 +807,10 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
       // Schur's complement into inadmissible block
       // timing::start("update_dense_blocks");
       #pragma omp parallel for collapse(2)
-      for (int64_t i: near_neighbors(node, level)) {
-        for (int64_t j: near_neighbors(node, level)) {
+      for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
+        for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
+          const auto i = near_neighbors(node, level)[idx_i];
+          const auto j = near_neighbors(node, level)[idx_j];
           if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
             const Matrix& D_i = D(i, node, level);
             const Matrix& D_j = D(node, j, level);
@@ -847,8 +861,11 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
       // Schur's complement into admissible block (fill-in)
       // timing::start("compute_fill_ins");
-      for (int64_t i: near_neighbors(node, level)) {
-        for (int64_t j: near_neighbors(node, level)) {
+      #pragma omp parallel for collapse(2)
+      for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
+        for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
+          const auto i = near_neighbors(node, level)[idx_i];
+          const auto j = near_neighbors(node, level)[idx_j];
           const bool is_admissible_ij =
               !is_admissible.exists(i, j, level) ||
               (is_admissible.exists(i, j, level) && is_admissible(i, j, level));
@@ -920,12 +937,15 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
                              U(j, level), false, true);
             }
             // Save or accumulate with existing fill-in block that has been propagated from lower level
-            if (!F.exists(i, j, level)) {
-              F.insert(i, j, level, std::move(F_ij));
-              fill_in_neighbors(i, level).push_back(j);
-            }
-            else {
-              F(i, j, level) += F_ij;
+            #pragma omp critical
+            {
+              if (!F.exists(i, j, level)) {
+                F.insert(i, j, level, std::move(F_ij));
+                fill_in_neighbors(i, level).push_back(j);
+              }
+              else {
+                F(i, j, level) += F_ij;
+              }
             }
           }
         }
