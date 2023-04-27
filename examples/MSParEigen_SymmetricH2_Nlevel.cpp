@@ -589,7 +589,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
       // Project admissible blocks accordingly
       // Current level: update coupling matrix
       #pragma omp parallel for
-      for (int64_t j: far_neighbors(node, level)) {
+      for (int64_t idx_j = 0; idx_j < far_neighbors(node, level).size(); idx_j++) {
+        const auto j = far_neighbors(node, level)[idx_j];
         S(node, j, level) = matmul(r(node), S(node, j, level), false, false);
         S(j, node, level) = matmul(S(j, node, level), r(node), false, true );
       }
@@ -640,7 +641,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
     Matrix U_F = prepend_complement_basis(U(node, level));
     // Multiply to dense blocks along the row in current level
     #pragma omp parallel for
-    for (int64_t j: near_neighbors(node, level)) {
+    for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
+      const auto j = near_neighbors(node, level)[idx_j];
       if (j < node) {
         // Do not touch the eliminated part (cc and oc)
         int64_t left_col_split = D(node, j, level).cols - U(j, level).cols;
@@ -653,7 +655,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
     }
     // Multiply to dense blocks along the column in current level
     #pragma omp parallel for
-    for (int64_t i: near_neighbors(node, level)) {
+    for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
+      const auto i = near_neighbors(node, level)[idx_i];
       if (i < node) {
         // Do not touch the eliminated part (cc and co)
         int64_t top_row_split = D(i, node, level).rows - U(i, level).cols;
@@ -675,7 +678,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
       // Lower elimination
       #pragma omp parallel for
-      for (int64_t i: near_neighbors(node, level)) {
+      for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
+        const auto i = near_neighbors(node, level)[idx_i];
         Matrix& D_i = D(i, node, level);
         const auto lower_o_size =
             (i <= node || level == height) ? U(i, level).cols : U(i * 2, level + 1).cols;
@@ -693,7 +697,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
       // Right elimination
       #pragma omp parallel for
-      for (int64_t j: near_neighbors(node, level)) {
+      for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
+        const auto j = near_neighbors(node, level)[idx_j];
         Matrix& D_j = D(node, j, level);
         const auto right_o_size =
             (j <= node || level == height) ? U(j, level).cols : U(j * 2, level + 1).cols;
@@ -711,8 +716,10 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
       // Schur's complement into inadmissible block
       #pragma omp parallel for collapse(2)
-      for (int64_t i: near_neighbors(node, level)) {
-        for (int64_t j: near_neighbors(node, level)) {
+      for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
+        for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
+          const auto i = near_neighbors(node, level)[idx_i];
+          const auto j = near_neighbors(node, level)[idx_j];
           if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
             const Matrix& D_i = D(i, node, level);
             const Matrix& D_j = D(node, j, level);
@@ -762,8 +769,10 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 
       // Schur's complement into admissible block (fill-in)
       #pragma omp parallel for collapse(2)
-      for (int64_t i: near_neighbors(node, level)) {
-        for (int64_t j: near_neighbors(node, level)) {
+      for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
+        for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
+          const auto i = near_neighbors(node, level)[idx_i];
+          const auto j = near_neighbors(node, level)[idx_j];
           const bool is_admissible_ij =
               !is_admissible.exists(i, j, level) ||
               (is_admissible.exists(i, j, level) && is_admissible(i, j, level));
