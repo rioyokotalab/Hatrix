@@ -31,6 +31,8 @@ using vec = std::vector<int64_t>;
 
 // Uncomment the following line to print output in CSV format
 #define OUTPUT_CSV
+// Uncomment the following line to enable debug
+// #define DEBUG_OUTPUT
 // Uncomment the following line to enable timer
 // #define USE_TIMER
 // Uncomment the following line to output memory consumption
@@ -544,18 +546,10 @@ void SymmetricH2::print_structure(const int64_t level) const {
 void SymmetricH2::print_ranks() const {
   for(int64_t level = height; level > 0; level--) {
     const int64_t num_nodes = level_blocks[level];
+    printf("LEVEL:%d\n", (int)level);
     for(int64_t node = 0; node < num_nodes; node++) {
-      std::cout << "node=" << node << "," << "level=" << level << ":\t"
-                << "diag= ";
-      if(D.exists(node, node, level)) {
-        std::cout << D(node, node, level).rows << "x" << D(node, node, level).cols;
-      }
-      else {
-        std::cout << "empty";
-      }
-      std::cout << ", row_rank=" << (U.exists(node, level) ?
-                                     U(node, level).cols : -1)
-                << std::endl;
+      printf("\tNode-%d: Rank=%d\n", (int)node,
+             (U.exists(node, level) ? (int)U(node, level).cols : -1));
     }
   }
 }
@@ -1544,6 +1538,20 @@ int main(int argc, char ** argv) {
     const double dense_mth_eigv = compute_eig_acc ? dense_eigv[m - 1] : -1;
     const double eig_abs_err = compute_eig_acc ? std::abs(h2_mth_eigv - dense_mth_eigv) : -1;
     const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
+#ifdef DEBUG_OUTPUT
+    // Output ranks after factorization of shifted matrix that produces the largest maximum rank
+    {
+      Hatrix::SymmetricH2 M(A);
+      const double lambda = max_rank_shift;
+      // Shift leaf level diagonal blocks
+      int64_t leaf_num_nodes = M.level_blocks[M.height];
+      for(int64_t node = 0; node < leaf_num_nodes; node++) {
+        shift_diag(M.D(node, node, M.height), -lambda);
+      }
+      M.factorize(domain);
+      M.print_ranks();
+    }
+#endif
 #ifndef OUTPUT_CSV
     std::cout << "m=" << m
               << " a0=" << a
