@@ -3,11 +3,12 @@
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 
-#include "globals.hpp"
 #include "h2_tasks.hpp"
 #include "h2_dtd_operations.hpp"
 
 using namespace Hatrix;
+
+std::vector<double> task_time;
 
 static h2_dc_t parsec_U, parsec_S, parsec_D, parsec_F,
   parsec_temp_fill_in_rows, parsec_temp_fill_in_cols,
@@ -23,7 +24,7 @@ void
 compute_fill_ins(SymmetricSharedBasisMatrix& A,
                  const Hatrix::Domain& domain,
                  int64_t block,
-                 int64_t level);
+                 int64_t level, parsec_taskpool_t* dtd_tp);
 
 int64_t
 get_dim(const SymmetricSharedBasisMatrix& A, const Domain& domain,
@@ -191,19 +192,20 @@ multiply_S(SymmetricSharedBasisMatrix& A,
     int S_nrows = A.ranks(i, level);
 
     for (int j = 0; j < i; ++j) {
-      if (A.is_admissible.exists(i, j, level) &&
-          A.is_admissible(i, j, level)) {
+      if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
         int proc_j = mpi_rank(j);
         int proc_S = mpi_rank(i);
         int S_ncols = A.ranks(j, level);
         MPI_Request i_request, j_request;
 
-        int S_tag = i + j * nblocks;
+        int S_tag = j;
+        // std::cout << "1 tag: " << S_tag << " i: " << i << " j: " << j << " nb: " << nblocks << std::endl;
         if (proc_S == MPIRANK) {
           Matrix& Sblock = A.S(i, j, level);
 
           MPI_Isend(&Sblock, S_nrows * S_ncols, MPI_DOUBLE, proc_i,
                     S_tag, MPI_COMM_WORLD, &i_request);
+
           MPI_Isend(&Sblock, S_nrows * S_ncols, MPI_DOUBLE, proc_j,
                     S_tag, MPI_COMM_WORLD, &j_request);
         }
@@ -214,10 +216,9 @@ multiply_S(SymmetricSharedBasisMatrix& A,
           int x_hat_index = x_hat_offset + i / MPISIZE;
           MPI_Isend(&x_hat[x_hat_index], x_hat[x_hat_index].numel(), MPI_DOUBLE,
                     proc_j, x_hat_i_tag, MPI_COMM_WORLD, &j_request);
-
         }
 
-        int x_hat_j_tag = j + S_tag + 1;
+        int x_hat_j_tag = i + S_tag;
         if (proc_j == MPIRANK) {
           // send x_hat(j) where b_hat(i) exists.
           int x_hat_index = x_hat_offset + j / MPISIZE;
@@ -232,10 +233,9 @@ multiply_S(SymmetricSharedBasisMatrix& A,
     for (int j = 0; j < i; ++j) {
       int S_ncols = A.ranks(j, level);
 
-      if (A.is_admissible.exists(i, j, level) &&
-          A.is_admissible(i, j, level)) {
-        int S_tag = i + j * nblocks;
-        int x_hat_j_tag = j + S_tag + 1;
+      if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
+        int S_tag = j;
+        int x_hat_j_tag = i + S_tag;
         int x_hat_i_tag = i + S_tag + 1;
         int proc_j = mpi_rank(j);
         int proc_S = mpi_rank(i);
@@ -348,7 +348,6 @@ matmul(SymmetricSharedBasisMatrix& A,
 
   // allocate b_hat blocks for the lowest level on each process.
   int nblocks = pow(2, A.min_level);
-  // nblocks_per_proc = ceil(nblocks / double(MPISIZE));
   std::vector<Matrix> b_hat;
   for (int i = MPIRANK; i < nblocks; i += MPISIZE) {
     b_hat.push_back(Matrix(A.ranks(i, A.min_level), 1));
@@ -466,7 +465,7 @@ matmul(SymmetricSharedBasisMatrix& A,
       int D_ncols = domain.cell_size(j, A.max_level);
       int proc_j = mpi_rank(j);
       int proc_D = mpi_rank(i);
-      int D_tag = i + j * nblocks;
+      int D_tag = j;
 
       // send D blocks where they are to be computed.
       if (A.is_admissible.exists(i, j, A.max_level) &&
@@ -481,7 +480,7 @@ matmul(SymmetricSharedBasisMatrix& A,
                     D_tag, MPI_COMM_WORLD, &j_request);
         }
 
-        int x_i_tag = i + D_tag + 1;
+        int x_i_tag = i + D_tag;
         if (proc_i == MPIRANK) {
           // send x(i) to proc_j
           int x_index = i / MPISIZE;
@@ -489,7 +488,7 @@ matmul(SymmetricSharedBasisMatrix& A,
                     x_i_tag, MPI_COMM_WORLD, &j_request);
         }
 
-        int x_j_tag = j + D_tag + 1;
+        int x_j_tag = i + D_tag + 1;
         if (proc_j == MPIRANK) {
           // send x(j) to proc_i
           int x_index = j / MPISIZE;
@@ -504,11 +503,11 @@ matmul(SymmetricSharedBasisMatrix& A,
       int D_ncols = domain.cell_size(j, A.max_level);
       int proc_j = mpi_rank(j);
       int proc_D = mpi_rank(i);
-      int D_tag = i + j * nblocks;
+      int D_tag = j;
 
       if (A.is_admissible.exists(i, j, A.max_level) &&
           !A.is_admissible(i, j, A.max_level)) {
-        int x_j_tag = j + D_tag + 1;
+        int x_j_tag = i + D_tag + 1;
         if (proc_i == MPIRANK) {
           // receive for b(i)
           Matrix Dij(D_nrows, D_ncols);
@@ -524,7 +523,7 @@ matmul(SymmetricSharedBasisMatrix& A,
           matmul(Dij, xj, b[index]);
         }
 
-        int x_i_tag = i + D_tag + 1;
+        int x_i_tag = i + D_tag;
         if (proc_j == MPIRANK) {
           Matrix Dij(D_nrows, D_ncols);
           Matrix xi(D_nrows, 1);
@@ -543,12 +542,10 @@ matmul(SymmetricSharedBasisMatrix& A,
   }
 }
 
-std::vector<int> MERGE_ARENAS;
-parsec_arena_datatype_t* merge_arena_t;
-
 // Copy blocks from the child level into level.
 void
-merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, int64_t level) {
+merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain,
+                          int64_t level, parsec_taskpool_t* dtd_tp) {
   const int64_t parent_level = level - 1;
   const int64_t parent_nblocks = pow(2, parent_level);
 
@@ -643,7 +640,7 @@ merge_unfactorized_blocks(SymmetricSharedBasisMatrix& A, const Domain& domain, i
 void
 multiply_complements(SymmetricSharedBasisMatrix& A,
                      Domain& domain,
-                     const int64_t block, const int64_t level) {
+                     const int64_t block, const int64_t level, parsec_taskpool_t* dtd_tp) {
   int64_t nblocks = pow(2, level);
 
   parsec_data_key_t U_key = parsec_U.super.data_key(&parsec_U.super, block, level);
@@ -726,7 +723,7 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
 void factorize_diagonal(SymmetricSharedBasisMatrix& A,
                         const Domain& domain,
                         const int64_t block,
-                        const int64_t level) {
+                        const int64_t level, parsec_taskpool_t* dtd_tp) {
   int64_t D_nrows = get_dim(A, domain, block, level);
   int64_t rank_nrows = A.ranks(block, level);
   auto D_key = parsec_D.super.data_key(&parsec_D.super, block, block, level);
@@ -746,7 +743,7 @@ void triangle_reduce_cc_oc(SymmetricSharedBasisMatrix& A,
                              const Domain& domain,
                              const int64_t i,
                              const int64_t block,
-                             const int64_t level) {
+                             const int64_t level, parsec_taskpool_t* dtd_tp) {
     if (exists_and_inadmissible(A, i, block, level)) {
       parsec_data_key_t diagonal_key =
         parsec_D.super.data_key(&parsec_D.super, block, block, level);
@@ -791,7 +788,7 @@ void triangle_reduce_co(SymmetricSharedBasisMatrix& A,
                            const Domain& domain,
                            const int64_t i,
                            const int64_t block,
-                           const int64_t level) {
+                           const int64_t level, parsec_taskpool_t* dtd_tp) {
   if (exists_and_inadmissible(A, i, block, level)) {
     parsec_data_key_t diagonal_key =
       parsec_D.super.data_key(&parsec_D.super, block, block, level);
@@ -836,17 +833,17 @@ void triangle_reduce_co(SymmetricSharedBasisMatrix& A,
 void triangle_reduction(SymmetricSharedBasisMatrix& A,
                         const Domain& domain,
                         const int64_t block,
-                        const int64_t level) {
+                        const int64_t level, parsec_taskpool_t* dtd_tp) {
   int64_t nblocks = pow(2, level);
 
   // TRSM with cc and oc blocks along the 'block' column after the diagonal block.
   for (int64_t i = block+1; i < nblocks; ++i) {
-    triangle_reduce_cc_oc(A, domain, i, block, level);
+    triangle_reduce_cc_oc(A, domain, i, block, level, dtd_tp);
   }
 
   // TRSM with co blocks behind the diagonal on the 'block' row.
   for (int64_t j = 0; j < block; ++j) {
-    triangle_reduce_co(A, domain, block, j, level);
+    triangle_reduce_co(A, domain, block, j, level, dtd_tp);
   }
 }
 
@@ -854,7 +851,7 @@ void
 compute_schurs_complement(SymmetricSharedBasisMatrix& A,
                           const Domain& domain,
                           const int64_t block,
-                          const int64_t level) {
+                          const int64_t level, parsec_taskpool_t* dtd_tp) {
   int64_t nblocks = pow(2, level);
 
   int dense_arena = A.max_level == level ? D_ARENA : FINAL_DENSE_ARENA;
@@ -1008,7 +1005,7 @@ update_row_cluster_basis(SymmetricSharedBasisMatrix& A,
                          const Hatrix::Domain& domain,
                          const int64_t block,
                          const int64_t level,
-                         const Hatrix::Args& opts) {
+                         const Hatrix::Args& opts, parsec_taskpool_t* dtd_tp) {
   int64_t block_size = get_dim(A, domain, block, level);
   parsec_data_key_t fill_in_key =
     parsec_temp_fill_in_rows.super.data_key(&parsec_temp_fill_in_rows.super,
@@ -1086,7 +1083,7 @@ void
 update_row_S_blocks(SymmetricSharedBasisMatrix& A,
                     const Hatrix::Domain& domain,
                     const int64_t block,
-                    const int64_t level) {
+                    const int64_t level, parsec_taskpool_t* dtd_tp) {
   // update the S blocks with the new projected basis.
   for (int64_t j = 0; j < block; ++j) {
     if (exists_and_admissible(A, block, j, level)) {
@@ -1117,7 +1114,7 @@ void
 update_row_transfer_bases(SymmetricSharedBasisMatrix& A,
                           const Hatrix::Domain& domain,
                           const int64_t block,
-                          const int64_t level) {
+                          const int64_t level, parsec_taskpool_t* dtd_tp) {
   const int64_t parent_block = block / 2;
   const int64_t parent_level = level - 1;
 
@@ -1155,7 +1152,7 @@ void
 update_col_transfer_bases(SymmetricSharedBasisMatrix& A,
                           const Hatrix::Domain& domain,
                           const int64_t block,
-                          const int64_t level) {
+                          const int64_t level, parsec_taskpool_t* dtd_tp) {
   const int64_t parent_block = block / 2;
   const int64_t parent_level = level - 1;
 
@@ -1194,7 +1191,7 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const Hatrix::Domain& domain,
                                       const int64_t block,
                                       const int64_t level,
-                                      const Hatrix::Args& opts) {
+                                      const Hatrix::Args& opts, parsec_taskpool_t* dtd_tp) {
 
   bool found_row_fill_in = false;
   for (int64_t j = 0; j < block; ++j) {
@@ -1205,10 +1202,10 @@ update_row_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   }
 
   if (found_row_fill_in) {
-    update_row_cluster_basis(A, domain, block, level, opts);
-    update_row_S_blocks(A, domain, block, level);
+    update_row_cluster_basis(A, domain, block, level, opts, dtd_tp);
+    update_row_S_blocks(A, domain, block, level, dtd_tp);
     if (level-1 >= A.min_level) {
-      update_row_transfer_bases(A, domain, block, level);
+      update_row_transfer_bases(A, domain, block, level, dtd_tp);
     }
   }
 }
@@ -1218,7 +1215,7 @@ update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
                          const Hatrix::Domain& domain,
                          const int64_t block,
                          const int64_t level,
-                         const Hatrix::Args& opts) {
+                         const Hatrix::Args& opts, parsec_taskpool_t* dtd_tp) {
   const int64_t nblocks = pow(2, level);
   const int64_t block_size = get_dim(A, domain, block, level);
   parsec_data_key_t fill_in_key =
@@ -1293,7 +1290,7 @@ void
 update_col_S_blocks(SymmetricSharedBasisMatrix& A,
                     const Hatrix::Domain& domain,
                     const int64_t block,
-                    const int64_t level) {
+                    const int64_t level, parsec_taskpool_t* dtd_tp) {
   const int64_t nblocks = pow(2, level);
   for (int64_t i = block+1; i < nblocks; ++i) {
     if (exists_and_admissible(A, i, block, level)) {
@@ -1325,7 +1322,7 @@ update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
                                       const Hatrix::Domain& domain,
                                       const int64_t block,
                                       const int64_t level,
-                                      const Hatrix::Args& opts) {
+                                      const Hatrix::Args& opts, parsec_taskpool_t* dtd_tp) {
   bool found_col_fill_in = false;
   int64_t nblocks = pow(2, level);
 
@@ -1337,10 +1334,10 @@ update_col_cluster_basis_and_S_blocks(SymmetricSharedBasisMatrix& A,
   }
 
   if (found_col_fill_in) {
-    update_col_cluster_basis(A, domain, block, level, opts);
-    update_col_S_blocks(A, domain, block, level);
+    update_col_cluster_basis(A, domain, block, level, opts, dtd_tp);
+    update_col_S_blocks(A, domain, block, level, dtd_tp);
     if (level-1 >= A.min_level) {
-      update_col_transfer_bases(A, domain, block, level);
+      update_col_transfer_bases(A, domain, block, level, dtd_tp);
     }
   }
 }
@@ -1349,17 +1346,17 @@ void
 factorize_level(SymmetricSharedBasisMatrix& A,
                 Hatrix::Domain& domain,
                 int64_t level,
-                const Hatrix::Args& opts) {
+                const Hatrix::Args& opts, parsec_taskpool_t* dtd_tp) {
   const int64_t nblocks = pow(2, level);
   for (int64_t block = 0; block < nblocks; ++block) {
-    update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts);
-    update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts);
+    // update_row_cluster_basis_and_S_blocks(A, domain, block, level, opts, dtd_tp);
+    // update_col_cluster_basis_and_S_blocks(A, domain, block, level, opts, dtd_tp);
 
-    multiply_complements(A, domain, block, level);
-    factorize_diagonal(A, domain, block, level);
-    triangle_reduction(A, domain, block, level);
-    compute_schurs_complement(A, domain, block, level);
-    compute_fill_ins(A, domain, block, level);
+    multiply_complements(A, domain, block, level, dtd_tp);
+    factorize_diagonal(A, domain, block, level, dtd_tp);
+    // triangle_reduction(A, domain, block, level, dtd_tp);
+    // compute_schurs_complement(A, domain, block, level, dtd_tp);
+    // compute_fill_ins(A, domain, block, level, dtd_tp);
   }
 }
 
@@ -1482,7 +1479,7 @@ void
 compute_fill_ins(SymmetricSharedBasisMatrix& A,
                  const Hatrix::Domain& domain,
                  int64_t block,
-                 int64_t level) {
+                 int64_t level, parsec_taskpool_t* dtd_tp) {
   int nblocks = pow(2, level);
   int arena_d = level == A.max_level ? D_ARENA : FINAL_DENSE_ARENA;
   int arena_u = level == A.max_level ? U_ARENA : U_NON_LEAF_ARENA;
@@ -1555,7 +1552,7 @@ compute_fill_ins(SymmetricSharedBasisMatrix& A,
     }
   }
 
-  // nb * rank fill-in.
+  // nb * rank fill-in. corresponds to schurs_complement_4 task as per loop structure.
   for (int i = block+1; i < nblocks; ++i) {
     for (int j = 0; j < block; ++j) {
       if (exists_and_inadmissible(A, i, block, level) &&
@@ -1659,7 +1656,7 @@ void
 final_dense_factorize(SymmetricSharedBasisMatrix& A,
                       const Hatrix::Domain& domain,
                       const Hatrix::Args& opts,
-                      const int64_t level) {
+                      const int64_t level, parsec_taskpool_t* dtd_tp) {
   const int64_t nblocks = pow(2, level);
 
   for (int64_t d = 0; d < nblocks; ++d) {
@@ -1698,51 +1695,52 @@ final_dense_factorize(SymmetricSharedBasisMatrix& A,
     }
 
     for (int64_t i = d+1; i < nblocks; ++i) {
-      for (int64_t j = d+1; j <= i; ++j) {
+      auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
+      auto D_ii_key = parsec_D.super.data_key(&parsec_D.super, i, i, level);
+      int64_t D_id_nrows = get_dim(A, domain, i, level);
+      int64_t D_id_ncols = get_dim(A, domain, d, level);
+      int64_t D_ii_nrows = get_dim(A, domain, i, level);
+      int64_t D_ii_ncols = get_dim(A, domain, i, level);
+
+      parsec_dtd_insert_task(dtd_tp, task_syrk_full, 80, PARSEC_DEV_CPU,
+                             "syrk_full_task",
+                             sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
+                             sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
+                             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
+                             PARSEC_INPUT | FINAL_DENSE_ARENA,
+                             sizeof(int64_t), &D_ii_nrows, PARSEC_VALUE,
+                             sizeof(int64_t), &D_ii_ncols, PARSEC_VALUE,
+                             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ii_key),
+                             PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
+                             PARSEC_DTD_ARG_END);
+
+      for (int64_t j = i+1; j < nblocks; ++j) {
+        auto D_jd_key = parsec_D.super.data_key(&parsec_D.super, j, d, level);
+        auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
+        auto D_ji_key = parsec_D.super.data_key(&parsec_D.super, j, i, level);
+
+        int64_t D_jd_nrows = get_dim(A, domain, j, level);
+        int64_t D_jd_ncols = get_dim(A, domain, d, level);
         int64_t D_id_nrows = get_dim(A, domain, i, level);
         int64_t D_id_ncols = get_dim(A, domain, d, level);
-        int64_t D_ij_nrows = get_dim(A, domain, i, level);
-        int64_t D_ij_ncols = get_dim(A, domain, j, level);
-
-        if (i == j) {
-          auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
-          auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
-
-          parsec_dtd_insert_task(dtd_tp, task_syrk_full, 80, PARSEC_DEV_CPU,
-            "syrk_full_task",
-            sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
-                                 PARSEC_INPUT | FINAL_DENSE_ARENA,
-            sizeof(int64_t), &D_ij_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_ij_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
-                                 PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
-            PARSEC_DTD_ARG_END);
-        }
-        else {
-          auto D_id_key = parsec_D.super.data_key(&parsec_D.super, i, d, level);
-          auto D_ij_key = parsec_D.super.data_key(&parsec_D.super, i, j, level);
-          auto D_jd_key = parsec_D.super.data_key(&parsec_D.super, j, d, level);
-          int64_t D_jd_nrows = get_dim(A, domain, j, level);
-          int64_t D_jd_ncols = get_dim(A, domain, d, level);
+        int64_t D_ji_nrows = get_dim(A, domain, j, level);
+        int64_t D_ji_ncols = get_dim(A, domain, i, level);
 
           parsec_dtd_insert_task(dtd_tp, task_matmul_full, 80, PARSEC_DEV_CPU,
             "matmul_full_task",
+                                 sizeof(int64_t), &D_jd_nrows, PARSEC_VALUE,
+                                 sizeof(int64_t), &D_jd_ncols, PARSEC_VALUE,
+                                 PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_jd_key),
+                                 PARSEC_INPUT | FINAL_DENSE_ARENA,
             sizeof(int64_t), &D_id_nrows, PARSEC_VALUE,
             sizeof(int64_t), &D_id_ncols, PARSEC_VALUE,
             PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_id_key),
                                  PARSEC_INPUT | FINAL_DENSE_ARENA,
-            sizeof(int64_t), &D_jd_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_jd_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_jd_key),
-                                 PARSEC_INPUT | FINAL_DENSE_ARENA,
-            sizeof(int64_t), &D_ij_nrows, PARSEC_VALUE,
-            sizeof(int64_t), &D_ij_ncols, PARSEC_VALUE,
-            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ij_key),
+            sizeof(int64_t), &D_ji_nrows, PARSEC_VALUE,
+            sizeof(int64_t), &D_ji_ncols, PARSEC_VALUE,
+            PASSED_BY_REF, parsec_dtd_tile_of(&parsec_D.super, D_ji_key),
                                  PARSEC_INOUT | FINAL_DENSE_ARENA | PARSEC_AFFINITY,
             PARSEC_DTD_ARG_END);
-        }
       }
     }
   }
@@ -1752,7 +1750,7 @@ static void
 add_fill_in_contributions_to_skeleton_matrices(SymmetricSharedBasisMatrix& A,
                                                const Hatrix::Domain& domain,
                                                const Hatrix::Args& opts,
-                                               const int64_t level) {
+                                               const int64_t level, parsec_taskpool_t* dtd_tp) {
   int64_t nblocks = pow(2, level);
 
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -1800,7 +1798,7 @@ propagate_fill_ins_to_upper_level(SymmetricSharedBasisMatrix& A,
 
 void
 factorize_setup(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                const Hatrix::Args& opts) {
+                const Hatrix::Args& opts, parsec_context_t* parsec) {
   parsec_arena_datatype_t* u_arena_t = parsec_dtd_create_arena_datatype(parsec, &U_ARENA);
   parsec_add2arena_rect(u_arena_t, parsec_datatype_double_t, opts.nleaf, opts.max_rank, opts.nleaf);
 
@@ -1845,7 +1843,7 @@ factorize_setup(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
   }
 }
 
-void factorize_teardown() {
+void factorize_teardown(parsec_context_t* parsec) {
   h2_dc_destroy_maps();
   parsec_dtd_destroy_arena_datatype(parsec, U_ARENA);
   parsec_dtd_destroy_arena_datatype(parsec, D_ARENA);
@@ -1859,18 +1857,19 @@ void factorize_teardown() {
 // data that has already been allocated by the matrix with parsec and
 // make it work with the runtime.
 long long int
-factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain, const Hatrix::Args& opts) {
+factorize(SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+          const Hatrix::Args& opts, parsec_taskpool_t* dtd_tp) {
   int64_t level;
 
   for (level = A.max_level; level >= A.min_level; --level) {
-    factorize_level(A, domain, level, opts);
-    add_fill_in_contributions_to_skeleton_matrices(A, domain, opts, level);
+    factorize_level(A, domain, level, opts, dtd_tp);
+    add_fill_in_contributions_to_skeleton_matrices(A, domain, opts, level, dtd_tp);
     // propagate_fill_ins_to_upper_level(A, opts, level);
 
-    merge_unfactorized_blocks(A, domain, level);
+    merge_unfactorized_blocks(A, domain, level, dtd_tp);
   }
 
-  final_dense_factorize(A, domain, opts, level);
+  final_dense_factorize(A, domain, opts, level, dtd_tp);
 
   parsec_dtd_data_flush_all(dtd_tp, &parsec_D.super);
   parsec_dtd_data_flush_all(dtd_tp, &parsec_S.super);
@@ -1900,7 +1899,7 @@ solve_forward_level(SymmetricSharedBasisMatrix& A,
     int64_t block_index = block / MPISIZE;
     if (mpi_rank(block) == MPIRANK) {
       Matrix U_F = make_complement(A.U(block, level));
-      Matrix prod = matmul(U_F, x_level[block_index]);
+      Matrix prod = matmul(U_F, x_level[block_index], true);
       x_level[block_index] = prod;
     }
 
@@ -2151,7 +2150,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
   for (int64_t block = nblocks-1; block >=0; --block) {
     int64_t block_index = block / MPISIZE;
 
-    // apply the tranpose of the oc block that is actually in the lower triangle.
+    // apply the transpose of the oc block that is actually in the lower triangle.
     for (int64_t icol = 0; icol < block; ++icol) {
       if (exists_and_inadmissible(A, block, icol, level)) {
         int64_t icol_index = icol / MPISIZE;
@@ -2270,7 +2269,7 @@ solve_backward_level(SymmetricSharedBasisMatrix& A,
 
     if (mpi_rank(block) == MPIRANK) {
       Matrix V_F = make_complement(A.U(block, level));
-      Matrix prod = matmul(V_F, x_level[block_index], true);
+      Matrix prod = matmul(V_F, x_level[block_index]);
       x_level[block_index] = prod;
     }
   }
@@ -2429,6 +2428,4 @@ solve(SymmetricSharedBasisMatrix& A,
   for (int64_t i = 0; i < x_levels[0].size(); ++i) {
     h2_solution[i] = x_levels[0][i];
   }
-
-  MPI_Barrier(MPI_COMM_WORLD);
 }

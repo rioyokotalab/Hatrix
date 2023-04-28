@@ -1,6 +1,6 @@
 include $(TOPSRCDIR)/make.fugaku.inc
 
-OBJECTS := $(subst .cpp,.o,$(SOURCES))
+OBJECTS := $(subst .cpp,.o,$(SOURCES)) $(subst .c,.o,$(wildcard *.c))
 
 all: $(sublib)
 

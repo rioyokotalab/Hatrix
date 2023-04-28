@@ -12,6 +12,12 @@ namespace Lapack {
   enum QR_ret { QAndR, OnlyQ };
 }
 
+// Call LASWP for swapping the rows.
+void swap_rows(Matrix& A, std::vector<int> pivots);
+
+// Compute condition number with dgecon.
+double cond(const Matrix& A);
+
 // Compute in-place inverse using GETRF + GETRI.
 void inverse(Matrix& A);
 
@@ -23,6 +29,8 @@ void lu(Matrix& A);
 
 // Compute in-place Cholesky factorization fo A with LAPACK DPOTRF.
 void cholesky(Matrix& A, Mode uplo);
+
+std::vector<int> cholesky_piv(Matrix& A, Mode uplo);
 
 // Compute pivoted LU factorization using LAPACK.
 std::vector<int> lup(Matrix& A);
@@ -43,7 +51,8 @@ std::tuple<Matrix, std::vector<int64_t>> pivoted_qr(const Matrix& A, int64_t ran
 
 std::tuple<Matrix,Matrix> pivoted_qr_nopiv_return(const Matrix& A, int64_t rank);
 
-// Returns <Q, pivots, rank>
+// Returns <Q, pivots, rank> by computing the first 'rank' orthogonal factors of A
+// until the error 'error' has been met.
 std::tuple<Matrix, std::vector<int64_t>, int64_t> error_pivoted_qr_max_rank(const Matrix& A,
                                                                    double error,
                                                                    int64_t max_rank=-1);
@@ -100,6 +109,9 @@ std::tuple<Matrix, Matrix, int64_t> error_pivoted_qr(Matrix& A, double eps,
 
 // Compute the Frobenius norm of a matrix
 double norm(const Matrix& A);
+
+// Compute the Frobenius norm of a matrix
+double one_norm(const Matrix& A);
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T);
 void apply_block_reflector(const Matrix& V, const Matrix& T, Matrix& C,

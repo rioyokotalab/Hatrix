@@ -62,16 +62,6 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
-# parsec HSS matrix
-.PHONY: examples/distributed/HSS_dtd
-examples/distributed/HSS_dtd:
-	$(MAKE) -C $@
-
-HSS_dtd : % : dirs examples/distributed/HSS_dtd
-	$(MPICXX) libHSS_dtd.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
-
 # parsec H2 matrix
 .PHONY: examples/distributed/H2_dtd
 examples/distributed/H2_dtd:
@@ -82,13 +72,14 @@ H2_dtd : % : dirs examples/distributed/H2_dtd
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-# non-distributed HSS code.
-.PHONY: examples/distributed/HSS
-examples/distributed/HSS:
+
+# parsec H2 matrix with PTG
+.PHONY: examples/distributed/H2_ptg
+examples/distributed/H2_ptg:
 	$(MAKE) -C $@
 
-HSS_main : % : dirs examples/distributed/HSS
-	$(CXX) libHSS_main.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+H2_ptg : % : dirs examples/distributed/H2_ptg
+	$(MPICXX) libH2_ptg.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
@@ -102,8 +93,15 @@ H2_main : % : dirs examples/distributed/H2
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-UMV_strong_H2_Nlevel_starsh: % : $(EXAMPLES)/%.o dirs
-	$(LINK_EXECUTABLE)
+# non-distributed dense matrix verification code
+.PHONY: examples/distributed/Dense
+examples/distributed/Dense:
+	$(MAKE) -C $@
+
+Dense : % : dirs examples/distributed/Dense
+	$(CXX) libDense.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
 
 test: $(TEST_EXECUTABLES)
 	for e in $(TEST_EXECUTABLES); do \
@@ -113,9 +111,10 @@ test: $(TEST_EXECUTABLES)
 .PHONY: clean
 .SILENT: clean
 clean:
-	for dir in $(DIRS) examples/distributed/HSS \
-	examples/distributed/H2 examples/distributed/HSS_dtd \
-	examples/distributed/H2_dtd $(TEST) $(EXAMPLES); do \
+	for dir in $(DIRS)  \
+		examples/distributed/H2 \
+		examples/distributed/H2_dtd examples/distributed/H2_ptg \
+		$(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
 	$(RM) $(OBJLIBS) bin/ *.a

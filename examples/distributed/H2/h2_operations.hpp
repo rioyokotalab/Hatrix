@@ -28,6 +28,7 @@ void
 merge_unfactorized_blocks(Hatrix::SymmetricSharedBasisMatrix& A, int64_t level);
 
 long long int factorize(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Args& opts);
+
 Hatrix::Matrix solve(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x);
 
 int64_t

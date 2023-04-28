@@ -1,38 +1,84 @@
 #!/bin/bash
 
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/Users/sameer/gitrepos/parsec/build/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/Users/sameer/gitrepos/parsec/build/lib/pkgconfig:/Users/sameer/gitrepos/gsl-2.7.1/build/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/Users/sameer/gitrepos/parsec/build/lib
+export PATH=/Users/sameer/gitrepos/parsec/build/bin:$PATH
 
 # Keep for this reason: https://github.com/open-mpi/ompi/issues/7393
 export TMPDIR=/tmp
+ROOT=$PWD
+
+set -e
+
+# make clean
 
 # export VECLIB_MAXIMUM_THREADS=1
+# cd examples/distributed/H2_ptg
+# ./compile_jdf.sh
+# cd $ROOT
 
-ulimit -c unlimited
+# ulimit -c unlimited
 
 make -j H2_dtd
-# make -j H2_main
+# make -j Dense
 
-for adm in 1; do
-    nleaf=256
-    ndim=3
-    max_rank=50
+max_rank=50
+nleaf=512
+adm=0
+ndim=2
+N=4096
 
-    for N in 8192; do
-        mpirun --oversubscribe -n 16 xterm -e lldb -o "b malloc_error_break" \
-               -o run -- ./bin/H2_dtd --N $N \
-                      --nleaf $nleaf \
-                      --kernel_func laplace \
-                      --kind_of_geometry grid \
-                      --ndim $ndim \
-                      --max_rank $max_rank \
-                      --accuracy -1 \
-                      --admis $adm \
-                      --admis_kind diagonal \
-                      --construct_algorithm miro \
-                      --add_diag 1e-9  \
-                      --kind_of_recompression 3 \
-                      --parsec_cores 2 \
-		      --use_nested_basis
+# ./bin/Dense --N $N --kernel_func laplace --kind_of_geometry grid --ndim $ndim --param_1 1e-9
+# ./bin/Dense --N $N --kernel_func laplace --kind_of_geometry grid --ndim $ndim --param_1 1e-4
+# ./bin/Dense --N $N --kernel_func gsl_matern --kind_of_geometry grid --ndim $ndim --param_1 1 --param_2 0.03 --param_3 0.5
+# ./bin/Dense --N $N --kernel_func gsl_matern --kind_of_geometry grid --ndim $ndim --param_1 1 --param_2 0.1 --param_3 1
+# ./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-9 --param_2 1
+# ./bin/Dense --N $N --kernel_func yukawa --kind_of_geometry grid --ndim $ndim --param_1 1e-4 --param_2 1
+
+for N in 1024; do
+    for adm in 0; do
+        for nleaf in 32; do
+            for max_rank in 15; do
+                ./bin/H2_dtd --N $N \
+                              --nleaf $nleaf \
+                              --kernel_func laplace \
+                              --kind_of_geometry grid \
+                              --ndim $ndim \
+                              --max_rank $max_rank \
+                              --accuracy -1 \
+                              --admis $adm \
+                              --admis_kind diagonal \
+                              --construct_algorithm miro \
+                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3 --use_nested_basis \
+                              --parsec_cores 1
+            done
+        done
     done
+    # lldb -- ./bin/H2_ptg --N $N \
+    #              --nleaf $nleaf \
+    #              --kernel_func laplace \
+    #              --kind_of_geometry grid \
+    #              --ndim $ndim \
+    #              --max_rank $max_rank \
+    #              --accuracy -1 \
+    #              --admis $adm \
+    #              --admis_kind diagonal \
+    #              --construct_algorithm miro \
+    #              --param_1 1e-9  \
+    #              --kind_of_recompression 3
 done
+
+function benchmark_sc22() {
+    mpicxx -I${VEC_LIB_INCLUDE} -I/opt/homebrew/opt/lapack/include -I/Users/sameer/gitrepos/gsl-2.7.1/build/include -framework Accelerate -L/Users/sameer/gitrepos/gsl-2.7.1/build/lib -lgsl -lm -L/opt/homebrew/opt/lapack/lib -llapacke -llapack examples/SymmH2_ULV_SC22.cpp -o bin/sc_22
+
+    for N in 32768; do
+        for nleaf in 512 1024 2048; do
+            for max_rank in 150 200 500; do
+                mpirun -n 8 bin/sc_22 $N 2 $nleaf 1.e-8 $max_rank 2000
+            done
+        done
+    done
+}
+
+# benchmark_sc22

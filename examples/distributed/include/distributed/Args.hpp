@@ -24,7 +24,9 @@ namespace Hatrix {
     double qr_accuracy;             // cut off accuracy for QR factorization
     // 0 - accuracy truncated, 1 - lapack constant rank QR, 2 - constant rank no pivot, 3 - fixed rank svd
     int kind_of_recompression;
-    double add_diag;
+    double param_1;
+    double param_2;
+    double param_3;
     ADMIS_KIND admis_kind;      // whether this is diagonal or geometry based admis
     CONSTRUCT_ALGORITHM construct_algorithm;
     bool use_nested_basis;      // whether to use nested basis in construction

@@ -2,7 +2,6 @@
 
 #include "Hatrix/Hatrix.h"
 
-#include "Domain.hpp"
 #include "internal_types.hpp"
 #include "SymmetricSharedBasisMatrix.hpp"
 
@@ -52,9 +51,6 @@ namespace Hatrix {
   Matrix generate_p2p_matrix(const Domain& domain,
                              const kernel_function& kernel);
 
-  double laplace_kernel(const std::vector<double>& coords_row,
-                        const std::vector<double>& coords_col,
-                        const double eta);
 
   void init_geometry_admis(SymmetricSharedBasisMatrix& A,
                            const Domain& domain, const Args& opts);

@@ -88,8 +88,9 @@ Matrix::Matrix(const Matrix& A, bool copy)
     // // stride = A.rows;
     // // Need the for loop and cannot init directly in the initializer list because
     // // the object might be a view and therefore will not get copied properly.
-    for (int i = 0; i < A.rows; ++i) {
-      for (int j = 0; j < A.cols; ++j) {
+#pragma omp parallel for
+    for (int i = 0; i < rows; ++i) {
+      for (int j = 0; j < cols; ++j) {
         (*this)(i, j) = A(i, j);
       }
     }
@@ -294,10 +295,10 @@ void Matrix::print() const {
   for (int i = 0; i < rows; i++) {
     for (int j = 0; j < cols; j++) {
       if ((*this)(i, j) > -1e-10 && (*this)(i, j) < 1e-10) {
-        std::cout << std::setw(13) << 0 << " ";
+        std::cout << std::setw(15) << 0 << " ";
       }
       else {
-        std::cout << std::setprecision(8) << std::setw(13) <<  (*this)(i, j) << " ";
+        std::cout << std::setprecision(6) << std::setw(15) <<  (*this)(i, j) << " ";
       }
     }
     std::cout << "\n";
@@ -398,5 +399,17 @@ void Matrix::destructive_resize(const int64_t nrows, const int64_t ncols) {
   stride = nrows;
   is_view = false;
   data_ptr = new double[rows * cols];
+}
+
+Matrix Matrix::tril(const int64_t diag) {
+  Matrix out(rows, cols);
+
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j <= std::min(i + diag, cols); ++j) {
+      out(i, j) = (*this)(i, j);
+    }
+  }
+
+  return out;
 }
 }  // namespace Hatrix

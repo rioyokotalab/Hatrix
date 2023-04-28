@@ -1,7 +1,6 @@
 #include <vector>
 #include <cassert>
 #include <cmath>
-
 #include "distributed/distributed.hpp"
 
 // This is actually RowLevelMap
@@ -100,7 +99,8 @@ namespace Hatrix {
       dual_tree_traversal(A, Ci.cells[0], Cj, domain, opts);
       dual_tree_traversal(A, Ci.cells[1], Cj, domain, opts);
     }
-    else if (j_level <= i_level && Cj.cells.size() > 0 && (!well_separated || !opts.use_nested_basis)) {
+    else if (j_level <= i_level && Cj.cells.size() > 0 &&
+             (!well_separated || !opts.use_nested_basis)) {
       // i is at a higheer level and j is not leaf.
       dual_tree_traversal(A, Ci, Cj.cells[0], domain, opts);
       dual_tree_traversal(A, Ci, Cj.cells[1], domain, opts);
@@ -242,6 +242,7 @@ namespace Hatrix {
         }
       }
     }
+    A.min_level = -1;
 
     for (int64_t l = A.max_level; l > 0; --l) {
       int64_t nblocks = pow(2, l);
@@ -261,7 +262,13 @@ namespace Hatrix {
       }
     }
 
-    if (A.max_level != A.min_level) { A.min_level++; }
+    if ((A.max_level != A.min_level) && A.min_level != -1) { A.min_level++; }
+    if (A.min_level == -1) {
+	    A.min_level = 1; // HSS matrix detected.
+    }
+    if (opts.use_nested_basis && A.min_level == 1) {
+      A.is_admissible.insert(0, 0, 0, false);
+    }
     populate_near_far_lists(A);
   }
 
@@ -317,55 +324,4 @@ namespace Hatrix {
 
     return out;
   }
-
-  double laplace_kernel(const std::vector<double>& coords_row,
-                        const std::vector<double>& coords_col,
-                        const double eta) {
-    int64_t ndim = coords_row.size();
-    double rij = 0;
-    for (int64_t k = 0; k < ndim; ++k) {
-      rij += pow(coords_row[k] - coords_col[k], 2);
-    }
-    double out = 1 / (std::sqrt(rij) + eta);
-
-    return out;
-  }
-
-
-  // double
-  // block_sin(const std::vector<double>& coords_row,
-  //           const std::vector<double>& coords_col) {
-  //   double dist = 0, temp;
-  //   int64_t ndim = coords_row.size();
-
-  //   for (int64_t k = 0; k < ndim; ++k) {
-  //     dist += pow(coords_row[k] - coords_col[k], 2);
-  //   }
-  //   if (dist == 0) {
-  //     return add_diag;
-  //   }
-  //   else {
-  //     dist = std::sqrt(dist);
-  //     return sin(wave_k * dist) / dist;
-  //   }
-  // }
-
-  // double
-  // sqrexp_kernel(const std::vector<double>& coords_row,
-  //               const std::vector<double>& coords_col) {
-  //   int64_t ndim = coords_row.size();
-  //   double dist = 0;
-  //   double local_beta = -2 * pow(beta, 2);
-  //   // Copied from kernel_sqrexp.c in stars-H.
-  //   for (int64_t k = 0; k < ndim; ++k) {
-  //     dist += pow(coords_row[k] - coords_col[k], 2);
-  //   }
-  //   dist = dist / local_beta;
-  //   if (std::abs(dist) < 1e-10) {
-  //     return sigma + noise;
-  //   }
-  //   else {
-  //     return sigma * exp(dist);
-  //   }
-  // }
 }

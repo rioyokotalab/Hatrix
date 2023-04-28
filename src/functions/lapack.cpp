@@ -24,6 +24,19 @@
 
 namespace Hatrix {
 
+void swap_rows(Matrix& A, std::vector<int> pivots) {
+  LAPACKE_dlaswp(LAPACK_COL_MAJOR, A.cols, &A, A.stride, 0, pivots.size(), pivots.data(), 1);
+}
+
+double cond(const Matrix& A) {
+  double cond_number;
+  char nrm = '1';
+  double one_nrm = Hatrix::one_norm(A);
+  int info = LAPACKE_dgecon(LAPACK_COL_MAJOR, nrm, A.rows, &A, A.stride, one_nrm, &cond_number);
+
+  return 1.0 / cond_number;
+}
+
 void inverse(Matrix& A) {
   std::vector<int> ipiv(A.min_dim());
   int info;
@@ -88,6 +101,18 @@ void lu(Matrix& A) {
 
 void cholesky(Matrix& A, Mode uplo) {
   LAPACKE_dpotrf(LAPACK_COL_MAJOR, uplo == Lower ? 'L' : 'U', A.rows, &A, A.stride);
+}
+
+std::vector<int> cholesky_piv(Matrix& A, Mode uplo) {
+  std::vector<int> pivots(A.rows);
+  int rank;
+  double tol = -1;
+  double WORK[A.rows * 2];
+  int INFO;
+
+  LAPACKE_dpstrf(LAPACK_COL_MAJOR, uplo == Lower ? 'L' : 'U', A.rows, &A, A.stride, pivots.data(),
+                 &rank, tol);
+  return pivots;
 }
 
 std::vector<int> lup(Matrix& A) {
@@ -518,6 +543,10 @@ std::tuple<Matrix, Matrix, int64_t> error_pivoted_qr(Matrix& A, double eps,
 
 double norm(const Matrix& A) {
   return LAPACKE_dlange(LAPACK_COL_MAJOR, 'F', A.rows, A.cols, &A, A.stride);
+}
+
+double one_norm(const Matrix& A) {
+  return LAPACKE_dlange(LAPACK_COL_MAJOR, 'O', A.rows, A.cols, &A, A.stride);
 }
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T) {

@@ -137,6 +137,7 @@ template class RowColMap<Hatrix::Matrix>;
 template class RowColMap<int64_t>;
 template class RowColMap<int>;
 template class RowColMap<std::vector<int64_t>>;
+template class RowColMap<std::vector<int>>;
 
 template<class T>
 void RowColLevelMap<T>::deep_copy(const RowColLevelMap<T>& A) {

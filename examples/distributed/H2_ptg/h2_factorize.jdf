@@ -1,0 +1,274 @@
+extern "C" %{
+
+  #include "math.h"
+  #include "parsec.h"
+  #include "h2_ptg_internal.h"
+  #include "tasks_c_interface.h"
+
+  int64_t get_dim(const int64_t block, const int64_t level,
+                  h2_factorize_params_t* params) {
+    return level == params->max_level ? params->nleaf : params->max_rank * 2;
+  }
+%}
+
+/* data descriptors */
+parsec_D_leaf [ type="parsec_data_collection_t*"]
+parsec_D_non_leaf [ type="parsec_data_collection_t*"]
+parsec_U_leaf [ type="parsec_data_collection_t*"]
+parsec_U_non_leaf [ type="parsec_data_collection_t*"]
+parsec_US [ type="parsec_data_collection_t*"]
+parsec_r [ type="parsec_data_collection_t*"]
+parsec_S [ type="parsec_data_collection_t*" aligned=parsec_D_non_leaf]
+parsec_F [ type="parsec_data_collection_t*"]
+parsec_temp_fill_in_rows [ type="parsec_data_collection_t*" ]
+h2_params [ type="h2_factorize_params_t*" ]
+
+/* diagonal_multiply_complements task */
+diagonal_multiply_complements(block, level)
+
+level = h2_params->max_level .. h2_params->min_level
+block = 0 .. %{ return pow(2, level)-1; %}
+
+: parsec_D_leaf(block, block, level)
+
+RW D <- parsec_D_leaf(block, block, level)
+      -> D factorize_diagonal(block, level) [type=LEAF_SIZE_TILE]
+READ U <- parsec_U_leaf(block, level) [type=BASIS_LEAF]
+
+BODY
+{
+  int64_t D_nrows = get_dim(block, level, h2_params);
+  int64_t D_ncols = get_dim(block, level, h2_params);
+  int64_t D_row_rank = h2_params->max_rank;
+  int64_t D_col_rank = h2_params->max_rank;
+  int64_t U_nrows = get_dim(block, level, h2_params);
+  int64_t U_ncols = h2_params->max_rank;
+  char which  = 'F';
+
+  printf("exec multiply complement: block -> %d level -> %d\n", block, level);
+
+  CORE_multiply_complement(D_nrows, D_ncols, D_row_rank, D_col_rank,
+                           U_nrows, U_ncols, (double*)D, (double*)U, which);
+}
+END
+
+/* factorize_diagonal task */
+factorize_diagonal(block, level)
+
+level = h2_params->max_level .. h2_params->min_level
+block = 0 .. %{ return pow(2, level)-1; %}
+col_blocks = %{ return h2_params->col_near_list[level].level_block_list[block].length; %}
+
+: parsec_D_leaf(block, block, level)
+
+RW D <- D diagonal_multiply_complements(block, level) /* no type cuz always on the same MPI rank. */
+     -> block % 2 == 0 ? TL merge_diagonal_blocks(block/2, level-1) [type_remote=TOP_LEFT]
+     -> block % 2 == 1 ? BR merge_diagonal_blocks(block/2, level-1) [type_remote=BOTTOM_RIGHT]
+     -> parsec_D_leaf(block, block, level) [type=LEAF_SIZE_TILE]
+
+BODY
+{
+  int64_t D_nrows = get_dim(block, level, h2_params);
+  int64_t rank_nrows = h2_params->max_rank;
+
+  printf("exec diag block : %d l: %d col_block: %d\n", block, level, col_blocks);
+
+  CORE_factorize_diagonal(D_nrows, rank_nrows, (double*)D);
+}
+END
+
+/* merge blocks to lower level. */
+merge_diagonal_blocks(block, level) /* choose the i'th block on row 'block'. */
+
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 0 .. %{ return pow(2, level)-1; %}
+
+: parsec_D_non_leaf(block, block, level)
+
+READ TL <- D factorize_diagonal(block*2, level+1) [type_remote=RANK_TILE]
+READ BR <- D factorize_diagonal(block*2+1, level+1) [type_remote=RANK_TILE]
+READ BL <- parsec_S(block*2+1, block*2, level+1) [type=RANK_TILE]
+RW BLOCK <- parsec_D_non_leaf(block, block, level) [type=SMALL_TILE]
+         -> BLOCK cholesky_full(block, level) [type=SMALL_TILE]
+BODY
+{
+  printf("merge dense blocks: block-> %d actual_i -> %d level -> %d\n",
+         block, block, level);
+  int LD_BLOCK = h2_params->max_rank * 2;
+  int LD_RANK_TILE = h2_params->max_rank;
+  double *_BLOCK = (double*)BLOCK;
+  double *_TL = (double*)TL;
+  double *_BL = (double*)BL;
+  double *_BR = (double*)BR;
+
+  /* copy top left block. */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[i + j * LD_BLOCK] = _TL[i + j * LD_RANK_TILE];
+    }
+  }
+
+  /* copy bottom right */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[(i + h2_params->max_rank) + (j + h2_params->max_rank) * LD_BLOCK] =
+        _BR[i + j * LD_RANK_TILE];
+    }
+  }
+
+  /* copy bottom left */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[(i + h2_params->max_rank) + j * LD_BLOCK] = _BL[i + j * LD_RANK_TILE];
+    }
+  }
+}
+END
+
+merge_non_diagonal_blocks(block, i, level)
+
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 1 .. %{ return pow(2, level)-1; %}
+i = 0 .. %{ return h2_params->row_near_list[level].level_block_list[block].length-2; %}
+actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %}
+
+: parsec_D_non_leaf(block, actual_i, level)
+
+READ TL <- parsec_S(block * 2, actual_i * 2, level+1) [type=RANK_TILE]
+READ TR <- parsec_S(block * 2, actual_i * 2 + 1, level+1) [type=RANK_TILE]
+READ BL <- parsec_S(block * 2 + 1, actual_i * 2, level+1) [type=RANK_TILE]
+READ BR <- parsec_S(block * 2 + 1, actual_i * 2 + 1, level+1) [type=RANK_TILE]
+RW BLOCK <- parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
+         -> parsec_D_non_leaf(block, actual_i, level) [type=SMALL_TILE]
+
+BODY
+{
+  int LD_BLOCK = h2_params->max_rank * 2;
+  int LD_RANK_TILE = h2_params->max_rank;
+  double *_BLOCK = (double*)BLOCK;
+  double *_TL = (double*)TL;
+  double *_TR = (double*)TR;
+  double *_BL = (double*)BL;
+  double *_BR = (double*)BR;
+
+  /* copy top left block. */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[i + j * LD_BLOCK] = _TL[i + j * LD_RANK_TILE];
+    }
+  }
+
+  /* copy top right block. */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[i + (j + h2_params->max_rank) * LD_BLOCK] =
+        _TR[i + j * LD_RANK_TILE];
+    }
+  }
+
+  /* copy bottom right */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[(i + h2_params->max_rank) + (j + h2_params->max_rank) * LD_BLOCK] =
+        _BR[i + j * LD_RANK_TILE];
+    }
+  }
+
+  /* copy bottom left */
+  for (int i = 0; i < h2_params->max_rank; ++i) {
+    for (int j = 0; j < h2_params->max_rank; ++j) {
+      _BLOCK[(i + h2_params->max_rank) + j * LD_BLOCK] = _BL[i + j * LD_RANK_TILE];
+    }
+  }
+}
+END
+
+/* factorize lower block matrix. */
+
+/* full cholesky factorization. */
+cholesky_full(block, level)
+
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 0 .. %{ return pow(2, level)-1;%}
+
+: parsec_D_non_leaf(block, block, level)
+
+RW BLOCK <- (block == 0) ? BLOCK merge_diagonal_blocks(block, level) [type=SMALL_TILE]
+         -> BLOCK solve_triangular_full(block, 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1;%}, level)
+         -> parsec_D_non_leaf(block, block, level) [type=SMALL_TILE]
+
+BODY
+{
+  int64_t D_nrows = get_dim(block, level, h2_params);
+  int64_t D_ncols = get_dim(block, level, h2_params);
+  double *_BLOCK = (double*)BLOCK;
+
+  CORE_cholesky_full(D_nrows, D_ncols, _BLOCK);
+  printf("full chol block-> %d level ->%d\n", block, level);
+}
+END
+
+/* triangular solve. */
+solve_triangular_full(block, i, level)
+
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 0 .. %{ return pow(2, level)-1;%}
+i = 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}
+actual_i = %{ return h2_params->col_near_list[level].level_block_list[block].indices[i]; %}
+
+: parsec_D_non_leaf(actual_i, block, level)
+
+READ BLOCK <- BLOCK cholesky_full(block, level) [type=SMALL_TILE]
+RW A <- BLOCK merge_non_diagonal_blocks(actual_i, block, level) [type=SMALL_TILE]
+     -> syrk_full(actual_i, level)
+
+BODY
+{
+  int64_t D_dd_nrows = get_dim(block, level, h2_params);
+  int64_t D_dd_ncols = get_dim(block, level, h2_params);
+  double *_D_dd = (double*)BLOCK;
+
+  int64_t D_id_nrows = get_dim(actual_i, level, h2_params);
+  int64_t D_id_ncols = get_dim(block, level, h2_params);
+  double *_D_id = (double*)A;
+
+  CORE_solve_triangular_full(D_id_nrows, D_id_ncols, _D_id,
+                             D_dd_nrows, D_dd_ncols, _D_dd);
+  printf("full trsm: i -> %d block-> %d lvl -> %d\n", actual_i, block, level);
+}
+END
+
+syrk_full(block, level)
+
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 1 .. %{ return pow(2, level)-1; %}
+
+  : parsec_D_non_leaf(block, block, level)
+
+  RW A <- solve_triangular_full(block, 1 .. %{ return h2_params->col_near_list[level].level_block_list[block].length-1; %}, level)
+       -> BLOCK cholesky_full(block, level)
+
+BODY
+{
+}
+END
+
+matmul_full(block, i, level)
+
+level = h2_params->min_level-1 .. h2_params->min_level-1
+block = 2 .. %{ return pow(2, level)-1; %}
+i = 1 .. %{ return h2_params->row_near_list[level].level_block_list[block].length-2; %}
+actual_i = %{ return h2_params->row_near_list[level].level_block_list[block].indices[i]; %}
+
+  : parsec_D_non_leaf(block, )
+
+  READ A <- A solve_triangular_full()
+  READ B <- A solve_triangular_full()
+  RW C <- (block == 0) ? BLOCK merge_non_diagonal_blocks(actual_i, block, level)
+       <- (block != 0) ? C matmul_full(block, actual_i, level)
+       -> (n == k+1) ? C potrf_ztrsm(m, n) : C potrf_zgemm(m, n, k+1)
+
+BODY
+{
+}
+END

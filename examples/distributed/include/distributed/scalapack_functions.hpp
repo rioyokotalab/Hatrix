@@ -1,9 +1,6 @@
 #pragma once
 
-#include "parsec.h"
-
-
-#include <vector>
+#include "distributed/distributed.hpp"
 
 extern "C" {
   /* Cblacs declarations: https://netlib.org/blacs/BLACS/QRef.html */
@@ -130,26 +127,18 @@ extern "C" {
 // row/col. Returns the local FORTRAN-style index. NPROCS is the number of processes
 // in that row or col.
 int indxg2l(int INDXGLOB, int NB, int NPROCS);
-int indxl2g(int indxloc, int nb, int iproc, int isrcproc, int nprocs);
+int indxl2g(int indxloc, int nb, int iproc, int nprocs);
 int indxg2p(int INDXGLOB, int NB, int ISRCPROC, int NPROCS);
-int mpi_rank(int i);
-int mpi_rank(int i, int j);
 
-extern parsec_context_t *parsec;
-extern parsec_taskpool_t *dtd_tp;
-extern int MPIRANK, MPISIZE, MPIGRID[2], MYROW, MYCOL;
-extern int N; // total matrix dimension.
 extern int BLACS_CONTEXT;
 extern int info;
 
 extern int ZERO, ONE, MINUS_ONE;
 extern const char NOTRANS;
 extern const char TRANS;
-extern int DENSE_NBROW, DENSE_NBCOL;
-extern int DENSE_local_rows, DENSE_local_cols;
 
 constexpr int DESC_LEN = 9;
 
-// SCALAPACK data for the large dense matrix used for construction and verification.
-extern double* DENSE_MEM;
-extern std::vector<int> DENSE;
+void
+construct_h2_matrix(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain& domain,
+                    const Hatrix::Args& opts);

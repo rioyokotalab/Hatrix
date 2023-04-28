@@ -1,4 +1,4 @@
-#include "distributed/Particle.hpp"
+#include "Hatrix/classes/Particle.hpp"
 #include <vector>
 #include <iostream>
 

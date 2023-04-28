@@ -79,6 +79,10 @@ else()
   target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} OpenMP::OpenMP_CXX)
 endif()
 
+
+find_package(GSL REQUIRED)    # See below (2)
+target_link_libraries(Hatrix GSL::gsl)
+
 add_subdirectory(examples)
 
 if(${Hatrix_BUILD_TESTS})

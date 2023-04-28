@@ -5,12 +5,27 @@
 #include <random>
 
 #include "Hatrix/Hatrix.h"
-#include "distributed/distributed.hpp"
 
 namespace Hatrix {
+  void
+  Domain::search_tree_for_nodes(const Cell& tree, const int64_t level_index, const int64_t level,
+                                int64_t &pstart, int64_t &pend) const {
+    if (tree.level == level && tree.level_index == level_index) {
+      pstart = tree.start_index;
+      pend = tree.end_index;
+      return;
+    }
+
+    if (tree.cells.size() > 0) {
+      search_tree_for_nodes(tree.cells[0], level_index, level, pstart, pend);
+      search_tree_for_nodes(tree.cells[1], level_index, level, pstart, pend);
+    }
+  }
+
   int64_t
   Domain::cell_size(int64_t level_index, int64_t level) const {
     int64_t pstart, pend;
+
     search_tree_for_nodes(tree, level_index, level, pstart, pend);
 
     return pend - pstart;
@@ -28,10 +43,16 @@ namespace Hatrix {
     file << std::endl;
 
     for (int64_t i = 0; i < N; ++i) {
-      for (int64_t k = 0; k < ndim; ++k) {
-        file << particles[i].coords[k] << ",";
+      if (ndim == 1) {
+        file << particles[i].coords[0] <<  std::endl;
       }
-      file << std::endl;
+      else if (ndim == 2) {
+        file << particles[i].coords[0] << "," << particles[i].coords[1] << std::endl;
+      }
+      else if (ndim == 3) {
+        file << particles[i].coords[0] << "," << particles[i].coords[1]
+             << "," << particles[i].coords[2] << std::endl;
+      }
     }
 
     file.close();
@@ -45,40 +66,39 @@ namespace Hatrix {
   }
 
   void Domain::generate_grid_particles() {
-    int64_t side = ceil(pow(N, 1.0 / ndim)); // size of each size of the grid.
-    int64_t total = side;
-    for (int64_t i = 1; i < ndim; ++i) { total *= side; }
+    std::vector<int64_t> sides(ndim, 0);
+    sides[0] = ceil(pow(N, 1.0 / ndim));
+    int64_t total = sides[0];
+    int64_t temp_N = N;
+    for (int k = 1; k < ndim; ++k) {
+      sides[k] = temp_N / sides[k-1];
+      temp_N = sides[k];
+    }
+    for (int k = 1; k < ndim; ++k) { total += sides[k]; }
+    int64_t extra = N - total;
+    particles.resize(N, Particle(std::vector<double>(ndim), 0));
 
-    int64_t ncoords = ndim * side;
-    std::vector<double> coord(ncoords);
-
-    for (int64_t i = 0; i < side; ++i) {
-      double val = double(i) / side;
-      for (int64_t j = 0; j < ndim; ++j) {
-        coord[j * side + i] = val;
+    if (ndim == 1) {
+      double space_0 = 1.0 / N;
+      for (int64_t i = 0; i < sides[0]; ++i) {
+        std::vector<double> point(ndim);
+        point[0] = i * space_0;
+        particles[i] = Hatrix::Particle(point, 0);
       }
     }
-
-    std::vector<int64_t> pivot(ndim, 0);
-
-    int64_t k = 0;
-    for (int64_t i = 0; i < N; ++i) {
-      std::vector<double> points(ndim);
-      for (k = 0; k < ndim; ++k) {
-        points[k] = coord[pivot[k] + k * side];
-      }
-      particles.push_back(Hatrix::Particle(points, 0));
-
-      k = ndim - 1;
-      pivot[k]++;
-
-      while(pivot[k] == side) {
-        pivot[k] = 0;
-        if (k > 0) {
-          --k;
-          pivot[k]++;
+    else if (ndim == 2) {
+      double space_0 = 1.0 / sides[0], space_1 = 1.0 / sides[1];
+      for (int64_t i = 0; i < sides[0]; ++i) {
+        for (int64_t j = 0; j < sides[1]; ++j) {
+          std::vector<double> point(ndim);
+          point[0] = i * space_0;
+          point[1] = j * space_1;
+          particles[i + j * sides[0]] = Hatrix::Particle(point, 0);
         }
       }
+    }
+    else if (ndim == 3) {
+      abort();
     }
   }
 
@@ -137,6 +157,20 @@ namespace Hatrix {
     file.close();
   }
 
+  void Domain::read_col_file_2d(const std::string& geometry_file) {
+    std::ifstream file;
+    file.open(geometry_file, std::ios::in);
+
+    double x, y;
+
+    for (int64_t line = 0; line < N; ++line) {
+      file >> x >> y;
+      particles.push_back(Hatrix::Particle(x, y));
+    }
+
+    file.close();
+  }
+
   void Domain::orb_split(Cell& cell,
                          const int64_t pstart,
                          const int64_t pend,
@@ -178,8 +212,6 @@ namespace Hatrix {
       return;
     }
 
-    // permute the points along dim using the median as the splitting point.
-    // TODO: is there a way to not sort? try k-th largest element.
     std::sort(particles.begin() + pstart,
               particles.begin() + pend,
               [&](const Particle& lhs, const Particle& rhs) {
@@ -195,36 +227,5 @@ namespace Hatrix {
   void
   Domain::build_tree(const int64_t max_nleaf) {
     orb_split(tree, 0, N, max_nleaf, 0, 0, 0);
-  }
-
-  Cell::Cell() : start_index(-1), end_index(-1), level(-1), radius(-1) {}
-
-  Cell::Cell(std::vector<double> _center, int64_t pstart,
-             int64_t pend, double _radius) :
-    center(_center), start_index(pstart), end_index(pend), radius(_radius) {}
-
-  void
-  Cell::print() const {
-    std::cout << "level: " << level << std::endl;
-    std::cout << "start: " << start_index << " stop: " << end_index
-              << " radius: " << radius
-              << " index: " << level_index
-              << std::endl;
-    for (int i = 0; i < cells.size(); ++i) {
-      cells[i].print();
-    }
-  }
-
-  int64_t
-  Cell::height() const {
-    if (cells.size() > 0) {
-      int64_t left = cells[0].height() + 1;
-      int64_t right = cells[1].height() + 1;
-
-      return (left > right) ? left : right;
-    }
-    else {
-      return 1;
-    }
   }
 }

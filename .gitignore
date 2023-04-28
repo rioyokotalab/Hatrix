@@ -12,3 +12,8 @@ run.sh
 *.data
 *.csv
 .DS_Store
+h2_factorize.c
+h2_factorize.h
+jdf_sources.mk
+a.out
+Dense

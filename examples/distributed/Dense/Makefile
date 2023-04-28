@@ -1,6 +1,6 @@
 TOPSRCDIR = ../../..
 SOURCES :=  $(wildcard *.cpp)
-sublib := libHSS_main.a
+sublib := libDense.a
 
 include $(TOPSRCDIR)/common.mk
 

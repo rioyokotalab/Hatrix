@@ -4,14 +4,20 @@
 #include <set>
 #include <cmath>
 #include <cstring>
+#include <new>
+
+#if !defined(__clang__)
+#include <bits/stdc++.h>
+#else
+#define INT_MAX 2147483647
+#endif
 
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 
-#include "globals.hpp"
-#include "h2_dtd_construction.hpp"
-
 using namespace Hatrix;
+
+const char ALL_GRID = 'A';
 
 double *U_MEM, *U_REAL_MEM;
 int U[9];
@@ -25,7 +31,15 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
   int AY_local_ncols = numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
   int AY[9]; int INFO;
-  double* AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  double* AY_MEM;
+  try {
+    AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate AY_MEM in LEAF of size:  "
+              << (int64_t)AY_local_nrows * (int64_t)AY_local_ncols
+              << " " << exception.what() << std::endl;
+  }
   descinit_(AY, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &AY_local_nrows, &INFO);
 
@@ -34,8 +48,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j <= i; ++j) {
-      if (A.is_admissible.exists(i, j, A.max_level) &&
-          !A.is_admissible(i, j, A.max_level)) {
+      if (exists_and_inadmissible(A, i, j, A.max_level)) {
         if (mpi_rank(i) == MPIRANK) { // row-cyclic process distribution.
           Matrix Aij = generate_p2p_interactions(domain,
                                                  i, j, A.max_level,
@@ -49,20 +62,24 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   double ALPHA = 1.0;
   double BETA = 1.0;
   // Accumulate admissible blocks from the large distributed dense matrix.
-  for (int64_t block = 0; block < nblocks; ++block) {
-    for (int64_t j = 0; j < nblocks; ++j) {
+  for (int64_t block = MYROW; block < nblocks; block += MPIGRID[0]) {
+    int IA = nleaf * block + 1;
+    for (int64_t j = MYCOL; j < nblocks; j += MPIGRID[1]) {
       if (exists_and_inadmissible(A, block, j, A.max_level)) { continue; }
-
-      int IA = nleaf * block + 1;
       int JA = nleaf * j + 1;
 
-      pdgeadd_(&NOTRANS, &nleaf, &nleaf,
-               &ALPHA,
-               DENSE_MEM, &IA, &JA, DENSE.data(),
-               &BETA,
-               AY_MEM, &IA, &ONE, AY);
+      for (int ii = 0; ii < nleaf; ++ii) {
+        for (int jj = 0; jj < nleaf; ++jj) {
+          int AY_local_i = indxg2l(IA + ii, nleaf, MPIGRID[0])-1;
+
+          AY_MEM[AY_local_i + jj * AY_local_nrows] +=
+            opts.kernel(domain.particles[IA + ii - 1].coords,
+                        domain.particles[JA + jj - 1].coords);
+        }
+      }
     }
   }
+
 
   int LWORK; double *WORK;
   const char JOB_U = 'V';
@@ -71,7 +88,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   for (int64_t block = 0; block < nblocks; ++block) {
     // init global S vector for this block.
     double *S_MEM = new double[(int64_t)nleaf]();
-
 
     // SVD workspace query.
     {
@@ -91,7 +107,7 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                WORK, &LWORK,
                &INFO);
 
-      LWORK = WORK[0] + nleaf * (AY_local_nrows + AY_local_ncols + 1) + AY_local_ncols;
+      LWORK = WORK[0] + nleaf * (AY_local_nrows + AY_local_ncols + 1) * nleaf + AY_local_ncols;
       // workspace query throws a weird error so add nleaf*rank.
 
       delete[] WORK;
@@ -131,6 +147,9 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     int U_LOCAL[9];
     int U_LOCAL_nrows = nleaf, U_LOCAL_ncols = opts.max_rank;
     Matrix U_LOCAL_MEM(U_LOCAL_nrows, U_LOCAL_ncols);
+    if (IMAP[0] != MPIRANK) {
+      U_LOCAL_CONTEXT = -1;
+    }
     descset_(U_LOCAL,
              &U_LOCAL_nrows, &U_LOCAL_ncols, &U_LOCAL_nrows, &U_LOCAL_ncols,
              &U_LOCAL_PROW, &U_LOCAL_PCOL, &U_LOCAL_CONTEXT, &U_LOCAL_nrows, &INFO);
@@ -160,9 +179,11 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     }
   }
 
+  delete[] AY_MEM;
+
   // Generate S blocks for the lower triangle
-  for (int64_t i = 0; i < nblocks; ++i) {
-    for (int64_t j = 0; j < i; ++j) {
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < i; ++j) {
       if (exists_and_admissible(A, i, j, A.max_level)) {
         // send U(j) to where S(i,j) exists.
         if (mpi_rank(j) == MPIRANK) {
@@ -172,6 +193,10 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                     j, MPI_COMM_WORLD, &request);
         }
 
+      }
+    }
+    for (int j = 0; j < i; ++j) {
+      if (exists_and_admissible(A, i, j, A.max_level)) {
         if (mpi_rank(i) == MPIRANK) {
           MPI_Status status;
           Matrix Uj(opts.nleaf, opts.max_rank);
@@ -187,8 +212,6 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       }
     }
   }
-
-  delete[] AY_MEM;
 }
 
 static bool
@@ -197,7 +220,8 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
   bool has_admis = false;
 
   for (int64_t i = 0; i < pow(2, level); ++i) {
-    if (!A.is_admissible.exists(row, i, level) || exists_and_admissible(A, row, i, level)) {
+    if (!A.is_admissible.exists(row, i, level) ||
+        exists_and_admissible(A, row, i, level)) {
       has_admis = true;
       break;
     }
@@ -207,57 +231,88 @@ row_has_admissible_blocks(const SymmetricSharedBasisMatrix& A, int64_t row,
 }
 
 void
-generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts,
+generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
+                           const Domain& domain, const Args& opts,
                            int64_t level) {
+  if (!MPIRANK) {
+    std::cout << "generate transfer matrices level=" << level << std::endl;
+  }
   int INFO;
+  int N = opts.N;
   int64_t child_level = level + 1;
   int64_t nblocks = pow(2, level);
   int64_t child_nblocks = pow(2, child_level);
   int rank = opts.max_rank;
   int level_block_size = N / nblocks;
   // 1. Generate blocks from the current admissible blocks for this level.
-  int N = opts.N;
   int nleaf = opts.nleaf;
 
-  int AY_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  int AY_local_ncols = fmax(numroc_(&level_block_size, &nleaf, &MYCOL, &ZERO,
-                                    &ONE), 1);
+  int AY_local_nrows = fmax(numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int AY_local_ncols = fmax(numroc_(&level_block_size, &level_block_size, &MYCOL, &ZERO,
+                                    &MPIGRID[1]), 1);
   int AY[9];
-  double *AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
-  descinit_(AY, &N, &level_block_size, &nleaf, &nleaf,
+  double *AY_MEM;
+  try {
+    AY_MEM = new double[(int64_t)AY_local_nrows * (int64_t)AY_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate AY_MEM of size:  "
+              << (int64_t)AY_local_nrows * (int64_t)AY_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
+  descinit_(AY, &N, &level_block_size, &nleaf, &level_block_size,
             &ZERO, &ZERO, &BLACS_CONTEXT, &AY_local_nrows, &INFO);
 
   // Allocate temporary AY matrix for accumulation of admissible blocks at this level.
   double ALPHA = 1.0;
   double BETA = 1.0;
-  for (int64_t block = 0; block < nblocks; ++block) {
-    for (int64_t j = 0; j < nblocks; ++j) {
-      if (exists_and_inadmissible(A, block, j, level)) { continue; }
+  int64_t leaf_nblocks = N / nleaf;
+  for (int64_t block = MYROW; block < leaf_nblocks; block += MPIGRID[0]) {
+    int64_t level_block = block / (leaf_nblocks / nblocks);
+    int IA = level_block_size * level_block +
+      (block % (leaf_nblocks / nblocks)) * nleaf + 1;
 
-      int IA = level_block_size * block + 1;
+    for (int64_t j = MYCOL; j < nblocks; j += MPIGRID[1]) {
+      if (exists_and_inadmissible(A, level_block, j, level)) { continue; }
       int JA = level_block_size * j + 1;
 
-      pdgeadd_(&NOTRANS, &level_block_size, &level_block_size,
-               &ALPHA,
-               DENSE_MEM, &IA, &JA, DENSE.data(),
-               &BETA,
-               AY_MEM, &IA, &ONE, AY);
+      for (int ii = 0; ii < nleaf; ++ii) {
+        for (int jj = 0; jj < level_block_size; ++jj) {
+          int AY_local_i = indxg2l(IA + ii, nleaf, MPIGRID[0])-1;
+          AY_MEM[AY_local_i + jj * AY_local_nrows] +=
+            opts.kernel(domain.particles[IA + ii - 1].coords,
+                        domain.particles[JA + jj - 1].coords);
+        }
+      }
     }
   }
 
+  MPI_Barrier(MPI_COMM_WORLD);
+
+
   // Allocate a temporary global matrix to store the product of the real basis with the
   // summation of the admissible blocks.
-
   int block_nrows = rank * 2;
   int TEMP_nrows = nblocks * block_nrows;
-  int TEMP_local_nrows = numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
-  int TEMP_local_ncols = fmax(numroc_(&level_block_size, &nleaf,
-                                      &MYCOL, &ZERO, &ONE), 1);
+  int TEMP_local_nrows =
+    fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int TEMP_local_ncols = fmax(numroc_(&level_block_size, &rank,
+                                      &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int TEMP[9];
   // Use rank as NB cuz it throws a 806 error for an unknown reason.
   descinit_(TEMP, &TEMP_nrows, &level_block_size, &rank, &rank, &ZERO, &ZERO,
-            &BLACS_CONTEXT, &TEMP_local_nrows, &INFO);
-  double *TEMP_MEM = new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+             &BLACS_CONTEXT, &TEMP_local_nrows, &INFO);
+  double *TEMP_MEM;
+  try {
+    TEMP_MEM = new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate TEMP_MEM of size : "
+              << (int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
   int child_block_size = N / child_nblocks;
 
   // 2. Apply the real basis U to the summation of the admissible blocks.
@@ -276,8 +331,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     int JA = 1;
     int ITEMP = c1 * rank + 1;
     int JTEMP = 1;
+
+    // std::cout << "FIRST IU: " << IU << " JU: " << JU
+    //           << " IA: " << IA << " JA: " << JA
+    //           << " ITEMP: " << ITEMP << " JTEMP: " << JTEMP
+    //           << std::endl;
     pdgemm_(&TRANS, &NOTRANS,
-            &rank, &child_block_size, &child_block_size,
+            &rank, &level_block_size, &child_block_size,
             &ALPHA,
             U_MEM, &IU, &JU, U,
             AY_MEM, &IA, &JA, AY,
@@ -291,24 +351,44 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
     JA = 1;
     ITEMP = c2 * rank + 1;
     JTEMP = 1;
+
     pdgemm_(&TRANS, &NOTRANS,
-            &rank, &child_block_size, &child_block_size,
+            &rank, &level_block_size, &child_block_size,
             &ALPHA,
             U_MEM, &IU, &JU, U,
             AY_MEM, &IA, &JA, AY,
             &BETA,
             TEMP_MEM, &ITEMP, &JTEMP, TEMP);
   }
+
+  if (!MPIRANK) {
+    // std::cout << "\t Apply real basis U.\n" << std::endl;
+  }
+
+  delete[] AY_MEM;
+
   // 3. Calcuate the SVD of the applied block to generate the transfer matrix.
-  // Allocate a global matrix to store the transfer matrices. The transfer matrices for the
-  // entire level are stacked by row in this global matrix.
-  int UTRANSFER_local_nrows = numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
-  int UTRANSFER_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &ONE), 1);
+  // Allocate a global matrix to store the transfer matrices.
+  // The transfer matrices for the entire level are stacked by row in this global matrix.
+  int UTRANSFER_local_nrows =
+    fmax(numroc_(&TEMP_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int UTRANSFER_local_ncols = fmax(numroc_(&level_block_size,
+                                           &nleaf, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int UTRANSFER[9];
-  descinit_(UTRANSFER, &TEMP_nrows, &rank, &rank, &rank, &ZERO, &ZERO,
+
+  descinit_(UTRANSFER, &TEMP_nrows, &level_block_size, &rank, &nleaf, &ZERO, &ZERO,
             &BLACS_CONTEXT, &UTRANSFER_local_nrows, &INFO);
-  double *UTRANSFER_MEM =
-    new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+  double *UTRANSFER_MEM;
+  try {
+    UTRANSFER_MEM =
+      new double[(int64_t)TEMP_local_nrows * (int64_t)TEMP_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate UTRANSFER_MEM of size: "
+              << (int64_t)AY_local_nrows * (int64_t)AY_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
 
   int LWORK; double *WORK;
 
@@ -316,7 +396,15 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   const char JOB_VT = 'N';
 
   for (int64_t block = 0; block < nblocks; ++block) {
-    double *S_MEM = new double[(int64_t)rank]();
+    double *S_MEM;
+    try {
+      S_MEM = new double[(int64_t)level_block_size]();
+    }
+    catch (std::bad_alloc & exception) {
+      std::cerr << "tried to allocate S_MEM of size:  "
+                << (int64_t)level_block_size
+                << " " << exception.what() << std::endl;
+    }
     // SVD workspace query.
     {
       LWORK = -1;
@@ -328,14 +416,17 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       WORK = new double[1]();
 
       pdgesvd_(&JOB_U, &JOB_VT,
-               &block_nrows, &rank,
+               &block_nrows, &level_block_size,
                TEMP_MEM, &ITEMP, &JTEMP, TEMP,
                S_MEM,
                UTRANSFER_MEM, &IU, &JU, UTRANSFER,
                NULL, NULL, NULL, NULL,
                WORK, &LWORK,
                &INFO);
-      LWORK = WORK[0] + nleaf * (TEMP_local_nrows + TEMP_local_ncols + 1) + TEMP_local_ncols;
+      int64_t lwork_space = (int64_t)WORK[0] +
+        nleaf * ((int64_t)TEMP_local_nrows + TEMP_local_ncols + 1) *
+        (int64_t)nleaf + (int64_t)TEMP_local_ncols;
+      LWORK = (int)std::fmin(INT_MAX, lwork_space);
       delete[] WORK;
     }
 
@@ -345,10 +436,17 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
       int JTEMP = 1;
       int IU = block * block_nrows + 1;
       int JU = 1;
-      WORK = new double[(int64_t)LWORK]();
+      try {
+        WORK = new double[(int64_t)LWORK]();
+      }
+      catch (std::bad_alloc & exception) {
+        std::cerr << "tried to allocate WORK in TRANSFER of size:  "
+                  << (int64_t)LWORK
+                  << " " << exception.what() << std::endl;
+      }
 
       pdgesvd_(&JOB_U, &JOB_VT,
-               &block_nrows, &rank,
+               &block_nrows, &level_block_size,
                TEMP_MEM, &ITEMP, &JTEMP, TEMP,
                S_MEM,
                UTRANSFER_MEM, &IU, &JU, UTRANSFER,
@@ -409,13 +507,20 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
   // 4. Generate the real basis at this level from the transfer matrices and the real basis one
   // level below.
   int U_REAL_local_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  int U_REAL_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &ONE), 1);
+  int U_REAL_local_ncols = fmax(numroc_(&rank, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int U_REAL[9];
-  U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols]();
+  try {
+    U_REAL_MEM = new double[(int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate UREAL_MEM of size: "
+              << (int64_t)U_REAL_local_nrows * (int64_t)U_REAL_local_ncols
+              << " " << exception.what() << std::endl;
+  }
   descinit_(U_REAL, &N, &rank, &nleaf, &rank, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_REAL_local_nrows, &INFO);
 
-  for (int64_t block = 0; block < 1; ++block) {
+  for (int64_t block = 0; block < nblocks; ++block) {
     // Apply the child basis to the upper part of the transfer matrix to generate the
     // upper part of the real basis.
     int64_t c1 = block * 2;
@@ -456,8 +561,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
               &BETA,
               U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
     }
+
+    if (!MPIRANK) {
+      // std::cout << "\t Generate transfer matrix block= " << block << std::endl;
+    }
   }
   // Free the real basis of the child level and set the U_REAL to real basis.
+  delete[] UTRANSFER_MEM;
   delete[] U_MEM;
   U_MEM = U_REAL_MEM;
   memcpy(U, U_REAL, sizeof(int) * 9);
@@ -466,37 +576,91 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
   // Allocate a (nblocks * max_rank) ** 2 global matrix for temporary storage of the S blocks.
   int S_BLOCKS_nrows = nblocks * rank;
-  int S_BLOCKS_local_nrows = numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]);
-  int S_BLOCKS_local_ncols = numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]);
+  int S_BLOCKS_local_nrows =
+    fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int S_BLOCKS_local_ncols =
+    fmax(numroc_(&S_BLOCKS_nrows, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int S_BLOCKS[9];
-  double *S_BLOCKS_MEM = new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
+  double *S_BLOCKS_MEM;
+  try {
+  S_BLOCKS_MEM =
+    new double[(int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate S_BLOCKS_MEM of size: "
+              << (int64_t)S_BLOCKS_local_nrows * (int64_t)S_BLOCKS_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
   descinit_(S_BLOCKS, &S_BLOCKS_nrows, &S_BLOCKS_nrows, &rank, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &S_BLOCKS_local_nrows, &INFO);
 
-  // multiply the 0th real basis
-
   // Allocate a temporary block for storing the intermediate result of the product of the
   // real basis and admissible dense matrix.
-  int TEMP_PRODUCT_local_nrows = fmax(numroc_(&rank, &rank, &MYROW, &ZERO, &ONE), 1);
-  int TEMP_PRODUCT_local_ncols = numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  int TEMP_PRODUCT_local_nrows = fmax(numroc_(&rank, &rank, &MYROW, &ZERO, &MPIGRID[0]), 1);
+  int TEMP_PRODUCT_local_ncols = fmax(numroc_(&N, &rank, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   int TEMP_PRODUCT[9];
-  double *TEMP_PRODUCT_MEM =
-    new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
-  descset_(TEMP_PRODUCT, &rank, &N, &rank, &nleaf,
+
+  double *TEMP_PRODUCT_MEM;
+  try {
+    TEMP_PRODUCT_MEM =
+      new double[(int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate TEMP_PRODUCT_MEM of size: "
+              << (int64_t)TEMP_PRODUCT_local_nrows * (int64_t)TEMP_PRODUCT_local_ncols
+              << " " << exception.what() << std::endl;
+  }
+
+  descinit_(TEMP_PRODUCT, &rank, &N, &rank, &rank,
             &ZERO, &ZERO, &BLACS_CONTEXT, &TEMP_PRODUCT_local_nrows, &INFO);
 
+  // Allocate dense block.
+  int DENSE_local_rows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
+  int DENSE_local_cols = numroc_(&N, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]);
+  std::vector<int> DENSE(DESC_LEN);
+
+  descinit_(DENSE.data(), &N, &N, &nleaf, &nleaf, &ZERO, &ZERO,
+            &BLACS_CONTEXT, &DENSE_local_rows, &info);
+  double* DENSE_MEM;
+  try {
+    DENSE_MEM = new double[int64_t(DENSE_local_rows) * int64_t(DENSE_local_cols)]();
+  }
+  catch (std::bad_alloc & exception) {
+    std::cerr << "tried to allocate DENSE_MEM TRANSFER of size: "
+              << (int64_t)DENSE_local_rows * (int64_t)DENSE_local_cols
+              << " " << exception.what() << std::endl;
+  }
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < DENSE_local_rows; ++i) {
+#pragma omp parallel for
+    for (int64_t j = 0; j < DENSE_local_cols; ++j) {
+      int g_row = indxl2g(i + 1, nleaf, MYROW, MPIGRID[0]) - 1;
+      int g_col = indxl2g(j + 1, nleaf, MYCOL, MPIGRID[1]) - 1;
+
+      DENSE_MEM[i + j * DENSE_local_rows] =
+        opts.kernel(domain.particles[g_row].coords,
+                    domain.particles[g_col].coords);
+    }
+  }
+
+  if (!MPIRANK) {
+    // std::cout << "\t Done DENSE_MEM generation." << std::endl;
+  }
+
   for (int64_t i = 0; i < nblocks; ++i) {
+    int ITEMP_PRODUCT = 1;
+    int IU = i * level_block_size + 1;
+    int JU = 1;
+    int IDENSE = i * level_block_size + 1;
+
     for (int64_t j = 0; j < i; ++j) {
       if (exists_and_admissible(A, i, j, level)) {
         // Multiply the real basis with the admissible block and store it in a temporary matrix.
-        int IU = i * level_block_size + 1;
-        int JU = 1;
-
-        int IDENSE = i * level_block_size + 1;
         int JDENSE = j * level_block_size + 1;
-
-        int ITEMP_PRODUCT = 1;
         int JTEMP_PRODUCT = j * level_block_size + 1;
+
         pdgemm_(&TRANS, &NOTRANS,
                 &rank, &level_block_size, &level_block_size,
                 &ALPHA,
@@ -506,7 +670,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                 TEMP_PRODUCT_MEM, &ITEMP_PRODUCT, &JTEMP_PRODUCT, TEMP_PRODUCT);
 
         IU = j * level_block_size + 1;
-        JU = 1;
 
         int IS_BLOCKS = i * rank + 1;
         int JS_BLOCKS = j * rank + 1;
@@ -518,9 +681,16 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
                 U_MEM, &IU, &JU, U,
                 &BETA,
                 S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
+
+        if (!MPIRANK) {
+          // std::cout << "\t Done TEMP_PRODUCT : " << i << " " << j << std::endl;
+        }
       }
     }
   }
+
+  delete[] TEMP_PRODUCT_MEM;
+  delete[] DENSE_MEM;
 
   // Copy the S blocks to the H2 matrix data structure.
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -533,15 +703,21 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
         int S_LOCAL_PNROWS, S_LOCAL_PNCOLS, S_LOCAL_PROW, S_LOCAL_PCOL;
         // specify the rank from the global grid for the local grid.
         IMAP[0] = mpi_rank(i);
+
         Cblacs_get(-1, 0, &S_LOCAL_CONTEXT);                    // init the new CBLACS context.
         Cblacs_gridmap(&S_LOCAL_CONTEXT, IMAP, ONE, ONE, ONE);  // init a 1x1 process grid.
         Cblacs_gridinfo(S_LOCAL_CONTEXT,                       // init grid params from the context.
                         &S_LOCAL_PNROWS, &S_LOCAL_PNCOLS, &S_LOCAL_PROW, &S_LOCAL_PCOL);
 
-        // Store the info for the S block to be copied into in S_LOCAL.
         int S_LOCAL[9];
         int S_LOCAL_nrows = opts.max_rank, S_LOCAL_ncols = opts.max_rank;
         Matrix S_LOCAL_MEM(S_LOCAL_nrows, S_LOCAL_ncols);
+
+        // Store the info for the S block to be copied into in S_LOCAL.
+        if (IMAP[0] != MPIRANK) {
+          S_LOCAL_CONTEXT=-1;
+          // processes that are not part of this context set the local context to -1.
+        }
         descset_(S_LOCAL,
                  &S_LOCAL_nrows, &S_LOCAL_ncols, &S_LOCAL_nrows, &S_LOCAL_ncols,
                  &S_LOCAL_PROW, &S_LOCAL_PCOL, &S_LOCAL_CONTEXT, &S_LOCAL_nrows, &INFO);
@@ -555,33 +731,37 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Domain& domain, 
 
         if (mpi_rank(i) == MPIRANK) {
           A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
+          Cblacs_gridexit(S_LOCAL_CONTEXT);
         }
 
-        if (IMAP[0] == MPIRANK) {
-          Cblacs_gridexit(S_LOCAL_CONTEXT);
+        if (!MPIRANK) {
+          // std::cout << "\t Done S_LOCAL : " << i << " " << j << std::endl;
         }
       }
     }
   }
 
   delete[] S_BLOCKS_MEM;
-  delete[] TEMP_PRODUCT_MEM;
-  delete[] UTRANSFER_MEM;
   delete[] TEMP_MEM;
-  delete[] AY_MEM;
 }
 
 void
-construct_h2_matrix_dtd(SymmetricSharedBasisMatrix& A, const Domain& domain, const Args& opts) {
+construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
+                    const Args& opts) {
   // init global U matrix
   int nleaf = opts.nleaf; int N = opts.N; int INFO;
   int U_nrows = numroc_(&N, &nleaf, &MYROW, &ZERO, &MPIGRID[0]);
-  int U_ncols = fmax(numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &ONE), 1);
+  int U_ncols = fmax(numroc_(&nleaf, &nleaf, &MYCOL, &ZERO, &MPIGRID[1]), 1);
   U_MEM = new double[(int64_t)U_nrows * (int64_t)U_ncols]();
   descinit_(U, &N, &nleaf, &nleaf, &nleaf, &ZERO, &ZERO, &BLACS_CONTEXT,
             &U_nrows, &INFO);
 
+
   generate_leaf_nodes(A, domain, opts);
+
+  if (!MPIRANK) {
+    // std::cout << "FINISH LEAF NODE\n";
+  }
 
   for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
     generate_transfer_matrices(A, domain, opts, level);

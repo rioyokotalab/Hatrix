@@ -7,6 +7,10 @@
 #include "math.h"
 #include "string.h"
 #include "inttypes.h"
+#include "omp.h"
+#include <vector>
+#include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_sf_bessel.h>
 
 #ifdef USE_MKL
 #include "mkl.h"
@@ -19,7 +23,8 @@ struct Body { double X[3], B; };
 struct Matrix { double* A; int64_t M, N; };
 struct Cell { int64_t Child, Body[2], Level, Procs[2]; double R[3], C[3]; };
 struct CSC { int64_t M, N, *ColIndex, *RowIndex; };
-struct CellComm { struct CSC Comms; int64_t Proc[3], *ProcRootI, *ProcBoxes, *ProcBoxesEnd; MPI_Comm Comm_share, Comm_merge, *Comm_box; };
+struct CellComm { struct CSC Comms; int64_t Proc[3], *ProcRootI, *ProcBoxes, *ProcBoxesEnd;
+  MPI_Comm Comm_share, Comm_merge, *Comm_box; };
 struct Base { int64_t Ulen, *Lchild, *Dims, *DimsLr, *Offsets, *Multipoles; struct Matrix *Uo, *Uc, *R; };
 struct Node { int64_t lenA, lenS; struct Matrix *A, *S, *A_cc, *A_oc, *A_oo; };
 struct RightHandSides { int64_t Xlen; struct Matrix *X, *XcM, *XoL, *B; };
@@ -107,27 +112,60 @@ void getCommTime(double* cmtime) {
 #endif
 }
 
-double _singularity = 1.e-8;
+double _singularity = 1.e-9;
 double _alpha = 1.;
-
-void laplace3d(double* r2) {
-  double _r2 = *r2;
-  double r = sqrt(_r2) + _singularity;
-  *r2 = 1. / r;
+void set_yukawa_constants(double singularity, double alpha) {
+  _singularity = singularity;
+  _alpha = alpha;
 }
 
-void yukawa3d(double* r2) {
+void yukawa(double* r2) {
   double _r2 = *r2;
   double r = sqrt(_r2) + _singularity;
   *r2 = exp(_alpha * -r) / r;
 }
 
-void set_kernel_constants(double singularity, double alpha) {
-  _singularity = singularity;
-  _alpha = alpha;
+double _sigma = 1e-2;
+double _nu = 1;
+double _smoothness = 0.9;
+void set_matern_constants(double sigma, double nu, double smoothness) {
+  _sigma = sigma;
+  _nu = nu;
+  _smoothness = smoothness;
 }
 
-void gen_matrix(void(*ef)(double*), int64_t m, int64_t n, const struct Body* bi, const struct Body* bj, double Aij[], const int64_t sel_i[], const int64_t sel_j[]) {
+void gsl_matern(double *r2) {
+  double expr = 0.0;
+  double con = 0.0;
+  double sigma_square = _sigma*_sigma;
+  double dist = sqrt(*r2);
+
+  con = pow(2, (_smoothness - 1)) * gsl_sf_gamma(_smoothness);
+  con = 1.0 / con;
+  con = sigma_square * con;
+
+  if (dist != 0) {
+    expr = dist / _nu;
+    *r2 =  con * pow(expr, _smoothness) * gsl_sf_bessel_Knu(_smoothness, expr);
+  }
+  else {
+    *r2 = sigma_square;
+  }
+}
+
+double _eta = 1.e-9;
+void set_laplace_constants(double eta) {
+  _eta = eta;
+}
+
+void laplace(double* r2) {
+  double _r2 = *r2;
+  double r = sqrt(_r2) + _eta;
+  *r2 = 1. / r;
+}
+
+void gen_matrix(void(*ef)(double*), int64_t m, int64_t n,
+                const struct Body* bi, const struct Body* bj, double Aij[], const int64_t sel_i[], const int64_t sel_j[]) {
   for (int64_t i = 0; i < m * n; i++) {
     int64_t x = i / m;
     int64_t bx = sel_j == NULL ? x : sel_j[x];
@@ -158,6 +196,22 @@ void uniform_unit_cube(struct Body* bodies, int64_t nbodies, int64_t dim, unsign
     bodies[i].X[0] = r0;
     bodies[i].X[1] = r1;
     bodies[i].X[2] = r2;
+  }
+}
+
+void uniform_unit_2d_grid(struct Body* bodies, int64_t nbodies) {
+  int64_t side = ceil(pow(nbodies, 1. / 2.)); // size of each size of the grid.
+  double step = 1. / side; // interval distance
+
+  for (int64_t i = 0; i < side; ++i) {
+    for (int64_t j = 0; j < side; ++j) {
+      int64_t sum = i + side * j;
+      if (sum < nbodies) {
+        bodies[sum].X[0] = i * step;
+        bodies[sum].X[1] = j * step;
+        bodies[sum].X[2] = 0;
+      }
+    }
   }
 }
 
@@ -1309,8 +1363,10 @@ void dist_double(double* arr[], const struct CellComm* comm) {
 #endif
 }
 
-void buildBasis(void(*ef)(double*), struct Base basis[], int64_t ncells, struct Cell* cells, const struct CSC* rel_near, int64_t levels,
-const struct CellComm* comm, const struct Body* bodies, int64_t nbodies, double epi, int64_t mrank, int64_t sp_pts) {
+void buildBasis(void(*ef)(double*), struct Base basis[], int64_t ncells,
+                struct Cell* cells, const struct CSC* rel_near, int64_t levels,
+                const struct CellComm* comm, const struct Body* bodies, int64_t nbodies,
+                double epi, int64_t mrank, int64_t sp_pts) {
 
   for (int64_t l = levels; l >= 0; l--) {
     int64_t xlen = 0;
@@ -2043,15 +2099,26 @@ int main(int argc, char* argv[]) {
   double epi = argc > 4 ? atof(argv[4]) : 1.e-10;
   int64_t rank_max = argc > 5 ? atol(argv[5]) : 100;
   int64_t sp_pts = argc > 6 ? atol(argv[6]) : 2000;
-  const char* fname = argc > 7 ? argv[7] : NULL;
+  int64_t kernel = argc > 7 ? atol(argv[7]) : 0;
+  const char* fname = argc > 8 ? argv[8] : NULL;
 
   int64_t levels = (int64_t)log2((double)Nbody / leaf_size);
   int64_t Nleaf = (int64_t)1 << levels;
   int64_t ncells = Nleaf + Nleaf - 1;
 
-  //void(*ef)(double*) = laplace3d;
-  void(*ef)(double*) = yukawa3d;
-  set_kernel_constants(1.e-3 / Nbody, 1.);
+  void(*ef)(double*);
+  if (kernel == 0) {
+    set_laplace_constants(1.e-9);
+    ef = laplace;
+  }
+  if (kernel == 1) {
+    set_matern_constants(1e-2, 0.5, 0.1);
+    ef = gsl_matern;
+  }
+  else if (kernel == 2) {
+    set_yukawa_constants(1.e-9, 1.);
+    ef = yukawa;
+  }
 
   struct Body* body = (struct Body*)malloc(sizeof(struct Body) * Nbody);
   struct Cell* cell = (struct Cell*)malloc(sizeof(struct Cell) * ncells);
@@ -2064,9 +2131,7 @@ int main(int argc, char* argv[]) {
   struct RightHandSides* rhs = (struct RightHandSides*)malloc(sizeof(struct RightHandSides) * (levels + 1));
 
   if (fname == NULL) {
-    mesh_unit_sphere(body, Nbody);
-    //mesh_unit_cube(body, Nbody);
-    //uniform_unit_cube(body, Nbody, 3, 1234);
+    uniform_unit_2d_grid(body, Nbody);
     buildTree(&ncells, cell, body, Nbody, levels);
   }
   else {
@@ -2139,18 +2204,24 @@ int main(int argc, char* argv[]) {
   double cm_time;
   getCommTime(&cm_time);
 
-  if (mpi_rank == 0)
-    printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
-      "Factorize: %lf s. COMM: %lf s.\n"
-      "Solution: %lf s. COMM: %lf s.\n"
-      "Basis Memory: %lf GiB.\n"
-      "Matrix Memory: %lf GiB.\n"
-      "Vector Memory: %lf GiB.\n"
-      "Err: %e\n"
-      "Program: %lf s. COMM: %lf s.\n",
-      (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
-      construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
-      (double)mem_basis * 1.e-9, (double)mem_A * 1.e-9, (double)mem_X * 1.e-9, err, prog_time, cm_time);
+  if (mpi_rank == 0) {
+    printf("LORASP: %d,%d,%lf,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%e,%lld,%lld,%d\n",
+           (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
+           construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
+           err,rank_max,kernel,omp_get_max_threads());
+
+    // printf("LORASP: %d,%d,%lf,%d,%d\nConstruct: %lf s. COMM: %lf s.\n"
+    //   "Factorize: %lf s. COMM: %lf s.\n"
+    //   "Solution: %lf s. COMM: %lf s.\n"
+    //   "Basis Memory: %lf GiB.\n"
+    //   "Matrix Memory: %lf GiB.\n"
+    //   "Vector Memory: %lf GiB.\n"
+    //   "Err: %e\n"
+    //   "Program: %lf s. COMM: %lf s.\n",
+    //   (int)Nbody, (int)(Nbody / Nleaf), theta, 3, (int)mpi_size,
+    //   construct_time, construct_comm_time, factor_time, factor_comm_time, solve_time, solve_comm_time,
+    //   (double)mem_basis * 1.e-9, (double)mem_A * 1.e-9, (double)mem_X * 1.e-9, err, prog_time, cm_time);
+  }
 
   for (int64_t i = 0; i <= levels; i++) {
     csc_free(&rels_far[i]);

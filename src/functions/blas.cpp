@@ -13,6 +13,14 @@
 
 namespace Hatrix {
 
+void swap_row(Matrix& A, int64_t r1, int64_t r2) {
+  cblas_dswap(A.rows, &A(r1, 0), A.stride, &A(r2, 0), A.stride);
+}
+
+void swap_col(Matrix& A, int64_t c1, int64_t c2) {
+  cblas_dswap(A.cols, &A(0, c1), 1, &A(0, c2), 1);
+}
+
 void
 array_copy(const double* from, double* to, int64_t size) {
   cblas_dcopy(size, from, 1, to, 1);

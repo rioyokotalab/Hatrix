@@ -46,10 +46,25 @@ generate_rhs_vector(Hatrix::Args& opts) {
   return x;
 }
 
+static double cond_svd(const Matrix& A) {
+  Matrix copy(A, true);
+  Matrix _U(A, true), _S(A, true), _V(A, true);
+  double error;
+
+  svd(copy, _U, _S, _V);
+
+  return _S(0,0) / _S(_S.rows-1, _S.cols-1);
+}
+
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
+  long long int fp_ops;
+  int64_t dense_blocks;
+  double construct_time, matvec_time, factor_time,
+    solve_time, solve_error, construct_error;
+  int64_t construct_max_rank, construct_average_rank,
+    post_factor_max_rank, post_factor_average_rank;
 
-  std::cout << "start args.";
   Args opts(argc, argv);
 
   auto start_domain = std::chrono::system_clock::now();
@@ -60,28 +75,22 @@ int main(int argc, char* argv[]) {
   else if (opts.kind_of_geometry == CIRCULAR) {
     domain.generate_circular_particles(0, opts.N);
   }
-  else if (opts.kind_of_geometry == COL_FILE_3D) {
+  else if (opts.kind_of_geometry == COL_FILE && opts.ndim == 3) {
     domain.read_col_file_3d(opts.geometry_file);
   }
+  else if (opts.kind_of_geometry == COL_FILE && opts.ndim == 2) {
+    domain.read_col_file_2d(opts.geometry_file);
+  }
+
   domain.build_tree(opts.nleaf);
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
   Matrix b, h2_solution, x_regen;
-  double construct_time, matvec_time, factor_time, solve_time;
-  int64_t construct_max_rank, construct_average_rank,
-    post_factor_max_rank, post_factor_average_rank;
+  Matrix x = Hatrix::generate_random_matrix(opts.N, 1);
 
-  std::mt19937 gen(0);
-  std::uniform_real_distribution<double> dist(0, 1);
-  Matrix x(opts.N, 1);
-  for (int64_t i = 0; i < opts.N; ++i) {
-    x(i, 0) = dist(gen);
-  }
-
-  long long int fp_ops;
-  int64_t dense_blocks;
+  Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
 
   if (opts.is_symmetric) {
     auto begin_construct = std::chrono::system_clock::now();
@@ -94,7 +103,6 @@ int main(int argc, char* argv[]) {
     }
     A.print_structure();
 
-
     construct_h2_matrix_miro(A, domain, opts);
     auto stop_construct = std::chrono::system_clock::now();
     construct_time = std::chrono::duration_cast<
@@ -103,7 +111,6 @@ int main(int argc, char* argv[]) {
     construct_max_rank = A.max_rank();
     construct_average_rank = A.average_rank();
     dense_blocks = A.leaf_dense_blocks();
-
 
     auto begin_matvec = std::chrono::system_clock::now();
     b = matmul(A, x);
@@ -122,8 +129,6 @@ int main(int argc, char* argv[]) {
 
     auto begin_solve = std::chrono::system_clock::now();
     h2_solution = solve(A, b);
-    // x_regen = matmul(A_orig, h2_solution);
-
     auto stop_solve = std::chrono::system_clock::now();
     solve_time = std::chrono::duration_cast<
       std::chrono::milliseconds>(stop_solve - begin_solve).count();
@@ -134,21 +139,15 @@ int main(int argc, char* argv[]) {
   }
 
   // ||x - A * (A^-1 * x)|| / ||x||
-  double solve_error = Hatrix::norm(h2_solution - x) / opts.N;
-
-  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  // Matrix dense_solution = cholesky_solve(Adense, b, Hatrix::Lower);
-  // double solve_error = Hatrix::norm(dense_solution - h2_solution) / opts.N;
-
-  // Matrix Adense = generate_p2p_matrix(domain, opts.kernel);
-  // Matrix bdense = matmul(Adense, x);
-  // double construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);
-  double construct_error = 0;
+  auto diff = h2_solution - x;
+  solve_error = Hatrix::norm(diff) / Hatrix::norm(x);
+  Matrix bdense = matmul(Adense, x);
+  construct_error = Hatrix::norm(bdense - b) / Hatrix::norm(b);
 
   double h2_norm = Hatrix::norm(h2_solution);
   double x_norm = Hatrix::norm(x);
-
-  std::cout << "x: " << x_norm << " h2 norm: "<< h2_norm << std::endl;
+  std::cout << "CONST. ERR: " << construct_error
+            << " MAX RANK: " << construct_max_rank << std::endl;
 
   std::cout << "RESULT: " << opts.N << "," << opts.ndim << ","
             << opts.accuracy << ","
@@ -163,36 +162,17 @@ int main(int argc, char* argv[]) {
             << factor_time << ","
             << solve_time << ","
             << construct_error << ","
-            << solve_error << ","
-            << fp_ops << ","
+            << std::scientific << solve_error << ","
+            << std::fixed << fp_ops << ","
             << opts.kind_of_geometry << ","
             << opts.use_nested_basis << ","
             << dense_blocks << ","
-            << opts.perturbation
+            << opts.perturbation << ","
+            << std::scientific << opts.param_1 << std::fixed  << ","
+            << std::scientific << opts.param_2 << std::fixed << ","
+            << opts.param_3 << ","
+            << opts.kernel_verbose << ",1" // fake MPISIZE
             << std::endl;
-
-  // std::cout << "----------------------------\n";
-  // std::cout << "N               : " << opts.N << std::endl;
-  // std::cout << "NDIM            : " << opts.ndim << std::endl;
-  // std::cout << "ACCURACY        : " << opts.accuracy << std::endl;
-  // std::cout << "QR ACCURACY     : " << opts.qr_accuracy << std::endl;
-  // std::cout << "RECOMP. KIND    : " << opts.kind_of_recompression << std::endl;
-  // std::cout << "OPT MAX RANK    : " << opts.max_rank << std::endl;
-  // std::cout << "ADMIS           : " << opts.admis << std::endl;
-  // std::cout << "REAL MAX RANK   : " << construct_max_rank << std::endl;
-  // std::cout << "POST FACT. RANK : " << post_factor_max_rank << std::endl;
-  // std::cout << "NLEAF           : " << opts.nleaf << "\n"
-  //           << "Domain(ms)      : " << domain_time << "\n"
-  //           << "Contruct(ms)    : " << construct_time << "\n"
-  //           << "Factor(ms)      : " << factor_time << "\n"
-  //           << "Solve(ms)       : " << solve_time << "\n"
-  //           << "Solve error     : " << solve_error << "\n"
-  //           << "PAPI_FP_OPS     : " << fp_ops << "\n"
-  //           << "Kind of recomp. : " << opts.kind_of_recompression
-  //           << std::endl;
-  // std::cout << "----------------------------\n";
-
-
 
   Hatrix::Context::finalize();
   return 0;

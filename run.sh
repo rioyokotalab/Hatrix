@@ -1,51 +1,163 @@
 #!/bin/bash
-#YBATCH -r dgx-a100_8
+#YBATCH -r epyc-7502_8
 #SBATCH -N 1
-#SBATCH -J BLR2
-#SBATCH --time=72:00:00
+#SBATCH -J H2_gsl
+#SBATCH --time=24:00:00
 
 source ~/.bashrc
-source /home/sameer.deshmukh/gitrepos/parsec/build/bin/parsec.env.sh
+# source /home/sameer.deshmukh/gitrepos/parsec/build/bin/parsec.env.sh
 
 source /etc/profile.d/modules.sh
 module purge
-module load cuda intel/2022/mkl gcc/10.4 cmake lapack/3.9.0 openmpi/4.0.5
+module load gcc/12.2 cuda intel/2022/mkl cmake intel/2022/mpi
 
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gsl-2.7.1/build/lib
 
-#:/mnt/nfs/packages/x86_64/intel/2022/mpi/2021.6.0/lib/pkgconfig
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib
 
 # export MKL_NUM_THREADS=1
 # export OMP_NUM_THREADS=1
-# export OMP_PLACES=cores
-# export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+export OMP_PROC_BIND=close
 
+# ROOT=$PWD
+# cd examples/distributed/H2_ptg
+# ./compile_jdf.sh
+# cd $ROOT
 
 make -j H2_dtd
-# make -j H2_main
+make -j H2_main
 
-for adm in 1; do
-    nleaf=256
-    ndim=3
-    max_rank=50
+ndim=2
 
-    # gdb -q -iex "set auto-load safe-path /home/user/gdb" -ex run --args
+# ./build/examples/UMV_H2_Nlevel 64 16 0 10 60 1.9 0 2 2 0
 
-    for N in 8192; do
-        mpirun --oversubscribe -n 16 \
-               ./bin/H2_dtd --N $N \
-                      --nleaf $nleaf \
-                      --kernel_func laplace \
-                      --kind_of_geometry grid \
-                      --ndim $ndim \
-                      --max_rank $max_rank \
-                      --accuracy -1 \
-                      --admis $adm \
-                      --admis_kind diagonal \
-                      --construct_algorithm miro \
-                      --add_diag 1e-9  \
-                      --kind_of_recompression 3 \
-                      --use_nested_basis
+# for N in 65536; do
+#     for adm in 0; do
+#         for nleaf in 256; do
+#             for max_rank in 50 150 200; do
+#                     ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func laplace \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy -1 \
+#                               --admis $adm \
+#                               --admis_kind diagonal \
+#                               --construct_algorithm miro \
+#                               --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
+#                               --kind_of_recompression 3 --use_nested_basis
+#             done
+#         done
+
+#         for nleaf in 512; do
+#             for max_rank in 200 300 400; do
+#                     ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func laplace \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy -1 \
+#                               --admis $adm \
+#                               --admis_kind diagonal \
+#                               --construct_algorithm miro \
+#                               --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
+#                               --kind_of_recompression 3 --use_nested_basis
+#             done
+#         done
+#     done
+# done
+
+for N in 1024; do
+    for adm in 0; do
+        # for nleaf in 256; do
+        #     for max_rank in 50 150 200; do
+        #         ./bin/H2_main --N $N \
+        #                       --nleaf $nleaf \
+        #                       --kernel_func gsl_matern \
+        #                       --kind_of_geometry grid \
+        #                       --ndim $ndim \
+        #                       --max_rank $max_rank \
+        #                       --accuracy -1 \
+        #                       --admis $adm \
+        #                       --admis_kind diagonal \
+        #                       --construct_algorithm miro \
+        #                       --param_1 1 --param_2 0.03 --param_3 0.5 \
+        #                       --kind_of_recompression 3 --use_nested_basis
+        #     done
+        # done
+
+        for nleaf in 32; do
+            for max_rank in 25; do
+                echo "--- MAIN ---"
+                ./bin/H2_main --N $N \
+                              --nleaf $nleaf \
+                              --kernel_func laplace \
+                              --kind_of_geometry grid \
+                              --ndim $ndim \
+                              --max_rank $max_rank \
+                              --accuracy -1 \
+                              --admis $adm \
+                              --admis_kind diagonal \
+                              --construct_algorithm miro \
+                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3 --use_nested_basis
+
+                echo "--- DTD ---"
+                mpirun -n 4 ./bin/H2_dtd --N $N \
+                              --nleaf $nleaf \
+                              --kernel_func laplace \
+                              --kind_of_geometry grid \
+                              --ndim $ndim \
+                              --max_rank $max_rank \
+                              --accuracy -1 \
+                              --admis $adm \
+                              --admis_kind diagonal \
+                              --construct_algorithm miro \
+                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
+                              --kind_of_recompression 3 --use_nested_basis
+            done
+        done
     done
 done
+
+# for N in 65536; do
+#     for adm in 0; do
+#         for nleaf in 256; do
+#             for max_rank in 50 150 200; do
+#                 ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func yukawa \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy -1 \
+#                               --admis $adm \
+#                               --admis_kind geometry \
+#                               --construct_algorithm miro \
+#                               --param_1 1 --param_2 1e-9 \
+#                               --kind_of_recompression 3 --use_nested_basis
+#             done
+#         done
+
+#         for nleaf in 512; do
+#             for max_rank in 200 300 400; do
+#                 ./bin/H2_main --N $N \
+#                               --nleaf $nleaf \
+#                               --kernel_func yukawa \
+#                               --kind_of_geometry grid \
+#                               --ndim $ndim \
+#                               --max_rank $max_rank \
+#                               --accuracy -1 \
+#                               --admis $adm \
+#                               --admis_kind geometry \
+#                               --construct_algorithm miro \
+#                               --param_1 1 --param_2 1e-9 \
+#                               --kind_of_recompression 3 --use_nested_basis
+#             done
+#         done
+#     done
+# done

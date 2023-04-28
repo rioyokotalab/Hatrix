@@ -11,6 +11,9 @@
 #include "Domain.hpp"
 #include "Hatrix/Hatrix.h"
 
+#include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_sf_bessel.h>
+
 namespace Hatrix {
 
 using kernel_func_t =
@@ -50,6 +53,27 @@ double yukawa_kernel(const Body& source, const Body& target) {
   const double r = p2p_distance(source, target) + PV;
   const double out = std::exp(alpha * -r) / r;
   return out;
+}
+
+double matern_kernel(const Body& source, const Body& target) {
+  double sigma = 1.0, nu = 0.03, smoothness = 0.5;
+
+  double expr = 0.0;
+  double con = 0.0;
+  double sigma_square = sigma*sigma;
+  double dist = p2p_distance(source, target);
+
+  con = pow(2, (smoothness - 1)) * gsl_sf_gamma(smoothness);
+  con = 1.0 / con;
+  con = sigma_square * con;
+
+  if (dist != 0) {
+    expr = dist / nu;
+    return con * pow(expr, smoothness) * gsl_sf_bessel_Knu(smoothness, expr);
+  }
+  else {
+    return sigma_square;
+  }
 }
 
 Matrix generate_p2p_matrix(const Domain& domain,
@@ -203,4 +227,3 @@ Matrix prepend_complement_basis(const Matrix &Q) {
 }
 
 } // namespace Hatrix
-

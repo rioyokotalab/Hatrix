@@ -1314,7 +1314,7 @@ void H2::factorize() {
           int64_t rank_c2 = U(c2, level).cols;
           int64_t rank_parent = std::max(rank_c1, rank_c2);
           Matrix Utransfer =
-              generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
+            generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
 
           if (r.exists(c1)) r.erase(c1);
           if (r.exists(c2)) r.erase(c2);
@@ -1328,7 +1328,7 @@ void H2::factorize() {
           int64_t rank_c2 = V(c2, level).cols;
           int64_t rank_parent = std::max(rank_c1, rank_c2);
           Matrix Vtransfer =
-              generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
+            generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
 
           if (t.exists(c1)) t.erase(c1);
           if (t.exists(c2)) t.erase(c2);
@@ -1392,7 +1392,6 @@ void H2::factorize() {
               }
             }
           }
-
           D.insert(i, j, parent_level, std::move(D_unelim));
         }
       }
@@ -1483,6 +1482,8 @@ void H2::solve_forward_level(Matrix& x_level, const int64_t level) const {
     // Multiply with (U_F)^T
     Matrix U_F = prepend_complement_basis(U(block, level));
     Matrix x_block = matmul(U_F, x_level_split[block], true);
+
+    // Matrix x_block(x_level_split[block], true);
     auto x_block_splits = x_block.split(vec{diag_col_split}, vec{});
     // Solve forward with diagonal L
     auto L_block_splits = D(block, block, level).split(vec{diag_row_split}, vec{diag_col_split});
@@ -1563,7 +1564,7 @@ void H2::solve_backward_level(Matrix& x_level, const int64_t level) const {
 }
 
 Matrix H2::solve(const Matrix& b) const {
-  Matrix x(b);
+  Matrix x(b, true);
   int64_t level = height;
   int64_t rhs_offset = 0;
 
@@ -1633,6 +1634,7 @@ int main(int argc, char ** argv) {
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
+  // 2: Matern kernel
   const int64_t kernel_type = argc > 7 ? atol(argv[7]) : 0;
 
   // Specify underlying geometry
@@ -1649,23 +1651,28 @@ int main(int argc, char ** argv) {
 
   Hatrix::Context::init();
 
-  Hatrix::set_kernel_constants(1e-3 / (double)N, 1.);
+  Hatrix::set_kernel_constants(1e-4, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
-    case 0: {
-      Hatrix::kernel_function = Hatrix::laplace_kernel;
-      kernel_name = "laplace";
-      break;
-    }
-    case 1: {
-      Hatrix::kernel_function = Hatrix::yukawa_kernel;
-      kernel_name = "yukawa";
-      break;
-    }
-    default: {
-      Hatrix::kernel_function = Hatrix::laplace_kernel;
-      kernel_name = "laplace";
-    }
+  case 0: {
+    Hatrix::kernel_function = Hatrix::laplace_kernel;
+    kernel_name = "laplace";
+    break;
+  }
+  case 1: {
+    Hatrix::kernel_function = Hatrix::yukawa_kernel;
+    kernel_name = "yukawa";
+    break;
+  }
+  case 2: {
+    Hatrix::kernel_function = Hatrix::matern_kernel;
+    kernel_name = "matern";
+    break;
+  }
+  default: {
+    Hatrix::kernel_function = Hatrix::laplace_kernel;
+    kernel_name = "laplace";
+  }
   }
 
   const auto start_particles = std::chrono::system_clock::now();
