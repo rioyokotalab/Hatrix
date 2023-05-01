@@ -136,9 +136,10 @@ class SymmetricH2 {
   std::tuple<int64_t, int64_t, int64_t> inertia(const Domain& domain,
                                                 const double lambda, bool &singular) const;
   std::tuple<double, int64_t, int64_t, double>
-  get_mth_eigenvalue(const Domain& domain,
-                     const int64_t m, const double ev_tol,
-                     double left, double right) const;
+  get_kth_eigenvalue(const Domain& domain,
+                     const double ev_tol, const int64_t idx_k,
+                     const std::vector<int64_t>& k_list,
+                     std::vector<double>& a, std::vector<double>& b) const;
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
@@ -844,17 +845,18 @@ SymmetricH2::inertia(const Domain& domain,
 }
 
 std::tuple<double, int64_t, int64_t, double>
-SymmetricH2::get_mth_eigenvalue(const Domain& domain,
-                                const int64_t m, const double ev_tol,
-                                double left, double right) const {
+SymmetricH2::get_kth_eigenvalue(const Domain& domain,
+                                const double ev_tol, const int64_t idx_k,
+                                const std::vector<int64_t>& k_list,
+                                std::vector<double>& a, std::vector<double>& b) const {
   int64_t shift_min_rank = get_basis_min_rank();
   int64_t shift_max_rank = get_basis_max_rank();
   double max_rank_shift = -1;
   bool singular = false;
-  while((right - left) >= ev_tol) {
-    const auto mid = (left + right) / 2;
-    int64_t value, factor_min_rank, factor_max_rank;
-    std::tie(value, factor_min_rank, factor_max_rank) = (*this).inertia(domain, mid, singular);
+  while((b[idx_k] - a[idx_k]) >= ev_tol) {
+    const auto mid = (a[idx_k] + b[idx_k]) / 2;
+    int64_t v_mid, factor_min_rank, factor_max_rank;
+    std::tie(v_mid, factor_min_rank, factor_max_rank) = (*this).inertia(domain, mid, singular);
     if(factor_max_rank >= shift_max_rank) {
       shift_min_rank = factor_min_rank;
       shift_max_rank = factor_max_rank;
@@ -864,10 +866,18 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain,
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
       break;
     }
-    if(value >= m) right = mid;
-    else left = mid;
+    // Update intervals accordingly
+    for (int64_t idx = 0; idx < k_list.size(); idx++) {
+      const auto ki = k_list[idx];
+      if (ki <= v_mid && mid < b[idx]) {
+        b[idx] = mid;
+      }
+      if (ki > v_mid && mid > a[idx]) {
+        a[idx] = mid;
+      }
+    }
   }
-  return {(left + right) / 2, shift_min_rank, shift_max_rank, max_rank_shift};
+  return {(a[idx_k] + b[idx_k]) / 2, shift_min_rank, shift_max_rank, max_rank_shift};
 }
 
 } // namespace Hatrix
@@ -1149,13 +1159,15 @@ int main(int argc, char ** argv) {
     }
   }
 
+  const int64_t num_ev = target_m.size();
+  std::vector<double> target_a(num_ev, a), target_b(num_ev, b); // Target starting intervals
   for (int64_t k = 0; k < target_m.size(); k++) {
     const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;
     int64_t ldl_min_rank, ldl_max_rank;
     const auto h2_eig_start = std::chrono::system_clock::now();
     std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
-        M.get_mth_eigenvalue(domain, m, ev_tol, a, b);
+        M.get_kth_eigenvalue(domain, ev_tol, k, target_m, target_a, target_b);
     const auto h2_eig_stop = std::chrono::system_clock::now();
     const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                (h2_eig_stop - h2_eig_start).count();

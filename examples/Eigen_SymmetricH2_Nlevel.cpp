@@ -147,8 +147,10 @@ class SymmetricH2 {
   std::tuple<int64_t, int64_t, int64_t, int64_t>
   inertia(const Domain& domain, const double lambda, bool &singular) const;
   std::tuple<double, int64_t, int64_t, int64_t, double, int64_t>
-  get_mth_eigenvalue(const Domain& domain, const int64_t m, const double ev_tol,
-                     double left, double right) const;
+  get_kth_eigenvalue(const Domain& domain,
+                     const double ev_tol, const int64_t idx_k,
+                     const std::vector<int64_t>& k_list,
+                     std::vector<double>& a, std::vector<double>& b) const;
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
@@ -1231,8 +1233,10 @@ SymmetricH2::inertia(const Domain& domain,
 }
 
 std::tuple<double, int64_t, int64_t, int64_t, double, int64_t>
-SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const double ev_tol,
-                                double left, double right) const {
+SymmetricH2::get_kth_eigenvalue(const Domain& domain,
+                                const double ev_tol, const int64_t idx_k,
+                                const std::vector<int64_t>& k_list,
+                                std::vector<double>& a, std::vector<double>& b) const {
   Hatrix::profiling::PAPI papi;
   papi.add_fp_ops(0);
   papi.start();
@@ -1242,11 +1246,11 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const dou
   double max_rank_shift = -1;
   bool singular = false;
   START_TIMER("slicing_the_spectrum");
-  while((right - left) >= ev_tol) {
-    const auto mid = (left + right) / 2;
-    int64_t value, factor_min_rank, factor_max_rank, factor_mem;
+  while((b[idx_k] - a[idx_k]) >= ev_tol) {
+    const auto mid = (a[idx_k] + b[idx_k]) / 2;
+    int64_t v_mid, factor_min_rank, factor_max_rank, factor_mem;
     START_TIMER("compute_inertia");
-    std::tie(value, factor_min_rank, factor_max_rank, factor_mem) = (*this).inertia(domain, mid, singular);
+    std::tie(v_mid, factor_min_rank, factor_max_rank, factor_mem) = (*this).inertia(domain, mid, singular);
     STOP_TIMER("compute_inertia");
     if(factor_max_rank > shift_max_rank) {
       shift_min_rank = factor_min_rank;
@@ -1258,12 +1262,20 @@ SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const dou
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
       break;
     }
-    if(value >= m) right = mid;
-    else left = mid;
+    // Update intervals accordingly
+    for (int64_t idx = 0; idx < k_list.size(); idx++) {
+      const auto ki = k_list[idx];
+      if (ki <= v_mid && mid < b[idx]) {
+        b[idx] = mid;
+      }
+      if (ki > v_mid && mid > a[idx]) {
+        a[idx] = mid;
+      }
+    }
   }
   STOP_TIMER("slicing_the_spectrum");
   const auto fp_ops = (int64_t)papi.fp_ops();
-  return {(left + right) / 2, shift_min_rank, shift_max_rank, shift_max_mem, max_rank_shift, fp_ops};
+  return {(a[idx_k] + b[idx_k]) / 2, shift_min_rank, shift_max_rank, shift_max_mem, max_rank_shift, fp_ops};
 }
 
 } // namespace Hatrix
@@ -1522,16 +1534,18 @@ int main(int argc, char ** argv) {
     }
   }
 
+  const int64_t num_ev = target_m.size();
+  std::vector<double> target_a(num_ev, a), target_b(num_ev, b); // Target starting intervals
   for (int64_t k = 0; k < target_m.size(); k++) {
     const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;
     int64_t ldl_min_rank, ldl_max_rank, ldl_max_mem, h2_eig_ops;
-    START_TIMER("get_mth_eigenvalue");
+    START_TIMER("get_kth_eigenvalue");
     const auto h2_eig_start = std::chrono::system_clock::now();
     std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, ldl_max_mem, max_rank_shift, h2_eig_ops) =
-        A.get_mth_eigenvalue(domain, m, ev_tol, a, b);
+        A.get_kth_eigenvalue(domain, ev_tol, k, target_m, target_a, target_b);
     const auto h2_eig_stop = std::chrono::system_clock::now();
-    STOP_TIMER("get_mth_eigenvalue");
+    STOP_TIMER("get_kth_eigenvalue");
     const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                (h2_eig_stop - h2_eig_start).count();
     const auto h2_eig_mem = construct_mem + ldl_max_mem;
@@ -1618,7 +1632,7 @@ int main(int argc, char ** argv) {
               << std::endl;
 #endif
   }
-  PRINT_TIME("get_mth_eigenvalue", 6);
+  PRINT_TIME("get_kth_eigenvalue", 6);
 
   Hatrix::Context::finalize();
   return 0;
