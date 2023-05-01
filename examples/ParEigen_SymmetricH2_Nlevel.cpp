@@ -1350,7 +1350,7 @@ int main(int argc, char ** argv) {
     printf("mpi_nprocs,N,leaf_size,accuracy,acc_type,max_rank,admis,matrix_type,kernel,geometry"
            ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
            ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,dense_eig_time_all,h2_eig_time_all"
-           ",k,a,b,v_a,v_b,ev_tol,dense_ev,h2_ev,eig_abs_err,success\n");
+           ",m,k,a,b,v_a,v_b,ev_tol,dense_ev,h2_ev,eig_abs_err,success\n");
   }
 #endif
 
@@ -1381,9 +1381,10 @@ int main(int argc, char ** argv) {
   for (int i = 0; i < (int)count.size(); i++)
     count[i] = offset[i + 1] - offset[i];
 
+  int64_t local_num_ev;
   // Compute eigenvalues
   if (mpi_rank < num_working_procs) {
-    const int64_t local_num_ev = count[mpi_rank];
+    local_num_ev = count[mpi_rank];
     const int64_t k0 = k_begin + offset[mpi_rank];
     const int64_t k1 = k0 + local_num_ev - 1;
 #ifdef DEBUG_OUTPUT
@@ -1446,24 +1447,25 @@ int main(int argc, char ** argv) {
   h2_ev_time += MPI_Wtime();
 
   if (mpi_rank == 0) {
+    const int m = local_num_ev;
     for (int k = k_begin; k <= k_end; k++) {
       const double dense_ev_k = compute_eig_acc ? dense_ev[k-1] : -1;
       const double h2_ev_k = h2_ev[k - k_begin];
       const double eig_abs_err = compute_eig_acc ? std::abs(dense_ev_k - h2_ev_k) : -1;
       const std::string success = eig_abs_err < (0.5 * ev_tol) ? "TRUE" : "FALSE";
 #ifndef OUTPUT_CSV
-      printf("h2_eig_time_all=%.3lf k=%d a=%.2lf b=%.2lf v_a=%d v_b=%d ev_tol=%.1e"
+      printf("h2_eig_time_all=%.3lf m=%d k=%d a=%.2lf b=%.2lf v_a=%d v_b=%d ev_tol=%.1e"
              " dense_ev=%.8lf h2_ev=%.8lf eig_abs_err=%.2e success=%s\n",
-             h2_ev_time, k, a, b, v_a, v_b, ev_tol,
+             h2_ev_time, m, k, a, b, v_a, v_b, ev_tol,
              dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #else
       printf("%d,%d,%d,%.1e,%d,%d,%.1lf,%d,%s,%s,%d,%d,%d,%d,%.3lf,%.5e,%d,%d,%d,%d"
-             ",%.3lf,%.3lf,%d,%.2lf,%.2lf,%d,%d,%.1e,%.8lf,%.8lf,%.2e,%s\n",
+             ",%.3lf,%.3lf,%d,%d,%.2lf,%.2lf,%d,%d,%.1e,%.8lf,%.8lf,%.2e,%s\n",
              mpi_nprocs,(int)N, (int)leaf_size, accuracy, (int)use_rel_acc, (int)max_rank,
              admis, (int)matrix_type, kernel_name.c_str(), geom_name.c_str(), (int)A.height,
              (int)construct_min_rank, (int)construct_max_rank, (int)construct_mem, construct_time,
              construct_error, (int)csp, (int)csp_dense_leaf, (int)csp_dense_all, (int)csp_lr_all,
-             dense_eig_time, h2_ev_time, k, a, b, v_a, v_b, ev_tol,
+             dense_eig_time, h2_ev_time, m, k, a, b, v_a, v_b, ev_tol,
              dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #endif
     }
