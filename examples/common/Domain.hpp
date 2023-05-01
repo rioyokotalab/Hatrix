@@ -1254,14 +1254,14 @@ class Domain {
         // Sort left part
         const auto sort_axis_left = get_sort_axis(mol_begin, mol_mid);
         std::sort(bodies.begin() + mol_begin, bodies.begin() + mol_mid,
-                  [sort_axis=sort_axis_left](const Body& lhs, const Body& rhs) {
-                    return lhs.X[sort_axis] < rhs.X[sort_axis];
+                  [sort_axis_left](const Body& lhs, const Body& rhs) {
+                    return lhs.X[sort_axis_left] < rhs.X[sort_axis_left];
                   });
         // Sort right part
         const auto sort_axis_right = get_sort_axis(mol_mid, mol_end);
         std::sort(bodies.begin() + mol_mid, bodies.begin() + mol_end,
-                  [sort_axis=sort_axis_right](const Body& lhs, const Body& rhs) {
-                    return lhs.X[sort_axis] < rhs.X[sort_axis];
+                  [sort_axis_right](const Body& lhs, const Body& rhs) {
+                    return lhs.X[sort_axis_right] < rhs.X[sort_axis_right];
                   });
       }
     }
