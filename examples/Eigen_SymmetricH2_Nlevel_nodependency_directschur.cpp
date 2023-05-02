@@ -37,7 +37,7 @@ using vec = std::vector<int64_t>;
 // Uncomment the following line to output memory consumption
 // #define OUTPUT_MEM
 // Comment the following line to use ID (without SVD) for basis construction
-#define USE_SVD_COMPRESSION
+// #define USE_SVD_COMPRESSION
 
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
@@ -253,9 +253,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     if (near_size + far_size > 0) {
       Matrix skeleton_dn(skeleton_size, 0);
       Matrix skeleton_lr(skeleton_size, 0);
-      double norm_dn = 0.;
-      double norm_lr = 0.;
-      // Fill-in (dense) part
+      // Fill-in  part
       if (near_size > 0) {
         // Concat fill-ins
         for (int64_t j = 0; j <num_nodes; j++) {
@@ -263,15 +261,11 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
             skeleton_dn = concat(skeleton_dn, F(i, j, level), 1);
           }
         }
-        norm_dn = Hatrix::norm(skeleton_dn);
       }
       // Low-rank part
       if (far_size > 0) {
         skeleton_lr = concat(skeleton_lr, generate_p2p_matrix(domain, skeleton, cell.sample_farfield), 1);
-        norm_lr = Hatrix::norm(skeleton_lr);
       }
-      const double scale = (norm_dn == 0. || norm_lr == 0.) ? 1. : norm_lr / norm_dn;
-      Hatrix::scale(skeleton_dn, scale);
       Matrix skeleton_row = concat(skeleton_lr, skeleton_dn, 1);
 
       Matrix Ui;
@@ -406,6 +400,9 @@ SymmetricH2::SymmetricH2(const Domain& domain,
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
   err_tol = accuracy;
+#ifndef USE_SVD_COMPRESSION
+  err_tol *= 1e-2;  // Use smaller threshold to match SVD accuracy
+#endif
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
   if (build_basis) {
