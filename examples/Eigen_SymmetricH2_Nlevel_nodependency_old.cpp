@@ -404,9 +404,6 @@ SymmetricH2::SymmetricH2(const Domain& domain,
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
   err_tol = accuracy;
-#ifndef USE_SVD_COMPRESSION
-  // err_tol *= 1e-2;  // Use smaller threshold to match SVD accuracy
-#endif
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
   for (int64_t level = height; level >= 0; level--) {
