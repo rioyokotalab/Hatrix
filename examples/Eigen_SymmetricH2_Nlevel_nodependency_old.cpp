@@ -128,7 +128,7 @@ class SymmetricH2 {
   void factorize(const Domain& domain);
   std::tuple<int64_t, int64_t> inertia(const Domain& domain,
                                        const double lambda, bool &singular) const;
-  std::tuple<double, double>
+  std::tuple<double, double, int64_t>
   get_kth_eigenvalue(const Domain& domain,
                      const double ev_tol, const int64_t idx_k,
                      const std::vector<int64_t>& k_list,
@@ -781,11 +781,14 @@ SymmetricH2::inertia(const Domain& domain,
   return {negative_elements_count, ldl_max_rank};
 }
 
-std::tuple<double, double>
+std::tuple<double, double, int64_t>
 SymmetricH2::get_kth_eigenvalue(const Domain& domain,
                                 const double ev_tol, const int64_t idx_k,
                                 const std::vector<int64_t>& k_list,
                                 std::vector<double>& a, std::vector<double>& b) const {
+  Hatrix::profiling::PAPI papi;
+  papi.add_fp_ops(0);
+  papi.start();
   int64_t ldl_max_rank = 0;
   double max_rank_shift = 0;
   bool singular = false;
@@ -812,7 +815,8 @@ SymmetricH2::get_kth_eigenvalue(const Domain& domain,
       }
     }
   }
-  return {(a[idx_k] + b[idx_k]) / 2, max_rank_shift};
+  const auto fp_ops = (int64_t)papi.fp_ops();
+  return {(a[idx_k] + b[idx_k]) / 2, max_rank_shift, fp_ops};
 }
 
 } // namespace Hatrix
@@ -881,7 +885,7 @@ int main(int argc, char ** argv) {
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_avg_rank,construct_mem,construct_time,construct_error"
               << ",dense_eig_time,build_basis_time"
-              << ",m,a0,b0,v_a0,v_b0,ev_tol,h2_eig_time,ldl_min_rank,ldl_max_rank,ldl_avg_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,a0,b0,v_a0,v_b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,ldl_avg_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
@@ -1109,8 +1113,9 @@ int main(int argc, char ** argv) {
   for (int64_t k = 0; k < target_m.size(); k++) {
     const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;
+    int64_t h2_eig_ops;
     const auto h2_eig_start = std::chrono::system_clock::now();
-    std::tie(h2_mth_eigv, max_rank_shift) =
+    std::tie(h2_mth_eigv, max_rank_shift, h2_eig_ops) =
         M.get_kth_eigenvalue(domain, ev_tol, k, target_m, target_a, target_b);
     const auto h2_eig_stop = std::chrono::system_clock::now();
     // Since we are using the composite basis for shift=0 for all shifted matrix factorization
@@ -1130,6 +1135,7 @@ int main(int argc, char ** argv) {
               << " v_a0=" << v_a
               << " v_b0=" << v_b
               << " ev_tol=" << ev_tol
+              << " h2_eig_ops=" << h2_eig_ops
               << " h2_eig_time=" << h2_eig_time
               << " ldl_min_rank=" << ldl_min_rank
               << " ldl_max_rank=" << ldl_max_rank
@@ -1178,6 +1184,7 @@ int main(int argc, char ** argv) {
               << "," << v_a
               << "," << v_b
               << "," << ev_tol
+              << "," << h2_eig_ops
               << "," << h2_eig_time
               << "," << ldl_min_rank
               << "," << ldl_max_rank
