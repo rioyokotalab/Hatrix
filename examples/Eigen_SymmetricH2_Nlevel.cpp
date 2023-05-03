@@ -1289,22 +1289,17 @@ int main(int argc, char ** argv) {
   // Fixed accuracy with bounded rank
   const int64_t max_rank = argc > 5 ? atol(argv[5]) : 30;
   const double admis = argc > 6 ? atof(argv[6]) : 3;
-  // 0: Default
-  // 1: dist(i,j)  > admis*(min(diam(i), diam(j)))
-  // 2: dist(i,j)  > admis*(max(diam(i), diam(j)))
-  // 3: dist2(i,j) > admis*(size(i)+size(j))  (default)
-  const int64_t admis_variant = argc > 7 ? atol(argv[7]) : 0;
 
   // Specify compressed representation
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = argc > 8 ? atol(argv[8]) : 1;
+  const int64_t matrix_type = argc > 7 ? atol(argv[7]) : 1;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
   // 2: ELSES Dense Matrix
-  const int64_t kernel_type = argc > 9 ? atol(argv[9]) : 0;
+  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
@@ -1312,20 +1307,20 @@ int main(int argc, char ** argv) {
   // 2: StarsH Uniform Grid
   // 3: ELSES Geometry (ndim = 3)
   // 4: Random Uniform Grid
-  const int64_t geom_type = argc > 10 ? atol(argv[10]) : 0;
-  int64_t ndim  = argc > 11 ? atol(argv[11]) : 1;
+  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
+  int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
     // Eigenvalue computation parameters
-  const double ev_tol = argc > 12 ? atof(argv[12]) : 1.e-3;
-  int64_t m_begin = argc > 13 ? atol(argv[13]) : 1;
-  int64_t m_end = argc > 14 ? atol(argv[14]) : m_begin;
-  double a = argc > 15 ? atof(argv[15]) : 0;
-  double b = argc > 16 ? atof(argv[16]) : 0;
-  const bool compute_eig_acc = argc > 17 ? (atol(argv[17]) == 1) : true;
-  const int64_t print_csv_header = argc > 18 ? atol(argv[18]) : 1;
+  const double ev_tol = argc > 11 ? atof(argv[11]) : 1.e-3;
+  int64_t m_begin = argc > 12 ? atol(argv[12]) : 1;
+  int64_t m_end = argc > 13 ? atol(argv[13]) : m_begin;
+  double a = argc > 14 ? atof(argv[14]) : 0;
+  double b = argc > 15 ? atof(argv[15]) : 0;
+  const bool compute_eig_acc = argc > 16 ? (atol(argv[16]) == 1) : true;
+  const int64_t print_csv_header = argc > 17 ? atol(argv[17]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 19 ? std::string(argv[19]) : "";
-  const int64_t sort_bodies = argc > 20 ? atol(argv[20]) : 0;
+  const std::string file_name = argc > 18 ? std::string(argv[18]) : "";
+  const int64_t sort_bodies = argc > 19 ? atol(argv[19]) : 0;
 
   Hatrix::Context::init();
 
@@ -1421,7 +1416,7 @@ int main(int argc, char ** argv) {
   else {
     domain.build_tree(leaf_size);
   }
-  domain.build_interactions(admis, admis_variant);
+  domain.build_interactions(admis);
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
 
   const auto start_construct = std::chrono::system_clock::now();
@@ -1453,7 +1448,6 @@ int main(int argc, char ** argv) {
             << "SVD"
 #endif
             << " admis=" << admis << std::setw(3)
-            << " admis_variant=" << admis_variant
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << " kernel=" << kernel_name
             << " geometry=" << geom_name
