@@ -1320,7 +1320,7 @@ int main(int argc, char ** argv) {
   int64_t m_end = argc > 14 ? atol(argv[14]) : m_begin;
   double a = argc > 15 ? atof(argv[15]) : 0;
   double b = argc > 16 ? atof(argv[16]) : 0;
-  const bool compute_eig_acc = argc > 17 ? (atol(argv[17]) == 1) : false;
+  const bool compute_eig_acc = argc > 17 ? (atol(argv[17]) == 1) : true;
   const int64_t print_csv_header = argc > 18 ? atol(argv[18]) : 1;
 
   // ELSES Input Files

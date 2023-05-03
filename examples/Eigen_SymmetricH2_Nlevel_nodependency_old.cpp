@@ -856,7 +856,7 @@ int main(int argc, char ** argv) {
   int64_t m_end = argc > 16 ? atol(argv[16]) : m_begin;
   double a = argc > 17 ? atof(argv[17]) : 0;
   double b = argc > 18 ? atof(argv[18]) : 0;
-  const bool compute_eig_acc = argc > 19 ? (atol(argv[19]) == 1) : false;
+  const bool compute_eig_acc = argc > 19 ? (atol(argv[19]) == 1) : true;
   const int64_t print_csv_header = argc > 20 ? atol(argv[20]) : 1;
 
   // ELSES Input Files
