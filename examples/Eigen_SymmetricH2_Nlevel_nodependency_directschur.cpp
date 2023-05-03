@@ -108,9 +108,8 @@ class SymmetricH2 {
 
   Matrix get_dense_skeleton(const Domain& domain,
                             const int64_t i, const int64_t j, const int64_t level) const;
-  void compute_fill_in_cholesky(const Domain& domain, const int64_t level, const double diag_shift);
   void compute_fill_in_qr(const Domain& domain, const int64_t level, const double diag_shift);
-  void compute_fill_in_svd(const Domain& domain, const int64_t level, const double diag_shift);
+  void compute_fill_in(const Domain& domain, const int64_t level, const double diag_shift);
   void factorize_level(const int64_t level);
   void permute_and_merge(const int64_t level);
 
@@ -622,37 +621,6 @@ Matrix SymmetricH2::get_dense_skeleton(const Domain& domain,
   return generate_p2p_matrix(domain, skeleton_i, skeleton_j);
 }
 
-void SymmetricH2::compute_fill_in_cholesky(const Domain& domain, const int64_t level, const double diag_shift) {
-  const int64_t num_nodes = level_blocks[level];
-  for (int64_t k = 0; k < num_nodes; k++) {
-    Matrix Dkk = get_dense_skeleton(domain, k, k, level);
-    shift_diag(Dkk, diag_shift);
-    cholesky(Dkk, Hatrix::Lower);
-    for (int64_t i = 0; i < num_nodes; i++) {
-      for (int64_t j = 0; j < num_nodes; j++) {
-        if (i != k && j != k &&
-            is_admissible.exists(i, k, level) && !is_admissible(i, k, level) &&
-            is_admissible.exists(k, j, level) && !is_admissible(k, j, level)) {
-          Matrix Dik = get_dense_skeleton(domain, i, k, level);
-          Matrix Dkj = get_dense_skeleton(domain, k, j, level);
-          // Compute fill_in = Dik * inv(Dkk) * Dkj
-          solve_triangular(Dkk, Dik, Hatrix::Right, Hatrix::Lower, false, true ); // Dik*L^-T
-          solve_triangular(Dkk, Dkj, Hatrix::Left,  Hatrix::Lower, false, false); // L^-1*Dkj
-          Matrix fill_in = matmul(Dik, Dkj, false, false, -1);
-          if (F.exists(i, j, level)) {
-            assert(F(i, j, level).rows == fill_in.rows);
-            assert(F(i, j, level).cols == fill_in.cols);
-            F(i, j, level) += fill_in;
-          }
-          else {
-            F.insert(i, j, level, std::move(fill_in));
-          }
-        }
-      }
-    }
-  }
-}
-
 void SymmetricH2::compute_fill_in_qr(const Domain& domain, const int64_t level, const double diag_shift) {
   const int64_t num_nodes = level_blocks[level];
   for (int64_t k = 0; k < num_nodes; k++) {
@@ -680,6 +648,28 @@ void SymmetricH2::compute_fill_in_qr(const Domain& domain, const int64_t level, 
           else {
             F.insert(i, j, level, std::move(fill_in));
           }
+        }
+      }
+    }
+  }
+}
+
+void SymmetricH2::compute_fill_in(const Domain& domain, const int64_t level, const double diag_shift) {
+  const int64_t num_nodes = level_blocks[level];
+  #pragma omp parallel for
+  for (int64_t k = 0; k < num_nodes; k++) {
+    Matrix Dkk = get_dense_skeleton(domain, k, k, level);
+    shift_diag(Dkk, diag_shift);
+    std::vector<int> ipiv;
+    pivoted_ldl(Dkk, ipiv);
+    for (int64_t i: near_neighbors(k, level)) {
+      if (i != k) {
+        // Compute fill_in = Dik * inv(Dkk)
+        Matrix fill_in_T = transpose(get_dense_skeleton(domain, i, k, level)); // TODO change to D_ki
+        pivoted_ldl_solve(Dkk, ipiv, fill_in_T);
+        #pragma omp critical
+        {
+          F.insert(i, k, level, transpose(fill_in_T));
         }
       }
     }
@@ -790,7 +780,7 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
 
 void SymmetricH2::factorize(const Domain& domain, const double diag_shift) {
   for (int64_t level = height; level >= 0; level--) {
-    compute_fill_in_qr(domain, level, diag_shift);
+    compute_fill_in(domain, level, diag_shift);
     generate_row_cluster_basis(domain, level, true);
     generate_far_coupling_matrices(domain, level);
     factorize_level(level);
