@@ -36,8 +36,6 @@ using vec = std::vector<int64_t>;
 // Uncomment the following line to enable timer
 // #define USE_TIMER
 // Uncomment the following line to output memory consumption
-// #define OUTPUT_MEM
-// Uncomment the following line to pivoted QR instead of SVD for low-rank compression
 // #define USE_QR_COMPRESSION
 
 // H2-Construction employ multiplication with a random matrix to reduce far-block matrix size
@@ -133,6 +131,7 @@ class SymmetricH2 {
 
   int64_t get_basis_min_rank(const int64_t level_begin, const int64_t level_end) const;
   int64_t get_basis_max_rank(const int64_t level_begin, const int64_t level_end) const;
+  double get_basis_avg_rank(const int64_t level_begin, const int64_t level_end) const;
   int64_t get_level_max_nblocks(const char nearfar,
                                 const int64_t level_begin, const int64_t level_end) const;
   double construction_error(const Domain& domain) const;
@@ -144,9 +143,9 @@ class SymmetricH2 {
 #endif
 
   void factorize(const Domain& domain);
-  std::tuple<int64_t, int64_t, int64_t, int64_t>
+  std::tuple<int64_t, int64_t>
   inertia(const Domain& domain, const double lambda, bool &singular) const;
-  std::tuple<double, int64_t, int64_t, int64_t, double, int64_t>
+  std::tuple<double, double, int64_t>
   get_kth_eigenvalue(const Domain& domain,
                      const double ev_tol, const int64_t idx_k,
                      const std::vector<int64_t>& k_list,
@@ -436,6 +435,22 @@ int64_t SymmetricH2::get_basis_max_rank(const int64_t level_begin,
   return rank_max;
 }
 
+double SymmetricH2::get_basis_avg_rank(const int64_t level_begin,
+                                       const int64_t level_end) const {
+  int64_t rank_sum = 0;
+  int64_t num_bases = 0;
+  for (int64_t level = level_begin; level <= level_end; level++) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      if (U.exists(node, level) && U(node, level).cols > 0) {
+        num_bases++;
+        rank_sum += U(node, level).cols;
+      }
+    }
+  }
+  return (double)rank_sum / (double)num_bases;
+}
+
 int64_t SymmetricH2::get_level_max_nblocks(const char nearfar,
                                            const int64_t level_begin, const int64_t level_end) const {
   int64_t csp = 0;
@@ -488,7 +503,6 @@ double SymmetricH2::construction_error(const Domain& domain) const {
 
 int64_t SymmetricH2::memory_usage() const {
   int64_t mem = 0;
-#ifdef OUTPUT_MEM
   for (int64_t level = height; level > 0; level--) {
     const auto num_nodes = level_blocks[level];
     for (int64_t i = 0; i < num_nodes; i++) {
@@ -517,7 +531,6 @@ int64_t SymmetricH2::memory_usage() const {
       }
     }
   }
-#endif
   return mem;
 }
 
@@ -1180,7 +1193,7 @@ void SymmetricH2::factorize(const Domain& domain) {
   STOP_TIMER("factorize_remaining_blocks");
 }
 
-std::tuple<int64_t, int64_t, int64_t, int64_t>
+std::tuple<int64_t, int64_t>
 SymmetricH2::inertia(const Domain& domain,
                      const double lambda, bool &singular) const {
   START_TIMER("create_shifted_matrix");
@@ -1226,13 +1239,11 @@ SymmetricH2::inertia(const Domain& domain,
   }
   STOP_TIMER("count_negative_diagonal_entries");
 
-  const auto ldl_min_rank = A_shifted.get_basis_min_rank(1, height);
   const auto ldl_max_rank = A_shifted.get_basis_max_rank(1, height);
-  const auto ldl_mem = A_shifted.memory_usage();
-  return {negative_elements_count, ldl_min_rank, ldl_max_rank, ldl_mem};
+  return {negative_elements_count, ldl_max_rank};
 }
 
-std::tuple<double, int64_t, int64_t, int64_t, double, int64_t>
+std::tuple<double, double, int64_t>
 SymmetricH2::get_kth_eigenvalue(const Domain& domain,
                                 const double ev_tol, const int64_t idx_k,
                                 const std::vector<int64_t>& k_list,
@@ -1240,23 +1251,19 @@ SymmetricH2::get_kth_eigenvalue(const Domain& domain,
   Hatrix::profiling::PAPI papi;
   papi.add_fp_ops(0);
   papi.start();
-  int64_t shift_min_rank = get_basis_min_rank(1, height);
-  int64_t shift_max_rank = get_basis_max_rank(1, height);
-  int64_t shift_max_mem = 0;
-  double max_rank_shift = -1;
+  int64_t ldl_max_rank = 0;
+  double max_rank_shift = 0;
   bool singular = false;
   START_TIMER("slicing_the_spectrum");
   while((b[idx_k] - a[idx_k]) >= ev_tol) {
     const auto mid = (a[idx_k] + b[idx_k]) / 2;
-    int64_t v_mid, factor_min_rank, factor_max_rank, factor_mem;
+    int64_t v_mid, factor_max_rank;
     START_TIMER("compute_inertia");
-    std::tie(v_mid, factor_min_rank, factor_max_rank, factor_mem) = (*this).inertia(domain, mid, singular);
+    std::tie(v_mid, factor_max_rank) = (*this).inertia(domain, mid, singular);
     STOP_TIMER("compute_inertia");
-    if(factor_max_rank > shift_max_rank) {
-      shift_min_rank = factor_min_rank;
-      shift_max_rank = factor_max_rank;
+    if(factor_max_rank >= ldl_max_rank) {
+      ldl_max_rank = factor_max_rank;
       max_rank_shift = mid;
-      shift_max_mem = factor_mem;
     }
     if(singular) {
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
@@ -1275,7 +1282,7 @@ SymmetricH2::get_kth_eigenvalue(const Domain& domain,
   }
   STOP_TIMER("slicing_the_spectrum");
   const auto fp_ops = (int64_t)papi.fp_ops();
-  return {(a[idx_k] + b[idx_k]) / 2, shift_min_rank, shift_max_rank, shift_max_mem, max_rank_shift, fp_ops};
+  return {(a[idx_k] + b[idx_k]) / 2, max_rank_shift, fp_ops};
 }
 
 } // namespace Hatrix
@@ -1328,10 +1335,10 @@ int main(int argc, char ** argv) {
   if (print_csv_header == 1) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
-              << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
-              << ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,construct_min_rank_leaf,construct_max_rank_leaf"
+              << ",height,construct_min_rank,construct_max_rank,construct_avg_rank,construct_mem,construct_time,construct_error"
+              << ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,construct_min_rank_leaf,construct_max_rank_leaf,construct_avg_rank_leaf"
               << ",dense_eig_time"
-              << ",m,a0,b0,v_a0,v_b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",m,a0,b0,v_a0,v_b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,ldl_avg_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
@@ -1426,10 +1433,12 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   const auto construct_min_rank = A.get_basis_min_rank(1, A.height);
   const auto construct_max_rank = A.get_basis_max_rank(1, A.height);
+  const auto construct_avg_rank = A.get_basis_avg_rank(1, A.height);
   const auto construct_error = A.construction_error(domain);
   const auto construct_mem = A.memory_usage();
   const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
   const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
+  const auto construct_avg_rank_leaf = A.get_basis_avg_rank(A.height, A.height);
   const auto csp = A.get_level_max_nblocks('a', 1, A.height);
   const auto csp_dense_leaf = A.get_level_max_nblocks('n', A.height, A.height);
   const auto csp_dense_all = A.get_level_max_nblocks('n', 1, A.height);
@@ -1454,6 +1463,7 @@ int main(int argc, char ** argv) {
             << " height=" << A.height
             << " construct_min_rank=" << construct_min_rank
             << " construct_max_rank=" << construct_max_rank
+            << " construct_avg_rank=" << construct_avg_rank
             << " construct_mem=" << construct_mem
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
@@ -1464,6 +1474,7 @@ int main(int argc, char ** argv) {
             << " csp_lr_all=" << csp_lr_all
             << " construct_min_rank_leaf=" << construct_min_rank_leaf
             << " construct_max_rank_leaf=" << construct_max_rank_leaf
+            << " construct_avg_rank_leaf=" << construct_avg_rank_leaf
             << std::endl;
 #endif
 
@@ -1488,9 +1499,9 @@ int main(int argc, char ** argv) {
         Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : N * (1. / Hatrix::PV);
     a = -b;
   }
-  int64_t v_a, v_b, temp1, temp2, temp3;
-  std::tie(v_a, temp1, temp2, temp3) = A.inertia(domain, a, s);
-  std::tie(v_b, temp1, temp2, temp3) = A.inertia(domain, b, s);
+  int64_t v_a, v_b, temp;
+  std::tie(v_a, temp) = A.inertia(domain, a, s);
+  std::tie(v_b, temp) = A.inertia(domain, b, s);
   if(v_a != 0 || v_b != N) {
 #ifndef OUTPUT_CSV
     std::cerr << std::endl
@@ -1533,21 +1544,16 @@ int main(int argc, char ** argv) {
   for (int64_t k = 0; k < target_m.size(); k++) {
     const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;
-    int64_t ldl_min_rank, ldl_max_rank, ldl_max_mem, h2_eig_ops;
+    int64_t h2_eig_ops;
     START_TIMER("get_kth_eigenvalue");
     const auto h2_eig_start = std::chrono::system_clock::now();
-    std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, ldl_max_mem, max_rank_shift, h2_eig_ops) =
+    std::tie(h2_mth_eigv, max_rank_shift, h2_eig_ops) =
         A.get_kth_eigenvalue(domain, ev_tol, k, target_m, target_a, target_b);
     const auto h2_eig_stop = std::chrono::system_clock::now();
     STOP_TIMER("get_kth_eigenvalue");
-    const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                               (h2_eig_stop - h2_eig_start).count();
-    const auto h2_eig_mem = construct_mem + ldl_max_mem;
-    const double dense_mth_eigv = compute_eig_acc ? dense_eigv[m - 1] : -1;
-    const double eig_abs_err = compute_eig_acc ? std::abs(h2_mth_eigv - dense_mth_eigv) : -1;
-    const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
-#ifdef DEBUG_OUTPUT
-    // Output ranks after factorization of shifted matrix that produces the largest maximum rank
+    int64_t ldl_min_rank, ldl_max_rank, h2_eig_mem;
+    double ldl_avg_rank;
+    // Reproduce factorization of shifted matrix with the largest maximum rank
     {
       Hatrix::SymmetricH2 M(A);
       const double lambda = max_rank_shift;
@@ -1557,9 +1563,19 @@ int main(int argc, char ** argv) {
         shift_diag(M.D(node, node, M.height), -lambda);
       }
       M.factorize(domain);
+      ldl_min_rank = M.get_basis_min_rank(1, M.height);
+      ldl_max_rank = M.get_basis_max_rank(1, M.height);
+      ldl_avg_rank = M.get_basis_avg_rank(1, M.height);
+      h2_eig_mem = construct_mem + M.memory_usage();
+#ifdef DEBUG_OUTPUT
       M.print_ranks();
-    }
 #endif
+    }
+    const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                               (h2_eig_stop - h2_eig_start).count();
+    const double dense_mth_eigv = compute_eig_acc ? dense_eigv[m - 1] : -1;
+    const double eig_abs_err = compute_eig_acc ? std::abs(h2_mth_eigv - dense_mth_eigv) : -1;
+    const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
 #ifndef OUTPUT_CSV
     std::cout << "m=" << m
               << " a0=" << a
@@ -1571,6 +1587,7 @@ int main(int argc, char ** argv) {
               << " h2_eig_time=" << h2_eig_time
               << " ldl_min_rank=" << ldl_min_rank
               << " ldl_max_rank=" << ldl_max_rank
+              << " ldl_avg_rank=" << ldl_avg_rank
               << " h2_eig_mem=" << h2_eig_mem
               << " max_rank_shift=" << max_rank_shift
               << " dense_eigv=" << dense_mth_eigv
@@ -1597,6 +1614,7 @@ int main(int argc, char ** argv) {
               << "," << A.height
               << "," << construct_min_rank
               << "," << construct_max_rank
+              << "," << construct_avg_rank
               << "," << construct_mem
               << "," << construct_time
               << "," << std::scientific << construct_error << std::defaultfloat
@@ -1606,6 +1624,7 @@ int main(int argc, char ** argv) {
               << "," << csp_lr_all
               << "," << construct_min_rank_leaf
               << "," << construct_max_rank_leaf
+              << "," << construct_avg_rank_leaf
               << "," << dense_eig_time
               << "," << m
               << "," << a
@@ -1617,6 +1636,7 @@ int main(int argc, char ** argv) {
               << "," << h2_eig_time
               << "," << ldl_min_rank
               << "," << ldl_max_rank
+              << "," << ldl_avg_rank
               << "," << h2_eig_mem
               << "," << max_rank_shift
               << "," << dense_mth_eigv
