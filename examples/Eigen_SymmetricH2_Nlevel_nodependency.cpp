@@ -36,6 +36,8 @@ using vec = std::vector<int64_t>;
 // #define USE_TIMER
 // Comment the following line to use ID (without SVD) for basis construction
 // #define USE_SVD_COMPRESSION
+// Uncomment the following to ignore L factor of overall LDL (since only D is needed for H2-Bisection)
+#define IGNORE_L_FACTOR
 
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
@@ -722,8 +724,21 @@ void SymmetricH2::factorize_level(const int64_t level) {
     // Skeleton (o) and Redundancy (c) decomposition
     Matrix UF_k = concat(Uc(k, level), U(k, level), 1);
     for (int64_t i: near_neighbors(k, level)) {
+#ifdef IGNORE_L_FACTOR
+      if (i == k) {
+        Matrix UF_i = concat(Uc(i, level), U(i, level), 1);
+        D(i, k, level) = matmul(UF_i, matmul(D(i, k, level), UF_k), true, false);
+      }
+      else {
+        // Ignore redundancy parts
+        Matrix Dik(D(i, k, level));
+        auto Dik_splits = D(i, k, level).split(vec{Uc(i, level).cols}, vec{Uc(k, level).cols});
+        Dik_splits[3] = matmul(U(i, level), matmul(Dik, U(k, level)), true, false);
+      }
+#else
       Matrix UF_i = concat(Uc(i, level), U(i, level), 1);
       D(i, k, level) = matmul(UF_i, matmul(D(i, k, level), UF_k), true, false);
+#endif
     }
     // Factorization
     const int64_t diag_row_split = D(k, k, level).rows - U(k, level).cols;
@@ -735,6 +750,10 @@ void SymmetricH2::factorize_level(const int64_t level) {
     ldl(Dkk_cc);
     // Lower Elimination
     for (int64_t i: near_neighbors(k, level)) {
+#ifdef IGNORE_L_FACTOR
+      // Ignore triangular solves with other than diagonal block
+      if (i != k) continue;
+#endif
       auto Dik_splits = D(i, k, level).split(vec{D(i, k, level).rows - U(i, level).cols},
                                              vec{diag_col_split});
       Matrix& Dik_cc = Dik_splits[0];
