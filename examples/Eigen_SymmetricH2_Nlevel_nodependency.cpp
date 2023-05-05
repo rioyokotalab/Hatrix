@@ -240,6 +240,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
                                              const int64_t level,
                                              const bool include_fill_in) {
   const int64_t num_nodes = level_blocks[level];
+  #pragma omp parallel for
   for (int64_t i = 0; i < num_nodes; i++) {
     const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
     const auto idx = domain.get_cell_idx(i, node_level);
@@ -249,22 +250,41 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     const int64_t near_size = include_fill_in ? cell.sample_nearfield.size() : 0;
     const int64_t far_size  = cell.sample_farfield.size();
     if (near_size + far_size > 0) {
-      Matrix skeleton_dn(skeleton_size, 0);
-      Matrix skeleton_lr(skeleton_size, 0);
-      // Fill-in  part
+      // Allocate skeleton_row
+      std::vector<int64_t> col_splits;
+      int64_t ncols = 0;
+      if (far_size > 0) {
+        ncols += far_size;
+        col_splits.push_back(ncols);
+      }
       if (near_size > 0) {
-        // Concat fill-ins
-        for (int64_t j = 0; j <num_nodes; j++) {
-          if (F.exists(i, j, level)) {
-            skeleton_dn = concat(skeleton_dn, F(i, j, level), 1);
+        for (int64_t j: near_neighbors(i, level)) {
+          if (i != j) {
+            if (!F.exists(i, j, level)) {
+              throw std::logic_error("Could not find F(" + std::to_string(i) + "," + std::to_string(j) +
+                                     "," + std::to_string(level) + ") when constructing composite basis");
+            }
+            ncols += F(i, j, level).cols;
+            col_splits.push_back(ncols);
           }
         }
       }
-      // Low-rank part
+      col_splits.pop_back();
+      Matrix skeleton_row(skeleton_size, ncols);
+      auto skeleton_row_splits = skeleton_row.split({}, col_splits);
+      int64_t k = 0;
+      // Append low-rank part
       if (far_size > 0) {
-        skeleton_lr = concat(skeleton_lr, generate_p2p_matrix(domain, skeleton, cell.sample_farfield), 1);
+        skeleton_row_splits[k++] = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
       }
-      Matrix skeleton_row = concat(skeleton_lr, skeleton_dn, 1);
+      // Append fill-in part
+      if (near_size > 0) {
+        for (int64_t j: near_neighbors(i, level)) {
+          if (i != j) {
+            skeleton_row_splits[k++] = F(i, j, level);
+          }
+        }
+      }
 
       Matrix Ui;
       int64_t rank;
@@ -319,18 +339,24 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
         node_multipoles.push_back(skeleton[ipiv_row[k]]);
       }
       // Insert
-      U.insert(i, level, std::move(Qo));
-      Uc.insert(i, level, std::move(Qc));
-      R_row.insert(i, level, std::move(R));
-      multipoles.insert(i, level, std::move(node_multipoles));
+      #pragma omp critical
+      {
+        U.insert(i, level, std::move(Qo));
+        Uc.insert(i, level, std::move(Qc));
+        R_row.insert(i, level, std::move(R));
+        multipoles.insert(i, level, std::move(node_multipoles));
+      }
     }
     else {
       // Insert Dummies
       const int64_t rank = 0;
-      U.insert(i, level, Matrix(skeleton_size, rank));
-      Uc.insert(i, level, generate_identity_matrix(skeleton_size, skeleton_size));
-      R_row.insert(i, level, Matrix(rank, rank));
-      multipoles.insert(i, level, std::vector<int64_t>());
+      #pragma omp critical
+      {
+        U.insert(i, level, Matrix(skeleton_size, rank));
+        Uc.insert(i, level, generate_identity_matrix(skeleton_size, skeleton_size));
+        R_row.insert(i, level, Matrix(rank, rank));
+        multipoles.insert(i, level, std::vector<int64_t>());
+      }
     }
   }
 }
