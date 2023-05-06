@@ -103,6 +103,7 @@ class SymmetricH2 {
                  const int64_t level, nlohmann::json& json) const;
 #endif
 
+  Matrix get_oo(const int64_t i, const int64_t j, const int64_t level) const;
   void factorize_level(const int64_t level);
   void permute_and_merge(const int64_t level);
 
@@ -639,6 +640,22 @@ void SymmetricH2::write_JSON(const Domain& domain,
 }
 #endif
 
+Matrix SymmetricH2::get_oo(const int64_t i, const int64_t j, const int64_t level) const {
+  if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+    // Admissible block, use S block
+    return S(i, j, level);
+  }
+  else {
+    // Inadmissible block, use oo part of dense block
+    const Matrix& Dij = D(i, j, level);
+    const Matrix& Ui = U(i, level);
+    const Matrix& Uj = U(j, level);
+    const auto Dij_splits = Dij.split(vec{Dij.rows - Ui.cols},
+                                      vec{Dij.cols - Uj.cols});
+    return Dij_splits[3];
+  }
+}
+
 void SymmetricH2::factorize_level(const int64_t level) {
   if (level == 0) return;
   const int64_t parent_level = level - 1;
@@ -682,21 +699,6 @@ void SymmetricH2::factorize_level(const int64_t level) {
 
 void SymmetricH2::permute_and_merge(const int64_t level) {
   if (level == 0) return;
-  auto Dchild_oo = [this](const int64_t ic, const int64_t jc, const int64_t child_level) {
-    if (is_admissible.exists(ic, jc, child_level) && is_admissible(ic, jc, child_level)) {
-      // Admissible block, use S block
-      return S(ic, jc, child_level);
-    }
-    else {
-      // Inadmissible block, use oo part of dense block
-      Matrix& Dchild = D(ic, jc, child_level);
-      Matrix& Ui = U(ic, child_level);
-      Matrix& Uj = U(jc, child_level);
-      auto Dchild_splits = Dchild.split(vec{Dchild.rows - Ui.cols},
-                                        vec{Dchild.cols - Uj.cols});
-      return Dchild_splits[3];
-    }
-  };
   // Merge oo parts of children as parent level near coupling matrices
   if (matrix_type == BLR2_MATRIX) {
     const int64_t num_nodes = level_blocks[level];
@@ -708,18 +710,20 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
         parent_row_splits.push_back(nrows);
       }
     }
-    Matrix Dij(nrows, nrows);
-    auto Dij_splits = Dij.split(parent_row_splits, parent_row_splits);
+    D.insert(0, 0, 0, Matrix(nrows, nrows));
+    auto D_splits = D(0, 0, 0).split(parent_row_splits, parent_row_splits);
+    // The following loop should be parallelizable
+    // But for some reason pragma omp parallel for with omp atomic does not compile
     for (int64_t ic = 0; ic < num_nodes; ic++) {
       for (int64_t jc = 0; jc < num_nodes; jc++) {
-        Dij_splits[ic * num_nodes + jc] = Dchild_oo(ic, jc, level);
+        D_splits[ic * num_nodes + jc] = get_oo(ic, jc, level);
       }
     }
-    D.insert(0, 0, 0, std::move(Dij));
   }
   else {
     const auto parent_level = level - 1;
     const auto parent_num_nodes = level_blocks[parent_level];
+    // Allocate
     for (int64_t i = 0; i < parent_num_nodes; i++) {
       for (int64_t j: near_neighbors(i, parent_level)) {
         const auto i_c1 = i * 2 + 0;
@@ -728,14 +732,26 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
         const auto j_c2 = j * 2 + 1;
         const auto nrows = U(i_c1, level).cols + U(i_c2, level).cols;
         const auto ncols = U(j_c1, level).cols + U(j_c2, level).cols;
-        Matrix Dij(nrows, ncols);
+        D.insert(i, j, parent_level, Matrix(nrows, ncols));
+      }
+    }
+    // Merge
+    #pragma omp parallel for
+    for (int64_t i = 0; i < parent_num_nodes; i++) {
+      for (int64_t j: near_neighbors(i, parent_level)) {
+        const auto i_c1 = i * 2 + 0;
+        const auto i_c2 = i * 2 + 1;
+        const auto j_c1 = j * 2 + 0;
+        const auto j_c2 = j * 2 + 1;
+        const auto nrows = U(i_c1, level).cols + U(i_c2, level).cols;
+        const auto ncols = U(j_c1, level).cols + U(j_c2, level).cols;
+        Matrix& Dij = D(i, j, parent_level);
         auto Dij_splits = Dij.split(vec{U(i_c1, level).cols},
                                     vec{U(j_c1, level).cols});
-        Dij_splits[0] = Dchild_oo(i_c1, j_c1, level);  // Dij_cc
-        Dij_splits[1] = Dchild_oo(i_c1, j_c2, level);  // Dij_co
-        Dij_splits[2] = Dchild_oo(i_c2, j_c1, level);  // Dij_oc
-        Dij_splits[3] = Dchild_oo(i_c2, j_c2, level);  // Dij_oo
-        D.insert(i, j, parent_level, std::move(Dij));
+        Dij_splits[0] = get_oo(i_c1, j_c1, level);  // Dij_cc
+        Dij_splits[1] = get_oo(i_c1, j_c2, level);  // Dij_co
+        Dij_splits[2] = get_oo(i_c2, j_c1, level);  // Dij_oc
+        Dij_splits[3] = get_oo(i_c2, j_c2, level);  // Dij_oo
       }
     }
   }

@@ -724,6 +724,17 @@ void SymmetricH2::compute_fill_in_qr(const Domain& domain, const int64_t level, 
 
 void SymmetricH2::compute_fill_in(const Domain& domain, const int64_t level, const double diag_shift) {
   const int64_t num_nodes = level_blocks[level];
+  // Allocate
+  for (int64_t k = 0; k < num_nodes; k++) {
+    const auto skeleton_k_size = get_skeleton(domain, k, level).size();
+    for (int64_t i: near_neighbors(k, level)) {
+      if (i != k) {
+        const auto skeleton_i_size = get_skeleton(domain, i, level).size();
+        F.insert(i, k, level, Matrix(skeleton_i_size, skeleton_k_size));
+      }
+    }
+  }
+  // Compute
   #pragma omp parallel for
   for (int64_t k = 0; k < num_nodes; k++) {
     Matrix Dkk = get_dense_skeleton(domain, k, k, level);
@@ -733,12 +744,10 @@ void SymmetricH2::compute_fill_in(const Domain& domain, const int64_t level, con
     for (int64_t i: near_neighbors(k, level)) {
       if (i != k) {
         // Compute fill_in = Dik * inv(Dkk)
-        Matrix fill_in_T = transpose(get_dense_skeleton(domain, i, k, level)); // TODO change to D_ki
-        pivoted_ldl_solve(Dkk, ipiv, fill_in_T);
-        #pragma omp critical
-        {
-          F.insert(i, k, level, transpose(fill_in_T));
-        }
+        // Equivalent to: (fill_in)^T = inv(Dkk) * Dik^T = inv(Dkk) * Dki
+        Matrix Dki = get_dense_skeleton(domain, k, i, level);
+        pivoted_ldl_solve(Dkk, ipiv, Dki);
+        F(i, k, level) = transpose(Dki);
       }
     }
   }
@@ -815,18 +824,20 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
         parent_row_splits.push_back(nrows);
       }
     }
-    Matrix Dij(nrows, nrows);
-    auto Dij_splits = Dij.split(parent_row_splits, parent_row_splits);
+    D.insert(0, 0, 0, Matrix(nrows, nrows));
+    auto D_splits = D(0, 0, 0).split(parent_row_splits, parent_row_splits);
+    // The following loop should be parallelizable
+    // But for some reason pragma omp parallel for with omp atomic does not compile
     for (int64_t ic = 0; ic < num_nodes; ic++) {
       for (int64_t jc = 0; jc < num_nodes; jc++) {
-        Dij_splits[ic * num_nodes + jc] = get_oo(ic, jc, level);
+        D_splits[ic * num_nodes + jc] = get_oo(ic, jc, level);
       }
     }
-    D.insert(0, 0, 0, std::move(Dij));
   }
   else {
     const auto parent_level = level - 1;
     const auto parent_num_nodes = level_blocks[parent_level];
+    // Allocate
     for (int64_t i = 0; i < parent_num_nodes; i++) {
       for (int64_t j: near_neighbors(i, parent_level)) {
         const auto i_c1 = i * 2 + 0;
@@ -835,14 +846,26 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
         const auto j_c2 = j * 2 + 1;
         const auto nrows = U(i_c1, level).cols + U(i_c2, level).cols;
         const auto ncols = U(j_c1, level).cols + U(j_c2, level).cols;
-        Matrix Dij(nrows, ncols);
+        D.insert(i, j, parent_level, Matrix(nrows, ncols));
+      }
+    }
+    // Merge
+    #pragma omp parallel for
+    for (int64_t i = 0; i < parent_num_nodes; i++) {
+      for (int64_t j: near_neighbors(i, parent_level)) {
+        const auto i_c1 = i * 2 + 0;
+        const auto i_c2 = i * 2 + 1;
+        const auto j_c1 = j * 2 + 0;
+        const auto j_c2 = j * 2 + 1;
+        const auto nrows = U(i_c1, level).cols + U(i_c2, level).cols;
+        const auto ncols = U(j_c1, level).cols + U(j_c2, level).cols;
+        Matrix& Dij = D(i, j, parent_level);
         auto Dij_splits = Dij.split(vec{U(i_c1, level).cols},
                                     vec{U(j_c1, level).cols});
         Dij_splits[0] = get_oo(i_c1, j_c1, level);  // Dij_cc
         Dij_splits[1] = get_oo(i_c1, j_c2, level);  // Dij_co
         Dij_splits[2] = get_oo(i_c2, j_c1, level);  // Dij_oc
         Dij_splits[3] = get_oo(i_c2, j_c2, level);  // Dij_oo
-        D.insert(i, j, parent_level, std::move(Dij));
       }
     }
   }
