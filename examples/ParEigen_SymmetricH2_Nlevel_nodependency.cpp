@@ -219,6 +219,19 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
                                              const int64_t level,
                                              const bool include_fill_in) {
   const int64_t num_nodes = level_blocks[level];
+  // Allocate spaces for all nodes
+  for (int64_t i = 0; i < num_nodes; i++) {
+    const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
+    const auto idx = domain.get_cell_idx(i, node_level);
+    const auto& cell = domain.cells[idx];
+    const auto skeleton = get_skeleton(domain, i, level);
+    const auto skeleton_size = skeleton.size();
+    U.insert(i, level, Matrix(skeleton_size, skeleton_size));
+    Uc.insert(i, level, generate_identity_matrix(skeleton_size, skeleton_size));
+    R_row.insert(i, level, Matrix(skeleton_size, skeleton_size));
+    multipoles.insert(i, level, std::vector<int64_t>(skeleton_size));
+  }
+  // Construct bases
   #pragma omp parallel for
   for (int64_t i = 0; i < num_nodes; i++) {
     const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
@@ -228,6 +241,10 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     const int64_t skeleton_size = skeleton.size();
     const int64_t near_size = include_fill_in ? cell.near_list.size() - 1 : 0;
     const int64_t far_size  = cell.sample_farfield.size();
+    auto& U_i = U(i, level);
+    auto& Uc_i = Uc(i, level);
+    auto& R_i = R_row(i, level);
+    auto& multipoles_i = multipoles(i, level);
     if (near_size + far_size > 0) {
       // Allocate skeleton_row
       std::vector<int64_t> col_splits;
@@ -311,31 +328,26 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       Matrix Qo(Q_splits[0], true);
       Matrix Qc = rank < skeleton_size ? Matrix(Q_splits[1], true) : Matrix(skeleton_size, 0);
       R.shrink(rank, rank);
+      // Insert to pre-allocated space
+      U_i.shrink(Qo.rows, Qo.cols);
+      Uc_i.shrink(Qc.rows, Qc.cols);
+      R_i.shrink(rank, rank);
+      U_i = Qo;
+      Uc_i = Qc;
+      R_i = R;
       // Convert ipiv to multipoles
-      std::vector<int64_t> node_multipoles;
-      node_multipoles.reserve(rank);
+      multipoles_i.resize(rank);
       for (int64_t k = 0; k < rank; k++) {
-        node_multipoles.push_back(skeleton[ipiv_row[k]]);
-      }
-      // Insert
-      #pragma omp critical
-      {
-        U.insert(i, level, std::move(Qo));
-        Uc.insert(i, level, std::move(Qc));
-        R_row.insert(i, level, std::move(R));
-        multipoles.insert(i, level, std::move(node_multipoles));
+        multipoles_i[k] = skeleton[ipiv_row[k]];
       }
     }
     else {
       // Insert Dummies
       const int64_t rank = 0;
-      #pragma omp critical
-      {
-        U.insert(i, level, Matrix(skeleton_size, rank));
-        Uc.insert(i, level, generate_identity_matrix(skeleton_size, skeleton_size));
-        R_row.insert(i, level, Matrix(rank, rank));
-        multipoles.insert(i, level, std::vector<int64_t>());
-      }
+      U_i.shrink(skeleton_size, rank);
+      Uc_i.shrink(skeleton_size, skeleton_size);
+      R_i.shrink(rank, rank);
+      multipoles_i.resize(rank);
     }
   }
 }
