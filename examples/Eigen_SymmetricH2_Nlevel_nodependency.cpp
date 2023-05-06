@@ -16,6 +16,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <cstdio>
+#include <omp.h>
 
 #ifdef USE_JSON
 #include "nlohmann/json.hpp"
@@ -987,7 +988,7 @@ int main(int argc, char ** argv) {
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
-    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
+    std::cout << "nthreads,N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_avg_rank,construct_mem,construct_time,construct_error"
               << ",dense_eig_time,build_basis_time"
@@ -1111,7 +1112,8 @@ int main(int argc, char ** argv) {
   const auto lr_ratio = A.low_rank_block_ratio();
 
 #ifndef OUTPUT_CSV
-  std::cout << "N=" << N
+  std::cout << "nthreads=" << omp_get_max_threads()
+            << " N=" << N
             << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
             << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
@@ -1261,7 +1263,8 @@ int main(int argc, char ** argv) {
               << " success=" << (success ? "TRUE" : "FALSE")
               << std::endl;
 #else
-    std::cout << N
+    std::cout << omp_get_max_threads()
+              << "," << N
               << "," << leaf_size
               << "," << accuracy
               << "," << (use_rel_acc ? "rel_err" : "abs_err")
