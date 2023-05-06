@@ -850,14 +850,30 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
 
 void SymmetricH2::factorize(const Domain& domain, const double diag_shift) {
   for (int64_t level = height; level >= 0; level--) {
+    START_TIMER("compute_fill_ins");
     compute_fill_in(domain, level, diag_shift);
+    STOP_TIMER("compute_fill_ins");
+
+    START_TIMER("generate_cluster_bases");
     generate_row_cluster_basis(domain, level, true);
+    STOP_TIMER("generate_cluster_bases");
+
+    START_TIMER("generate_far_coupling_matrices");
     generate_far_coupling_matrices(domain, level);
+    STOP_TIMER("generate_far_coupling_matrices");
+
+    START_TIMER("factorize_level");
     factorize_level(level);
+    STOP_TIMER("factorize_level");
+
+    START_TIMER("permute_and_merge");
     permute_and_merge(level);
+    STOP_TIMER("permute_and_merge");
   }
   // Factorize remaining root level
+  START_TIMER("factorize_root");
   ldl(D(0, 0, 0));
+  STOP_TIMER("factorize_root");
 }
 
 std::tuple<int64_t, int64_t>
@@ -870,7 +886,9 @@ SymmetricH2::inertia(const Domain& domain,
     shift_diag(A_shifted.D(node, node, height), -lambda);
   }
   // LDL Factorize
+  START_TIMER("ldl_factorization");
   A_shifted.factorize(domain, -lambda);
+  STOP_TIMER("ldl_factorization");
   // Count negative entries in D
   int64_t negative_elements_count = 0;
   for(int64_t level = height; level >= 0; level--) {
@@ -911,10 +929,13 @@ SymmetricH2::get_kth_eigenvalue(const Domain& domain,
   int64_t ldl_max_rank = 0;
   double max_rank_shift = 0;
   bool singular = false;
+  START_TIMER("slicing_the_spectrum");
   while((b[idx_k] - a[idx_k]) >= ev_tol) {
     const auto mid = (a[idx_k] + b[idx_k]) / 2;
     int64_t v_mid, factor_max_rank;
+    START_TIMER("compute_inertia");
     std::tie(v_mid, factor_max_rank) = (*this).inertia(domain, mid, singular);
+    STOP_TIMER("compute_inertia");
     if(factor_max_rank >= ldl_max_rank) {
       ldl_max_rank = factor_max_rank;
       max_rank_shift = mid;
@@ -934,6 +955,7 @@ SymmetricH2::get_kth_eigenvalue(const Domain& domain,
       }
     }
   }
+  STOP_TIMER("slicing_the_spectrum");
   const auto fp_ops = (int64_t)papi.fp_ops();
   return {(a[idx_k] + b[idx_k]) / 2, max_rank_shift, fp_ops};
 }
@@ -1226,10 +1248,12 @@ int main(int argc, char ** argv) {
     const int64_t m = target_m[k];
     double h2_mth_eigv, max_rank_shift;
     int64_t h2_eig_ops;
+    START_TIMER("get_kth_eigenvalue");
     const auto h2_eig_start = std::chrono::system_clock::now();
     std::tie(h2_mth_eigv, max_rank_shift, h2_eig_ops) =
         M.get_kth_eigenvalue(domain, ev_tol, k, target_m, target_a, target_b);
     const auto h2_eig_stop = std::chrono::system_clock::now();
+    STOP_TIMER("get_kth_eigenvalue");
     int64_t ldl_min_rank, ldl_max_rank, h2_eig_mem;
     double ldl_avg_rank;
     // Output ranks after factorization of shifted matrix that produces the largest maximum rank
@@ -1326,6 +1350,7 @@ int main(int argc, char ** argv) {
               << std::endl;
 #endif
   }
+  PRINT_TIME("get_kth_eigenvalue", 4);
 
   Hatrix::Context::finalize();
   return 0;
