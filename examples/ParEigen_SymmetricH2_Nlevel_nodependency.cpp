@@ -226,7 +226,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
     const auto& cell = domain.cells[idx];
     const auto skeleton = get_skeleton(domain, i, level);
     const int64_t skeleton_size = skeleton.size();
-    const int64_t near_size = include_fill_in ? cell.sample_nearfield.size() : 0;
+    const int64_t near_size = include_fill_in ? cell.near_list.size() - 1 : 0;
     const int64_t far_size  = cell.sample_farfield.size();
     if (near_size + far_size > 0) {
       // Allocate skeleton_row
@@ -1024,7 +1024,7 @@ int main(int argc, char ** argv) {
   domain.build_interactions(admis);
 
   const auto start_sample = MPI_Wtime();
-  domain.build_sample_bodies(sample_self_size, sample_far_size, sample_far_size, sampling_algo, geom_type == 3);
+  domain.build_sample_bodies(sample_self_size, 0, sample_far_size, sampling_algo, geom_type == 3);
   const auto stop_sample = MPI_Wtime();
   const double sample_time = stop_sample - start_sample;
 

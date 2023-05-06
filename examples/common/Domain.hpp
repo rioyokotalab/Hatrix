@@ -661,25 +661,26 @@ class Domain {
                                  sample_self_size, sampling_algo, 0, ELSES_GEOM);
       }
     }
-    // Bottom-up pass to select cell's nearfield sample
-    for (int64_t level = tree_height; level > 0; level--) {
-      const auto level_ncells = (int64_t)1 << level;
-      const auto level_offset = level_ncells - 1;
-      for (int64_t node = 0; node < level_ncells; node++) {
-        const auto cell_idx = level_offset + node;
-        auto& cell = cells[cell_idx];
-        std::vector<int64_t> initial_sample;
-        for (const auto near_idx: cell.near_list) {
-          if (near_idx != cell_idx) {  // Exclude self-to-self interaction
-            const auto& near_cell = cells[near_idx];
-            initial_sample.insert(initial_sample.end(),
-                                  near_cell.sample_bodies.begin(),
-                                  near_cell.sample_bodies.end());
+    if (sample_near_size > 0) {
+      // Bottom-up pass to select cell's nearfield sample
+      for (int64_t level = tree_height; level > 0; level--) {
+        const auto level_ncells = (int64_t)1 << level;
+        const auto level_offset = level_ncells - 1;
+        for (int64_t node = 0; node < level_ncells; node++) {
+          const auto cell_idx = level_offset + node;
+          auto& cell = cells[cell_idx];
+          std::vector<int64_t> initial_sample;
+          for (const auto near_idx: cell.near_list) {
+            if (near_idx != cell_idx) {  // Exclude self-to-self interaction
+              const auto& near_cell = cells[near_idx];
+              const auto near_bodies = near_cell.get_bodies();
+              initial_sample.insert(initial_sample.end(), near_bodies.begin(), near_bodies.end());
+            }
           }
+          cell.sample_nearfield =
+              select_sample_bodies(ndim, bodies, initial_sample,
+                                   sample_near_size, sampling_algo, 1, ELSES_GEOM);
         }
-        cell.sample_nearfield =
-            select_sample_bodies(ndim, bodies, initial_sample,
-                                 sample_near_size, sampling_algo, 1, ELSES_GEOM);
       }
     }
     // Top-down pass to select cell's farfield sample
