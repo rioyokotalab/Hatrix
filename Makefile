@@ -133,6 +133,9 @@ $(EIGEN_EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 examples/ParEigen_SymmetricH2_Nlevel.o : examples/ParEigen_SymmetricH2_Nlevel.cpp
 	$(MPICXX) $(CXXFLAGS) $< -c -o $@
 
+examples/ParEigen_SymmetricH2_Nlevel_nodependency.o : examples/ParEigen_SymmetricH2_Nlevel_nodependency.cpp
+	$(MPICXX) $(CXXFLAGS) $< -c -o $@
+
 examples/MSParEigen_SymmetricH2_Nlevel.o : examples/MSParEigen_SymmetricH2_Nlevel.cpp
 	$(MPICXX) $(CXXFLAGS) $< -c -o $@
 
@@ -143,6 +146,11 @@ examples/ParEigen_Dense_PDSYEVX.o : examples/ParEigen_Dense_PDSYEVX.cpp
 	$(MPICXX) $(CXXFLAGS) $< -c -o $@
 
 ParEigen_SymmetricH2_Nlevel : % : examples/ParEigen_SymmetricH2_Nlevel.o dirs
+	$(MPICXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+ParEigen_SymmetricH2_Nlevel_nodependency : % : examples/ParEigen_SymmetricH2_Nlevel_nodependency.o dirs
 	$(MPICXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
@@ -163,6 +171,7 @@ ParEigen_Dense_PDSYEVX : % : examples/ParEigen_Dense_PDSYEVX.o dirs
 	$(MV) $@ bin/
 
 PAR_EIGEN_EXAMPLE_EXECUTABLES := ParEigen_SymmetricH2_Nlevel \
+	ParEigen_SymmetricH2_Nlevel_nodependency \
 	MSParEigen_SymmetricH2_Nlevel \
 	ParEigen_Dense_PDSYEV \
 	ParEigen_Dense_PDSYEVX
