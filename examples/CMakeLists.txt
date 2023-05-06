@@ -85,6 +85,9 @@ if(MPI_FOUND)
   add_executable(ParEigen_SymmetricH2_Nlevel ParEigen_SymmetricH2_Nlevel.cpp)
   target_link_libraries(ParEigen_SymmetricH2_Nlevel Hatrix MPI::MPI_CXX)
 
+  add_executable(ParEigen_SymmetricH2_Nlevel_nodependency ParEigen_SymmetricH2_Nlevel_nodependency.cpp)
+  target_link_libraries(ParEigen_SymmetricH2_Nlevel_nodependency Hatrix MPI::MPI_CXX)
+
   add_executable(ParEigen_Dense_PDSYEV ParEigen_Dense_PDSYEV.cpp)
   target_link_libraries(ParEigen_Dense_PDSYEV Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
 
