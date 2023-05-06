@@ -343,15 +343,12 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       }
     }
     else {
-      #pragma omp critical
-      {
-        // Insert Dummies
-        const int64_t rank = 0;
-        U_i.shrink(skeleton_size, rank);
-        Uc_i.shrink(skeleton_size, skeleton_size);
-        R_i.shrink(rank, rank);
-        multipoles_i.resize(rank);
-      }
+      // Insert Dummies
+      const int64_t rank = 0;
+      U_i.shrink(skeleton_size, rank);
+      Uc_i.shrink(skeleton_size, skeleton_size);
+      R_i.shrink(rank, rank);
+      multipoles_i.resize(rank);
     }
   }
 }
