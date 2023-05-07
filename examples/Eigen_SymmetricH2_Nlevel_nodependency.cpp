@@ -83,12 +83,14 @@ class SymmetricH2 {
   int64_t matrix_type;
   int64_t height;
   int64_t min_adm_level;
+  int64_t rand_size;
   RowLevelMap U, Uc, R_row;
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
   RowColMap<std::vector<int64_t>> near_neighbors, far_neighbors;  // This is actually RowLevelMap
   std::vector<int64_t> level_blocks;
   RowColMap<std::vector<int64_t>> multipoles;
+  RowLevelMap rand_farblocks;  // Random sampling of farfield blocks
   RowColLevelMap<Matrix> F;  // Fill-in blocks
 
  private:
@@ -120,7 +122,8 @@ class SymmetricH2 {
               const int64_t N, const int64_t leaf_size,
               const double accuracy, const bool use_rel_acc,
               const int64_t max_rank, const double admis,
-              const int64_t matrix_type, const bool build_basis);
+              const int64_t matrix_type, const bool build_basis,
+              const int64_t rand_size);
 
   int64_t get_basis_min_rank() const;
   int64_t get_basis_max_rank() const;
@@ -275,7 +278,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       std::vector<int64_t> col_splits;
       int64_t ncols = 0;
       if (far_size > 0) {
-        ncols += far_size;
+        ncols += rand_size > 0 ? rand_size : far_size;
         col_splits.push_back(ncols);
       }
       if (near_size > 0) {
@@ -296,7 +299,20 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       int64_t k = 0;
       // Append low-rank part
       if (far_size > 0) {
-        skeleton_row_splits[k++] = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
+        if (rand_size > 0) {  // Use pre-computed random sample of farblocks
+          const auto& farblocks = rand_farblocks(i, level);
+          Matrix skeleton_farblocks(skeleton_size, rand_size);
+          for (int64_t idx_i = 0; idx_i < skeleton_size; idx_i++) {
+            const auto local_i = skeleton[idx_i] - cell.body_offset;
+            for (int64_t j = 0; j < rand_size; j++) {
+              skeleton_farblocks(idx_i, j) = farblocks(local_i, j);
+            }
+          }
+          skeleton_row_splits[k++] = skeleton_farblocks;
+        }
+        else {
+          skeleton_row_splits[k++] = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
+        }
       }
       // Append fill-in part
       if (near_size > 0) {
@@ -447,14 +463,28 @@ SymmetricH2::SymmetricH2(const Domain& domain,
                          const int64_t N, const int64_t leaf_size,
                          const double accuracy, const bool use_rel_acc,
                          const int64_t max_rank, const double admis,
-                         const int64_t matrix_type, const bool build_basis)
-    : N(N), leaf_size(leaf_size), accuracy(accuracy),
-      use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
+                         const int64_t matrix_type, const bool build_basis,
+                         const int64_t rand_size)
+    : N(N), leaf_size(leaf_size), accuracy(accuracy), use_rel_acc(use_rel_acc),
+      max_rank(max_rank), admis(admis), matrix_type(matrix_type), rand_size(rand_size) {
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
   err_tol = accuracy;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
+  if (rand_size > 0) {  // Pre-compute random sample of farfield blocks
+    for (int64_t level = height; level >= 0; level--) {
+      const auto num_nodes = level_blocks[level];
+      for (int64_t node = 0; node < num_nodes; node++) {
+        const auto& cell = domain.cells[domain.get_cell_idx(node, level)];
+        if (cell.sample_farfield.size() > 0) {
+          Matrix farblocks = generate_p2p_matrix(domain, cell.get_bodies(), cell.sample_farfield);
+          Matrix rand = generate_random_matrix(cell.sample_farfield.size(), rand_size);
+          rand_farblocks.insert(node, level, matmul(farblocks, rand));
+        }
+      }
+    }
+  }
   if (build_basis) {
     for (int64_t level = height; level >= 0; level--) {
       generate_row_cluster_basis(domain, level, false);
@@ -1026,43 +1056,46 @@ int main(int argc, char ** argv) {
   const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
   int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
 
+  // Sample columns of low-rank part with random matrix
+  const int64_t rand_size = argc > 11 ? atol(argv[11]) : 0;
+
   // Specify sampling technique
   // 0: Choose bodies with equally spaced indices
   // 1: Choose bodies random indices
   // 2: Farthest Point Sampling
   // 3: Anchor Net method
-  const int64_t sampling_algo = argc > 11 ? atol(argv[11]) : 3;
+  const int64_t sampling_algo = argc > 12 ? atol(argv[12]) : 3;
   // Specify maximum number of sample points that represents a cluster
   // For anchor-net method: size of grid
-  int64_t sample_self_size = argc > 12 ? atol(argv[12]) :
+  int64_t sample_self_size = argc > 13 ? atol(argv[13]) :
                              (ndim == 1 ? 10 * leaf_size : 30);
   // Specify maximum number of sample points that represents a cluster's far-field
   // For anchor-net method: size of grid
-  int64_t sample_far_size = argc > 13 ? atol(argv[13]) :
+  int64_t sample_far_size = argc > 14 ? atol(argv[14]) :
                             (ndim == 1 ? 10 * leaf_size + 10: sample_self_size + 5);
   // Eigenvalue computation parameters
-  const double ev_tol = argc > 14 ? atof(argv[14]) : 1.e-3;
-  int64_t m_begin = argc > 15 ? atol(argv[15]) : 1;
-  int64_t m_end = argc > 16 ? atol(argv[16]) : m_begin;
-  double a = argc > 17 ? atof(argv[17]) : 0;
-  double b = argc > 18 ? atof(argv[18]) : 0;
-  const bool compute_eig_acc = argc > 19 ? (atol(argv[19]) == 1) : true;
-  const int64_t print_csv_header = argc > 20 ? atol(argv[20]) : 1;
+  const double ev_tol = argc > 15 ? atof(argv[15]) : 1.e-3;
+  int64_t k_begin = argc > 16 ? atol(argv[16]) : 1;
+  int64_t k_end = argc > 17 ? atol(argv[17]) : k_begin;
+  double a = argc > 18 ? atof(argv[18]) : 0;
+  double b = argc > 19 ? atof(argv[19]) : 0;
+  const bool compute_eig_acc = argc > 20 ? (atol(argv[20]) == 1) : true;
+  const int64_t print_csv_header = argc > 21 ? atol(argv[21]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 21 ? std::string(argv[21]) : "";
-  const int64_t sort_bodies = argc > 22 ? atol(argv[22]) : 0;
+  const std::string file_name = argc > 22 ? std::string(argv[22]) : "";
+  const int64_t sort_bodies = argc > 23 ? atol(argv[23]) : 0;
 
   Hatrix::Context::init();
 
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
-    std::cout << "nthreads,N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
+    std::cout << "nthreads,N,leaf_size,accuracy,acc_type,max_rank,rand_size,LRA,admis,matrix_type,kernel,geometry"
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
               << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_avg_rank,construct_mem,construct_time,construct_error"
               << ",dense_eig_time,build_basis_time"
-              << ",m,a0,b0,v_a0,v_b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,ldl_avg_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
+              << ",k,a0,b0,v_a0,v_b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,ldl_avg_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
               << std::endl;
   }
 #endif
@@ -1170,7 +1203,8 @@ int main(int argc, char ** argv) {
                              (stop_sample - start_sample).count();
 
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
+  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank,
+                        admis, matrix_type, true, rand_size);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
@@ -1188,6 +1222,7 @@ int main(int argc, char ** argv) {
             << " accuracy=" << accuracy
             << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
             << " max_rank=" << max_rank
+            << " rand_size=" << rand_size
             << " LRA="
 #ifdef USE_SVD_COMPRESSION
             << "SVD+ID+QR"
@@ -1224,7 +1259,8 @@ int main(int argc, char ** argv) {
     dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
                      (dense_eig_stop - dense_eig_start).count();
   }
-  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
+  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank,
+                        admis, matrix_type, false, rand_size);
   const double build_basis_time = 0;  // Basis is constructed during factorization instead
 #ifndef OUTPUT_CSV
   std::cout << "dense_eig_time=" << dense_eig_time
@@ -1252,9 +1288,9 @@ int main(int argc, char ** argv) {
   }
   // Determine which eigenvalue(s) to approximate
   std::vector<int64_t> target_m;
-  if (m_begin <= 0) {
-    const auto num = m_end;
-    if (m_begin == 0) {
+  if (k_begin <= 0) {
+    const auto num = k_end;
+    if (k_begin == 0) {
       std::mt19937 g(N);
       std::vector<int64_t> random_m(N, 0);
       for (int64_t i = 0; i < N; i++) {
@@ -1265,7 +1301,7 @@ int main(int argc, char ** argv) {
         target_m.push_back(random_m[i]);
       }
     }
-    if (m_begin == -1) {
+    if (k_begin == -1) {
       const auto linspace = Hatrix::equally_spaced_vector(num, 1, N, true);
       for (int64_t i = 0; i < num; i++) {
         target_m.push_back((int64_t)linspace[i]);
@@ -1273,7 +1309,7 @@ int main(int argc, char ** argv) {
     }
   }
   else {
-    for (int64_t m = m_begin; m <= m_end; m++) {
+    for (int64_t m = k_begin; m <= k_end; m++) {
       target_m.push_back(m);
     }
   }
@@ -1316,7 +1352,7 @@ int main(int argc, char ** argv) {
     const double eig_abs_err = compute_eig_acc ? std::abs(h2_mth_eigv - dense_mth_eigv) : -1;
     const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
 #ifndef OUTPUT_CSV
-    std::cout << "m=" << m
+    std::cout << "k=" << m
               << " a0=" << a
               << " b0=" << b
               << " v_a0=" << v_a
@@ -1341,6 +1377,7 @@ int main(int argc, char ** argv) {
               << "," << accuracy
               << "," << (use_rel_acc ? "rel_err" : "abs_err")
               << "," << max_rank
+              << "," << rand_size
               << ","
 #ifdef USE_SVD_COMPRESSION
               << "SVD+ID+QR"

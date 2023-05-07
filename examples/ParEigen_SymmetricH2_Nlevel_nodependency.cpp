@@ -74,12 +74,14 @@ class SymmetricH2 {
   int64_t matrix_type;
   int64_t height;
   int64_t min_adm_level;
+  int64_t rand_size;
   RowLevelMap U, Uc, R_row;
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
   RowColMap<std::vector<int64_t>> near_neighbors, far_neighbors;  // This is actually RowLevelMap
   std::vector<int64_t> level_blocks;
   RowColMap<std::vector<int64_t>> multipoles;
+  RowLevelMap rand_farblocks;  // Random sampling of farfield blocks
   RowColLevelMap<Matrix> F;  // Fill-in blocks
 
  private:
@@ -105,7 +107,8 @@ class SymmetricH2 {
               const int64_t N, const int64_t leaf_size,
               const double accuracy, const bool use_rel_acc,
               const int64_t max_rank, const double admis,
-              const int64_t matrix_type, const bool build_basis);
+              const int64_t matrix_type, const bool build_basis,
+              const int64_t rand_size);
 
   int64_t get_basis_min_rank() const;
   int64_t get_basis_max_rank() const;
@@ -250,7 +253,7 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       std::vector<int64_t> col_splits;
       int64_t ncols = 0;
       if (far_size > 0) {
-        ncols += far_size;
+        ncols += rand_size > 0 ? rand_size : far_size;
         col_splits.push_back(ncols);
       }
       if (near_size > 0) {
@@ -271,7 +274,20 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       int64_t k = 0;
       // Append low-rank part
       if (far_size > 0) {
-        skeleton_row_splits[k++] = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
+        if (rand_size > 0) {  // Use pre-computed random sample of farblocks
+          const auto& farblocks = rand_farblocks(i, level);
+          Matrix skeleton_farblocks(skeleton_size, rand_size);
+          for (int64_t idx_i = 0; idx_i < skeleton_size; idx_i++) {
+            const auto local_i = skeleton[idx_i] - cell.body_offset;
+            for (int64_t j = 0; j < rand_size; j++) {
+              skeleton_farblocks(idx_i, j) = farblocks(local_i, j);
+            }
+          }
+          skeleton_row_splits[k++] = skeleton_farblocks;
+        }
+        else {
+          skeleton_row_splits[k++] = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
+        }
       }
       // Append fill-in part
       if (near_size > 0) {
@@ -422,14 +438,28 @@ SymmetricH2::SymmetricH2(const Domain& domain,
                          const int64_t N, const int64_t leaf_size,
                          const double accuracy, const bool use_rel_acc,
                          const int64_t max_rank, const double admis,
-                         const int64_t matrix_type, const bool build_basis)
-    : N(N), leaf_size(leaf_size), accuracy(accuracy),
-      use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
+                         const int64_t matrix_type, const bool build_basis,
+                         const int64_t rand_size)
+    : N(N), leaf_size(leaf_size), accuracy(accuracy), use_rel_acc(use_rel_acc),
+      max_rank(max_rank), admis(admis), matrix_type(matrix_type), rand_size(rand_size) {
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
   err_tol = accuracy;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
+  if (rand_size > 0) {  // Pre-compute random sample of farfield blocks
+    for (int64_t level = height; level >= 0; level--) {
+      const auto num_nodes = level_blocks[level];
+      for (int64_t node = 0; node < num_nodes; node++) {
+        const auto& cell = domain.cells[domain.get_cell_idx(node, level)];
+        if (cell.sample_farfield.size() > 0) {
+          Matrix farblocks = generate_p2p_matrix(domain, cell.get_bodies(), cell.sample_farfield);
+          Matrix rand = generate_random_matrix(cell.sample_farfield.size(), rand_size);
+          rand_farblocks.insert(node, level, matmul(farblocks, rand));
+        }
+      }
+    }
+  }
   if (build_basis) {
     for (int64_t level = height; level >= 0; level--) {
       generate_row_cluster_basis(domain, level, false);
@@ -939,32 +969,35 @@ int main(int argc, char ** argv) {
   const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
   int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
 
+    // Sample columns of low-rank part with random matrix
+  const int64_t rand_size = argc > 11 ? atol(argv[11]) : 0;
+
   // Specify sampling technique
   // 0: Choose bodies with equally spaced indices
   // 1: Choose bodies random indices
   // 2: Farthest Point Sampling
   // 3: Anchor Net method
-  const int64_t sampling_algo = argc > 11 ? atol(argv[11]) : 3;
+  const int64_t sampling_algo = argc > 12 ? atol(argv[12]) : 3;
   // Specify maximum number of sample points that represents a cluster
   // For anchor-net method: size of grid
-  int64_t sample_self_size = argc > 12 ? atol(argv[12]) :
+  int64_t sample_self_size = argc > 13 ? atol(argv[13]) :
                              (ndim == 1 ? 10 * leaf_size : 30);
   // Specify maximum number of sample points that represents a cluster's far-field
   // For anchor-net method: size of grid
-  int64_t sample_far_size = argc > 13 ? atol(argv[13]) :
+  int64_t sample_far_size = argc > 14 ? atol(argv[14]) :
                             (ndim == 1 ? 10 * leaf_size + 10: sample_self_size + 5);
   // Eigenvalue computation parameters
-  const double ev_tol = argc > 14 ? atof(argv[14]) : 1.e-3;
-  int64_t k_begin = argc > 15 ? atol(argv[15]) : 1;
-  int64_t k_end = argc > 16 ? atol(argv[16]) : k_begin;
-  double a = argc > 17 ? atof(argv[17]) : 0;
-  double b = argc > 18 ? atof(argv[18]) : 0;
-  const bool compute_eig_acc = argc > 19 ? (atol(argv[19]) == 1) : true;
-  const int64_t print_csv_header = argc > 20 ? atol(argv[20]) : 1;
+  const double ev_tol = argc > 15 ? atof(argv[15]) : 1.e-3;
+  int64_t k_begin = argc > 16 ? atol(argv[16]) : 1;
+  int64_t k_end = argc > 17 ? atol(argv[17]) : k_begin;
+  double a = argc > 18 ? atof(argv[18]) : 0;
+  double b = argc > 19 ? atof(argv[19]) : 0;
+  const bool compute_eig_acc = argc > 20 ? (atol(argv[20]) == 1) : true;
+  const int64_t print_csv_header = argc > 21 ? atol(argv[21]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 21 ? std::string(argv[21]) : "";
-  const int64_t sort_bodies = argc > 22 ? atol(argv[22]) : 0;
+  const std::string file_name = argc > 22 ? std::string(argv[22]) : "";
+  const int64_t sort_bodies = argc > 23 ? atol(argv[23]) : 0;
 
   Hatrix::Context::init();
 
@@ -1077,7 +1110,8 @@ int main(int argc, char ** argv) {
   const double sample_time = stop_sample - start_sample;
 
   const auto start_construct = MPI_Wtime();
-  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
+  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank,
+                        admis, matrix_type, true, rand_size);
   const auto stop_construct = MPI_Wtime();
   const auto construct_min_rank = A.get_basis_min_rank();
   const auto construct_max_rank = A.get_basis_max_rank();
@@ -1086,7 +1120,8 @@ int main(int argc, char ** argv) {
   const auto construct_error = A.construction_error(domain);
   const auto construct_mem = A.memory_usage();
   // Construct without basis
-  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
+  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank,
+                        admis, matrix_type, false, rand_size);
 
   // All processes finished construction
   MPI_Barrier(MPI_COMM_WORLD);
@@ -1094,12 +1129,12 @@ int main(int argc, char ** argv) {
 #ifndef OUTPUT_CSV
   if (mpi_rank == 0) {
       printf("mpi_nprocs=%d nthreads=%d N=%d leaf_size=%d accuracy=%.1e acc_type=%d max_rank=%d"
-             " admis=%.1lf matrix_type=%d kernel=%s geometry=%s"
+             " rand_size=%d admis=%.1lf matrix_type=%d kernel=%s geometry=%s"
              " sampling_algo=%s sample_self_size=%d sample_far_size=%d sample_farfield_max_size=%d"
              " height=%d construct_min_rank=%d construct_max_rank=%d construct_avg_rank=%.3lf"
              " construct_mem=%d construct_time=%.3lf construct_error=%.5e\n",
              mpi_nprocs, omp_get_max_threads(), (int)N, (int)leaf_size, accuracy,
-             (int)use_rel_acc, (int)max_rank, admis, (int)matrix_type,
+             (int)use_rel_acc, (int)max_rank, (int)rand_size, admis, (int)matrix_type,
              kernel_name.c_str(), geom_name.c_str(), sampling_algo_name.c_str(),
              (int)sample_self_size, (int)sample_far_size,
              (int)domain.get_max_farfield_size(), (int)A.height, (int)construct_min_rank,
@@ -1143,7 +1178,7 @@ int main(int argc, char ** argv) {
 #ifdef OUTPUT_CSV
   if (mpi_rank == 0 && print_csv_header == 1) {
     // Print CSV header
-    printf("mpi_nprocs,nthreads,N,leaf_size,accuracy,acc_type,max_rank,admis,matrix_type,kernel,geometry"
+    printf("mpi_nprocs,nthreads,N,leaf_size,accuracy,acc_type,max_rank,rand_size,admis,matrix_type,kernel,geometry"
            ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size"
            ",height,construct_min_rank,construct_max_rank,construct_avg_rank"
            ",construct_mem,construct_time,construct_error"
@@ -1257,10 +1292,10 @@ int main(int argc, char ** argv) {
              h2_ev_time, m, k, a, b, v_a, v_b, ev_tol,
              dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #else
-      printf("%d,%d,%d,%d,%.1e,%d,%d,%.1lf,%d,%s,%s,%s,%d,%d,%d,%d,%d,%d,%.3lf,%d,%.3lf,%.5e"
+      printf("%d,%d,%d,%d,%.1e,%d,%d,%d,%.1lf,%d,%s,%s,%s,%d,%d,%d,%d,%d,%d,%.3lf,%d,%.3lf,%.5e"
              ",%.3lf,%.3lf,%d,%d,%.2lf,%.2lf,%d,%d,%.1e,%.8lf,%.8lf,%.2e,%s\n",
              mpi_nprocs, omp_get_max_threads(), (int)N, (int)leaf_size,
-             accuracy, (int)use_rel_acc, (int)max_rank,
+             accuracy, (int)use_rel_acc, (int)max_rank, (int)rand_size,
              admis, (int)matrix_type, kernel_name.c_str(), geom_name.c_str(),
              sampling_algo_name.c_str(), (int)sample_self_size, (int)sample_far_size,
              (int)domain.get_max_farfield_size(), (int)A.height,
