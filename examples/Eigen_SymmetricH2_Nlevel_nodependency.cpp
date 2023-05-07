@@ -313,24 +313,37 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
 #ifdef USE_SVD_COMPRESSION
       // SVD followed by ID
       Matrix Utemp, Stemp, Vtemp;
-      std::tie(Utemp, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
-      // Truncate to max_rank if exceeded
-      if (max_rank > 0 && rank > max_rank) {
-        rank = max_rank;
-        Utemp.shrink(Utemp.rows, rank);
-        Stemp.shrink(rank, rank);
+      if (accuracy == 0.) {  // Fixed rank
+        rank = std::min(skeleton_row.min_dim(), max_rank);
+        double etemp;
+        std::tie(Utemp, Stemp, Vtemp, etemp) = truncated_svd(skeleton_row, rank);
+      }
+      else {  // Fixed accuracy
+        std::tie(Utemp, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
+        // Truncate to max_rank if exceeded
+        if (max_rank > 0 && rank > max_rank) {
+          rank = max_rank;
+          Utemp.shrink(Utemp.rows, rank);
+          Stemp.shrink(rank, rank);
+        }
       }
       // ID to get skeleton rows
       column_scale(Utemp, Stemp);
       std::tie(Ui, ipiv_row) = truncated_id_row(Utemp, rank);
 #else
       // ID Only
-      std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
-      rank = Ui.cols;
-      // Truncate to max_rank if exceeded
-      if (max_rank > 0 && rank > max_rank) {
-        rank = max_rank;
-        Ui.shrink(Ui.rows, rank);
+      if (accuracy == 0.) {  // Fixed rank
+        rank = std::min(skeleton_row.min_dim(), max_rank);
+        std::tie(Ui, ipiv_row) = truncated_id_row(skeleton_row, rank);
+      }
+      else {  // Fixed accuracy
+        std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
+        rank = Ui.cols;
+        // Truncate to max_rank if exceeded
+        if (max_rank > 0 && rank > max_rank) {
+          rank = max_rank;
+          Ui.shrink(Ui.rows, rank);
+        }
       }
 #endif
       // Multiply U with child R
