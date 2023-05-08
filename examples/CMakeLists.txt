@@ -51,7 +51,7 @@ else()
     LDL_SymmetricH2_Nlevel_Ma2019
     ULV_SymmetricH2_Nlevel_nodependency
     LDL_SymmetricH2_Nlevel_nodependency
-    LDL_SymmetricH2_Nlevel_nodependency_directschur
+    LDL_SymmetricH2_Nlevel_nodependency_old
     Eigen_Dense
     Eigen_Dense_DSYEV
     Eigen_Dense_DSYEVX

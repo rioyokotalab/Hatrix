@@ -16,6 +16,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <cstdio>
+#include <omp.h>
 
 #ifdef USE_JSON
 #include "nlohmann/json.hpp"
@@ -27,7 +28,16 @@
 
 using vec = std::vector<int64_t>;
 
-// #define OUTPUT_CSV
+// Uncomment the following line to print output in CSV format
+#define OUTPUT_CSV
+// Uncomment the following line to enable debug
+// #define DEBUG_OUTPUT
+// Uncomment the following line to enable timer
+// #define USE_TIMER
+// Comment the following line to use ID (without SVD) for basis construction
+// #define USE_SVD_COMPRESSION
+// Uncomment the following line to skip solve step
+// #define SKIP_SOLVE_STEP
 
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
@@ -40,7 +50,24 @@ using vec = std::vector<int64_t>;
  * - Generating p2p_matrix using block_index and level
  * See parts that involve matrix_type below
  */
+
+#ifdef USE_TIMER
+#define START_TIMER(name) Hatrix::timing::start(name)
+#define STOP_TIMER(name)  Hatrix::timing::stop(name)
+#define PRINT_TIME(name, depth) Hatrix::timing::printTime(name, depth)
+#else
+#define START_TIMER(name)
+#define STOP_TIMER(name)
+#define PRINT_TIME(name, depth)
+#endif
+
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
+
+void shift_diag(Hatrix::Matrix& A, const double shift) {
+  for(int64_t i = 0; i < A.min_dim(); i++) {
+    A(i, i) += shift;
+  }
+}
 
 namespace Hatrix {
 
@@ -54,11 +81,16 @@ class SymmetricH2 {
   double admis;
   int64_t matrix_type;
   int64_t height;
+  int64_t min_adm_level;
+  int64_t rand_size;
   RowLevelMap U, Uc, R_row;
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
+  RowColMap<std::vector<int64_t>> near_neighbors, far_neighbors;  // This is actually RowLevelMap
   std::vector<int64_t> level_blocks;
   RowColMap<std::vector<int64_t>> multipoles;
+  RowLevelMap rand_farblocks;  // Random sampling of farfield blocks
+  RowColLevelMap<Matrix> F;  // Fill-in blocks
 
  private:
   void initialize_geometry_admissibility(const Domain& domain);
@@ -76,6 +108,11 @@ class SymmetricH2 {
                  const int64_t level, nlohmann::json& json) const;
 #endif
 
+  Matrix get_dense_skeleton(const Domain& domain,
+                            const int64_t i, const int64_t j, const int64_t level) const;
+  Matrix get_oo(const int64_t i, const int64_t j, const int64_t level) const;
+  void compute_fill_in_qr(const Domain& domain, const int64_t level, const double diag_shift);
+  void compute_fill_in(const Domain& domain, const int64_t level, const double diag_shift);
   void factorize_level(const int64_t level);
   void permute_and_merge(const int64_t level);
 
@@ -93,11 +130,14 @@ class SymmetricH2 {
               const int64_t N, const int64_t leaf_size,
               const double accuracy, const bool use_rel_acc,
               const int64_t max_rank, const double admis,
-              const int64_t matrix_type, const bool include_fill_in);
+              const int64_t matrix_type, const bool build_basis,
+              const int64_t rand_size);
 
   int64_t get_basis_min_rank() const;
   int64_t get_basis_max_rank() const;
+  double get_basis_avg_rank() const;
   double construction_error(const Domain& domain) const;
+  int64_t memory_usage() const;
   void print_structure(const int64_t level) const;
   void print_ranks() const;
   double low_rank_block_ratio() const;
@@ -105,12 +145,13 @@ class SymmetricH2 {
   void write_JSON(const Domain& domain, const std::string filename) const;
 #endif
 
-  void factorize(const Domain& domain);
+  void factorize(const Domain& domain, const double diag_shift = 0);
   void solve(Matrix& b) const;
   double solve_error(const Matrix& x, const Matrix& ref) const;
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
+  min_adm_level = -1;
   if (matrix_type == H2_MATRIX) {
     height = domain.tree_height;
     level_blocks.assign(height + 1, 0);
@@ -119,31 +160,51 @@ void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
       const auto i = cell.block_index;
       level_blocks[level]++;
       // Near interaction list: inadmissible dense blocks
+      near_neighbors.insert(i, level, std::vector<int64_t>());
       for (const auto near_idx: cell.near_list) {
         const auto j_near = domain.cells[near_idx].block_index;
         is_admissible.insert(i, j_near, level, false);
+        near_neighbors(i, level).push_back(j_near);
       }
       // Far interaction list: admissible low-rank blocks
+      far_neighbors.insert(i, level, std::vector<int64_t>());
       for (const auto far_idx: cell.far_list) {
         const auto j_far = domain.cells[far_idx].block_index;
         is_admissible.insert(i, j_far, level, true);
+        far_neighbors(i, level).push_back(j_far);
+      }
+      if ((min_adm_level == -1) && (far_neighbors(i, level).size() > 0)) {
+        min_adm_level = level;
       }
     }
   }
   else if (matrix_type == BLR2_MATRIX) {
     height = 1;
     level_blocks.assign(height + 1, 0);
+     // Root level
     level_blocks[0] = 1;
-    level_blocks[1] = (int64_t)1 << domain.tree_height;
     is_admissible.insert(0, 0, 0, false);
+    near_neighbors.insert(0, 0, std::vector<int64_t>(1, 0));
+    far_neighbors.insert(0, 0, std::vector<int64_t>());
+    // Subdivide into BLR
+    level_blocks[1] = (int64_t)1 << domain.tree_height;
     for (int64_t i = 0; i < level_blocks[height]; i++) {
+      near_neighbors.insert(i, height, std::vector<int64_t>());
+      far_neighbors.insert(i, height, std::vector<int64_t>());
       for (int64_t j = 0; j < level_blocks[height]; j++) {
         const auto level = domain.tree_height;
         const auto& source = domain.cells[domain.get_cell_idx(i, level)];
         const auto& target = domain.cells[domain.get_cell_idx(j, level)];
         is_admissible.insert(i, j, height, domain.is_well_separated(source, target, admis));
+        if (is_admissible(i, j, height)) {
+          far_neighbors(i, height).push_back(j);
+        }
+        else {
+          near_neighbors(i, height).push_back(j);
+        }
       }
     }
+    min_adm_level = height;
   }
 }
 
@@ -189,49 +250,121 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
                                              const int64_t level,
                                              const bool include_fill_in) {
   const int64_t num_nodes = level_blocks[level];
+  // Allocate spaces for all nodes
+  for (int64_t i = 0; i < num_nodes; i++) {
+    const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
+    const auto idx = domain.get_cell_idx(i, node_level);
+    const auto& cell = domain.cells[idx];
+    const auto skeleton = get_skeleton(domain, i, level);
+    const auto skeleton_size = skeleton.size();
+    U.insert(i, level, Matrix(skeleton_size, skeleton_size));
+    Uc.insert(i, level, generate_identity_matrix(skeleton_size, skeleton_size));
+    R_row.insert(i, level, Matrix(skeleton_size, skeleton_size));
+    multipoles.insert(i, level, std::vector<int64_t>(skeleton_size));
+  }
+  // Construct bases
+  #pragma omp parallel for
   for (int64_t i = 0; i < num_nodes; i++) {
     const auto node_level = (matrix_type == BLR2_MATRIX && level == height) ? domain.tree_height : level;
     const auto idx = domain.get_cell_idx(i, node_level);
     const auto& cell = domain.cells[idx];
     const auto skeleton = get_skeleton(domain, i, level);
     const int64_t skeleton_size = skeleton.size();
-    const int64_t near_size = include_fill_in ? cell.sample_nearfield.size() : 0;
+    const int64_t near_size = include_fill_in ? cell.near_list.size() - 1 : 0;
     const int64_t far_size  = cell.sample_farfield.size();
+    auto& U_i = U(i, level);
+    auto& Uc_i = Uc(i, level);
+    auto& R_i = R_row(i, level);
+    auto& multipoles_i = multipoles(i, level);
     if (near_size + far_size > 0) {
-      Matrix skeleton_dn(skeleton_size, 0);
-      Matrix skeleton_lr(skeleton_size, 0);
-      double norm_dn = 0.;
-      double norm_lr = 0.;
-      // Fill-in (dense) part
-      if (near_size > 0) {
-        // Use sample of nearfield blocks within the same level
-        Matrix nearblocks = generate_p2p_matrix(domain, skeleton, cell.sample_nearfield);
-        skeleton_dn = concat(skeleton_dn, matmul(nearblocks, nearblocks, false, true), 1);
-        norm_dn = Hatrix::norm(skeleton_dn);
-      }
-      // Low-rank part
+      // Allocate skeleton_row
+      std::vector<int64_t> col_splits;
+      int64_t ncols = 0;
       if (far_size > 0) {
-        skeleton_lr = concat(skeleton_lr, generate_p2p_matrix(domain, skeleton, cell.sample_farfield), 1);
-        norm_lr = Hatrix::norm(skeleton_lr);
+        ncols += rand_size > 0 ? rand_size : far_size;
+        col_splits.push_back(ncols);
       }
-      const double scale = (norm_dn == 0. || norm_lr == 0.) ? 1. : norm_lr / norm_dn;
-      Hatrix::scale(skeleton_dn, scale);
-      Matrix skeleton_row = concat(skeleton_dn, skeleton_lr, 1);
+      if (near_size > 0) {
+        for (int64_t j: near_neighbors(i, level)) {
+          if (i != j) {
+            if (!F.exists(i, j, level)) {
+              throw std::logic_error("Could not find F(" + std::to_string(i) + "," + std::to_string(j) +
+                                     "," + std::to_string(level) + ") when constructing composite basis");
+            }
+            ncols += F(i, j, level).cols;
+            col_splits.push_back(ncols);
+          }
+        }
+      }
+      col_splits.pop_back();
+      Matrix skeleton_row(skeleton_size, ncols);
+      auto skeleton_row_splits = skeleton_row.split({}, col_splits);
+      int64_t k = 0;
+      // Append low-rank part
+      if (far_size > 0) {
+        if (rand_size > 0) {  // Use pre-computed random sample of farblocks
+          const auto& farblocks = rand_farblocks(i, level);
+          Matrix skeleton_farblocks(skeleton_size, rand_size);
+          for (int64_t idx_i = 0; idx_i < skeleton_size; idx_i++) {
+            const auto local_i = skeleton[idx_i] - cell.body_offset;
+            for (int64_t j = 0; j < rand_size; j++) {
+              skeleton_farblocks(idx_i, j) = farblocks(local_i, j);
+            }
+          }
+          skeleton_row_splits[k++] = skeleton_farblocks;
+        }
+        else {
+          skeleton_row_splits[k++] = generate_p2p_matrix(domain, skeleton, cell.sample_farfield);
+        }
+      }
+      // Append fill-in part
+      if (near_size > 0) {
+        for (int64_t j: near_neighbors(i, level)) {
+          if (i != j) {
+            skeleton_row_splits[k++] = F(i, j, level);
+          }
+        }
+      }
 
-      Matrix Ui, Si, Vi;
+      Matrix Ui;
       int64_t rank;
       std::vector<int64_t> ipiv_row;
+#ifdef USE_SVD_COMPRESSION
       // SVD followed by ID
-      std::tie(Ui, Si, Vi, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
-      // Truncate to max_rank if exceeded
-      if (max_rank > 0 && rank > max_rank) {
-        rank = max_rank;
-        Ui.shrink(Ui.rows, rank);
-        Si.shrink(rank, rank);
+      Matrix Utemp, Stemp, Vtemp;
+      if (accuracy == 0.) {  // Fixed rank
+        rank = std::min(skeleton_row.min_dim(), max_rank);
+        double etemp;
+        std::tie(Utemp, Stemp, Vtemp, etemp) = truncated_svd(skeleton_row, rank);
+      }
+      else {  // Fixed accuracy
+        std::tie(Utemp, Stemp, Vtemp, rank) = error_svd(skeleton_row, err_tol, use_rel_acc, true);
+        // Truncate to max_rank if exceeded
+        if (max_rank > 0 && rank > max_rank) {
+          rank = max_rank;
+          Utemp.shrink(Utemp.rows, rank);
+          Stemp.shrink(rank, rank);
+        }
       }
       // ID to get skeleton rows
-      column_scale(Ui, Si);
-      id_row(Ui, ipiv_row);
+      column_scale(Utemp, Stemp);
+      std::tie(Ui, ipiv_row) = truncated_id_row(Utemp, rank);
+#else
+      // ID Only
+      if (accuracy == 0.) {  // Fixed rank
+        rank = std::min(skeleton_row.min_dim(), max_rank);
+        std::tie(Ui, ipiv_row) = truncated_id_row(skeleton_row, rank);
+      }
+      else {  // Fixed accuracy
+        std::tie(Ui, ipiv_row) = error_id_row(skeleton_row, err_tol, use_rel_acc);
+        rank = Ui.cols;
+        // Truncate to max_rank if exceeded
+        if (max_rank > 0 && rank > max_rank) {
+          rank = max_rank;
+          Ui.shrink(Ui.rows, rank);
+        }
+      }
+#endif
       // Multiply U with child R
       if (level < height) {
         const auto& child1 = domain.cells[cell.child];
@@ -252,25 +385,26 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
       Matrix Qo(Q_splits[0], true);
       Matrix Qc = rank < skeleton_size ? Matrix(Q_splits[1], true) : Matrix(skeleton_size, 0);
       R.shrink(rank, rank);
+      // Insert to pre-allocated space
+      U_i.shrink(Qo.rows, Qo.cols);
+      Uc_i.shrink(Qc.rows, Qc.cols);
+      R_i.shrink(rank, rank);
+      U_i = Qo;
+      Uc_i = Qc;
+      R_i = R;
       // Convert ipiv to multipoles
-      std::vector<int64_t> node_multipoles;
-      node_multipoles.reserve(rank);
+      multipoles_i.resize(rank);
       for (int64_t k = 0; k < rank; k++) {
-        node_multipoles.push_back(skeleton[ipiv_row[k]]);
+        multipoles_i[k] = skeleton[ipiv_row[k]];
       }
-      // Insert
-      U.insert(i, level, std::move(Qo));
-      Uc.insert(i, level, std::move(Qc));
-      R_row.insert(i, level, std::move(R));
-      multipoles.insert(i, level, std::move(node_multipoles));
     }
     else {
       // Insert Dummies
       const int64_t rank = 0;
-      U.insert(i, level, Matrix(skeleton_size, rank));
-      Uc.insert(i, level, generate_identity_matrix(skeleton_size, skeleton_size));
-      R_row.insert(i, level, Matrix(rank, rank));
-      multipoles.insert(i, level, std::vector<int64_t>());
+      U_i.shrink(skeleton_size, rank);
+      Uc_i.shrink(skeleton_size, skeleton_size);
+      R_i.shrink(rank, rank);
+      multipoles_i.resize(rank);
     }
   }
 }
@@ -278,31 +412,30 @@ void SymmetricH2::generate_row_cluster_basis(const Domain& domain,
 void SymmetricH2::generate_near_coupling_matrices(const Domain& domain) {
   const auto level = height;
   const auto num_nodes = level_blocks[level];
+  // Inadmissible leaf blocks
   for (int64_t i = 0; i < num_nodes; i++) {
-    for (int64_t j = 0; j < num_nodes; j++) {
-      // Inadmissible leaf blocks
-      if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
-        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
-        D.insert(i, j, level, generate_p2p_matrix(domain, i, j, node_level));
-      }
+    for (int64_t j: near_neighbors(i, level)) {
+      const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
+      D.insert(i, j, level, generate_p2p_matrix(domain, i, j, node_level));
     }
   }
 }
 
 void SymmetricH2::generate_far_coupling_matrices(const Domain& domain, const int64_t level) {
   const auto num_nodes = level_blocks[level];
+  #pragma omp parallel for
   for (int64_t i = 0; i < num_nodes; i++) {
-    for (int64_t j = 0; j < num_nodes; j++) {
-      // Admissible blocks
-      if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-        const auto& multipoles_i = multipoles(i, level);
-        const auto& multipoles_j = multipoles(j, level);
-        Matrix Sij = generate_p2p_matrix(domain, multipoles_i, multipoles_j);
-        // Multiply with R from left and right
-        triangular_matmul(R_row(i, level), Sij,
-                          Hatrix::Left, Hatrix::Upper, false, false, 1);
-        triangular_matmul(R_row(j, level), Sij,
-                          Hatrix::Right, Hatrix::Upper, true, false, 1);
+    for (int64_t j: far_neighbors(i, level)) {
+      const auto& multipoles_i = multipoles(i, level);
+      const auto& multipoles_j = multipoles(j, level);
+      Matrix Sij = generate_p2p_matrix(domain, multipoles_i, multipoles_j);
+      // Multiply with R from left and right
+      triangular_matmul(R_row(i, level), Sij,
+                        Hatrix::Left, Hatrix::Upper, false, false, 1);
+      triangular_matmul(R_row(j, level), Sij,
+                        Hatrix::Right, Hatrix::Upper, true, false, 1);
+      #pragma omp critical
+      {
         S.insert(i, j, level, std::move(Sij));
       }
     }
@@ -333,17 +466,33 @@ SymmetricH2::SymmetricH2(const Domain& domain,
                          const int64_t N, const int64_t leaf_size,
                          const double accuracy, const bool use_rel_acc,
                          const int64_t max_rank, const double admis,
-                         const int64_t matrix_type, const bool include_fill_in)
-    : N(N), leaf_size(leaf_size), accuracy(accuracy),
-      use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
+                         const int64_t matrix_type, const bool build_basis,
+                         const int64_t rand_size)
+    : N(N), leaf_size(leaf_size), accuracy(accuracy), use_rel_acc(use_rel_acc),
+      max_rank(max_rank), admis(admis), matrix_type(matrix_type), rand_size(rand_size) {
   // Consider setting error tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
   err_tol = accuracy;
   initialize_geometry_admissibility(domain);
   generate_near_coupling_matrices(domain);
-  for (int64_t level = height; level >= 0; level--) {
-    generate_row_cluster_basis(domain, level, include_fill_in);
-    generate_far_coupling_matrices(domain, level);
+  if (rand_size > 0) {  // Pre-compute random sample of farfield blocks
+    for (int64_t level = height; level >= 0; level--) {
+      const auto num_nodes = level_blocks[level];
+      for (int64_t node = 0; node < num_nodes; node++) {
+        const auto& cell = domain.cells[domain.get_cell_idx(node, level)];
+        if (cell.sample_farfield.size() > 0) {
+          Matrix farblocks = generate_p2p_matrix(domain, cell.get_bodies(), cell.sample_farfield);
+          Matrix rand = generate_random_matrix(cell.sample_farfield.size(), rand_size);
+          rand_farblocks.insert(node, level, matmul(farblocks, rand));
+        }
+      }
+    }
+  }
+  if (build_basis) {
+    for (int64_t level = height; level >= 0; level--) {
+      generate_row_cluster_basis(domain, level, false);
+      generate_far_coupling_matrices(domain, level);
+    }
   }
 }
 
@@ -373,16 +522,46 @@ int64_t SymmetricH2::get_basis_max_rank() const {
   return rank_max;
 }
 
+double SymmetricH2::get_basis_avg_rank() const {
+  int64_t rank_sum = 0;
+  int64_t num_bases = 0;
+  for (int64_t level = height; level > 0; level--) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      if (U.exists(node, level) && U(node, level).cols > 0) {
+        num_bases++;
+        rank_sum += U(node, level).cols;
+      }
+    }
+  }
+  return (double)rank_sum / (double)num_bases;
+}
+
+
 double SymmetricH2::construction_error(const Domain& domain) const {
   double dense_norm = 0;
   double diff_norm = 0;
   // Inadmissible blocks (only at leaf level)
   for (int64_t i = 0; i < level_blocks[height]; i++) {
-    for (int64_t j = 0; j < level_blocks[height]; j++) {
-      if (is_admissible.exists(i, j, height) && !is_admissible(i, j, height)) {
-        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : height;
+    for (int64_t j: near_neighbors(i, height)) {
+      const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : height;
+      const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, node_level);
+      const Matrix A_ij = D(i, j, height);
+      const auto dnorm = norm(D_ij);
+      const auto diff = norm(A_ij - D_ij);
+      dense_norm += dnorm * dnorm;
+      diff_norm += diff * diff;
+    }
+  }
+  // Admissible blocks
+  for (int64_t level = height; level > 0; level--) {
+    for (int64_t i = 0; i < level_blocks[level]; i++) {
+      for (int64_t j: far_neighbors(i, level)) {
+        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
         const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, node_level);
-        const Matrix A_ij = D(i, j, height);
+        const Matrix Ubig = get_Ubig(i, level);
+        const Matrix Vbig = get_Ubig(j, level);
+        const Matrix A_ij = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
         const auto dnorm = norm(D_ij);
         const auto diff = norm(A_ij - D_ij);
         dense_norm += dnorm * dnorm;
@@ -390,25 +569,36 @@ double SymmetricH2::construction_error(const Domain& domain) const {
       }
     }
   }
-  // Admissible blocks
+  return (use_rel_acc ? std::sqrt(diff_norm / dense_norm) : std::sqrt(diff_norm));
+}
+
+int64_t SymmetricH2::memory_usage() const {
+  int64_t mem = 0;
   for (int64_t level = height; level > 0; level--) {
-    for (int64_t i = 0; i < level_blocks[level]; i++) {
-      for (int64_t j = 0; j < level_blocks[level]; j++) {
-        if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
-          const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
-          const Matrix D_ij = Hatrix::generate_p2p_matrix(domain, i, j, node_level);
-          const Matrix Ubig = get_Ubig(i, level);
-          const Matrix Vbig = get_Ubig(j, level);
-          const Matrix A_ij = matmul(matmul(Ubig, S(i, j, level)), Vbig, false, true);
-          const auto dnorm = norm(D_ij);
-          const auto diff = norm(A_ij - D_ij);
-          dense_norm += dnorm * dnorm;
-          diff_norm += diff * diff;
+    const auto num_nodes = level_blocks[level];
+    for (int64_t i = 0; i < num_nodes; i++) {
+      if (U.exists(i, level)) {
+        mem += U(i, level).memory_used();
+      }
+      if (Uc.exists(i, level)) {
+        mem += Uc(i, level).memory_used();
+      }
+      if (R_row.exists(i, level)) {
+        mem += R_row(i, level).memory_used();
+      }
+      for (auto j: near_neighbors(i, level)) {
+        if (D.exists(i, j, level)) {
+          mem += D(i, j, level).memory_used();
+        }
+      }
+      for (auto j: far_neighbors(i, level)) {
+        if (S.exists(i, j, level)) {
+          mem += S(i, j, level).memory_used();
         }
       }
     }
   }
-  return (use_rel_acc ? std::sqrt(diff_norm / dense_norm) : std::sqrt(diff_norm));
+  return mem;
 }
 
 void SymmetricH2::print_structure(const int64_t level) const {
@@ -437,18 +627,10 @@ void SymmetricH2::print_structure(const int64_t level) const {
 void SymmetricH2::print_ranks() const {
   for(int64_t level = height; level > 0; level--) {
     const int64_t num_nodes = level_blocks[level];
+    printf("LEVEL:%d\n", (int)level);
     for(int64_t node = 0; node < num_nodes; node++) {
-      std::cout << "node=" << node << "," << "level=" << level << ":\t"
-                << "diag= ";
-      if(D.exists(node, node, level)) {
-        std::cout << D(node, node, level).rows << "x" << D(node, node, level).cols;
-      }
-      else {
-        std::cout << "empty";
-      }
-      std::cout << ", row_rank=" << (U.exists(node, level) ?
-                                     U(node, level).cols : -1)
-                << std::endl;
+      printf("\tNode-%d: Rank=%d\n", (int)node,
+             (U.exists(node, level) ? (int)U(node, level).cols : -1));
     }
   }
 }
@@ -530,6 +712,93 @@ void SymmetricH2::write_JSON(const Domain& domain,
 }
 #endif
 
+Matrix SymmetricH2::get_dense_skeleton(const Domain& domain,
+                                       const int64_t i, const int64_t j, const int64_t level) const {
+  const auto skeleton_i = get_skeleton(domain, i, level);
+  const auto skeleton_j = get_skeleton(domain, j, level);
+  return generate_p2p_matrix(domain, skeleton_i, skeleton_j);
+}
+
+Matrix SymmetricH2::get_oo(const int64_t i, const int64_t j, const int64_t level) const {
+  if (is_admissible.exists(i, j, level) && is_admissible(i, j, level)) {
+    // Admissible block, use S block
+    return S(i, j, level);
+  }
+  else {
+    // Inadmissible block, use oo part of dense block
+    const Matrix& Dij = D(i, j, level);
+    const Matrix& Ui = U(i, level);
+    const Matrix& Uj = U(j, level);
+    const auto Dij_splits = Dij.split(vec{Dij.rows - Ui.cols},
+                                      vec{Dij.cols - Uj.cols});
+    return Dij_splits[3];
+  }
+}
+
+void SymmetricH2::compute_fill_in_qr(const Domain& domain, const int64_t level, const double diag_shift) {
+  const int64_t num_nodes = level_blocks[level];
+  for (int64_t k = 0; k < num_nodes; k++) {
+    Matrix Dkk = get_dense_skeleton(domain, k, k, level);
+    shift_diag(Dkk, diag_shift);
+    Matrix Qkk(Dkk.rows, Dkk.rows);
+    Matrix Rkk(Dkk.rows, Dkk.cols);
+    qr(Dkk, Qkk, Rkk);
+    for (int64_t i = 0; i < num_nodes; i++) {
+      for (int64_t j = 0; j < num_nodes; j++) {
+        if (i != k && j != k &&
+            is_admissible.exists(i, k, level) && !is_admissible(i, k, level) &&
+            is_admissible.exists(k, j, level) && !is_admissible(k, j, level)) {
+          Matrix Dik = get_dense_skeleton(domain, i, k, level);
+          Matrix Dkj = get_dense_skeleton(domain, k, j, level);
+          // Compute fill_in = Dik * inv(Dkk) * Dkj
+          solve_triangular(Rkk, Dik, Hatrix::Right, Hatrix::Upper, false, false); // Dik x inv(Rkk)
+          Dkj = matmul(Qkk, Dkj, true, false); // inv(Qkk) * Dkj
+          Matrix fill_in = matmul(Dik, Dkj, false, false, -1);
+          if (F.exists(i, j, level)) {
+            assert(F(i, j, level).rows == fill_in.rows);
+            assert(F(i, j, level).cols == fill_in.cols);
+            F(i, j, level) += fill_in;
+          }
+          else {
+            F.insert(i, j, level, std::move(fill_in));
+          }
+        }
+      }
+    }
+  }
+}
+
+void SymmetricH2::compute_fill_in(const Domain& domain, const int64_t level, const double diag_shift) {
+  const int64_t num_nodes = level_blocks[level];
+  // Allocate
+  for (int64_t k = 0; k < num_nodes; k++) {
+    const auto skeleton_k_size = get_skeleton(domain, k, level).size();
+    for (int64_t i: near_neighbors(k, level)) {
+      if (i != k) {
+        const auto skeleton_i_size = get_skeleton(domain, i, level).size();
+        F.insert(i, k, level, Matrix(skeleton_i_size, skeleton_k_size));
+      }
+    }
+  }
+  // Compute
+  #pragma omp parallel for
+  for (int64_t k = 0; k < num_nodes; k++) {
+    Matrix Dkk = get_dense_skeleton(domain, k, k, level);
+    shift_diag(Dkk, diag_shift);
+    std::vector<int> ipiv;
+    pivoted_ldl(Dkk, ipiv);
+    for (int64_t i: near_neighbors(k, level)) {
+      if (i != k) {
+        // Compute fill_in = Dik * inv(Dkk)
+        // Equivalent to: (fill_in)^T = inv(Dkk) * Dik^T = inv(Dkk) * Dki
+        Matrix Dki = get_dense_skeleton(domain, k, i, level);
+        pivoted_ldl_solve(Dkk, ipiv, Dki);
+        F(i, k, level) = transpose(Dki);
+      }
+    }
+  }
+}
+
 void SymmetricH2::factorize_level(const int64_t level) {
   if (level == 0) return;
   const int64_t parent_level = level - 1;
@@ -539,11 +808,22 @@ void SymmetricH2::factorize_level(const int64_t level) {
   for (int64_t k = 0; k < num_nodes; k++) {
     // Skeleton (o) and Redundancy (c) decomposition
     Matrix UF_k = concat(Uc(k, level), U(k, level), 1);
-    for (int64_t i = 0; i < num_nodes; i++) {
-      if (is_admissible.exists(i, k, level) && !is_admissible(i, k, level)) {
+    for (int64_t i: near_neighbors(k, level)) {
+#ifdef IGNORE_L_FACTOR
+      if (i == k) {
         Matrix UF_i = concat(Uc(i, level), U(i, level), 1);
         D(i, k, level) = matmul(UF_i, matmul(D(i, k, level), UF_k), true, false);
       }
+      else {
+        // Ignore redundancy parts
+        Matrix Dik(D(i, k, level));
+        auto Dik_splits = D(i, k, level).split(vec{Uc(i, level).cols}, vec{Uc(k, level).cols});
+        Dik_splits[3] = matmul(U(i, level), matmul(Dik, U(k, level)), true, false);
+      }
+#else
+      Matrix UF_i = concat(Uc(i, level), U(i, level), 1);
+      D(i, k, level) = matmul(UF_i, matmul(D(i, k, level), UF_k), true, false);
+#endif
     }
     // Factorization
     const int64_t diag_row_split = D(k, k, level).rows - U(k, level).cols;
@@ -554,18 +834,20 @@ void SymmetricH2::factorize_level(const int64_t level) {
     Matrix& Dkk_oo = Dkk_splits[3];
     ldl(Dkk_cc);
     // Lower Elimination
-    for (int64_t i = 0; i < num_nodes; i++) {
-      if (is_admissible.exists(i, k, level) && !is_admissible(i, k, level)) {
-        auto Dik_splits = D(i, k, level).split(vec{D(i, k, level).rows - U(i, level).cols},
-                                               vec{diag_col_split});
-        Matrix& Dik_cc = Dik_splits[0];
-        Matrix& Dik_oc = Dik_splits[2];
-        solve_triangular(Dkk_cc, Dik_oc, Hatrix::Right, Hatrix::Lower, true, true);
-        solve_diagonal(Dkk_cc, Dik_oc, Hatrix::Right);
-        if (i > k) {
-          solve_triangular(Dkk_cc, Dik_cc, Hatrix::Right, Hatrix::Lower, true, true);
-          solve_diagonal(Dkk_cc, Dik_cc, Hatrix::Right);
-        }
+    for (int64_t i: near_neighbors(k, level)) {
+#ifdef IGNORE_L_FACTOR
+      // Ignore triangular solves with other than diagonal block
+      if (i != k) continue;
+#endif
+      auto Dik_splits = D(i, k, level).split(vec{D(i, k, level).rows - U(i, level).cols},
+                                             vec{diag_col_split});
+      Matrix& Dik_cc = Dik_splits[0];
+      Matrix& Dik_oc = Dik_splits[2];
+      solve_triangular(Dkk_cc, Dik_oc, Hatrix::Right, Hatrix::Lower, true, true);
+      solve_diagonal(Dkk_cc, Dik_oc, Hatrix::Right);
+      if (i > k) {
+        solve_triangular(Dkk_cc, Dik_cc, Hatrix::Right, Hatrix::Lower, true, true);
+        solve_diagonal(Dkk_cc, Dik_cc, Hatrix::Right);
       }
     }
     // Schur Complement
@@ -577,21 +859,6 @@ void SymmetricH2::factorize_level(const int64_t level) {
 
 void SymmetricH2::permute_and_merge(const int64_t level) {
   if (level == 0) return;
-  auto Dchild_oo = [this](const int64_t ic, const int64_t jc, const int64_t child_level) {
-    if (is_admissible.exists(ic, jc, child_level) && is_admissible(ic, jc, child_level)) {
-      // Admissible block, use S block
-      return S(ic, jc, child_level);
-    }
-    else {
-      // Inadmissible block, use oo part of dense block
-      Matrix& Dchild = D(ic, jc, child_level);
-      Matrix& Ui = U(ic, child_level);
-      Matrix& Uj = U(jc, child_level);
-      auto Dchild_splits = Dchild.split(vec{Dchild.rows - Ui.cols},
-                                        vec{Dchild.cols - Uj.cols});
-      return Dchild_splits[3];
-    }
-  };
   // Merge oo parts of children as parent level near coupling matrices
   if (matrix_type == BLR2_MATRIX) {
     const int64_t num_nodes = level_blocks[level];
@@ -603,48 +870,87 @@ void SymmetricH2::permute_and_merge(const int64_t level) {
         parent_row_splits.push_back(nrows);
       }
     }
-    Matrix Dij(nrows, nrows);
-    auto Dij_splits = Dij.split(parent_row_splits, parent_row_splits);
+    D.insert(0, 0, 0, Matrix(nrows, nrows));
+    auto D_splits = D(0, 0, 0).split(parent_row_splits, parent_row_splits);
+    // The following loop should be parallelizable
+    // But for some reason pragma omp parallel for with omp atomic does not compile
     for (int64_t ic = 0; ic < num_nodes; ic++) {
       for (int64_t jc = 0; jc < num_nodes; jc++) {
-        Dij_splits[ic * num_nodes + jc] = Dchild_oo(ic, jc, level);
+        D_splits[ic * num_nodes + jc] = get_oo(ic, jc, level);
       }
     }
-    D.insert(0, 0, 0, std::move(Dij));
   }
   else {
     const auto parent_level = level - 1;
     const auto parent_num_nodes = level_blocks[parent_level];
+    // Allocate
     for (int64_t i = 0; i < parent_num_nodes; i++) {
-      for (int64_t j = 0; j < parent_num_nodes; j++) {
-        if (is_admissible.exists(i, j, parent_level) && !is_admissible(i, j, parent_level)) {
-          const auto i_c1 = i * 2 + 0;
-          const auto i_c2 = i * 2 + 1;
-          const auto j_c1 = j * 2 + 0;
-          const auto j_c2 = j * 2 + 1;
-          const auto nrows = U(i_c1, level).cols + U(i_c2, level).cols;
-          const auto ncols = U(j_c1, level).cols + U(j_c2, level).cols;
-          Matrix Dij(nrows, ncols);
-          auto Dij_splits = Dij.split(vec{U(i_c1, level).cols},
-                                      vec{U(j_c1, level).cols});
-          Dij_splits[0] = Dchild_oo(i_c1, j_c1, level);  // Dij_cc
-          Dij_splits[1] = Dchild_oo(i_c1, j_c2, level);  // Dij_co
-          Dij_splits[2] = Dchild_oo(i_c2, j_c1, level);  // Dij_oc
-          Dij_splits[3] = Dchild_oo(i_c2, j_c2, level);  // Dij_oo
-          D.insert(i, j, parent_level, std::move(Dij));
-        }
+      for (int64_t j: near_neighbors(i, parent_level)) {
+        const auto i_c1 = i * 2 + 0;
+        const auto i_c2 = i * 2 + 1;
+        const auto j_c1 = j * 2 + 0;
+        const auto j_c2 = j * 2 + 1;
+        const auto nrows = U(i_c1, level).cols + U(i_c2, level).cols;
+        const auto ncols = U(j_c1, level).cols + U(j_c2, level).cols;
+        D.insert(i, j, parent_level, Matrix(nrows, ncols));
+      }
+    }
+    // Merge
+    #pragma omp parallel for
+    for (int64_t i = 0; i < parent_num_nodes; i++) {
+      for (int64_t j: near_neighbors(i, parent_level)) {
+        const auto i_c1 = i * 2 + 0;
+        const auto i_c2 = i * 2 + 1;
+        const auto j_c1 = j * 2 + 0;
+        const auto j_c2 = j * 2 + 1;
+        const auto nrows = U(i_c1, level).cols + U(i_c2, level).cols;
+        const auto ncols = U(j_c1, level).cols + U(j_c2, level).cols;
+        Matrix& Dij = D(i, j, parent_level);
+        auto Dij_splits = Dij.split(vec{U(i_c1, level).cols},
+                                    vec{U(j_c1, level).cols});
+        Dij_splits[0] = get_oo(i_c1, j_c1, level);  // Dij_cc
+        Dij_splits[1] = get_oo(i_c1, j_c2, level);  // Dij_co
+        Dij_splits[2] = get_oo(i_c2, j_c1, level);  // Dij_oc
+        Dij_splits[3] = get_oo(i_c2, j_c2, level);  // Dij_oo
       }
     }
   }
 }
 
-void SymmetricH2::factorize(const Domain& domain) {
+void SymmetricH2::factorize(const Domain& domain, const double diag_shift) {
+  // Shift leaf level dense diagonal blocks
+  {
+    const auto level = height;
+    const auto num_nodes = level_blocks[level];
+    for(int64_t node = 0; node < num_nodes; node++) {
+      shift_diag(D(node, node, level), diag_shift);
+    }
+  }
   for (int64_t level = height; level >= 0; level--) {
+    START_TIMER("compute_fill_ins");
+    compute_fill_in(domain, level, diag_shift);
+    STOP_TIMER("compute_fill_ins");
+
+    START_TIMER("generate_cluster_bases");
+    generate_row_cluster_basis(domain, level, true);
+    STOP_TIMER("generate_cluster_bases");
+
+    START_TIMER("generate_far_coupling_matrices");
+    generate_far_coupling_matrices(domain, level);
+    STOP_TIMER("generate_far_coupling_matrices");
+
+    START_TIMER("factorize_level");
     factorize_level(level);
+    STOP_TIMER("factorize_level");
+
+    START_TIMER("permute_and_merge");
     permute_and_merge(level);
+    STOP_TIMER("permute_and_merge");
   }
   // Factorize remaining root level
+  START_TIMER("factorize_root");
   ldl(D(0, 0, 0));
+  STOP_TIMER("factorize_root");
 }
 
 void SymmetricH2::solve_forward(const int64_t level, const RowLevelMap& X,
@@ -884,29 +1190,34 @@ int main(int argc, char ** argv) {
   const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
   int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
 
+  // Sample columns of low-rank part with random matrix
+  const int64_t rand_size = argc > 11 ? atol(argv[11]) : 0;
+
   // Specify sampling technique
   // 0: Choose bodies with equally spaced indices
   // 1: Choose bodies random indices
   // 2: Farthest Point Sampling
   // 3: Anchor Net method
-  const int64_t sampling_algo = argc > 11 ? atol(argv[11]) : 3;
+  const int64_t sampling_algo = argc > 12 ? atol(argv[12]) : 3;
   // Specify maximum number of sample points that represents a cluster
   // For anchor-net method: size of grid
-  int64_t sample_self_size = argc > 12 ? atol(argv[12]) :
+  int64_t sample_self_size = argc > 13 ? atol(argv[13]) :
                              (ndim == 1 ? 10 * leaf_size : 30);
   // Specify maximum number of sample points that represents a cluster's far-field
   // For anchor-net method: size of grid
-  int64_t sample_far_size = argc > 13 ? atol(argv[13]) :
+  int64_t sample_far_size = argc > 14 ? atol(argv[14]) :
                             (ndim == 1 ? 10 * leaf_size + 10: sample_self_size + 5);
-  const int64_t print_csv_header = argc > 14 ? atol(argv[14]) : 1;
+  // Specify diagonal shift for factorization
+  const double diag_shift = argc > 15 ? atof(argv[15]) : 0;
+  const int64_t print_csv_header = argc > 16 ? atol(argv[16]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 15 ? std::string(argv[15]) : "";
-  const int64_t sort_bodies = argc > 16 ? atol(argv[16]) : 0;
+  const std::string file_name = argc > 17 ? std::string(argv[17]) : "";
+  const int64_t sort_bodies = argc > 18 ? atol(argv[18]) : 0;
 
   Hatrix::Context::init();
 
-  Hatrix::set_kernel_constants(1.e-3 / (double)N, 1.);
+  Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
     case 0: {
@@ -979,7 +1290,8 @@ int main(int argc, char ** argv) {
   }
 
   // Pre-processing step for ELSES geometry
-  if (geom_type == 3) {
+  const bool is_non_synthetic = (geom_type == 3);
+  if (is_non_synthetic) {
     const int64_t num_atoms_per_molecule = 60;
     const int64_t num_electrons_per_atom = kernel_type == 2 ? 4 : 1;
     const int64_t molecule_size = num_atoms_per_molecule * num_electrons_per_atom;
@@ -1002,28 +1314,38 @@ int main(int argc, char ** argv) {
   domain.build_interactions(admis);
 
   const auto start_sample = std::chrono::system_clock::now();
-  domain.build_sample_bodies(sample_self_size, sample_far_size, sample_far_size, sampling_algo, geom_type == 3);
+  domain.build_sample_bodies(sample_self_size, 0, sample_far_size, sampling_algo, geom_type == 3);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();
 
   const auto start_construct = std::chrono::system_clock::now();
-  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, false);
+  Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank,
+                        admis, matrix_type, true, rand_size);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
   const auto construct_min_rank = A.get_basis_min_rank();
   const auto construct_max_rank = A.get_basis_max_rank();
+  const auto construct_avg_rank = A.get_basis_avg_rank();
   const auto construct_error = A.construction_error(domain);
+  const auto construct_mem = A.memory_usage();
   const auto lr_ratio = A.low_rank_block_ratio();
 
 #ifndef OUTPUT_CSV
-  std::cout << "N=" << N
+  std::cout << "nthreads=" << omp_get_max_threads()
+            << " N=" << N
             << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
             << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
             << " max_rank=" << max_rank
-            << " LRA=" << "SVD_ID_QR"
+            << " rand_size=" << rand_size
+            << " LRA="
+#ifdef USE_SVD_COMPRESSION
+            << "SVD+ID+QR"
+#else
+            << "ID+QR"
+#endif
             << " admis=" << admis << std::setw(3)
             << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << " kernel=" << kernel_name
@@ -1037,32 +1359,43 @@ int main(int argc, char ** argv) {
             << " lr_ratio=" << lr_ratio * 100 << "%"
             << " construct_min_rank=" << construct_min_rank
             << " construct_max_rank=" << construct_max_rank
+            << " construct_avg_rank=" << construct_avg_rank
+            << " construct_mem=" << construct_mem
             << " construct_time=" << construct_time
             << " construct_error=" << std::scientific << construct_error << std::defaultfloat
             << std::endl;
 #endif
 
-  const auto build_basis_start = std::chrono::system_clock::now();
-  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type, true);
-  const auto build_basis_stop = std::chrono::system_clock::now();
-  const double build_basis_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                  (build_basis_stop - build_basis_start).count();
+  const auto init_h2_start = std::chrono::system_clock::now();
+  Hatrix::SymmetricH2 M(domain, N, leaf_size, accuracy, use_rel_acc, max_rank,
+                        admis, matrix_type, false, rand_size);
+  const auto init_h2_stop = std::chrono::system_clock::now();
+  const double init_h2_time = std::chrono::duration_cast<std::chrono::milliseconds>
+                                  (init_h2_stop - init_h2_start).count();
+
+  START_TIMER("ldl_factorization");
   const auto start_factor = std::chrono::system_clock::now();
-  M.factorize(domain);
+  M.factorize(domain, diag_shift);
   const auto stop_factor = std::chrono::system_clock::now();
+  STOP_TIMER("ldl_factorization");
   const double factor_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_factor - start_factor).count();
   const auto factor_min_rank = M.get_basis_min_rank();
   const auto factor_max_rank = M.get_basis_max_rank();
+  const auto factor_avg_rank = M.get_basis_avg_rank();
 #ifndef OUTPUT_CSV
-  std::cout << "build_basis_time=" << build_basis_time
+  std::cout << "init_h2_time=" << init_h2_time
+            << " diag_shift=" << diag_shift
             << " factor_min_rank=" << factor_min_rank
             << " factor_max_rank=" << factor_max_rank
+            << " factor_avg_rank=" << factor_avg_rank
             << " factor_time=" << factor_time
             << std::endl;
 #endif
 
+#ifndef SKIP_SOLVE_STEP
   Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
+  shift_diag(Adense, diag_shift);
   Hatrix::Matrix x = Hatrix::body_neutral_charge(domain, 1, 0);
   Hatrix::Matrix b = Hatrix::matmul(Adense, x);
   const auto solve_start = std::chrono::system_clock::now();
@@ -1071,6 +1404,11 @@ int main(int argc, char ** argv) {
   const double solve_time = std::chrono::duration_cast<std::chrono::milliseconds>
                             (solve_stop - solve_start).count();
   const auto solve_error = M.solve_error(b, x);
+#else
+  const int64_t solve_time = 0;
+  const double solve_error = -1;
+#endif
+
 #ifndef OUTPUT_CSV
   std::cout << "solve_time=" << solve_time
             << " solve_error=" << std::scientific << solve_error
@@ -1080,19 +1418,28 @@ int main(int argc, char ** argv) {
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
-    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
+    std::cout << "nthreads,N,leaf_size,accuracy,acc_type,max_rank,rand_size,LRA,admis"
+              << ",matrix_type,kernel,geometry"
               << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
-              << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_time,construct_error"
-              << ",build_basis_time,factor_min_rank,factor_max_rank,factor_time"
+              << ",height,lr_ratio,construct_min_rank,construct_max_rank,construct_avg_rank"
+              << ",construct_mem,construct_time,construct_error"
+              << ",init_h2_time,diag_shift,factor_min_rank,factor_max_rank,factor_avg_rank,factor_time"
               << ",solve_time,solve_error"
               << std::endl;
   }
-  std::cout << N
+  std::cout << omp_get_max_threads()
+            << "," << N
             << "," << leaf_size
             << "," << accuracy
             << "," << (use_rel_acc ? "rel_err" : "abs_err")
             << "," << max_rank
-            << "," << "SVD_ID_QR"
+            << "," << rand_size
+            << ","
+#ifdef USE_SVD_COMPRESSION
+            << "SVD+ID+QR"
+#else
+            << "ID+QR"
+#endif
             << "," << admis
             << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
             << "," << kernel_name
@@ -1106,16 +1453,21 @@ int main(int argc, char ** argv) {
             << "," << lr_ratio
             << "," << construct_min_rank
             << "," << construct_max_rank
+            << "," << construct_avg_rank
+            << "," << construct_mem
             << "," << construct_time
             << "," << std::scientific << construct_error << std::defaultfloat
-            << "," << build_basis_time
+            << "," << init_h2_time
+            << "," << diag_shift
             << "," << factor_min_rank
             << "," << factor_max_rank
+            << "," << factor_avg_rank
             << "," << factor_time
             << "," << solve_time
             << "," << std::scientific << solve_error << std::defaultfloat
             << std::endl;
 #endif
+  PRINT_TIME("ldl_factorization", 4);
 
   Hatrix::Context::finalize();
   return 0;
