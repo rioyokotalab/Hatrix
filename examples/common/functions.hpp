@@ -5,6 +5,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <limits>
 
 #include "Body.hpp"
 #include "Cell.hpp"
@@ -60,6 +61,179 @@ double ELSES_dense_input(const Domain& domain,
   const auto row = (int64_t)source.value;
   const auto col = (int64_t)target.value;
   return domain.p2p_matrix(row, col);
+}
+
+void ELSES_calc_db(const int64_t ja, double db[3]) {
+  double dbx1 = 0, dby1 = 0, dbz1 = 0;
+  switch (ja) {
+    case 1: {
+      dbx1 = 1.0;
+      dby1 = 1.0;
+      dbz1 = 1.0;
+      break;
+    }
+    case 2: {
+      dbx1 = -1.0;
+      dby1 = -1.0;
+      dbz1 = 1.0;
+      break;
+    }
+    case 3: {
+      dbx1 = 1.0;
+      dby1 = -1.0;
+      dbz1 = -1.0;
+      break;
+    }
+    case 4: {
+      dbx1 = -1.0;
+      dby1 = 1.0;
+      dbz1 = -1.0;
+      break;
+    }
+  }
+  const double ddd = dbx1*dbx1 + dby1*dby1 + dbz1*dbz1;
+  const double dd = std::sqrt(ddd);
+  db[0] = dbx1 / dd;
+  db[1] = dby1 / dd;
+  db[2] = dbz1 / dd;
+}
+
+double ELSES_carbon_kernel(const Domain& domain,
+                           const Body& source, const Body& target) {
+  double mat_val = 0;
+  const auto ig = (int64_t)source.value + 1;  // Global row index within matrix
+  const auto jg = (int64_t)target.value + 1;  // Global col index within matrix
+  // Carbon model parameters
+  const int64_t n_orb = 4;
+  const auto js1 = (ig-1)/n_orb + 1;      // Atom number of source electron
+  const auto ja1 = ((ig-1) % n_orb) + 1;  // Source electron number within atom (1-4)
+  const auto js2 = (jg-1)/n_orb + 1;      // Atom number of target electron
+  const auto ja2 = ((jg-1) % n_orb) + 1;  // Target electron number within atom (1-4)
+  double ierr = 0;
+  const double dnal0 = 2.38573234;  // n
+  const double rnn0 = 1.42720722;   // r_0
+  double dhal[5];  // V_{ss sigma} etc.
+  dhal[1] = -5.0;
+  dhal[2] = 4.7;
+  dhal[3] = 5.5;
+  dhal[4] = -1.55;
+  double dnal[5];  // n_c (common)
+  dnal[1] = 1.76325031;
+  dnal[2] = 1.76325031;
+  dnal[3] = 1.76325031;
+  dnal[4] = 1.76325031;
+  double rcal[5];  // r_c (common)
+  rcal[1] = 8.04301633;
+  rcal[2] = 8.04301633;
+  rcal[3] = 8.04301633;
+  rcal[4] = 8.04301633;
+  const double ev4au = 2.0 * 13.6058;  // 1 au = (ev4au) eV
+  const double angst = 0.529177;       // 1 au = 0.529177 A
+  // No cut-off setting
+  const double rcc = std::numeric_limits<double>::max() / 100.;  // r_m (cut-off distance) in a.u.
+  const double es0 = -3.35 / ev4au;  // E_s
+  const double ep0 =  3.35 / ev4au;  // E_p
+  const double esp3a = 0.25 * es0 + 0.75 * ep0;
+  const double esp3b = -0.25 * (ep0 - es0);
+  const double qc0 = 1.6955223822 * 1e-2;   // c_0
+  const double qc1 = -1.4135915717 * 1e-2;  // c_1
+  const double qc2 = 7.2917027294 * 1e-6;   // c_2
+  const double qc3 = 1.4516116860 * 1e-3;   // c_3
+  // tail distance in A
+  const double r_cut_tail = rcc * angst * 1.1; // r_1
+  if (js1 == js2) {
+    if (ig == jg) {
+      mat_val = esp3a;
+    }
+    else {
+      mat_val = esp3b;
+    }
+  }
+  else {
+    // Constants ax, ay, and az are taken from base carbon model
+    // ELSES_mat_calc/make_supercell_C60_FCCs_w_noise/C60_fcc2x2x2_20220727.xyz
+    // TODO Debug
+    const double ax = 28.34;
+    const double ay = 28.34;
+    const double az = 28.34;
+    double dxc = target.X[0] - source.X[0];
+    double dyc = target.X[1] - source.X[1];
+    double dzc = target.X[2] - source.X[2];
+    dxc = dxc * ax;
+    dyc = dyc * ay;
+    dzc = dzc * az;
+    double drr = std::sqrt(dxc*dxc + dyc*dyc + dzc*dzc);
+    dxc = dxc / drr;
+    dyc = dyc / drr;
+    dzc = dzc / drr;
+    double rnn = drr * 0.529177;  // Distance in [A]
+    double dkwondd[5][3];  // Work array for TB parameters
+    for (int64_t isym = 1; isym <= 4; isym++) {
+      double dha = dhal[isym];
+      double dna = dnal[isym];
+      double rca = rcal[isym];
+
+      double rat1 = rnn0 / rnn;
+      double rat2 = rnn / rca;
+      double rat3 = rnn0 / rca;
+      double rat4 = dnal0 / rnn;
+
+      double fac1 = std::pow(rat1, dnal0);
+      double fac2 = std::pow(rat2, dna);
+      double fac3 = std::pow(rat3, dna);
+      double fac4 = 1.0 + dna * fac2;
+
+      double dargexp = dnal0 * (-fac2 + fac3);
+      double dexpon = std::exp(dargexp);
+      dkwondd[isym][1] = dha * fac1 * dexpon;
+      dkwondd[isym][2] = -dha * fac1 * dexpon * rat4 * fac4;
+      if (rnn > r_cut_tail) {
+        double dddx = rnn - r_cut_tail;
+        double potij = qc0+qc1*dddx+qc2*dddx*dddx+qc3*dddx*dddx*dddx;
+        double dphidr=qc1+2.0*qc2*dddx+3.0*qc3*dddx*dddx;
+        dkwondd[isym][1] = dha * potij;
+        dkwondd[isym][2] = dha * dphidr;
+      }
+    }
+    // Slator-Koster parameters in au
+    double dvss0 = dkwondd[1][1] / ev4au;
+    double dvsp0 = dkwondd[2][1] / ev4au;
+    double dvpp0 = dkwondd[3][1] / ev4au;
+    double dvpp1 = dkwondd[4][1] / ev4au;
+
+    // Calculate dbx, dby, and dbz
+    double dbi[3], dbj[3];
+    ELSES_calc_db(ja1, dbi);
+    ELSES_calc_db(ja2, dbj);
+    double dbx1 = dbi[0];
+    double dby1 = dbi[1];
+    double dbz1 = dbi[2];
+    double dbx2 = dbj[0];
+    double dby2 = dbj[1];
+    double dbz2 = dbj[2];
+    // Inner products
+    double ad2 = dbx2*dxc + dby2*dyc + dbz2*dzc;  // inner product ( a_2 | d )
+    double ad1 = dbx1*dxc + dby1*dyc + dbz1*dzc;  // inner product  ( a_1 | d )
+
+    //  Vector :  a' = a - (ad) d
+    double dbx1b = dbx1- ad1*dxc;
+    double dby1b = dby1- ad1*dyc;
+    double dbz1b = dbz1- ad1*dzc;
+
+    double dbx2b = dbx2 - ad2*dxc;
+    double dby2b = dby2 - ad2*dyc;
+    double dbz2b = dbz2 - ad2*dzc;
+
+    // double inner product : ( a_1 | d ) ( a_2 | d ) 
+    double app0 = ad1*ad2;
+    // inner product : ( a'_1 | a'_2 )
+    double app1 = dbx1b*dbx2b + dby1b*dby2b + dbz1b*dbz2b;
+    double aaa =
+        dvss0+std::sqrt(3.0)*(ad2-ad1)*dvsp0+3.0*app0*dvpp0+3.0*app1*dvpp1;
+    aaa = 0.25 * aaa;
+    mat_val = aaa;
+  }
+  return mat_val;
 }
 
 Matrix generate_p2p_matrix(const Domain& domain,
