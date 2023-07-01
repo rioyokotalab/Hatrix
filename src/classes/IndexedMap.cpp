@@ -47,6 +47,7 @@ void RowMap<T>::erase_all() {
 
 template class RowMap<Matrix>;
 template class RowMap<std::vector<int64_t>>;
+template class RowMap<std::set<int64_t>>;
 
 template<class T>
 void RowColMap<T>::deep_copy(const RowColMap<T>& A) {

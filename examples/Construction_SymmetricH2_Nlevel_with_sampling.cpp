@@ -16,6 +16,10 @@
 #include <chrono>
 #include <stdexcept>
 
+#ifdef USE_JSON
+#include "nlohmann/json.hpp"
+#endif
+
 #include "Hatrix/Hatrix.h"
 #include "Domain.hpp"
 #include "functions.hpp"
@@ -63,6 +67,11 @@ class SymmetricH2 {
   void generate_coupling_matrices(const Domain& domain);
 
   Matrix get_Ubig(const int64_t node, const int64_t level) const;
+#ifdef USE_JSON
+  void fill_JSON(const Domain& domain,
+                 const int64_t i, const int64_t j,
+                 const int64_t level, nlohmann::json& json) const;
+#endif
 
  public:
   SymmetricH2(const Domain& domain,
@@ -77,6 +86,9 @@ class SymmetricH2 {
   void print_structure(const int64_t level) const;
   void print_ranks() const;
   double low_rank_block_ratio() const;
+#ifdef USE_JSON
+  void write_JSON(const Domain& domain, const std::string filename) const;
+#endif
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
@@ -384,6 +396,62 @@ double SymmetricH2::low_rank_block_ratio() const {
   return low_rank / total;
 }
 
+#ifdef USE_JSON
+void SymmetricH2::fill_JSON(const Domain& domain,
+                            const int64_t i, const int64_t j,
+                            const int64_t level,
+                            nlohmann::json& json) const {
+  json["abs_pos"] = {i, j};
+  json["level"] = level;
+  json["dim"] = {get_block_size(domain, i, level), get_block_size(domain, j, level)};
+  if (is_admissible.exists(i, j, level)) {
+    if (is_admissible(i, j, level)) {
+      json["type"] = "LowRank";
+      json["rank"] = U(i, level).cols;
+    }
+    else {
+      if (level == height) {
+        json["type"] = "Dense";
+      }
+      else {
+        json["type"] = "Hierarchical";
+        json["children"] = {};
+        if (matrix_type == BLR2_MATRIX) {
+          for (int64_t i_child = 0; i_child < level_blocks[height]; i_child++) {
+            std::vector<nlohmann::json> row(level_blocks[height]);
+            int64_t j_pos = 0;
+            for (int64_t j_child = 0; j_child < level_blocks[height]; j_child++) {
+              fill_JSON(domain, i_child, j_child, height, row[j_pos]);
+              j_pos++;
+            }
+            json["children"].push_back(row);
+          }
+        }
+        else {
+          for (int64_t i_child = 2 * i; i_child <= (2 * i + 1); i_child++) {
+            std::vector<nlohmann::json> row(2);
+            int64_t j_pos = 0;
+            for (int64_t j_child = 2 * j; j_child <= (2 * j + 1); j_child++) {
+              fill_JSON(domain, i_child, j_child, level + 1, row[j_pos]);
+              j_pos++;
+            }
+            json["children"].push_back(row);
+          }
+        }
+      }
+    }
+  }
+}
+
+void SymmetricH2::write_JSON(const Domain& domain,
+                             const std::string filename) const {
+  nlohmann::json json;
+  fill_JSON(domain, 0, 0, 0, json);
+  std::ofstream out_file(filename);
+  out_file << json << std::endl;
+}
+#endif
+
 } // namespace Hatrix
 
 int main(int argc, char ** argv) {
@@ -427,6 +495,10 @@ int main(int argc, char ** argv) {
   // 0: BLR2
   // 1: H2
   const int64_t matrix_type = argc > 13 ? atol(argv[13]) : 1;
+
+  // Output H2-Matrix structure as JSON file
+  // Empty string: do not write JSON file
+  const std::string out_filename = argc > 14 ? std::string(argv[14]) : "";
 
   Hatrix::Context::init();
 
@@ -521,6 +593,13 @@ int main(int argc, char ** argv) {
                                 (stop_construct - start_construct).count();
   double construct_error = A.construction_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
+  A.print_structure(A.height);
+
+#ifdef USE_JSON
+  if (out_filename.length() > 0) {
+    A.write_JSON(domain, out_filename);
+  }
+#endif
 
   std::cout << "N=" << N
             << " leaf_size=" << leaf_size

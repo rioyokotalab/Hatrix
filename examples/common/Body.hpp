@@ -11,6 +11,7 @@ class Body {
  public:
   double value;
   double X[MAX_NDIM];  // Position
+  int64_t key;
 
   Body() {
     for (int64_t axis = 0; axis < MAX_NDIM; axis++) {

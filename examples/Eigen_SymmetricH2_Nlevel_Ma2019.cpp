@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <cstdio>
 #include <set>
+#include <stack>
 
 #ifdef USE_JSON
 #include "nlohmann/json.hpp"
@@ -31,8 +32,6 @@ using vec = std::vector<int64_t>;
 
 // Uncomment the following line to print output in CSV format
 #define OUTPUT_CSV
-// Uncomment the following line to enable debug
-// #define DEBUG_OUTPUT
 // Uncomment the following line to enable timer
 // #define USE_TIMER
 // Uncomment the following line to output memory consumption
@@ -88,7 +87,6 @@ class SymmetricH2 {
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
   RowColMap<std::vector<int64_t>> near_neighbors, far_neighbors;  // This is actually RowLevelMap
-  RowLevelMap US_row;
   std::vector<int64_t> level_blocks;
   RowColLevelMap<Matrix> F;  // Fill-in blocks
   RowColMap<std::vector<int64_t>> fill_in_neighbors;
@@ -99,15 +97,13 @@ class SymmetricH2 {
   int64_t get_block_size(const Domain& domain, const int64_t node, const int64_t level) const;
   std::tuple<Matrix, Matrix, int64_t> svd_like_compression(Matrix& A, const bool compute_S = true) const;
 
-  std::tuple<Matrix, Matrix>
-  generate_row_cluster_basis(const Domain& domain,
-                             const int64_t node, const int64_t level) const;
+  Matrix generate_row_cluster_basis(const Domain& domain,
+                                    const int64_t node, const int64_t level) const;
   void generate_leaf_nodes(const Domain& domain);
 
-  std::tuple<Matrix, Matrix>
-  generate_U_transfer_matrix(const Domain& domain,
-                             const int64_t node, const int64_t level,
-                             const Matrix& Ubig_child1, const Matrix& Ubig_child2) const;
+  Matrix generate_U_transfer_matrix(const Domain& domain,
+                                    const int64_t node, const int64_t level,
+                                    const Matrix& Ubig_child1, const Matrix& Ubig_child2) const;
   RowLevelMap
   generate_transfer_matrices(const Domain& domain, const int64_t level,
                              RowLevelMap& Uchild);
@@ -120,6 +116,7 @@ class SymmetricH2 {
 #endif
 
   void update_row_cluster_bases(const int64_t row, const int64_t level,
+                                const RowLevelMap& S_sum,
                                 RowMap<Matrix>& r);
   void factorize_level(const Domain& domain, const int64_t level,
                        RowMap<Matrix>& r);
@@ -225,7 +222,7 @@ SymmetricH2::svd_like_compression(Matrix& A, const bool compute_S) const {
   const double qr_tol = accuracy * 1e-1;
   std::tie(Ui, R, rank) = error_pivoted_qr(A, qr_tol, use_rel_acc, false);
   if (R.rows > R.cols) {
-    R.shrink(R.cols, R.cols);  // Ignore zero entries below
+    R.shrink(R.cols, R.cols);  // Ignore zero entries below diagonal
   }
   if (compute_S) {
     Si = Matrix(R.rows, R.rows);
@@ -242,9 +239,8 @@ SymmetricH2::svd_like_compression(Matrix& A, const bool compute_S) const {
   return std::make_tuple(std::move(Ui), std::move(Si), std::move(rank));
 }
 
-std::tuple<Matrix, Matrix>
-SymmetricH2::generate_row_cluster_basis(const Domain& domain,
-                                        const int64_t node, const int64_t level) const {
+Matrix SymmetricH2::generate_row_cluster_basis(const Domain& domain,
+                                               const int64_t node, const int64_t level) const {
   const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
   const auto idx = domain.get_cell_idx(node, node_level);
   const auto& cell = domain.cells[idx];
@@ -252,11 +248,9 @@ SymmetricH2::generate_row_cluster_basis(const Domain& domain,
 
   Matrix Ui, Si;
   int64_t rank;
-  std::tie(Ui, Si, rank) = svd_like_compression(block_row);
-
-  Matrix UxS = matmul(Ui, Si);
+  std::tie(Ui, Si, rank) = svd_like_compression(block_row, false);
   Ui.shrink(Ui.rows, rank);
-  return std::make_tuple(std::move(Ui), std::move(UxS));
+  return Ui;
 }
 
 void SymmetricH2::generate_leaf_nodes(const Domain& domain) {
@@ -275,13 +269,10 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain) {
     const auto idx = domain.get_cell_idx(i, leaf_level);
     const auto& cell = domain.cells[idx];
     if (cell.sample_farfield.size() > 0) {
-      Matrix Ui, UxS;
-      std::tie(Ui, UxS) =
-          generate_row_cluster_basis(domain, i, height);
+      Matrix Ui = generate_row_cluster_basis(domain, i, height);
       #pragma omp critical
       {
         U.insert(i, height, std::move(Ui));
-        US_row.insert(i, height, std::move(UxS));
       }
     }
   }
@@ -296,10 +287,9 @@ void SymmetricH2::generate_leaf_nodes(const Domain& domain) {
   }
 }
 
-std::tuple<Matrix, Matrix>
-SymmetricH2::generate_U_transfer_matrix(const Domain& domain,
-                                        const int64_t node, const int64_t level,
-                                        const Matrix& Ubig_child1, const Matrix& Ubig_child2) const {
+Matrix SymmetricH2::generate_U_transfer_matrix(const Domain& domain,
+                                               const int64_t node, const int64_t level,
+                                               const Matrix& Ubig_child1, const Matrix& Ubig_child2) const {
   const auto idx = domain.get_cell_idx(node, level);
   const auto& cell = domain.cells[idx];
   Matrix block_row = generate_p2p_matrix(domain, cell.get_bodies(), cell.sample_farfield);
@@ -313,11 +303,10 @@ SymmetricH2::generate_U_transfer_matrix(const Domain& domain,
 
   Matrix Ui, Si;
   int64_t rank;
-  std::tie(Ui, Si, rank) = svd_like_compression(temp);
+  std::tie(Ui, Si, rank) = svd_like_compression(temp, false);
 
-  Matrix UxS = matmul(Ui, Si);
   Ui.shrink(Ui.rows, rank);
-  return std::make_tuple(std::move(Ui), std::move(UxS));
+  return Ui;
 }
 
 RowLevelMap
@@ -341,9 +330,7 @@ SymmetricH2::generate_transfer_matrices(const Domain& domain,
       // Generate row cluster transfer matrix.
       const Matrix& Ubig_child1 = Uchild(child1, child_level);
       const Matrix& Ubig_child2 = Uchild(child2, child_level);
-      Matrix Utransfer, UxS;
-      std::tie(Utransfer, UxS) =
-          generate_U_transfer_matrix(domain, node, level, Ubig_child1, Ubig_child2);
+      Matrix Utransfer = generate_U_transfer_matrix(domain, node, level, Ubig_child1, Ubig_child2);
 
       // Generate the full bases to pass onto the parent.
       auto Utransfer_splits = Utransfer.split(vec{Ubig_child1.cols}, vec{});
@@ -355,7 +342,6 @@ SymmetricH2::generate_transfer_matrices(const Domain& domain,
       {
         U.insert(node, level, std::move(Utransfer));
         Ubig_parent.insert(node, level, std::move(Ubig));
-        US_row.insert(node, level, std::move(UxS));
       }
     }
   }
@@ -400,9 +386,30 @@ SymmetricH2::SymmetricH2(const Domain& domain,
   initialize_geometry_admissibility(domain);
   generate_leaf_nodes(domain);
   RowLevelMap Uchild = U;
-
   for (int64_t level = height - 1; level > 0; level--) {
     Uchild = generate_transfer_matrices(domain, level, Uchild);
+  }
+  // Put dummy identity basis to all dense block rows (if any)
+  for (int64_t level = height; level >= min_adm_level; level--) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      if (!U.exists(node, level)) {
+        if (level == height) {
+          const int64_t nrows = leaf_size;
+          const int64_t rank = 1;
+          U.insert(node, level, generate_identity_matrix(nrows, rank));
+        }
+        else {
+          const int64_t c1 = 2 * node + 0;
+          const int64_t c2 = 2 * node + 1;
+          const int64_t rank_c1 = U(c1, level + 1).cols;
+          const int64_t rank_c2 = U(c2, level + 1).cols;
+          const int64_t nrows = rank_c1 + rank_c2;
+          const int64_t rank = std::max(rank_c1, rank_c2);
+          U.insert(node, level, generate_identity_matrix(nrows, rank));
+        }
+      }
+    }
   }
 }
 
@@ -493,9 +500,6 @@ int64_t SymmetricH2::memory_usage() const {
       if (U.exists(i, level)) {
         mem += U(i, level).memory_used();
       }
-      if (US_row.exists(i, level)) {
-        mem += US_row(i, level).memory_used();
-      }
       for (auto j: near_neighbors(i, level)) {
         if (D.exists(i, j, level)) {
           mem += D(i, j, level).memory_used();
@@ -546,10 +550,18 @@ void SymmetricH2::print_structure(const int64_t level) const {
 void SymmetricH2::print_ranks() const {
   for(int64_t level = height; level > 0; level--) {
     const int64_t num_nodes = level_blocks[level];
-    printf("LEVEL:%d\n", (int)level);
     for(int64_t node = 0; node < num_nodes; node++) {
-      printf("\tNode-%d: Rank=%d\n", (int)node,
-             (U.exists(node, level) ? (int)U(node, level).cols : -1));
+      std::cout << "node=" << node << "," << "level=" << level << ":\t"
+                << "diag= ";
+      if(D.exists(node, node, level)) {
+        std::cout << D(node, node, level).rows << "x" << D(node, node, level).cols;
+      }
+      else {
+        std::cout << "empty";
+      }
+      std::cout << ", row_rank=" << (U.exists(node, level) ?
+                                     U(node, level).cols : -1)
+                << std::endl;
     }
   }
 }
@@ -617,42 +629,36 @@ void SymmetricH2::write_JSON(const Domain& domain,
 #endif
 
 void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t level,
+                                           const RowLevelMap& S_sum,
                                            RowMap<Matrix>& r) {
   const int64_t num_nodes = level_blocks[level];
   const int64_t block_size = D(row, row, level).rows;
+  START_TIMER("compute_lowrank_part");
+  // Z = U_i x S_sum_i x (U_i)^T
+  Matrix Z = matmul(U(row, level), matmul(S_sum(row, level), U(row, level), false, true));
+  STOP_TIMER("compute_lowrank_part");
 
-  // Allocate block_row
-  START_TIMER("allocate_block_row");
-  std::vector<int64_t> col_splits;
-  int64_t ncols = US_row(row, level).cols;
-  col_splits.push_back(ncols);
+  START_TIMER("compute_fill_in_part");
   for (int64_t j: fill_in_neighbors(row, level)) {
-    ncols += F(row, j, level).cols;
-    col_splits.push_back(ncols);
+    matmul(F(row, j, level), F(row, j, level), Z, false, true, 1, 1);
   }
-  col_splits.pop_back();
-  Matrix block_row(block_size, ncols);
-  auto block_row_splits = block_row.split({}, col_splits);
-  int64_t k = 0;
-  STOP_TIMER("allocate_block_row");
-
-  START_TIMER("concat_lowrank_part");
-  // TODO consider implementing a more accurate variant from MiaoMiaoMa2019_UMV paper (Algorithm 1)
-  // instead of using a pre-computed UxS from construction phase
-  block_row_splits[k++] = US_row(row, level);
-  STOP_TIMER("concat_lowrank_part");
-
-  START_TIMER("concat_fill_ins");
-  // Concat fill-in blocks
-  for (int64_t j: fill_in_neighbors(row, level)) {
-    block_row_splits[k++] = F(row, j, level);
-  }
-  STOP_TIMER("concat_fill_ins");
+  STOP_TIMER("compute_fill_in_part");
 
   START_TIMER("lowrank_approximation");
-  Matrix Ui, Si;
-  int64_t rank;
-  std::tie(Ui, Si, rank) = svd_like_compression(block_row, false);
+  const auto k = Z.min_dim();
+  Matrix Ui(Z.rows, k);
+  Matrix Si(k, k);
+  Matrix Vi;
+  svd(Z, Ui, Si, Vi, true, false);
+  // Choose truncation rank
+  double error = accuracy;
+  if (use_rel_acc) error *= std::sqrt(Si(0, 0));
+  int64_t rank = 1;
+  while (rank < k && std::sqrt(Si(rank, rank)) > error) {
+    rank++;
+  }
+  // Fixed-accuracy with bounded rank
+  rank = max_rank > 0 ? std::min(max_rank, rank) : rank;
   Ui.shrink(Ui.rows, rank);
   STOP_TIMER("lowrank_approximation");
 
@@ -668,15 +674,62 @@ void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t leve
 
 void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
                                   RowMap<Matrix>& r) {
+  RowLevelMap S_sum_local, S_sum_global;
   const int64_t num_nodes = level_blocks[level];
   const int64_t parent_level = level - 1;
   for (int64_t node = 0; node < num_nodes; node++) {
     const int64_t parent_node = node / 2;
     const bool found_row_fill_in = (fill_in_neighbors(node, level).size() > 0);
+    START_TIMER("compute_S_sum");
+    // Compute local S_sum
+    S_sum_local.insert(node, level, Matrix(U(node, level).cols, U(node, level).cols));
+    for (int64_t j: far_neighbors(node, level)) {
+      Matrix SxVT = matmul(S(node, j, level), U(j, level), false, true);
+      matmul(SxVT, SxVT, S_sum_local(node, level), false, true, 1, 1);
+    }
+    // Bottom-up pass
+    int64_t cur_node = parent_node;
+    int64_t cur_level = parent_level;
+    std::stack<std::tuple<int64_t, int64_t>> path;
+    path.push(std::make_tuple(node, level));
+    while (cur_level >= min_adm_level && !S_sum_global.exists(cur_node, cur_level)) {
+      // Compute local S_sum
+      path.push(std::make_tuple(cur_node, cur_level));
+      S_sum_local.insert(cur_node, cur_level,
+                         Matrix(U(cur_node, cur_level).cols, U(cur_node, cur_level).cols));
+      for (int64_t j: far_neighbors(cur_node, cur_level)) {
+        Matrix SxVT = matmul(S(cur_node, j, cur_level), U(j, cur_level), false, true);
+        matmul(SxVT, SxVT, S_sum_local(cur_node, cur_level), false, true, 1, 1);
+      }
+      cur_node /= 2;
+      cur_level--;
+    }
+    // Top-down pass
+    while(!path.empty()) {
+      std::tie(cur_node, cur_level) = path.top();
+      path.pop();
+      // Compute global S_sum
+      Matrix S_sum = S_sum_local(cur_node, cur_level);
+      int64_t cur_parent_node = cur_node / 2;
+      int64_t cur_parent_level = cur_level - 1;
+      if (cur_parent_level >= min_adm_level && S_sum_global.exists(cur_parent_node, cur_parent_level)) {
+        // Get transfer matrix
+        const Matrix& Utransfer = U(cur_parent_node, cur_parent_level);
+        const auto c1 = cur_parent_node * 2 + 0;
+        const auto c2 = cur_parent_node * 2 + 1;
+        const auto Utransfer_splits = Utransfer.split(vec{U(c1, cur_level).cols}, vec{});
+        const Matrix& T_cur = Utransfer_splits[cur_node == c1 ? 0 : 1];
+        matmul(T_cur, matmul(S_sum_global(cur_parent_node, cur_parent_level), T_cur, false, true),
+               S_sum, false, false, 1, 1);
+      }
+      S_sum_global.insert(cur_node, cur_level, std::move(S_sum));
+    }
+    STOP_TIMER("compute_S_sum");
+
     // Update cluster bases if necessary
     if (found_row_fill_in) {
       START_TIMER("update_cluster_basis");
-      update_row_cluster_bases(node, level, r);
+      update_row_cluster_bases(node, level, S_sum_global, r);
       STOP_TIMER("update_cluster_basis");
       // Project admissible blocks accordingly
       // Current level: update coupling matrix
@@ -689,28 +742,20 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
       }
       STOP_TIMER("update_coupling_matrices");
       // Upper levels: update transfer matrix one level higher
-      // also the pre-computed US_row
       START_TIMER("update_transfer_matrix");
       const auto parent_idx = domain.get_cell_idx(parent_node, parent_level);
       const auto& parent_cell = domain.cells[parent_idx];
-      if (parent_cell.sample_farfield.size() > 0) {
+      if (parent_level >= min_adm_level) {
         const int64_t c1 = parent_node * 2;
         const int64_t c2 = parent_node * 2 + 1;
         Matrix& Utransfer = U(parent_node, parent_level);
-        Matrix& US = US_row(parent_node, parent_level);
         Matrix Utransfer_new(U(c1, level).cols + U(c2, level).cols, Utransfer.cols);
-        Matrix US_new(U(c1, level).cols + U(c2, level).cols, US.cols);
 
         auto Utransfer_new_splits = Utransfer_new.split(vec{U(c1, level).cols}, vec{});
-        auto US_new_splits = US_new.split(vec{U(c1, level).cols}, vec{});
         if (node == c1) {
           auto Utransfer_splits = Utransfer.split(vec{r(c1).cols}, vec{});
           matmul(r(c1), Utransfer_splits[0], Utransfer_new_splits[0], false, false, 1, 0);
           Utransfer_new_splits[1] = Utransfer_splits[1];
-
-          auto US_splits = US.split(vec{r(c1).cols}, vec{});
-          matmul(r(c1), US_splits[0], US_new_splits[0], false, false, 1, 0);
-          US_new_splits[1] = US_splits[1];
 
           r.erase(c1);
         }
@@ -719,16 +764,10 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
           Utransfer_new_splits[0] = Utransfer_splits[0];
           matmul(r(c2), Utransfer_splits[1], Utransfer_new_splits[1], false, false, 1, 0);
 
-          auto US_splits = US.split(vec{U(c1, level).cols}, vec{});
-          US_new_splits[0] = US_splits[0];
-          matmul(r(c2), US_splits[1], US_new_splits[1], false, false, 1, 0);
-
           r.erase(c2);
         }
         U.erase(parent_node, parent_level);
         U.insert(parent_node, parent_level, std::move(Utransfer_new));
-        US_row.erase(parent_node, parent_level);
-        US_row.insert(parent_node, parent_level, std::move(US_new));
       }
       STOP_TIMER("update_transfer_matrix");
     }
@@ -972,8 +1011,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
 }
 
 void SymmetricH2::factorize(const Domain& domain) {
-  START_TIMER("init_fill_in_neighbors");
   // Initialize fill_in_neighbors array
+  START_TIMER("init_fill_in_neighbors");
   for (int64_t level = height; level >= min_adm_level; level--) {
     const int64_t num_nodes = level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
@@ -984,13 +1023,7 @@ void SymmetricH2::factorize(const Domain& domain) {
   for (int64_t level = height; level >= min_adm_level; level--) {
     RowMap<Matrix> r;
     const int64_t num_nodes = level_blocks[level];
-    // Make sure all cluster bases exist and none of them is full-rank
-    for (int64_t i = 0; i < num_nodes; ++i) {
-      if (!U.exists(i, level)) {
-        throw std::logic_error("Cluster bases not found at U(" + std::to_string(i) +
-                               "," + std::to_string(level) + ")");
-      }
-    }
+
     START_TIMER("factorize_level");
     factorize_level(domain, level, r);
     STOP_TIMER("factorize_level");
@@ -1063,24 +1096,6 @@ void SymmetricH2::factorize(const Domain& domain) {
                    U(j2, level), fill_in_splits[3], false, false, 1, 0);
           }
           F.insert(i, j, parent_level, std::move(fill_in));
-        }
-      }
-      // Put identity bases when all dense is encountered in parent level
-      for (int64_t node = 0; node < num_nodes; node += 2) {
-        int64_t parent_node = node / 2;
-        if (!U.exists(parent_node, parent_level)) {
-          // Use identity matrix as U bases whenever all dense row is encountered
-          int64_t c1 = node;
-          int64_t c2 = node + 1;
-          int64_t rank_c1 = U(c1, level).cols;
-          int64_t rank_c2 = U(c2, level).cols;
-          int64_t rank_parent = std::max(rank_c1, rank_c2);
-          Matrix Utransfer =
-              generate_identity_matrix(rank_c1 + rank_c2, rank_parent);
-
-          if (r.exists(c1)) r.erase(c1);
-          if (r.exists(c2)) r.erase(c2);
-          U.insert(parent_node, parent_level, std::move(Utransfer));
         }
       }
     }
@@ -1538,20 +1553,6 @@ int main(int argc, char ** argv) {
     const double dense_mth_eigv = compute_eig_acc ? dense_eigv[m - 1] : -1;
     const double eig_abs_err = compute_eig_acc ? std::abs(h2_mth_eigv - dense_mth_eigv) : -1;
     const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
-#ifdef DEBUG_OUTPUT
-    // Output ranks after factorization of shifted matrix that produces the largest maximum rank
-    {
-      Hatrix::SymmetricH2 M(A);
-      const double lambda = max_rank_shift;
-      // Shift leaf level diagonal blocks
-      int64_t leaf_num_nodes = M.level_blocks[M.height];
-      for(int64_t node = 0; node < leaf_num_nodes; node++) {
-        shift_diag(M.D(node, node, M.height), -lambda);
-      }
-      M.factorize(domain);
-      M.print_ranks();
-    }
-#endif
 #ifndef OUTPUT_CSV
     std::cout << "m=" << m
               << " a0=" << a

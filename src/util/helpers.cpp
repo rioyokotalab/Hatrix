@@ -5,13 +5,13 @@
 #include <iostream>
 
 namespace Hatrix {
-  std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
+  std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal, bool endpoint) {
     // Behave similarly to numpy linspace
     // https://numpy.org/doc/stable/reference/generated/numpy.linspace.html
     std::vector<double> res(N, 0.0);
     res[0] = minVal;
     if (N > 1) {
-      double d = (maxVal - minVal) / ((double)N - 1.);
+      double d = (maxVal - minVal) / ((double)N - (endpoint ? 1 : 0));
       for(int i=1; i<N; i++) {
         res[i] = minVal + ((double)i * d);
       }

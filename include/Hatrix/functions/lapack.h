@@ -65,7 +65,9 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A,
                               Lapack::QR_ret qr_ret,
                               bool pivoted=false);
 
-void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V);
+std::vector<double> get_singular_values(Matrix& A);
+
+void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, bool compute_U = true, bool compute_V = true);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
@@ -89,6 +91,9 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
 std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
                                                       bool relative=true,
                                                       bool ret_truncated=true);
+std::tuple<Matrix, Matrix, int64_t> error_svd_U(Matrix& A, double eps,
+                                                bool relative=true,
+                                                bool ret_truncated=true);
 
 /*
   Compute truncated pivoted QR that stops as soon as the desired accuracy
@@ -136,12 +141,15 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
 // denoting the first rank pivot columns from A that are chosen as the basis vectors.
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank);
 
+void id_row(Matrix& U, std::vector<int64_t>& ipiv);
 std::tuple<Matrix, std::vector<int64_t>> truncated_id_row(Matrix& A, int64_t rank);
 std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double error, bool relative);
 
-std::vector<double> get_eigenvalues(const Matrix& A);
+std::vector<double> get_eigenvalues(Matrix& A);
+std::vector<double> get_selected_eigenvalues(Matrix& A, const int64_t k0, const int64_t k1,
+                                             const double abs_tol);
 
-std::tuple<Matrix, Matrix>
-truncated_pivoted_qr(Matrix& A, const int64_t rank);
+std::tuple<int64_t, std::vector<int64_t>, std::vector<double>> partial_pivoted_qr(Matrix& A, const int64_t rank);
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, const int64_t rank);
 
 }  // namespace Hatrix

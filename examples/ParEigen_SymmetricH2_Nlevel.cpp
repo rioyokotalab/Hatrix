@@ -1,26 +1,26 @@
 #include <algorithm>
-#include <cstdint>
+#include <cassert>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <cstdint>
+#include <fstream>
+#include <functional>
+#include <iomanip>
 #include <iostream>
-#include <tuple>
 #include <map>
+#include <queue>
+#include <random>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <cassert>
-#include <random>
-#include <string>
-#include <iomanip>
-#include <functional>
-#include <fstream>
-#include <chrono>
-#include <stdexcept>
-#include <cstdio>
-#include <set>
 
-#ifdef USE_JSON
-#include "nlohmann/json.hpp"
-#endif
+#include <unistd.h>
+#include <mpi.h>
 
 #include "Hatrix/Hatrix.h"
 #include "Domain.hpp"
@@ -31,7 +31,7 @@ using vec = std::vector<int64_t>;
 
 // Uncomment the following line to print output in CSV format
 #define OUTPUT_CSV
-// Uncomment the following line to enable debug
+// Uncomment the following line to enable debug output
 // #define DEBUG_OUTPUT
 // Uncomment the following line to enable timer
 // #define USE_TIMER
@@ -40,9 +40,10 @@ using vec = std::vector<int64_t>;
 // Uncomment the following line to pivoted QR instead of SVD for low-rank compression
 // #define USE_QR_COMPRESSION
 
-// H2-Construction employ multiplication with a random matrix to reduce far-block matrix size
-// Quite accurate and does not rely on ID but incur O(N^2) complexity to construct basis and coupling matrices
 /*
+ * H2-Construction employ multiplication with pure SVD without sampling
+ * Quite accurate but incur O(N^2) complexity to construct basis and coupling matrices
+ *
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
  * where every cell has two children. However, we can enforce BLR2 structure by a simple workaround
  * that use only the leaf level cells. One thing to keep in mind is that
@@ -54,23 +55,7 @@ using vec = std::vector<int64_t>;
  * See parts that involve matrix_type below
  */
 
-#ifdef USE_TIMER
-#define START_TIMER(name) Hatrix::timing::start(name)
-#define STOP_TIMER(name)  Hatrix::timing::stop(name)
-#define PRINT_TIME(name, depth) Hatrix::timing::printTime(name, depth)
-#else
-#define START_TIMER(name)
-#define STOP_TIMER(name)
-#define PRINT_TIME(name, depth)
-#endif
-
 enum MATRIX_TYPES {BLR2_MATRIX=0, H2_MATRIX=1};
-
-void shift_diag(Hatrix::Matrix& A, const double shift) {
-  for(int64_t i = 0; i < A.min_dim(); i++) {
-    A(i, i) += shift;
-  }
-}
 
 namespace Hatrix {
 
@@ -113,11 +98,6 @@ class SymmetricH2 {
                              RowLevelMap& Uchild);
 
   Matrix get_Ubig(const int64_t node, const int64_t level) const;
-#ifdef USE_JSON
-  void fill_JSON(const Domain& domain,
-                 const int64_t i, const int64_t j,
-                 const int64_t level, nlohmann::json& json) const;
-#endif
 
   void update_row_cluster_bases(const int64_t row, const int64_t level,
                                 RowMap<Matrix>& r);
@@ -139,16 +119,8 @@ class SymmetricH2 {
   int64_t memory_usage() const;
   void print_structure(const int64_t level) const;
   void print_ranks() const;
-#ifdef USE_JSON
-  void write_JSON(const Domain& domain, const std::string filename) const;
-#endif
 
   void factorize(const Domain& domain);
-  std::tuple<int64_t, int64_t, int64_t, int64_t>
-  inertia(const Domain& domain, const double lambda, bool &singular) const;
-  std::tuple<double, int64_t, int64_t, int64_t, double, int64_t>
-  get_mth_eigenvalue(const Domain& domain, const int64_t m, const double ev_tol,
-                     double left, double right) const;
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
@@ -546,75 +518,21 @@ void SymmetricH2::print_structure(const int64_t level) const {
 void SymmetricH2::print_ranks() const {
   for(int64_t level = height; level > 0; level--) {
     const int64_t num_nodes = level_blocks[level];
-    printf("LEVEL:%d\n", (int)level);
     for(int64_t node = 0; node < num_nodes; node++) {
-      printf("\tNode-%d: Rank=%d\n", (int)node,
-             (U.exists(node, level) ? (int)U(node, level).cols : -1));
-    }
-  }
-}
-
-#ifdef USE_JSON
-void SymmetricH2::fill_JSON(const Domain& domain,
-                            const int64_t i, const int64_t j,
-                            const int64_t level,
-                            nlohmann::json& json) const {
-  json["abs_pos"] = {i, j};
-  json["level"] = level;
-  json["dim"] = {get_block_size(domain, i, level), get_block_size(domain, j, level)};
-  if (is_admissible.exists(i, j, level)) {
-    if (is_admissible(i, j, level)) {
-      json["type"] = "LowRank";
-      json["rank"] = U(i, level).cols;
-      const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
-      Matrix Dij = generate_p2p_matrix(domain, i, j, node_level);
-      json["svalues"] = get_singular_values(Dij);
-    }
-    else {
-      if (level == height) {
-        json["type"] = "Dense";
-        const auto node_level = matrix_type == BLR2_MATRIX ? domain.tree_height : level;
-        Matrix Dij = generate_p2p_matrix(domain, i, j, node_level);
-        json["svalues"] = get_singular_values(Dij);
+      std::cout << "node=" << node << "," << "level=" << level << ":\t"
+                << "diag= ";
+      if(D.exists(node, node, level)) {
+        std::cout << D(node, node, level).rows << "x" << D(node, node, level).cols;
       }
       else {
-        json["type"] = "Hierarchical";
-        json["children"] = {};
-        if (matrix_type == BLR2_MATRIX) {
-          for (int64_t i_child = 0; i_child < level_blocks[height]; i_child++) {
-            std::vector<nlohmann::json> row(level_blocks[height]);
-            int64_t j_pos = 0;
-            for (int64_t j_child = 0; j_child < level_blocks[height]; j_child++) {
-              fill_JSON(domain, i_child, j_child, height, row[j_pos]);
-              j_pos++;
-            }
-            json["children"].push_back(row);
-          }
-        }
-        else {
-          for (int64_t i_child = 2 * i; i_child <= (2 * i + 1); i_child++) {
-            std::vector<nlohmann::json> row(2);
-            int64_t j_pos = 0;
-            for (int64_t j_child = 2 * j; j_child <= (2 * j + 1); j_child++) {
-              fill_JSON(domain, i_child, j_child, level + 1, row[j_pos]);
-              j_pos++;
-            }
-            json["children"].push_back(row);
-          }
-        }
+        std::cout << "empty";
       }
+      std::cout << ", row_rank=" << (U.exists(node, level) ?
+                                     U(node, level).cols : -1)
+                << std::endl;
     }
   }
 }
-
-void SymmetricH2::write_JSON(const Domain& domain,
-                             const std::string filename) const {
-  nlohmann::json json;
-  fill_JSON(domain, 0, 0, 0, json);
-  std::ofstream out_file(filename);
-  out_file << json << std::endl;
-}
-#endif
 
 void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t level,
                                            RowMap<Matrix>& r) {
@@ -622,7 +540,6 @@ void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t leve
   const int64_t block_size = D(row, row, level).rows;
 
   // Allocate block_row
-  START_TIMER("allocate_block_row");
   std::vector<int64_t> col_splits;
   int64_t ncols = US_row(row, level).cols;
   col_splits.push_back(ncols);
@@ -634,27 +551,20 @@ void SymmetricH2::update_row_cluster_bases(const int64_t row, const int64_t leve
   Matrix block_row(block_size, ncols);
   auto block_row_splits = block_row.split({}, col_splits);
   int64_t k = 0;
-  STOP_TIMER("allocate_block_row");
 
-  START_TIMER("concat_lowrank_part");
   // TODO consider implementing a more accurate variant from MiaoMiaoMa2019_UMV paper (Algorithm 1)
   // instead of using a pre-computed UxS from construction phase
   block_row_splits[k++] = US_row(row, level);
-  STOP_TIMER("concat_lowrank_part");
 
-  START_TIMER("concat_fill_ins");
   // Concat fill-in blocks
   for (int64_t j: fill_in_neighbors(row, level)) {
     block_row_splits[k++] = F(row, j, level);
   }
-  STOP_TIMER("concat_fill_ins");
 
-  START_TIMER("lowrank_approximation");
   Matrix Ui, Si;
   int64_t rank;
   std::tie(Ui, Si, rank) = svd_like_compression(block_row, false);
   Ui.shrink(Ui.rows, rank);
-  STOP_TIMER("lowrank_approximation");
 
   Matrix r_row = matmul(Ui, U(row, level), true, false);
   if (r.exists(row)) {
@@ -675,22 +585,17 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
     const bool found_row_fill_in = (fill_in_neighbors(node, level).size() > 0);
     // Update cluster bases if necessary
     if (found_row_fill_in) {
-      START_TIMER("update_cluster_basis");
       update_row_cluster_bases(node, level, r);
-      STOP_TIMER("update_cluster_basis");
       // Project admissible blocks accordingly
       // Current level: update coupling matrix
-      START_TIMER("update_coupling_matrices");
       #pragma omp parallel for
       for (int64_t idx_j = 0; idx_j < far_neighbors(node, level).size(); idx_j++) {
         const auto j = far_neighbors(node, level)[idx_j];
         S(node, j, level) = matmul(r(node), S(node, j, level), false, false);
         S(j, node, level) = matmul(S(j, node, level), r(node), false, true );
       }
-      STOP_TIMER("update_coupling_matrices");
       // Upper levels: update transfer matrix one level higher
       // also the pre-computed US_row
-      START_TIMER("update_transfer_matrix");
       const auto parent_idx = domain.get_cell_idx(parent_node, parent_level);
       const auto& parent_cell = domain.cells[parent_idx];
       if (parent_cell.sample_farfield.size() > 0) {
@@ -730,15 +635,11 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
         US_row.erase(parent_node, parent_level);
         US_row.insert(parent_node, parent_level, std::move(US_new));
       }
-      STOP_TIMER("update_transfer_matrix");
     }
 
     // Multiplication with U_F
-    START_TIMER("construct_U_F");
     Matrix U_F = prepend_complement_basis(U(node, level));
-    STOP_TIMER("construct_U_F");
     // Multiply to dense blocks along the row in current level
-    START_TIMER("apply_U_F");
     #pragma omp parallel for
     for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
       const auto j = near_neighbors(node, level)[idx_j];
@@ -766,7 +667,6 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
         D(i, node, level) = matmul(D(i, node, level), U_F);
       }
     }
-    STOP_TIMER("apply_U_F");
 
     // The diagonal block is split along the row and column.
     Matrix& D_node = D(node, node, level);
@@ -774,12 +674,9 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
     if (node_c_size > 0) {
       auto D_node_splits = D_node.split(vec{node_c_size}, vec{node_c_size});
       Matrix& D_node_cc = D_node_splits[0];
-      START_TIMER("diagonal_factorization");
       ldl(D_node_cc);
-      STOP_TIMER("diagonal_factorization");
 
       // Lower elimination
-      START_TIMER("lower_elimination");
       #pragma omp parallel for
       for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
         const auto i = near_neighbors(node, level)[idx_i];
@@ -797,10 +694,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
         solve_triangular(D_node_cc, D_i_oc, Hatrix::Right, Hatrix::Lower, true, true);
         solve_diagonal(D_node_cc, D_i_oc, Hatrix::Right);
       }
-      STOP_TIMER("lower_elimination");
 
       // Right elimination
-      START_TIMER("right_elimination");
       #pragma omp parallel for
       for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
         const auto j = near_neighbors(node, level)[idx_j];
@@ -818,10 +713,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
         solve_triangular(D_node_cc, D_j_co, Hatrix::Left, Hatrix::Lower, true, false);
         solve_diagonal(D_node_cc, D_j_co, Hatrix::Left);
       }
-      STOP_TIMER("right_elimination");
 
       // Schur's complement into inadmissible block
-      START_TIMER("update_dense_blocks");
       #pragma omp parallel for collapse(2)
       for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
         for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
@@ -873,10 +766,8 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
           }
         }
       }
-      STOP_TIMER("update_dense_blocks");
 
       // Schur's complement into admissible block (fill-in)
-      START_TIMER("compute_fill_ins");
       #pragma omp parallel for collapse(2)
       for (int64_t idx_i = 0; idx_i < near_neighbors(node, level).size(); idx_i++) {
         for (int64_t idx_j = 0; idx_j < near_neighbors(node, level).size(); idx_j++) {
@@ -966,13 +857,11 @@ void SymmetricH2::factorize_level(const Domain& domain, const int64_t level,
           }
         }
       }
-      STOP_TIMER("compute_fill_ins");
     } // if (node_c_size > 0)
   } // for (int64_t node = 0; node < num_nodes; ++node)
 }
 
 void SymmetricH2::factorize(const Domain& domain) {
-  START_TIMER("init_fill_in_neighbors");
   // Initialize fill_in_neighbors array
   for (int64_t level = height; level >= min_adm_level; level--) {
     const int64_t num_nodes = level_blocks[level];
@@ -980,7 +869,6 @@ void SymmetricH2::factorize(const Domain& domain) {
       fill_in_neighbors.insert(node, level, std::vector<int64_t>());
     }
   }
-  STOP_TIMER("init_fill_in_neighbors");
   for (int64_t level = height; level >= min_adm_level; level--) {
     RowMap<Matrix> r;
     const int64_t num_nodes = level_blocks[level];
@@ -991,13 +879,10 @@ void SymmetricH2::factorize(const Domain& domain) {
                                "," + std::to_string(level) + ")");
       }
     }
-    START_TIMER("factorize_level");
     factorize_level(domain, level, r);
-    STOP_TIMER("factorize_level");
 
     // Update coupling matrices of admissible blocks in the current level
     // To add fill-in contributions
-    START_TIMER("add_fill_in_contributions");
     #pragma omp parallel for
     for (int64_t i = 0; i < num_nodes; ++i) {
       for (int64_t j: far_neighbors(i, level)) {
@@ -1007,12 +892,10 @@ void SymmetricH2::factorize(const Domain& domain) {
         }
       }
     }
-    STOP_TIMER("add_fill_in_contributions");
 
     const int64_t parent_level = level - 1;
     const int64_t parent_num_nodes = level_blocks[parent_level];
     // Propagate fill-in to upper level admissible blocks (if any)
-    START_TIMER("propagate_fill_ins");
     if (parent_level >= min_adm_level) {
       // Mark parent node that has fill-in coming from the current level
       RowMap<std::set<int64_t>> parent_fill_in_neighbors;
@@ -1084,10 +967,8 @@ void SymmetricH2::factorize(const Domain& domain) {
         }
       }
     }
-    STOP_TIMER("propagate_fill_ins");
 
     // Merge the unfactorized parts.
-    START_TIMER("merge_unfactorized_parts");
     for (int64_t i = 0; i < parent_num_nodes; ++i) {
       for (int64_t j: near_neighbors(i, parent_level)) {
         std::vector<int64_t> i_children, j_children;
@@ -1144,13 +1025,11 @@ void SymmetricH2::factorize(const Domain& domain) {
         D.insert(i, j, parent_level, std::move(D_unelim));
       }
     }
-    STOP_TIMER("merge_unfactorized_parts");
   } // for (int64_t level = height; level >= min_adm_level; level--)
 
   // Factorize remaining blocks as block dense matrix
   const auto level = min_adm_level - 1;
   const auto num_nodes = level_blocks[level];
-  START_TIMER("factorize_remaining_blocks");
   for (int64_t k = 0; k < num_nodes; k++) {
     ldl(D(k, k, level));
     // Lower elimination
@@ -1175,29 +1054,28 @@ void SymmetricH2::factorize(const Domain& domain) {
       }
     }
   }
-  STOP_TIMER("factorize_remaining_blocks");
 }
 
-std::tuple<int64_t, int64_t, int64_t, int64_t>
-SymmetricH2::inertia(const Domain& domain,
-                     const double lambda, bool &singular) const {
-  START_TIMER("create_shifted_matrix");
-  SymmetricH2 A_shifted(*this);
-  // Shift leaf level diagonal blocks
-  int64_t leaf_num_nodes = level_blocks[height];
-  for(int64_t node = 0; node < leaf_num_nodes; node++) {
-    shift_diag(A_shifted.D(node, node, height), -lambda);
+void shift_diag(Matrix& A, const double shift) {
+  for(int64_t i = 0; i < A.min_dim(); i++) {
+    A(i, i) += shift;
   }
-  STOP_TIMER("create_shifted_matrix");
+}
+
+int64_t inertia(const SymmetricH2& A, const Domain& domain,
+                const double lambda, bool &singular) {
+  SymmetricH2 A_shifted(A);
+  // Shift leaf level diagonal blocks
+  const int64_t leaf_num_nodes = A.level_blocks[A.height];
+  for(int64_t node = 0; node < leaf_num_nodes; node++) {
+    shift_diag(A_shifted.D(node, node, A.height), -lambda);
+  }
   // LDL Factorize
-  START_TIMER("ldl_factorization");
   A_shifted.factorize(domain);
-  STOP_TIMER("ldl_factorization");
   // Count negative entries in D
-  START_TIMER("count_negative_diagonal_entries");
   int64_t negative_elements_count = 0;
-  for(int64_t level = height; level >= min_adm_level; level--) {
-    int64_t num_nodes = level_blocks[level];
+  for(int64_t level = A.height; level >= A.min_adm_level; level--) {
+    const int64_t num_nodes = A.level_blocks[level];
     for(int64_t node = 0; node < num_nodes; node++) {
       const Matrix& D_node = A_shifted.D(node, node, level);
       const auto rank = A_shifted.U(node, level).cols;
@@ -1212,8 +1090,8 @@ SymmetricH2::inertia(const Domain& domain,
   }
   // Remaining blocks that are factorized as block-dense matrix
   {
-    const auto level = min_adm_level - 1;
-    const auto num_nodes = level_blocks[level];
+    const auto level = A.min_adm_level - 1;
+    const auto num_nodes = A.level_blocks[level];
     for (int64_t node = 0; node < num_nodes; node++) {
       const Matrix& D_lambda = A_shifted.D(node, node, level);
       for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
@@ -1222,77 +1100,78 @@ SymmetricH2::inertia(const Domain& domain,
       }
     }
   }
-  STOP_TIMER("count_negative_diagonal_entries");
-
-  const auto ldl_min_rank = A_shifted.get_basis_min_rank(1, height);
-  const auto ldl_max_rank = A_shifted.get_basis_max_rank(1, height);
-  const auto ldl_mem = A_shifted.memory_usage();
-  return {negative_elements_count, ldl_min_rank, ldl_max_rank, ldl_mem};
+  return negative_elements_count;
 }
 
-std::tuple<double, int64_t, int64_t, int64_t, double, int64_t>
-SymmetricH2::get_mth_eigenvalue(const Domain& domain, const int64_t m, const double ev_tol,
-                                double left, double right) const {
-  Hatrix::profiling::PAPI papi;
-  papi.add_fp_ops(0);
-  papi.start();
-  int64_t shift_min_rank = get_basis_min_rank(1, height);
-  int64_t shift_max_rank = get_basis_max_rank(1, height);
-  int64_t shift_max_mem = 0;
-  double max_rank_shift = -1;
+double get_kth_eigenvalue(const SymmetricH2& A, const Domain& domain,
+                          const double ev_tol, const int64_t idx_k,
+                          const std::vector<int64_t>& k_list,
+                          std::vector<double>& a,
+                          std::vector<double>& b) {
   bool singular = false;
-  START_TIMER("slicing_the_spectrum");
-  while((right - left) >= ev_tol) {
-    const auto mid = (left + right) / 2;
-    int64_t value, factor_min_rank, factor_max_rank, factor_mem;
-    START_TIMER("compute_inertia");
-    std::tie(value, factor_min_rank, factor_max_rank, factor_mem) = (*this).inertia(domain, mid, singular);
-    STOP_TIMER("compute_inertia");
-    if(factor_max_rank > shift_max_rank) {
-      shift_min_rank = factor_min_rank;
-      shift_max_rank = factor_max_rank;
-      max_rank_shift = mid;
-      shift_max_mem = factor_mem;
-    }
+  while((b[idx_k] - a[idx_k]) >= ev_tol) {
+    const auto mid = (a[idx_k] + b[idx_k]) / 2;
+    const auto v_mid = inertia(A, domain, mid, singular);
     if(singular) {
-      std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
+      printf("Shifted matrix becomes singular (shift=%.5lf)\n", mid);
       break;
     }
-    if(value >= m) right = mid;
-    else left = mid;
+    // Update intervals accordingly
+    for (int64_t idx = 0; idx < k_list.size(); idx++) {
+      const auto ki = k_list[idx];
+      if (ki <= v_mid && mid < b[idx]) {
+        b[idx] = mid;
+      }
+      if (ki > v_mid && mid > a[idx]) {
+        a[idx] = mid;
+      }
+    }
   }
-  STOP_TIMER("slicing_the_spectrum");
-  const auto fp_ops = (int64_t)papi.fp_ops();
-  return {(left + right) / 2, shift_min_rank, shift_max_rank, shift_max_mem, max_rank_shift, fp_ops};
+  return (a[idx_k] + b[idx_k]) / 2.;
 }
 
 } // namespace Hatrix
 
+// MPI Related Definitions
+#define MPI_TAG_TASK 0
+#define MPI_TAG_SPLIT_TASK 1
+#define MPI_TAG_RESULT 2
+#define MPI_TAG_FINISH 3
+typedef struct Task {
+  // Defines a task to compute the k0-th to k1-th eigenvalues within the interval [a, b]
+  int k0;
+  int k1;
+  double a;
+  double b;
+} Task;
+#define TASK_LEN 4
+
 int main(int argc, char ** argv) {
+  MPI_Init(&argc, &argv);
+  int mpi_rank, mpi_nprocs;
+  MPI_Comm_size(MPI_COMM_WORLD, &mpi_nprocs);
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+
+  // Parse Inputs
   int64_t N = argc > 1 ? atol(argv[1]) : 256;
   int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
-  const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-8;
+  const double accuracy = argc > 3 ? atof(argv[3]) : 1e-8;
   // Use relative or absolute error threshold for LRA
   const bool use_rel_acc = argc > 4 ? (atol(argv[4]) == 1) : false;
   // Fixed accuracy with bounded rank
-  const int64_t max_rank = argc > 5 ? atol(argv[5]) : 30;
+  const int64_t max_rank = argc > 5 ? atol(argv[5]) : 0;
   const double admis = argc > 6 ? atof(argv[6]) : 3;
-  // 0: Default
-  // 1: dist(i,j)  > admis*(min(diam(i), diam(j)))
-  // 2: dist(i,j)  > admis*(max(diam(i), diam(j)))
-  // 3: dist2(i,j) > admis*(size(i)+size(j))  (default)
-  const int64_t admis_variant = argc > 7 ? atol(argv[7]) : 0;
 
   // Specify compressed representation
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = argc > 8 ? atol(argv[8]) : 1;
+  const int64_t matrix_type = argc > 7 ? atol(argv[7]) : 1;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
   // 2: ELSES Dense Matrix
-  const int64_t kernel_type = argc > 9 ? atol(argv[9]) : 0;
+  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
@@ -1300,34 +1179,22 @@ int main(int argc, char ** argv) {
   // 2: StarsH Uniform Grid
   // 3: ELSES Geometry (ndim = 3)
   // 4: Random Uniform Grid
-  const int64_t geom_type = argc > 10 ? atol(argv[10]) : 0;
-  int64_t ndim  = argc > 11 ? atol(argv[11]) : 1;
+  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
+  int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
     // Eigenvalue computation parameters
-  const double ev_tol = argc > 12 ? atof(argv[12]) : 1.e-3;
-  int64_t m_begin = argc > 13 ? atol(argv[13]) : 1;
-  int64_t m_end = argc > 14 ? atol(argv[14]) : m_begin;
-  double a = argc > 15 ? atof(argv[15]) : 0;
-  double b = argc > 16 ? atof(argv[16]) : 0;
-  const bool compute_eig_acc = argc > 17 ? (atol(argv[17]) == 1) : false;
-  const int64_t print_csv_header = argc > 18 ? atol(argv[18]) : 1;
+  const double ev_tol = argc > 11 ? atof(argv[11]) : 1e-3;
+  int64_t k_begin = argc > 12 ? atol(argv[12]) : 1;
+  int64_t k_end = argc > 13 ? atol(argv[13]) : k_begin;
+  const double a = argc > 14 ? atof(argv[14]) : 0;
+  const double b = argc > 15 ? atof(argv[15]) : N;
+  const bool compute_eig_acc = argc > 16 ? (atol(argv[16]) == 1) : true;
+  const int64_t print_csv_header = argc > 17 ? atol(argv[17]) : 1;
 
   // ELSES Input Files
-  const std::string file_name = argc > 19 ? std::string(argv[19]) : "";
-  const int64_t sort_bodies = argc > 20 ? atol(argv[20]) : 0;
+  const std::string file_name = argc > 18 ? std::string(argv[18]) : "";
+  const int64_t sort_bodies = argc > 19 ? atol(argv[19]) : 0;
 
   Hatrix::Context::init();
-
-#ifdef OUTPUT_CSV
-  if (print_csv_header == 1) {
-    // Print CSV header
-    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
-              << ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
-              << ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,construct_min_rank_leaf,construct_max_rank_leaf"
-              << ",dense_eig_time"
-              << ",m,a0,b0,v_a0,v_b0,ev_tol,h2_eig_ops,h2_eig_time,ldl_min_rank,ldl_max_rank,h2_eig_mem,max_rank_shift,dense_eigv,h2_eigv,eig_abs_err,success"
-              << std::endl;
-  }
-#endif
 
   Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
@@ -1387,7 +1254,9 @@ int main(int argc, char ** argv) {
       geom_name += "circular_mesh";
     }
   }
-  // Pre-processing step for ELSES geometry
+
+  // Construct H2-Matrix
+  // At the moment all processes redundantly construct the same instance of H2-Matrix
   const bool is_non_synthetic = (geom_type == 3);
   if (is_non_synthetic) {
     const int64_t num_atoms_per_molecule = 60;
@@ -1409,16 +1278,14 @@ int main(int argc, char ** argv) {
   else {
     domain.build_tree(leaf_size);
   }
-  domain.build_interactions(admis, admis_variant);
+  domain.build_interactions(admis);
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
-
-  const auto start_construct = std::chrono::system_clock::now();
+  const auto start_construct = MPI_Wtime();
   Hatrix::SymmetricH2 A(domain, N, leaf_size, accuracy, use_rel_acc, max_rank, admis, matrix_type);
-  const auto stop_construct = std::chrono::system_clock::now();
-  const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                (stop_construct - start_construct).count();
+  const auto stop_construct = MPI_Wtime();
   const auto construct_min_rank = A.get_basis_min_rank(1, A.height);
   const auto construct_max_rank = A.get_basis_max_rank(1, A.height);
+  const auto construct_time = stop_construct - start_construct;
   const auto construct_error = A.construction_error(domain);
   const auto construct_mem = A.memory_usage();
   const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
@@ -1428,199 +1295,185 @@ int main(int argc, char ** argv) {
   const auto csp_dense_all = A.get_level_max_nblocks('n', 1, A.height);
   const auto csp_lr_all = A.get_level_max_nblocks('f', 1, A.height);
 
+  // All processes finished construction
+  MPI_Barrier(MPI_COMM_WORLD);
+
 #ifndef OUTPUT_CSV
-  std::cout << "N=" << N
-            << " leaf_size=" << leaf_size
-            << " accuracy=" << accuracy
-            << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
-            << " max_rank=" << max_rank
-            << " LRA="
-#ifdef USE_QR_COMPRESSION
-            << "QR"
-#else
-            << "SVD"
-#endif
-            << " admis=" << admis << std::setw(3)
-            << " admis_variant=" << admis_variant
-            << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
-            << " kernel=" << kernel_name
-            << " geometry=" << geom_name
-            << " height=" << A.height
-            << " construct_min_rank=" << construct_min_rank
-            << " construct_max_rank=" << construct_max_rank
-            << " construct_mem=" << construct_mem
-            << " construct_time=" << construct_time
-            << " construct_error=" << std::scientific << construct_error << std::defaultfloat
-            << std::endl
-            << "csp=" << csp
-            << " csp_dense_leaf=" << csp_dense_leaf
-            << " csp_dense_all=" << csp_dense_all
-            << " csp_lr_all=" << csp_lr_all
-            << " construct_min_rank_leaf=" << construct_min_rank_leaf
-            << " construct_max_rank_leaf=" << construct_max_rank_leaf
-            << std::endl;
+  if (mpi_rank == 0) {
+      printf("mpi_nprocs=%d N=%d leaf_size=%d accuracy=%.1e acc_type=%d max_rank=%d"
+             " admis=%.1lf matrix_type=%d kernel=%s geometry=%s height=%d"
+             " construct_min_rank=%d construct_max_rank=%d construct_mem=%d"
+             " construct_time=%.3lf construct_error=%.5e"
+             " csp=%d csp_dense_leaf=%d csp_dense_all=%d csp_lr_all=%d\n",
+             mpi_nprocs, (int)N, (int)leaf_size, accuracy, (int)use_rel_acc, (int)max_rank, admis,
+             (int)matrix_type, kernel_name.c_str(), geom_name.c_str(), (int)A.height,
+             (int)construct_min_rank, (int)construct_max_rank, (int)construct_mem, construct_time,
+             construct_error, (int)csp, (int)csp_dense_leaf, (int)csp_dense_all, (int)csp_lr_all);
+  }
 #endif
 
-  std::vector<double> dense_eigv;
+  // Compute dense eigenvalue with LAPACK dsyev (if necessary)
+  std::vector<double> dense_ev;
   double dense_eig_time = 0;
-  if (compute_eig_acc) {
-    Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
-    const auto dense_eig_start = std::chrono::system_clock::now();
-    dense_eigv = Hatrix::get_eigenvalues(Adense);
-    const auto dense_eig_stop = std::chrono::system_clock::now();
-    dense_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                     (dense_eig_stop - dense_eig_start).count();
-  }
+  if (mpi_rank == 0) {
+    if (compute_eig_acc) {
+      Hatrix::Matrix Adense = Hatrix::generate_p2p_matrix(domain);
+      const auto dense_eig_start = MPI_Wtime();
+      dense_ev = Hatrix::get_eigenvalues(Adense);
+      const auto dense_eig_stop = MPI_Wtime();
+      dense_eig_time = dense_eig_stop - dense_eig_start;
+    }
 #ifndef OUTPUT_CSV
-  std::cout << "dense_eig_time=" << dense_eig_time
-            << std::endl;
+    printf("dense_eig_time_all=%.3lf\n", dense_eig_time);
+#endif
+  }
+
+  // Check whether starting interval contains all desired eigenvalues
+  int v_a, v_b;
+  if (mpi_rank == 0) {
+    bool s;
+    v_a = inertia(A, domain, a, s);
+    v_b = inertia(A, domain, b, s);
+    if (!(k_begin > v_a && k_end <= v_b)) {
+      printf("Error: starting interval does not contain all target eigenvalues:"
+             " [%.3lf, %.3lf] contain [%d, %d] eigenvalues, while the target is [%d, %d]\n",
+             a, b, v_a + 1, v_b, (int)k_begin, (int)k_end);
+      // Abort by making initial task of size 0
+      k_begin = 0;
+      k_end = -1;
+    }
+  }
+
+#ifdef OUTPUT_CSV
+  if (mpi_rank == 0 && print_csv_header == 1) {
+    // Print CSV header
+    printf("mpi_nprocs,N,leaf_size,accuracy,acc_type,max_rank,admis,matrix_type,kernel,geometry"
+           ",height,construct_min_rank,construct_max_rank,construct_mem,construct_time,construct_error"
+           ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,dense_eig_time_all,h2_eig_time_all"
+           ",m,k,a,b,v_a,v_b,ev_tol,dense_ev,h2_ev,eig_abs_err,success\n");
+  }
 #endif
 
-  bool s = false;
-  if (a == 0 && b == 0) {
-    b = N < 10000 || is_non_synthetic ?
-        Hatrix::norm(Hatrix::generate_p2p_matrix(domain)) : N * (1. / Hatrix::PV);
-    a = -b;
+  // Initialize variables
+  double h2_ev_time = 0;
+  std::vector<double> h2_ev;
+  // Begin computing target eigenvalues
+  MPI_Barrier(MPI_COMM_WORLD);
+  h2_ev_time -= MPI_Wtime();
+  // Get task for current process
+  const int64_t num_ev = k_end - k_begin + 1;
+  const int64_t num_working_procs = mpi_nprocs > num_ev ? num_ev : mpi_nprocs;
+#ifdef DEBUG_OUTPUT
+  if (mpi_rank == 0) {
+    printf("\nProcess-%d: num_ev=%d, num_working_procs=%d\n",
+           mpi_rank, (int)num_ev, (int)num_working_procs);
   }
-  int64_t v_a, v_b, temp1, temp2, temp3;
-  std::tie(v_a, temp1, temp2, temp3) = A.inertia(domain, a, s);
-  std::tie(v_b, temp1, temp2, temp3) = A.inertia(domain, b, s);
-  if(v_a != 0 || v_b != N) {
-#ifndef OUTPUT_CSV
-    std::cerr << std::endl
-              << "Warning: starting interval does not contain the whole spectrum "
-              << "(v(a)=v(" << a << ")=" << v_a << ","
-              << " v(b)=v(" << b << ")=" << v_b << ")"
-              << std::endl;
 #endif
-  }
-  // Determine which eigenvalue(s) to approximate
-  std::vector<int64_t> target_m;
-  if (m_begin <= 0) {
-    const auto num = m_end;
-    if (m_begin == 0) {
-      std::mt19937 g(N);
-      std::vector<int64_t> random_m(N, 0);
-      for (int64_t i = 0; i < N; i++) {
-        random_m[i] = i + 1;
-      }
-      std::shuffle(random_m.begin(), random_m.end(), g);
-      for (int64_t i = 0; i < num; i++) {
-        target_m.push_back(random_m[i]);
-      }
+  // Create communicator for working processes
+  MPI_Comm comm;
+  int color = (mpi_rank < num_working_procs);
+  int key = mpi_rank;
+  MPI_Comm_split(MPI_COMM_WORLD, color, key, &comm);
+
+  std::vector<int> offset(num_working_procs + 1, 0), count(num_working_procs, 0);
+  for (int i = 0; i < (int)offset.size(); i++)
+    offset[i] = (i * num_ev) / num_working_procs;
+  for (int i = 0; i < (int)count.size(); i++)
+    count[i] = offset[i + 1] - offset[i];
+
+  int64_t local_num_ev;
+  // Compute eigenvalues
+  if (mpi_rank < num_working_procs) {
+    local_num_ev = count[mpi_rank];
+    const int64_t k0 = k_begin + offset[mpi_rank];
+    const int64_t k1 = k0 + local_num_ev - 1;
+#ifdef DEBUG_OUTPUT
+    printf("Process-%d: local_num_ev=%d, k0=%d, k1=%d\n",
+           mpi_rank, (int)local_num_ev, (int)k0, (int)k1);
+#endif
+    std::vector<int64_t> local_k(local_num_ev);  // Local target eigenvalue indices
+    std::vector<double> local_a(local_num_ev, a), local_b(local_num_ev, b);  // Local starting intervals
+    std::vector<double> local_ev(local_num_ev);
+    for (int64_t idx_k = 0; idx_k < local_num_ev; idx_k++) {
+      local_k[idx_k] = k0 + idx_k;
     }
-    if (m_begin == -1) {
-      const auto linspace = Hatrix::equally_spaced_vector(num, 1, N, true);
-      for (int64_t i = 0; i < num; i++) {
-        target_m.push_back((int64_t)linspace[i]);
-      }
+    int64_t idx_k_start = 0;
+    int64_t idx_k_finish = local_num_ev-1;
+    // Compute largest and smallest eigenvalues in the set
+#ifdef DEBUG_OUTPUT
+    printf("Process-%d: Computing %d-th eigenvalue\n",
+           mpi_rank, (int)local_k[idx_k_start]);
+#endif
+    local_ev[idx_k_start] = get_kth_eigenvalue(A, domain, ev_tol, idx_k_start,
+                                               local_k, local_a, local_b);
+    if (idx_k_start < idx_k_finish) {
+#ifdef DEBUG_OUTPUT
+      printf("Process-%d: Computing %d-th eigenvalue\n",
+             mpi_rank, (int)local_k[idx_k_finish]);
+#endif
+      local_ev[idx_k_finish] = get_kth_eigenvalue(A, domain, ev_tol, idx_k_finish,
+                                                  local_k, local_a, local_b);
+    }
+    idx_k_start++;
+    idx_k_finish--;
+#ifdef DEBUG_OUTPUT
+    printf("Process-%d: Computing %d inner eigenvalues between [%d, %d]-th eigenvalue\n",
+           mpi_rank, (int)std::max((int64_t)0, idx_k_finish - idx_k_start + 1),
+           (int)local_k[idx_k_start-1], (int)local_k[idx_k_finish+1]);
+#endif
+    // Compute the rest of eigenvalues
+    for (int64_t idx_k = idx_k_start; idx_k <= idx_k_finish; idx_k++) {
+      local_ev[idx_k] = get_kth_eigenvalue(A, domain, ev_tol, idx_k,
+                                           local_k, local_a, local_b);
+    }
+    // Gather results at process 0
+    if (mpi_rank == 0) {
+      h2_ev.assign(num_ev, 0);
+      MPI_Gatherv(local_ev.data(), local_num_ev, MPI_DOUBLE,
+                  h2_ev.data(), count.data(), offset.data(), MPI_DOUBLE, 0, comm);
+    }
+    else {
+      MPI_Gatherv(local_ev.data(), local_num_ev, MPI_DOUBLE,
+                  nullptr, nullptr, nullptr, MPI_DOUBLE, 0, comm);
     }
   }
   else {
-    for (int64_t m = m_begin; m <= m_end; m++) {
-      target_m.push_back(m);
-    }
+#ifdef DEBUG_OUTPUT
+    printf("Process-%d: Not working\n", mpi_rank);
+#endif
   }
 
-  for (int64_t k = 0; k < target_m.size(); k++) {
-    const int64_t m = target_m[k];
-    double h2_mth_eigv, max_rank_shift;
-    int64_t ldl_min_rank, ldl_max_rank, ldl_max_mem, h2_eig_ops;
-    START_TIMER("get_mth_eigenvalue");
-    const auto h2_eig_start = std::chrono::system_clock::now();
-    std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, ldl_max_mem, max_rank_shift, h2_eig_ops) =
-        A.get_mth_eigenvalue(domain, m, ev_tol, a, b);
-    const auto h2_eig_stop = std::chrono::system_clock::now();
-    STOP_TIMER("get_mth_eigenvalue");
-    const double h2_eig_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                               (h2_eig_stop - h2_eig_start).count();
-    const auto h2_eig_mem = construct_mem + ldl_max_mem;
-    const double dense_mth_eigv = compute_eig_acc ? dense_eigv[m - 1] : -1;
-    const double eig_abs_err = compute_eig_acc ? std::abs(h2_mth_eigv - dense_mth_eigv) : -1;
-    const bool success = compute_eig_acc ? (eig_abs_err < (0.5 * ev_tol)) : true;
-#ifdef DEBUG_OUTPUT
-    // Output ranks after factorization of shifted matrix that produces the largest maximum rank
-    {
-      Hatrix::SymmetricH2 M(A);
-      const double lambda = max_rank_shift;
-      // Shift leaf level diagonal blocks
-      int64_t leaf_num_nodes = M.level_blocks[M.height];
-      for(int64_t node = 0; node < leaf_num_nodes; node++) {
-        shift_diag(M.D(node, node, M.height), -lambda);
-      }
-      M.factorize(domain);
-      M.print_ranks();
-    }
-#endif
+  MPI_Barrier(MPI_COMM_WORLD);
+  h2_ev_time += MPI_Wtime();
+
+  if (mpi_rank == 0) {
+    const int m = local_num_ev;
+    for (int k = k_begin; k <= k_end; k++) {
+      const double dense_ev_k = compute_eig_acc ? dense_ev[k-1] : -1;
+      const double h2_ev_k = h2_ev[k - k_begin];
+      const double eig_abs_err = compute_eig_acc ? std::abs(dense_ev_k - h2_ev_k) : -1;
+      const std::string success = eig_abs_err < (0.5 * ev_tol) ? "TRUE" : "FALSE";
 #ifndef OUTPUT_CSV
-    std::cout << "m=" << m
-              << " a0=" << a
-              << " b0=" << b
-              << " v_a0=" << v_a
-              << " v_b0=" << v_b
-              << " ev_tol=" << ev_tol
-              << " h2_eig_ops=" << h2_eig_ops
-              << " h2_eig_time=" << h2_eig_time
-              << " ldl_min_rank=" << ldl_min_rank
-              << " ldl_max_rank=" << ldl_max_rank
-              << " h2_eig_mem=" << h2_eig_mem
-              << " max_rank_shift=" << max_rank_shift
-              << " dense_eigv=" << dense_mth_eigv
-              << " h2_eigv=" << h2_mth_eigv
-              << " eig_abs_err=" << std::scientific << eig_abs_err << std::defaultfloat
-              << " success=" << (success ? "TRUE" : "FALSE")
-              << std::endl;
+      printf("h2_eig_time_all=%.3lf m=%d k=%d a=%.2lf b=%.2lf v_a=%d v_b=%d ev_tol=%.1e"
+             " dense_ev=%.8lf h2_ev=%.8lf eig_abs_err=%.2e success=%s\n",
+             h2_ev_time, m, k, a, b, v_a, v_b, ev_tol,
+             dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #else
-    std::cout << N
-              << "," << leaf_size
-              << "," << accuracy
-              << "," << (use_rel_acc ? "rel_err" : "abs_err")
-              << "," << max_rank
-              << ","
-#ifdef USE_QR_COMPRESSION
-              << "QR"
-#else
-              << "SVD"
+      printf("%d,%d,%d,%.1e,%d,%d,%.1lf,%d,%s,%s,%d,%d,%d,%d,%.3lf,%.5e,%d,%d,%d,%d"
+             ",%.3lf,%.3lf,%d,%d,%.2lf,%.2lf,%d,%d,%.1e,%.8lf,%.8lf,%.2e,%s\n",
+             mpi_nprocs,(int)N, (int)leaf_size, accuracy, (int)use_rel_acc, (int)max_rank,
+             admis, (int)matrix_type, kernel_name.c_str(), geom_name.c_str(), (int)A.height,
+             (int)construct_min_rank, (int)construct_max_rank, (int)construct_mem, construct_time,
+             construct_error, (int)csp, (int)csp_dense_leaf, (int)csp_dense_all, (int)csp_lr_all,
+             dense_eig_time, h2_ev_time, m, k, a, b, v_a, v_b, ev_tol,
+             dense_ev_k, h2_ev_k, eig_abs_err, success.c_str());
 #endif
-              << "," << admis
-              << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
-              << "," << kernel_name
-              << "," << geom_name
-              << "," << A.height
-              << "," << construct_min_rank
-              << "," << construct_max_rank
-              << "," << construct_mem
-              << "," << construct_time
-              << "," << std::scientific << construct_error << std::defaultfloat
-              << "," << csp
-              << "," << csp_dense_leaf
-              << "," << csp_dense_all
-              << "," << csp_lr_all
-              << "," << construct_min_rank_leaf
-              << "," << construct_max_rank_leaf
-              << "," << dense_eig_time
-              << "," << m
-              << "," << a
-              << "," << b
-              << "," << v_a
-              << "," << v_b
-              << "," << ev_tol
-              << "," << h2_eig_ops
-              << "," << h2_eig_time
-              << "," << ldl_min_rank
-              << "," << ldl_max_rank
-              << "," << h2_eig_mem
-              << "," << max_rank_shift
-              << "," << dense_mth_eigv
-              << "," << h2_mth_eigv
-              << "," << std::scientific << eig_abs_err << std::defaultfloat
-              << "," << (success ? "TRUE" : "FALSE")
-              << std::endl;
-#endif
+    }
   }
-  PRINT_TIME("get_mth_eigenvalue", 6);
 
   Hatrix::Context::finalize();
+  MPI_Comm_free(&comm);
+  MPI_Finalize();
   return 0;
 }
 

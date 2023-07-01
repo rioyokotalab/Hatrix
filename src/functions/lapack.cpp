@@ -327,17 +327,33 @@ error_pivoted_qr_max_rank(const Matrix& A, double error, int64_t max_rank) {
   return std::make_tuple(std::move(Q), std::move(pivots), rank);
 }
 
-void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V) {
+std::vector<double> get_singular_values(Matrix& A) {
+  std::vector<double> Sdiag(A.min_dim());
+  std::vector<double> work(A.max_dim());
+  LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'N', 'N', A.rows, A.cols, &A, A.stride,
+                 Sdiag.data(), work.data(), A.stride, work.data(), A.stride, work.data());
+  return Sdiag;
+}
+
+void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, bool compute_U, bool compute_V) {
   // check dimensions
-  assert(U.rows == A.rows);
   assert(S.cols == S.rows && S.cols == A.min_dim());
-  assert(U.cols == S.cols && V.rows == S.rows);
-  assert(V.cols == A.cols);
+  if (compute_U) {
+    assert(U.rows == A.rows);
+    assert(U.cols == S.cols);
+  }
+  if (compute_V) {
+    assert(V.rows == S.rows);
+    assert(V.cols == A.cols);
+  }
 
   std::vector<double> Sdiag(S.rows);
   std::vector<double> work(S.rows - 1);
-  LAPACKE_dgesvd(LAPACK_COL_MAJOR, 'S', 'S', A.rows, A.cols, &A, A.stride,
-                 Sdiag.data(), &U, U.stride, &V, V.stride, work.data());
+  LAPACKE_dgesvd(LAPACK_COL_MAJOR, compute_U ? 'S' : 'N', compute_V ? 'S' : 'N',
+                 A.rows, A.cols, &A, A.stride, Sdiag.data(),
+                 compute_U ? &U : nullptr, compute_U ? U.stride : A.stride,
+                 compute_V ? &V : nullptr, compute_V ? V.stride : A.stride,
+                 work.data());
   S = 0;
   for (int64_t i = 0; i < S.rows; i++) {
     S(i, i) = Sdiag[i];
@@ -373,9 +389,10 @@ std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A, int64_t ran
 std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
                                                       bool relative,
                                                       bool ret_truncated) {
-  Matrix U(A.rows, A.min_dim());
-  Matrix S(A.min_dim(), A.min_dim());
-  Matrix V(A.min_dim(), A.cols);
+  const int64_t k = A.min_dim();
+  Matrix U(A.rows, k);
+  Matrix S(k, k);
+  Matrix V(k, A.cols);
 
   svd(A, U, S, V);
 
@@ -383,10 +400,8 @@ std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
   if(relative) error *= S(0, 0);
 
   int64_t rank = 1;
-  int64_t irow = 1;
-  while (rank < S.rows && S(irow, irow) > error) {
+  while (rank < k && S(rank, rank) > error) {
     rank += 1;
-    irow += 1;
   }
 
   if (ret_truncated) {
@@ -396,6 +411,32 @@ std::tuple<Matrix, Matrix, Matrix, int64_t> error_svd(Matrix& A, double eps,
   }
 
   return std::make_tuple(std::move(U), std::move(S), std::move(V), rank);
+}
+
+std::tuple<Matrix, Matrix, int64_t> error_svd_U(Matrix& A, double eps,
+                                                bool relative,
+                                                bool ret_truncated) {
+  const int64_t k = A.min_dim();
+  Matrix U(A.rows, k);
+  Matrix S(k, k);
+  Matrix V(0, 0);
+
+  svd(A, U, S, V, true, false);
+
+  double error = eps;
+  if(relative) error *= S(0, 0);
+
+  int64_t rank = 1;
+  while (rank < k && S(rank, rank) > error) {
+    rank += 1;
+  }
+
+  if (ret_truncated) {
+    U.shrink(U.rows, rank);
+    S.shrink(rank, rank);
+  }
+
+  return std::make_tuple(std::move(U), std::move(S), rank);
 }
 
 std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>
@@ -617,6 +658,27 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
   return std::make_tuple(std::move(interp), std::move(c_pivots), rank);
 }
 
+void id_row(Matrix& U, std::vector<int64_t>& ipiv) {
+  Matrix A(U);
+  std::vector<int> arows(A.min_dim());
+  LAPACKE_dgetrf(LAPACK_COL_MAJOR, A.rows, A.cols, &A, A.stride, arows.data());
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasUpper, CblasNoTrans, CblasNonUnit,
+              A.rows, A.cols, 1., &A, A.stride, &U, U.stride);
+  cblas_dtrsm(CblasColMajor, CblasRight, CblasLower, CblasNoTrans, CblasUnit,
+              A.rows, A.cols, 1., &A, A.stride, &U, U.stride);
+  // Convert arows to ipiv_row
+  ipiv.resize(U.rows);
+  for (int64_t k = 0; k < ipiv.size(); k++) {
+    ipiv[k] = k;
+  }
+  for (int64_t j = 0; j < U.cols; j++) {
+    int64_t p = arows[j] - 1;
+    if (p != j) {
+      std::swap(ipiv[j], ipiv[p]);
+    }
+  }
+}
+
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank) {
   Matrix interp(A.rows, rank), pivots(A.cols, 1);
   std::vector<double> tau(std::min(A.rows, A.cols));
@@ -687,15 +749,25 @@ std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double eps, boo
   return std::make_tuple(std::move(PU), std::move(skel_rows));
 }
 
-std::vector<double> get_eigenvalues(const Matrix& A) {
+std::vector<double> get_eigenvalues(Matrix& A) {
   assert(A.rows == A.cols);
-  Matrix Ac(A);
-  std::vector<double> eigv(Ac.rows, 0);
-  LAPACKE_dsyev(LAPACK_COL_MAJOR, 'N', 'L', Ac.rows, &Ac, Ac.stride, eigv.data());
+  std::vector<double> eigv(A.rows, 0);
+  LAPACKE_dsyev(LAPACK_COL_MAJOR, 'N', 'L', A.rows, &A, A.stride, eigv.data());
   return eigv;
 }
 
-  std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>
+std::vector<double> get_selected_eigenvalues(Matrix& A, const int64_t k0, const int64_t k1,
+                                             const double abstol) {
+  assert(A.rows == A.cols);
+  int m, tmp;
+  std::vector<double> eigv(A.rows, 0);
+  LAPACKE_dsyevx(LAPACK_COL_MAJOR, 'N', 'I', 'L', A.rows, &A, A.stride, 0, 0,
+                 k0, k1, abstol, &m, eigv.data(), nullptr, 1, &tmp);
+  eigv.resize(m);
+  return eigv;
+}
+
+std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>
 partial_pivoted_qr(Matrix& A, const int64_t rank) {
   assert(rank <= A.min_dim());
   // Pointer aliases
@@ -785,8 +857,7 @@ partial_pivoted_qr(Matrix& A, const int64_t rank) {
   return std::make_tuple(std::move(r), std::move(ipiv), std::move(tau));
 }
 
-std::tuple<Matrix, Matrix>
-truncated_pivoted_qr(Matrix& A, const int64_t rank) {
+std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, const int64_t rank) {
   const int64_t m = A.rows;
   const int64_t n = A.cols;
   int64_t r;

@@ -1,4 +1,4 @@
-include $(TOPSRCDIR)/make.fugaku.inc
+include $(TOPSRCDIR)/make.inc
 
 OBJECTS := $(subst .cpp,.o,$(SOURCES)) $(subst .c,.o,$(wildcard *.c))
 

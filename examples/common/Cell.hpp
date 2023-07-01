@@ -10,6 +10,8 @@ namespace Hatrix {
 
 class Cell {
  public:
+  Body *body_ptr;                        // Pointer to first body
+  Cell *child_ptr;                       // Pointer to first child
   int64_t body_offset;                   // Index of first body within Domain.bodies
   int64_t nbodies;                       // Number of bodies within Cell
   int64_t child;                         // Index of first child within Domain.cells
@@ -17,11 +19,13 @@ class Cell {
   int64_t parent;                        // Index of parent within Domain cells
   int64_t level;                         // Level in cluster tree
   int64_t block_index;                   // Corresponding block index within matrix partition
+  int64_t key;                           // Key within space-filling curve ordering
   double center[MAX_NDIM];               // Center coordinates of cell
   double radius[MAX_NDIM];               // Size of the bounding box
   std::vector<int64_t> near_list;        // Index of cells in near interaction list
   std::vector<int64_t> far_list;         // Index of cells in far interaction list
   std::vector<int64_t> sample_bodies;    // Index of sample bodies representing this cell
+  std::vector<int64_t> sample_nearfield; // Index of sample bodies representing the nearfield
   std::vector<int64_t> sample_farfield;  // Index of sample bodies representing the farfield
 
   Cell() : body_offset(-1), nbodies(0), child(-1),
@@ -36,16 +40,24 @@ class Cell {
     return (nchilds == 0);
   }
 
-  double get_radius() const {
-    double rad = 0.;
+  double get_size() const {
+    double size = 0.;
     for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
-      rad += radius[axis] * radius[axis];
+      size += radius[axis] * radius[axis];
     }
-    return rad;
+    return size;
+  }
+
+  double get_radius() const {
+    double r = 0.;
+    for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
+      r = std::max(r, radius[axis]);
+    }
+    return r;
   }
 
   double get_diameter() const {
-    return 4. * get_radius();
+    return 2 * get_radius();
   }
 
   std::vector<int64_t> get_bodies() const {

@@ -20,14 +20,18 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#define SQUARE_INITIAL_BOX 1
+
 namespace Hatrix {
 
 class Domain {
  public:
   int64_t N, ndim;
   int64_t ncells, tree_height;
+  double X0[MAX_NDIM], X0_min[MAX_NDIM], X0_max[MAX_NDIM], R0[MAX_NDIM];  // Root level bounding box
   std::vector<Body> bodies;
   std::vector<Cell> cells;
+  Matrix p2p_matrix;
 
   static int64_t get_cell_idx(const int64_t block_index, const int64_t level) {
     return (1 << level) - 1 + block_index;
@@ -78,12 +82,54 @@ class Domain {
     return dist;
   }
 
-  static bool is_well_separated(const Cell& source, const Cell& target,
-                                const double theta) {
+  // Eq.(5.6) of "Hierarchical Matrices: Algorithms and Analysis" (W. Hackbusch, 2015)
+  static bool admis_check_var1(const Cell& source, const Cell& target,
+                               const double theta) {
+    const auto distance = std::sqrt(dist2(MAX_NDIM, source.center, target.center));
+    const auto source_diam = source.get_diameter();
+    const auto target_diam = target.get_diameter();
+    return (distance > (theta * std::min(source_diam, target_diam)));
+  }
+
+  // Eq.(5.7a) of "Hierarchical Matrices: Algorithms and Analysis" (W. Hackbusch, 2015)
+  static bool admis_check_var2(const Cell& source, const Cell& target,
+                               const double theta) {
+    const auto distance = std::sqrt(dist2(MAX_NDIM, source.center, target.center));
+    const auto source_diam = source.get_diameter();
+    const auto target_diam = target.get_diameter();
+    return (distance > (theta * std::max(source_diam, target_diam)));
+  }
+
+  // Another variant that uses bounding box size in all directions
+  static bool admis_check_var3(const Cell& source, const Cell& target,
+                               const double theta) {
     const auto distance = dist2(MAX_NDIM, source.center, target.center);
-    const auto source_size = source.get_radius();
-    const auto target_size = target.get_radius();
+    const auto source_size = source.get_size();
+    const auto target_size = target.get_size();
     return (distance > (theta * (source_size + target_size)));
+  }
+
+  static bool is_well_separated(const Cell& source, const Cell& target,
+                                const double theta, const int64_t admis_variant = 0) {
+    bool admissible = false;
+    switch (admis_variant) {
+      case 1: {
+        admissible = admis_check_var1(source, target, theta);
+        break;
+      }
+      case 2: {
+        admissible = admis_check_var2(source, target, theta);
+        break;
+      }
+      case 3: {
+        admissible = admis_check_var3(source, target, theta);
+        break;
+      }
+      default: {
+        admissible = admis_check_var3(source, target, theta);
+      }
+    }
+    return admissible;
   }
 
   // Taken from: H2Pack GitHub
@@ -204,7 +250,8 @@ class Domain {
                        const std::vector<int64_t>& bodies_idx,
                        const int64_t sample_size,
                        const int64_t sampling_algo,
-                       const int64_t grid_algo = 0) {
+                       const int64_t grid_algo = 0,
+                       const bool ELSES_GEOM = false) {
     const int64_t nbodies = bodies_idx.size();
     if (sample_size >= nbodies) {
       return bodies_idx;
@@ -316,9 +363,20 @@ class Domain {
             chosen[min_idx] = true;
           }
           sample_idx.reserve(anchor_npt);
+          std::vector<bool> is_chosen_particle(bodies_arr.size() / 4, false);
           for (int64_t i = 0; i < nbodies; i++) {
-            if (chosen[i]) {
+            // Check if atom from the same particle has been selected before
+            bool ELSES_cond = true;
+            if (ELSES_GEOM) {
+              const auto particle_number = (int64_t)bodies_arr[bodies_idx[i]].value / 4;
+              ELSES_cond = !is_chosen_particle[particle_number];
+            }
+            if (chosen[i] && ELSES_cond) {
               sample_idx.push_back(bodies_idx[i]);
+              if (ELSES_GEOM) {
+                const auto particle_number = (int64_t)bodies_arr[bodies_idx[i]].value / 4;
+                is_chosen_particle[particle_number] = true;
+              }
             }
           }
         }
@@ -336,7 +394,8 @@ class Domain {
   }
 
  private:
-  void orthogonal_recursive_bisection(
+  void cardinal_recursive_bisection(
+      std::vector<Body>& bodies, std::vector<Cell>& cells,
       const int64_t left, const int64_t right, const int64_t leaf_size,
       const int64_t level, const int64_t block_index) {
     // Initialize cell
@@ -346,15 +405,14 @@ class Domain {
     cell.nbodies = right - left;
     cell.level = level;
     cell.block_index = block_index;
-    double radius_max = 0.;
+    double radius_max = 0;
     int64_t sort_axis = 0;
     for (int64_t axis = 0; axis < ndim; axis++) {
       const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
       const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
       const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
-      const auto diam = Xmax - Xmin;
-      cell.center[axis] = Xsum / (double)cell.nbodies;
-      cell.radius[axis] = diam / 2.;
+      cell.center[axis] = (Xmin + Xmax) / 2.;  // Midpoint
+      cell.radius[axis] = (Xmax - Xmin) / 2.;
 
       if (cell.radius[axis] > radius_max) {
         radius_max = cell.radius[axis];
@@ -379,18 +437,18 @@ class Domain {
     cell.nchilds = 2;
     cells[cell.child].parent = cell_idx;
     cells[cell.child + 1].parent = cell_idx;
-    orthogonal_recursive_bisection(left, mid, leaf_size,
-                                   level + 1, block_index << 1);
-    orthogonal_recursive_bisection(mid, right, leaf_size,
-                                   level + 1, (block_index << 1) + 1);
+    cardinal_recursive_bisection(bodies, cells, left, mid, leaf_size,
+                                 level + 1, block_index << 1);
+    cardinal_recursive_bisection(bodies, cells, mid, right, leaf_size,
+                                 level + 1, (block_index << 1) + 1);
   }
 
-  void dual_tree_traversal(Cell& Ci, Cell& Cj, const double theta) {
+  void dual_tree_traversal(Cell& Ci, Cell& Cj, const double theta, const int64_t admis_variant) {
     const auto i_level = Ci.level;
     const auto j_level = Cj.level;
     bool admissible = false;
     if (i_level == j_level) {
-      admissible = is_well_separated(Ci, Cj, theta);
+      admissible = is_well_separated(Ci, Cj, theta, admis_variant);
       if (admissible) {
         Ci.far_list.push_back(get_cell_idx(Cj.block_index, Cj.level));
       }
@@ -400,12 +458,12 @@ class Domain {
     }
     if (!admissible) {
       if (i_level <= j_level && !Ci.is_leaf()) {
-        dual_tree_traversal(cells[Ci.child], Cj, theta);
-        dual_tree_traversal(cells[Ci.child + 1], Cj, theta);
+        dual_tree_traversal(cells[Ci.child], Cj, theta, admis_variant);
+        dual_tree_traversal(cells[Ci.child + 1], Cj, theta, admis_variant);
       }
       else if (j_level <= i_level && !Cj.is_leaf()) {
-        dual_tree_traversal(Ci, cells[Cj.child], theta);
-        dual_tree_traversal(Ci, cells[Cj.child + 1], theta);
+        dual_tree_traversal(Ci, cells[Cj.child], theta, admis_variant);
+        dual_tree_traversal(Ci, cells[Cj.child + 1], theta, admis_variant);
       }
     }
   }
@@ -416,6 +474,68 @@ class Domain {
       std::sort(cell.near_list.begin(), cell.near_list.end());
       std::sort(cell.far_list.begin(), cell.far_list.end());
     }
+  }
+
+  // Levelwise offset of Hilbert key
+  int64_t levelOffset(int64_t level) {
+    return (((int64_t)1 << 3 * level) - 1) / 7;
+  }
+
+  // Get level from Hilbert key
+  int64_t getLevel(int64_t i) {
+    int level = -1;
+    uint64_t offset = 0;
+    while (i >= offset) {
+      level++;
+      offset += (int64_t)1 << 3 * level;
+    }
+    return level;
+  }
+
+  // Get first child's Hilbert key
+  int64_t getChild(int64_t i) {
+    int64_t level = getLevel(i);
+    return (i - levelOffset(level)) * 8 + levelOffset(level+1);
+  }
+
+  // Get 3-D Hilbert index from coordinates
+  void get3DIndex(const double X[MAX_NDIM], const int64_t level,
+                  int64_t iX[MAX_NDIM]) {
+    for (int64_t axis = 0; axis < 3; axis++) {
+      const double dx = 2 * R0[axis] / (1 << level);
+      iX[axis] = floor((X[axis] - X0_min[axis]) / dx);
+    }
+  }
+
+  int64_t getKey(int64_t iX[MAX_NDIM], const int64_t level,
+                 const bool offset = true) {
+    // Preprocess for Hilbert
+    int64_t M = 1 << (level - 1);
+    for (int64_t Q=M; Q>1; Q>>=1) {
+      int64_t R = Q - 1;
+      for (int64_t d=0; d<3; d++) {
+        if (iX[d] & Q) iX[0] ^= R;
+        else {
+          int64_t t = (iX[0] ^ iX[d]) & R;
+          iX[0] ^= t;
+          iX[d] ^= t;
+        }
+      }
+    }
+    for (int64_t d=1; d<3; d++) iX[d] ^= iX[d-1];
+    int64_t t = 0;
+    for (int64_t Q=M; Q>1; Q>>=1)
+      if (iX[2] & Q) t ^= Q - 1;
+    for (int64_t d=0; d<3; d++) iX[d] ^= t;
+
+    int64_t i = 0;
+    for (int64_t l = 0; l < level; l++) {
+      i |= (iX[2] & (int64_t)1 << l) << 2*l;
+      i |= (iX[1] & (int64_t)1 << l) << (2*l + 1);
+      i |= (iX[0] & (int64_t)1 << l) << (2*l + 2);
+    }
+    if (offset) i += levelOffset(level);
+    return i;
   }
 
  public:
@@ -435,11 +555,11 @@ class Domain {
     // Initialize empty cells
     cells.resize(ncells);
     // Partition
-    orthogonal_recursive_bisection(0, N, leaf_size, 0, 0);
+    cardinal_recursive_bisection(bodies, cells, 0, N, leaf_size, 0, 0);
   }
 
-  void build_interactions(const double theta) {
-    dual_tree_traversal(cells[0], cells[0], theta);
+  void build_interactions(const double theta, const int64_t admis_variant = 0) {
+    dual_tree_traversal(cells[0], cells[0], theta, admis_variant);
     sort_interaction_lists();
   }
 
@@ -498,12 +618,22 @@ class Domain {
         }
       }
     }
-    sort_interaction_lists();
   }
 
   void build_sample_bodies(const int64_t sample_self_size,
                            const int64_t sample_far_size,
-                           const int64_t sampling_algo) {
+                           const int64_t sampling_algo,
+                           const bool ELSES_GEOM = false) {
+    const auto sample_near_size = sample_far_size;
+    build_sample_bodies(sample_self_size, sample_near_size, sample_far_size,
+                        sampling_algo, ELSES_GEOM);
+  }
+
+  void build_sample_bodies(const int64_t sample_self_size,
+                           const int64_t sample_near_size,
+                           const int64_t sample_far_size,
+                           const int64_t sampling_algo,
+                           const bool ELSES_GEOM = false) {
     // Bottom-up pass to select cell's sample bodies
     for (int64_t level = tree_height; level > 0; level--) {
       const auto level_ncells = (int64_t)1 << level;
@@ -528,7 +658,28 @@ class Domain {
         }
         cell.sample_bodies =
             select_sample_bodies(ndim, bodies, initial_sample,
-                                 sample_self_size, sampling_algo, 0);
+                                 sample_self_size, sampling_algo, 0, ELSES_GEOM);
+      }
+    }
+    // Bottom-up pass to select cell's nearfield sample
+    for (int64_t level = tree_height; level > 0; level--) {
+      const auto level_ncells = (int64_t)1 << level;
+      const auto level_offset = level_ncells - 1;
+      for (int64_t node = 0; node < level_ncells; node++) {
+        const auto cell_idx = level_offset + node;
+        auto& cell = cells[cell_idx];
+        std::vector<int64_t> initial_sample;
+        for (const auto near_idx: cell.near_list) {
+          if (near_idx != cell_idx) {  // Exclude self-to-self interaction
+            const auto& near_cell = cells[near_idx];
+            initial_sample.insert(initial_sample.end(),
+                                  near_cell.sample_bodies.begin(),
+                                  near_cell.sample_bodies.end());
+          }
+        }
+        cell.sample_nearfield =
+            select_sample_bodies(ndim, bodies, initial_sample,
+                                 sample_near_size, sampling_algo, 1, ELSES_GEOM);
       }
     }
     // Top-down pass to select cell's farfield sample
@@ -657,7 +808,7 @@ class Domain {
         }
         cell.sample_farfield =
             select_sample_bodies(ndim, bodies, initial_sample,
-                                 sample_far_size, sampling_algo, 1);
+                                 sample_far_size, sampling_algo, 1, ELSES_GEOM);
       }
     }
   }
@@ -829,6 +980,16 @@ class Domain {
     }
   }
 
+  void initialize_random_uniform_grid() {
+    for (int64_t i = 0; i < N; i++) {
+      const double px = ndim > 0 ? ((double)rand() / RAND_MAX) : 0.;
+      const double py = ndim > 1 ? ((double)rand() / RAND_MAX) : 0.;
+      const double pz = ndim > 2 ? ((double)rand() / RAND_MAX) : 0.;
+      const double value = (double)i / (double)N;
+      bodies.emplace_back(Body(px, py, pz, value));
+    }
+  }
+
   void initialize_starsh_uniform_grid() {
     std::vector<int64_t> sides(ndim, 0);
     sides[0] = ceil(pow((double)N, 1.0 / ndim));
@@ -866,7 +1027,323 @@ class Domain {
     }
   }
 
-  void print_bodies_to_file(const std::string& file_name) const {
+  void calculate_bounding_box() {
+    Cell root;
+    root.body_offset = 0;
+    root.nbodies = N;
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      const auto Xmin = get_Xmin(bodies, root.get_bodies(), axis);
+      const auto Xmax = get_Xmax(bodies, root.get_bodies(), axis);
+      X0[axis] = (Xmin + Xmax) / 2.;
+      R0[axis] = (Xmax - Xmin) / 2.;
+    }
+#if SQUARE_INITIAL_BOX
+    double R_max = 0;
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      R_max = std::max(R_max, R0[axis]);
+    }
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      R0[axis] = R_max;
+    }
+#endif
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      X0_min[axis] = X0[axis] - R0[axis];
+      X0_max[axis] = X0[axis] + R0[axis];
+    }
+  }
+
+  void read_bodies_ELSES(const std::string& file_name,
+                         const int64_t num_electrons_per_atom = 4) {
+    std::ifstream file;
+    file.open(file_name);
+    int64_t num_atoms;
+    file >> num_atoms;
+    ndim = 3;
+    N = num_atoms * num_electrons_per_atom;
+
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore the rest of line after num_particles
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore line before atom positions
+    int64_t body_idx = 0;
+    for(int64_t i = 0; i < num_atoms; i++) {
+      std::string pref;
+      double x, y, z;
+      file >> pref >> x >> y >> z;
+      file.ignore(1, '\n'); //Ignore newline
+      for (int64_t k = 0; k < num_electrons_per_atom; k++) {
+        bodies.emplace_back(Body(x, y, z, (double)body_idx));
+        body_idx++;
+      }
+    }
+    file.close();
+  }
+
+  // Build cells of tree adaptively using a top-down approach based on recursion
+  void build_cells(Body *bodies, Body *buffer,
+                   const int64_t begin, const int64_t end,
+                   Cell * cell, std::vector<Cell>& cells, const int64_t leaf_size,
+                   const double X[MAX_NDIM], const double R[MAX_NDIM],
+                   const int64_t level = 0, const bool direction = false) {
+    // Create a tree cell
+    cell->body_ptr = bodies + begin;
+    if (direction) cell->body_ptr = buffer + begin;
+    cell->nbodies = end - begin;
+    cell->level = level;
+    cell->nchilds = 0;
+    for (int64_t axis = 0; axis < ndim; axis++) {
+      cell->center[axis] = X[axis];
+      cell->radius[axis] = R[axis];
+    }
+    int64_t iX[MAX_NDIM];
+    get3DIndex(X, level, iX);
+    cell->key = getKey(iX, level, false);
+    // Count number of bodies in each octant
+    int64_t size[8] = {0,0,0,0,0,0,0,0};
+    for (int64_t i = begin; i < end; i++) {
+      int64_t octant = ( bodies[i].X[0] > X[0]) +
+                       ((bodies[i].X[1] > X[1]) << 1) +
+                       ((bodies[i].X[2] > X[2]) << 2);
+      size[octant]++;
+    }
+    // Exclusive scan to get offsets
+    int64_t offset = begin;
+    int64_t offsets[8], counter[8];
+    for (int64_t i = 0; i < 8; i++) {
+      offsets[i] = offset;
+      offset += size[i];
+      if (size[i]) cell->nchilds++;
+    }
+    // If cell is a leaf
+    if (end - begin <= leaf_size) {
+      cell->nchilds = 0;
+      if (direction) {
+        for (int64_t i = begin; i < end; i++) {
+          buffer[i] = bodies[i];
+        }
+      }
+      return;
+    }
+    // Sort bodies by octant
+    for (int64_t i = 0; i < 8; i++) counter[i] = offsets[i];
+    for (int64_t i = begin; i < end; i++) {
+      int64_t octant = ( bodies[i].X[0] > X[0]) +
+                       ((bodies[i].X[1] > X[1]) << 1) +
+                       ((bodies[i].X[2] > X[2]) << 2);
+      buffer[counter[octant]] = bodies[i];
+      counter[octant]++;
+    }
+    // Loop over children and recurse
+    assert(cells.capacity() >= cells.size()+cell->nchilds);
+    cells.resize(cells.size()+cell->nchilds);
+    Cell *child = &cells.back() - cell->nchilds + 1;
+    cell->child_ptr = child;
+    for (int64_t i = 0, c = 0; i < 8; i++) {
+      double Xchild[MAX_NDIM];
+      double Rchild[MAX_NDIM];
+      for (int64_t axis = 0; axis < MAX_NDIM; axis++) {
+        Xchild[axis] = X[axis];
+        Rchild[axis] = R[axis] / 2.;
+      }
+      for (int64_t d = 0; d < 3; d++) {
+        Xchild[d] += Rchild[d] * (((i & 1 << d) >> d) * 2 - 1);
+      }
+      if (size[i]) {
+        build_cells(buffer, bodies, offsets[i], offsets[i] + size[i],
+                    &child[c++], cells, leaf_size, Xchild, Rchild, level+1, !direction);
+      }
+    }
+  }
+
+  void sort_bodies_ELSES(const int64_t molecule_size) {
+    // Calculate root level bounding box
+    calculate_bounding_box();
+    // Every leaf_size consecutive electrons comprise a molecule
+    const auto nmols = N / molecule_size;
+    std::vector<Body> mol_centers(nmols);  // Center of each molecule
+    for (int64_t i = 0; i < nmols; i++) {
+      Cell cell;
+      cell.body_offset = i * molecule_size;
+      cell.nbodies = molecule_size;
+      for (int64_t axis = 0; axis < ndim; axis++) {
+        const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
+        const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
+        mol_centers[i].X[axis] = (Xmin + Xmax) / 2.;
+      }
+      mol_centers[i].value = (double)i;
+    }
+    // Partition until each box contain only one molecule
+    std::vector<Body> buffer = mol_centers;
+    std::vector<Cell> mol_cells(1);
+    const int64_t leaf_box_size = 1;
+    mol_cells.reserve(nmols*(32/leaf_box_size+1));
+    build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0], mol_cells, leaf_box_size, X0, R0);
+    int64_t max_level = 0;
+    for (int64_t i = 0; i < mol_cells.size(); i++) {
+      if (mol_cells[i].nchilds == 0) {
+        max_level = std::max(max_level, mol_cells[i].level);
+      }
+    }
+    for (int64_t i = 0; i < mol_cells.size(); i++) {
+      if (mol_cells[i].nchilds == 0) {
+        auto hilbert_level = mol_cells[i].level;
+        auto hilbert_idx = mol_cells[i].key;
+        // Ensure hilbert indices are on the same level
+        while (hilbert_level < max_level) {
+          hilbert_idx = getChild(hilbert_idx);
+          hilbert_level++;
+        }
+        for (int64_t b = 0; b < mol_cells[i].nbodies; b++) {
+          auto& bi = mol_cells[i].body_ptr[b];
+          bi.key = hilbert_idx;
+        }
+      }
+    }
+    // Sort molecules based on hilbert index
+    std::vector<Body> mol_centers_sorted = mol_centers;
+    std::sort(mol_centers_sorted.begin(), mol_centers_sorted.end(),
+              [](const Body& a, const Body& b) {
+                return a.key < b.key;
+              });
+    // Sort electrons based on molecule hilbert index
+    std::vector<Body> temp = bodies;
+    int64_t count = 0;
+    for (int64_t i = 0; i < nmols; i++) {
+      const auto& mol_i = mol_centers_sorted[i];
+      const auto srcBegin = (int64_t)mol_i.value * molecule_size;
+      const auto dstBegin = count;
+      for (int64_t k = 0; k < molecule_size; k++) {
+        bodies[dstBegin + k] = temp[srcBegin + k];
+      }
+      count += molecule_size;
+    }
+    // Sort electrons within each molecule using cardinal recursive bisection
+    auto get_sort_axis = [this](const int64_t begin, const int64_t end) {
+      std::vector<int64_t> bodies_idx(end - begin);
+      for (int64_t idx = begin; idx < end; idx++) {
+        bodies_idx[idx - begin] = idx;
+      }
+      double max_radius = 0;
+      int64_t sort_axis = 0;
+      for (int64_t axis = 0; axis < ndim; axis++) {
+        const auto Xmin = get_Xmin(bodies, bodies_idx, axis);
+        const auto Xmax = get_Xmax(bodies, bodies_idx, axis);
+        const auto radius = (Xmax - Xmin) / 2.;
+        if (radius > max_radius) {
+          max_radius = radius;
+          sort_axis = axis;
+        }
+      }
+      return sort_axis;
+    };
+    for (int64_t i = 0; i < nmols; i++) {
+      // Level 1
+      {
+        const auto mol_begin = i * molecule_size;
+        const auto mol_end = mol_begin + molecule_size;
+        const auto sort_axis = get_sort_axis(mol_begin, mol_end);
+        std::sort(bodies.begin() + mol_begin, bodies.begin() + mol_end,
+                  [sort_axis](const Body& lhs, const Body& rhs) {
+                    return lhs.X[sort_axis] < rhs.X[sort_axis];
+                  });
+      }
+      // Level 2
+      {
+        const auto mol_begin = i * molecule_size;
+        const auto mol_mid = mol_begin + molecule_size / 2;
+        const auto mol_end = mol_begin + molecule_size;
+        // Sort left part
+        const auto sort_axis_left = get_sort_axis(mol_begin, mol_mid);
+        std::sort(bodies.begin() + mol_begin, bodies.begin() + mol_mid,
+                  [sort_axis_left](const Body& lhs, const Body& rhs) {
+                    return lhs.X[sort_axis_left] < rhs.X[sort_axis_left];
+                  });
+        // Sort right part
+        const auto sort_axis_right = get_sort_axis(mol_mid, mol_end);
+        std::sort(bodies.begin() + mol_mid, bodies.begin() + mol_end,
+                  [sort_axis_right](const Body& lhs, const Body& rhs) {
+                    return lhs.X[sort_axis_right] < rhs.X[sort_axis_right];
+                  });
+      }
+    }
+  }
+
+  void build_tree_from_sorted_bodies(const int64_t leaf_size,
+                                     const std::vector<int64_t>& buckets) {
+    tree_height = (int64_t)std::log2((double)N / (double)leaf_size);
+    const int64_t nleaf_cells = (int64_t)1 << tree_height;
+    assert(nleaf_cells == buckets.size());
+
+    ncells = 2 * nleaf_cells - 1;
+    // Initialize empty cells
+    cells.resize(ncells);
+    // Build cell tree using bottom up traversal
+    int64_t count = 0;
+    for (int64_t level = tree_height; level >= 0; level--) {
+      const auto level_ncells = (int64_t)1 << level;
+      const auto level_offset = level_ncells - 1;
+      for (int64_t node = 0; node < level_ncells; node++) {
+        auto& cell = cells[level_offset + node];
+        cell.level = level;
+        cell.block_index = node;
+        if (level == tree_height) {
+          // Construct leaf node
+          cell.child = -1;
+          cell.nchilds = 0;
+          cell.body_offset = count;
+          cell.nbodies = buckets[node];
+          count += buckets[node];
+        }
+        else {
+          // Construct non-leaf nodes from adjacent lower nodes
+          const auto child1_idx = get_cell_idx((node << 1) + 0, level + 1);
+          const auto child2_idx = get_cell_idx((node << 1) + 1, level + 1);
+          auto& child1 = cells[child1_idx];
+          auto& child2 = cells[child2_idx];
+          cell.child = child1_idx;
+          cell.nchilds = 2;
+          cell.body_offset = child1.body_offset;
+          cell.nbodies = child1.nbodies + child2.nbodies;
+          // Set parent
+          child1.parent = level_offset + node;
+          child2.parent = level_offset + node;
+        }
+        // Calculate cell center and radius
+        for (int64_t axis = 0; axis < ndim; axis++) {
+          const auto Xmin = get_Xmin(bodies, cell.get_bodies(), axis);
+          const auto Xmax = get_Xmax(bodies, cell.get_bodies(), axis);
+          const auto Xsum = get_Xsum(bodies, cell.get_bodies(), axis);
+          cell.center[axis] = (Xmin + Xmax) / 2.;  // Midpoint
+          cell.radius[axis] = (Xmax - Xmin) / 2.;
+        }
+      }
+    }
+    cells[0].parent = -1; //  Root has no parent
+  }
+
+  void read_p2p_matrix_ELSES(const std::string& file_name) {
+    std::ifstream file;
+    file.open(file_name);
+    // Ignore first two lines
+    const int64_t nskip_lines = 2;
+    for (int64_t i = 0; i < nskip_lines; i++) {
+      file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    }
+
+    int64_t nrows, ncols, nnz;
+    file >> nrows >> ncols >> nnz;
+    Matrix D(nrows, ncols);
+    D = 0; // Initialize with zero entries
+    int64_t row, col;
+    double val;
+    for(int64_t k = 0; k < nnz; k++) {
+      file >> col >> row >> val;
+      D(row - 1, col - 1) = val;
+      D(col - 1, row - 1) = val; // Symmetric
+    }
+    file.close();
+    p2p_matrix = std::move(D);
+  }
+
+  void write_bodies(const std::string& file_name) const {
     const std::vector<char> axis{'x', 'y', 'z'};
 
     std::ofstream file;
@@ -875,14 +1352,14 @@ class Domain {
       if (k > 0) file << ",";
       file << axis[k];
     }
-    file << std::endl;
+    file << ",value" << std::endl;
 
     for (int64_t i = 0; i < N; i++) {
       for (int64_t k = 0; k < ndim; k++) {
         if (k > 0) file << ",";
         file << bodies[i].X[k];
       }
-      file << std::endl;
+      file << "," << bodies[i].value << std::endl;
     }
 
     file.close();

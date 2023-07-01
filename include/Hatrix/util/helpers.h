@@ -3,7 +3,7 @@
 #include <vector>
 
 namespace Hatrix {
-  std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal);
+  std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal, bool endpoint=true);
 
   // Concat two matrices along the given axis.
   //

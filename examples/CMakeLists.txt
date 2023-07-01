@@ -45,19 +45,49 @@ else()
     LDL_strong_1level
     LDL_strong_Nlevel
     Construction_H2_Nlevel
-    LDL_SymmetricH2_Nlevel
-    Eigen_SymmetricH2_Nlevel
     UMV_H2_Nlevel
     Construction_SymmetricH2_Nlevel_with_sampling
+    LDL_SymmetricH2_Nlevel
+    LDL_SymmetricH2_Nlevel_Ma2019
+    ULV_SymmetricH2_Nlevel_nodependency
+    LDL_SymmetricH2_Nlevel_nodependency
+    LDL_SymmetricH2_Nlevel_nodependency_directschur
+    Eigen_Dense
+    Eigen_Dense_DSYEV
+    Eigen_Dense_DSYEVX
+    Eigen_SymmetricH2_Nlevel
+    Eigen_SymmetricH2_Nlevel_Ma2019
+    Eigen_SymmetricH2_Nlevel_nodependency
+    Eigen_SymmetricH2_Nlevel_nodependency_directschur
   )
 endif()
 
 foreach(EXAMPLE ${HATRIX_EXAMPLES})
   add_executable(${EXAMPLE} ${EXAMPLE}.cpp)
   target_link_libraries(${EXAMPLE} Hatrix)
+  if(USE_JSON)
+    target_link_libraries(${EXAMPLE} nlohmann_json::nlohmann_json)
+  endif()
 endforeach()
 
-find_package(MPI REQUIRED)
-add_executable(SymmH2_ULV_SC22 SymmH2_ULV_SC22.cpp)
-# target_compile_options(SymmH2_ULV_SC22 PRIVATE -DUSE_MKL -D_PROF)
-target_link_libraries(SymmH2_ULV_SC22 MPI::MPI_CXX Hatrix)
+find_package(MPI)
+if(MPI_FOUND)
+  add_executable(SymmH2_ULV_SC22 SymmH2_ULV_SC22.cpp)
+  target_compile_options(SymmH2_ULV_SC22 PRIVATE -DUSE_MKL -D_PROF)
+  target_link_libraries(SymmH2_ULV_SC22 MPI::MPI_CXX Hatrix)
+
+  add_executable(ParSlicing ParSlicing.cpp)
+  target_link_libraries(ParSlicing MPI::MPI_CXX)
+
+  add_executable(MSParEigen_SymmetricH2_Nlevel MSParEigen_SymmetricH2_Nlevel.cpp)
+  target_link_libraries(MSParEigen_SymmetricH2_Nlevel Hatrix MPI::MPI_CXX)
+
+  add_executable(ParEigen_SymmetricH2_Nlevel ParEigen_SymmetricH2_Nlevel.cpp)
+  target_link_libraries(ParEigen_SymmetricH2_Nlevel Hatrix MPI::MPI_CXX)
+
+  add_executable(ParEigen_Dense_PDSYEV ParEigen_Dense_PDSYEV.cpp)
+  target_link_libraries(ParEigen_Dense_PDSYEV Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
+
+  add_executable(ParEigen_Dense_PDSYEVX ParEigen_Dense_PDSYEVX.cpp)
+  target_link_libraries(ParEigen_Dense_PDSYEVX Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
+endif()

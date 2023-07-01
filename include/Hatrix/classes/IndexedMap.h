@@ -3,6 +3,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <iostream>
+#include <set>
 
 #include "Hatrix/classes/Matrix.h"
 
@@ -61,7 +62,8 @@ public:
 
   void erase_all();
 };
-template<typename T> using ColMap  = RowMap<T>;
+template<typename T> using ColMap   = RowMap<T>;
+template<typename T> using LevelMap = RowMap<T>;
 using RankMap = RowMap<std::vector<int64_t>>;
 
 template <class T>
@@ -98,6 +100,7 @@ class RowColMap {
 };
 
 // RowLevel and ColLevel also use a <int, int> tuple which is same as RowCol
+// TODO make RowLevelMap templated for extensibility
 using RowLevelMap = RowColMap<Matrix>;
 using ColLevelMap = RowColMap<Matrix>;
 
