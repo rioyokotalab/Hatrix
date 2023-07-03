@@ -93,6 +93,16 @@ H2_main : % : dirs examples/distributed/H2
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
+# non-distributed H2 code
+.PHONY: examples/distributed/H2_eigen
+examples/distributed/H2:
+	$(MAKE) -C $@
+
+H2_eigen : % : dirs examples/distributed/H2_eigen
+	$(CXX) libH2_main.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
 # non-distributed dense matrix verification code
 .PHONY: examples/distributed/Dense
 examples/distributed/Dense:
