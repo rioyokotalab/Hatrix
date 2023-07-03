@@ -95,11 +95,11 @@ H2_main : % : dirs examples/distributed/H2
 
 # non-distributed H2 code
 .PHONY: examples/distributed/H2_eigen
-examples/distributed/H2:
+examples/distributed/H2_eigen:
 	$(MAKE) -C $@
 
 H2_eigen : % : dirs examples/distributed/H2_eigen
-	$(CXX) libH2_main.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+	$(CXX) libH2_eigen.a /home/sameer.deshmukh/ELSES_mat_calc-master/elses_main.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 

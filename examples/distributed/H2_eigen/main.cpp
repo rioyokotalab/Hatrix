@@ -14,10 +14,16 @@
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 
+extern "C" {
+#include "elses.h"
+}
+
 using namespace Hatrix;
 
 int main(int argc, char* argv[]) {
   Args opts(argc, argv);
+
+  init_elses_state();
 
   return 0;
 }

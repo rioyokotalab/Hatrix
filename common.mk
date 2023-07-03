@@ -1,4 +1,4 @@
-include $(TOPSRCDIR)/make.inc
+include $(TOPSRCDIR)/make.lab.inc
 
 OBJECTS := $(subst .cpp,.o,$(SOURCES)) $(subst .c,.o,$(wildcard *.c))
 
