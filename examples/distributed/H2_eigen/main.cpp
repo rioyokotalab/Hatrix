@@ -35,5 +35,9 @@ int main(int argc, char* argv[]) {
   //   }
   // }
 
+  if (opts.kernel_verbose == "elses_c60") {
+
+  }
+
   return 0;
 }

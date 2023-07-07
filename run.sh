@@ -32,4 +32,12 @@ source_file=/home/sameer.deshmukh/ELSES_mat_calc-master/sample/sample_non_geno/C
 
 $exec_supercell $nx $ny $nz $source_file
 
-./bin/H2_eigen
+./bin/H2_eigen --N 7680 \
+               --nleaf 512 \
+               --kernel_func elses_c60 \
+               --kind_of_geometry elses_c60_geometry \
+               --geometry_file C60_fcc.xyz \
+               --ndim 3 \
+               --admis_kind geometry \
+               --geometry_file C60_fcc.xyz \
+               --use_nested_basis 1
