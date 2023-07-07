@@ -25,5 +25,15 @@ int main(int argc, char* argv[]) {
 
   init_elses_state();
 
+  int m = 7680;
+  double val;
+
+  // for (long int i = 1; i <= 7680; ++i) {
+  //   for (long int j = 1; j <= 7680; ++j) {
+  //     get_elses_matrix_value(&i, &j, &val);
+  //     std::cout << "i: " << i << " j: " << j << " "  << val << std::endl;
+  //   }
+  // }
+
   return 0;
 }

@@ -16,148 +16,20 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gsl-2.7.1/build/li
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/papi/src/lib/pkgconfig:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/build/lib:/mnt/nfs/packages/x86_64/cuda/cuda-11.7/lib64:/home/sameer.deshmukh/gitrepos/papi/src/lib:/home/sameer.deshmukh/gitrepos/gsl-2.7.1/build/lib
 
-# export MKL_NUM_THREADS=1
-# export OMP_NUM_THREADS=1
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
-# ROOT=$PWD
-# cd examples/distributed/H2_ptg
-# ./compile_jdf.sh
-# cd $ROOT
+exec_supercell=/home/sameer.deshmukh/ELSES_mat_calc-master/make_supercell_C60_FCCs_w_noise/a.out
 
-make -j H2_dtd
-make -j H2_main
+make -j H2_eigen
 
-ndim=2
 
-# ./build/examples/UMV_H2_Nlevel 64 16 0 10 60 1.9 0 2 2 0
+# Generate the points for the ELSES matrix.
+nx=1
+ny=1
+nz=1
+source_file=/home/sameer.deshmukh/ELSES_mat_calc-master/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xyz
 
-# for N in 65536; do
-#     for adm in 0; do
-#         for nleaf in 256; do
-#             for max_rank in 50 150 200; do
-#                     ./bin/H2_main --N $N \
-#                               --nleaf $nleaf \
-#                               --kernel_func laplace \
-#                               --kind_of_geometry grid \
-#                               --ndim $ndim \
-#                               --max_rank $max_rank \
-#                               --accuracy -1 \
-#                               --admis $adm \
-#                               --admis_kind diagonal \
-#                               --construct_algorithm miro \
-#                               --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-#                               --kind_of_recompression 3 --use_nested_basis
-#             done
-#         done
+$exec_supercell $nx $ny $nz $source_file
 
-#         for nleaf in 512; do
-#             for max_rank in 200 300 400; do
-#                     ./bin/H2_main --N $N \
-#                               --nleaf $nleaf \
-#                               --kernel_func laplace \
-#                               --kind_of_geometry grid \
-#                               --ndim $ndim \
-#                               --max_rank $max_rank \
-#                               --accuracy -1 \
-#                               --admis $adm \
-#                               --admis_kind diagonal \
-#                               --construct_algorithm miro \
-#                               --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-#                               --kind_of_recompression 3 --use_nested_basis
-#             done
-#         done
-#     done
-# done
-
-for N in 1024; do
-    for adm in 0; do
-        # for nleaf in 256; do
-        #     for max_rank in 50 150 200; do
-        #         ./bin/H2_main --N $N \
-        #                       --nleaf $nleaf \
-        #                       --kernel_func gsl_matern \
-        #                       --kind_of_geometry grid \
-        #                       --ndim $ndim \
-        #                       --max_rank $max_rank \
-        #                       --accuracy -1 \
-        #                       --admis $adm \
-        #                       --admis_kind diagonal \
-        #                       --construct_algorithm miro \
-        #                       --param_1 1 --param_2 0.03 --param_3 0.5 \
-        #                       --kind_of_recompression 3 --use_nested_basis
-        #     done
-        # done
-
-        for nleaf in 32; do
-            for max_rank in 25; do
-                echo "--- MAIN ---"
-                ./bin/H2_main --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func laplace \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy -1 \
-                              --admis $adm \
-                              --admis_kind diagonal \
-                              --construct_algorithm miro \
-                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
-
-                echo "--- DTD ---"
-                mpirun -n 4 ./bin/H2_dtd --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func laplace \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy -1 \
-                              --admis $adm \
-                              --admis_kind diagonal \
-                              --construct_algorithm miro \
-                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
-            done
-        done
-    done
-done
-
-# for N in 65536; do
-#     for adm in 0; do
-#         for nleaf in 256; do
-#             for max_rank in 50 150 200; do
-#                 ./bin/H2_main --N $N \
-#                               --nleaf $nleaf \
-#                               --kernel_func yukawa \
-#                               --kind_of_geometry grid \
-#                               --ndim $ndim \
-#                               --max_rank $max_rank \
-#                               --accuracy -1 \
-#                               --admis $adm \
-#                               --admis_kind geometry \
-#                               --construct_algorithm miro \
-#                               --param_1 1 --param_2 1e-9 \
-#                               --kind_of_recompression 3 --use_nested_basis
-#             done
-#         done
-
-#         for nleaf in 512; do
-#             for max_rank in 200 300 400; do
-#                 ./bin/H2_main --N $N \
-#                               --nleaf $nleaf \
-#                               --kernel_func yukawa \
-#                               --kind_of_geometry grid \
-#                               --ndim $ndim \
-#                               --max_rank $max_rank \
-#                               --accuracy -1 \
-#                               --admis $adm \
-#                               --admis_kind geometry \
-#                               --construct_algorithm miro \
-#                               --param_1 1 --param_2 1e-9 \
-#                               --kind_of_recompression 3 --use_nested_basis
-#             done
-#         done
-#     done
-# done
+./bin/H2_eigen
