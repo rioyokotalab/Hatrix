@@ -99,9 +99,9 @@ examples/distributed/H2_eigen:
 	$(MAKE) -C $@
 
 H2_eigen : % : dirs examples/distributed/H2_eigen
-	$(CXX) libH2_eigen.a /home/sameer.deshmukh/ELSES_mat_calc-master/src/src.a \
-	/home/sameer.deshmukh/ELSES_mat_calc-master/xmlf90-1.2g-elses/macros/lib/libflib.a \
-	libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+	$(CXX) libH2_eigen.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) \
+	/home/sameer.deshmukh/ELSES_mat_calc-master/src/src.a \
+	/home/sameer.deshmukh/ELSES_mat_calc-master/xmlf90-1.2g-elses/macros/lib/libflib.a -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 

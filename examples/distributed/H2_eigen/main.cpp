@@ -20,13 +20,12 @@ extern "C" {
 
 using namespace Hatrix;
 
+
 int main(int argc, char* argv[]) {
   Args opts(argc, argv);
+  const int64_t num_electrons_per_atom = 4;
 
   init_elses_state();
-
-  int m = 7680;
-  double val;
 
   // for (long int i = 1; i <= 7680; ++i) {
   //   for (long int j = 1; j <= 7680; ++j) {
@@ -35,9 +34,11 @@ int main(int argc, char* argv[]) {
   //   }
   // }
 
-  if (opts.kernel_verbose == "elses_c60") {
+  // Hatrix::Domain domain(opts.N, opts.ndim);
 
-  }
+  // if (opts.kernel_verbose == "elses_c60") {
+    // domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
+  // }
 
   return 0;
 }

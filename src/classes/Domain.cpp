@@ -171,6 +171,31 @@ namespace Hatrix {
     file.close();
   }
 
+  void Domain::read_xyz_chemical_file(const std::string& geometry_file,
+                                      const int64_t num_electrons_per_atom) {
+    std::ifstream file;
+    file.open(geometry_file);
+    int64_t num_atoms;
+    file >> num_atoms;
+    ndim = 3;
+    N = num_atoms * num_electrons_per_atom;
+
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore the rest of line after num_particles
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore line before atom positions
+    int64_t body_idx = 0;
+    for(int64_t i = 0; i < num_atoms; i++) {
+      std::string pref;
+      double x, y, z;
+      file >> pref >> x >> y >> z;
+      file.ignore(1, '\n'); //Ignore newline
+      for (int64_t k = 0; k < num_electrons_per_atom; k++) {
+        particles.emplace_back(Hatrix::Particle(x, y, z, (double)body_idx));
+        body_idx++;
+      }
+    }
+    file.close();
+  }
+
   void Domain::orb_split(Cell& cell,
                          const int64_t pstart,
                          const int64_t pend,

@@ -19,24 +19,27 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
-exec_supercell=/home/sameer.deshmukh/ELSES_mat_calc-master/make_supercell_C60_FCCs_w_noise/a.out
+ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
+
+exec_supercell=$ELSES_ROOT/make_supercell_C60_FCCs_w_noise/a.out
+exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_eigen
-
 
 # Generate the points for the ELSES matrix.
 nx=1
 ny=1
 nz=1
-source_file=/home/sameer.deshmukh/ELSES_mat_calc-master/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xyz
+source_file=$ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xyz
 
 $exec_supercell $nx $ny $nz $source_file
+$exec_elses_xml_generate $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xml $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xml
+
 
 ./bin/H2_eigen --N 7680 \
                --nleaf 512 \
                --kernel_func elses_c60 \
                --kind_of_geometry elses_c60_geometry \
-               --geometry_file C60_fcc.xyz \
                --ndim 3 \
                --admis_kind geometry \
                --geometry_file C60_fcc.xyz \
