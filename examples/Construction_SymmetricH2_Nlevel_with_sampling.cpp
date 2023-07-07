@@ -26,6 +26,13 @@
 
 using vec = std::vector<int64_t>;
 
+// Uncomment the following line to print output in CSV format
+#define OUTPUT_CSV
+// Uncomment the following line to enable debug
+// #define DEBUG_OUTPUT
+// Uncomment the following line to enable timer
+// #define USE_TIMER
+
 /*
  * Note: the current Domain class is not designed for BLR2 since it assumes a balanced binary tree partition
  * where every cell has two children. However, we can enforce BLR2 structure by a simple workaround
@@ -51,9 +58,11 @@ class SymmetricH2 {
   double admis;
   int64_t matrix_type;
   int64_t height;
+  int64_t min_adm_level;
   RowLevelMap U, R_row;
   RowColLevelMap<Matrix> D, S;
   RowColLevelMap<bool> is_admissible;
+  RowColMap<std::vector<int64_t>> near_neighbors, far_neighbors;  // This is actually RowLevelMap
   std::vector<int64_t> level_blocks;
   RowColMap<std::vector<int64_t>> skeleton_rows;
 
@@ -80,18 +89,22 @@ class SymmetricH2 {
               const int64_t max_rank, const double admis,
               const int64_t matrix_type);
 
-  int64_t get_basis_min_rank() const;
-  int64_t get_basis_max_rank() const;
+  int64_t get_basis_min_rank(const int64_t level_begin, const int64_t level_end) const;
+  int64_t get_basis_max_rank(const int64_t level_begin, const int64_t level_end) const;
+  double get_basis_avg_rank(const int64_t level_begin, const int64_t level_end) const;
+  int64_t get_level_max_nblocks(const char nearfar,
+                                const int64_t level_begin, const int64_t level_end) const;
   double construction_error(const Domain& domain) const;
+  int64_t memory_usage() const;
   void print_structure(const int64_t level) const;
   void print_ranks() const;
-  double low_rank_block_ratio() const;
 #ifdef USE_JSON
   void write_JSON(const Domain& domain, const std::string filename) const;
 #endif
 };
 
 void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
+  min_adm_level = -1;
   if (matrix_type == H2_MATRIX) {
     height = domain.tree_height;
     level_blocks.assign(height + 1, 0);
@@ -100,32 +113,51 @@ void SymmetricH2::initialize_geometry_admissibility(const Domain& domain) {
       const auto i = cell.block_index;
       level_blocks[level]++;
       // Near interaction list: inadmissible dense blocks
+      near_neighbors.insert(i, level, std::vector<int64_t>());
       for (const auto near_idx: cell.near_list) {
         const auto j_near = domain.cells[near_idx].block_index;
         is_admissible.insert(i, j_near, level, false);
+        near_neighbors(i, level).push_back(j_near);
       }
       // Far interaction list: admissible low-rank blocks
+      far_neighbors.insert(i, level, std::vector<int64_t>());
       for (const auto far_idx: cell.far_list) {
         const auto j_far = domain.cells[far_idx].block_index;
         is_admissible.insert(i, j_far, level, true);
+        far_neighbors(i, level).push_back(j_far);
+      }
+      if ((min_adm_level == -1) && (far_neighbors(i, level).size() > 0)) {
+        min_adm_level = level;
       }
     }
   }
   else if (matrix_type == BLR2_MATRIX) {
     height = 1;
     level_blocks.assign(height + 1, 0);
+     // Root level
     level_blocks[0] = 1;
-    level_blocks[1] = (int64_t)1 << domain.tree_height;
-    // Subdivide into BLR
     is_admissible.insert(0, 0, 0, false);
+    near_neighbors.insert(0, 0, std::vector<int64_t>(1, 0));
+    far_neighbors.insert(0, 0, std::vector<int64_t>());
+    // Subdivide into BLR
+    level_blocks[1] = (int64_t)1 << domain.tree_height;
     for (int64_t i = 0; i < level_blocks[height]; i++) {
+      near_neighbors.insert(i, height, std::vector<int64_t>());
+      far_neighbors.insert(i, height, std::vector<int64_t>());
       for (int64_t j = 0; j < level_blocks[height]; j++) {
         const auto level = domain.tree_height;
         const auto& source = domain.cells[domain.get_cell_idx(i, level)];
         const auto& target = domain.cells[domain.get_cell_idx(j, level)];
         is_admissible.insert(i, j, height, domain.is_well_separated(source, target, admis));
+        if (is_admissible(i, j, height)) {
+          far_neighbors(i, height).push_back(j);
+        }
+        else {
+          near_neighbors(i, height).push_back(j);
+        }
       }
     }
+    min_adm_level = height;
   }
 }
 
@@ -269,18 +301,19 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
   // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  ID_tolerance = accuracy * 1e-1;
+  ID_tolerance = accuracy * 1e-2;
   initialize_geometry_admissibility(domain);
   generate_row_cluster_basis(domain);
   generate_coupling_matrices(domain);
 }
 
-int64_t SymmetricH2::get_basis_min_rank() const {
+int64_t SymmetricH2::get_basis_min_rank(const int64_t level_begin,
+                                        const int64_t level_end) const {
   int64_t rank_min = N;
-  for (int64_t level = height; level > 0; level--) {
-    const int64_t nblocks = level_blocks[level];
-    for (int64_t node = 0; node < nblocks; node++) {
-      if (U.exists(node, level)) {
+  for (int64_t level = level_begin; level <= level_end; level++) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      if (U.exists(node, level) && U(node, level).cols > 0) {
         rank_min = std::min(rank_min, U(node, level).cols);
       }
     }
@@ -288,17 +321,50 @@ int64_t SymmetricH2::get_basis_min_rank() const {
   return rank_min;
 }
 
-int64_t SymmetricH2::get_basis_max_rank() const {
+int64_t SymmetricH2::get_basis_max_rank(const int64_t level_begin,
+                                        const int64_t level_end) const {
   int64_t rank_max = -N;
-  for (int64_t level = height; level > 0; level--) {
-    const int64_t nblocks = level_blocks[level];
-    for (int64_t node = 0; node < nblocks; node++) {
-      if (U.exists(node, level)) {
+  for (int64_t level = level_begin; level <= level_end; level++) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      if (U.exists(node, level) && U(node, level).cols > 0) {
         rank_max = std::max(rank_max, U(node, level).cols);
       }
     }
   }
   return rank_max;
+}
+
+double SymmetricH2::get_basis_avg_rank(const int64_t level_begin,
+                                       const int64_t level_end) const {
+  int64_t rank_sum = 0;
+  int64_t num_bases = 0;
+  for (int64_t level = level_begin; level <= level_end; level++) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      if (U.exists(node, level) && U(node, level).cols > 0) {
+        num_bases++;
+        rank_sum += U(node, level).cols;
+      }
+    }
+  }
+  return (double)rank_sum / (double)num_bases;
+}
+
+int64_t SymmetricH2::get_level_max_nblocks(const char nearfar,
+                                           const int64_t level_begin, const int64_t level_end) const {
+  int64_t csp = 0;
+  const bool count_far = (nearfar == 'f' || nearfar == 'a');
+  for (int64_t level = level_begin; level <= level_end; level++) {
+    const int64_t num_nodes = level_blocks[level];
+    for (int64_t node = 0; node < num_nodes; node++) {
+      const bool count_near = (nearfar == 'a') ? (level == height) : (nearfar == 'n');
+      const int64_t num_dense   = count_near ? near_neighbors(node, level).size() : 0;
+      const int64_t num_lowrank = count_far  ? far_neighbors(node, level).size()  : 0;
+      csp = std::max(csp, num_dense + num_lowrank);
+    }
+  }
+  return csp;
 }
 
 double SymmetricH2::construction_error(const Domain& domain) const {
@@ -337,6 +403,29 @@ double SymmetricH2::construction_error(const Domain& domain) const {
     }
   }
   return (use_rel_acc ? std::sqrt(diff_norm / dense_norm) : std::sqrt(diff_norm));
+}
+
+int64_t SymmetricH2::memory_usage() const {
+  int64_t mem = 0;
+  for (int64_t level = height; level > 0; level--) {
+    const auto num_nodes = level_blocks[level];
+    for (int64_t i = 0; i < num_nodes; i++) {
+      if (U.exists(i, level)) {
+        mem += U(i, level).memory_used();
+      }
+      for (auto j: near_neighbors(i, level)) {
+        if (D.exists(i, j, level)) {
+          mem += D(i, j, level).memory_used();
+        }
+      }
+      for (auto j: far_neighbors(i, level)) {
+        if (S.exists(i, j, level)) {
+          mem += S(i, j, level).memory_used();
+        }
+      }
+    }
+  }
+  return mem;
 }
 
 void SymmetricH2::print_structure(const int64_t level) const {
@@ -379,21 +468,6 @@ void SymmetricH2::print_ranks() const {
                 << std::endl;
     }
   }
-}
-
-double SymmetricH2::low_rank_block_ratio() const {
-  double total = 0, low_rank = 0;
-  const int64_t nblocks = level_blocks[height];
-  for (int64_t i = 0; i < nblocks; i++) {
-    for (int64_t j = 0; j < nblocks; j++) {
-      if ((is_admissible.exists(i, j, height) && is_admissible(i, j, height)) ||
-          !is_admissible.exists(i, j, height)) {
-        low_rank += 1;
-      }
-      total += 1;
-    }
-  }
-  return low_rank / total;
 }
 
 #ifdef USE_JSON
@@ -455,54 +529,68 @@ void SymmetricH2::write_JSON(const Domain& domain,
 } // namespace Hatrix
 
 int main(int argc, char ** argv) {
-  const int64_t N = argc > 1 ? atol(argv[1]) : 256;
-  const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
+  int64_t N = argc > 1 ? atol(argv[1]) : 256;
+  int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-8;
-  const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
-  const double admis = argc > 5 ? atof(argv[5]) : 3;
+  // Use relative or absolute error threshold for LRA
+  const bool use_rel_acc = argc > 4 ? (atol(argv[4]) == 1) : false;
+  // Fixed accuracy with bounded rank
+  const int64_t max_rank = argc > 5 ? atol(argv[5]) : 30;
+  const double admis = argc > 6 ? atof(argv[6]) : 3;
+
+  // Specify compressed representation
+  // 0: BLR2
+  // 1: H2
+  const int64_t matrix_type = argc > 7 ? atol(argv[7]) : 1;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
-  const int64_t kernel_type = argc > 6 ? atol(argv[6]) : 0;
+  // 2: ELSES Dense Matrix
+  const int64_t kernel_type = argc > 8 ? atol(argv[8]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
   // 1: Unit Cubical
   // 2: StarsH Uniform Grid
-  const int64_t geom_type = argc > 7 ? atol(argv[7]) : 0;
-  const int64_t ndim  = argc > 8 ? atol(argv[8]) : 1;
+  // 3: ELSES Geometry (ndim = 3)
+  // 4: Random Uniform Grid
+  const int64_t geom_type = argc > 9 ? atol(argv[9]) : 0;
+  int64_t ndim  = argc > 10 ? atol(argv[10]) : 1;
 
   // Specify sampling technique
   // 0: Choose bodies with equally spaced indices
   // 1: Choose bodies random indices
   // 2: Farthest Point Sampling
   // 3: Anchor Net method
-  const int64_t sampling_algo = argc > 9 ? atol(argv[9]) : 3;
+  const int64_t sampling_algo = argc > 11 ? atol(argv[11]) : 3;
   // Specify maximum number of sample points that represents a cluster
   // For anchor-net method: size of grid
-  int64_t sample_self_size = argc > 10 ? atol(argv[10]) :
+  int64_t sample_self_size = argc > 12 ? atol(argv[12]) :
                              (ndim == 1 ? 10 * leaf_size : 30);
   // Specify maximum number of sample points that represents a cluster's far-field
   // For anchor-net method: size of grid
-  int64_t sample_far_size = argc > 11 ? atol(argv[11]) :
+  int64_t sample_far_size = argc > 13 ? atol(argv[13]) :
                             (ndim == 1 ? 10 * leaf_size + 10: sample_self_size + 5);
+  const int64_t print_csv_header = argc > 14 ? atol(argv[14]) : 1;
 
-  // Use relative or absolute error threshold
-  const bool use_rel_acc = argc > 12 ? (atol(argv[12]) == 1) : false;
-
-  // Specify compressed representation
-  // 0: BLR2
-  // 1: H2
-  const int64_t matrix_type = argc > 13 ? atol(argv[13]) : 1;
-
-  // Output H2-Matrix structure as JSON file
-  // Empty string: do not write JSON file
-  const std::string out_filename = argc > 14 ? std::string(argv[14]) : "";
+  // ELSES Input Files
+  const std::string file_name = argc > 15 ? std::string(argv[15]) : "";
+  const int64_t sort_bodies = argc > 16 ? atol(argv[16]) : 0;
 
   Hatrix::Context::init();
 
-  Hatrix::set_kernel_constants(1e-3 / (double)N, 1.);
+#ifdef OUTPUT_CSV
+  if (print_csv_header == 1) {
+    // Print CSV header
+    std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
+              << ",height,construct_min_rank,construct_max_rank,construct_avg_rank,construct_mem,construct_time,construct_error"
+              << ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,construct_min_rank_leaf,construct_max_rank_leaf,construct_avg_rank_leaf"
+              << std::endl;
+  }
+#endif
+
+  Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
     case 0: {
@@ -513,6 +601,11 @@ int main(int argc, char ** argv) {
     case 1: {
       Hatrix::set_kernel_function(Hatrix::yukawa_kernel);
       kernel_name = "yukawa";
+      break;
+    }
+    case 2: {
+      Hatrix::set_kernel_function(Hatrix::ELSES_dense_input);
+      kernel_name = "ELSES-kernel";
       break;
     }
     default: {
@@ -539,6 +632,17 @@ int main(int argc, char ** argv) {
       geom_name += "starsh_uniform_grid";
       break;
     }
+    case 3: {
+      domain.ndim = 3;
+      const auto prefix_end = file_name.find_last_of("/\\");
+      geom_name = file_name.substr(prefix_end + 1);
+      break;
+    }
+    case 4: {
+      domain.initialize_random_uniform_grid();
+      geom_name += "random_uniform_grid";
+      break;
+    }
     default: {
       domain.initialize_unit_circular_mesh();
       geom_name += "circular_mesh";
@@ -563,9 +667,30 @@ int main(int argc, char ** argv) {
       break;
     }
   }
+  // Pre-processing step for ELSES geometry
+  const bool is_non_synthetic = (geom_type == 3);
+  if (is_non_synthetic) {
+    const int64_t num_atoms_per_molecule = 60;
+    const int64_t num_electrons_per_atom = kernel_type == 2 ? 4 : 1;
+    const int64_t molecule_size = num_atoms_per_molecule * num_electrons_per_atom;
+    assert(file_name.length() > 0);
+    domain.read_bodies_ELSES(file_name + ".xyz", num_electrons_per_atom);
+    assert(N == domain.N);
 
-  domain.build_tree(leaf_size);
+    if (sort_bodies) {
+      domain.sort_bodies_ELSES(molecule_size);
+      geom_name = geom_name + "_sorted";
+    }
+    domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
+    if (kernel_type == 2) {
+      domain.read_p2p_matrix_ELSES(file_name + ".dat");
+    }
+  }
+  else {
+    domain.build_tree(leaf_size);
+  }
   domain.build_interactions(admis);
+  // Sampling
   const auto start_sample = std::chrono::system_clock::now();
   // if (sampling_algo == 3) {
   //   // It is also possible to determine the minimum sample size to reach a desired accuracy.
@@ -591,38 +716,82 @@ int main(int argc, char ** argv) {
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
-  double construct_error = A.construction_error(domain);
-  double lr_ratio = A.low_rank_block_ratio();
-  A.print_structure(A.height);
+  const auto construct_min_rank = A.get_basis_min_rank(1, A.height);
+  const auto construct_max_rank = A.get_basis_max_rank(1, A.height);
+  const auto construct_avg_rank = A.get_basis_avg_rank(1, A.height);
+  const auto construct_error = A.construction_error(domain);
+  const auto construct_mem = A.memory_usage();
+  const auto construct_min_rank_leaf = A.get_basis_min_rank(A.height, A.height);
+  const auto construct_max_rank_leaf = A.get_basis_max_rank(A.height, A.height);
+  const auto construct_avg_rank_leaf = A.get_basis_avg_rank(A.height, A.height);
+  const auto csp = A.get_level_max_nblocks('a', 1, A.height);
+  const auto csp_dense_leaf = A.get_level_max_nblocks('n', A.height, A.height);
+  const auto csp_dense_all = A.get_level_max_nblocks('n', 1, A.height);
+  const auto csp_lr_all = A.get_level_max_nblocks('f', 1, A.height);
 
-#ifdef USE_JSON
-  if (out_filename.length() > 0) {
-    A.write_JSON(domain, out_filename);
-  }
-#endif
-
+#ifndef OUTPUT_CSV
   std::cout << "N=" << N
             << " leaf_size=" << leaf_size
             << " accuracy=" << accuracy
             << " acc_type=" << (use_rel_acc ? "rel_err" : "abs_err")
             << " max_rank=" << max_rank
+            << " LRA=ID+QR"
             << " admis=" << admis << std::setw(3)
+            << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
+            << " kernel=" << kernel_name
+            << " geometry=" << geom_name
             << " sampling_algo=" << sampling_algo_name
             << " sample_self_size=" << sample_self_size
             << " sample_far_size=" << sample_far_size
             << " sample_farfield_max_size=" << domain.get_max_farfield_size()
-            << " compress_alg=" << "ID"
-            << " kernel=" << kernel_name
-            << " geometry=" << geom_name
-            << " matrix_type=" << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
-            << " height=" << A.height
-            << " LR%=" << lr_ratio * 100 << "%"
-            << " construct_min_rank=" << A.get_basis_min_rank()
-            << " construct_max_rank=" << A.get_basis_max_rank()
             << " sample_time=" << sample_time
+            << " height=" << A.height
+            << " construct_min_rank=" << construct_min_rank
+            << " construct_max_rank=" << construct_max_rank
+            << " construct_avg_rank=" << construct_avg_rank
+            << " construct_mem=" << construct_mem
             << " construct_time=" << construct_time
-            << " construct_error=" << std::scientific << construct_error
+            << " construct_error=" << std::scientific << construct_error << std::defaultfloat
+            << std::endl
+            << "csp=" << csp
+            << " csp_dense_leaf=" << csp_dense_leaf
+            << " csp_dense_all=" << csp_dense_all
+            << " csp_lr_all=" << csp_lr_all
+            << " construct_min_rank_leaf=" << construct_min_rank_leaf
+            << " construct_max_rank_leaf=" << construct_max_rank_leaf
+            << " construct_avg_rank_leaf=" << construct_avg_rank_leaf
             << std::endl;
+#else
+  std::cout << N
+            << "," << leaf_size
+            << "," << accuracy
+            << "," << (use_rel_acc ? "rel_err" : "abs_err")
+            << "," << max_rank
+            << "," << "ID+QR"
+            << "," << admis
+            << "," << (matrix_type == BLR2_MATRIX ? "BLR2" : "H2")
+            << "," << kernel_name
+            << "," << geom_name
+            << "," << sampling_algo_name
+            << "," << sample_self_size
+            << "," << sample_far_size
+            << "," << domain.get_max_farfield_size()
+            << "," << A.height
+            << "," << construct_min_rank
+            << "," << construct_max_rank
+            << "," << construct_avg_rank
+            << "," << construct_mem
+            << "," << construct_time
+            << "," << std::scientific << construct_error << std::defaultfloat
+            << "," << csp
+            << "," << csp_dense_leaf
+            << "," << csp_dense_all
+            << "," << csp_lr_all
+            << "," << construct_min_rank_leaf
+            << "," << construct_max_rank_leaf
+            << "," << construct_avg_rank_leaf
+            << std::endl;
+#endif
 
   Hatrix::Context::finalize();
   return 0;
