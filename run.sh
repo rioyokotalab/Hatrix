@@ -32,8 +32,15 @@ ny=1
 nz=1
 source_file=$ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xyz
 
+# Generate the geometry file.
 $exec_supercell $nx $ny $nz $source_file
+
+# generate config.xml.
 $exec_elses_xml_generate $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xml $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xml
+
+# copy config file into Hatrix root
+cp $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xml .
+cp $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/config.xml .
 
 
 ./bin/H2_eigen --N 7680 \
@@ -44,3 +51,6 @@ $exec_elses_xml_generate $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xm
                --admis_kind geometry \
                --geometry_file C60_fcc.xyz \
                --use_nested_basis 1
+
+rm *xml
+rm *xyz

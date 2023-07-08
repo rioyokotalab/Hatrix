@@ -1397,11 +1397,16 @@ int main(int argc, char ** argv) {
     domain.read_bodies_ELSES(file_name + ".xyz", num_electrons_per_atom);
     assert(N == domain.N);
 
-    if (sort_bodies) {
+    if (sort_bodies) {          // this is called. Good compression.
+      // Assigns the Hilbert indices and sorts the geometry.
       domain.sort_bodies_ELSES(molecule_size);
       geom_name = geom_name + "_sorted";
     }
+    // Generates a tree with bottom-up traversal.
     domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
+
+    // Because there is no Green's function available for the ELSES so read the data
+    // file and obtain the matrix values from the file.
     if (kernel_type == 2) {
       domain.read_p2p_matrix_ELSES(file_name + ".dat");
     }
@@ -1409,6 +1414,8 @@ int main(int argc, char ** argv) {
   else {
     domain.build_tree(leaf_size);
   }
+
+  // This will setup the admissibility condition between all blocks on the same level of the tree.
   domain.build_interactions(admis, admis_variant);
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
 
@@ -1623,4 +1630,3 @@ int main(int argc, char ** argv) {
   Hatrix::Context::finalize();
   return 0;
 }
-

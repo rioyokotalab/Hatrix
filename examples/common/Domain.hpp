@@ -253,6 +253,8 @@ class Domain {
                        const int64_t grid_algo = 0,
                        const bool ELSES_GEOM = false) {
     const int64_t nbodies = bodies_idx.size();
+
+    // For ICPP2023 ELSES code, this condition is always true.
     if (sample_size >= nbodies) {
       return bodies_idx;
     }
@@ -1170,12 +1172,15 @@ class Domain {
       }
       mol_centers[i].value = (double)i;
     }
-    // Partition until each box contain only one molecule
+    // Partition until each box contain only one molecule.
+    // This partitioning is done using the Hilbert curve at the leaf level.
+    // This assigns numbers to each box on the leaf level.
     std::vector<Body> buffer = mol_centers;
     std::vector<Cell> mol_cells(1);
     const int64_t leaf_box_size = 1;
     mol_cells.reserve(nmols*(32/leaf_box_size+1));
-    build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0], mol_cells, leaf_box_size, X0, R0);
+    build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0],
+                mol_cells, leaf_box_size, X0, R0);
     int64_t max_level = 0;
     for (int64_t i = 0; i < mol_cells.size(); i++) {
       if (mol_cells[i].nchilds == 0) {
