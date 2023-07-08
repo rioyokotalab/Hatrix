@@ -22,6 +22,7 @@ using namespace Hatrix;
 
 
 int main(int argc, char* argv[]) {
+  Hatrix::Context::init();
   Args opts(argc, argv);
   const int64_t num_electrons_per_atom = 4;
 
@@ -34,11 +35,14 @@ int main(int argc, char* argv[]) {
   //   }
   // }
 
-  // Hatrix::Domain domain(opts.N, opts.ndim);
+  Domain domain(opts.N, opts.ndim);
 
   // if (opts.kernel_verbose == "elses_c60") {
-    // domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
+  //   domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
   // }
 
+  Matrix A_dense;
+
+  Hatrix::Context::finalize();
   return 0;
 }

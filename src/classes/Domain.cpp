@@ -193,6 +193,8 @@ namespace Hatrix {
         body_idx++;
       }
     }
+
+    std::cout << "particles: " << particles.size() << std::endl;
     file.close();
   }
 
