@@ -301,7 +301,7 @@ SymmetricH2::SymmetricH2(const Domain& domain,
       use_rel_acc(use_rel_acc), max_rank(max_rank), admis(admis), matrix_type(matrix_type) {
   // Set ID tolerance to be smaller than desired accuracy, based on HiDR paper source code
   // https://github.com/scalable-matrix/H2Pack/blob/sample-pt-algo/src/H2Pack_build_with_sample_point.c#L859
-  ID_tolerance = accuracy * 1e-2;
+  ID_tolerance = accuracy;
   initialize_geometry_admissibility(domain);
   generate_row_cluster_basis(domain);
   generate_coupling_matrices(domain);
@@ -706,7 +706,8 @@ int main(int argc, char ** argv) {
   //   sample_self_size = r;
   //   sample_far_size = r > 3 ? std::max(r + 3, (int64_t)10) : r + 3;
   // }
-  domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo);
+  const bool sample_ELSES = (geom_type == 3 && kernel_type == 2);
+  domain.build_sample_bodies(sample_self_size, sample_far_size, sampling_algo, sample_ELSES);
   const auto stop_sample = std::chrono::system_clock::now();
   const double sample_time = std::chrono::duration_cast<std::chrono::milliseconds>
                              (stop_sample - start_sample).count();

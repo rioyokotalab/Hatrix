@@ -20,7 +20,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define SQUARE_INITIAL_BOX 1
+#define SQUARE_INITIAL_BOX 0
 
 namespace Hatrix {
 
@@ -624,7 +624,7 @@ class Domain {
                            const int64_t sample_far_size,
                            const int64_t sampling_algo,
                            const bool ELSES_GEOM = false) {
-    const auto sample_near_size = sample_far_size;
+    const auto sample_near_size = 0;
     build_sample_bodies(sample_self_size, sample_near_size, sample_far_size,
                         sampling_algo, ELSES_GEOM);
   }
