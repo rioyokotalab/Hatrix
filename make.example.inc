@@ -3,6 +3,8 @@ BLAS_LIB       = $(shell pkg-config --libs cblas blas)
 LAPACK_INCLUDE = $(shell pkg-config --cflags lapack lapacke)
 LAPACK_LIB     = $(shell pkg-config --libs lapack lapacke)
 SCALAPACK_LIB  =
+ELPA_INCLUDE   = -I/home/ridwan/local/include/elpa-2023.05.001
+ELPA_LIB       = -L/home/ridwan/local/lib -lelpa
 CXX            = g++
 MPICXX         = mpicxx
 CXXFLAGS       = -std=c++11 -rdynamic -O3 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ \
