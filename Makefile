@@ -147,6 +147,9 @@ examples/ParEigen_Dense_PDSYEV.o : examples/ParEigen_Dense_PDSYEV.cpp
 examples/ParEigen_Dense_PDSYEVX.o : examples/ParEigen_Dense_PDSYEVX.cpp
 	$(MPICXX) $(CXXFLAGS) $< -c -o $@
 
+examples/ParEigen_Dense_ELPA.o : examples/ParEigen_Dense_ELPA.cpp
+	$(MPICXX) $(CXXFLAGS) $(ELPA_INCLUDE) $< -c -o $@
+
 ParEigen_SymmetricH2_Nlevel : % : examples/ParEigen_SymmetricH2_Nlevel.o dirs
 	$(MPICXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
@@ -172,10 +175,16 @@ ParEigen_Dense_PDSYEVX : % : examples/ParEigen_Dense_PDSYEVX.o dirs
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
+ParEigen_Dense_ELPA : % : examples/ParEigen_Dense_ELPA.o dirs
+	$(MPICXX) $< $(OBJLIBS) $(LDFLAGS) $(SCALAPACK_LIB) $(ELPA_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
 PAR_EIGEN_EXAMPLE_EXECUTABLES := ParEigen_SymmetricH2_Nlevel \
 	ParEigen_SymmetricH2_Nlevel_nodependency \
 	MSParEigen_SymmetricH2_Nlevel \
 	ParEigen_Dense_PDSYEV \
-	ParEigen_Dense_PDSYEVX
+	ParEigen_Dense_PDSYEVX \
+	ParEigen_Dense_ELPA
 
 eigen: $(EIGEN_EXAMPLE_EXECUTABLES) $(PAR_EIGEN_EXAMPLE_EXECUTABLES)
