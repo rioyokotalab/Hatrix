@@ -119,7 +119,8 @@ clean:
 	done
 	$(RM) $(OBJLIBS) bin/ *.a
 
-EIGEN_EXAMPLE_EXECUTABLES := LDL_SymmetricH2_Nlevel \
+EIGEN_EXAMPLE_EXECUTABLES := Construction_SymmetricH2_Nlevel_with_sampling \
+	LDL_SymmetricH2_Nlevel \
 	LDL_SymmetricH2_Nlevel_nodependency \
 	Eigen_Dense \
 	Eigen_Dense_DSYEV \

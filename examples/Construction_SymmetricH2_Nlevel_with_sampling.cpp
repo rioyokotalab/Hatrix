@@ -584,7 +584,7 @@ int main(int argc, char ** argv) {
   if (print_csv_header == 1) {
     // Print CSV header
     std::cout << "N,leaf_size,accuracy,acc_type,max_rank,LRA,admis,matrix_type,kernel,geometry"
-              << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size"
+              << ",sampling_algo,sample_self_size,sample_far_size,sample_farfield_max_size,sample_time"
               << ",height,construct_min_rank,construct_max_rank,construct_avg_rank,construct_mem,construct_time,construct_error"
               << ",csp,csp_dense_leaf,csp_dense_all,csp_lr_all,construct_min_rank_leaf,construct_max_rank_leaf,construct_avg_rank_leaf"
               << std::endl;
@@ -778,6 +778,7 @@ int main(int argc, char ** argv) {
             << "," << sample_self_size
             << "," << sample_far_size
             << "," << domain.get_max_farfield_size()
+            << "," << sample_time
             << "," << A.height
             << "," << construct_min_rank
             << "," << construct_max_rank
