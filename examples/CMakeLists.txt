@@ -93,4 +93,7 @@ if(MPI_FOUND)
 
   add_executable(ParEigen_Dense_PDSYEVX ParEigen_Dense_PDSYEVX.cpp)
   target_link_libraries(ParEigen_Dense_PDSYEVX Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
+
+  add_executable(ParEigen_TestMPI ParEigen_TestMPI.cpp)
+  target_link_libraries(ParEigen_TestMPI MPI::MPI_CXX)
 endif()
