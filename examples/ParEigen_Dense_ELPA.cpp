@@ -241,11 +241,6 @@ int main(int argc, char ** argv) {
   error = elpa_setup(handle);
   assert_elpa_ok(error, "ELPA setup failed",
                  elpa_success, elpa_error_str);
-  // For performance
-  elpa_set(handle, "solver", ELPA_SOLVER_2STAGE, &error);
-  elpa_set(handle, "real_kernel", ELPA_2STAGE_REAL_AVX2_BLOCK2, &error);
-  assert_elpa_ok(error, "ELPA ",
-                 elpa_success, elpa_error_str);
 
   if (elpa_success) {
     MPI_Barrier(MPI_COMM_WORLD);
