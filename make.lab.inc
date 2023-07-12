@@ -7,7 +7,7 @@ SCALAPACK_LIB  = -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_scalapack_lp6
                  -lpthread -lm -ldl
 ELPA_INCLUDE   = -I/home/ridwan/local/include/elpa-2023.05.001
 ELPA_LIB       = -L/home/ridwan/local/lib -lelpa
-CXXFLAGS       = -std=c++11 -O3 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
+CXXFLAGS       = -std=c++17 -O3 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) \
                  $(shell pkg-config --cflags gtest) $(shell pkg-config --cflags gtest_main) \
                  -Wno-maybe-uninitialized -Wno-unused-variable -Wno-unused-but-set-variable -Wno-sign-compare \
                  -I$(TOPSRCDIR)/examples/common/
