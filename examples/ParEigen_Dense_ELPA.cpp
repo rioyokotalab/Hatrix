@@ -29,6 +29,7 @@
 #include <elpa/elpa.h>
 
 #define OUTPUT_CSV
+// #define COMPARE_SCALAPACK
 
 // ScaLAPACK Fortran Interface
 extern "C" {
@@ -243,6 +244,9 @@ int main(int argc, char ** argv) {
                  elpa_success, elpa_error_str);
 
   if (elpa_success) {
+#ifdef COMPARE_SCALAPACK
+    std::vector<double> A_copy(A);
+#endif
     MPI_Barrier(MPI_COMM_WORLD);
     dense_eig_time -= MPI_Wtime();
 
@@ -252,6 +256,45 @@ int main(int argc, char ** argv) {
     dense_eig_time += MPI_Wtime();
     assert_elpa_ok(error, "Call to elpa_eigenvalues failed",
                    elpa_success, elpa_error_str);
+#ifdef COMPARE_SCALAPACK
+    // Verify against ScaLAPACK result
+    {
+      // Compute all eigenvalues with pdsyev
+      char jobz = 'N';
+      char uplo = 'L';
+      int m;
+      std::vector<double> dense_eigv(N);
+      int LWORK; double *WORK;
+      MPI_Barrier(MPI_COMM_WORLD);
+      // PDSYEV Work Query
+      {
+        LWORK = -1;
+        WORK = new double[1];
+        pdsyev_(&jobz, &uplo, &N, A_copy.data(), &ONE, &ONE, desc, dense_eigv.data(),
+                nullptr, nullptr, nullptr, nullptr, WORK, &LWORK, &info);
+        if (info != 0) {
+          printf("Process-%d: Error in pdsyev workspace query, info=%d\n", mpi_rank, info);
+        }
+        LWORK = (int)WORK[0];
+        delete[] WORK;
+      }
+      // PDSYEV Computation
+      {
+        WORK = new double[LWORK];
+        pdsyev_(&jobz, &uplo, &N, A_copy.data(), &ONE, &ONE, desc, dense_eigv.data(),
+                nullptr, nullptr, nullptr, nullptr, WORK, &LWORK, &info);
+        delete[] WORK;
+      }
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (mpi_rank == 0) {
+        double max_abs_err = 0;
+        for (int64_t i = 0; i < N; i++) {
+          max_abs_err = std::max(max_abs_err, std::abs(ev[i] - dense_eigv[i]));
+        }
+        printf("Max Abs Error vs. ScaLAPACK pdsyev = %.3e\n", max_abs_err);
+      }
+    }
+#endif
   }
 
   // Print outputs
