@@ -1,6 +1,6 @@
 BLAS_INCLUDE   = -DMKL_LP64 -I${MKLROOT}/include -DUSE_MKL
 BLAS_LIB       = -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_intel_lp64 \
-                 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl \
+                 -lmkl_sequential -lmkl_core -lpthread -lm -ldl \
                  $(shell pkg-config --cflags gtest)
 SCALAPACK_LIB  = -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_scalapack_lp64 \
                  -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lmkl_blacs_intelmpi_lp64 \
@@ -13,7 +13,7 @@ CXXFLAGS       = -std=c++17 -O3 -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ $(BLA
                  -I$(TOPSRCDIR)/examples/common/
 CXX            = g++
 MPICXX         = mpicxx
-LDFLAGS        = $(shell pkg-config --libs gtest_main) $(shell pkg-config --libs gtest)  $(BLAS_LIB)
+LDFLAGS        = $(shell pkg-config --libs gtest_main) $(shell pkg-config --libs gtest) $(BLAS_LIB) -lgomp -lpthread
 RM             = rm -rf
 AR             = ar
 ARFLAGS        = -rv
