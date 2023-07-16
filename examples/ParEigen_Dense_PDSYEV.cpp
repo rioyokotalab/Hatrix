@@ -219,8 +219,10 @@ int main(int argc, char ** argv) {
   {
     LWORK = -1;
     WORK = new double[1];
+    MPI_Barrier(MPI_COMM_WORLD);
     pdsyev_(&jobz, &uplo, &N, A.data(), &ONE, &ONE, desc, dense_eigv.data(),
             nullptr, nullptr, nullptr, nullptr, WORK, &LWORK, &info);
+    MPI_Barrier(MPI_COMM_WORLD);
     if (info != 0) {
       printf("Process-%d: Error in pdsyev workspace query, info=%d\n", mpi_rank, info);
     }
@@ -230,8 +232,10 @@ int main(int argc, char ** argv) {
   // PDSYEV Computation
   {
     WORK = new double[LWORK];
+    MPI_Barrier(MPI_COMM_WORLD);
     pdsyev_(&jobz, &uplo, &N, A.data(), &ONE, &ONE, desc, dense_eigv.data(),
             nullptr, nullptr, nullptr, nullptr, WORK, &LWORK, &info);
+    MPI_Barrier(MPI_COMM_WORLD);
     delete[] WORK;
   }
   MPI_Barrier(MPI_COMM_WORLD);
@@ -240,14 +244,18 @@ int main(int argc, char ** argv) {
   // Print outputs
   if (mpi_rank == 0) {
 #ifndef OUTPUT_CSV
-    printf("nprocs=%d N=%d NB=%d kernel=%s geometry=%s dense_eig_time=%.5lf\n",
-           blacs_nprocs, N, NB, kernel_name.c_str(), geom_name.c_str(), dense_eig_time);
+    printf("nprocs=%d mpi_nprocs=%d mpi_grid_x=%d mpi_grid_y=%d"
+           " N=%d NB=%d kernel=%s geometry=%s dense_eig_time=%.5lf\n",
+           blacs_nprocs, mpi_nprocs, mpi_grid[0], mpi_grid[1],
+           N, NB, kernel_name.c_str(), geom_name.c_str(), dense_eig_time);
 #else
     if (print_csv_header == 1) {
-      printf("nprocs,N,NB,kernel,geometry,dense_eig_time\n");
+      printf("nprocs,mpi_nprocs,mpi_grid_x,mpi_grid_y"
+             ",N,NB,kernel,geometry,dense_eig_time\n");
     }
-    printf("%d,%d,%d,%s,%s,%.5lf\n",
-           blacs_nprocs, N, NB, kernel_name.c_str(), geom_name.c_str(), dense_eig_time);
+    printf("%d,%d,%d,%d,%d,%d,%s,%s,%.5lf\n",
+           blacs_nprocs, mpi_nprocs, mpi_grid[0], mpi_grid[1],
+           N, NB, kernel_name.c_str(), geom_name.c_str(), dense_eig_time);
 #endif
   }
 

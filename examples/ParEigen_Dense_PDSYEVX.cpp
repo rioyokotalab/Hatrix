@@ -97,7 +97,7 @@ int main(int argc, char ** argv) {
 
   // Parse Input
   int N = argc > 1 ? atol(argv[1]) : 256;
-  int NB = argc > 2 ? atol(argv[2]) : 128;
+  int NB = argc > 2 ? atol(argv[2]) : 32;
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
@@ -234,9 +234,11 @@ int main(int argc, char ** argv) {
     LIWORK = -1;
     WORK = new double[1];
     IWORK = new int[1];
+    MPI_Barrier(MPI_COMM_WORLD);
     pdsyevx_(&jobz, &range, &uplo, &N, A.data(), &ONE, &ONE, desc, nullptr, nullptr,
              &il, &iu, &abs_tol, &m, nullptr, actual_eigv.data(), nullptr, nullptr, nullptr,
              nullptr, nullptr, WORK, &LWORK, IWORK, &LIWORK, nullptr, nullptr, nullptr, &info);
+    MPI_Barrier(MPI_COMM_WORLD);
     if (info != 0) {
       printf("Process-%d: Error in pdsyevx workspace query, info=%d\n", mpi_rank, info);
     }
@@ -257,9 +259,11 @@ int main(int argc, char ** argv) {
   {
     WORK = new double[LWORK];
     IWORK = new int[LIWORK];
+    MPI_Barrier(MPI_COMM_WORLD);
     pdsyevx_(&jobz, &range, &uplo, &N, A.data(), &ONE, &ONE, desc, nullptr, nullptr,
              &il, &iu, &abs_tol, &m, nullptr, actual_eigv.data(), nullptr, nullptr, nullptr,
              nullptr, nullptr, WORK, &LWORK, IWORK, &LIWORK, nullptr, nullptr, nullptr, &info);
+    MPI_Barrier(MPI_COMM_WORLD);
     delete[] WORK;
     delete[] IWORK;
   }
@@ -299,12 +303,16 @@ int main(int argc, char ** argv) {
   // Print outputs
   if (mpi_rank == 0) {
 #ifndef OUTPUT_CSV
-    printf("nprocs=%d N=%d NB=%d kernel=%s geometry=%s abs_tol=%.1e k_begin=%d k_end=%d"
-           " dense_eig_time=%.3lf, actual_eig_time=%.3lf\n", blacs_nprocs, N, NB, kernel_name.c_str(),
+    printf("nprocs=%d mpi_nprocs=%d mpi_grid_x=%d mpi_grid_y=%d"
+           " N=%d NB=%d kernel=%s geometry=%s abs_tol=%.1e k_begin=%d k_end=%d"
+           " dense_eig_time=%.3lf, actual_eig_time=%.3lf\n",
+           blacs_nprocs, mpi_nprocs, mpi_grid[0], mpi_grid[1],
+           N, NB, kernel_name.c_str(),
            geom_name.c_str(), abs_tol, (int)k_begin, (int)k_end, dense_eig_time, actual_eig_time);
 #else
     if (print_csv_header == 1) {
-      printf("nprocs,N,NB,kernel,geometry,abs_tol,k_begin,k_end,dense_eig_time"
+      printf("nprocs,mpi_nprocs,mpi_grid_x,mpi_grid_y"
+             ",N,NB,kernel,geometry,abs_tol,k_begin,k_end,dense_eig_time"
              ",actual_eig_time,k,dense_eigv,actual_eigv,eig_abs_err\n");
     }
 #endif
@@ -316,8 +324,9 @@ int main(int argc, char ** argv) {
       printf("k=%d dense_eigv=%.8lf actual_eigv=%.8lf eig_abs_err=%.2e\n",
              (int)k, dense_eigv_k, actual_eigv_k, eig_abs_err);
 #else
-      printf("%d,%d,%d,%s,%s,%.1e,%d,%d,%.3lf,%.3lf,%d,%.8lf,%.8lf,%.2e\n",
-             blacs_nprocs, N, NB, kernel_name.c_str(), geom_name.c_str(), abs_tol,
+      printf("%d,%d,%d,%d,%d,%d,%s,%s,%.1e,%d,%d,%.3lf,%.3lf,%d,%.8lf,%.8lf,%.2e\n",
+             blacs_nprocs, mpi_nprocs, mpi_grid[0], mpi_grid[1],
+             N, NB, kernel_name.c_str(), geom_name.c_str(), abs_tol,
              (int)k_begin, (int)k_end, dense_eig_time, actual_eig_time,
              (int)k, dense_eigv_k, actual_eigv_k, eig_abs_err);
 #endif
