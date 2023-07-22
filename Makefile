@@ -62,6 +62,16 @@ $(TEST_EXECUTABLES): % : $(TEST)/%.o dirs
 $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 	$(LINK_EXECUTABLE)
 
+# H2 matrix distributed construction.
+.PHONY: examples/distributed/H2_construct
+examples/distributed/H2_construct:
+	$(MAKE) -C $@
+
+H2_construct : % : dirs examples/distributed/H2_construct
+	$(MPICXX) libH2_construct.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
 # parsec H2 matrix
 .PHONY: examples/distributed/H2_dtd
 examples/distributed/H2_dtd:
