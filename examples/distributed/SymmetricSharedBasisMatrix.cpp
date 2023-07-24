@@ -72,7 +72,7 @@ void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
 
   std::cout << std::endl;
 
-  if (level == min_level) { return; }
+  if (level <= min_level) { return; }
 
   actually_print_structure(level-1);
 }

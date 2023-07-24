@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
   int DENSE_NBROW = opts.nleaf;
   int DENSE_NBCOL = opts.nleaf;
 
-  int cores = 1;
+  int cores = opts.parsec_cores;
   if (!MPIRANK) {
     std::cout << "MPIGRID g[0] : " << MPIGRID[0]
               << " g[1]: " << MPIGRID[1]
