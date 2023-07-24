@@ -34,7 +34,11 @@ namespace Hatrix {
     void read_col_file_3d(const std::string& geometry_file);
     void read_col_file_2d(const std::string& geometry_file);
     // Read this kind of file: https://open-babel.readthedocs.io/en/latest/FileFormats/XYZ_cartesian_coordinates_format.html
-    void read_xyz_chemical_file(const std::string& geometry_file, const int64_t num_electrons_per_atom);
+    void read_xyz_chemical_file(const std::string& geometry_file,
+                                const int64_t num_electrons_per_atom);
+    // Sort bodies using Hilbert curves. Specialized for ELSES blocks.
+    void sort_bodies_elses(int64_t molecule_size);
+
     void print_file(std::string file_name);
 
     // Build tree using co-oridinate sorting similar to exafmm. Uses the new Cell struct.

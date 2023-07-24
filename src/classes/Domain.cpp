@@ -171,6 +171,15 @@ namespace Hatrix {
     file.close();
   }
 
+  void Domain::calculate_bounding_box() {
+
+  }
+
+  void Domain::sort_bodies_elses(int64_t molecule_size) {
+    calculate_bounding_box();
+
+  }
+
   void Domain::read_xyz_chemical_file(const std::string& geometry_file,
                                       const int64_t num_electrons_per_atom) {
     std::ifstream file;
@@ -180,8 +189,10 @@ namespace Hatrix {
     ndim = 3;
     N = num_atoms * num_electrons_per_atom;
 
-    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore the rest of line after num_particles
-    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Ignore line before atom positions
+    // Ignore the rest of line after num_particles
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    // Ignore line before atom positions
+    file.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     int64_t body_idx = 0;
     for(int64_t i = 0; i < num_atoms; i++) {
       std::string pref;

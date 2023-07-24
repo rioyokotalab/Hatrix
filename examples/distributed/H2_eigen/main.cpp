@@ -24,7 +24,8 @@ using namespace Hatrix;
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
   Args opts(argc, argv);
-  const int64_t num_electrons_per_atom = 4;
+  const int64_t num_electrons_per_atom = 4, num_atoms_per_molecule = 60;
+  const int64_t molecule_size = num_electrons_per_atom * num_atoms_per_molecule;
 
   init_elses_state();
 
@@ -37,9 +38,10 @@ int main(int argc, char* argv[]) {
 
   Domain domain(opts.N, opts.ndim);
 
-  // if (opts.kernel_verbose == "elses_c60") {
-  //   domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
-  // }
+  if (opts.kernel_verbose == "elses_c60") {
+    domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
+  }
+  domain.sort_bodies_elses(molecule_size);
 
   Matrix A_dense;
 
