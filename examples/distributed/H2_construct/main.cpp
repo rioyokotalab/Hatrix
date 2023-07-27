@@ -52,11 +52,11 @@ public:
   }
 
   int glob_row(int local_row) {
-    return indxl2g(local_row + 1, DESC[3], MYROW, MPIGRID[0]) - 1;
+    return indxl2g(local_row + 1, block_nrows, MYROW, MPIGRID[0]) - 1;
   }
 
   int glob_col(int local_col) {
-    return indxl2g(local_col + 1, DESC[4], MYCOL, MPIGRID[1]) - 1;
+    return indxl2g(local_col + 1, block_ncols, MYCOL, MPIGRID[1]) - 1;
   }
 
   void set_local(size_t local_row, size_t local_col, double value) {
@@ -132,8 +132,10 @@ int main(int argc, char* argv[]) {
   ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE, 0, 0, BLACS_CONTEXT);
   for (size_t i = 0; i < DENSE.local_nrows; ++i) {
     for (size_t j = 0; j < DENSE.local_ncols; ++j) {
+      // std::cout << "i: " << i << " g_i: " << DENSE.glob_row(i) << std::endl;
+      // std::cout << "j: " << j << " g_j: " << DENSE.glob_col(j) << std::endl;
       double value = opts.kernel(domain.particles[DENSE.glob_row(i)].coords,
-                                 domain.particles[DENSE.glob_col(i)].coords);
+                                 domain.particles[DENSE.glob_col(j)].coords);
       DENSE.set_local(i, j, value);
     }
   }

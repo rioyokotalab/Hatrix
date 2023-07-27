@@ -60,7 +60,7 @@ ndim=2
 max_rank=100
 admis=0
 
-mpirun -n 1 bin/H2_construct --N $N \
+mpirun -n 4 bin/H2_construct --N $N \
        --nleaf $nleaf \
        --kernel_func yukawa \
        --kind_of_geometry grid \
