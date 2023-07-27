@@ -24,7 +24,7 @@ ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
 exec_supercell=$ELSES_ROOT/make_supercell_C60_FCCs_w_noise/a.out
 exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
-make -j H2_dtd
+make -j H2_construct
 
 # Generate the points for the ELSES matrix.
 # nx=1
@@ -54,30 +54,21 @@ make -j H2_dtd
 
 # rm *xml
 # rm *xyz
+N=8096
+nleaf=256
+ndim=2
+max_rank=100
+admis=0
 
-for adm in 0; do
-    nleaf=256
-    ndim=2
-
-    for max_rank in 100; do
-        for i in "2 4096" "8 16384" "32 65536" "128 262144"; do
-            set -- $i
-            parsec_cores=$1
-            N=$2
-
-            mpirun -n 1 bin/H2_dtd --N $N \
-                   --nleaf $nleaf \
-                   --parsec_cores $parsec_cores \
-                   --kernel_func yukawa \
-                   --kind_of_geometry grid \
-                   --ndim $ndim \
-                   --max_rank $max_rank \
-                   --accuracy -1 \
-                   --admis $adm \
-                   --admis_kind diagonal \
-                   --construct_algorithm miro \
-                   --param_1 1 --param_2 1e-9 --param_3 0.5 \
-                   --kind_of_recompression 3 --use_nested_basis 1
-        done
-    done
-done
+mpirun -n 1 bin/H2_construct --N $N \
+       --nleaf $nleaf \
+       --kernel_func yukawa \
+       --kind_of_geometry grid \
+       --ndim $ndim \
+       --max_rank $max_rank \
+       --accuracy -1 \
+       --admis $admis \
+       --admis_kind diagonal \
+       --construct_algorithm miro \
+       --param_1 1 --param_2 1e-9 --param_3 0.5 \
+       --kind_of_recompression 3 --use_nested_basis 1
