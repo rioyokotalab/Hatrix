@@ -1,13 +1,13 @@
 #!/bin/bash
-#PJM -L "node=8"
+#PJM -L "node=4096"
 #PJM -L "rscunit=rscunit_ft01"
-#PJM -L "rscgrp=small"
+#PJM -L "rscgrp=large"
 #PJM -L "elapse=24:00:00"
 #PJM -L "freq=2200"
 #PJM -L "throttling_state=0"
 #PJM -L "issue_state=0"
 #PJM -L "ex_pipe_state=0"
-#PJM --mpi "proc=8"
+#PJM --mpi "proc=4096"
 #PJM --mpi "max-proc-per-node=1"
 #PJM -s
 
@@ -31,33 +31,21 @@ export OMP_PROC_BIND=close
 export OMP_BIND=close
 export XOS_MMM_L_PAGING_POLICY="demand:demand:demand"
 
-# make -j H2_main
-#make clean
-make -j H2_dtd
-# make -j H2_main
+N=4194304
+nleaf=256
+ndim=2
+max_rank=100
+admis=0
 
-
-for adm in 0; do
-    nleaf=256
-    ndim=2
-
-    for max_rank in 100; do
-        for N in 16384; do
-                mpiexec bin/H2_dtd --N $N \
-                              --nleaf $nleaf \
-                              --kernel_func laplace \
-                              --kind_of_geometry grid \
-                              --ndim $ndim \
-                              --max_rank $max_rank \
-                              --accuracy -1 \
-                              --admis $adm \
-                              --admis_kind diagonal \
-                              --construct_algorithm miro \
-                              --param_1 1e-9 --param_2 0.03 --param_3 0.5 \
-                              --kind_of_recompression 3 --use_nested_basis
-
-		mkdir profiles
-		mv hatrix_profile-* profiles/
-        done
-    done
-done
+mpiexec bin/H2_construct --N $N \
+       --nleaf $nleaf \
+       --kernel_func yukawa \
+       --kind_of_geometry grid \
+       --ndim $ndim \
+       --max_rank $max_rank \
+       --accuracy -1 \
+       --admis $admis \
+       --admis_kind diagonal \
+       --construct_algorithm miro \
+       --param_1 1 --param_2 1e-9 --param_3 0.5 \
+       --kind_of_recompression 3 --use_nested_basis 1

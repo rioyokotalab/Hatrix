@@ -3,8 +3,8 @@ BLAS_LIB       = -SSL2
 LAPACK_INCLUDE =
 LAPACK_LIB     = -L$FJSVXTCLANGA/lib64 -lfjlapacksve
 SCALAPACK_LIB  =
-CXX            = FCC
-MPICXX         = mpiFCC
+CXX            = FCCpx
+MPICXX         = mpiFCCpx
 CXXFLAGS       = -Nclang -O3 -fopenmp $(shell pkg-config --cflags gtest gtest_main) \
                  -I. -I$(TOPSRCDIR)/include/ -I$(TOPSRCDIR)/examples/common -fPIC -Ofast -std=c++11 -stdlib=libstdc++ -Kfast,openmp \
                  -I/home/hp190122/u01594/gsl-2.7.1/build/include
