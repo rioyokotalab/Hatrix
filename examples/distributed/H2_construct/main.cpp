@@ -26,19 +26,22 @@ int indxl2g(int indxloc, int nb, int iproc, int nprocs) {
 }
 
 class ScaLAPACK_dist_matrix_t {
-  // scalapack storage for matrix descriptor.
-  std::vector<int> DESC;
-  std::vector<double> data;
 public:
-
+  // scalapack storage for matrix descriptor.
+  int nrows, ncols, block_nrows, block_ncols, local_stride;
+  std::vector<double> data;
+  std::vector<int> DESC;
   int local_nrows, local_ncols;
 
   ScaLAPACK_dist_matrix_t(int nrows, int ncols,
                           int block_nrows, int block_ncols,
                           int begin_prow, int begin_pcol,
-                          int BLACS_CONTEXT) {
+                          int BLACS_CONTEXT) :
+    nrows(nrows), ncols(ncols), block_nrows(block_nrows), block_ncols(block_ncols)
+  {
     local_nrows = numroc_(&nrows, &block_nrows, &MYROW, &begin_prow, &MPIGRID[0]);
     local_ncols = numroc_(&ncols, &block_ncols, &MYCOL, &begin_pcol, &MPIGRID[1]);
+    local_stride = local_nrows;
 
     int INFO;
     DESC.resize(9);
@@ -61,6 +64,21 @@ public:
   }
 };
 
+void dist_matvec(ScaLAPACK_dist_matrix_t& A, int A_row_offset, int A_col_offset, double alpha,
+                 ScaLAPACK_dist_matrix_t& X, int X_row_offset, int X_col_offset,
+                 double beta,
+                 ScaLAPACK_dist_matrix_t& B, int B_row_offset, int B_col_offset) {
+  const char TRANSA = 'N';
+  int INCX = 1, INCB = 1;
+  pdgemv_(&TRANSA, &A.nrows, &A.ncols, &alpha,
+          A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
+          X.data.data(), &X_row_offset, &X_col_offset, X.DESC.data(),
+          &INCX,
+          &beta,
+          B.data.data(), &B_row_offset, &B_col_offset, B.DESC.data(),
+          &INCB);
+}
+
 
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
@@ -79,6 +97,9 @@ int main(int argc, char* argv[]) {
   Cblacs_get(-1, 0, &BLACS_CONTEXT );
   Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
+
+  std::mt19937 gen(MPIRANK);
+  std::uniform_real_distribution<double> dist(0, 1);
 
   // Init domain decomposition for H2 matrix using DTT.
   auto start_domain = std::chrono::system_clock::now();
@@ -117,6 +138,18 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, 0, 0, BLACS_CONTEXT),
+    VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, 0, 0, BLACS_CONTEXT);
+
+  for (int i = 0; i < VECTOR_X.local_nrows; ++i) {
+    VECTOR_X.set_local(i, 0, dist(gen));
+    VECTOR_B.set_local(i, 0, 0);
+  }
+
+  dist_matvec(DENSE, 1, 1, 1.0,
+              VECTOR_X, 1, 1,
+              0.0,
+              VECTOR_B, 1, 1);
 
 
   Cblacs_gridexit(BLACS_CONTEXT);

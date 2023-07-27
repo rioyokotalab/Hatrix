@@ -7,24 +7,6 @@
 Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;
 
 namespace Hatrix {
-
-  int
-  indxg2l(int INDXGLOB, int NB, int NPROCS) {
-    return NB * ((INDXGLOB - 1) / ( NB * NPROCS)) + (INDXGLOB - 1) % NB + 1;
-  }
-
-  int
-  indxl2g(int indxloc, int nb, int iproc, int nprocs) {
-    return nprocs * nb * ((indxloc - 1) / nb) +
-      (indxloc-1) % nb + ((nprocs + iproc) % nprocs) * nb + 1;
-  }
-
-  int
-  indxg2p(int INDXGLOB, int NB, int ISRCPROC, int NPROCS) {
-    return (ISRCPROC + (INDXGLOB - 1) / NB) % NPROCS;
-  }
-
-
   std::vector<Hatrix::Matrix>
   split_dense(const Hatrix::Matrix& dense, int64_t row_split, int64_t col_split) {
     return dense.split(std::vector<int64_t>(1, row_split),
