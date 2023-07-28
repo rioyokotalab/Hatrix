@@ -45,6 +45,8 @@ int main(int argc, char* argv[]) {
 
   Matrix A_dense;
 
+  // Compute the kth eigen value.
+
   Hatrix::Context::finalize();
   return 0;
 }

@@ -79,6 +79,10 @@ void dist_matvec(ScaLAPACK_dist_matrix_t& A, int A_row_offset, int A_col_offset,
           &INCB);
 }
 
+void construct_H2_matrix(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t& DENSE) {
+
+}
+
 
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();

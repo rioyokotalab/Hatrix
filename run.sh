@@ -19,28 +19,29 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
-ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
+# Matrix size 7,680
 
-exec_supercell=$ELSES_ROOT/make_supercell_C60_FCCs_w_noise/a.out
-exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
+function generate_elses_config_file {
+    ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
+    exec_supercell=$ELSES_ROOT/make_supercell_C60_FCCs_w_noise/a.out
+    exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
+
+    source elses_7680.sh
+
+    # Generate the geometry file.
+    $exec_supercell $nx $ny $nz $source_file
+
+    # generate config.xml.
+    $exec_elses_xml_generate $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xml $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xml
+
+    # copy config file into Hatrix root
+    cp $fcc_xml_file .
+    cp $xml_config_file .
+}
 
 make -j H2_construct
 
-# Generate the points for the ELSES matrix.
-# nx=1
-# ny=1
-# nz=1
-# source_file=$ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xyz
 
-# # Generate the geometry file.
-# $exec_supercell $nx $ny $nz $source_file
-
-# # generate config.xml.
-# $exec_elses_xml_generate $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xml $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xml
-
-# # copy config file into Hatrix root
-# cp $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xml .
-# cp $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/config.xml .
 
 
 # ./bin/H2_eigen --N 7680 \
