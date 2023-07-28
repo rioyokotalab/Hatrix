@@ -29,12 +29,7 @@ int main(int argc, char* argv[]) {
 
   init_elses_state();
 
-  // for (long int i = 1; i <= 7680; ++i) {
-  //   for (long int j = 1; j <= 7680; ++j) {
-  //     get_elses_matrix_value(&i, &j, &val);
-  //     std::cout << "i: " << i << " j: " << j << " "  << val << std::endl;
-  //   }
-  // }
+
 
   Domain domain(opts.N, opts.ndim);
 
@@ -43,7 +38,20 @@ int main(int argc, char* argv[]) {
   }
   domain.sort_bodies_elses(molecule_size);
 
-  Matrix A_dense;
+  Matrix A_dense(opts.N, opts.N);
+#pragma omp parallel for collapse(2)
+  for (long int i = 0; i < opts.N; ++i) {
+    for (long int j = 0; j < opts.N; ++j) {
+      long int f_i = i + 1;
+      long int f_j = j + 1;
+      double val;
+      get_elses_matrix_value(&f_i, &f_j, &val);
+      A_dense(i, j) = val;
+    }
+  }
+
+  auto dense_eign = Hatrix::get_eigenvalues(A_dense);
+
 
   // Compute the kth eigen value.
 

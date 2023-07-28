@@ -19,6 +19,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
 
+N=7680
+
 # Matrix size 7,680
 
 function generate_elses_config_file {
@@ -26,7 +28,11 @@ function generate_elses_config_file {
     exec_supercell=$ELSES_ROOT/make_supercell_C60_FCCs_w_noise/a.out
     exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
-    source elses_7680.sh
+    if [ $N == 7680 ]; then
+        source elses_7680.sh
+    elif [ $N == 30720 ]; then
+        source elses_30720.sh
+    fi
 
     # Generate the geometry file.
     $exec_supercell $nx $ny $nz $source_file
@@ -39,37 +45,36 @@ function generate_elses_config_file {
     cp $xml_config_file .
 }
 
-make -j H2_construct
+generate_elses_config_file
 
+make -j H2_eigen
 
-
-
-# ./bin/H2_eigen --N 7680 \
-#                --nleaf 512 \
-#                --kernel_func elses_c60 \
-#                --kind_of_geometry elses_c60_geometry \
-#                --ndim 3 \
-#                --admis_kind geometry \
-#                --geometry_file C60_fcc.xyz \
-#                --use_nested_basis 1
+./bin/H2_eigen --N $N \
+               --nleaf 240 \
+               --kernel_func elses_c60 \
+               --kind_of_geometry elses_c60_geometry \
+               --ndim 3 \
+               --admis_kind geometry \
+               --geometry_file C60_fcc.xyz \
+               --use_nested_basis 1
 
 # rm *xml
 # rm *xyz
-N=8096
-nleaf=256
-ndim=2
-max_rank=100
-admis=0
+# N=8096
+# nleaf=256
+# ndim=2
+# max_rank=100
+# admis=0
 
-mpirun -n 4 bin/H2_construct --N $N \
-       --nleaf $nleaf \
-       --kernel_func yukawa \
-       --kind_of_geometry grid \
-       --ndim $ndim \
-       --max_rank $max_rank \
-       --accuracy -1 \
-       --admis $admis \
-       --admis_kind diagonal \
-       --construct_algorithm miro \
-       --param_1 1 --param_2 1e-9 --param_3 0.5 \
-       --kind_of_recompression 3 --use_nested_basis 1
+# mpirun -n 4 bin/H2_construct --N $N \
+#        --nleaf $nleaf \
+#        --kernel_func yukawa \
+#        --kind_of_geometry grid \
+#        --ndim $ndim \
+#        --max_rank $max_rank \
+#        --accuracy -1 \
+#        --admis $admis \
+#        --admis_kind diagonal \
+#        --construct_algorithm miro \
+#        --param_1 1 --param_2 1e-9 --param_3 0.5 \
+#        --kind_of_recompression 3 --use_nested_basis 1
