@@ -10,6 +10,7 @@ namespace Hatrix {
   public:
     std::vector<Hatrix::Particle> particles;
     Cell tree;
+    std::vector<Cell> tree_list;
     int64_t N, ndim;
 
   private:

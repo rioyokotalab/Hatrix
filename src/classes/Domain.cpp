@@ -171,8 +171,16 @@ namespace Hatrix {
     file.close();
   }
 
-  void Domain::build_elses_tree(const int64_t molecule_size) {
+  void Domain::sort_elses_bodies(const int64_t molecule_size) {
+    // Bounding box of the root cell.
+    Cell root(ndim);
+    root.start_index = 0;
+    root.end_index = N;
 
+  }
+
+  void Domain::build_elses_tree(const int64_t molecule_size) {
+    sort_elses_bodies(molecule_size);
   }
 
   void Domain::read_xyz_chemical_file(const std::string& geometry_file,

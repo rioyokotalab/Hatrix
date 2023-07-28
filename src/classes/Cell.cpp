@@ -7,6 +7,15 @@
 #include "Hatrix/Hatrix.h"
 
 namespace Hatrix {
+  Cell::Cell(int64_t ndim) {
+    center.resize(ndim);
+    radius_axis.resize(ndim);
+    start_index = -1;
+    end_index = -1;
+    level = -1;
+    radius = -1;
+  }
+
   Cell::Cell() : start_index(-1), end_index(-1), level(-1), radius(-1) {}
 
   Cell::Cell(std::vector<double> _center, int64_t pstart,

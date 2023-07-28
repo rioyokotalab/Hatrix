@@ -1161,6 +1161,10 @@ class Domain {
     // Every leaf_size consecutive electrons comprise a molecule
     const auto nmols = N / molecule_size;
     std::vector<Body> mol_centers(nmols);  // Center of each molecule
+
+    // Subdivide the domain into 'nmols' molecules so that you can call each
+    // molecule into a single box which can then be used as the basic building
+    // block for sorting.
     for (int64_t i = 0; i < nmols; i++) {
       Cell cell;
       cell.body_offset = i * molecule_size;

@@ -54,6 +54,7 @@ interval_start=0
 interval_end=2048
 
 ./bin/H2_eigen --N $N \
+               --ndim 3 \
                --nleaf 240 \
                --kernel_func elses_c60 \
                --kind_of_geometry elses_c60_geometry \
