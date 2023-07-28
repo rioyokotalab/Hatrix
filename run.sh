@@ -49,6 +49,10 @@ generate_elses_config_file
 
 make -j H2_eigen
 
+# values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
+interval_start=0
+interval_end=2048
+
 ./bin/H2_eigen --N $N \
                --nleaf 240 \
                --kernel_func elses_c60 \
@@ -56,6 +60,7 @@ make -j H2_eigen
                --ndim 3 \
                --admis_kind geometry \
                --geometry_file C60_fcc.xyz \
+               --param_1 $interval_start --param_2 $interval_end \
                --use_nested_basis 1
 
 # rm *xml
