@@ -39,11 +39,6 @@ int main(int argc, char* argv[]) {
 
   Domain domain(opts.N, opts.ndim);
 
-  if (opts.kernel_verbose == "elses_c60") {
-    domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
-  }
-  domain.sort_bodies_elses(molecule_size);
-
   Matrix A_dense(opts.N, opts.N);
 #pragma omp parallel for collapse(2)
   for (long int i = 0; i < opts.N; ++i) {

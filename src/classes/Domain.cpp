@@ -171,12 +171,7 @@ namespace Hatrix {
     file.close();
   }
 
-  void Domain::calculate_bounding_box() {
-
-  }
-
-  void Domain::sort_bodies_elses(int64_t molecule_size) {
-    calculate_bounding_box();
+  void Domain::build_elses_tree(const int64_t molecule_size) {
 
   }
 
@@ -199,7 +194,13 @@ namespace Hatrix {
       double x, y, z;
       file >> pref >> x >> y >> z;
       file.ignore(1, '\n'); //Ignore newline
+
       for (int64_t k = 0; k < num_electrons_per_atom; k++) {
+        // The body_idx stores a number that corresponds to the index at which this particle exists
+        // in the geometry. This value is used as a placeholder for tracing the initial position
+        // of this particle in the domain. This is useful when sorting the bodies and generating
+        // the admissibility because the sorting can destroy the original indexing of the particles.
+        // The body_idx is used for tracing back the initial position of this particle.
         particles.emplace_back(Hatrix::Particle(x, y, z, (double)body_idx));
         body_idx++;
       }

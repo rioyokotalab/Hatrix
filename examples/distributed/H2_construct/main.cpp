@@ -105,25 +105,31 @@ int main(int argc, char* argv[]) {
   std::mt19937 gen(MPIRANK);
   std::uniform_real_distribution<double> dist(0, 1);
 
-  // Init domain decomposition for H2 matrix using DTT.
+  // Init domain decomposition for H2 matrix using dual tree traversal.
   auto start_domain = std::chrono::system_clock::now();
   Domain domain(opts.N, opts.ndim);
   if (opts.kind_of_geometry == GRID) {
     domain.generate_grid_particles();
+    domain.build_tree(opts.nleaf);
   }
   else if (opts.kind_of_geometry == CIRCULAR) {
     domain.generate_circular_particles(0, opts.N);
+    domain.build_tree(opts.nleaf);
   }
   else if (opts.kind_of_geometry == COL_FILE) {
     domain.read_col_file_3d(opts.geometry_file);
+    domain.build_tree(opts.nleaf);
   }
-  domain.build_tree(opts.nleaf);
+  else if (opts.kind_of_geometry == ELSES_C60_GEOMETRY) {
+    const int64_t num_electrons_per_atom = 4;
+    const int64_t num_atoms_per_molecule = 60;
+    domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
+    domain.build_elses_tree(num_electrons_per_atom * num_atoms_per_molecule);
+  }
+
   auto stop_domain = std::chrono::system_clock::now();
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
-
-  int64_t construct_max_rank;
-  SymmetricSharedBasisMatrix A;
 
   auto start_construct = std::chrono::system_clock::now();
   if (opts.admis_kind == GEOMETRY) {
@@ -156,6 +162,9 @@ int main(int argc, char* argv[]) {
               VECTOR_X, 1, 1,
               0.0,
               VECTOR_B, 1, 1);
+
+  int64_t construct_max_rank;
+  SymmetricSharedBasisMatrix A;
 
 
   Cblacs_gridexit(BLACS_CONTEXT);

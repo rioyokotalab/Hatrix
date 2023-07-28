@@ -36,15 +36,15 @@ namespace Hatrix {
     // Read this kind of file: https://open-babel.readthedocs.io/en/latest/FileFormats/XYZ_cartesian_coordinates_format.html
     void read_xyz_chemical_file(const std::string& geometry_file,
                                 const int64_t num_electrons_per_atom);
-    // Sort bodies using Hilbert curves. Specialized for ELSES blocks.
-    void sort_bodies_elses(int64_t molecule_size);
+
+    // Sort bodies using Hilbert curves. Specialized for ELSES blocks. Then generate a
+    // tree with near and far blocks.
+    void build_elses_tree(const int64_t molecule_size);
 
     void print_file(std::string file_name);
 
     // Build tree using co-oridinate sorting similar to exafmm. Uses the new Cell struct.
     void build_tree(const int64_t max_nleaf);
-
-    void calculate_bounding_box();
 
     int64_t cell_size(int64_t level_index, int64_t level) const;
   };
