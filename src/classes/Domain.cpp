@@ -195,7 +195,7 @@ namespace Hatrix {
     Cell root(ndim);
     root.start_index = 0;
     root.end_index = N;
-    for (int64_t axis = 0; axis < ndim; ++ndim) {
+    for (int64_t axis = 0; axis < ndim; ++axis) {
       auto axis_min = get_axis_min(root.start_index, root.end_index, axis);
       auto axis_max = get_axis_max(root.start_index, root.end_index, axis);
       root.radii[axis] = (axis_max - axis_min) / 2;

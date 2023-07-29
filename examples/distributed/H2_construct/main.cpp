@@ -16,6 +16,10 @@
 
 #include "mpi.h"
 
+extern "C" {
+#include "elses.h"
+}
+
 using namespace Hatrix;
 
 static const int SCALAPACK_BLOCK_SIZE = 256;
@@ -123,6 +127,7 @@ int main(int argc, char* argv[]) {
   else if (opts.kind_of_geometry == ELSES_C60_GEOMETRY) {
     const int64_t num_electrons_per_atom = 4;
     const int64_t num_atoms_per_molecule = 60;
+    init_elses_state();
     domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
     domain.build_elses_tree(num_electrons_per_atom * num_atoms_per_molecule);
   }
@@ -145,12 +150,13 @@ int main(int argc, char* argv[]) {
   }
 
   ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE, 0, 0, BLACS_CONTEXT);
-#pragma omp parallel for collapse(2)
   for (size_t i = 0; i < DENSE.local_nrows; ++i) {
     for (size_t j = 0; j < DENSE.local_ncols; ++j) {
-      double value = opts.kernel(domain.particles[DENSE.glob_row(i)].coords,
-                                 domain.particles[DENSE.glob_col(j)].coords);
-      DENSE.set_local(i, j, value);
+      long int f_i = i + 1;
+      long int f_j = j + 1;
+      double val;
+      get_elses_matrix_value(&f_i, &f_j, &val);
+      DENSE.set_local(i, j, val);
     }
   }
 

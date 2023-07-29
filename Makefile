@@ -67,8 +67,11 @@ $(EXAMPLE_EXECUTABLES) : % : $(EXAMPLES)/%.o dirs
 examples/distributed/H2_construct:
 	$(MAKE) -C $@
 
-H2_construct : % : dirs examples/distributed/H2_construct
-	$(MPICXX) libH2_construct.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
+H2_construct : % : dirs examples/distributed/H2_construct \
+	$(MPICXX) libH2_construct.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB)
+	/home/sameer.deshmukh/ELSES_mat_calc-master/src/src.a \
+	/home/sameer.deshmukh/ELSES_mat_calc-master/xmlf90-1.2g-elses/macros/lib/libflib.a \
+	-o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 

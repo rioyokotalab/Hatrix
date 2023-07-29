@@ -58,7 +58,7 @@ mpirun -n 1 gdb --args ./bin/H2_construct --N $N \
                --nleaf 240 \
                --kernel_func elses_c60 \
                --kind_of_geometry elses_c60_geometry \
-               --admis_kind geometry \
+               --admis_kind diagonal \
                --geometry_file C60_fcc.xyz \
                --param_1 $interval_start --param_2 $interval_end \
                --use_nested_basis 1
