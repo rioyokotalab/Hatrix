@@ -1164,7 +1164,8 @@ class Domain {
 
     // Subdivide the domain into 'nmols' molecules so that you can call each
     // molecule into a single box which can then be used as the basic building
-    // block for sorting.
+    // block for sorting. Note that this loop assumes that a single molecule has
+    // all its constituent atoms stored in contiguous locations.
     for (int64_t i = 0; i < nmols; i++) {
       Cell cell;
       cell.body_offset = i * molecule_size;

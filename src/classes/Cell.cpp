@@ -9,7 +9,7 @@
 namespace Hatrix {
   Cell::Cell(int64_t ndim) {
     center.resize(ndim);
-    radius_axis.resize(ndim);
+    radii.resize(ndim);
     start_index = -1;
     end_index = -1;
     level = -1;

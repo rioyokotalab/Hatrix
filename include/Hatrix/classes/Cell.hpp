@@ -11,7 +11,7 @@ namespace Hatrix {
   public:
     std::vector<Cell> cells;
     std::vector<double> center;
-    std::vector<double> radius_axis;
+    std::vector<double> radii;
     int64_t start_index, end_index, level;
     uint32_t level_index;
     double radius;

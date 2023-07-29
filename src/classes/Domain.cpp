@@ -3,6 +3,7 @@
 #include <fstream>
 #include <algorithm>
 #include <random>
+#include <cassert>
 
 #include "Hatrix/Hatrix.h"
 
@@ -171,16 +172,65 @@ namespace Hatrix {
     file.close();
   }
 
+  double Domain::get_axis_min(int64_t start_index, int64_t end_index, int64_t axis) {
+    double min_coord = particles[start_index].coords[axis];
+    for (int64_t i = start_index; i < end_index; ++i) {
+      min_coord = std::min(min_coord, particles[i].coords[axis]);
+    }
+
+    return min_coord;
+  }
+
+  double Domain::get_axis_max(int64_t start_index, int64_t end_index, int64_t axis) {
+    double min_coord = particles[start_index].coords[axis];
+    for (int64_t i = start_index; i < end_index; ++i) {
+      min_coord = std::max(min_coord, particles[i].coords[axis]);
+    }
+
+    return min_coord;
+  }
+
   void Domain::sort_elses_bodies(const int64_t molecule_size) {
     // Bounding box of the root cell.
     Cell root(ndim);
     root.start_index = 0;
     root.end_index = N;
+    for (int64_t axis = 0; axis < ndim; ++ndim) {
+      auto axis_min = get_axis_min(root.start_index, root.end_index, axis);
+      auto axis_max = get_axis_max(root.start_index, root.end_index, axis);
+      root.radii[axis] = (axis_max - axis_min) / 2;
+      root.center[axis] = (axis_min + axis_max) / 2;
+    }
+    root.level = 0;
+    tree_list.push_back(root);
 
+    // Subdivide the particles (atoms) into molecules. Each molecule contains
+    // molecule_size atoms.
+    assert(N % molecule_size == 0);
+
+    const int64_t nmolecules = N / molecule_size;
+
+    // Each vector within this vector contains co-ordinates that correspond to
+    // the center of each molecule.
+    std::vector<std::vector<double> > molecule_centers;
+
+    for (int64_t mol = 0; mol < nmolecules; ++mol) {
+      std::vector<double> mol_center;
+      auto start_index = mol * molecule_size;
+      auto end_index = mol * molecule_size + molecule_size;
+
+      for (int64_t axis = 0; axis < ndim; ++axis) {
+        auto axis_min = get_axis_min(start_index, end_index, axis);
+        auto axis_max = get_axis_max(start_index, end_index, axis);
+        mol_center.push_back((axis_min + axis_max) / 2);
+      }
+      molecule_centers.push_back(mol_center);
+    }
   }
 
   void Domain::build_elses_tree(const int64_t molecule_size) {
     sort_elses_bodies(molecule_size);
+
   }
 
   void Domain::read_xyz_chemical_file(const std::string& geometry_file,

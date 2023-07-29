@@ -28,6 +28,9 @@ namespace Hatrix {
                           const int64_t level_index,
                           const int64_t level,
                           int64_t &pstart, int64_t &pend) const;
+    double get_axis_min(int64_t start_index, int64_t end_index, int64_t axis);
+    double get_axis_max(int64_t start_index, int64_t end_index, int64_t axis);
+    void sort_elses_bodies(const int64_t molecule_size);
   public:
     Domain(int64_t N, int64_t ndim);
     void generate_circular_particles(double min_val, double max_val);
