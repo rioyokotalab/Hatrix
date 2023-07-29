@@ -1183,7 +1183,7 @@ class Domain {
     std::vector<Body> buffer = mol_centers;
     std::vector<Cell> mol_cells(1);
     const int64_t leaf_box_size = 1;
-    mol_cells.reserve(nmols*(32/leaf_box_size+1));
+    mol_cells.reserve(nmols * (32 / leaf_box_size + 1));
     build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0],
                 mol_cells, leaf_box_size, X0, R0);
     int64_t max_level = 0;

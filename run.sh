@@ -47,13 +47,13 @@ function generate_elses_config_file {
 
 generate_elses_config_file
 
-make -j H2_eigen
+make -j H2_construct
 
 # values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
 interval_start=0
 interval_end=2048
 
-./bin/H2_eigen --N $N \
+mpirun -n 1 gdb --args ./bin/H2_construct --N $N \
                --ndim 3 \
                --nleaf 240 \
                --kernel_func elses_c60 \

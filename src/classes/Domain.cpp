@@ -214,18 +214,22 @@ namespace Hatrix {
     // the center of each molecule.
     std::vector<std::vector<double> > molecule_centers;
 
+    std::cout << "begin mol center calc.\n";
+
     for (int64_t mol = 0; mol < nmolecules; ++mol) {
-      std::vector<double> mol_center;
+      std::vector<double> mol_center(ndim);
       auto start_index = mol * molecule_size;
       auto end_index = mol * molecule_size + molecule_size;
 
       for (int64_t axis = 0; axis < ndim; ++axis) {
         auto axis_min = get_axis_min(start_index, end_index, axis);
         auto axis_max = get_axis_max(start_index, end_index, axis);
-        mol_center.push_back((axis_min + axis_max) / 2);
+        mol_center[axis] = (axis_min + axis_max) / 2;
       }
       molecule_centers.push_back(mol_center);
     }
+
+    // Partition the molecules using Hilbert indexing.
   }
 
   void Domain::build_elses_tree(const int64_t molecule_size) {

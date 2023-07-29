@@ -131,7 +131,12 @@ int main(int argc, char* argv[]) {
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
+  std::cout << "Domain setup time: " << domain_time << "ms" << std::endl;
+
   auto start_construct = std::chrono::system_clock::now();
+
+  int64_t construct_max_rank;
+  SymmetricSharedBasisMatrix A;
   if (opts.admis_kind == GEOMETRY) {
     init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
   }
@@ -163,8 +168,6 @@ int main(int argc, char* argv[]) {
               0.0,
               VECTOR_B, 1, 1);
 
-  int64_t construct_max_rank;
-  SymmetricSharedBasisMatrix A;
 
 
   Cblacs_gridexit(BLACS_CONTEXT);
