@@ -4,6 +4,8 @@
 #SBATCH -J H2_gsl
 #SBATCH --time=24:00:00
 
+set -e
+
 source ~/.bashrc
 # source /home/sameer.deshmukh/gitrepos/parsec/build/bin/parsec.env.sh
 

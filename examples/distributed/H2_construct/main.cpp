@@ -22,7 +22,10 @@ extern "C" {
 
 using namespace Hatrix;
 
-static const int SCALAPACK_BLOCK_SIZE = 240;
+static const int SCALAPACK_BLOCK_SIZE = 60;
+static const int BEGIN_PROW = 0, BEGIN_PCOL = 0;
+
+int BLACS_CONTEXT;
 
 int indxl2g(int indxloc, int nb, int iproc, int nprocs) {
   return nprocs * nb * ((indxloc - 1) / nb) +
@@ -52,7 +55,15 @@ public:
     descinit_(DESC.data(), &nrows, &ncols, &block_nrows, &block_ncols,
               &begin_prow, &begin_pcol, &BLACS_CONTEXT, &local_nrows, &INFO);
 
-    data.resize((size_t)local_nrows * (size_t)local_ncols);
+    try {
+      data.resize((size_t)local_nrows * (size_t)local_ncols);
+    }
+    catch (std::bad_alloc & exception) {
+      std::cerr << "tried to allocate memory of size:  "
+                << (size_t)local_nrows * (size_t)local_ncols
+                << " " << exception.what() << std::endl;
+    }
+
   }
 
   int glob_row(int local_row) {
@@ -83,8 +94,47 @@ void dist_matvec(ScaLAPACK_dist_matrix_t& A, int A_row_offset, int A_col_offset,
           &INCB);
 }
 
-void construct_H2_matrix(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t& DENSE) {
+// i, j, level -> block numbers.
+Matrix
+generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
+                          const SymmetricSharedBasisMatrix& A) {
+  int64_t block_size = opts.N / A.num_blocks[level];
+  Matrix dense(block_size, block_size);
 
+#pragma omp parallel for collapse(2)
+  for (int64_t local_i = 0; local_i < block_size; ++local_i) {
+    for (int64_t local_j = 0; local_j < block_size; ++local_j) {
+      long int global_i = i * block_size + local_i;
+      long int global_j = j * block_size + local_j;
+      double value;
+      get_elses_matrix_value(&global_i, &global_j, &value);
+
+      dense(local_i, local_j) = value;
+    }
+  }
+
+  return dense;
+}
+
+void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t& DENSE,
+                         ScaLAPACK_dist_matrix_t& U, const Args& opts) {
+  ScaLAPACK_dist_matrix_t AY(opts.N, opts.nleaf, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
+                             BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+
+  int64_t nblocks = A.num_blocks[A.max_level];
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    if (mpi_rank(i) == MPIRANK) {
+      Matrix Aij = generate_p2p_interactions(i, i, A.max_level, opts, A);
+    }
+  }
+}
+
+void construct_H2_matrix(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t& DENSE, const Args& opts) {
+  ScaLAPACK_dist_matrix_t U(opts.N, opts.nleaf, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
+                            BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+
+  generate_leaf_nodes(A, DENSE, U, opts);
 }
 
 
@@ -92,7 +142,9 @@ int main(int argc, char* argv[]) {
   Hatrix::Context::init();
   Args opts(argc, argv);
   int N = opts.N;
-  int BLACS_CONTEXT;
+
+  assert(opts.nleaf % SCALAPACK_BLOCK_SIZE == 0);
+  assert(opts.N % opts.nleaf == 0);
 
   {
     int provided;
@@ -142,6 +194,14 @@ int main(int argc, char* argv[]) {
 
   int64_t construct_max_rank;
   SymmetricSharedBasisMatrix A;
+
+  // Making BLR for now.
+  A.max_level = log2(opts.N/opts.nleaf);
+  A.min_level = log2(opts.N/opts.nleaf);
+  std::cout << "max level: " << A.max_level << std::endl;
+  A.num_blocks.resize(A.max_level+1);
+  A.num_blocks[A.max_level] = opts.N/opts.nleaf;
+
   // if (opts.admis_kind == GEOMETRY) {
   //   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
   // }
