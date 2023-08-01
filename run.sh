@@ -18,47 +18,43 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
+export OMP_NUM_THREADS=1
 
-N=7680
+# Generate the points for the ELSES matrix.
+ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
+mol_folder=$ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1
+source_file=$mol_folder/C60_fcc2x2x2_20220727.xyz
+fcc_xml_file=C60_fcc.xml
 
-# Matrix size 7,680
-
-function generate_elses_config_file {
-    ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
-    exec_supercell=$ELSES_ROOT/make_supercell_C60_FCCs_w_noise/a.out
-    exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
-
-    if [ $N == 7680 ]; then
-        source elses_7680.sh
-    elif [ $N == 30720 ]; then
-        source elses_30720.sh
-    fi
-
-    # Generate the geometry file.
-    $exec_supercell $nx $ny $nz $source_file
-
-    # generate config.xml.
-    $exec_elses_xml_generate $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xml $ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1/C60_fcc2x2x2_20220727.xml
-
-    # copy config file into Hatrix root
-    cp $fcc_xml_file .
-    cp $xml_config_file .
-}
-
-generate_elses_config_file
+exec_supercell=$ELSES_ROOT/make_supercell_C60_FCCs_w_noise/a.out
+exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-# values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
-interval_start=0
-interval_end=2048
+for nx in 1; do
+    ny=1
+    nz=1
+    # Generate the xml file from the source geometry depenending on the number of repetitions specified.
+    $exec_supercell $nx $ny $nz $source_file
 
-mpirun -n 1 gdb --args ./bin/H2_construct --N $N \
-               --ndim 3 \
-               --nleaf 240 \
-               --kernel_func elses_c60 \
-               --kind_of_geometry elses_c60_geometry \
-               --admis_kind diagonal \
-               --geometry_file C60_fcc.xyz \
-               --param_1 $interval_start --param_2 $interval_end \
-               --use_nested_basis 1
+    cp C60_fcc.xyz $ELSES_ROOT/make_supercell_C60_FCCs_w_noise
+
+    # generate config.xml.
+    $exec_elses_xml_generate $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xml $fcc_xml_file
+
+    # Calcualte dimension of the resulting matrix.
+    N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
+
+    # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
+    interval_start=0
+    interval_end=2048
+    mpirun -n 1 ./bin/H2_construct --N $N \
+           --ndim 3 \
+           --nleaf 240 \
+           --kernel_func elses_c60 \
+           --kind_of_geometry elses_c60_geometry \
+           --admis_kind diagonal \
+           --geometry_file C60_fcc.xyz \
+           --param_1 $interval_start --param_2 $interval_end \
+           --use_nested_basis 1
+done
