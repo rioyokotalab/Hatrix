@@ -27,7 +27,8 @@ static const int BEGIN_PROW = 0, BEGIN_PCOL = 0;
 
 int BLACS_CONTEXT;
 
-int indxl2g(int indxloc, int nb, int iproc, int nprocs) {
+int
+indxl2g(int indxloc, int nb, int iproc, int nprocs) {
   return nprocs * nb * ((indxloc - 1) / nb) +
     (indxloc-1) % nb + ((nprocs + iproc) % nprocs) * nb + 1;
 }
@@ -56,7 +57,7 @@ public:
               &begin_prow, &begin_pcol, &BLACS_CONTEXT, &local_nrows, &INFO);
 
     try {
-      data.resize((size_t)local_nrows * (size_t)local_ncols);
+      data.resize((size_t)local_nrows * (size_t)local_ncols, 0);
     }
     catch (std::bad_alloc & exception) {
       std::cerr << "tried to allocate memory of size:  "
@@ -94,6 +95,19 @@ void dist_matvec(ScaLAPACK_dist_matrix_t& A, int A_row_offset, int A_col_offset,
           &INCB);
 }
 
+// sub(C) = beta * sub(C) + alpha * sub(A)
+void dist_add(ScaLAPACK_dist_matrix_t& A, int A_nrows, int A_ncols,
+              int A_row_offset, int A_col_offset,
+              const double alpha, const double beta,
+              ScaLAPACK_dist_matrix_t& C, int C_row_offset, int C_col_offset) {
+  const char TRANSA = 'N';
+  pdgeadd_(&TRANSA, &A_nrows, &A_ncols,
+           &alpha,
+           A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
+           &beta,
+           C.data.data(), &C_row_offset, &C_col_offset, C.DESC.data());
+}
+
 // i, j, level -> block numbers.
 Matrix
 generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
@@ -123,11 +137,33 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t&
 
   int64_t nblocks = A.num_blocks[A.max_level];
 
+  // Generate dense blocks and store them in the appropriate structure.
   for (int64_t i = 0; i < nblocks; ++i) {
     if (mpi_rank(i) == MPIRANK) {
       Matrix Aij = generate_p2p_interactions(i, i, A.max_level, opts, A);
+      A.D.insert(i, i, A.max_level, std::move(Aij));
     }
   }
+
+  double ALPHA = 1.0, BETA = 1.0;
+
+  // Accumulate admissible blocks from the large dist matrix.
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (i != j) {
+        int global_i = i * opts.nleaf + 1;
+        int global_j = j * opts.nleaf + 1;
+
+        dist_add(AY, opts.nleaf, opts.nleaf,
+                 global_i, 1,
+                 ALPHA, BETA,
+                 DENSE, global_i, global_j);
+      }
+    }
+  }
+
+
+
 }
 
 void construct_H2_matrix(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t& DENSE, const Args& opts) {
@@ -188,7 +224,8 @@ int main(int argc, char* argv[]) {
   double domain_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
-  std::cout << "Domain setup time: " << domain_time << "ms" << std::endl;
+  if (!MPIRANK)
+    std::cout << "Domain setup time: " << domain_time << "ms" << std::endl;
 
   auto start_construct = std::chrono::system_clock::now();
 
@@ -198,7 +235,6 @@ int main(int argc, char* argv[]) {
   // Making BLR for now.
   A.max_level = log2(opts.N/opts.nleaf);
   A.min_level = log2(opts.N/opts.nleaf);
-  std::cout << "max level: " << A.max_level << std::endl;
   A.num_blocks.resize(A.max_level+1);
   A.num_blocks[A.max_level] = opts.N/opts.nleaf;
 
@@ -209,34 +245,38 @@ int main(int argc, char* argv[]) {
   //   init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   // }
 
-  ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
-                                0, 0, BLACS_CONTEXT);
+  // scope the construction so the memory is deleted after construction.
+  {
+    ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
+                                  0, 0, BLACS_CONTEXT);
 #pragma omp parallel for collapse(2)
-  for (size_t i = 0; i < DENSE.local_nrows; ++i) {
-    for (size_t j = 0; j < DENSE.local_ncols; ++j) {
-      long int g_row = indxl2g(i + 1, SCALAPACK_BLOCK_SIZE, MYROW, MPIGRID[0]) + 1;
-      long int g_col = indxl2g(j + 1, SCALAPACK_BLOCK_SIZE, MYCOL, MPIGRID[1]) + 1;
-      double val;
-      get_elses_matrix_value(&g_row, &g_col, &val);
-      DENSE.set_local(i, j, val);
+    for (size_t i = 0; i < DENSE.local_nrows; ++i) {
+      for (size_t j = 0; j < DENSE.local_ncols; ++j) {
+        long int g_row = indxl2g(i + 1, SCALAPACK_BLOCK_SIZE, MYROW, MPIGRID[0]) + 1;
+        long int g_col = indxl2g(j + 1, SCALAPACK_BLOCK_SIZE, MYCOL, MPIGRID[1]) + 1;
+        double val;
+        get_elses_matrix_value(&g_row, &g_col, &val);
+        DENSE.set_local(i, j, val);
+      }
     }
-  }
 
-  ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, 0, 0, BLACS_CONTEXT),
-    VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, 0, 0, BLACS_CONTEXT);
+    construct_H2_matrix(A, DENSE, opts);
+
+    ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, 0, 0, BLACS_CONTEXT),
+      VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, 0, 0, BLACS_CONTEXT);
 
 #pragma omp parallel for
-  for (int i = 0; i < VECTOR_X.local_nrows; ++i) {
-    VECTOR_X.set_local(i, 0, dist(gen));
-    VECTOR_B.set_local(i, 0, 0);
+    for (int i = 0; i < VECTOR_X.local_nrows; ++i) {
+      VECTOR_X.set_local(i, 0, dist(gen));
+      VECTOR_B.set_local(i, 0, 0);
+    }
+
+    dist_matvec(DENSE, 1, 1, 1.0,
+                VECTOR_X, 1, 1,
+                0.0,
+                VECTOR_B, 1, 1);
+
   }
-
-  dist_matvec(DENSE, 1, 1, 1.0,
-              VECTOR_X, 1, 1,
-              0.0,
-              VECTOR_B, 1, 1);
-
-
 
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);
