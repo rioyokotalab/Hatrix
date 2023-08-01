@@ -33,7 +33,7 @@ exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-for nx in 10; do
+for nx in 4; do
     ny=1
     nz=1
     # Generate the xml file from the source geometry depenending on the number of repetitions specified.

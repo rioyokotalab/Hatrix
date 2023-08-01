@@ -95,58 +95,6 @@ void dist_matvec(ScaLAPACK_dist_matrix_t& A, int A_row_offset, int A_col_offset,
           &INCB);
 }
 
-// sub(C) = beta * sub(C) + alpha * sub(A)
-void dist_add(ScaLAPACK_dist_matrix_t& A, int A_nrows, int A_ncols,
-              int A_row_offset, int A_col_offset,
-              const double alpha, const double beta,
-              ScaLAPACK_dist_matrix_t& C, int C_row_offset, int C_col_offset) {
-  const char TRANSA = 'N';
-  pdgeadd_(&TRANSA, &A_nrows, &A_ncols,
-           &alpha,
-           A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
-           &beta,
-           C.data.data(), &C_row_offset, &C_col_offset, C.DESC.data());
-}
-
-void dist_svd_only_u(ScaLAPACK_dist_matrix_t& A, int A_nrows, int A_ncols,
-                     int A_row_offset, int A_col_offset,
-                     std::vector<double>& S_row,
-                     ScaLAPACK_dist_matrix_t& U, int U_row_offset, int U_col_offset) {
-  // Verify requirements for SCALAPACK.
-  assert(A.block_nrows == A.block_ncols);
-  assert((A_row_offset - 1) % A.block_nrows == 0);
-  assert((A_col_offset - 1) % A.block_ncols == 0);
-
-  // Verify memory requirements.
-  assert(S_row.size() == A_ncols);
-
-  int LWORK = -1;
-  int INFO;
-  const char JOB_U = 'V';
-  const char JOB_Vt = 'N';
-  std::vector<double> WORK(1);
-
-  // workspace query.
-  pdgesvd_(&JOB_U, &JOB_Vt,
-           &A_nrows, &A_ncols,
-           A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
-           S_row.data(),
-           U.data.data(), &U_row_offset, &U_col_offset, U.DESC.data(),
-           NULL, NULL, NULL, NULL,
-           WORK.data(), &LWORK, &INFO);
-
-  LWORK = WORK[0];
-  WORK.resize(LWORK, 0);
-
-  pdgesvd_(&JOB_U, &JOB_Vt,
-           &A_nrows, &A_ncols,
-           A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
-           S_row.data(),
-           U.data.data(), &U_row_offset, &U_col_offset, U.DESC.data(),
-           NULL, NULL, NULL, NULL,
-           WORK.data(), &LWORK, &INFO);
-}
-
 // i, j, level -> block numbers.
 Matrix
 generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
@@ -169,12 +117,9 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
   return dense;
 }
 
-void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t& DENSE,
-                         ScaLAPACK_dist_matrix_t& U, const Args& opts) {
-  ScaLAPACK_dist_matrix_t AY(opts.N, opts.nleaf, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
-                             BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
-
+void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
   int64_t nblocks = A.num_blocks[A.max_level];
+  int64_t block_size = opts.N / nblocks;
 
   // Generate dense blocks and store them in the appropriate structure.
   for (int64_t i = 0; i < nblocks; ++i) {
@@ -187,38 +132,80 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t&
   double ALPHA = 1.0, BETA = 1.0;
 
   // Accumulate admissible blocks from the large dist matrix.
-  for (int64_t i = 0; i < nblocks; ++i) {
+  for (int64_t i = MYROW; i < nblocks; i += MPIGRID[0]) { // row cylic distribution.
+    Matrix AY(opts.nleaf, opts.nleaf);
     for (int64_t j = 0; j < nblocks; ++j) {
-      if (i != j) {
-        int global_i = i * opts.nleaf + 1;
-        int global_j = j * opts.nleaf + 1;
 
-        dist_add(AY, opts.nleaf, opts.nleaf,
-                 global_i, 1,
-                 ALPHA, BETA,
-                 DENSE, global_i, global_j);
+      if (i != j) {
+#pragma omp parallel for collapse(2)
+        for (int64_t local_i = 0; local_i < block_size; ++local_i) {
+          for (int64_t local_j = 0; local_j < block_size; ++local_j) {
+            long int global_i = i * block_size + local_i + 1;
+            long int global_j = j * block_size + local_j + 1;
+            double value;
+            get_elses_matrix_value(&global_i, &global_j, &value);
+
+            AY(local_i, local_j) += value;
+          }
+        }
+      }
+    }
+
+    Matrix Ui, Si, _V; double error;
+    std::tie(Ui, Si, _V, error) = truncated_svd(AY, opts.max_rank);
+
+    A.U.insert(i, A.max_level, std::move(Ui));
+    A.US.insert(i, A.max_level, std::move(Si));
+  }
+
+  // Calculate the skeleton blocks.
+  for (int i = 0; i < nblocks; ++i) {
+    std::cout << "i: " << i << std::endl;
+    for (int j = 0; j < nblocks; ++j) {
+      // if (exists_and_admissible(A, i, j, A.max_level)) {i
+      if (i != j) {
+        // send U(j) to where S(i,j) exists.
+        if (mpi_rank(j) == MPIRANK) {
+          MPI_Request request;
+          Matrix& Uj = A.U(j, A.max_level);
+          MPI_Isend(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(i),
+                    j, MPI_COMM_WORLD, &request);
+        }
+      }
+    }
+
+
+    for (int j = 0; j < nblocks; ++j) {
+      // if (exists_and_admissible(A, i, j, A.max_level)) {
+      if (i != j) {
+        if (mpi_rank(i) == MPIRANK) {
+          MPI_Status status;
+          Matrix Uj(opts.nleaf, opts.max_rank);
+          MPI_Recv(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(j),
+                   j, MPI_COMM_WORLD, &status);
+          Matrix Aij = generate_p2p_interactions(i, j, A.max_level, opts, A);
+          Matrix S_block = matmul(matmul(A.U(i, A.max_level), Aij, true, false), Uj);
+          A.S.insert(i, j, A.max_level, std::move(S_block));
+        }
       }
     }
   }
-
-  // Calculate the shared bases.
-  for (int64_t block = 0; block < nblocks; ++block) {
-    std::vector<double> S_MEM(opts.nleaf);
-
-    int IOFFSET = opts.nleaf * block + 1;
-    dist_svd_only_u(AY, opts.nleaf, opts.nleaf,
-                    IOFFSET, 1,
-                    S_MEM,
-                    U,
-                    IOFFSET, 1);
-  }
 }
 
-void construct_H2_matrix(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t& DENSE, const Args& opts) {
-  ScaLAPACK_dist_matrix_t U(opts.N, opts.nleaf, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
-                            BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+static RowLevelMap
+generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Args& opts, const RowLevelMap& Uchild) {
+  RowLevelMap Ubig_parent;
 
-  generate_leaf_nodes(A, DENSE, U, opts);
+  return Ubig_parent;
+}
+
+void construct_H2_matrix(SymmetricSharedBasisMatrix& A, const Args& opts) {
+  generate_leaf_nodes(A, opts);
+  RowLevelMap Uchild = A.U;
+
+  for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
+    Uchild = generate_transfer_matrices(A, opts, Uchild);
+  }
 }
 
 
@@ -294,39 +281,39 @@ int main(int argc, char* argv[]) {
   //   init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   // }
 
-  // scope the construction so the memory is deleted after construction.
-  {
-    ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
-                                  BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+  construct_H2_matrix(A, opts);
 
-#pragma omp parallel for collapse(2)
-    for (size_t i = 0; i < DENSE.local_nrows; ++i) {
-      for (size_t j = 0; j < DENSE.local_ncols; ++j) {
-        long int g_row = indxl2g(i + 1, SCALAPACK_BLOCK_SIZE, MYROW, MPIGRID[0]) + 1;
-        long int g_col = indxl2g(j + 1, SCALAPACK_BLOCK_SIZE, MYCOL, MPIGRID[1]) + 1;
-        double val;
-        get_elses_matrix_value(&g_row, &g_col, &val);
-        DENSE.set_local(i, j, val);
-      }
-    }
+//   ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT),
+//     VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
 
-    construct_H2_matrix(A, DENSE, opts);
+//   // scope the construction so the memory is deleted after construction.
+//   {
+//     ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
+//                                   BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
 
-    ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT),
-      VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+// #pragma omp parallel for collapse(2)
+//     for (size_t i = 0; i < DENSE.local_nrows; ++i) {
+//       for (size_t j = 0; j < DENSE.local_ncols; ++j) {
+//         long int g_row = indxl2g(i + 1, SCALAPACK_BLOCK_SIZE, MYROW, MPIGRID[0]) + 1;
+//         long int g_col = indxl2g(j + 1, SCALAPACK_BLOCK_SIZE, MYCOL, MPIGRID[1]) + 1;
+//         double val;
+//         get_elses_matrix_value(&g_row, &g_col, &val);
+//         DENSE.set_local(i, j, val);
+//       }
+//     }
 
-#pragma omp parallel for
-    for (int i = 0; i < VECTOR_X.local_nrows; ++i) {
-      VECTOR_X.set_local(i, 0, dist(gen));
-      VECTOR_B.set_local(i, 0, 0);
-    }
+// #pragma omp parallel for
+//     for (int i = 0; i < VECTOR_X.local_nrows; ++i) {
+//       VECTOR_X.set_local(i, 0, dist(gen));
+//       VECTOR_B.set_local(i, 0, 0);
+//     }
 
-    dist_matvec(DENSE, 1, 1, 1.0,
-                VECTOR_X, 1, 1,
-                0.0,
-                VECTOR_B, 1, 1);
+//     dist_matvec(DENSE, 1, 1, 1.0,
+//                 VECTOR_X, 1, 1,
+//                 0.0,
+//                 VECTOR_B, 1, 1);
 
-  }
+//   }
 
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);
