@@ -33,7 +33,7 @@ exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-for nx in 1; do
+for nx in 10; do
     ny=1
     nz=1
     # Generate the xml file from the source geometry depenending on the number of repetitions specified.
@@ -50,10 +50,10 @@ for nx in 1; do
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
     interval_start=0
     interval_end=2048
-    mpirun -n 1 ./bin/H2_construct --N $N \
+    mpirun -n 16 ./bin/H2_construct --N $N \
            --ndim 3 \
            --nleaf 240 \
-           --max_rank 120 \
+           --max_rank 240 \
            --kernel_func elses_c60 \
            --kind_of_geometry elses_c60_geometry \
            --admis_kind diagonal \

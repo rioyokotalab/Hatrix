@@ -22,7 +22,7 @@ extern "C" {
 
 using namespace Hatrix;
 
-static const int SCALAPACK_BLOCK_SIZE = 60;
+static const int SCALAPACK_BLOCK_SIZE = 240;
 static const int BEGIN_PROW = 0, BEGIN_PCOL = 0;
 
 int BLACS_CONTEXT;
@@ -134,6 +134,17 @@ void dist_svd_only_u(ScaLAPACK_dist_matrix_t& A, int A_nrows, int A_ncols,
            U.data.data(), &U_row_offset, &U_col_offset, U.DESC.data(),
            NULL, NULL, NULL, NULL,
            WORK.data(), &LWORK, &INFO);
+
+  LWORK = WORK[0];
+  WORK.resize(LWORK, 0);
+
+  pdgesvd_(&JOB_U, &JOB_Vt,
+           &A_nrows, &A_ncols,
+           A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
+           S_row.data(),
+           U.data.data(), &U_row_offset, &U_col_offset, U.DESC.data(),
+           NULL, NULL, NULL, NULL,
+           WORK.data(), &LWORK, &INFO);
 }
 
 // i, j, level -> block numbers.
@@ -216,7 +227,7 @@ int main(int argc, char* argv[]) {
   Args opts(argc, argv);
   int N = opts.N;
 
-  assert(opts.nleaf % SCALAPACK_BLOCK_SIZE == 0);
+  assert(opts.nleaf == SCALAPACK_BLOCK_SIZE); // SVD for basis matrices throws a segfault if this is not true.
   assert(opts.N % opts.nleaf == 0);
   assert(opts.max_rank % SCALAPACK_BLOCK_SIZE == 0);
 
@@ -286,7 +297,8 @@ int main(int argc, char* argv[]) {
   // scope the construction so the memory is deleted after construction.
   {
     ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
-                                  0, 0, BLACS_CONTEXT);
+                                  BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+
 #pragma omp parallel for collapse(2)
     for (size_t i = 0; i < DENSE.local_nrows; ++i) {
       for (size_t j = 0; j < DENSE.local_ncols; ++j) {
@@ -300,8 +312,8 @@ int main(int argc, char* argv[]) {
 
     construct_H2_matrix(A, DENSE, opts);
 
-    ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, 0, 0, BLACS_CONTEXT),
-      VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, 0, 0, BLACS_CONTEXT);
+    ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT),
+      VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
 
 #pragma omp parallel for
     for (int i = 0; i < VECTOR_X.local_nrows; ++i) {
