@@ -20,7 +20,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/sameer.deshmukh/gitrepos/parsec/bu
 
 export OMP_PLACES=cores
 export OMP_PROC_BIND=close
-export OMP_NUM_THREADS=1
+export OMP_NUM_THREADS=32
 
 # Generate the points for the ELSES matrix.
 ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
@@ -53,6 +53,7 @@ for nx in 1; do
     mpirun -n 1 ./bin/H2_construct --N $N \
            --ndim 3 \
            --nleaf 240 \
+           --max_rank 120 \
            --kernel_func elses_c60 \
            --kind_of_geometry elses_c60_geometry \
            --admis_kind diagonal \

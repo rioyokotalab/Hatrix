@@ -108,6 +108,34 @@ void dist_add(ScaLAPACK_dist_matrix_t& A, int A_nrows, int A_ncols,
            C.data.data(), &C_row_offset, &C_col_offset, C.DESC.data());
 }
 
+void dist_svd_only_u(ScaLAPACK_dist_matrix_t& A, int A_nrows, int A_ncols,
+                     int A_row_offset, int A_col_offset,
+                     std::vector<double>& S_row,
+                     ScaLAPACK_dist_matrix_t& U, int U_row_offset, int U_col_offset) {
+  // Verify requirements for SCALAPACK.
+  assert(A.block_nrows == A.block_ncols);
+  assert((A_row_offset - 1) % A.block_nrows == 0);
+  assert((A_col_offset - 1) % A.block_ncols == 0);
+
+  // Verify memory requirements.
+  assert(S_row.size() == A_ncols);
+
+  int LWORK = -1;
+  int INFO;
+  const char JOB_U = 'V';
+  const char JOB_Vt = 'N';
+  std::vector<double> WORK(1);
+
+  // workspace query.
+  pdgesvd_(&JOB_U, &JOB_Vt,
+           &A_nrows, &A_ncols,
+           A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
+           S_row.data(),
+           U.data.data(), &U_row_offset, &U_col_offset, U.DESC.data(),
+           NULL, NULL, NULL, NULL,
+           WORK.data(), &LWORK, &INFO);
+}
+
 // i, j, level -> block numbers.
 Matrix
 generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
@@ -162,8 +190,17 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t&
     }
   }
 
+  // Calculate the shared bases.
+  for (int64_t block = 0; block < nblocks; ++block) {
+    std::vector<double> S_MEM(opts.nleaf);
 
-
+    int IOFFSET = opts.nleaf * block + 1;
+    dist_svd_only_u(AY, opts.nleaf, opts.nleaf,
+                    IOFFSET, 1,
+                    S_MEM,
+                    U,
+                    IOFFSET, 1);
+  }
 }
 
 void construct_H2_matrix(SymmetricSharedBasisMatrix& A, ScaLAPACK_dist_matrix_t& DENSE, const Args& opts) {
@@ -181,6 +218,7 @@ int main(int argc, char* argv[]) {
 
   assert(opts.nleaf % SCALAPACK_BLOCK_SIZE == 0);
   assert(opts.N % opts.nleaf == 0);
+  assert(opts.max_rank % SCALAPACK_BLOCK_SIZE == 0);
 
   {
     int provided;
