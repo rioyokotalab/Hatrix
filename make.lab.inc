@@ -19,6 +19,7 @@ RM           = rm -rf
 AR           = ar
 ARFLAGS      = -rv
 MV           = mv -f
+ELSES_OBJ    = ${ELSES_ROOT}/src/src.a ${ELSES_ROOT}/xmlf90-1.2g-elses/macros/lib/libflib.a
 
 %.o : %.cpp
 	$(CXX) $(CXXFLAGS) $< -c -o $@
