@@ -22,7 +22,6 @@ extern "C" {
 
 using namespace Hatrix;
 
-static const int SCALAPACK_BLOCK_SIZE = 240;
 static const int BEGIN_PROW = 0, BEGIN_PCOL = 0;
 
 int BLACS_CONTEXT;
@@ -31,6 +30,23 @@ int
 indxl2g(int indxloc, int nb, int iproc, int nprocs) {
   return nprocs * nb * ((indxloc - 1) / nb) +
     (indxloc-1) % nb + ((nprocs + iproc) % nprocs) * nb + 1;
+}
+
+int
+translate_rank_comm_world(int right_comm_rank, MPI_Comm right_comm) {
+  int left_rank[MPISIZE], right_rank[MPISIZE];
+  MPI_Group left_group, right_group;
+
+  MPI_Comm_group(MPI_COMM_WORLD, &left_group);
+  MPI_Comm_group(right_comm, &right_group);
+  for (int i = 0; i < MPISIZE; ++i) {
+    left_rank[i] = i;
+  }
+
+
+  MPI_Group_translate_ranks(left_group, MPISIZE, left_rank, right_group, right_rank);
+
+  return right_rank[right_comm_rank];
 }
 
 class ScaLAPACK_dist_matrix_t {
@@ -159,8 +175,8 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
   }
 
   // Calculate the skeleton blocks.
+  // TOD:: This is very slow. Somehow use gather.
   for (int i = 0; i < nblocks; ++i) {
-    std::cout << "i: " << i << std::endl;
     for (int j = 0; j < nblocks; ++j) {
       // if (exists_and_admissible(A, i, j, A.max_level)) {i
       if (i != j) {
@@ -214,9 +230,7 @@ int main(int argc, char* argv[]) {
   Args opts(argc, argv);
   int N = opts.N;
 
-  assert(opts.nleaf == SCALAPACK_BLOCK_SIZE); // SVD for basis matrices throws a segfault if this is not true.
   assert(opts.N % opts.nleaf == 0);
-  assert(opts.max_rank % SCALAPACK_BLOCK_SIZE == 0);
 
   {
     int provided;
