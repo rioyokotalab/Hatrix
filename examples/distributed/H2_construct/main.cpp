@@ -33,18 +33,26 @@ indxl2g(int indxloc, int nb, int iproc, int nprocs) {
 }
 
 int
-translate_rank_comm_world(int right_comm_rank, MPI_Comm right_comm) {
-  int left_rank[MPISIZE], right_rank[MPISIZE];
+translate_rank_comm_world(int num_ranks, int right_comm_rank, MPI_Comm right_comm) {
+  std::vector<int> left_rank(num_ranks), right_rank(num_ranks);
   MPI_Group left_group, right_group;
 
   MPI_Comm_group(MPI_COMM_WORLD, &left_group);
   MPI_Comm_group(right_comm, &right_group);
-  for (int i = 0; i < MPISIZE; ++i) {
+  for (int i = 0; i < num_ranks; ++i) {
     left_rank[i] = i;
   }
 
 
-  MPI_Group_translate_ranks(left_group, MPISIZE, left_rank, right_group, right_rank);
+  MPI_Group_translate_ranks(left_group, num_ranks, left_rank.data(),
+                            right_group, right_rank.data());
+
+  if (MPIRANK == 0) {
+    std::cout << "ranks: " << right_comm_rank <<  std::endl;
+    for (int i = 0; i < num_ranks; ++i) {
+      std::cout << right_rank[i] << " " << std::endl;
+    }
+  }
 
   return right_rank[right_comm_rank];
 }
@@ -175,33 +183,83 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
   }
 
   // Calculate the skeleton blocks.
-  // TOD:: This is very slow. Somehow use gather.
   for (int i = 0; i < nblocks; ++i) {
-    for (int j = 0; j < nblocks; ++j) {
-      // if (exists_and_admissible(A, i, j, A.max_level)) {i
-      if (i != j) {
-        // send U(j) to where S(i,j) exists.
-        if (mpi_rank(j) == MPIRANK) {
-          MPI_Request request;
-          Matrix& Uj = A.U(j, A.max_level);
-          MPI_Isend(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(i),
-                    j, MPI_COMM_WORLD, &request);
+    std::vector<double> Utemp_buffer(opts.nleaf * opts.max_rank * MPISIZE);
+
+    int p_blocks = nblocks / MPISIZE;
+
+    for (int p_block = 0; p_block < p_blocks; ++p_block) {
+      int j = MPISIZE * p_block + MYROW;
+
+      // send, recv
+      MPI_Gather(&A.U(j, A.max_level),
+                 A.U(j, A.max_level).numel(),
+                 MPI_DOUBLE,
+                 Utemp_buffer.data(),
+                 opts.nleaf * opts.max_rank,
+                 MPI_DOUBLE,
+                 mpi_rank(i),
+                 MPI_COMM_WORLD);
+
+      if (mpi_rank(i) == MPIRANK) {
+        for (int j = 0; j < MPISIZE; ++j) {
+          int real_j = p_block * MPISIZE + j;
+          if (i != j) {
+            Matrix temp = matmul(A.U(i, A.max_level),
+                                 generate_p2p_interactions(i, real_j, A.max_level, opts, A), true, false);
+
+            Matrix Uj(opts.nleaf, opts.max_rank);
+            array_copy(&Utemp_buffer[(opts.nleaf * opts.max_rank) * j], &Uj, Uj.numel());
+
+            auto S_block = matmul(temp, Uj);
+
+            A.S.insert(i, real_j, A.max_level, std::move(S_block));
+          }
         }
       }
     }
 
+    int leftover_nprocs = nblocks - p_blocks * MPISIZE;
 
-    for (int j = 0; j < nblocks; ++j) {
-      // if (exists_and_admissible(A, i, j, A.max_level)) {
-      if (i != j) {
+    // Leftover block group communication. Second condition is needed to limit
+    // the root process calculation to within the leftover processes?
+    if (p_blocks * MPISIZE < nblocks && mpi_rank(i) < leftover_nprocs) {
+      int j = MPISIZE * p_blocks + MYROW;
+
+      MPI_Comm MPI_ROW_I_PROCESSES;
+      int color = j < nblocks ? 1 : 0;
+      int key = MYROW;
+
+      MPI_Comm_split(MPI_COMM_WORLD,
+                     color, key,
+                     &MPI_ROW_I_PROCESSES);
+
+      if (j < nblocks && mpi_rank(i) < leftover_nprocs) {
+        int root_proc = translate_rank_comm_world(leftover_nprocs, mpi_rank(i), MPI_ROW_I_PROCESSES);
+        MPI_Gather(&A.U(j, A.max_level),
+                   A.U(j, A.max_level).numel(),
+                   MPI_DOUBLE,
+                   Utemp_buffer.data(),
+                   opts.nleaf * opts.max_rank,
+                   MPI_DOUBLE,
+                   root_proc,
+                   MPI_ROW_I_PROCESSES);
+
         if (mpi_rank(i) == MPIRANK) {
-          MPI_Status status;
-          Matrix Uj(opts.nleaf, opts.max_rank);
-          MPI_Recv(&Uj, Uj.rows * Uj.cols, MPI_DOUBLE, mpi_rank(j),
-                   j, MPI_COMM_WORLD, &status);
-          Matrix Aij = generate_p2p_interactions(i, j, A.max_level, opts, A);
-          Matrix S_block = matmul(matmul(A.U(i, A.max_level), Aij, true, false), Uj);
-          A.S.insert(i, j, A.max_level, std::move(S_block));
+          for (int j = 0; j < leftover_nprocs; ++j) {
+            int real_j = p_blocks * MPISIZE + j;
+            if (i != real_j) {
+              Matrix temp = matmul(A.U(i, A.max_level),
+                                   generate_p2p_interactions(i, real_j, A.max_level, opts, A), true, false);
+
+              Matrix Uj(opts.nleaf, opts.max_rank);
+              array_copy(&Utemp_buffer[(opts.nleaf * opts.max_rank) * j], &Uj, Uj.numel());
+
+              auto S_block = matmul(temp, Uj);
+
+              A.S.insert(i, real_j, A.max_level, std::move(S_block));
+            }
+          }
         }
       }
     }
