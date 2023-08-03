@@ -325,7 +325,7 @@ int main(int argc, char* argv[]) {
     const int64_t num_atoms_per_molecule = 60;
     init_elses_state();
     domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
-    //    domain.build_elses_tree(num_electrons_per_atom * num_atoms_per_molecule);
+    domain.build_elses_tree(num_electrons_per_atom * num_atoms_per_molecule);
   }
 
   auto stop_domain = std::chrono::system_clock::now();
@@ -333,7 +333,10 @@ int main(int argc, char* argv[]) {
     std::chrono::milliseconds>(stop_domain - start_domain).count();
 
   if (!MPIRANK)
-    std::cout << "Domain setup time: " << domain_time << "ms" << std::endl;
+    std::cout << "Domain setup time: " << domain_time << "ms"
+              << " leaf: " << opts.nleaf
+              << " ndim: " << opts.ndim
+              << std::endl;
 
   auto start_construct = std::chrono::system_clock::now();
 

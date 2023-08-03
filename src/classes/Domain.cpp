@@ -64,6 +64,8 @@ namespace Hatrix {
       std::cout << "invalid ndim : " << ndim << std::endl;
       abort();
     }
+    Xmin.resize(ndim);
+    Xmax.resize(ndim);
   }
 
   void Domain::generate_grid_particles() {
@@ -190,46 +192,203 @@ namespace Hatrix {
     return min_coord;
   }
 
-  void Domain::sort_elses_bodies(const int64_t molecule_size) {
-    // Bounding box of the root cell.
-    Cell root(ndim);
-    root.start_index = 0;
-    root.end_index = N;
-    for (int64_t axis = 0; axis < ndim; ++axis) {
-      auto axis_min = get_axis_min(root.start_index, root.end_index, axis);
-      auto axis_max = get_axis_max(root.start_index, root.end_index, axis);
-      root.radii[axis] = (axis_max - axis_min) / 2;
-      root.center[axis] = (axis_min + axis_max) / 2;
+  // Get integer indices for the given index X.
+  std::vector<int64_t>
+  Domain::int_index_3d(const std::vector<double>& X,
+                       const int64_t level) {
+    std::vector<int64_t> iX(ndim);
+    const std::vector<double>& R0 = tree_list[0].radii;
+    for (int axis = 0; axis < ndim; ++axis) {
+      const double dx = 2 * R0[axis] / pow(2, level);
+      iX[axis] = floor((X[axis] - Xmin[axis]) / dx);
     }
-    root.level = 0;
-    tree_list.push_back(root);
+    return iX;
+  }
 
+  int64_t Domain::hilbert_index(std::vector<int64_t>& iX, const int64_t level,
+                                const bool offset) {
+    int64_t level_offset = (((int64_t)1 << 3 * level) - 1) / 7; // level-wise offset for hilbert key.
+    // Preprocess for Hilbert
+    int64_t M = 1 << (level - 1);
+    for (int64_t Q=M; Q>1; Q>>=1) {
+      int64_t R = Q - 1;
+      for (int64_t d = 0; d < ndim; d++) {
+        if (iX[d] & Q) iX[0] ^= R;
+        else {
+          int64_t t = (iX[0] ^ iX[d]) & R;
+          iX[0] ^= t;
+          iX[d] ^= t;
+        }
+      }
+    }
+    for (int64_t d=1; d < ndim; d++) iX[d] ^= iX[d-1];
+    int64_t t = 0;
+    for (int64_t Q=M; Q>1; Q>>=1)
+      if (iX[2] & Q) t ^= Q - 1;
+    for (int64_t d=0; d < ndim; d++) iX[d] ^= t;
+
+    int64_t i = 0;
+    for (int64_t l = 0; l < level; l++) {
+      i |= (iX[2] & (int64_t)1 << l) << 2*l;
+      i |= (iX[1] & (int64_t)1 << l) << (2*l + 1);
+      i |= (iX[0] & (int64_t)1 << l) << (2*l + 2);
+    }
+    if (offset) i += level_offset;
+
+    return i;
+  }
+
+  // Code derived from https://github.com/exafmm/minimal/blob/master/3d/build_tree.h#L24
+  void Domain::sort_particles_and_build_tree(Particle *buffer, Particle* bodies,
+                                             const int64_t start_index, const int64_t end_index,
+                                             int64_t cell_list_index, std::vector<Cell>& cell_list,
+                                             int64_t nleaf, int64_t level, bool direction) {
+    Cell& cell = cell_list[cell_list_index];
+    cell.start_index = start_index;
+    cell.end_index = end_index;
+    cell.level = level;
+    cell.nchild = 0;
+    std::vector<int64_t> index_3d = int_index_3d(cell.center, level);
+    cell.key = hilbert_index(index_3d, level, false);
+
+    if (end_index - start_index <= nleaf) {
+      if (direction) {                      // copy data into the original array.
+        for (int64_t i = start_index; i < end_index; ++i) {
+          buffer[i].coords = bodies[i].coords;
+          buffer[i].value = bodies[i].value;
+        }
+      }
+      return;
+    }
+
+    int domain_divs = pow(2, ndim); // number of divisions of the domain.
+    std::vector<int64_t>size(domain_divs, 0);
+    std::vector<double> x(ndim);
+
+    for (int64_t i = start_index; i < end_index; ++i) {
+      x = bodies[i].coords;
+      int64_t octant = (x[0] > cell.center[0]) +
+        ((x[1] > cell.center[1]) << 1) +
+        ((x[2] > cell.center[2]) << 2);
+      size[octant]++;
+    }
+
+    // Obtain the offsets for each octant from the number of particles in 'size'.
+    int64_t offset = start_index;
+    std::vector<int64_t> offsets(domain_divs, 0), counter(domain_divs, 0);
+    for (int i = 0; i < domain_divs; ++i) {
+      offsets[i] = offset;
+      offset += size[i];
+      if (size[i]) { cell.nchild++; }
+    }
+
+    // Sort bodies by the octant/quadrant that they belong to.
+    counter = offsets;
+    for (int64_t i = start_index; i < end_index; ++i) {
+      x = bodies[i].coords;
+      int64_t octant = (x[0] > cell.center[0]) +
+        ((x[1] > cell.center[1]) << 1) +
+        ((x[2] > cell.center[2]) << 2);
+      // Copy this particle to its correct location in the buffer.
+      buffer[counter[octant]].coords = bodies[i].coords;
+      buffer[counter[octant]].value = bodies[i].value;
+      counter[octant]++;        // move to the next location in the sorted octant/quadrant.
+    }
+
+    // std::cout << "nchild: " << cell.nchild << std::endl;
+    for (int i = 0; i < cell.nchild; ++i) { cell_list.push_back(Cell(ndim));}
+    Cell& first_child = cell_list[cell_list.size() - cell.nchild];
+    cell.child = &first_child;
+
+    int c = 0;
+    int64_t child_index = cell_list.size() - cell.nchild;
+    for (int i = 0; i < domain_divs; ++i) {
+      if (size[i]) {
+        Cell& child = cell_list[child_index];
+        std::vector<double> child_center(ndim);
+        double child_radius = cell.radius / 2;
+
+        for (int axis = 0; axis < ndim; ++axis) {
+          child_center[axis] = cell.center[axis];
+          child_center[axis] += child_radius * (((i & 1 << axis) >> axis) * 2 - 1);
+        }
+        child.center = child_center;
+        child.radius = child_radius;
+
+        sort_particles_and_build_tree(bodies, buffer,
+                                      offsets[i], offsets[i] + size[i],
+                                      child_index, cell_list,
+                                      nleaf, level+1, !direction);
+        child_index++;
+        c++;
+      }
+    }
+  }
+
+  void Domain::sort_elses_bodies(const int64_t molecule_size) {
     // Subdivide the particles (atoms) into molecules. Each molecule contains
     // molecule_size atoms.
     assert(N % molecule_size == 0);
-
     const int64_t nmolecules = N / molecule_size;
+
+    tree_list.reserve(nmolecules * log(nmolecules));
+
+    // Bounding box of the root cell.
+    Cell root(ndim);
+    root.start_index = 0;
+    root.end_index = nmolecules;
+    root.radius = 0;
+    for (int64_t axis = 0; axis < ndim; ++axis) {
+      auto axis_min = get_axis_min(0, N, axis);
+      auto axis_max = get_axis_max(0, N, axis);
+
+      Xmin[axis] = axis_min;
+      Xmax[axis] = axis_max;
+
+      root.radii[axis] = std::abs(axis_max - axis_min) / 2;
+      root.center[axis] = (axis_min + axis_max) / 2;
+      root.radius = std::max(root.radii[axis] - axis_min, root.radius);
+      root.radius = std::max(axis_max - root.radii[axis], root.radius);
+    }
+
+    root.level = 0;
+    tree_list.push_back(root);
+
 
     // Each vector within this vector contains co-ordinates that correspond to
     // the center of each molecule.
-    std::vector<std::vector<double> > molecule_centers;
-
-    std::cout << "begin mol center calc.\n";
+    std::vector<Particle> molecule_centers;
 
     for (int64_t mol = 0; mol < nmolecules; ++mol) {
-      std::vector<double> mol_center(ndim);
+      Particle mol_center(ndim);
       auto start_index = mol * molecule_size;
       auto end_index = mol * molecule_size + molecule_size;
 
-      for (int64_t axis = 0; axis < ndim; ++axis) {
+      for (int axis = 0; axis < ndim; ++axis) {
         auto axis_min = get_axis_min(start_index, end_index, axis);
         auto axis_max = get_axis_max(start_index, end_index, axis);
-        mol_center[axis] = (axis_min + axis_max) / 2;
+        mol_center.coords[axis] = (axis_min + axis_max) / 2;
       }
       molecule_centers.push_back(mol_center);
     }
 
-    // Partition the molecules using Hilbert indexing.
+    // Sort the particles according to octants using an out-of-place sort (something like a merge sort).
+    // Along with sorting, also generate cells that correspond to ranges of sorted particles and assign
+    // various parameters such as start and stop index, hilbert index and level.
+    const int64_t nmolecules_per_box = 1;
+    std::vector<Particle> buffer = molecule_centers;
+    sort_particles_and_build_tree(buffer.data(), molecule_centers.data(),
+                                  0, nmolecules,
+                                  0, tree_list,
+                                  nmolecules_per_box, 0, false);
+
+    // Partition the molecules using Hilbert indexing and sort them.
+    int64_t max_level = 0;
+    for (auto cell : tree_list) { max_level = std::max(max_level, cell.level); }
+
+    // Sort the molecules based on the hilbert index generated during the tree generation.
+
+    // Sort the electrons (actual Particles in the Domain) based on the sorted molecules.
   }
 
   void Domain::build_elses_tree(const int64_t molecule_size) {

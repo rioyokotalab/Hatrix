@@ -23,7 +23,7 @@ export OMP_PROC_BIND=close
 export OMP_NUM_THREADS=32
 
 # Generate the points for the ELSES matrix.
-ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
+export ELSES_ROOT=/home/sameer.deshmukh/ELSES_mat_calc-master
 mol_folder=$ELSES_ROOT/sample/sample_non_geno/C60_fcc2x2x2_disorder_expand_1x1x1
 source_file=$mol_folder/C60_fcc2x2x2_20220727.xyz
 fcc_xml_file=C60_fcc.xml
@@ -33,7 +33,7 @@ exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-for nx in 8; do
+for nx in 1; do
     ny=1
     nz=1
     # Generate the xml file from the source geometry depenending on the number of repetitions specified.
@@ -42,18 +42,21 @@ for nx in 8; do
     cp C60_fcc.xyz $ELSES_ROOT/make_supercell_C60_FCCs_w_noise
 
     # generate config.xml.
-    $exec_elses_xml_generate $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xml $fcc_xml_file
+    $exec_elses_xml_generate \
+        $ELSES_ROOT/make_supercell_C60_FCCs_w_noise/generate.xml \
+        $fcc_xml_file
 
     # Calcualte dimension of the resulting matrix.
     N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
     NLEAF=240
     MAX_RANK=100
+    NDIM=3
 
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
     interval_start=0
     interval_end=2048
-    mpirun -n 16 ./bin/H2_construct --N $N \
-           --ndim 3 \
+    mpirun -n 1 ./bin/H2_construct --N $N \
+           --ndim $NDIM \
            --nleaf $NLEAF \
            --max_rank $MAX_RANK \
            --kernel_func elses_c60 \

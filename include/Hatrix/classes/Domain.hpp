@@ -8,12 +8,18 @@
 namespace Hatrix {
   class Domain {
   public:
-    std::vector<Hatrix::Particle> particles;
-    Cell tree;
-    std::vector<Cell> tree_list;
     int64_t N, ndim;
+    Cell tree;
+
+    std::vector<Hatrix::Particle> particles;
+    std::vector<Cell> tree_list;
+    std::vector<double> Xmin, Xmax; // store the min and max co-ordinates of the whole domain.
 
   private:
+    std::vector<int64_t> int_index_3d(const std::vector<double>& X,
+                                      const int64_t level);
+    int64_t hilbert_index(std::vector<int64_t>& iX, const int64_t level,
+                          const bool offset = true);
     void
     orb_split(Cell& cell,
               const int64_t pstart,
@@ -31,6 +37,10 @@ namespace Hatrix {
     double get_axis_min(int64_t start_index, int64_t end_index, int64_t axis);
     double get_axis_max(int64_t start_index, int64_t end_index, int64_t axis);
     void sort_elses_bodies(const int64_t molecule_size);
+    void sort_particles_and_build_tree(Particle *buffer, Particle* bodies,
+                                       int64_t start_index, int64_t end_index,
+                                       int64_t cell_list_index, std::vector<Cell>& cell_list,
+                                       int64_t nleaf, int64_t level, bool direction);
   public:
     Domain(int64_t N, int64_t ndim);
     void generate_circular_particles(double min_val, double max_val);
