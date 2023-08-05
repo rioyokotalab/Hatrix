@@ -206,7 +206,8 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
           int real_j = p_block * MPISIZE + j;
           if (i != j) {
             Matrix temp = matmul(A.U(i, A.max_level),
-                                 generate_p2p_interactions(i, real_j, A.max_level, opts, A), true, false);
+                                 generate_p2p_interactions(i, real_j, A.max_level, opts, A),
+                                 true, false);
 
             Matrix Uj(opts.nleaf, opts.max_rank);
             array_copy(&Utemp_buffer[(opts.nleaf * opts.max_rank) * j], &Uj, Uj.numel());
@@ -250,7 +251,8 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
             int real_j = p_blocks * MPISIZE + j;
             if (i != real_j) {
               Matrix temp = matmul(A.U(i, A.max_level),
-                                   generate_p2p_interactions(i, real_j, A.max_level, opts, A), true, false);
+                                   generate_p2p_interactions(i, real_j, A.max_level, opts, A),
+                                   true, false);
 
               Matrix Uj(opts.nleaf, opts.max_rank);
               array_copy(&Utemp_buffer[(opts.nleaf * opts.max_rank) * j], &Uj, Uj.numel());
@@ -267,7 +269,8 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
 }
 
 static RowLevelMap
-generate_transfer_matrices(SymmetricSharedBasisMatrix& A, const Args& opts, const RowLevelMap& Uchild) {
+generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
+                           const Args& opts, const RowLevelMap& Uchild) {
   RowLevelMap Ubig_parent;
 
   return Ubig_parent;
@@ -305,6 +308,8 @@ int main(int argc, char* argv[]) {
   std::mt19937 gen(MPIRANK);
   std::uniform_real_distribution<double> dist(0, 1);
 
+  SymmetricSharedBasisMatrix A;
+
   // Init domain decomposition for H2 matrix using dual tree traversal.
   auto start_domain = std::chrono::system_clock::now();
   Domain domain(opts.N, opts.ndim);
@@ -325,7 +330,8 @@ int main(int argc, char* argv[]) {
     const int64_t num_atoms_per_molecule = 60;
     init_elses_state();
     domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
-    domain.build_elses_tree(num_electrons_per_atom * num_atoms_per_molecule);
+    A.max_level = domain.build_elses_tree(num_electrons_per_atom * num_atoms_per_molecule);
+    A.min_level = 0;
   }
 
   auto stop_domain = std::chrono::system_clock::now();
@@ -341,13 +347,16 @@ int main(int argc, char* argv[]) {
   auto start_construct = std::chrono::system_clock::now();
 
   int64_t construct_max_rank;
-  SymmetricSharedBasisMatrix A;
+
 
   // Making BLR for now.
-  A.max_level = log2(opts.N/opts.nleaf);
-  A.min_level = log2(opts.N/opts.nleaf);
+
   A.num_blocks.resize(A.max_level+1);
   A.num_blocks[A.max_level] = opts.N/opts.nleaf;
+  init_geometry_admis(A, domain, opts);
+
+  A.print_structure();
+  A.print_Csp(A.max_level);
 
   // if (opts.admis_kind == GEOMETRY) {
   //   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
@@ -356,7 +365,7 @@ int main(int argc, char* argv[]) {
   //   init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   // }
 
-  construct_H2_matrix(A, opts);
+  // construct_H2_matrix(A, opts);
 
 //   ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT),
 //     VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);

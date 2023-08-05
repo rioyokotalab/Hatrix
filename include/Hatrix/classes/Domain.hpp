@@ -16,7 +16,14 @@ namespace Hatrix {
     std::vector<double> Xmin, Xmax; // store the min and max co-ordinates of the whole domain.
 
   private:
+    int64_t build_bottom_up_binary_tree(const int64_t molecule_size);
+
+    int64_t level_offset(int64_t level);
+    int64_t get_hilbert_id_child(int64_t hilbert_key);
+    int64_t get_level(int64_t hilbert_key);
+
     std::vector<int64_t> int_index_3d(const std::vector<double>& X,
+                                      const std::vector<Cell>& cell_list,
                                       const int64_t level);
     int64_t hilbert_index(std::vector<int64_t>& iX, const int64_t level,
                           const bool offset = true);
@@ -53,7 +60,7 @@ namespace Hatrix {
 
     // Sort bodies using Hilbert curves. Specialized for ELSES blocks. Then generate a
     // tree with near and far blocks.
-    void build_elses_tree(const int64_t molecule_size);
+    int64_t build_elses_tree(const int64_t molecule_size);
 
     void print_file(std::string file_name);
 

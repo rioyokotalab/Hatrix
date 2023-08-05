@@ -3,6 +3,10 @@
 #include <iostream>
 
 namespace Hatrix {
+  Particle::Particle() {
+    value = -1;
+  }
+
   Particle::Particle(int64_t ndim) {
     coords.resize(ndim);
     value = -1;
