@@ -1,7 +1,7 @@
 #!/bin/bash
 #YBATCH -r epyc-7502_8
 #SBATCH -N 1
-#SBATCH -J H2_gsl
+#SBATCH -J BLR2_construct
 #SBATCH --time=24:00:00
 
 set -e
@@ -33,10 +33,11 @@ exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-for nx in 1 2 4 8 16; do
+for N in 2048 4096 8192 16384 32768 131072 262144 524288; do
+    nx=1
     ny=1
     nz=1
-    # Generate the xml file from the source geometry depenending on the number of repetitions specified.
+# Generate the xml file from the source geometry depenending on the number of repetitions specified.
     $exec_supercell $nx $ny $nz $source_file
 
     cp C60_fcc.xyz $ELSES_ROOT/make_supercell_C60_FCCs_w_noise
@@ -47,23 +48,29 @@ for nx in 1 2 4 8 16; do
         $fcc_xml_file
 
     # Calcualte dimension of the resulting matrix.
-    N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
-    NLEAF=240
-    MAX_RANK=100
-    NDIM=3
+    # N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
+    # N=2048
+    for MAX_RANK in 30; do
+        NLEAF=128
+        NDIM=2
+        KERNEL_FUNC=laplace
 
-    # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
-    interval_start=0
-    interval_end=2048
-    mpirun -n 1 ./bin/H2_construct --N $N \
-           --ndim $NDIM \
-           --nleaf $NLEAF \
-           --max_rank $MAX_RANK \
-           --kernel_func elses_c60 \
-           --kind_of_geometry elses_c60_geometry \
-           --admis_kind geometry \
-           --admis 0.2 \
-           --geometry_file C60_fcc.xyz \
-           --param_1 $interval_start --param_2 $interval_end \
-           --use_nested_basis 1
+        # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
+        # interval_start=0
+        # interval_end=2048
+
+        # Laplace kernel paramters
+        p1=1e-9
+        mpirun -n 16 ./bin/H2_construct --N $N \
+               --ndim $NDIM \
+               --nleaf $NLEAF \
+               --max_rank $MAX_RANK \
+               --kernel_func $KERNEL_FUNC \
+               --kind_of_geometry grid \
+               --admis_kind geometry \
+               --admis 0.7 \
+               --geometry_file C60_fcc.xyz \
+               --param_1 $p1 \
+               --use_nested_basis 0
+    done
 done

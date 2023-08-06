@@ -2,6 +2,7 @@
 #include <string>
 #include <fstream>
 #include <algorithm>
+#include <iomanip>
 #include <random>
 #include <cassert>
 
@@ -86,22 +87,94 @@ namespace Hatrix {
       for (int64_t i = 0; i < sides[0]; ++i) {
         std::vector<double> point(ndim);
         point[0] = i * space_0;
-        particles[i] = Hatrix::Particle(point, 0);
+        particles[i] = Hatrix::Particle(point, i);
       }
     }
     else if (ndim == 2) {
-      double space_0 = 1.0 / sides[0], space_1 = 1.0 / sides[1];
-      for (int64_t i = 0; i < sides[0]; ++i) {
-        for (int64_t j = 0; j < sides[1]; ++j) {
-          std::vector<double> point(ndim);
-          point[0] = i * space_0;
-          point[1] = j * space_1;
-          particles[i + j * sides[0]] = Hatrix::Particle(point, 0);
+      // Generate a uniform grid of 'N' points.
+      int64_t M = ceil(N / sqrt(N));
+      int64_t Q = N / M;
+      int count = 0;
+      for (int64_t i = 0; i < M; ++i) {
+        for (int64_t j = 0; j < Q; ++j) {
+          if ((i+1) * (j+1) <= N) {
+            Hatrix::Particle p({(double)i/M, (double)j/Q}, count);
+            particles[count] = p;
+            count++;
+          }
         }
       }
     }
     else if (ndim == 3) {
-      abort();
+      // Generate a unit cube mesh with N points around the surface
+      const int64_t mlen = (int64_t)ceil((double)N / 6.);
+      const double alen = std::sqrt((double)mlen);
+      const int64_t m = (int64_t)std::ceil(alen);
+      const int64_t n = (int64_t)std::ceil((double)mlen / m);
+
+      const double seg_fv = 1. / ((double)m - 1);
+      const double seg_fu = 1. / (double)n;
+      const double seg_sv = 1. / ((double)m + 1);
+      const double seg_su = 1. / ((double)n + 1);
+
+      for (int64_t i = 0; i < N; i++) {
+        const int64_t face = i / mlen;
+        const int64_t ii = i - face * mlen;
+        const int64_t x = ii / m;
+        const int64_t y = ii - x * m;
+        const int64_t x2 = y & 1;
+
+        double u, v;
+        double px, py, pz;
+
+        switch (face) {
+        case 0: // POSITIVE X
+          v = y * seg_fv;
+          u = (0.5 * x2 + x) * seg_fu;
+          px = 1.;
+          py = 2. * v - 1.;
+          pz = -2. * u + 1.;
+          break;
+        case 1: // NEGATIVE X
+          v = y * seg_fv;
+          u = (0.5 * x2 + x) * seg_fu;
+          px = -1.;
+          py = 2. * v - 1.;
+          pz = 2. * u - 1.;
+          break;
+        case 2: // POSITIVE Y
+          v = (y + 1) * seg_sv;
+          u = (0.5 * x2 + x + 1) * seg_su;
+          px = 2. * u - 1.;
+          py = 1.;
+          pz = -2. * v + 1.;
+          break;
+        case 3: // NEGATIVE Y
+          v = (y + 1) * seg_sv;
+          u = (0.5 * x2 + x + 1) * seg_su;
+          px = 2. * u - 1.;
+          py = -1.;
+          pz = 2. * v - 1.;
+          break;
+        case 4: // POSITIVE Z
+          v = y * seg_fv;
+          u = (0.5 * x2 + x) * seg_fu;
+          px = 2. * u - 1.;
+          py = 2. * v - 1.;
+          pz = 1.;
+          break;
+        case 5: // NEGATIVE Z
+          v = y * seg_fv;
+          u = (0.5 * x2 + x) * seg_fu;
+          px = -2. * u + 1.;
+          py = 2. * v - 1.;
+          pz = -1.;
+          break;
+        }
+
+        const double value = i;
+        particles[i] = Hatrix::Particle(px, py, pz, value);
+      }
     }
   }
 
@@ -119,12 +192,15 @@ namespace Hatrix {
       // std::random_device rd;  // Will be used to obtain a seed for the random number engine
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
+
       for (int64_t i = 0; i < N; ++i) {
         double theta = (i * 2.0 * M_PI) / N ;
-        double x = radius * cos(theta);
-        double y = radius * sin(theta);
+        Particle p(ndim);
+        p.coords[0] = radius * cos(theta);
+        p.coords[1] = radius * sin(theta);
+        p.value = i;
 
-        particles.emplace_back(Hatrix::Particle(x, y, min_val + (double(i) / double(range))));
+        particles.emplace_back(p);
       }
     }
     else if (ndim == 3) {
@@ -206,33 +282,36 @@ namespace Hatrix {
     return iX;
   }
 
-  int64_t Domain::hilbert_index(std::vector<int64_t>& iX, const int64_t level,
-                                const bool offset) {
+  int64_t
+  Domain::hilbert_index(std::vector<int64_t>& iX,
+                        const int64_t level,
+                        const bool offset) {
     int64_t level_offset = (((int64_t)1 << 3 * level) - 1) / 7; // level-wise offset for hilbert key.
     // Preprocess for Hilbert
-    int64_t M = 1 << (level - 1);
-    for (int64_t Q=M; Q>1; Q>>=1) {
-      int64_t R = Q - 1;
-      for (int64_t d = 0; d < ndim; d++) {
-        if (iX[d] & Q) iX[0] ^= R;
-        else {
-          int64_t t = (iX[0] ^ iX[d]) & R;
-          iX[0] ^= t;
-          iX[d] ^= t;
-        }
-      }
-    }
-    for (int64_t d=1; d < ndim; d++) iX[d] ^= iX[d-1];
-    int64_t t = 0;
-    for (int64_t Q=M; Q>1; Q>>=1)
-      if (iX[2] & Q) t ^= Q - 1;
-    for (int64_t d=0; d < ndim; d++) iX[d] ^= t;
+    // int64_t M = 1 << (level - 1);
+    // for (int64_t Q=M; Q>1; Q>>=1) {
+    //   int64_t R = Q - 1;
+    //   for (int64_t d = 0; d < ndim; d++) {
+    //     if (iX[d] & Q) iX[0] ^= R;
+    //     else {
+    //       int64_t t = (iX[0] ^ iX[d]) & R;
+    //       iX[0] ^= t;
+    //       iX[d] ^= t;
+    //     }
+    //   }
+    // }
+    // for (int64_t d=1; d < ndim; d++) iX[d] ^= iX[d-1];
+    // int64_t t = 0;
+    // for (int64_t Q=M; Q>1; Q>>=1)
+    //   if (iX[2] & Q) t ^= Q - 1;
+    // for (int64_t d=0; d < ndim; d++) iX[d] ^= t;
 
+    // Just generate the morton index.
     int64_t i = 0;
     for (int64_t l = 0; l < level; l++) {
-      i |= (iX[2] & (int64_t)1 << l) << 2*l;
-      i |= (iX[1] & (int64_t)1 << l) << (2*l + 1);
-      i |= (iX[0] & (int64_t)1 << l) << (2*l + 2);
+      for (int axis = 0; axis < ndim; ++axis) {
+        i |= (iX[ndim - axis - 1] & (int64_t)1 << l) << (2*l + axis);
+      }
     }
     if (offset) i += level_offset;
 
@@ -240,12 +319,13 @@ namespace Hatrix {
   }
 
   // Code derived from https://github.com/exafmm/minimal/blob/master/3d/build_tree.h#L24
-  void Domain::sort_particles_and_build_tree(Particle *buffer, Particle* bodies,
-                                             const int64_t start_index, const int64_t end_index,
-                                             int64_t cell_list_index,
-                                             std::vector<Cell>& cell_list,
-                                             int64_t nleaf, int64_t level,
-                                             bool direction) {
+  void
+  Domain::sort_particles_and_build_tree(Particle *buffer, Particle* bodies,
+                                        const int64_t start_index, const int64_t end_index,
+                                        int64_t cell_list_index,
+                                        std::vector<Cell>& cell_list,
+                                        int64_t nleaf, int64_t level,
+                                        bool direction) {
     Cell& cell = cell_list[cell_list_index];
     cell.start_index = start_index;
     cell.end_index = end_index;
@@ -253,6 +333,7 @@ namespace Hatrix {
     cell.nchild = 0;
     std::vector<int64_t> index_3d = int_index_3d(cell.center, cell_list, level);
     cell.key = hilbert_index(index_3d, level, false);
+
 
     if (end_index - start_index <= nleaf) {
       if (direction) {                      // copy data into the original array.
@@ -270,9 +351,10 @@ namespace Hatrix {
 
     for (int64_t i = start_index; i < end_index; ++i) {
       x = bodies[i].coords;
-      int64_t octant = (x[0] > cell.center[0]) +
-        ((x[1] > cell.center[1]) << 1) +
-        ((x[2] > cell.center[2]) << 2);
+      int64_t octant = 0;
+      for (int axis = 0; axis < ndim; ++axis) {
+        octant += (x[axis] > cell.center[axis]) << axis;
+      }
       size[octant]++;
     }
 
@@ -289,17 +371,26 @@ namespace Hatrix {
     counter = offsets;
     for (int64_t i = start_index; i < end_index; ++i) {
       x = bodies[i].coords;
-      int64_t octant = (x[0] > cell.center[0]) +
-        ((x[1] > cell.center[1]) << 1) +
-        ((x[2] > cell.center[2]) << 2);
+      int64_t octant = 0;
+      for (int axis = 0; axis < ndim; ++axis) {
+        octant += (x[axis] > cell.center[axis]) << axis;
+      }
       // Copy this particle to its correct location in the buffer.
       buffer[counter[octant]].coords = bodies[i].coords;
       buffer[counter[octant]].value = bodies[i].value;
       counter[octant]++;        // move to the next location in the sorted octant/quadrant.
     }
 
+    // std::cout << "level: " << level << " size: ";
+    // for (int ax = 0; ax < domain_divs; ++ax) {
+    //   std::cout << size[ax] << " ";
+    // }
+    // std::cout << std::endl;
+
     for (int i = 0; i < cell.nchild; ++i) { cell_list.push_back(Cell(ndim));}
     Cell& first_child = cell_list[cell_list.size() - cell.nchild];
+    const Cell& parent = cell_list[cell_list_index];
+
     cell.child = &first_child;
 
     int c = 0;
@@ -308,10 +399,10 @@ namespace Hatrix {
       if (size[i]) {
         Cell& child = cell_list[child_index];
         std::vector<double> child_center(ndim);
-        double child_radius = cell.radius / 2;
+        double child_radius = parent.radius / 2;
 
         for (int axis = 0; axis < ndim; ++axis) {
-          child_center[axis] = cell.center[axis];
+          child_center[axis] = parent.center[axis];
           child_center[axis] += child_radius * (((i & 1 << axis) >> axis) * 2 - 1);
         }
         child.center = child_center;
@@ -352,7 +443,8 @@ namespace Hatrix {
     return (hilbert_key - level_offset(level)) * 8 + level_offset(level+1);
   }
 
-  void Domain::sort_elses_bodies(const int64_t molecule_size) {
+  void
+  Domain::sort_elses_bodies(const int64_t molecule_size) {
     // Subdivide the particles (atoms) into molecules. Each molecule contains
     // molecule_size atoms.
     assert(N % molecule_size == 0);
@@ -496,8 +588,8 @@ namespace Hatrix {
     }
   }
 
-  int64_t Domain::build_bottom_up_binary_tree(const int64_t molecule_size) {
-    int64_t height = (int64_t)std::log2((double)N / (double)molecule_size);
+  int64_t Domain::build_bottom_up_binary_tree(const int64_t nleaf) {
+    int64_t height = (int64_t)std::log2((double)N / (double)nleaf);
     const int64_t leaf_ncells = pow(2, height);
     tree_list.resize(leaf_ncells * 2 - 1, Cell(ndim));
 
@@ -511,10 +603,10 @@ namespace Hatrix {
 
         if (level == height) {  // leaf node directly from particles.
           cell.nchild = 0;
-          cell.start_index = node * molecule_size;
-          cell.end_index = cell.start_index + molecule_size;
+          cell.start_index = node * nleaf;
+          cell.end_index = cell.start_index + nleaf;
         }
-        else {                  // non-leaf node from adjacent lower nodes.
+        else {                  // non-nleaf node from adjacent lower nodes.
           cell.nchild = 2;
           const int64_t child1_id = (pow(2, level+1) - 1) + node * 2;
           const int64_t child2_id = (pow(2, level+1) - 1) + node * 2 + 1;
@@ -532,12 +624,10 @@ namespace Hatrix {
           const double X_max = get_axis_max(cell.start_index, cell.end_index, axis);
 
           cell.center[axis] = (X_min + X_max) / 2;
-          cell.radii[axis] = (X_max - X_min) / 2;
+          cell.radii[axis] = std::abs(X_max - X_min) / 2;
           cell.radius = std::max(cell.radius, std::abs(cell.radius - X_min));
           cell.radius = std::max(cell.radius, std::abs(X_max - cell.radius));
         }
-
-        std::cout << std::endl;
       }
     }
 
@@ -551,6 +641,71 @@ namespace Hatrix {
 
     return tree_height;
   }
+
+  void
+  Domain::sector_sort(const int64_t nleaf) {
+
+  }
+
+  void Domain::cardinal_sort_and_cell_generation(const int64_t nleaf) {
+    int64_t max_level = log2(N / nleaf);
+
+    for (int64_t level = 0; level <= max_level; ++level) {
+      int64_t nblocks = pow(2, level);
+      int64_t split = N / nblocks;
+      for (int64_t node = 0; node < nblocks; ++node) {
+        int64_t start_index = node * split;
+        int64_t end_index = (node + 1) * split;
+
+        Cell cell(ndim);
+
+        cell.start_index = start_index;
+        cell.end_index = end_index;
+        cell.level = level;
+        cell.key = node;
+
+        // Find the longest axis
+        int longest_axis = 0;
+        double longest_axis_len = std::numeric_limits<double>::min();
+        // std::cout << "\t";
+        for (int axis = 0; axis < ndim; ++axis) {
+          double min_c = std::numeric_limits<double>::max(),
+            max_c = std::numeric_limits<double>::min();
+          for (int64_t i = start_index; i < end_index; ++i) {
+            min_c = std::min(particles[i].coords[axis], min_c);
+            max_c = std::max(particles[i].coords[axis], max_c);
+          }
+
+          double axis_len = max_c - min_c;
+          if (axis_len > longest_axis_len) {
+            longest_axis = axis;
+            longest_axis_len = axis_len;
+          }
+
+          cell.center[axis] = (max_c + min_c) / 2;
+          cell.radii[axis] = std::abs(max_c - min_c) / 2;
+        }
+
+        // Sort the particles according to the longest axis.
+        std::sort(particles.begin() + start_index,
+                  particles.begin() + end_index,
+                  [longest_axis](const Particle& a,
+                                 const Particle& b) {
+                    return a.coords[longest_axis] < b.coords[longest_axis];
+                  });
+        cell.radius = longest_axis_len;
+        if (level == max_level) {
+          cell.nchild = 0;
+        }
+        else {
+          cell.nchild = 2;
+        }
+
+        tree_list.push_back(cell);
+      }
+    }
+  }
+
 
   void Domain::read_xyz_chemical_file(const std::string& geometry_file,
                                       const int64_t num_electrons_per_atom) {
@@ -582,66 +737,6 @@ namespace Hatrix {
         body_idx++;
       }
     }
-
-    std::cout << "particles: " << particles.size() << std::endl;
     file.close();
-  }
-
-  void Domain::orb_split(Cell& cell,
-                         const int64_t pstart,
-                         const int64_t pend,
-                         const int64_t max_nleaf,
-                         const int64_t dim,
-                         const int64_t level,
-                         uint32_t level_index) {
-    // std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
-    //   Xmax(ndim, std::numeric_limits<double>::min()),
-    //   cell_center(ndim, 0);
-
-    // // calculate the min and max points for this cell
-    // for (int64_t i = pstart; i < pend; ++i) {
-    //   for (int k = 0; k < ndim; ++k) {
-    //     if (Xmax[k] < particles[i].coords[k]) {
-    //       Xmax[k] = particles[i].coords[k];
-    //     }
-    //     if (Xmin[k] > particles[i].coords[k]) {
-    //       Xmin[k] = particles[i].coords[k];
-    //     }
-    //   }
-    // }
-
-    // // set the center point and radius
-    // cell.radius = 0;
-    // for (int64_t k = 0; k < ndim; ++k) {
-    //   cell_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
-    //   // set radius to the max distance along any dimension.
-    //   cell.radius = std::max((Xmax[k] - Xmin[k]) / 2, cell.radius);
-    // }
-    // cell.center = cell_center;
-    // cell.start_index = pstart;
-    // cell.end_index = pend;
-    // cell.level = level;
-    // cell.level_index = level_index;
-
-    // // we have hit the leaf level. return without sorting.
-    // if (pend - pstart <= max_nleaf) {
-    //   return;
-    // }
-
-    // std::sort(particles.begin() + pstart,
-    //           particles.begin() + pend,
-    //           [&](const Particle& lhs, const Particle& rhs) {
-    //             return lhs.coords[dim] < rhs.coords[dim];
-    //           });
-
-    // int64_t mid = ceil(double(pstart + pend) / 2.0);
-    // cell.cells.resize(2);
-    // orb_split(cell.cells[0], pstart, mid, max_nleaf, (dim+1) % ndim, level+1, level_index << 1);
-    // orb_split(cell.cells[1], mid, pend, max_nleaf, (dim+1) % ndim, level+1, (level_index << 1) + 1);
-  }
-
-  void
-  Domain::build_tree(const int64_t max_nleaf) {
-    orb_split(tree, 0, N, max_nleaf, 0, 0, 0);
   }
 }

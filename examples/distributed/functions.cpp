@@ -1,4 +1,6 @@
 #include <vector>
+#include <iostream>
+#include <iomanip>
 #include <cassert>
 #include <cmath>
 #include "distributed/distributed.hpp"
@@ -69,9 +71,9 @@ namespace Hatrix {
     const int64_t i_level = Ci.level;
     const int64_t j_level = Cj.level;
 
-
     bool well_separated = false;
-    if (i_level == j_level && ((!opts.use_nested_basis && i_level == A.max_level) || opts.use_nested_basis)) {
+    if (i_level == j_level &&
+        ((!opts.use_nested_basis && i_level == A.max_level) || opts.use_nested_basis)) {
       double distance = 0;
 
       for (int64_t k = 0; k < opts.ndim; ++k) {
@@ -79,7 +81,19 @@ namespace Hatrix {
       }
       distance = sqrt(distance);
 
-      if (distance > ((Ci.radius + Cj.radius) * opts.admis)) {
+      double ci_size = 0, cj_size = 0;
+      ci_size = Ci.radius;
+      cj_size = Cj.radius;
+      // for (int axis = 0; axis < opts.ndim; ++axis) {
+      //   ci_size += pow(Ci.radii[axis], 2);
+      //   cj_size += pow(Cj.radii[axis], 2);
+      // }
+      // ci_size = sqrt(ci_size);
+      // cj_size = sqrt(cj_size);
+
+      // std::cout << "d: " << distance
+      //           << " value: " << ((ci_size + cj_size) * opts.admis) << std::endl;
+      if (distance >= ((ci_size + cj_size) * opts.admis)) {
         well_separated = true;
       }
 
@@ -150,7 +164,6 @@ namespace Hatrix {
   void
   init_geometry_admis(SymmetricSharedBasisMatrix& A,
                       const Domain& domain, const Args& opts) {
-    // A.max_level = domain.tree.height() - 1;
     dual_tree_traversal(A, 0, 0, domain, opts);
     // Using BLR2 so need an 'artificial' dense matrix level at max_level-1
     // for accumulation of the partial factorization.
@@ -177,7 +190,7 @@ namespace Hatrix {
     }
 
     if (A.max_level != A.min_level) { A.min_level++; }
-    populate_near_far_lists(A);
+    // populate_near_far_lists(A);
   }
 
   static void

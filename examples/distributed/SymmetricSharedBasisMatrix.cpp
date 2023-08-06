@@ -83,8 +83,8 @@ SymmetricSharedBasisMatrix::print_structure() {
   actually_print_structure(max_level);
 }
 
-void
-SymmetricSharedBasisMatrix::print_Csp(int64_t level) {
+double
+SymmetricSharedBasisMatrix::Csp(int64_t level) {
   assert(level >= min_level && level <= max_level);
 
   int64_t nblocks = pow(2, level);
@@ -93,13 +93,12 @@ SymmetricSharedBasisMatrix::print_Csp(int64_t level) {
     int64_t i_dense = 0;
     for (int64_t j = 0; j < nblocks; ++j) {
       if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
-        i_dense++;
+        avg_csp++;
       }
     }
-    avg_csp += i_dense;
   }
 
-  std::cout << "level: " << level << " Csp: " << avg_csp / nblocks << std::endl;
+  return avg_csp / nblocks;
 }
 
 int64_t

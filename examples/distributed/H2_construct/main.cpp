@@ -27,6 +27,11 @@ static const int BEGIN_PROW = 0, BEGIN_PCOL = 0;
 int BLACS_CONTEXT;
 
 int
+indxg2l(int INDXGLOB, int NB, int NPROCS) {
+  return NB * ((INDXGLOB - 1) / ( NB * NPROCS)) + (INDXGLOB - 1) % NB + 1;
+}
+
+int
 indxl2g(int indxloc, int nb, int iproc, int nprocs) {
   return nprocs * nb * ((indxloc - 1) / nb) +
     (indxloc-1) % nb + ((nprocs + iproc) % nprocs) * nb + 1;
@@ -104,35 +109,29 @@ public:
   }
 };
 
-void dist_matvec(ScaLAPACK_dist_matrix_t& A, int A_row_offset, int A_col_offset, double alpha,
-                 ScaLAPACK_dist_matrix_t& X, int X_row_offset, int X_col_offset,
-                 double beta,
-                 ScaLAPACK_dist_matrix_t& B, int B_row_offset, int B_col_offset) {
-  const char TRANSA = 'N';
-  int INCX = 1, INCB = 1;
-  pdgemv_(&TRANSA, &A.nrows, &A.ncols, &alpha,
-          A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
-          X.data.data(), &X_row_offset, &X_col_offset, X.DESC.data(),
-          &INCX,
-          &beta,
-          B.data.data(), &B_row_offset, &B_col_offset, B.DESC.data(),
-          &INCB);
-}
-
 // i, j, level -> block numbers.
 Matrix
 generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
+                          const Domain& domain,
                           const SymmetricSharedBasisMatrix& A) {
   int64_t block_size = opts.N / A.num_blocks[level];
   Matrix dense(block_size, block_size);
 
-#pragma omp parallel for collapse(2)
+
   for (int64_t local_i = 0; local_i < block_size; ++local_i) {
     for (int64_t local_j = 0; local_j < block_size; ++local_j) {
       long int global_i = i * block_size + local_i;
       long int global_j = j * block_size + local_j;
       double value;
-      get_elses_matrix_value(&global_i, &global_j, &value);
+      if (opts.kernel_verbose == "elses_c60") {
+        global_i += 1;
+        global_j += 1;
+        get_elses_matrix_value(&global_i, &global_j, &value);
+      }
+      else {
+        value = opts.kernel(domain.particles[global_i].coords,
+                            domain.particles[global_j].coords);
+      }
 
       dense(local_i, local_j) = value;
     }
@@ -141,34 +140,47 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
   return dense;
 }
 
-void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
+void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
+                         const Domain& domain, const Args& opts) {
   int64_t nblocks = A.num_blocks[A.max_level];
   int64_t block_size = opts.N / nblocks;
 
   // Generate dense blocks and store them in the appropriate structure.
-  for (int64_t i = 0; i < nblocks; ++i) {
-    if (mpi_rank(i) == MPIRANK) {
-      Matrix Aij = generate_p2p_interactions(i, i, A.max_level, opts, A);
-      A.D.insert(i, i, A.max_level, std::move(Aij));
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
+        Matrix Aij = generate_p2p_interactions(i, j, A.max_level, opts,
+                                               domain, A);
+        A.D.insert(i, j, A.max_level, std::move(Aij));
+      }
     }
   }
 
   double ALPHA = 1.0, BETA = 1.0;
 
   // Accumulate admissible blocks from the large dist matrix.
-  for (int64_t i = MYROW; i < nblocks; i += MPIGRID[0]) { // row cylic distribution.
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) { // row cylic distribution.
     Matrix AY(opts.nleaf, opts.nleaf);
     for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          A.is_admissible(i, j, A.max_level)) {
 
-      if (i != j) {
 #pragma omp parallel for collapse(2)
         for (int64_t local_i = 0; local_i < block_size; ++local_i) {
           for (int64_t local_j = 0; local_j < block_size; ++local_j) {
-            long int global_i = i * block_size + local_i + 1;
-            long int global_j = j * block_size + local_j + 1;
+            long int global_i = i * block_size + local_i;
+            long int global_j = j * block_size + local_j;
             double value;
-            get_elses_matrix_value(&global_i, &global_j, &value);
-
+            if (opts.kernel_verbose == "elses_c60") {
+              global_i += 1;
+              global_j += 1;
+              get_elses_matrix_value(&global_i, &global_j, &value);
+            }
+            else {
+              value = opts.kernel(domain.particles[global_i].coords,
+                                  domain.particles[global_j].coords);
+            }
             AY(local_i, local_j) += value;
           }
         }
@@ -182,87 +194,42 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
     A.US.insert(i, A.max_level, std::move(Si));
   }
 
-  // Calculate the skeleton blocks.
-  for (int i = 0; i < nblocks; ++i) {
-    std::vector<double> Utemp_buffer(opts.nleaf * opts.max_rank * MPISIZE);
+  // Allgather the bases for generation of skeleton blocks.
+  int temp_blocks = nblocks < MPISIZE ? MPISIZE  : (nblocks / MPISIZE + 1) * MPISIZE;
 
-    int p_blocks = nblocks / MPISIZE;
+  std::vector<double> temp_bases(opts.nleaf * opts.max_rank * temp_blocks, 0);
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+    int64_t temp_bases_offset = ((i / MPISIZE) * MPISIZE) * opts.nleaf * opts.max_rank;
 
-    for (int p_block = 0; p_block < p_blocks; ++p_block) {
-      int j = MPISIZE * p_block + MYROW;
+    MPI_Allgather(&A.U(i, A.max_level),
+                  opts.nleaf * opts.max_rank,
+                  MPI_DOUBLE,
+                  temp_bases.data() + temp_bases_offset,
+                  opts.nleaf * opts.max_rank,
+                  MPI_DOUBLE,
+                  MPI_COMM_WORLD);
+  }
 
-      // send, recv
-      MPI_Gather(&A.U(j, A.max_level),
-                 A.U(j, A.max_level).numel(),
-                 MPI_DOUBLE,
-                 Utemp_buffer.data(),
-                 opts.nleaf * opts.max_rank,
-                 MPI_DOUBLE,
-                 mpi_rank(i),
-                 MPI_COMM_WORLD);
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          A.is_admissible(i, j, A.max_level)) {
+        int64_t temp_bases_offset = j * opts.nleaf * opts.max_rank;
+        Matrix Uj(opts.nleaf, opts.max_rank);
 
-      if (mpi_rank(i) == MPIRANK) {
-        for (int j = 0; j < MPISIZE; ++j) {
-          int real_j = p_block * MPISIZE + j;
-          if (i != j) {
-            Matrix temp = matmul(A.U(i, A.max_level),
-                                 generate_p2p_interactions(i, real_j, A.max_level, opts, A),
-                                 true, false);
-
-            Matrix Uj(opts.nleaf, opts.max_rank);
-            array_copy(&Utemp_buffer[(opts.nleaf * opts.max_rank) * j], &Uj, Uj.numel());
-
-            auto S_block = matmul(temp, Uj);
-
-            A.S.insert(i, real_j, A.max_level, std::move(S_block));
+#pragma omp parallel for collapse(2)
+        for (int64_t Uj_i = 0; Uj_i < opts.nleaf; ++Uj_i) {
+          for (int64_t Uj_j = 0; Uj_j < opts.max_rank; ++Uj_j) {
+            Uj(Uj_i, Uj_j) = temp_bases[temp_bases_offset + Uj_i + Uj_j * opts.nleaf];
           }
         }
-      }
-    }
 
-    int leftover_nprocs = nblocks - p_blocks * MPISIZE;
-
-    // Leftover block group communication. Second condition is needed to limit
-    // the root process calculation to within the leftover processes?
-    if (p_blocks * MPISIZE < nblocks && mpi_rank(i) < leftover_nprocs) {
-      int j = MPISIZE * p_blocks + MYROW;
-
-      MPI_Comm MPI_ROW_I_PROCESSES;
-      int color = j < nblocks ? 1 : 0;
-      int key = MYROW;
-
-      MPI_Comm_split(MPI_COMM_WORLD,
-                     color, key,
-                     &MPI_ROW_I_PROCESSES);
-
-      if (j < nblocks && mpi_rank(i) < leftover_nprocs) {
-        int root_proc = translate_rank_comm_world(leftover_nprocs, mpi_rank(i), MPI_ROW_I_PROCESSES);
-        MPI_Gather(&A.U(j, A.max_level),
-                   A.U(j, A.max_level).numel(),
-                   MPI_DOUBLE,
-                   Utemp_buffer.data(),
-                   opts.nleaf * opts.max_rank,
-                   MPI_DOUBLE,
-                   root_proc,
-                   MPI_ROW_I_PROCESSES);
-
-        if (mpi_rank(i) == MPIRANK) {
-          for (int j = 0; j < leftover_nprocs; ++j) {
-            int real_j = p_blocks * MPISIZE + j;
-            if (i != real_j) {
-              Matrix temp = matmul(A.U(i, A.max_level),
-                                   generate_p2p_interactions(i, real_j, A.max_level, opts, A),
-                                   true, false);
-
-              Matrix Uj(opts.nleaf, opts.max_rank);
-              array_copy(&Utemp_buffer[(opts.nleaf * opts.max_rank) * j], &Uj, Uj.numel());
-
-              auto S_block = matmul(temp, Uj);
-
-              A.S.insert(i, real_j, A.max_level, std::move(S_block));
-            }
-          }
-        }
+        Matrix temp = matmul(A.U(i, A.max_level),
+                             generate_p2p_interactions(i, j, A.max_level, opts,
+                                                       domain, A),
+                             true, false);
+        auto S_block = matmul(temp, Uj);
+        A.S.insert(i, j, A.max_level, std::move(S_block));
       }
     }
   }
@@ -276,12 +243,108 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   return Ubig_parent;
 }
 
-void construct_H2_matrix(SymmetricSharedBasisMatrix& A, const Args& opts) {
-  generate_leaf_nodes(A, opts);
+void construct_H2_matrix(SymmetricSharedBasisMatrix& A,
+                         const Domain& domain,
+                         const Args& opts) {
+  generate_leaf_nodes(A, domain, opts);
   RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
     Uchild = generate_transfer_matrices(A, opts, Uchild);
+  }
+}
+
+// H2 matrix-vector product.
+// b = H2_A * x
+void
+dist_matvec_h2(const SymmetricSharedBasisMatrix& A,
+                  const Domain& domain,
+                  const Args& opts,
+                  const std::vector<Matrix>& x,
+                  std::vector<Matrix>& b) {
+  // Multiply V.T with x.
+  int64_t nblocks = pow(2, A.max_level);
+  int64_t x_hat_offset = 0;
+  std::vector<Matrix> x_hat;
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+    int64_t index_i = i / MPISIZE;
+    Matrix x_hat_i = matmul(A.U(i, A.max_level), x[index_i], true, false);
+    x_hat.push_back(x_hat_i);
+    x_hat_offset++;
+  }
+
+  // Init temp blocks for intermediate products.
+  std::vector<Matrix> b_hat;
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+    b_hat.push_back(Matrix(opts.max_rank, 1));
+  }
+
+  // Multiply S blocks with the x_hat intermediate products.
+  for (int64_t j = 0; j < nblocks; ++j) { // iterate over columns.
+    int64_t index_j = j / MPISIZE;
+    Matrix x_hat_j(opts.max_rank, 1);
+    if (mpi_rank(j) == MPIRANK) {
+      x_hat_j = x_hat[index_j];
+    }
+    MPI_Bcast(&x_hat_j, x_hat_j.numel(), MPI_DOUBLE, mpi_rank(j), MPI_COMM_WORLD);
+
+    for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+      int64_t index_i = i / MPISIZE;
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          A.is_admissible(i, j, A.max_level)) {
+        const Matrix& Sij = A.S(i, j, A.max_level);
+        matmul(Sij, x_hat_j, b_hat[index_i]);
+      }
+    }
+  }
+
+  // Update with row bases.
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+    int64_t index_i = i / MPISIZE;
+    matmul(A.U(i, A.max_level), b_hat[index_i], b[index_i], false, false, 1, 1);
+  }
+
+  for (int64_t j = 0; j < nblocks; ++j) {
+    Matrix x_j(opts.nleaf, 1);
+    if (mpi_rank(j) == MPIRANK) {
+      int j_index = j / MPISIZE;
+      x_j = x[j_index];
+    }
+
+    MPI_Bcast(&x_j, x_j.numel(), MPI_DOUBLE, mpi_rank(j), MPI_COMM_WORLD);
+    for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
+        int i_index = i / MPISIZE;
+        matmul(A.D(i, j, A.max_level), x_j, b[i_index], false, false, 1, 1);
+      }
+    }
+  }
+}
+
+// Distributed dense matrix vector product. Generates the dense matrix on the fly.
+// b = dense_A * x
+void
+dist_matvec_dense(const SymmetricSharedBasisMatrix& A,
+                  const Domain& domain,
+                  const Args& opts,
+                  const std::vector<Matrix>& x,
+                  std::vector<Matrix>& b) {
+  int64_t nblocks = pow(2, A.max_level);
+  for (int64_t j = 0; j < nblocks; ++j) {
+    Matrix xj(opts.nleaf, 1);
+    if (mpi_rank(j) == MPIRANK) {
+      int j_index = j / MPIGRID[0];
+      xj = x[j_index];
+    }
+
+    MPI_Bcast(&xj, xj.numel(), MPI_DOUBLE, mpi_rank(j), MPI_COMM_WORLD);
+    for (int64_t i = MPIRANK; i < nblocks; i += MPIGRID[0]) {
+      Matrix Aij = generate_p2p_interactions(i, j, A.max_level, opts,
+                                             domain, A);
+      int i_index = i / MPIGRID[0];
+      matmul(Aij, xj, b[i_index]); //  b = 1 * b + 1 * A * x
+    }
   }
 }
 
@@ -305,9 +368,6 @@ int main(int argc, char* argv[]) {
   Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
 
-  std::mt19937 gen(MPIRANK);
-  std::uniform_real_distribution<double> dist(0, 1);
-
   SymmetricSharedBasisMatrix A;
 
   // Init domain decomposition for H2 matrix using dual tree traversal.
@@ -315,17 +375,39 @@ int main(int argc, char* argv[]) {
   Domain domain(opts.N, opts.ndim);
   if (opts.kind_of_geometry == GRID) {
     domain.generate_grid_particles();
-    domain.build_tree(opts.nleaf);
+
+    if (opts.ndim == 1 || opts.ndim == 2) {
+      A.max_level = log2(opts.N / opts.nleaf);
+      domain.cardinal_sort_and_cell_generation(opts.nleaf);
+    }
+    else if (opts.ndim == 3) {
+      abort();
+      domain.sector_sort(opts.nleaf);
+      domain.build_bottom_up_binary_tree(opts.nleaf);
+    }
   }
   else if (opts.kind_of_geometry == CIRCULAR) {
     domain.generate_circular_particles(0, opts.N);
-    domain.build_tree(opts.nleaf);
+    A.max_level = log2(opts.N / opts.nleaf);
+
+    if (opts.ndim == 1 || opts.ndim == 2) {
+      A.max_level = log2(opts.N / opts.nleaf);
+      domain.cardinal_sort_and_cell_generation(opts.nleaf);
+    }
+    else if (opts.ndim == 3) {
+      abort();
+      domain.sector_sort(opts.nleaf);
+      domain.build_bottom_up_binary_tree(opts.nleaf);
+    }
   }
   else if (opts.kind_of_geometry == COL_FILE) {
     domain.read_col_file_3d(opts.geometry_file);
-    domain.build_tree(opts.nleaf);
+    A.max_level = log2(opts.N / opts.nleaf);
+    domain.sector_sort(opts.nleaf);
+    domain.build_bottom_up_binary_tree(opts.nleaf);
   }
   else if (opts.kind_of_geometry == ELSES_C60_GEOMETRY) {
+    abort();
     const int64_t num_electrons_per_atom = 4;
     const int64_t num_atoms_per_molecule = 60;
     init_elses_state();
@@ -348,56 +430,77 @@ int main(int argc, char* argv[]) {
 
   int64_t construct_max_rank;
 
-
-  // Making BLR for now.
-
   A.num_blocks.resize(A.max_level+1);
   A.num_blocks[A.max_level] = opts.N/opts.nleaf;
-  init_geometry_admis(A, domain, opts);
 
-  A.print_structure();
-  A.print_Csp(A.max_level);
+  if (opts.admis_kind == GEOMETRY) {
+    init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
+  }
+  else if (opts.admis_kind == DIAGONAL) {
+    init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
+  }
+  // A.print_structure();
 
-  // if (opts.admis_kind == GEOMETRY) {
-  //   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
-  // }
-  // else if (opts.admis_kind == DIAGONAL) {
-  //   init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
-  // }
+  construct_H2_matrix(A, domain, opts);
 
-  // construct_H2_matrix(A, opts);
+  std::vector<Matrix> x, actual_b, expected_b;
+  for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
+    x.push_back(Matrix(opts.nleaf, 1));
+    actual_b.push_back(Matrix(opts.nleaf, 1));
+    expected_b.push_back(Matrix(opts.nleaf, 1));
+  }
 
-//   ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT),
-//     VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+  std::mt19937 gen(MPIRANK);
+  std::uniform_real_distribution<double> dist(0, 1);
+  for (int block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
+    int index = block / MPISIZE;
 
-//   // scope the construction so the memory is deleted after construction.
-//   {
-//     ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
-//                                   BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+    for (int i = 0; i < opts.nleaf; ++i) {
+      int g_row = block * opts.nleaf + i + 1;
+      double value = i;
 
-// #pragma omp parallel for collapse(2)
-//     for (size_t i = 0; i < DENSE.local_nrows; ++i) {
-//       for (size_t j = 0; j < DENSE.local_ncols; ++j) {
-//         long int g_row = indxl2g(i + 1, SCALAPACK_BLOCK_SIZE, MYROW, MPIGRID[0]) + 1;
-//         long int g_col = indxl2g(j + 1, SCALAPACK_BLOCK_SIZE, MYCOL, MPIGRID[1]) + 1;
-//         double val;
-//         get_elses_matrix_value(&g_row, &g_col, &val);
-//         DENSE.set_local(i, j, val);
-//       }
-//     }
+      int l_row = indxg2l(g_row, opts.nleaf, MPIGRID[0]) - 1;
+      int l_col = 0;
 
-// #pragma omp parallel for
-//     for (int i = 0; i < VECTOR_X.local_nrows; ++i) {
-//       VECTOR_X.set_local(i, 0, dist(gen));
-//       VECTOR_B.set_local(i, 0, 0);
-//     }
+      x[index](i, 0) = value;  // assign random data to x.
+      actual_b[index](i, 0) = 0.0;    // set b to 0.
+      expected_b[index](i, 0) = 0.0;    // set b to 0.
+    }
+  }
 
-//     dist_matvec(DENSE, 1, 1, 1.0,
-//                 VECTOR_X, 1, 1,
-//                 0.0,
-//                 VECTOR_B, 1, 1);
+  // multiply dense matix with x. DENSE * x = actual_b
+  dist_matvec_dense(A, domain, opts, x, actual_b);
 
-//   }
+  // multiply H2 matrix with x. H2 * x = expected_b
+  dist_matvec_h2(A, domain, opts, x, expected_b);
+
+  double local_norm[2] = {0, 0};
+  for (int64_t i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
+    int64_t index_i = i / MPISIZE;
+    local_norm[0] += pow(norm(actual_b[index_i] - expected_b[index_i]), 2);
+    local_norm[1] += pow(norm(actual_b[index_i]), 2);
+  }
+  double global_norm[2] = {0, 0};
+  MPI_Reduce(&local_norm,
+             &global_norm,
+             2,
+             MPI_DOUBLE,
+             MPI_SUM,
+             0,                 // root process
+             MPI_COMM_WORLD);
+  global_norm[0] = sqrt(global_norm[0]);
+  global_norm[1] = sqrt(global_norm[1]);
+
+  if (!MPIRANK) {
+    double diff = global_norm[0];
+    double actual =  global_norm[1];
+
+    std::cout << "N       : " << opts.N << std::endl
+              << "nleaf   : " << opts.nleaf << std::endl
+              << "max rank: " << opts.max_rank << std::endl
+              << "construct rel err: " << diff / actual << std::endl
+              << "Csp              : " << A.Csp(A.max_level) << std::endl;
+  }
 
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);

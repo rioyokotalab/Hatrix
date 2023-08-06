@@ -16,7 +16,6 @@ namespace Hatrix {
     std::vector<double> Xmin, Xmax; // store the min and max co-ordinates of the whole domain.
 
   private:
-    int64_t build_bottom_up_binary_tree(const int64_t molecule_size);
 
     int64_t level_offset(int64_t level);
     int64_t get_hilbert_id_child(int64_t hilbert_key);
@@ -27,14 +26,6 @@ namespace Hatrix {
                                       const int64_t level);
     int64_t hilbert_index(std::vector<int64_t>& iX, const int64_t level,
                           const bool offset = true);
-    void
-    orb_split(Cell& cell,
-              const int64_t pstart,
-              const int64_t pend,
-              const int64_t max_nleaf,
-              const int64_t dim,
-              const int64_t level,
-              const uint32_t level_index);
 
     void
     search_tree_for_nodes(const Cell& tree,
@@ -48,8 +39,13 @@ namespace Hatrix {
                                        int64_t start_index, int64_t end_index,
                                        int64_t cell_list_index, std::vector<Cell>& cell_list,
                                        int64_t nleaf, int64_t level, bool direction);
+
   public:
     Domain(int64_t N, int64_t ndim);
+    void cardinal_sort_and_cell_generation(const int64_t nleaf);
+    void sector_sort(const int64_t nleaf);
+    int64_t build_bottom_up_binary_tree(const int64_t molecule_size);
+
     void generate_circular_particles(double min_val, double max_val);
     void generate_grid_particles();
     void read_col_file_3d(const std::string& geometry_file);
@@ -62,10 +58,11 @@ namespace Hatrix {
     // tree with near and far blocks.
     int64_t build_elses_tree(const int64_t molecule_size);
 
-    void print_file(std::string file_name);
+    void sort_generic_geometry_particles(const int64_t start_index,
+                                         const int64_t end_index,
+                                         const int64_t nleaf);
 
-    // Build tree using co-oridinate sorting similar to exafmm. Uses the new Cell struct.
-    void build_tree(const int64_t max_nleaf);
+    void print_file(std::string file_name);
 
     int64_t cell_size(int64_t level_index, int64_t level) const;
   };
