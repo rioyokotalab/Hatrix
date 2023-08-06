@@ -16,7 +16,6 @@ namespace Hatrix {
     std::vector<double> Xmin, Xmax; // store the min and max co-ordinates of the whole domain.
 
   private:
-    int64_t build_bottom_up_binary_tree(const int64_t molecule_size);
 
     int64_t level_offset(int64_t level);
     int64_t get_hilbert_id_child(int64_t hilbert_key);
@@ -42,6 +41,8 @@ namespace Hatrix {
                                        int64_t nleaf, int64_t level, bool direction);
   public:
     Domain(int64_t N, int64_t ndim);
+    int64_t build_bottom_up_binary_tree(const int64_t molecule_size);
+
     void generate_circular_particles(double min_val, double max_val);
     void generate_grid_particles();
     void read_col_file_3d(const std::string& geometry_file);
