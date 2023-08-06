@@ -354,7 +354,8 @@ namespace Hatrix {
     return (hilbert_key - level_offset(level)) * 8 + level_offset(level+1);
   }
 
-  void Domain::sort_elses_bodies(const int64_t molecule_size) {
+  void
+  Domain::sort_elses_bodies(const int64_t molecule_size) {
     // Subdivide the particles (atoms) into molecules. Each molecule contains
     // molecule_size atoms.
     assert(N % molecule_size == 0);
@@ -554,7 +555,115 @@ namespace Hatrix {
 
   int64_t
   Domain::sort_generic_geometry_particles(const int64_t nleaf) {
+    assert(N % nleaf == 0);
+    const int64_t nblocks = N / nleaf;
 
+    std::vector<Cell> temp_cell_list;
+
+    temp_cell_list.reserve(nblocks * log(nblocks));
+    // Bounding box of the root cell.
+    Cell root(ndim);
+    root.start_index = 0;
+    root.end_index = nblocks;
+    root.radius = 0;
+    for (int64_t axis = 0; axis < ndim; ++axis) {
+      auto axis_min = get_axis_min(0, N, axis);
+      auto axis_max = get_axis_max(0, N, axis);
+
+      Xmin[axis] = axis_min;
+      Xmax[axis] = axis_max;
+
+      root.radii[axis] = std::abs(axis_max - axis_min) / 2;
+      root.center[axis] = (axis_min + axis_max) / 2;
+      root.radius = std::max(std::abs(root.radii[axis] - axis_min), root.radius);
+      root.radius = std::max(std::abs(axis_max - root.radii[axis]), root.radius);
+    }
+    root.level = 0;
+    temp_cell_list.push_back(root);
+
+    std::vector<Particle> buffer = particles;
+    sort_particles_and_build_tree(buffer.data(), particles.data(),
+                                  0, N,
+                                  0, temp_cell_list,
+                                  nleaf, 0, false);
+
+    int64_t max_level = 0;
+    for (auto cell : temp_cell_list) { max_level = std::max(max_level, cell.level); }
+
+    std::vector<std::tuple<int64_t, int64_t> > hilbert_permute_vector;
+    hilbert_permute_vector.reserve(nblocks);
+    for (auto cell : temp_cell_list) {
+      if (cell.nchild == 0) { // leaf level
+        auto hilbert_level = cell.level;
+        auto hilbert_id = cell.key;
+
+        while (hilbert_level < max_level) {
+          hilbert_id = get_hilbert_id_child(hilbert_id);
+          hilbert_level++;
+        }
+
+        for (int64_t b = cell.start_index; b < cell.end_index; ++b) {
+          std::tuple<int64_t, int64_t> t = std::make_tuple(b, hilbert_id);
+          hilbert_permute_vector.push_back(t);
+        }
+      }
+    }
+
+    // Sort the molecules based on the hilbert index generated during the tree generation.
+    std::sort(hilbert_permute_vector.begin(), hilbert_permute_vector.end(),
+              [](const std::tuple<int64_t, int64_t>& a,
+                 const std::tuple<int64_t, int64_t>& b) {
+                return std::get<1>(a) <= std::get<1>(b); // sort based on hilbert index.
+              });
+    std::vector<Particle> hilbert_sorted_molecule_centers(nblocks);
+    for (int64_t i = 0; i < nblocks; ++i) {
+      int64_t sorted_index = std::get<0>(hilbert_permute_vector[i]);
+      hilbert_sorted_molecule_centers[sorted_index] = molecule_centers[i];
+    }
+
+    // Sort the electrons (actual Particles in the Domain) based on the sorted molecules.
+    std::vector<Particle> temp = particles;
+    int64_t count = 0;
+    for (int64_t i = 0; i < nblocks; ++i) {
+      const auto& molecule = hilbert_sorted_molecule_centers[i];
+      const auto src_begin = molecule.value * molecule_size;
+      const auto dst_begin = count;
+      for (int64_t k = 0; k < nleaf; ++k) {
+        particles[dst_begin+k] = temp[src_begin+k];
+      }
+      count += nleaf;
+    }
+
+    auto get_sort_axis = [this](const int64_t start_index, const int64_t end_index) {
+      double max_radius = 0;
+      int64_t sort_axis = 0;
+      for (int axis = 0; axis < ndim; ++axis) {
+        const auto Xmin = get_axis_min(start_index, end_index, axis);
+        const auto Xmax = get_axis_max(start_index, end_index, axis);
+        const auto radius = (Xmax - Xmin) / 2.0;
+        if (radius > max_radius) {
+          max_radius = radius;
+          sort_axis = axis;
+        }
+      }
+
+      return sort_axis;
+    };
+
+    // Sort the electrons within the molecules
+    for (int64_t mol = 0; mol < nblocks; ++mol) {
+      // Sort along the longest axis.
+      const int64_t start_index = mol * nleaf;
+      const int64_t end_index = start_index + nleaf;
+      const int64_t sort_axis = get_sort_axis(start_index, end_index);
+      std::sort(particles.begin() + start_index, particles.begin() + end_index,
+                [sort_axis](const Particle& a, const Particle& b) {
+                  return a.coords[sort_axis] < b.coords[sort_axis];
+                });
+
+      // Cut the molecules in half, find the longest axis for each half and
+      // then sort again.
+    }
   }
 
   void Domain::read_xyz_chemical_file(const std::string& geometry_file,

@@ -50,7 +50,7 @@ for nx in 2; do
     N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
     NLEAF=240
     MAX_RANK=100
-    NDIM=3
+    NDIM=1
     KERNEL_FUNC=laplace
 
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
