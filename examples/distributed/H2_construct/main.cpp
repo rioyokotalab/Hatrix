@@ -315,15 +315,15 @@ int main(int argc, char* argv[]) {
   Domain domain(opts.N, opts.ndim);
   if (opts.kind_of_geometry == GRID) {
     domain.generate_grid_particles();
-    domain.build_tree(opts.nleaf);
+    domain.sort_generic_geometry_particles(opts.nleaf);
   }
   else if (opts.kind_of_geometry == CIRCULAR) {
     domain.generate_circular_particles(0, opts.N);
-    domain.build_tree(opts.nleaf);
+    domain.sort_generic_geometry_particles(opts.nleaf);
   }
   else if (opts.kind_of_geometry == COL_FILE) {
     domain.read_col_file_3d(opts.geometry_file);
-    domain.build_tree(opts.nleaf);
+    domain.sort_generic_geometry_particles(opts.nleaf);
   }
   else if (opts.kind_of_geometry == ELSES_C60_GEOMETRY) {
     const int64_t num_electrons_per_atom = 4;

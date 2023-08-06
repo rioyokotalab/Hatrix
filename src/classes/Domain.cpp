@@ -552,6 +552,11 @@ namespace Hatrix {
     return tree_height;
   }
 
+  int64_t
+  Domain::sort_generic_geometry_particles(const int64_t nleaf) {
+
+  }
+
   void Domain::read_xyz_chemical_file(const std::string& geometry_file,
                                       const int64_t num_electrons_per_atom) {
     std::ifstream file;
@@ -585,63 +590,5 @@ namespace Hatrix {
 
     std::cout << "particles: " << particles.size() << std::endl;
     file.close();
-  }
-
-  void Domain::orb_split(Cell& cell,
-                         const int64_t pstart,
-                         const int64_t pend,
-                         const int64_t max_nleaf,
-                         const int64_t dim,
-                         const int64_t level,
-                         uint32_t level_index) {
-    // std::vector<double> Xmin(ndim, std::numeric_limits<double>::max()),
-    //   Xmax(ndim, std::numeric_limits<double>::min()),
-    //   cell_center(ndim, 0);
-
-    // // calculate the min and max points for this cell
-    // for (int64_t i = pstart; i < pend; ++i) {
-    //   for (int k = 0; k < ndim; ++k) {
-    //     if (Xmax[k] < particles[i].coords[k]) {
-    //       Xmax[k] = particles[i].coords[k];
-    //     }
-    //     if (Xmin[k] > particles[i].coords[k]) {
-    //       Xmin[k] = particles[i].coords[k];
-    //     }
-    //   }
-    // }
-
-    // // set the center point and radius
-    // cell.radius = 0;
-    // for (int64_t k = 0; k < ndim; ++k) {
-    //   cell_center[k] = (double)(Xmax[k] + Xmin[k]) / 2.0;
-    //   // set radius to the max distance along any dimension.
-    //   cell.radius = std::max((Xmax[k] - Xmin[k]) / 2, cell.radius);
-    // }
-    // cell.center = cell_center;
-    // cell.start_index = pstart;
-    // cell.end_index = pend;
-    // cell.level = level;
-    // cell.level_index = level_index;
-
-    // // we have hit the leaf level. return without sorting.
-    // if (pend - pstart <= max_nleaf) {
-    //   return;
-    // }
-
-    // std::sort(particles.begin() + pstart,
-    //           particles.begin() + pend,
-    //           [&](const Particle& lhs, const Particle& rhs) {
-    //             return lhs.coords[dim] < rhs.coords[dim];
-    //           });
-
-    // int64_t mid = ceil(double(pstart + pend) / 2.0);
-    // cell.cells.resize(2);
-    // orb_split(cell.cells[0], pstart, mid, max_nleaf, (dim+1) % ndim, level+1, level_index << 1);
-    // orb_split(cell.cells[1], mid, pend, max_nleaf, (dim+1) % ndim, level+1, (level_index << 1) + 1);
-  }
-
-  void
-  Domain::build_tree(const int64_t max_nleaf) {
-    orb_split(tree, 0, N, max_nleaf, 0, 0, 0);
   }
 }

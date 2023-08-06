@@ -51,6 +51,7 @@ for nx in 2; do
     NLEAF=240
     MAX_RANK=100
     NDIM=3
+    KERNEL_FUNC=laplace
 
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
     interval_start=0
@@ -59,8 +60,8 @@ for nx in 2; do
            --ndim $NDIM \
            --nleaf $NLEAF \
            --max_rank $MAX_RANK \
-           --kernel_func elses_c60 \
-           --kind_of_geometry elses_c60_geometry \
+           --kernel_func $KERNEL_FUNC \
+           --kind_of_geometry grid \
            --admis_kind geometry \
            --admis 0.3 \
            --geometry_file C60_fcc.xyz \
