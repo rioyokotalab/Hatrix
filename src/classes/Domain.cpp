@@ -206,8 +206,9 @@ namespace Hatrix {
     return iX;
   }
 
-  int64_t Domain::hilbert_index(std::vector<int64_t>& iX, const int64_t level,
-                                const bool offset) {
+  int64_t
+  Domain::hilbert_index(std::vector<int64_t>& iX, const int64_t level,
+                        const bool offset) {
     int64_t level_offset = (((int64_t)1 << 3 * level) - 1) / 7; // level-wise offset for hilbert key.
     // Preprocess for Hilbert
     int64_t M = 1 << (level - 1);
@@ -240,12 +241,13 @@ namespace Hatrix {
   }
 
   // Code derived from https://github.com/exafmm/minimal/blob/master/3d/build_tree.h#L24
-  void Domain::sort_particles_and_build_tree(Particle *buffer, Particle* bodies,
-                                             const int64_t start_index, const int64_t end_index,
-                                             int64_t cell_list_index,
-                                             std::vector<Cell>& cell_list,
-                                             int64_t nleaf, int64_t level,
-                                             bool direction) {
+  void
+  Domain::sort_particles_and_build_tree(Particle *buffer, Particle* bodies,
+                                        const int64_t start_index, const int64_t end_index,
+                                        int64_t cell_list_index,
+                                        std::vector<Cell>& cell_list,
+                                        int64_t nleaf, int64_t level,
+                                        bool direction) {
     Cell& cell = cell_list[cell_list_index];
     cell.start_index = start_index;
     cell.end_index = end_index;
@@ -532,12 +534,10 @@ namespace Hatrix {
           const double X_max = get_axis_max(cell.start_index, cell.end_index, axis);
 
           cell.center[axis] = (X_min + X_max) / 2;
-          cell.radii[axis] = (X_max - X_min) / 2;
+          cell.radii[axis] = std::abs(X_max - X_min) / 2;
           cell.radius = std::max(cell.radius, std::abs(cell.radius - X_min));
           cell.radius = std::max(cell.radius, std::abs(X_max - cell.radius));
         }
-
-        std::cout << std::endl;
       }
     }
 

@@ -33,7 +33,7 @@ exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-for nx in 1 2 4 8 16; do
+for nx in 2; do
     ny=1
     nz=1
     # Generate the xml file from the source geometry depenending on the number of repetitions specified.
@@ -62,7 +62,7 @@ for nx in 1 2 4 8 16; do
            --kernel_func elses_c60 \
            --kind_of_geometry elses_c60_geometry \
            --admis_kind geometry \
-           --admis 0.2 \
+           --admis 0.3 \
            --geometry_file C60_fcc.xyz \
            --param_1 $interval_start --param_2 $interval_end \
            --use_nested_basis 1
