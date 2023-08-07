@@ -2,6 +2,7 @@
 #include <string>
 #include <fstream>
 #include <algorithm>
+#include <iomanip>
 #include <random>
 #include <cassert>
 
@@ -231,9 +232,9 @@ namespace Hatrix {
 
     int64_t i = 0;
     for (int64_t l = 0; l < level; l++) {
-      i |= (iX[2] & (int64_t)1 << l) << 2*l;
-      i |= (iX[1] & (int64_t)1 << l) << (2*l + 1);
-      i |= (iX[0] & (int64_t)1 << l) << (2*l + 2);
+      for (int axis = 0; axis < ndim; ++axis) {
+        i |= (iX[ndim - axis - 1] & (int64_t)1 << l) << (2*l + axis);
+      }
     }
     if (offset) i += level_offset;
 
@@ -256,6 +257,7 @@ namespace Hatrix {
     std::vector<int64_t> index_3d = int_index_3d(cell.center, cell_list, level);
     cell.key = hilbert_index(index_3d, level, false);
 
+
     if (end_index - start_index <= nleaf) {
       if (direction) {                      // copy data into the original array.
         for (int64_t i = start_index; i < end_index; ++i) {
@@ -263,6 +265,13 @@ namespace Hatrix {
           buffer[i].value = bodies[i].value;
         }
       }
+
+      std::cout << "st: " << cell.start_index << " end: " << cell.end_index
+                << " lvl: " << cell.level << " +++ " << cell.key << " --- ";
+      for (int axis = 0; axis < ndim; ++axis) {
+        std::cout << cell.center[axis] << " ";
+      }
+      std::cout << std::endl;
       return;
     }
 
@@ -272,9 +281,10 @@ namespace Hatrix {
 
     for (int64_t i = start_index; i < end_index; ++i) {
       x = bodies[i].coords;
-      int64_t octant = (x[0] > cell.center[0]) +
-        ((x[1] > cell.center[1]) << 1) +
-        ((x[2] > cell.center[2]) << 2);
+      int64_t octant = 0;
+      for (int axis = 0; axis < ndim; ++axis) {
+        octant += (x[axis] > cell.center[axis]) << axis;
+      }
       size[octant]++;
     }
 
@@ -291,9 +301,10 @@ namespace Hatrix {
     counter = offsets;
     for (int64_t i = start_index; i < end_index; ++i) {
       x = bodies[i].coords;
-      int64_t octant = (x[0] > cell.center[0]) +
-        ((x[1] > cell.center[1]) << 1) +
-        ((x[2] > cell.center[2]) << 2);
+      int64_t octant = 0;
+      for (int axis = 0; axis < ndim; ++axis) {
+        octant += (x[axis] > cell.center[axis]) << axis;
+      }
       // Copy this particle to its correct location in the buffer.
       buffer[counter[octant]].coords = bodies[i].coords;
       buffer[counter[octant]].value = bodies[i].value;
@@ -302,6 +313,8 @@ namespace Hatrix {
 
     for (int i = 0; i < cell.nchild; ++i) { cell_list.push_back(Cell(ndim));}
     Cell& first_child = cell_list[cell_list.size() - cell.nchild];
+    const Cell& parent = cell_list[cell_list_index];
+
     cell.child = &first_child;
 
     int c = 0;
@@ -310,10 +323,10 @@ namespace Hatrix {
       if (size[i]) {
         Cell& child = cell_list[child_index];
         std::vector<double> child_center(ndim);
-        double child_radius = cell.radius / 2;
+        double child_radius = parent.radius / 2;
 
         for (int axis = 0; axis < ndim; ++axis) {
-          child_center[axis] = cell.center[axis];
+          child_center[axis] = parent.center[axis];
           child_center[axis] += child_radius * (((i & 1 << axis) >> axis) * 2 - 1);
         }
         child.center = child_center;
@@ -499,8 +512,8 @@ namespace Hatrix {
     }
   }
 
-  int64_t Domain::build_bottom_up_binary_tree(const int64_t molecule_size) {
-    int64_t height = (int64_t)std::log2((double)N / (double)molecule_size);
+  int64_t Domain::build_bottom_up_binary_tree(const int64_t nleaf) {
+    int64_t height = (int64_t)std::log2((double)N / (double)nleaf);
     const int64_t leaf_ncells = pow(2, height);
     tree_list.resize(leaf_ncells * 2 - 1, Cell(ndim));
 
@@ -514,8 +527,8 @@ namespace Hatrix {
 
         if (level == height) {  // leaf node directly from particles.
           cell.nchild = 0;
-          cell.start_index = node * molecule_size;
-          cell.end_index = cell.start_index + molecule_size;
+          cell.start_index = node * nleaf;
+          cell.end_index = cell.start_index + nleaf;
         }
         else {                  // non-leaf node from adjacent lower nodes.
           cell.nchild = 2;
@@ -542,6 +555,27 @@ namespace Hatrix {
       }
     }
 
+    std::cout << "distances:\n";
+    for (int i = 16; i < tree_list.size(); ++i) {
+      for (int j = 16; j < tree_list.size(); ++j) {
+        const auto& Ci = tree_list[i];
+        const auto& Cj = tree_list[j];
+
+        if (Ci.nchild == 0 && Cj.nchild == 0) {
+          double dist = 0;
+          for (int axis = 0; axis < ndim; ++axis) {
+            dist += pow(Ci.center[axis] - Cj.center[axis], 2);
+          }
+          dist = sqrt(dist);
+
+          std::cout << std::setw(4) << std::setprecision(3)
+                    << "(" << Ci.center[0] << ","
+                    << Cj.center[0] << ")";
+        }
+      }
+      std::cout << std::endl;
+    }
+
     return height;
   }
 
@@ -564,7 +598,7 @@ namespace Hatrix {
     // Bounding box of the root cell.
     Cell root(ndim);
     root.start_index = 0;
-    root.end_index = nblocks;
+    root.end_index = N;
     root.radius = 0;
     for (int64_t axis = 0; axis < ndim; ++axis) {
       auto axis_min = get_axis_min(0, N, axis);
@@ -613,6 +647,13 @@ namespace Hatrix {
                  const std::tuple<Cell, int64_t>& b) {
                 return std::get<1>(a) <= std::get<1>(b); // sort based on hilbert index.
               });
+
+    std::cout << "sorted hilbert permute vector: ";
+    for (auto c : hilbert_permute_vector) {
+      const auto a = std::get<1>(c);
+      std::cout << a << " ";
+    }
+    std::cout << std::endl;
 
     // Sort the electrons (actual Particles in the Domain) based on the sorted molecules.
     std::vector<Particle> temp = particles;
@@ -701,6 +742,4 @@ namespace Hatrix {
     }
 
     std::cout << "particles: " << particles.size() << std::endl;
-    file.close();
-  }
-}
+    file.cl

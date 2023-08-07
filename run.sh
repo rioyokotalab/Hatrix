@@ -47,16 +47,17 @@ for nx in 1; do
         $fcc_xml_file
 
     # Calcualte dimension of the resulting matrix.
-    N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
-    NLEAF=240
-    MAX_RANK=100
+    # N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
+    N=32
+    NLEAF=8
+    MAX_RANK=4
     NDIM=1
     KERNEL_FUNC=laplace
 
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
     interval_start=0
     interval_end=2048
-    mpirun -n 1 ./bin/H2_construct --N $N \
+    mpirun -n 1 gdb -ex run --args ./bin/H2_construct --N $N \
            --ndim $NDIM \
            --nleaf $NLEAF \
            --max_rank $MAX_RANK \
