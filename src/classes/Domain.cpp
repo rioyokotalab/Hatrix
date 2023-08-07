@@ -91,14 +91,34 @@ namespace Hatrix {
       }
     }
     else if (ndim == 2) {
-      double space_0 = 1.0 / sides[0], space_1 = 1.0 / sides[1];
-      for (int64_t i = 0; i < sides[0]; ++i) {
-        for (int64_t j = 0; j < sides[1]; ++j) {
-          std::vector<double> point(ndim);
-          point[0] = i * space_0;
-          point[1] = j * space_1;
-          particles[i + j * sides[0]] = Hatrix::Particle(point, i + j * space_1);
-        }
+      const double a = 0.5;
+      const int64_t top = N / 4;
+      const int64_t left = N / 2;
+      const int64_t bottom = 3 * N / 4;
+      int64_t i = 0;
+      for (i = 0; i < top; i++) {
+        const double x = a - 2.0 * a * i / top;
+        const double y = a;
+        const double value = (double)i;
+        particles[i] = Hatrix::Particle(x, y, value);
+      }
+      for (; i < left; i++) {
+        const double x = -a;
+        const double y = a - 2.0 * a * (i - top) / (left - top);
+        const double value = (double)i;
+        particles[i] = Hatrix::Particle(x, y, value);
+      }
+      for (; i < bottom; i++) {
+        const double x = -a + 2.0 * a * (i - left) / (bottom - left);
+        const double y = -a;
+        const double value = (double)i;
+        particles[i] = Hatrix::Particle(x, y, value);
+      }
+      for (; i < N; i++) {
+        const double x = a;
+        const double y = -a + 2.0 * a * (i - bottom) / (N - bottom);
+        const double value = (double)i;
+        particles[i] = Hatrix::Particle(x, y, value);
       }
     }
     else if (ndim == 3) {
@@ -120,12 +140,15 @@ namespace Hatrix {
       // std::random_device rd;  // Will be used to obtain a seed for the random number engine
       std::uniform_real_distribution<> dis(0.0, 2.0 * M_PI);
       double radius = 1.0;
+
       for (int64_t i = 0; i < N; ++i) {
         double theta = (i * 2.0 * M_PI) / N ;
-        double x = radius * cos(theta);
-        double y = radius * sin(theta);
+        Particle p(ndim);
+        p.coords[0] = radius * cos(theta);
+        p.coords[1] = radius * sin(theta);
+        p.value = i;
 
-        particles.emplace_back(Hatrix::Particle(x, y, min_val + (double(i) / double(range))));
+        particles.emplace_back(p);
       }
     }
     else if (ndim == 3) {
@@ -208,28 +231,30 @@ namespace Hatrix {
   }
 
   int64_t
-  Domain::hilbert_index(std::vector<int64_t>& iX, const int64_t level,
+  Domain::hilbert_index(std::vector<int64_t>& iX,
+                        const int64_t level,
                         const bool offset) {
     int64_t level_offset = (((int64_t)1 << 3 * level) - 1) / 7; // level-wise offset for hilbert key.
     // Preprocess for Hilbert
-    int64_t M = 1 << (level - 1);
-    for (int64_t Q=M; Q>1; Q>>=1) {
-      int64_t R = Q - 1;
-      for (int64_t d = 0; d < ndim; d++) {
-        if (iX[d] & Q) iX[0] ^= R;
-        else {
-          int64_t t = (iX[0] ^ iX[d]) & R;
-          iX[0] ^= t;
-          iX[d] ^= t;
-        }
-      }
-    }
-    for (int64_t d=1; d < ndim; d++) iX[d] ^= iX[d-1];
-    int64_t t = 0;
-    for (int64_t Q=M; Q>1; Q>>=1)
-      if (iX[2] & Q) t ^= Q - 1;
-    for (int64_t d=0; d < ndim; d++) iX[d] ^= t;
+    // int64_t M = 1 << (level - 1);
+    // for (int64_t Q=M; Q>1; Q>>=1) {
+    //   int64_t R = Q - 1;
+    //   for (int64_t d = 0; d < ndim; d++) {
+    //     if (iX[d] & Q) iX[0] ^= R;
+    //     else {
+    //       int64_t t = (iX[0] ^ iX[d]) & R;
+    //       iX[0] ^= t;
+    //       iX[d] ^= t;
+    //     }
+    //   }
+    // }
+    // for (int64_t d=1; d < ndim; d++) iX[d] ^= iX[d-1];
+    // int64_t t = 0;
+    // for (int64_t Q=M; Q>1; Q>>=1)
+    //   if (iX[2] & Q) t ^= Q - 1;
+    // for (int64_t d=0; d < ndim; d++) iX[d] ^= t;
 
+    // Just generate the morton index.
     int64_t i = 0;
     for (int64_t l = 0; l < level; l++) {
       for (int axis = 0; axis < ndim; ++axis) {
@@ -266,12 +291,12 @@ namespace Hatrix {
         }
       }
 
-      std::cout << "st: " << cell.start_index << " end: " << cell.end_index
-                << " lvl: " << cell.level << " +++ " << cell.key << " --- ";
-      for (int axis = 0; axis < ndim; ++axis) {
-        std::cout << cell.center[axis] << " ";
-      }
-      std::cout << std::endl;
+      // std::cout << "st: " << cell.start_index << " end: " << cell.end_index
+      //           << " lvl: " << cell.level << " +++ " << cell.key << " --- ";
+
+      // for (int axis = 0; axis < ndim; ++axis) {
+      //   std::cout << cell.center[axis] << " $$$ " << index_3d[axis];
+      // }
       return;
     }
 
@@ -310,6 +335,12 @@ namespace Hatrix {
       buffer[counter[octant]].value = bodies[i].value;
       counter[octant]++;        // move to the next location in the sorted octant/quadrant.
     }
+
+    std::cout << "level: " << level << " size: ";
+    for (int ax = 0; ax < domain_divs; ++ax) {
+      std::cout << size[ax] << " ";
+    }
+    std::cout << std::endl;
 
     for (int i = 0; i < cell.nchild; ++i) { cell_list.push_back(Cell(ndim));}
     Cell& first_child = cell_list[cell_list.size() - cell.nchild];
@@ -555,26 +586,28 @@ namespace Hatrix {
       }
     }
 
-    std::cout << "distances:\n";
-    for (int i = 16; i < tree_list.size(); ++i) {
-      for (int j = 16; j < tree_list.size(); ++j) {
-        const auto& Ci = tree_list[i];
-        const auto& Cj = tree_list[j];
+    // std::cout << "distances:\n";
+    // for (int i = 16; i < tree_list.size(); ++i) {
+    //   for (int j = 16; j < tree_list.size(); ++j) {
+    //     const auto& Ci = tree_list[i];
+    //     const auto& Cj = tree_list[j];
 
-        if (Ci.nchild == 0 && Cj.nchild == 0) {
-          double dist = 0;
-          for (int axis = 0; axis < ndim; ++axis) {
-            dist += pow(Ci.center[axis] - Cj.center[axis], 2);
-          }
-          dist = sqrt(dist);
+    //     if (Ci.nchild == 0 && Cj.nchild == 0) {
+    //       double dist = 0;
+    //       for (int axis = 0; axis < ndim; ++axis) {
+    //         dist += pow(Ci.center[axis] - Cj.center[axis], 2);
+    //       }
+    //       dist = sqrt(dist);
 
-          std::cout << std::setw(4) << std::setprecision(3)
-                    << "(" << Ci.center[0] << ","
-                    << Cj.center[0] << ")";
-        }
-      }
-      std::cout << std::endl;
-    }
+    //       std::cout << std::setw(6) << std::setprecision(3)
+    //                 << dist << " ";
+
+    //                 // << "(" << Ci.center[0] << ","
+    //                 // << Cj.center[0] << ")";
+    //     }
+    //   }
+    //   std::cout << std::endl;
+    // }
 
     return height;
   }
@@ -641,6 +674,18 @@ namespace Hatrix {
       }
     }
 
+    // std::cout << "circle centers: ";
+    // for (auto c : hilbert_permute_vector) {
+    //   auto cell = std::get<0>(c);
+    //   auto h_id = std::get<1>(c);
+    //   for (int axis = 0; axis < ndim; ++axis) {
+    //     std::cout << cell.center[axis] << ",";
+    //   }
+    //   std::cout << " -- " << h_id;
+    //   std::cout << std::endl;
+    // }
+    // std::cout << std::endl;
+
     // Sort the molecules based on the hilbert index generated during the tree generation.
     std::sort(hilbert_permute_vector.begin(), hilbert_permute_vector.end(),
               [](const std::tuple<Cell, int64_t>& a,
@@ -648,12 +693,12 @@ namespace Hatrix {
                 return std::get<1>(a) <= std::get<1>(b); // sort based on hilbert index.
               });
 
-    std::cout << "sorted hilbert permute vector: ";
-    for (auto c : hilbert_permute_vector) {
-      const auto a = std::get<1>(c);
-      std::cout << a << " ";
-    }
-    std::cout << std::endl;
+    // std::cout << "sorted hilbert permute vector: ";
+    // for (auto c : hilbert_permute_vector) {
+    //   const auto a = std::get<1>(c);
+    //   std::cout << a << " ";
+    // }
+    // std::cout << std::endl;
 
     // Sort the electrons (actual Particles in the Domain) based on the sorted molecules.
     std::vector<Particle> temp = particles;
@@ -670,11 +715,11 @@ namespace Hatrix {
       count += nleaf;
     }
 
-    for (const auto& p : hilbert_permute_vector) {
-      auto h = std::get<1>(p);
-      std::cout << h << " ";
-    }
-    std::cout << std::endl;
+    // for (const auto& p : hilbert_permute_vector) {
+    //   auto h = std::get<1>(p);
+    //   std::cout << h << " ";
+    // }
+    // std::cout << std::endl;
 
     auto get_sort_axis = [this](const int64_t start_index, const int64_t end_index) {
       double max_radius = 0;
@@ -740,6 +785,6 @@ namespace Hatrix {
         body_idx++;
       }
     }
-
-    std::cout << "particles: " << particles.size() << std::endl;
-    file.cl
+    file.close();
+  }
+}

@@ -83,10 +83,12 @@ namespace Hatrix {
       distance = sqrt(distance);
 
       double ci_size = 0, cj_size = 0;
-      for (int axis = 0; axis < opts.ndim; ++axis) {
-        ci_size += pow(Ci.radii[axis], 2);
-        cj_size += pow(Cj.radii[axis], 2);
-      }
+      ci_size = Ci.radius;
+      cj_size = Cj.radius;
+      // for (int axis = 0; axis < opts.ndim; ++axis) {
+      //   ci_size += pow(Ci.radii[axis], 2);
+      //   cj_size += pow(Cj.radii[axis], 2);
+      // }
 
       if (distance > ((ci_size + cj_size) * opts.admis)) {
         well_separated = true;
