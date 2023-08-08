@@ -91,38 +91,90 @@ namespace Hatrix {
       }
     }
     else if (ndim == 2) {
-      const double a = 0.5;
-      const int64_t top = N / 4;
-      const int64_t left = N / 2;
-      const int64_t bottom = 3 * N / 4;
-      int64_t i = 0;
-      for (i = 0; i < top; i++) {
-        const double x = a - 2.0 * a * i / top;
-        const double y = a;
-        const double value = (double)i;
-        particles[i] = Hatrix::Particle(x, y, value);
-      }
-      for (; i < left; i++) {
-        const double x = -a;
-        const double y = a - 2.0 * a * (i - top) / (left - top);
-        const double value = (double)i;
-        particles[i] = Hatrix::Particle(x, y, value);
-      }
-      for (; i < bottom; i++) {
-        const double x = -a + 2.0 * a * (i - left) / (bottom - left);
-        const double y = -a;
-        const double value = (double)i;
-        particles[i] = Hatrix::Particle(x, y, value);
-      }
-      for (; i < N; i++) {
-        const double x = a;
-        const double y = -a + 2.0 * a * (i - bottom) / (N - bottom);
-        const double value = (double)i;
-        particles[i] = Hatrix::Particle(x, y, value);
+      // Generate a uniform grid of 'N' points.
+      int64_t M = ceil(N / sqrt(N));
+      int64_t Q = N / M;
+      int count = 0;
+      for (int64_t i = 0; i < M; ++i) {
+        for (int64_t j = 0; j < Q; ++j) {
+          if ((i+1) * (j+1) <= N) {
+            Hatrix::Particle p({(double)i/M, (double)j/Q}, count);
+            particles[count] = p;
+            count++;
+          }
+        }
       }
     }
     else if (ndim == 3) {
-      abort();
+      // Generate a unit cube mesh with N points around the surface
+      const int64_t mlen = (int64_t)ceil((double)N / 6.);
+      const double alen = std::sqrt((double)mlen);
+      const int64_t m = (int64_t)std::ceil(alen);
+      const int64_t n = (int64_t)std::ceil((double)mlen / m);
+
+      const double seg_fv = 1. / ((double)m - 1);
+      const double seg_fu = 1. / (double)n;
+      const double seg_sv = 1. / ((double)m + 1);
+      const double seg_su = 1. / ((double)n + 1);
+
+      for (int64_t i = 0; i < N; i++) {
+        const int64_t face = i / mlen;
+        const int64_t ii = i - face * mlen;
+        const int64_t x = ii / m;
+        const int64_t y = ii - x * m;
+        const int64_t x2 = y & 1;
+
+        double u, v;
+        double px, py, pz;
+
+        switch (face) {
+        case 0: // POSITIVE X
+          v = y * seg_fv;
+          u = (0.5 * x2 + x) * seg_fu;
+          px = 1.;
+          py = 2. * v - 1.;
+          pz = -2. * u + 1.;
+          break;
+        case 1: // NEGATIVE X
+          v = y * seg_fv;
+          u = (0.5 * x2 + x) * seg_fu;
+          px = -1.;
+          py = 2. * v - 1.;
+          pz = 2. * u - 1.;
+          break;
+        case 2: // POSITIVE Y
+          v = (y + 1) * seg_sv;
+          u = (0.5 * x2 + x + 1) * seg_su;
+          px = 2. * u - 1.;
+          py = 1.;
+          pz = -2. * v + 1.;
+          break;
+        case 3: // NEGATIVE Y
+          v = (y + 1) * seg_sv;
+          u = (0.5 * x2 + x + 1) * seg_su;
+          px = 2. * u - 1.;
+          py = -1.;
+          pz = 2. * v - 1.;
+          break;
+        case 4: // POSITIVE Z
+          v = y * seg_fv;
+          u = (0.5 * x2 + x) * seg_fu;
+          px = 2. * u - 1.;
+          py = 2. * v - 1.;
+          pz = 1.;
+          break;
+        case 5: // NEGATIVE Z
+          v = y * seg_fv;
+          u = (0.5 * x2 + x) * seg_fu;
+          px = -2. * u + 1.;
+          py = 2. * v - 1.;
+          pz = -1.;
+          break;
+        }
+
+        const double value = i;
+        particles[i] = Hatrix::Particle(px, py, pz, value);
+      }
     }
   }
 
@@ -290,13 +342,6 @@ namespace Hatrix {
           buffer[i].value = bodies[i].value;
         }
       }
-
-      // std::cout << "st: " << cell.start_index << " end: " << cell.end_index
-      //           << " lvl: " << cell.level << " +++ " << cell.key << " --- ";
-
-      // for (int axis = 0; axis < ndim; ++axis) {
-      //   std::cout << cell.center[axis] << " $$$ " << index_3d[axis];
-      // }
       return;
     }
 
@@ -336,11 +381,11 @@ namespace Hatrix {
       counter[octant]++;        // move to the next location in the sorted octant/quadrant.
     }
 
-    std::cout << "level: " << level << " size: ";
-    for (int ax = 0; ax < domain_divs; ++ax) {
-      std::cout << size[ax] << " ";
-    }
-    std::cout << std::endl;
+    // std::cout << "level: " << level << " size: ";
+    // for (int ax = 0; ax < domain_divs; ++ax) {
+    //   std::cout << size[ax] << " ";
+    // }
+    // std::cout << std::endl;
 
     for (int i = 0; i < cell.nchild; ++i) { cell_list.push_back(Cell(ndim));}
     Cell& first_child = cell_list[cell_list.size() - cell.nchild];
@@ -561,7 +606,7 @@ namespace Hatrix {
           cell.start_index = node * nleaf;
           cell.end_index = cell.start_index + nleaf;
         }
-        else {                  // non-leaf node from adjacent lower nodes.
+        else {                  // non-nleaf node from adjacent lower nodes.
           cell.nchild = 2;
           const int64_t child1_id = (pow(2, level+1) - 1) + node * 2;
           const int64_t child2_id = (pow(2, level+1) - 1) + node * 2 + 1;
@@ -586,29 +631,6 @@ namespace Hatrix {
       }
     }
 
-    // std::cout << "distances:\n";
-    // for (int i = 16; i < tree_list.size(); ++i) {
-    //   for (int j = 16; j < tree_list.size(); ++j) {
-    //     const auto& Ci = tree_list[i];
-    //     const auto& Cj = tree_list[j];
-
-    //     if (Ci.nchild == 0 && Cj.nchild == 0) {
-    //       double dist = 0;
-    //       for (int axis = 0; axis < ndim; ++axis) {
-    //         dist += pow(Ci.center[axis] - Cj.center[axis], 2);
-    //       }
-    //       dist = sqrt(dist);
-
-    //       std::cout << std::setw(6) << std::setprecision(3)
-    //                 << dist << " ";
-
-    //                 // << "(" << Ci.center[0] << ","
-    //                 // << Cj.center[0] << ")";
-    //     }
-    //   }
-    //   std::cout << std::endl;
-    // }
-
     return height;
   }
 
@@ -620,140 +642,65 @@ namespace Hatrix {
     return tree_height;
   }
 
-  int64_t
-  Domain::sort_generic_geometry_particles(const int64_t nleaf) {
-    assert(N % nleaf == 0);
-    const int64_t nblocks = N / nleaf;
+  void Domain::cardinal_sort_and_cell_generation(const int64_t nleaf) {
+    int64_t max_level = log2(N / nleaf);
 
-    std::vector<Cell> temp_cell_list;
+    for (int64_t level = 0; level <= max_level; ++level) {
+      int64_t nblocks = pow(2, level);
+      int64_t split = N / nblocks;
+      for (int64_t node = 0; node < nblocks; ++node) {
+        int64_t start_index = node * split;
+        int64_t end_index = (node + 1) * split;
 
-    temp_cell_list.reserve(nblocks * log(nblocks));
-    // Bounding box of the root cell.
-    Cell root(ndim);
-    root.start_index = 0;
-    root.end_index = N;
-    root.radius = 0;
-    for (int64_t axis = 0; axis < ndim; ++axis) {
-      auto axis_min = get_axis_min(0, N, axis);
-      auto axis_max = get_axis_max(0, N, axis);
+        Cell cell(ndim);
 
-      Xmin[axis] = axis_min;
-      Xmax[axis] = axis_max;
+        cell.start_index = start_index;
+        cell.end_index = end_index;
+        cell.level = level;
+        cell.key = node;
 
-      root.radii[axis] = std::abs(axis_max - axis_min) / 2;
-      root.center[axis] = (axis_min + axis_max) / 2;
-      root.radius = std::max(std::abs(root.radii[axis] - axis_min), root.radius);
-      root.radius = std::max(std::abs(axis_max - root.radii[axis]), root.radius);
-    }
-    root.level = 0;
-    temp_cell_list.push_back(root);
+        // Find the longest axis
+        int longest_axis = 0;
+        double longest_axis_len = std::numeric_limits<double>::min();
+        // std::cout << "\t";
+        for (int axis = 0; axis < ndim; ++axis) {
+          double min_c = std::numeric_limits<double>::max(),
+            max_c = std::numeric_limits<double>::min();
+          for (int64_t i = start_index; i < end_index; ++i) {
+            min_c = std::min(particles[i].coords[axis], min_c);
+            max_c = std::max(particles[i].coords[axis], max_c);
+          }
 
-    std::vector<Particle> buffer = particles;
-    sort_particles_and_build_tree(buffer.data(), particles.data(),
-                                  0, N,
-                                  0, temp_cell_list,
-                                  nleaf, 0, false);
+          double axis_len = max_c - min_c;
+          if (axis_len > longest_axis_len) {
+            longest_axis = axis;
+            longest_axis_len = axis_len;
+          }
 
-    int64_t max_level = 0;
-    for (auto cell : temp_cell_list) { max_level = std::max(max_level, cell.level); }
-
-    std::vector<std::tuple<Cell, int64_t> > hilbert_permute_vector;
-    hilbert_permute_vector.reserve(nblocks);
-    for (auto cell : temp_cell_list) {
-      if (cell.nchild == 0) { // leaf level
-        auto hilbert_level = cell.level;
-        auto hilbert_id = cell.key;
-
-        while (hilbert_level < max_level) {
-          hilbert_id = get_hilbert_id_child(hilbert_id);
-          hilbert_level++;
+          cell.center[axis] = (max_c + min_c) / 2;
+          cell.radii[axis] = (max_c - min_c) / 2;
         }
 
-        std::tuple<Cell, int64_t> t = std::make_tuple(cell, hilbert_id);
-        hilbert_permute_vector.push_back(t);
-      }
-    }
-
-    // std::cout << "circle centers: ";
-    // for (auto c : hilbert_permute_vector) {
-    //   auto cell = std::get<0>(c);
-    //   auto h_id = std::get<1>(c);
-    //   for (int axis = 0; axis < ndim; ++axis) {
-    //     std::cout << cell.center[axis] << ",";
-    //   }
-    //   std::cout << " -- " << h_id;
-    //   std::cout << std::endl;
-    // }
-    // std::cout << std::endl;
-
-    // Sort the molecules based on the hilbert index generated during the tree generation.
-    std::sort(hilbert_permute_vector.begin(), hilbert_permute_vector.end(),
-              [](const std::tuple<Cell, int64_t>& a,
-                 const std::tuple<Cell, int64_t>& b) {
-                return std::get<1>(a) <= std::get<1>(b); // sort based on hilbert index.
-              });
-
-    // std::cout << "sorted hilbert permute vector: ";
-    // for (auto c : hilbert_permute_vector) {
-    //   const auto a = std::get<1>(c);
-    //   std::cout << a << " ";
-    // }
-    // std::cout << std::endl;
-
-    // Sort the electrons (actual Particles in the Domain) based on the sorted molecules.
-    std::vector<Particle> temp = particles;
-    int64_t count = 0;
-    for (int64_t i = 0; i < nblocks; ++i) {
-      const auto& t = hilbert_permute_vector[i];
-      const Cell& cell = std::get<0>(t);
-      const int64_t src_begin = cell.start_index;
-      const int64_t dst_begin = count;
-
-      for (int64_t k = 0; k < nleaf; ++k) {
-        particles[dst_begin + k] = temp[src_begin + k];
-      }
-      count += nleaf;
-    }
-
-    // for (const auto& p : hilbert_permute_vector) {
-    //   auto h = std::get<1>(p);
-    //   std::cout << h << " ";
-    // }
-    // std::cout << std::endl;
-
-    auto get_sort_axis = [this](const int64_t start_index, const int64_t end_index) {
-      double max_radius = 0;
-      int64_t sort_axis = 0;
-      for (int axis = 0; axis < ndim; ++axis) {
-        const auto Xmin = get_axis_min(start_index, end_index, axis);
-        const auto Xmax = get_axis_max(start_index, end_index, axis);
-        const auto radius = (Xmax - Xmin) / 2.0;
-        if (radius > max_radius) {
-          max_radius = radius;
-          sort_axis = axis;
+        // Sort the particles according to the longest axis.
+        std::sort(particles.begin() + start_index,
+                  particles.begin() + end_index,
+                  [longest_axis](const Particle& a,
+                                 const Particle& b) {
+                    return a.coords[longest_axis] < b.coords[longest_axis];
+                  });
+        cell.radius = longest_axis_len;
+        if (level == max_level) {
+          cell.nchild = 0;
         }
+        else {
+          cell.nchild = 2;
+        }
+
+        tree_list.push_back(cell);
       }
-
-      return sort_axis;
-    };
-
-    // Sort the electrons within the molecules
-    for (int64_t mol = 0; mol < nblocks; ++mol) {
-      // Sort along the longest axis.
-      const int64_t start_index = mol * nleaf;
-      const int64_t end_index = start_index + nleaf;
-      const int64_t sort_axis = get_sort_axis(start_index, end_index);
-      std::sort(particles.begin() + start_index, particles.begin() + end_index,
-                [sort_axis](const Particle& a, const Particle& b) {
-                  return a.coords[sort_axis] < b.coords[sort_axis];
-                });
-
-      // Cut the molecules in half, find the longest axis for each half and
-      // then sort again.
     }
-
-    return max_level;
   }
+
 
   void Domain::read_xyz_chemical_file(const std::string& geometry_file,
                                       const int64_t num_electrons_per_atom) {

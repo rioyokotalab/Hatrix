@@ -71,7 +71,6 @@ namespace Hatrix {
     const int64_t i_level = Ci.level;
     const int64_t j_level = Cj.level;
 
-
     bool well_separated = false;
     if (i_level == j_level &&
         ((!opts.use_nested_basis && i_level == A.max_level) || opts.use_nested_basis)) {
@@ -161,22 +160,6 @@ namespace Hatrix {
   void
   init_geometry_admis(SymmetricSharedBasisMatrix& A,
                       const Domain& domain, const Args& opts) {
-    // for (int i = 63; i < domain.tree_list.size(); ++i) {
-    //   const Cell& c_i = domain.tree_list[i];
-    //   for (int j = 63; j < domain.tree_list.size(); ++j) {
-    //     const Cell& c_j = domain.tree_list[j];
-
-    //     double dist = 0;
-    //     for (int axis = 0; axis < opts.ndim; ++axis) {
-    //       dist += pow(c_i.center[axis] - c_j.center[axis], 2);
-    //       // std::cout << std::setw(20) << c.center[axis] << " ";
-    //     }
-    //     dist = std::sqrt(dist);
-
-    //     std::cout << std::setw(10) << std::setprecision(4) << dist << " ";
-    //   }
-    //   std::cout << std::endl;
-    // }
     dual_tree_traversal(A, 0, 0, domain, opts);
     // Using BLR2 so need an 'artificial' dense matrix level at max_level-1
     // for accumulation of the partial factorization.

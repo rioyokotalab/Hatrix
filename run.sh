@@ -33,7 +33,7 @@ exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-for N in 128 256 512; do
+for N in 128 256 512 1024 2048 4096; do
     nx=1
     ny=1
     nz=1
@@ -52,7 +52,7 @@ for N in 128 256 512; do
     # N=2048
     NLEAF=8
     MAX_RANK=4
-    NDIM=2
+    NDIM=3
     KERNEL_FUNC=laplace
 
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
@@ -65,7 +65,7 @@ for N in 128 256 512; do
            --kernel_func $KERNEL_FUNC \
            --kind_of_geometry grid \
            --admis_kind geometry \
-           --admis 0.3 \
+           --admis 0.7 \
            --geometry_file C60_fcc.xyz \
            --param_1 $interval_start --param_2 $interval_end \
            --use_nested_basis 1

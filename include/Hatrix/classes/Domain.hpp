@@ -39,8 +39,10 @@ namespace Hatrix {
                                        int64_t start_index, int64_t end_index,
                                        int64_t cell_list_index, std::vector<Cell>& cell_list,
                                        int64_t nleaf, int64_t level, bool direction);
+
   public:
     Domain(int64_t N, int64_t ndim);
+    void cardinal_sort_and_cell_generation(const int64_t nleaf);
     int64_t build_bottom_up_binary_tree(const int64_t molecule_size);
 
     void generate_circular_particles(double min_val, double max_val);
@@ -55,7 +57,9 @@ namespace Hatrix {
     // tree with near and far blocks.
     int64_t build_elses_tree(const int64_t molecule_size);
 
-    int64_t sort_generic_geometry_particles(const int64_t nleaf);
+    void sort_generic_geometry_particles(const int64_t start_index,
+                                         const int64_t end_index,
+                                         const int64_t nleaf);
 
     void print_file(std::string file_name);
 
