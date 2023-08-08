@@ -186,7 +186,7 @@ namespace Hatrix {
     }
 
     if (A.max_level != A.min_level) { A.min_level++; }
-    populate_near_far_lists(A);
+    // populate_near_far_lists(A);
   }
 
   static void

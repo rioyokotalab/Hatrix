@@ -3,7 +3,7 @@ BLAS_LIB     =  -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -Wl,--no-as-needed
              -lmkl_intel_lp64 -lmkl_gnu_thread -lmkl_core -lmkl_blacs_intelmpi_lp64 -lgomp -lpthread -lm -ldl
 PAPI_INCLUDE = $(shell pkg-config --cflags papi)
 PAPI_LIBS    = $(shell pkg-config --libs papi)
-CXXFLAGS     = -std=c++17 -O0 -g -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ \
+CXXFLAGS     = -std=c++17 -O3 -g -fopenmp -I. -Wall -I$(TOPSRCDIR)/include/ \
              -I$(TOPSRCDIR)/examples/common/ $(BLAS_INCLUDE) \
              -I/home/sameer.deshmukh/gsl-2.7.1/build/include \
              $(shell pkg-config --cflags gtest gtest_main) $(PAPI_INCLUDE) -DUSE_MKL

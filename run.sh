@@ -33,7 +33,7 @@ exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-for N in 128 256 512 1024 2048 4096; do
+for N in 1024; do
     nx=1
     ny=1
     nz=1
@@ -50,15 +50,15 @@ for N in 128 256 512 1024 2048 4096; do
     # Calcualte dimension of the resulting matrix.
     # N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
     # N=2048
-    NLEAF=8
+    NLEAF=64
     MAX_RANK=4
-    NDIM=3
+    NDIM=2
     KERNEL_FUNC=laplace
 
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
     interval_start=0
     interval_end=2048
-    mpirun -n 1 ./bin/H2_construct --N $N \
+    mpirun -n 2 ./bin/H2_construct --N $N \
            --ndim $NDIM \
            --nleaf $NLEAF \
            --max_rank $MAX_RANK \

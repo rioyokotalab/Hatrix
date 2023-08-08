@@ -122,6 +122,7 @@ void dist_matvec(ScaLAPACK_dist_matrix_t& A, int A_row_offset, int A_col_offset,
 // i, j, level -> block numbers.
 Matrix
 generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
+                          const Domain& domain,
                           const SymmetricSharedBasisMatrix& A) {
   int64_t block_size = opts.N / A.num_blocks[level];
   Matrix dense(block_size, block_size);
@@ -132,7 +133,15 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
       long int global_i = i * block_size + local_i;
       long int global_j = j * block_size + local_j;
       double value;
-      get_elses_matrix_value(&global_i, &global_j, &value);
+      if (opts.kernel_verbose == "elses_c60") {
+        global_i += 1;
+        global_j += 1;
+        get_elses_matrix_value(&global_i, &global_j, &value);
+      }
+      else {
+        value = opts.kernel(domain.particles[global_i].coords,
+                            domain.particles[global_j].coords);
+      }
 
       dense(local_i, local_j) = value;
     }
@@ -141,15 +150,22 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
   return dense;
 }
 
-void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
+void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
+                         const Domain& domain, const Args& opts) {
   int64_t nblocks = A.num_blocks[A.max_level];
   int64_t block_size = opts.N / nblocks;
 
   // Generate dense blocks and store them in the appropriate structure.
   for (int64_t i = 0; i < nblocks; ++i) {
     if (mpi_rank(i) == MPIRANK) {
-      Matrix Aij = generate_p2p_interactions(i, i, A.max_level, opts, A);
-      A.D.insert(i, i, A.max_level, std::move(Aij));
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (A.is_admissible.exists(i, j, A.max_level) &&
+            !A.is_admissible(i, j, A.max_level)) {
+          Matrix Aij = generate_p2p_interactions(i, i, A.max_level, opts,
+                                                 domain, A);
+          A.D.insert(i, i, A.max_level, std::move(Aij));
+        }
+      }
     }
   }
 
@@ -159,19 +175,27 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
   for (int64_t i = MYROW; i < nblocks; i += MPIGRID[0]) { // row cylic distribution.
     Matrix AY(opts.nleaf, opts.nleaf);
     for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) && A.is_admissible(i, j, A.max_level)) {
 
-      if (i != j) {
 #pragma omp parallel for collapse(2)
         for (int64_t local_i = 0; local_i < block_size; ++local_i) {
           for (int64_t local_j = 0; local_j < block_size; ++local_j) {
-            long int global_i = i * block_size + local_i + 1;
-            long int global_j = j * block_size + local_j + 1;
+            long int global_i = i * block_size + local_i;
+            long int global_j = j * block_size + local_j;
             double value;
-            get_elses_matrix_value(&global_i, &global_j, &value);
-
+            if (opts.kernel_verbose == "elses_c60") {
+              global_i += 1;
+              global_j += 1;
+              get_elses_matrix_value(&global_i, &global_j, &value);
+            }
+            else {
+              value = opts.kernel(domain.particles[global_i].coords,
+                                  domain.particles[global_j].coords);
+            }
             AY(local_i, local_j) += value;
           }
         }
+
       }
     }
 
@@ -206,7 +230,8 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
           int real_j = p_block * MPISIZE + j;
           if (i != j) {
             Matrix temp = matmul(A.U(i, A.max_level),
-                                 generate_p2p_interactions(i, real_j, A.max_level, opts, A),
+                                 generate_p2p_interactions(i, real_j, A.max_level, opts,
+                                                           domain, A),
                                  true, false);
 
             Matrix Uj(opts.nleaf, opts.max_rank);
@@ -251,7 +276,8 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A, const Args& opts) {
             int real_j = p_blocks * MPISIZE + j;
             if (i != real_j) {
               Matrix temp = matmul(A.U(i, A.max_level),
-                                   generate_p2p_interactions(i, real_j, A.max_level, opts, A),
+                                   generate_p2p_interactions(i, real_j, A.max_level, opts,
+                                                             domain, A),
                                    true, false);
 
               Matrix Uj(opts.nleaf, opts.max_rank);
@@ -276,8 +302,10 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   return Ubig_parent;
 }
 
-void construct_H2_matrix(SymmetricSharedBasisMatrix& A, const Args& opts) {
-  generate_leaf_nodes(A, opts);
+void construct_H2_matrix(SymmetricSharedBasisMatrix& A,
+                         const Domain& domain,
+                         const Args& opts) {
+  generate_leaf_nodes(A, domain, opts);
   RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
@@ -321,6 +349,7 @@ int main(int argc, char* argv[]) {
       domain.cardinal_sort_and_cell_generation(opts.nleaf);
     }
     else if (opts.ndim == 3) {
+      abort();
       domain.sector_sort(opts.nleaf);
       domain.build_bottom_up_binary_tree(opts.nleaf);
     }
@@ -334,6 +363,7 @@ int main(int argc, char* argv[]) {
       domain.cardinal_sort_and_cell_generation(opts.nleaf);
     }
     else if (opts.ndim == 3) {
+      abort();
       domain.sector_sort(opts.nleaf);
       domain.build_bottom_up_binary_tree(opts.nleaf);
     }
@@ -345,6 +375,7 @@ int main(int argc, char* argv[]) {
     domain.build_bottom_up_binary_tree(opts.nleaf);
   }
   else if (opts.kind_of_geometry == ELSES_C60_GEOMETRY) {
+    abort();
     const int64_t num_electrons_per_atom = 4;
     const int64_t num_atoms_per_molecule = 60;
     init_elses_state();
@@ -374,17 +405,16 @@ int main(int argc, char* argv[]) {
   A.num_blocks[A.max_level] = opts.N/opts.nleaf;
   init_geometry_admis(A, domain, opts);
 
-  A.print_structure();
   A.print_Csp(A.max_level);
 
-  // if (opts.admis_kind == GEOMETRY) {
-  //   init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
-  // }
-  // else if (opts.admis_kind == DIAGONAL) {
-  //   init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
-  // }
+  if (opts.admis_kind == GEOMETRY) {
+    init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
+  }
+  else if (opts.admis_kind == DIAGONAL) {
+    init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
+  }
 
-  // construct_H2_matrix(A, opts);
+  construct_H2_matrix(A, domain, opts);
 
 //   ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT),
 //     VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
