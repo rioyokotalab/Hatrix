@@ -43,6 +43,7 @@ namespace Hatrix {
   public:
     Domain(int64_t N, int64_t ndim);
     void cardinal_sort_and_cell_generation(const int64_t nleaf);
+    void sector_sort(const int64_t nleaf);
     int64_t build_bottom_up_binary_tree(const int64_t molecule_size);
 
     void generate_circular_particles(double min_val, double max_val);

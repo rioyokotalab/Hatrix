@@ -642,6 +642,11 @@ namespace Hatrix {
     return tree_height;
   }
 
+  void
+  Domain::sector_sort(const int64_t nleaf) {
+
+  }
+
   void Domain::cardinal_sort_and_cell_generation(const int64_t nleaf) {
     int64_t max_level = log2(N / nleaf);
 
