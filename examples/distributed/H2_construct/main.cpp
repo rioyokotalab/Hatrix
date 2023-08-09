@@ -27,6 +27,11 @@ static const int BEGIN_PROW = 0, BEGIN_PCOL = 0;
 int BLACS_CONTEXT;
 
 int
+indxg2l(int INDXGLOB, int NB, int NPROCS) {
+  return NB * ((INDXGLOB - 1) / ( NB * NPROCS)) + (INDXGLOB - 1) % NB + 1;
+}
+
+int
 indxl2g(int indxloc, int nb, int iproc, int nprocs) {
   return nprocs * nb * ((indxloc - 1) / nb) +
     (indxloc-1) % nb + ((nprocs + iproc) % nprocs) * nb + 1;
@@ -103,21 +108,6 @@ public:
     data[local_row + local_col * (size_t)local_nrows] = value;
   }
 };
-
-void dist_matvec(ScaLAPACK_dist_matrix_t& A, int A_row_offset, int A_col_offset, double alpha,
-                 ScaLAPACK_dist_matrix_t& X, int X_row_offset, int X_col_offset,
-                 double beta,
-                 ScaLAPACK_dist_matrix_t& B, int B_row_offset, int B_col_offset) {
-  const char TRANSA = 'N';
-  int INCX = 1, INCB = 1;
-  pdgemv_(&TRANSA, &A.nrows, &A.ncols, &alpha,
-          A.data.data(), &A_row_offset, &A_col_offset, A.DESC.data(),
-          X.data.data(), &X_row_offset, &X_col_offset, X.DESC.data(),
-          &INCX,
-          &beta,
-          B.data.data(), &B_row_offset, &B_col_offset, B.DESC.data(),
-          &INCB);
-}
 
 // i, j, level -> block numbers.
 Matrix
@@ -313,6 +303,29 @@ void construct_H2_matrix(SymmetricSharedBasisMatrix& A,
   }
 }
 
+// Distributed dense matrix vector product. Generates the dense matrix on the fly.
+// b = A * x
+void
+dist_matvec(const SymmetricSharedBasisMatrix& A,
+            const Domain& domain,
+            const Args& opts,
+            const std::vector<Matrix>& x,
+            std::vector<Matrix>& b) {
+  int64_t nblocks = pow(2, A.max_level);
+  for (int64_t j = 0; j < nblocks; ++j) {
+    Matrix xj(opts.nleaf, 1);
+    if (mpi_rank(j) == MPIRANK) {
+      int j_index = j / MPIGRID[0];
+      xj = x[j_index];
+    }
+
+    MPI_Bcast(&xj, xj.numel(), MPI_DOUBLE, mpi_rank(j), MPI_COMM_WORLD);
+    for (int64_t i = 0; i < nblocks; ++i) {
+
+    }
+  }
+}
+
 
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
@@ -332,9 +345,6 @@ int main(int argc, char* argv[]) {
   Cblacs_get(-1, 0, &BLACS_CONTEXT );
   Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
   Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
-
-  std::mt19937 gen(MPIRANK);
-  std::uniform_real_distribution<double> dist(0, 1);
 
   SymmetricSharedBasisMatrix A;
 
@@ -398,14 +408,8 @@ int main(int argc, char* argv[]) {
 
   int64_t construct_max_rank;
 
-
-  // Making BLR for now.
-
   A.num_blocks.resize(A.max_level+1);
   A.num_blocks[A.max_level] = opts.N/opts.nleaf;
-  init_geometry_admis(A, domain, opts);
-
-  A.print_Csp(A.max_level);
 
   if (opts.admis_kind == GEOMETRY) {
     init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
@@ -413,40 +417,37 @@ int main(int argc, char* argv[]) {
   else if (opts.admis_kind == DIAGONAL) {
     init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   }
+  A.print_Csp(A.max_level);
 
   construct_H2_matrix(A, domain, opts);
 
-//   ScaLAPACK_dist_matrix_t VECTOR_B(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT),
-//     VECTOR_X(N, 1, SCALAPACK_BLOCK_SIZE, 1, BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+  std::vector<Matrix> x, actual_b, expected_b;
+  for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
+    x.push_back(Matrix(opts.nleaf, 1));
+    actual_b.push_back(Matrix(opts.nleaf, 1));
+    expected_b.push_back(Matrix(opts.nleaf, 1));
+  }
 
-//   // scope the construction so the memory is deleted after construction.
-//   {
-//     ScaLAPACK_dist_matrix_t DENSE(N, N, SCALAPACK_BLOCK_SIZE, SCALAPACK_BLOCK_SIZE,
-//                                   BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+  std::mt19937 gen(MPIRANK);
+  std::uniform_real_distribution<double> dist(0, 1);
+  for (int block = MPIRANK; block < pow(2, A.max_level); block += MPISIZE) {
+    int index = block / MPISIZE;
 
-// #pragma omp parallel for collapse(2)
-//     for (size_t i = 0; i < DENSE.local_nrows; ++i) {
-//       for (size_t j = 0; j < DENSE.local_ncols; ++j) {
-//         long int g_row = indxl2g(i + 1, SCALAPACK_BLOCK_SIZE, MYROW, MPIGRID[0]) + 1;
-//         long int g_col = indxl2g(j + 1, SCALAPACK_BLOCK_SIZE, MYCOL, MPIGRID[1]) + 1;
-//         double val;
-//         get_elses_matrix_value(&g_row, &g_col, &val);
-//         DENSE.set_local(i, j, val);
-//       }
-//     }
+    for (int i = 0; i < opts.nleaf; ++i) {
+      int g_row = block * opts.nleaf + i + 1;
+      double value = dist(gen);
 
-// #pragma omp parallel for
-//     for (int i = 0; i < VECTOR_X.local_nrows; ++i) {
-//       VECTOR_X.set_local(i, 0, dist(gen));
-//       VECTOR_B.set_local(i, 0, 0);
-//     }
+      int l_row = indxg2l(g_row, opts.nleaf, MPIGRID[0]) - 1;
+      int l_col = 0;
 
-//     dist_matvec(DENSE, 1, 1, 1.0,
-//                 VECTOR_X, 1, 1,
-//                 0.0,
-//                 VECTOR_B, 1, 1);
+      x[index](i, 0) = value;  // assign random data to x.
+      actual_b[index](i, 0) = 0.0;    // set b to 0.
+      expected_b[index](i, 0) = 0.0;    // set b to 0.
+    }
+  }
 
-//   }
+  // multiply dense matix with x. DENSE * x = actual_b
+  dist_matvec(A, domain, opts, x, actual_b);
 
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);

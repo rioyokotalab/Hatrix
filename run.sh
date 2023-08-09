@@ -58,7 +58,7 @@ for N in 1024; do
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
     interval_start=0
     interval_end=2048
-    mpirun -n 2 ./bin/H2_construct --N $N \
+    mpirun -n 1 ./bin/H2_construct --N $N \
            --ndim $NDIM \
            --nleaf $NLEAF \
            --max_rank $MAX_RANK \
