@@ -203,8 +203,6 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
     int64_t temp_bases_offset = (i / MPISIZE) * opts.nleaf * opts.max_rank;
 
-    std::cout << "i : " << i << std::endl;
-
     MPI_Allgather(&A.U(i, A.max_level),
                   opts.nleaf * opts.max_rank,
                   MPI_DOUBLE,
@@ -215,19 +213,27 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   }
 
   for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
-    int64_t temp_bases_offset = (i / MPISIZE) * opts.nleaf * opts.max_rank;
-    Matrix Ui(opts.nleaf, opts.max_rank);
 
-#pragma omp parallel for collapse(2)
-    for (int64_t U_i = 0; U_i < opts.nleaf; ++U_i) {
-      for (int64_t U_j = 0; U_j < opts.max_rank; ++U_j) {
-        Ui(U_i, U_j) = temp_bases[temp_bases_offset + U_i + U_j * opts.nleaf];
-      }
-    }
 
     for (int64_t j = 0; j < nblocks; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
+        int64_t temp_bases_offset = (j / MPISIZE) * opts.nleaf * opts.max_rank;
+        Matrix Uj(opts.nleaf, opts.max_rank);
+
+#pragma omp parallel for collapse(2)
+        for (int64_t Uj_i = 0; Uj_i < opts.nleaf; ++Uj_i) {
+          for (int64_t Uj_j = 0; Uj_j < opts.max_rank; ++Uj_j) {
+            Uj(Uj_i, Uj_j) = temp_bases[temp_bases_offset + Uj_i + Uj_j * opts.nleaf];
+          }
+        }
+
+        Matrix temp = matmul(A.U(i, A.max_level),
+                             generate_p2p_interactions(i, j, A.max_level, opts,
+                                                       domain, A),
+                             true, false);
+        auto S_block = matmul(temp, Uj);
+        A.S.insert(i, j, A.max_level, std::move(S_block));
       }
     }
   }
