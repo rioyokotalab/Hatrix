@@ -117,7 +117,7 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
   int64_t block_size = opts.N / A.num_blocks[level];
   Matrix dense(block_size, block_size);
 
-#pragma omp parallel for collapse(2)
+
   for (int64_t local_i = 0; local_i < block_size; ++local_i) {
     for (int64_t local_j = 0; local_j < block_size; ++local_j) {
       long int global_i = i * block_size + local_i;
@@ -146,15 +146,13 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   int64_t block_size = opts.N / nblocks;
 
   // Generate dense blocks and store them in the appropriate structure.
-  for (int64_t i = 0; i < nblocks; ++i) {
-    if (mpi_rank(i) == MPIRANK) {
-      for (int64_t j = 0; j < nblocks; ++j) {
-        if (A.is_admissible.exists(i, j, A.max_level) &&
-            !A.is_admissible(i, j, A.max_level)) {
-          Matrix Aij = generate_p2p_interactions(i, i, A.max_level, opts,
-                                                 domain, A);
-          A.D.insert(i, i, A.max_level, std::move(Aij));
-        }
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
+        Matrix Aij = generate_p2p_interactions(i, j, A.max_level, opts,
+                                               domain, A);
+        A.D.insert(i, j, A.max_level, std::move(Aij));
       }
     }
   }
@@ -213,8 +211,6 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   }
 
   for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
-
-
     for (int64_t j = 0; j < nblocks; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
@@ -237,95 +233,6 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       }
     }
   }
-
-
-
-  // // Calculate the skeleton blocks.
-  // for (int i = 0; i < nblocks; ++i) {
-  //   std::vector<double> Utemp_buffer(opts.nleaf * opts.max_rank * MPISIZE);
-
-  //   int p_blocks = nblocks / MPISIZE;
-
-  //   for (int p_block = 0; p_block < p_blocks; ++p_block) {
-  //     int j = MPISIZE * p_block + MYROW;
-
-  //     // send, recv
-  //     MPI_Gather(&A.U(j, A.max_level),
-  //                A.U(j, A.max_level).numel(),
-  //                MPI_DOUBLE,
-  //                Utemp_buffer.data(),
-  //                opts.nleaf * opts.max_rank,
-  //                MPI_DOUBLE,
-  //                mpi_rank(i),
-  //                MPI_COMM_WORLD);
-
-  //     if (mpi_rank(i) == MPIRANK) {
-  //       for (int j = 0; j < MPISIZE; ++j) {
-  //         int real_j = p_block * MPISIZE + j;
-  //         if (A.is_admissible.exists(i, j, A.max_level) && A.is_admissible(i, j, A.max_level)) {
-  //           Matrix temp = matmul(A.U(i, A.max_level),
-  //                                generate_p2p_interactions(i, real_j, A.max_level, opts,
-  //                                                          domain, A),
-  //                                true, false);
-
-  //           Matrix Uj(opts.nleaf, opts.max_rank);
-  //           array_copy(&Utemp_buffer[(opts.nleaf * opts.max_rank) * j], &Uj, Uj.numel());
-
-  //           auto S_block = matmul(temp, Uj);
-
-  //           A.S.insert(i, real_j, A.max_level, std::move(S_block));
-  //         }
-  //       }
-  //     }
-  //   }
-
-  //   int leftover_nprocs = nblocks - p_blocks * MPISIZE;
-
-  //   // Leftover block group communication. Second condition is needed to limit
-  //   // the root process calculation to within the leftover processes?
-  //   if (p_blocks * MPISIZE < nblocks && mpi_rank(i) < leftover_nprocs) {
-  //     int j = MPISIZE * p_blocks + MYROW;
-
-  //     MPI_Comm MPI_ROW_I_PROCESSES;
-  //     int color = j < nblocks ? 1 : 0;
-  //     int key = MYROW;
-
-  //     MPI_Comm_split(MPI_COMM_WORLD,
-  //                    color, key,
-  //                    &MPI_ROW_I_PROCESSES);
-
-  //     if (j < nblocks && mpi_rank(i) < leftover_nprocs) {
-  //       int root_proc = translate_rank_comm_world(leftover_nprocs, mpi_rank(i), MPI_ROW_I_PROCESSES);
-  //       MPI_Gather(&A.U(j, A.max_level),
-  //                  A.U(j, A.max_level).numel(),
-  //                  MPI_DOUBLE,
-  //                  Utemp_buffer.data(),
-  //                  opts.nleaf * opts.max_rank,
-  //                  MPI_DOUBLE,
-  //                  root_proc,
-  //                  MPI_ROW_I_PROCESSES);
-
-  //       if (mpi_rank(i) == MPIRANK) {
-  //         for (int j = 0; j < leftover_nprocs; ++j) {
-  //           int real_j = p_blocks * MPISIZE + j;
-  //           if (i != real_j) {
-  //             Matrix temp = matmul(A.U(i, A.max_level),
-  //                                  generate_p2p_interactions(i, real_j, A.max_level, opts,
-  //                                                            domain, A),
-  //                                  true, false);
-
-  //             Matrix Uj(opts.nleaf, opts.max_rank);
-  //             array_copy(&Utemp_buffer[(opts.nleaf * opts.max_rank) * j], &Uj, Uj.numel());
-
-  //             auto S_block = matmul(temp, Uj);
-
-  //             A.S.insert(i, real_j, A.max_level, std::move(S_block));
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
 }
 
 static RowLevelMap
@@ -366,19 +273,6 @@ dist_matvec_h2(const SymmetricSharedBasisMatrix& A,
     x_hat_offset++;
   }
 
-  // Multiply the bases from the remaining levels.
-  // for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
-  //   for (int64_t i = 0; i < nblocks; ++i) {
-  //     int64_t index_i = i / MPISIZE;
-  //     Matrix x_hat_i(opts.max_rank, 1);
-  //     if (mpi_rank(i) == MPIRANK) {
-  //       x_hat_i = x_hat[index_i];
-  //     }
-
-  //     MPI_Bcast();
-  //   }
-  // }
-
   // Init temp blocks for intermediate products.
   std::vector<Matrix> b_hat;
   for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
@@ -398,9 +292,32 @@ dist_matvec_h2(const SymmetricSharedBasisMatrix& A,
       int64_t index_i = i / MPIGRID[0];
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
-        // std::cout << "i: " << i << " j: " << j << std::endl;
-        // const Matrix& Sij = A.S(i, j, A.max_level);
-        // matmul(Sij, x_hat_j, b_hat[index_i]);
+        const Matrix& Sij = A.S(i, j, A.max_level);
+        matmul(Sij, x_hat_j, b_hat[index_i]);
+      }
+    }
+  }
+
+  // Update with row bases.
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+    int64_t index_i = i / MPISIZE;
+    matmul(A.U(i, A.max_level), b_hat[index_i], b[index_i], false, false, 1, 1);
+  }
+
+
+  for (int64_t j = 0; j < nblocks; ++j) {
+    Matrix x_j(opts.nleaf, 1);
+    if (mpi_rank(j) == MPIRANK) {
+      int j_index = j / MPISIZE;
+      x_j = x[j_index];
+    }
+
+    MPI_Bcast(&x_j, x_j.numel(), MPI_DOUBLE, mpi_rank(j), MPI_COMM_WORLD);
+    for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
+        int i_index = i / MPISIZE;
+        matmul(A.D(i, j, A.max_level), x_j, b[i_index], false, false, 1, 1);
       }
     }
   }
@@ -558,6 +475,29 @@ int main(int argc, char* argv[]) {
 
   // multiply H2 matrix with x. H2 * x = expected_b
   dist_matvec_h2(A, domain, opts, x, expected_b);
+
+  double local_norm[2] = {0, 0};
+  for (int64_t i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
+    local_norm[0] += pow(norm(actual_b[i] - expected_b[i]), 2);
+    local_norm[1] += pow(norm(actual_b[i]), 2);
+    std::cout << "actual: " << local_norm[1] << std::endl;
+  }
+  double global_norm[2] = {0, 0};
+  MPI_Reduce(&local_norm,
+             &global_norm,
+             2,
+             MPI_DOUBLE,
+             MPI_SUM,
+             0,                 // root process
+             MPI_COMM_WORLD);
+  global_norm[0] = sqrt(global_norm[0]);
+  global_norm[1] = sqrt(global_norm[1]);
+
+  if (!MPIRANK) {
+    double diff = global_norm[0];
+    double actual =  global_norm[1];
+    std::cout << "construct rel err: " << diff / actual << std::endl;
+  }
 
   Cblacs_gridexit(BLACS_CONTEXT);
   Cblacs_exit(1);

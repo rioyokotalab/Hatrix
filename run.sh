@@ -51,14 +51,17 @@ for N in 1024; do
     # N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
     # N=2048
     NLEAF=64
-    MAX_RANK=4
+    MAX_RANK=20
     NDIM=2
     KERNEL_FUNC=laplace
 
     # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
-    interval_start=0
-    interval_end=2048
-    mpirun -n 4 ./bin/H2_construct --N $N \
+    # interval_start=0
+    # interval_end=2048
+
+    # Laplace kernel paramters
+    p1=1e-9
+    mpirun -n 1 ./bin/H2_construct --N $N \
            --ndim $NDIM \
            --nleaf $NLEAF \
            --max_rank $MAX_RANK \
@@ -67,6 +70,6 @@ for N in 1024; do
            --admis_kind geometry \
            --admis 0.7 \
            --geometry_file C60_fcc.xyz \
-           --param_1 $interval_start --param_2 $interval_end \
+           --param_1 $p1 \
            --use_nested_basis 1
 done
