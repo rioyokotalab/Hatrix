@@ -35,7 +35,7 @@ fcc_xml_file=C60_fcc.xml
 exec_supercell=$ELSES_ROOT/make_supercell_C60_FCCs_w_noise/a.out
 exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
-make -j H2_construct
+# make -j H2_construct
 
 for N in 2048 4096 8192 16384 32768 131072 262144 524288 1048576; do
     nx=1
