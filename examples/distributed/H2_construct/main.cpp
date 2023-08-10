@@ -440,8 +440,7 @@ int main(int argc, char* argv[]) {
   else if (opts.admis_kind == DIAGONAL) {
     init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   }
-  A.print_Csp(A.max_level);
-  A.print_structure();
+  // A.print_structure();
 
   construct_H2_matrix(A, domain, opts);
 
@@ -478,9 +477,9 @@ int main(int argc, char* argv[]) {
 
   double local_norm[2] = {0, 0};
   for (int64_t i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
-    local_norm[0] += pow(norm(actual_b[i] - expected_b[i]), 2);
-    local_norm[1] += pow(norm(actual_b[i]), 2);
-    std::cout << "actual: " << local_norm[1] << std::endl;
+    int64_t index_i = i / MPISIZE;
+    local_norm[0] += pow(norm(actual_b[index_i] - expected_b[index_i]), 2);
+    local_norm[1] += pow(norm(actual_b[index_i]), 2);
   }
   double global_norm[2] = {0, 0};
   MPI_Reduce(&local_norm,
@@ -496,7 +495,14 @@ int main(int argc, char* argv[]) {
   if (!MPIRANK) {
     double diff = global_norm[0];
     double actual =  global_norm[1];
-    std::cout << "construct rel err: " << diff / actual << std::endl;
+
+    std::cout << "diff: " << diff << " actual: " << actual << std::endl;
+
+    std::cout << "N       : " << opts.N << std::endl
+              << "nleaf   : " << opts.nleaf << std::endl
+              << "max rank: " << opts.max_rank << std::endl
+              << "construct rel err: " << diff / actual << std::endl
+              << "Csp              : " << A.Csp(A.max_level) << std::endl;
   }
 
   Cblacs_gridexit(BLACS_CONTEXT);

@@ -683,7 +683,7 @@ namespace Hatrix {
           }
 
           cell.center[axis] = (max_c + min_c) / 2;
-          cell.radii[axis] = (max_c - min_c) / 2;
+          cell.radii[axis] = std::abs(max_c - min_c) / 2;
         }
 
         // Sort the particles according to the longest axis.

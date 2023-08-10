@@ -18,7 +18,7 @@ namespace Hatrix {
     int64_t average_rank();
     void print_structure();
     int64_t leaf_dense_blocks();
-    void print_Csp(int64_t level);
+    double Csp(int64_t level);
 
     SymmetricSharedBasisMatrix();
     SymmetricSharedBasisMatrix(const SymmetricSharedBasisMatrix& A); // deep copy

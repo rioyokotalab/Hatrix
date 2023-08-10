@@ -88,8 +88,12 @@ namespace Hatrix {
       //   ci_size += pow(Ci.radii[axis], 2);
       //   cj_size += pow(Cj.radii[axis], 2);
       // }
+      // ci_size = sqrt(ci_size);
+      // cj_size = sqrt(cj_size);
 
-      if (distance > ((ci_size + cj_size) * opts.admis)) {
+      // std::cout << "d: " << distance
+      //           << " value: " << ((ci_size + cj_size) * opts.admis) << std::endl;
+      if (distance >= ((ci_size + cj_size) * opts.admis)) {
         well_separated = true;
       }
 

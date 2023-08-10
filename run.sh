@@ -37,7 +37,7 @@ for N in 1024; do
     nx=1
     ny=1
     nz=1
-    # Generate the xml file from the source geometry depenending on the number of repetitions specified.
+# Generate the xml file from the source geometry depenending on the number of repetitions specified.
     $exec_supercell $nx $ny $nz $source_file
 
     cp C60_fcc.xyz $ELSES_ROOT/make_supercell_C60_FCCs_w_noise
@@ -50,26 +50,27 @@ for N in 1024; do
     # Calcualte dimension of the resulting matrix.
     # N=$(($nx * $ny * $nz * 1 * 1 * 1 * 32 * 60 * 4))
     # N=2048
-    NLEAF=64
-    MAX_RANK=20
-    NDIM=2
-    KERNEL_FUNC=laplace
+    for MAX_RANK in 25; do
+        NLEAF=64
+        NDIM=2
+        KERNEL_FUNC=laplace
 
-    # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
-    # interval_start=0
-    # interval_end=2048
+        # Values from Ridwan's paper where the correct k-th eigen value of the matrix resides.
+        # interval_start=0
+        # interval_end=2048
 
-    # Laplace kernel paramters
-    p1=1e-9
-    mpirun -n 1 ./bin/H2_construct --N $N \
-           --ndim $NDIM \
-           --nleaf $NLEAF \
-           --max_rank $MAX_RANK \
-           --kernel_func $KERNEL_FUNC \
-           --kind_of_geometry grid \
-           --admis_kind geometry \
-           --admis 0.7 \
-           --geometry_file C60_fcc.xyz \
-           --param_1 $p1 \
-           --use_nested_basis 1
+        # Laplace kernel paramters
+        p1=1e-9
+        mpirun -n 2 ./bin/H2_construct --N $N \
+               --ndim $NDIM \
+               --nleaf $NLEAF \
+               --max_rank $MAX_RANK \
+               --kernel_func $KERNEL_FUNC \
+               --kind_of_geometry grid \
+               --admis_kind geometry \
+               --admis 0.7 \
+               --geometry_file C60_fcc.xyz \
+               --param_1 $p1 \
+               --use_nested_basis 0
+    done
 done
