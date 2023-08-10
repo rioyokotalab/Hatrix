@@ -160,10 +160,11 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   double ALPHA = 1.0, BETA = 1.0;
 
   // Accumulate admissible blocks from the large dist matrix.
-  for (int64_t i = MPIRANK; i < nblocks; i += MPIGRID[0]) { // row cylic distribution.
+  for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) { // row cylic distribution.
     Matrix AY(opts.nleaf, opts.nleaf);
     for (int64_t j = 0; j < nblocks; ++j) {
-      if (A.is_admissible.exists(i, j, A.max_level) && A.is_admissible(i, j, A.max_level)) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          A.is_admissible(i, j, A.max_level)) {
 
 #pragma omp parallel for collapse(2)
         for (int64_t local_i = 0; local_i < block_size; ++local_i) {
@@ -183,7 +184,6 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
             AY(local_i, local_j) += value;
           }
         }
-
       }
     }
 
@@ -199,7 +199,7 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
 
   std::vector<double> temp_bases(opts.nleaf * opts.max_rank * temp_blocks, 0);
   for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
-    int64_t temp_bases_offset = (i / MPISIZE) * opts.nleaf * opts.max_rank;
+    int64_t temp_bases_offset = ((i / MPISIZE) * MPISIZE) * opts.nleaf * opts.max_rank;
 
     MPI_Allgather(&A.U(i, A.max_level),
                   opts.nleaf * opts.max_rank,
@@ -214,7 +214,7 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     for (int64_t j = 0; j < nblocks; ++j) {
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
-        int64_t temp_bases_offset = (j / MPISIZE) * opts.nleaf * opts.max_rank;
+        int64_t temp_bases_offset = j * opts.nleaf * opts.max_rank;
         Matrix Uj(opts.nleaf, opts.max_rank);
 
 #pragma omp parallel for collapse(2)
@@ -288,8 +288,8 @@ dist_matvec_h2(const SymmetricSharedBasisMatrix& A,
     }
     MPI_Bcast(&x_hat_j, x_hat_j.numel(), MPI_DOUBLE, mpi_rank(j), MPI_COMM_WORLD);
 
-    for (int64_t i = MPIRANK; i < nblocks; i += MPIGRID[0]) {
-      int64_t index_i = i / MPIGRID[0];
+    for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
+      int64_t index_i = i / MPISIZE;
       if (A.is_admissible.exists(i, j, A.max_level) &&
           A.is_admissible(i, j, A.max_level)) {
         const Matrix& Sij = A.S(i, j, A.max_level);
@@ -303,7 +303,6 @@ dist_matvec_h2(const SymmetricSharedBasisMatrix& A,
     int64_t index_i = i / MPISIZE;
     matmul(A.U(i, A.max_level), b_hat[index_i], b[index_i], false, false, 1, 1);
   }
-
 
   for (int64_t j = 0; j < nblocks; ++j) {
     Matrix x_j(opts.nleaf, 1);
@@ -458,7 +457,7 @@ int main(int argc, char* argv[]) {
 
     for (int i = 0; i < opts.nleaf; ++i) {
       int g_row = block * opts.nleaf + i + 1;
-      double value = dist(gen);
+      double value = i;
 
       int l_row = indxg2l(g_row, opts.nleaf, MPIGRID[0]) - 1;
       int l_col = 0;
@@ -495,8 +494,6 @@ int main(int argc, char* argv[]) {
   if (!MPIRANK) {
     double diff = global_norm[0];
     double actual =  global_norm[1];
-
-    std::cout << "diff: " << diff << " actual: " << actual << std::endl;
 
     std::cout << "N       : " << opts.N << std::endl
               << "nleaf   : " << opts.nleaf << std::endl
