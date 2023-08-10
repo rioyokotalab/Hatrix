@@ -1024,7 +1024,8 @@ void SymmetricH2::factorize(const Domain& domain) {
           const int64_t ip = i / 2;
           const int64_t jp = j / 2;
           if ((!is_admissible.exists(ip, jp, parent_level)) ||
-              (is_admissible.exists(ip, jp, parent_level) && is_admissible(ip, jp, parent_level))) {
+              (is_admissible.exists(ip, jp, parent_level) &&
+               is_admissible(ip, jp, parent_level))) {
             parent_fill_in_neighbors(ip).insert(jp);
           }
         }

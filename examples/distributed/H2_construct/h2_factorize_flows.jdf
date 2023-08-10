@@ -1,0 +1,21 @@
+extern "C" %{
+  #include "math.h"
+  #include "ptg_interfaces.h"
+%}
+
+DENSE_BLOCKS [ type="parsec_data_collection_t*" ]
+
+ldl_diagonal(block, level)
+
+block = 0 .. %{ return pow(2, level) - 1; %}
+level = 1 .. 2
+
+: DENSE_BLOCKS(block, block, level)
+
+READ D <- DENSE_BLOCKS(block, block, level)
+
+BODY
+{
+
+}
+END

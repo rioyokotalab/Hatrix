@@ -124,6 +124,17 @@ SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix(const SymmetricSharedBasi
   S.deep_copy(A.S);
   D.deep_copy(A.D);
   U.deep_copy(A.U);
+  num_blocks = A.num_blocks;
 }
 
 SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix() {}
+
+extern "C" int
+H2_max_level(SymmetricSharedBasisMatrix* A) {
+  return A->max_level;
+}
+
+extern "C" int
+H2_min_level(SymmetricSharedBasisMatrix* A) {
+  return A->min_level;
+}

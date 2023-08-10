@@ -137,7 +137,7 @@ test: $(TEST_EXECUTABLES)
 .SILENT: clean
 clean:
 	for dir in $(DIRS)  \
-		examples/distributed/H2 \
+		examples/distributed/H2 examples/distributed/H2_construct \
 		examples/distributed/H2_dtd examples/distributed/H2_ptg \
 		$(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \

@@ -14,15 +14,23 @@
 #include "Hatrix/Hatrix.h"
 #include "distributed/distributed.hpp"
 
+#include "factorize_noparsec.hpp"
+#include "factorize_ptg.hpp"
+
+#include "parsec.h"
 #include "mpi.h"
 
+#ifdef HAS_ELSES_ENABLED
 extern "C" {
 #include "elses.h"
 }
+#endif
 
 using namespace Hatrix;
 
+constexpr double EPS = 1e-13;// std::numeric_limits<double>::epsilon();
 static const int BEGIN_PROW = 0, BEGIN_PCOL = 0;
+const int ONE = 1;
 
 int BLACS_CONTEXT;
 
@@ -47,7 +55,6 @@ translate_rank_comm_world(int num_ranks, int right_comm_rank, MPI_Comm right_com
   for (int i = 0; i < num_ranks; ++i) {
     left_rank[i] = i;
   }
-
 
   MPI_Group_translate_ranks(left_group, num_ranks, left_rank.data(),
                             right_group, right_rank.data());
@@ -109,6 +116,123 @@ public:
   }
 };
 
+int64_t
+get_basis_min_rank(const SymmetricSharedBasisMatrix& A, const Args& opts) {
+  return opts.max_rank; // const rank code.
+}
+
+int64_t
+get_basis_max_rank(const SymmetricSharedBasisMatrix& A, const Args& opts) {
+  return opts.max_rank; // const rank code.
+}
+
+void
+shift_diagonal(Matrix& dense, const double shift) {
+  for(int64_t i = 0; i < dense.min_dim(); i++) {
+    dense(i, i) += shift;
+  }
+}
+
+void
+factorize_dtd(SymmetricSharedBasisMatrix& A,
+              const Domain& domain,
+              const Args& opts) {
+}
+
+
+std::tuple<int64_t, int64_t, int64_t, bool>
+inertia(const SymmetricSharedBasisMatrix& A,
+        const Domain& domain,
+        const Args& opts,
+        const double lambda) {
+  bool singular = false;
+  SymmetricSharedBasisMatrix A_shifted(A);
+  int64_t nblocks = pow(2, A.max_level);
+  for (int64_t node = MPIRANK; node < nblocks; node += MPISIZE) {
+    shift_diagonal(A_shifted.D(node, node, A_shifted.max_level), -lambda);
+  }
+
+  // factorize_dtd(A_shifted, domain, opts);
+  factorize_ptg(A_shifted, domain, opts);
+  // factorize_noparsec(A_shifted, domain, opts);
+
+  int64_t negative_elements_count = 0;
+
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
+    for (int64_t node = MPIRANK; node < nblocks; node += MPISIZE) {
+      const Matrix& D_node = A_shifted.D(node, node, level);
+      const auto D_node_splits =
+        D_node.split(std::vector<int64_t>{D_node.rows - opts.max_rank},
+                     std::vector<int64_t>{D_node.cols - opts.max_rank});
+      const Matrix& D_lambda = D_node_splits[0];
+      for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
+        negative_elements_count += (D_lambda(i, i) < 0 ? 1 : 0);
+        if(std::isnan(D_lambda(i, i)) || std::abs(D_lambda(i, i)) < EPS) {
+          singular = true;
+        }
+      }
+    }
+  }
+
+  // Remaining blocks that are factorized as block-dense matrix
+  const int64_t level = A.min_level - 1;
+  const int64_t num_nodes = pow(2, level);
+  for (int64_t node = MPIRANK; node < num_nodes; node += MPISIZE) {
+    const Matrix& D_lambda = A_shifted.D(node, node, level);
+    for(int64_t i = 0; i < D_lambda.min_dim(); i++) {
+      negative_elements_count += (D_lambda(i, i) < 0 ? 1 : 0);
+      if(std::isnan(D_lambda(i, i)) || std::abs(D_lambda(i, i)) < EPS) {
+        singular = true;
+      }
+    }
+  }
+
+  const int64_t ldl_min_rank = get_basis_min_rank(A, opts);
+  const int64_t ldl_max_rank = get_basis_max_rank(A, opts);
+
+  return {negative_elements_count, ldl_min_rank, ldl_max_rank, singular};
+}
+
+std::tuple<double, int64_t, int64_t, double>
+get_mth_eigenvalue(const SymmetricSharedBasisMatrix& A,
+                   const Domain& domain, const Args& opts,
+                   const int64_t k, const double ev_tol,
+                   double left, double right) {
+  int64_t shift_min_rank = get_basis_min_rank(A, opts);
+  int64_t shift_max_rank = get_basis_max_rank(A, opts);
+  double max_rank_shift = -1;
+  bool singular;
+  while((right - left) >= ev_tol) {
+    const double mid = (left + right) / 2;
+    std::cout << "left: " << left << " right: " << right
+              << " mid: " << mid << std::endl;
+    int64_t num_negative_values, factor_min_rank, factor_max_rank;
+    std::tie(num_negative_values, factor_min_rank, factor_max_rank, singular) =
+      inertia(A, domain, opts, mid);
+
+    if (factor_max_rank > shift_max_rank) {
+      shift_min_rank = factor_min_rank;
+      shift_max_rank = factor_max_rank;
+      max_rank_shift = mid;
+    }
+
+    if (singular) {
+      std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
+      break;
+    }
+
+    if (num_negative_values >= k) {
+      right = mid;
+    }
+    else {
+      left = mid;
+    }
+  }
+
+  return {(left + right) / 2, shift_min_rank, shift_max_rank, max_rank_shift};
+}
+
 // i, j, level -> block numbers.
 Matrix
 generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
@@ -126,7 +250,12 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
       if (opts.kernel_verbose == "elses_c60") {
         global_i += 1;
         global_j += 1;
+
+#ifdef HAS_ELSES_ENABLED
         get_elses_matrix_value(&global_i, &global_j, &value);
+#else
+        abort();
+#endif
       }
       else {
         value = opts.kernel(domain.particles[global_i].coords,
@@ -175,7 +304,11 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
             if (opts.kernel_verbose == "elses_c60") {
               global_i += 1;
               global_j += 1;
+#ifdef HAS_ELSES_ENABLED
               get_elses_matrix_value(&global_i, &global_j, &value);
+#else
+              abort();
+#endif
             }
             else {
               value = opts.kernel(domain.particles[global_i].coords,
@@ -252,6 +385,19 @@ void construct_H2_matrix(SymmetricSharedBasisMatrix& A,
   for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
     Uchild = generate_transfer_matrices(A, opts, Uchild);
   }
+
+  // Final dense block for the factoirization.
+  int64_t final_level = A.min_level - 1;
+  int64_t final_nblocks = pow(2, final_level);
+  for (int64_t i = 0; i < final_nblocks; ++i) {
+    for (int64_t j = 0; j < final_nblocks; ++j) {
+      A.D.insert(i, j, final_level,
+                 Matrix(opts.max_rank * 2, opts.max_rank * 2));
+    }
+  }
+
+  // Generate graphs for traversal.
+
 }
 
 // H2 matrix-vector product.
@@ -334,24 +480,31 @@ dist_matvec_dense(const SymmetricSharedBasisMatrix& A,
   for (int64_t j = 0; j < nblocks; ++j) {
     Matrix xj(opts.nleaf, 1);
     if (mpi_rank(j) == MPIRANK) {
-      int j_index = j / MPIGRID[0];
+      int j_index = j / MPISIZE;
       xj = x[j_index];
     }
 
     MPI_Bcast(&xj, xj.numel(), MPI_DOUBLE, mpi_rank(j), MPI_COMM_WORLD);
-    for (int64_t i = MPIRANK; i < nblocks; i += MPIGRID[0]) {
+    for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
       Matrix Aij = generate_p2p_interactions(i, j, A.max_level, opts,
                                              domain, A);
-      int i_index = i / MPIGRID[0];
+      int i_index = i / MPISIZE;
       matmul(Aij, xj, b[i_index]); //  b = 1 * b + 1 * A * x
     }
   }
+}
+
+void
+construct_h2_matrix_graph_structures(const SymmetricSharedBasisMatrix& A,
+                                     const Domain& domain,
+                                     const Args& opts) {
 }
 
 
 int main(int argc, char* argv[]) {
   Hatrix::Context::init();
   Args opts(argc, argv);
+  const double ev_tol = 1e-7;
   int N = opts.N;
 
   assert(opts.N % opts.nleaf == 0);
@@ -362,11 +515,6 @@ int main(int argc, char* argv[]) {
   }
   MPI_Comm_size(MPI_COMM_WORLD, &MPISIZE);
   MPI_Comm_rank(MPI_COMM_WORLD, &MPIRANK);
-  MPIGRID[0] = MPISIZE; MPIGRID[1] = 1;
-
-  Cblacs_get(-1, 0, &BLACS_CONTEXT );
-  Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
-  Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
 
   SymmetricSharedBasisMatrix A;
 
@@ -407,10 +555,13 @@ int main(int argc, char* argv[]) {
     domain.build_bottom_up_binary_tree(opts.nleaf);
   }
   else if (opts.kind_of_geometry == ELSES_C60_GEOMETRY) {
-    abort();
     const int64_t num_electrons_per_atom = 4;
     const int64_t num_atoms_per_molecule = 60;
+#ifdef HAS_ELSES_ENABLED
     init_elses_state();
+#else
+    abort();
+#endif
     domain.read_xyz_chemical_file(opts.geometry_file, num_electrons_per_atom);
     A.max_level = domain.build_elses_tree(num_electrons_per_atom * num_atoms_per_molecule);
     A.min_level = 0;
@@ -426,23 +577,85 @@ int main(int argc, char* argv[]) {
               << " ndim: " << opts.ndim
               << std::endl;
 
+  // Generate a dense matrix and compute its eigenvalues for verification.
+  std::vector<double> DENSE_EIGENVALUES(opts.N, 0);
+#ifdef VERIFY_EIGEN
+  {
+    MPI_Dims_create(MPISIZE, 2, MPIGRID); // init 2D grid for scalapack
+    Cblacs_get(-1, 0, &BLACS_CONTEXT );
+    Cblacs_gridinit(&BLACS_CONTEXT, "Row", MPIGRID[0], MPIGRID[1]);
+    Cblacs_pcoord(BLACS_CONTEXT, MPIRANK, &MYROW, &MYCOL);
+
+    ScaLAPACK_dist_matrix_t dist_dense(opts.N, opts.N, opts.nleaf, opts.nleaf,
+                                       BEGIN_PROW, BEGIN_PCOL, BLACS_CONTEXT);
+
+#pragma omp parallel for collapse(2)
+    for (int64_t i = 0; i < dist_dense.local_nrows; ++i) {
+      for (int64_t j = 0; j < dist_dense.local_ncols; ++j) {
+        int g_row = dist_dense.glob_row(i), g_col = dist_dense.glob_col(j);
+        double value = opts.kernel(domain.particles[g_row].coords,
+                                   domain.particles[g_col].coords);
+        dist_dense.set_local(i, j, value);
+      }
+    }
+
+    // Compute all the eigen values of the scalapack distributed matrix.
+    const char JOBZ = 'N';
+    const char UPLO = 'L';
+    int LWORK = -1;
+    std::vector<double> WORK(1);
+    int INFO;
+    pdsyev_(&JOBZ, &UPLO,
+            &N, dist_dense.data.data(), &ONE, &ONE, dist_dense.DESC.data(),
+            DENSE_EIGENVALUES.data(),
+            NULL, NULL, NULL, NULL,
+            WORK.data(), &LWORK, &INFO);
+
+    LWORK = WORK[0];
+    WORK.resize(LWORK);
+
+    pdsyev_(&JOBZ, &UPLO,
+            &N, dist_dense.data.data(), &ONE, &ONE, dist_dense.DESC.data(),
+            DENSE_EIGENVALUES.data(),
+            NULL, NULL, NULL, NULL,
+            WORK.data(), &LWORK, &INFO);
+
+    Cblacs_gridexit(BLACS_CONTEXT);
+    Cblacs_exit(1);
+  }
+
+  // {
+  //   Matrix AA(opts.N, opts.N);
+  //   for (int i = 0; i < N; ++i) {
+  //     for (int j = 0; j < N; ++j) {
+  //       AA(i, j) = opts.kernel(domain.particles[i].coords,
+  //                              domain.particles[j].coords);
+  //     }
+  //   }
+
+  //   DENSE_EIGENVALUES = Hatrix::get_singular_values(AA);
+  // }
+#endif
+
   auto start_construct = std::chrono::system_clock::now();
 
   int64_t construct_max_rank;
 
   A.num_blocks.resize(A.max_level+1);
   A.num_blocks[A.max_level] = opts.N/opts.nleaf;
-
   if (opts.admis_kind == GEOMETRY) {
     init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
   }
   else if (opts.admis_kind == DIAGONAL) {
     init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
   }
-  // A.print_structure();
-
+  A.print_structure();
   construct_H2_matrix(A, domain, opts);
+  auto stop_construct = std::chrono::system_clock::now();
+  double construct_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_construct - start_construct).count();
 
+  // Check the construction error.
   std::vector<Matrix> x, actual_b, expected_b;
   for (int i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
     x.push_back(Matrix(opts.nleaf, 1));
@@ -459,7 +672,7 @@ int main(int argc, char* argv[]) {
       int g_row = block * opts.nleaf + i + 1;
       double value = i;
 
-      int l_row = indxg2l(g_row, opts.nleaf, MPIGRID[0]) - 1;
+      int l_row = indxg2l(g_row, opts.nleaf, MPISIZE) - 1;
       int l_col = 0;
 
       x[index](i, 0) = value;  // assign random data to x.
@@ -490,6 +703,57 @@ int main(int argc, char* argv[]) {
              MPI_COMM_WORLD);
   global_norm[0] = sqrt(global_norm[0]);
   global_norm[1] = sqrt(global_norm[1]);
+  // Finish the construction verification.
+
+
+  // Intervals within which the eigen values should be searched.
+  {
+    parsec = parsec_init( -1, NULL, NULL );
+    construct_h2_matrix_graph_structures(A, domain, opts);
+
+    bool singular;
+    std::vector<int64_t> target_m;
+    int64_t m_begin = N/2, m_end = N/2; // find eigen values from m_begin to m_end.
+    for (int64_t m = m_begin; m <= m_end; ++m) {
+      target_m.push_back(m);
+    }
+
+    double b = N * (1 / opts.param_1); // default values from ridwan.
+    double a = -b;
+    // double a = 0, b = 1000; // N * (1 / opts.param_1);
+
+    int64_t v_a, v_b, temp1, temp2;
+    std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
+    std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
+
+    if(v_a != 0 || v_b != N) {
+      std::cout << std::endl
+                << "Warning: starting interval does not contain the whole spectrum "
+                << "(v(a)=v(" << a << ")=" << v_a << ","
+                << " v(b)=v(" << b << ")=" << v_b << ")"
+                << std::endl;
+    }
+
+    for (int64_t k : target_m) {
+      double h2_mth_eigv, max_rank_shift;
+      int64_t ldl_min_rank, ldl_max_rank;
+
+      std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
+        get_mth_eigenvalue(A, domain, opts, k, ev_tol, a, b);
+
+      const double dense_mth_eigv = DENSE_EIGENVALUES[k-1];
+      const double eigv_abs_error = std::abs(dense_mth_eigv - h2_mth_eigv);
+
+      std::cout << "Compute eigenvalue k: " << k
+                << " abs_error: " << eigv_abs_error
+                << " check: " << (eigv_abs_error < 0.5 * ev_tol)
+                << " dense: " << dense_mth_eigv
+                << " H2   : " << h2_mth_eigv
+                << std::endl;
+    }
+
+    parsec_fini(&parsec);
+  }
 
   if (!MPIRANK) {
     double diff = global_norm[0];
@@ -499,11 +763,11 @@ int main(int argc, char* argv[]) {
               << "nleaf   : " << opts.nleaf << std::endl
               << "max rank: " << opts.max_rank << std::endl
               << "construct rel err: " << diff / actual << std::endl
-              << "Csp              : " << A.Csp(A.max_level) << std::endl;
+              << "Csp              : " << A.Csp(A.max_level) << std::endl
+              << "construct time   : " << construct_time << std::endl;
   }
 
-  Cblacs_gridexit(BLACS_CONTEXT);
-  Cblacs_exit(1);
+
   MPI_Finalize();
 
   if (!MPIRANK) {

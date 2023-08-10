@@ -119,6 +119,12 @@ extern "C" {
                  double* c, const int* ic, const int* jc, const int* descc,
                  double* work, const int* lwork, int* info);
 
+  void pdsyev_(const char* JOBZ, const char* UPLO,
+               const int* N, double *A, const int* IA, const int* JA, const int* DESCA,
+               double* W,
+               double *Z, const int* IZ, const int* JZ, const int* DESCZ,
+               double* WORK, const int* LWORK, int* INFO);
+
 //   // scalapack copying routines
 //   // https://netlib.org/scalapack/slug/node164.html
 }
@@ -133,7 +139,7 @@ int indxg2p(int INDXGLOB, int NB, int ISRCPROC, int NPROCS);
 extern int BLACS_CONTEXT;
 extern int info;
 
-extern int ZERO, ONE, MINUS_ONE;
+extern const int ZERO, ONE, MINUS_ONE;
 extern const char NOTRANS;
 extern const char TRANS;
 

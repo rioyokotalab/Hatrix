@@ -33,7 +33,7 @@ exec_elses_xml_generate=$ELSES_ROOT/bin/elses-xml-generate
 
 make -j H2_construct
 
-for N in 2048 4096 8192 16384 32768 131072 262144 524288; do
+for N in 2048; do
     nx=1
     ny=1
     nz=1
@@ -61,7 +61,7 @@ for N in 2048 4096 8192 16384 32768 131072 262144 524288; do
 
         # Laplace kernel paramters
         p1=1e-9
-        mpirun -n 16 ./bin/H2_construct --N $N \
+        mpirun -n 1 ./bin/H2_construct --N $N \
                --ndim $NDIM \
                --nleaf $NLEAF \
                --max_rank $MAX_RANK \
