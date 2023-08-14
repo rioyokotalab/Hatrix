@@ -498,6 +498,40 @@ void
 construct_h2_matrix_graph_structures(const SymmetricSharedBasisMatrix& A,
                                      const Domain& domain,
                                      const Args& opts) {
+
+  for (int64_t level = A.max_level; level >= A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      std::vector<int64_t> near_i, far_i;
+
+      for (int64_t j = 0; j < nblocks; ++j) {
+        if (A.is_admissible.exists(i, j, level) &&
+            !A.is_admissible(i, j, level)) {
+          near_i.push_back(j);
+        }
+
+        if (A.is_admissible.exists(i, j, level) &&
+            !A.is_admissible(i, j, level)) {
+          far_i.push_back(j);
+        }
+      }
+
+      near_neighbours.insert(i, level, std::move(near_i));
+      far_neighbours.insert(i, level, std::move(far_i));
+    }
+  }
+
+  // Populate the last blocks of dense for the final factorization.
+  int64_t level = A.min_level - 1;
+  int64_t nblocks = pow(2, level);
+  for (int64_t i = 0; i < nblocks; ++i) {
+    std::vector<int64_t> near_i;
+    for (int64_t j = 0; j < nblocks; ++j) {
+      near_i.push_back(j);
+    }
+    near_neighbours.insert(i, level, std::move(near_i));
+  }
 }
 
 

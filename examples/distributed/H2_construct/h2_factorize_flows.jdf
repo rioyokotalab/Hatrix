@@ -4,11 +4,14 @@ extern "C" %{
 %}
 
 DENSE_BLOCKS [ type="parsec_data_collection_t*" ]
+H2_max_level [ type="int64_t" ]
+H2_min_level [ type="int64_t" ]
 
 ldl_diagonal(block, level)
 
+level = H2_max_level .. H2_min_level
 block = 0 .. %{ return pow(2, level) - 1; %}
-level = 1 .. 2
+
 
 : DENSE_BLOCKS(block, block, level)
 
@@ -16,6 +19,7 @@ READ D <- DENSE_BLOCKS(block, block, level)
 
 BODY
 {
-
+  printf("block: %d level: %d max: %ld min: %ld\n",
+         block, level, H2_max_level, H2_min_level);
 }
 END

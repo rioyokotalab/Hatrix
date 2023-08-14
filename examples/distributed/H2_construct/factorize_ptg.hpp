@@ -18,8 +18,10 @@ typedef struct H2_ptg_t {
   parsec_data_collection_t super;
 
   std::unordered_map<parsec_data_key_t, parsec_data_t*> data_map;
-  std::unordered_map<parsec_data_key_t, double*> matrix_map;
+  std::unordered_map<parsec_data_key_t, Matrix*> matrix_map;
 } H2_ptg_t;
+
+extern RowColMap<std::vector<int64_t> > near_neighbours, far_neighbours;
 
 parsec_data_key_t data_key_block(parsec_data_collection_t* desc, ...);
 parsec_data_key_t data_key_bases(parsec_data_collection_t* desc, ...);
