@@ -1153,26 +1153,26 @@ void SymmetricH2::factorize(const Domain& domain) {
   const auto num_nodes = level_blocks[level];
   START_TIMER("factorize_remaining_blocks");
   for (int64_t k = 0; k < num_nodes; k++) {
-    ldl(D(k, k, level));
+    // ldl(D(k, k, level));
     // Lower elimination
     #pragma omp parallel for
     for (int64_t i = k + 1; i < num_nodes; i++) {
-      solve_triangular(D(k, k, level), D(i, k, level), Hatrix::Right, Hatrix::Lower, true, true);
-      solve_diagonal(D(k, k, level), D(i, k, level), Hatrix::Right);
+      // solve_triangular(D(k, k, level), D(i, k, level), Hatrix::Right, Hatrix::Lower, true, true);
+      // solve_diagonal(D(k, k, level), D(i, k, level), Hatrix::Right);
     }
     // Right elimination
     #pragma omp parallel for
     for (int64_t j = k + 1; j < num_nodes; j++) {
-      solve_triangular(D(k, k, level), D(k, j, level), Hatrix::Left, Hatrix::Lower, true, false);
-      solve_diagonal(D(k, k, level), D(k, j, level), Hatrix::Left);
+      // solve_triangular(D(k, k, level), D(k, j, level), Hatrix::Left, Hatrix::Lower, true, false);
+      // solve_diagonal(D(k, k, level), D(k, j, level), Hatrix::Left);
     }
     // Schur's complement
     #pragma omp parallel for collapse(2)
     for (int64_t i = k + 1; i < num_nodes; i++) {
       for (int64_t j = k + 1; j < num_nodes; j++) {
         Matrix Dik(D(i, k, level), true);  // Deep-copy
-        column_scale(Dik, D(k, k, level));  // LD
-        matmul(Dik, D(k, j, level), D(i, j, level), false, false, -1, 1);
+        // column_scale(Dik, D(k, k, level));  // LD
+        // matmul(Dik, D(k, j, level), D(i, j, level), false, false, -1, 1);
       }
     }
   }

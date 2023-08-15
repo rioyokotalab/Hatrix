@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PARSEC_PATH=/Users/sameer/gitrepos/parsec/build
+PARSEC_PATH=/Users/sameer/gitrepos/parsec/install
 
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PARSEC_PATH/lib/pkgconfig:/Users/sameer/gitrepos/gsl-2.7.1/build/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PARSEC_PATH/lib
@@ -12,7 +12,7 @@ ROOT=$PWD
 
 set -e
 
-export OMP_NUM_THREADS=16
+# export OMP_NUM_THREADS=16
 
 ROOT=$PWD
 cd examples/distributed/H2_construct
@@ -34,7 +34,7 @@ for N in 1024; do
 
         # Laplace kernel paramters
         p1=1e-3
-        mpirun -n 1 ./bin/H2_construct --N $N \
+        mpirun -n 4 ./bin/H2_construct --N $N \
                --ndim $NDIM \
                --nleaf $NLEAF \
                --max_rank $MAX_RANK \

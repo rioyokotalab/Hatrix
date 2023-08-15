@@ -152,8 +152,9 @@ inertia(const SymmetricSharedBasisMatrix& A,
     shift_diagonal(A_shifted.D(node, node, A_shifted.max_level), -lambda);
   }
 
-  // factorize_dtd(A_shifted, domain, opts);
+  // SymmetricSharedBasisMatrix A_shifted_ptg(A_shifted);
   factorize_ptg(A_shifted, domain, opts);
+
   // factorize_noparsec(A_shifted, domain, opts);
 
   int64_t negative_elements_count = 0;
@@ -205,8 +206,8 @@ get_mth_eigenvalue(const SymmetricSharedBasisMatrix& A,
   bool singular;
   while((right - left) >= ev_tol) {
     const double mid = (left + right) / 2;
-    std::cout << "left: " << left << " right: " << right
-              << " mid: " << mid << std::endl;
+    // std::cout << "left: " << left << " right: " << right
+    //           << " mid: " << mid << std::endl;
     int64_t num_negative_values, factor_min_rank, factor_max_rank;
     std::tie(num_negative_values, factor_min_rank, factor_max_rank, singular) =
       inertia(A, domain, opts, mid);
@@ -512,7 +513,7 @@ construct_h2_matrix_graph_structures(const SymmetricSharedBasisMatrix& A,
         }
 
         if (A.is_admissible.exists(i, j, level) &&
-            !A.is_admissible(i, j, level)) {
+            A.is_admissible(i, j, level)) {
           far_i.push_back(j);
         }
       }
@@ -681,8 +682,11 @@ int main(int argc, char* argv[]) {
     init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
   }
   else if (opts.admis_kind == DIAGONAL) {
-    init_diagonal_admis(A, domain, opts); // init admissiblity conditions with diagonal condition.
+    // init admissiblity conditions with diagonal condition.
+    init_diagonal_admis(A, domain, opts);
   }
+
+  global_is_admissible.deep_copy(A.is_admissible);
   A.print_structure();
   construct_H2_matrix(A, domain, opts);
   auto stop_construct = std::chrono::system_clock::now();
@@ -740,12 +744,13 @@ int main(int argc, char* argv[]) {
   // Finish the construction verification.
 
 
+  double kth_value_time;
   // Intervals within which the eigen values should be searched.
   {
-    parsec = parsec_init( -1, NULL, NULL );
+    parsec = parsec_init( 1, NULL, NULL );
     construct_h2_matrix_graph_structures(A, domain, opts);
 
-    bool singular;
+    bool singular = false;
     std::vector<int64_t> target_m;
     int64_t m_begin = N/2, m_end = N/2; // find eigen values from m_begin to m_end.
     for (int64_t m = m_begin; m <= m_end; ++m) {
@@ -754,11 +759,10 @@ int main(int argc, char* argv[]) {
 
     double b = N * (1 / opts.param_1); // default values from ridwan.
     double a = -b;
-    // double a = 0, b = 1000; // N * (1 / opts.param_1);
 
-    int64_t v_a, v_b, temp1, temp2;
-    std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
-    std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
+    int64_t v_a = 0, v_b = N, temp1, temp2;
+    // std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
+    // std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
 
     if(v_a != 0 || v_b != N) {
       std::cout << std::endl
@@ -768,6 +772,7 @@ int main(int argc, char* argv[]) {
                 << std::endl;
     }
 
+    auto start_kth_value_time = std::chrono::system_clock::now();
     for (int64_t k : target_m) {
       double h2_mth_eigv, max_rank_shift;
       int64_t ldl_min_rank, ldl_max_rank;
@@ -785,6 +790,9 @@ int main(int argc, char* argv[]) {
                 << " H2   : " << h2_mth_eigv
                 << std::endl;
     }
+    auto stop_kth_value_time = std::chrono::system_clock::now();
+    kth_value_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_kth_value_time - start_kth_value_time).count();
 
     parsec_fini(&parsec);
   }
@@ -798,7 +806,9 @@ int main(int argc, char* argv[]) {
               << "max rank: " << opts.max_rank << std::endl
               << "construct rel err: " << diff / actual << std::endl
               << "Csp              : " << A.Csp(A.max_level) << std::endl
-              << "construct time   : " << construct_time << std::endl;
+              << "construct time   : " << construct_time << std::endl
+              << "kth value time   : " << kth_value_time
+              << std::endl;
   }
 
 

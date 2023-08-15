@@ -1,25 +1,245 @@
 extern "C" %{
-  #include "math.h"
-  #include "ptg_interfaces.h"
+
+#include "math.h"
+#include "ptg_interfaces.h"
+#include "tasks_c_interface.h"
+
 %}
 
-DENSE_BLOCKS [ type="parsec_data_collection_t*" ]
-H2_max_level [ type="int64_t" ]
-H2_min_level [ type="int64_t" ]
+BASES_BLOCKS          [ type="parsec_data_collection_t*" ]
+NON_LEAF_DENSE_BLOCKS [ type="parsec_data_collection_t*" ]
+DENSE_BLOCKS          [ type="parsec_data_collection_t*" ]
+S_BLOCKS              [ type="parsec_data_collection_t*" ]
+H2_nleaf              [ type="int64_t" ]
+H2_max_rank           [ type="int64_t" ]
+H2_max_level          [ type="int64_t" ]
+H2_min_level          [ type="int64_t" ]
 
+/* TASK: generate basis complements and send it to the dense blocks. */
+make_basis_complement(block, level)
+
+level = H2_max_level .. H2_min_level
+block = 0 .. %{ return pow(2, level) - 1; %}
+
+: BASES_BLOCKS(block, level)
+
+READ U <- BASES_BLOCKS(block, level)         [ type = LEAF_BASES]
+WRITE U_F <- NEW                             [ type = TILE ]
+       -> U_F ldl_diagonal(block, level)     [ type = TILE ]
+
+BODY
+{
+  if (level == H2_max_level) {
+    CORE_make_complement(H2_nleaf, H2_max_rank, (double*)U,
+                         H2_nleaf, H2_nleaf, (double*)U_F);
+  }
+}
+END
+
+/* TASK: factorize the diagonal using LDLT factorization. */
 ldl_diagonal(block, level)
 
 level = H2_max_level .. H2_min_level
 block = 0 .. %{ return pow(2, level) - 1; %}
 
-
 : DENSE_BLOCKS(block, block, level)
 
-READ D <- DENSE_BLOCKS(block, block, level)
+
+READ U_F <- U_F make_basis_complement(block, level)                             [ type = TILE ]
+RW D <- DENSE_BLOCKS(block, block, level)                                       [ type = TILE ]
+     -> DENSE_BLOCKS(block, block, level)                                       [ type = TILE ]
+     -> block % 2 == 0 ? UPPER_LEFT  merge_blocks(block/2, %{ return near_neighbours_reverse_index(block/2, level-1, block/2); %}, level-1) [ type = TILE_LOWER_RIGHT_CORNER type_remote = TILE_LOWER_RIGHT_CORNER ]
+     -> block % 2 == 1 ? LOWER_RIGHT merge_blocks(block/2, %{ return near_neighbours_reverse_index(block/2, level-1, block/2); %}, level-1) [ type = TILE_LOWER_RIGHT_CORNER type_remote = TILE_LOWER_RIGHT_CORNER ]
 
 BODY
 {
-  printf("block: %d level: %d max: %ld min: %ld\n",
-         block, level, H2_max_level, H2_min_level);
+  if (level == H2_max_level) {
+    CORE_multiply_complement(H2_nleaf, H2_nleaf, H2_max_rank, D,
+                             H2_nleaf, H2_nleaf, U_F,
+                             'F');
+
+    CORE_factorize_diagonal(H2_nleaf, H2_nleaf, H2_max_rank, D);
+  }
+}
+END
+
+/* TASK: Transmit S blocks to the merge task because they might be on different processes. */
+transmit_s_block(row, j, level)
+
+level = H2_max_level .. H2_min_level
+row   = 0 .. %{ return pow(2, level) - 1; %}
+j     = 0 .. %{ return far_neighbours_size(row, level) - 1; %}
+col   = %{ return far_neighbours_index(row, level, j); %}
+
+: S_BLOCKS(row, col, level)
+
+RW S <- S_BLOCKS(row, col, level)                                                    [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ]
+       -> (row % 2 == 0 && col % 2 == 0) ? UPPER_LEFT merge_blocks(row/2,   %{ return near_neighbours_reverse_index(row/2, level-1, col/2); %}, level-1)     [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ]
+       -> (row % 2 == 0 && col % 2 == 1) ? UPPER_RIGHT merge_blocks(row/2,  %{ return near_neighbours_reverse_index(row/2, level-1, col/2); %}, level-1)     [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ]
+       -> (row % 2 == 1 && col % 2 == 0) ? LOWER_LEFT merge_blocks(row/2,   %{ return near_neighbours_reverse_index(row/2, level-1, col/2); %}, level-1)     [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ]
+       -> (row % 2 == 1 && col % 2 == 1) ? LOWER_RIGHT merge_blocks(row/2,  %{ return near_neighbours_reverse_index(row/2, level-1, col/2); %}, level-1)     [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ]
+
+BODY
+{
+}
+END
+
+/* TASK: Merge either skeleton blocks from an admissible block or a partially
+   factorized inadmissible block in the child level.
+ */
+merge_blocks(row, j, level)
+
+level = H2_max_level - 1 .. H2_min_level - 1
+row   = 0 .. %{ return pow(2, level) - 1; %}
+j     = 0 .. %{ return near_neighbours_size(row, level)-1; %}
+col   = %{ return near_neighbours_index(row, level, j);  %}
+
+: NON_LEAF_DENSE_BLOCKS(row, col, level)
+
+READ UPPER_LEFT  <- %{ return is_admissible(row*2,   col*2, level+1);   %} ? S transmit_s_block(row*2, %{ return far_neighbours_reverse_index(row*2, level+1, col*2); %}, level+1)
+                                                                           : D ldl_diagonal(row*2, level+1)   [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ]
+READ UPPER_RIGHT <- %{ return is_admissible(row*2,   col*2+1, level+1); %} ? S transmit_s_block(row*2, %{ return far_neighbours_reverse_index(row*2,     level+1, col*2+1); %}, level+1) [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ]
+READ LOWER_LEFT  <- %{ return is_admissible(row*2+1, col*2, level+1);   %} ? S transmit_s_block(row*2+1, %{ return far_neighbours_reverse_index(row*2+1, level+1, col*2); %}, level+1) [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ]
+READ LOWER_RIGHT <- %{ return is_admissible(row*2+1, col*2+1, level+1); %} ? S transmit_s_block(row*2+1, %{ return far_neighbours_reverse_index(row*2+1, level+1, col*2+1); %}, level+1)
+                                                                           : D ldl_diagonal(row*2+1, level+1) [ type = S_BLOCK_TILE type_local = S_BLOCK_TILE ] /* obtain leftoer from LDL factorization of diagonal. */
+
+RW D <- NON_LEAF_DENSE_BLOCKS(row, col, level) [ type = NON_LEAF_TILE ]
+     -> (row == 0 && col == 0) ? D final_ldl(row, level) [ type = NON_LEAF_TILE ] /* only send to the 0th iteration of the final factorization. */
+     -> (row > 0 && col == 0) ? BELOW_BLOCK final_trsm_l(col, row, level) [type = NON_LEAF_TILE ]
+     -> (row == 0 && col > 0) ? RIGHT_BLOCK final_trsm_u(row, col, level) [ type = NON_LEAF_TILE ]
+     -> (row > 0 && col > 0) ? C final_trailing_update(row, col, 0, level)  [ type = NON_LEAF_TILE ]
+
+BODY
+{
+  double *_D = (double*)D, *_UPPER_LEFT = (double*)UPPER_LEFT,
+    *_UPPER_RIGHT = (double*)UPPER_RIGHT, *_LOWER_LEFT = (double*)LOWER_LEFT,
+    *_LOWER_RIGHT = (double*)LOWER_RIGHT;
+  int stride = H2_max_rank * 2;
+
+  for (int i = 0; i < H2_max_rank; ++i) {
+    for (int j = 0; j < H2_max_rank; ++j) {
+      _D[i + j * stride] = _UPPER_LEFT[i + j * H2_max_rank];
+
+      _D[(i + H2_max_rank) + j * stride] = _LOWER_LEFT[i + j * H2_max_rank];
+
+      _D[i + (j + H2_max_rank) * stride] = _UPPER_RIGHT[i + j * H2_max_rank];
+
+      _D[(i + H2_max_rank) + (j + H2_max_rank) * stride]= _LOWER_RIGHT[i + j * H2_max_rank];
+    }
+  }
+}
+END
+
+/* TASK: Perform a dense LDLT factorization of the final level. */
+final_ldl(block, level)
+
+level = H2_min_level - 1 .. H2_min_level - 1
+NB = %{ return pow(2, level); %}
+/* block = 0 .. NB-1 */
+block = 0 .. 0
+
+:  NON_LEAF_DENSE_BLOCKS(block, block, level)
+
+READ D <- (block == 0) ? D merge_blocks(block, block, level) [ type = NON_LEAF_TILE ]
+     /* <- (block > 0) ? C final_trailing_update(block, block, block, level) [ type = NON_LEAF_TILE ] */
+     /* -> DIAG_BLOCK final_trsm_u(block, block + 1 .. %{ return pow(2, level) - 1; %}, level)  [ type = NON_LEAF_TILE type_local = NON_LEAF_TILE ] */
+     /* -> DIAG_BLOCK final_trsm_l(block, block + 1 .. %{ return pow(2, level) - 1; %},  level) [ type = NON_LEAF_TILE ] */
+     /* -> DIAG final_trailing_update(block + 1 .. NB - 1, block+1 .. NB - 1, block, level)  [ type = NON_LEAF_TILE type_local = NON_LEAF_TILE  ] */
+     /* -> NON_LEAF_DENSE_BLOCKS(block, block, level) [ type = NON_LEAF_TILE ] */
+
+BODY
+{
+  /* printf("LDL block: %d\n", block); */
+  /* CORE_ldl_full(H2_max_rank*2, H2_max_rank*2, (double*)D); */
+}
+END
+
+/* /\* TASK: Upper triangular solve for LDLT factorization of the final level. *\/ */
+final_trsm_u(k, col, level)
+
+level = H2_min_level - 1 .. H2_min_level - 1
+/* k = 0 .. %{ return pow(2, level) - 1; %} */
+k = 0 .. 0
+col = k + 1 .. %{ return pow(2, level) - 1; %}
+
+: NON_LEAF_DENSE_BLOCKS(k, col, level)
+
+READ RIGHT_BLOCK <- (k == 0) ?  D merge_blocks(k, col, level)  [ type = NON_LEAF_TILE ]
+
+/* READ DIAG_BLOCK <- D final_ldl(k, level) [ type = NON_LEAF_TILE type_local = NON_LEAF_TILE ] */
+/* RW RIGHT_BLOCK <- (k == 0) ?  D merge_blocks(k, col, level)  [ type = NON_LEAF_TILE ] */
+/*                -> B final_trailing_update(k + 1 .. %{ return pow(2, level) - 1; %}, col, k, level) [ type = NON_LEAF_TILE type_local = NON_LEAF_TILE ] */
+               /* <- (k > 0) ? C final_trailing_update(k, col, k-1, level) [ type = NON_LEAF_TILE ] */
+/*                -> NON_LEAF_DENSE_BLOCKS(k, col, level) [ type = NON_LEAF_TILE ] */
+
+BODY
+{
+  /* printf("TRSM U: k-> %d col-> %d\n", k, col); */
+  /* int dim = H2_max_rank * 2; */
+  /* CORE_final_trsm_u(dim, dim, (double*)DIAG_BLOCK, */
+  /*                   dim, dim, (double*)RIGHT_BLOCK); */
+}
+END
+
+
+/* TASK: Lower triangular solve for LDLT factorization of the final level. */
+final_trsm_l(k, row, level)
+
+level = H2_min_level - 1 .. H2_min_level - 1 /* NOTE: for some reason this does not accept constants so you need to specify a range. */
+/* k = 0 .. %{ return pow(2, level) - 1; %} */
+k = 0 .. 0
+row = k + 1 ..  %{ return pow(2, level) - 1; %}
+
+: NON_LEAF_DENSE_BLOCKS(row, k, level)
+
+/* READ DIAG_BLOCK <- D final_ldl(k, level) [ type = NON_LEAF_TILE ] */
+READ BELOW_BLOCK <- (k == 0) ? D merge_blocks(row, k, level)  [ type = NON_LEAF_TILE ]
+                 /* -> A final_trailing_update(row, k + 1 .. %{ return pow(2, level) - 1; %}, k, level) [ type = NON_LEAF_TILE ] */
+/* RW BELOW_BLOCK <- (k == 0) ? D merge_blocks(row, k, level)  [ type = NON_LEAF_TILE ] */
+/*                <- (k > 0) ? C final_trailing_update(row, k, k-1, level) [ type = NON_LEAF_TILE ] */
+
+/*                -> NON_LEAF_DENSE_BLOCKS(row, k, level) [ type = NON_LEAF_TILE ] */
+
+BODY
+{
+  /* printf("TRSM L: k-> %d row-> %d\n", k, row); */
+  /* int dim = H2_max_rank * 2; */
+  /* CORE_final_trsm_l(dim, dim, (double*)DIAG_BLOCK, */
+  /*                   dim, dim, (double*)BELOW_BLOCK); */
+}
+END
+
+final_trailing_update(row, col, k, level)
+
+level = H2_min_level - 1 .. H2_min_level - 1
+NB =  %{ return pow(2, level); %}
+/* k = 0 .. NB - 1 */
+k = 0 .. 0
+row = (k + 1) .. NB - 1
+col = (k + 1) .. NB - 1
+
+: NON_LEAF_DENSE_BLOCKS(row, col, level)
+
+
+/* READ A <- BELOW_BLOCK final_trsm_l(k, row, level) [ type = NON_LEAF_TILE ] */
+/* READ B <- RIGHT_BLOCK final_trsm_u(k, col, level) [ type = NON_LEAF_TILE type_local = NON_LEAF_TILE ] */
+/* READ DIAG <- D final_ldl(k, level) [ type = NON_LEAF_TILE type_local = NON_LEAF_TILE ] */
+READ C <- (k == 0) ? D merge_blocks(row, %{ return near_neighbours_reverse_index(row, level, col); %}, level) [ type = NON_LEAF_TILE ] /* NON_LEAF_DENSE_BLOCKS(row, col, level) [ type = NON_LEAF_TILE ] */
+/* RW C <- (k == 0) ? D merge_blocks(row, %{ return near_neighbours_reverse_index(row, level, col); %}, level) [ type = NON_LEAF_TILE ] /\* NON_LEAF_DENSE_BLOCKS(row, col, level) [ type = NON_LEAF_TILE ] *\/ */
+/*      <- (k > 0) ? C final_trailing_update(row, col, k-1, level) [ type = NON_LEAF_TILE ] */
+/*      -> (row == k+1 && col == k+1) ? D final_ldl(k+1, level) [ type = NON_LEAF_TILE ] /\* notify the GETRF of GEMM completion ONLY ONCE per trailing sub-matrix update. *\/ */
+/*      -> (row > k+1 && col == k+1) ? BELOW_BLOCK final_trsm_l(k+1, row, level) [ type = NON_LEAF_TILE ] /\* notify the column below the current GETRF diagonal that it can begin TRSMs of the next block. *\/ */
+/*      -> (col > k+1 && row == k+1) ? RIGHT_BLOCK final_trsm_u(k+1, col, level) [ type = NON_LEAF_TILE ] /\* notify the row ahead of the diagonal that it can begin TRSMs of the next block. *\/ */
+/*      -> (row > k+1 && col > k+1) ? C final_trailing_update(row, col, k+1, level) [ type = NON_LEAF_TILE ] */
+/*      -> NON_LEAF_DENSE_BLOCKS(row, col, level) [ type = NON_LEAF_TILE ] */
+
+BODY
+{
+  /* printf("GEMM k: %d row %d col %d\n",k , row, col); */
+  /* int dim = H2_max_rank * 2; */
+  /* CORE_matmul_full(dim, dim, (double*)A, */
+  /*                  dim, dim, (double*)B, */
+  /*                  dim, dim, (double*)DIAG, */
+  /*                  dim, dim, (double*)C); */
 }
 END

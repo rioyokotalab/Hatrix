@@ -1,6 +1,6 @@
 include $(TOPSRCDIR)/make.macos.inc
 
-OBJECTS := $(subst .cpp,.o,$(SOURCES)) $(subst .c,.o,$(wildcard *.c))
+OBJECTS := $(subst .c,.o,$(wildcard *.c)) $(subst .cpp,.o,$(SOURCES))
 
 all: $(sublib)
 
