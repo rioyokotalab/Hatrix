@@ -687,7 +687,7 @@ int main(int argc, char* argv[]) {
   }
 
   global_is_admissible.deep_copy(A.is_admissible);
-  A.print_structure();
+  // A.print_structure();
   construct_H2_matrix(A, domain, opts);
   auto stop_construct = std::chrono::system_clock::now();
   double construct_time = std::chrono::duration_cast<

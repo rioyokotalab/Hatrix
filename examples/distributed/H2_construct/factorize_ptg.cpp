@@ -1,3 +1,5 @@
+#include <cmath>
+#include <mutex>
 #include <algorithm>
 
 #include "factorize_ptg.hpp"
