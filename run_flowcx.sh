@@ -39,7 +39,7 @@ cd $ROOT
 
 make -j H2_construct
 
-export MKL_NUM_THREADS=1
+export MKL_NUM_THREADS=40
 
 for N in 16384 65536 262144 1048576; do
     nx=1

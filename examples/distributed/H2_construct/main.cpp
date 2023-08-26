@@ -19,6 +19,11 @@
 
 #include "parsec.h"
 #include "mpi.h"
+#include "omp.h"
+
+#ifdef USE_MKL
+#include "mkl.h"
+#endif
 
 #ifdef HAS_ELSES_ENABLED
 extern "C" {
@@ -747,6 +752,11 @@ int main(int argc, char* argv[]) {
   double kth_value_time;
   // Intervals within which the eigen values should be searched.
   {
+#ifdef USE_MKL
+    mkl_set_num_threads(1);
+#endif
+    omp_set_num_threads(1);
+
     parsec = parsec_init( 1, NULL, NULL );
     construct_h2_matrix_graph_structures(A, domain, opts);
 
