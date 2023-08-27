@@ -73,7 +73,7 @@ for N in 262144 1048576; do
         # Laplace kernel paramters
         p1=1e-9
         mpirun -n $PJM_MPI_PROC -machinefile $PJM_O_NODEINF -npernode 1 \
-               --bind-to socket ./bin/H2_construct --N $N \
+               --report-bindings ./bin/H2_construct --N $N \
                --ndim $NDIM \
                --nleaf $NLEAF \
                --max_rank $MAX_RANK \

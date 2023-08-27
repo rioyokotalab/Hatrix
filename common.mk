@@ -1,4 +1,4 @@
-include $(TOPSRCDIR)/make.flowcx.inc
+include $(TOPSRCDIR)/make.macos.inc
 
 OBJECTS := $(subst .c,.o,$(wildcard *.c)) $(subst .cpp,.o,$(SOURCES))
 

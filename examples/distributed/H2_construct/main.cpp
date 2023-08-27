@@ -223,6 +223,7 @@ get_mth_eigenvalue(const SymmetricSharedBasisMatrix& A,
       max_rank_shift = mid;
     }
 
+    break;
     if (singular) {
       std::cout << "Shifted matrix became singular (shift=" << mid << ")" << std::endl;
       break;
@@ -246,7 +247,6 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
                           const SymmetricSharedBasisMatrix& A) {
   int64_t block_size = opts.N / A.num_blocks[level];
   Matrix dense(block_size, block_size);
-
 
 #pragma omp parallel for collapse(2)
   for (int64_t local_i = 0; local_i < block_size; ++local_i) {
@@ -379,10 +379,66 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   }
 }
 
+// U_leaf_level - store pow(2, A.max_level) number of bases. If level != A.max_level,
+// this map stores bases that are chopped up bases from the full child bases.
 static RowLevelMap
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
-                           const Args& opts, const RowLevelMap& Uchild) {
-  RowLevelMap Ubig_parent;
+                           const int64_t level,
+                           const Args& opts,
+                           const Domain& domain,
+                           const RowLevelMap& U_leaf_level) {
+  RowLevelMap Ubig_parent, Utransfer_temp;
+
+  const int64_t leaf_nblocks = pow(2, A.max_level);
+  const int64_t nblocks = pow(2, level);
+  const int64_t nblocks_per_non_leaf = leaf_nblocks / nblocks;
+
+  // Project the child basis onto the large block.
+
+  // Accumulate the low rank block at 'level' into a block AY.
+  for (int64_t i = MPIRANK; i < leaf_nblocks; i += MPISIZE) {
+    const int64_t level_index_i = i / nblocks;
+    Matrix AY(opts.nleaf, opts.nleaf);
+
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (!A.is_admissible.exists(level_index_i, j, level) ||
+          (A.is_admissible.exists(level_index_i, j, level) &&
+           A.is_admissible(level_index_i, j, level))) {
+        for (int64_t leaf_j = j * nblocks_per_non_leaf; leaf_j < (j+1) * nblocks_per_non_leaf; ++leaf_j) {
+
+#pragma omp parallel for collapse(2)
+          for (int64_t ii = 0; ii < opts.nleaf; ++ii) {
+            for (int64_t jj = 0; jj < opts.nleaf; ++jj) {
+              double value;
+              if (opts.kernel_verbose == "elses_c60") {
+                const int global_i = ii + 1;
+                const int global_j = jj + 1;
+#ifdef HAS_ELSES_ENABLED
+                get_elses_matrix_value(&global_i, &global_j, &value);
+#else
+                abort();
+#endif
+              }
+              else {
+                value = opts.kernel(domain.particles[ii].coords,
+                                    domain.particles[jj].coords);
+              }
+
+              AY(ii, jj) += value;
+            }
+          }
+        }
+      }
+    } // for (j = 0 .. nblocks)
+
+    // Project the bases onto the accumulated block.
+    Utransfer_temp.insert(i, A.max_level, matmul(U_leaf_level(i, A.max_level), AY, true, false));
+  } // for (i = MPIRANK .. leaf_nblocks)
+
+  std::cout << "nblocks per non leaf: " << nblocks_per_non_leaf << std::endl;
+  for (int64_t chunk = 0; chunk < leaf_nblocks; chunk += nblocks_per_non_leaf) {
+
+  }
 
   return Ubig_parent;
 }
@@ -394,13 +450,13 @@ void construct_H2_matrix(SymmetricSharedBasisMatrix& A,
   RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
-    Uchild = generate_transfer_matrices(A, opts, Uchild);
+    Uchild = generate_transfer_matrices(A, level, opts, domain, Uchild);
   }
 
   // Final dense block for the factoirization.
   int64_t final_level = A.min_level - 1;
   int64_t final_nblocks = pow(2, final_level);
-  for (int64_t i = 0; i < final_nblocks; ++i) {
+  for (int64_t i = MPIRANK; i < final_nblocks; i += MPISIZE) {
     for (int64_t j = 0; j < final_nblocks; ++j) {
       A.D.insert(i, j, final_level,
                  Matrix(opts.max_rank * 2, opts.max_rank * 2));
@@ -697,8 +753,9 @@ int main(int argc, char* argv[]) {
   }
 
   global_is_admissible.deep_copy(A.is_admissible);
-  // A.print_structure();
+  A.print_structure();
   if (!MPIRANK) { std::cout << "start H2 construction.\n"; }
+  construct_h2_matrix_graph_structures(A, domain, opts);
   construct_H2_matrix(A, domain, opts);
   auto stop_construct = std::chrono::system_clock::now();
   if (!MPIRANK) { std::cout << "stop H2 construction.\n"; }
@@ -733,10 +790,27 @@ int main(int argc, char* argv[]) {
   }
 
   // multiply dense matix with x. DENSE * x = actual_b
+  auto start_dense_dist_matvec = std::chrono::system_clock::now();
   dist_matvec_dense(A, domain, opts, x, actual_b);
+  auto stop_dense_dist_matvec = std::chrono::system_clock::now();
+  double dense_dist_matvec = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_dense_dist_matvec -
+                               start_dense_dist_matvec).count();
+  if (!MPIRANK) {
+    std::cout << "### dense dist matvec: " << dense_dist_matvec << std::endl;
+  }
 
   // multiply H2 matrix with x. H2 * x = expected_b
+  auto start_h2_dist_matvec = std::chrono::system_clock::now();
   dist_matvec_h2(A, domain, opts, x, expected_b);
+  auto stop_h2_dist_matvec = std::chrono::system_clock::now();
+  double h2_dist_matvec = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_h2_dist_matvec -
+                               start_h2_dist_matvec).count();
+
+  if (!MPIRANK) {
+    std::cout << "### H2 dist matvec: " << h2_dist_matvec << std::endl;
+  }
 
   double local_norm[2] = {0, 0};
   for (int64_t i = MPIRANK; i < pow(2, A.max_level); i += MPISIZE) {
@@ -756,64 +830,63 @@ int main(int argc, char* argv[]) {
   global_norm[1] = sqrt(global_norm[1]);
   // Finish the construction verification.
 
-
   double kth_value_time;
   // Intervals within which the eigen values should be searched.
-  {
-#ifdef USE_MKL
-    mkl_set_num_threads(1);
-#endif
-    omp_set_num_threads(1);
+//   {
+// #ifdef USE_MKL
+//     mkl_set_num_threads(1);
+// #endif
+//     omp_set_num_threads(1);
 
-    parsec = parsec_init( -1, NULL, NULL );
-    construct_h2_matrix_graph_structures(A, domain, opts);
+//     parsec = parsec_init( -1, NULL, NULL );
 
-    bool singular = false;
-    std::vector<int64_t> target_m;
-    int64_t m_begin = N/2, m_end = N/2; // find eigen values from m_begin to m_end.
-    for (int64_t m = m_begin; m <= m_end; ++m) {
-      target_m.push_back(m);
-    }
+//     bool singular = false;
+//     std::vector<int64_t> target_m;
+//     int64_t m_begin = N/2, m_end = N/2;
+//     // find eigen values from m_begin to m_end.
+//     for (int64_t m = m_begin; m <= m_end; ++m) {
+//       target_m.push_back(m);
+//     }
 
-    double b = N * (1 / opts.param_1); // default values from ridwan.
-    double a = -b;
+//     double b = N * (1 / opts.param_1); // default values from ridwan.
+//     double a = -b;
 
-    int64_t v_a = 0, v_b = N, temp1, temp2;
-    // std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
-    // std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
+//     int64_t v_a = 0, v_b = N, temp1, temp2;
+//     // std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
+//     // std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
 
-    if(v_a != 0 || v_b != N) {
-      std::cout << std::endl
-                << "Warning: starting interval does not contain the whole spectrum "
-                << "(v(a)=v(" << a << ")=" << v_a << ","
-                << " v(b)=v(" << b << ")=" << v_b << ")"
-                << std::endl;
-    }
+//     if(v_a != 0 || v_b != N) {
+//       std::cout << std::endl
+//                 << "Warning: starting interval does not contain the whole spectrum "
+//                 << "(v(a)=v(" << a << ")=" << v_a << ","
+//                 << " v(b)=v(" << b << ")=" << v_b << ")"
+//                 << std::endl;
+//     }
 
-    auto start_kth_value_time = std::chrono::system_clock::now();
-    for (int64_t k : target_m) {
-      double h2_mth_eigv, max_rank_shift;
-      int64_t ldl_min_rank, ldl_max_rank;
+//     auto start_kth_value_time = std::chrono::system_clock::now();
+//     for (int64_t k : target_m) {
+//       double h2_mth_eigv, max_rank_shift;
+//       int64_t ldl_min_rank, ldl_max_rank;
 
-      std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
-        get_mth_eigenvalue(A, domain, opts, k, ev_tol, a, b);
+//       std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
+//         get_mth_eigenvalue(A, domain, opts, k, ev_tol, a, b);
 
-      const double dense_mth_eigv = DENSE_EIGENVALUES[k-1];
-      const double eigv_abs_error = std::abs(dense_mth_eigv - h2_mth_eigv);
+//       const double dense_mth_eigv = DENSE_EIGENVALUES[k-1];
+//       const double eigv_abs_error = std::abs(dense_mth_eigv - h2_mth_eigv);
 
-      std::cout << "Compute eigenvalue k: " << k
-                << " abs_error: " << eigv_abs_error
-                << " check: " << (eigv_abs_error < 0.5 * ev_tol)
-                << " dense: " << dense_mth_eigv
-                << " H2   : " << h2_mth_eigv
-                << std::endl;
-    }
-    auto stop_kth_value_time = std::chrono::system_clock::now();
-    kth_value_time = std::chrono::duration_cast<
-      std::chrono::milliseconds>(stop_kth_value_time - start_kth_value_time).count();
+//       std::cout << "Compute eigenvalue k: " << k
+//                 << " abs_error: " << eigv_abs_error
+//                 << " check: " << (eigv_abs_error < 0.5 * ev_tol)
+//                 << " dense: " << dense_mth_eigv
+//                 << " H2   : " << h2_mth_eigv
+//                 << std::endl;
+//     }
+//     auto stop_kth_value_time = std::chrono::system_clock::now();
+//     kth_value_time = std::chrono::duration_cast<
+//       std::chrono::milliseconds>(stop_kth_value_time - start_kth_value_time).count();
 
-    parsec_fini(&parsec);
-  }
+//     parsec_fini(&parsec);
+//   }
 
   if (!MPIRANK) {
     double diff = global_norm[0];

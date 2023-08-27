@@ -405,11 +405,18 @@ void
 factorize_ptg(SymmetricSharedBasisMatrix& A,
               const Domain& domain,
               const Args& opts) {
+  auto start_ptg_setup = std::chrono::system_clock::now();
   parsec_h2_factorize_flows_taskpool_t *tp = h2_factorize_ptg_New(A, domain, opts);
-
   parsec_context_add_taskpool(parsec, (parsec_taskpool_t*)tp);
+  auto stop_ptg_setup = std::chrono::system_clock::now();
+  double ptg_setup_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_ptg_setup - start_ptg_setup).count();
+  std::cout << "### setup ptg: " << ptg_setup_time << std::endl;
+
   parsec_context_start(parsec);
   parsec_context_wait(parsec);
+
+  auto start_ptg_teardown = std::chrono::system_clock::now();
 
   // parsec_del2arena(&tp->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_ADT_IDX]);
   // parsec_del2arena(&tp->arenas_datatypes[PARSEC_h2_factorize_flows_NON_LEAF_TILE_ADT_IDX]);
@@ -417,11 +424,11 @@ factorize_ptg(SymmetricSharedBasisMatrix& A,
 
   parsec_taskpool_free((parsec_taskpool_t*)tp);
 
+
   // clear_maps(A, DENSE_BLOCKS);
   // clear_maps(A, NON_LEAF_DENSE_BLOCKS);
   // clear_maps(A, BASES_BLOCKS);
   // clear_maps(A, S_BLOCKS);
-
 
   // parsec_del2arena(&tp->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_LOWER_RIGHT_CORNER_ADT_IDX]);
   // parsec_del2arena(&tp->arenas_datatypes[PARSEC_h2_factorize_flows_LEAF_BASES_ADT_IDX]);
@@ -471,5 +478,8 @@ factorize_ptg(SymmetricSharedBasisMatrix& A,
       }
     }
   }
-
+  auto stop_ptg_teardown = std::chrono::system_clock::now();
+  double ptg_teardown_time = std::chrono::duration_cast<
+    std::chrono::milliseconds>(stop_ptg_teardown - start_ptg_teardown).count();
+  std::cout << "### PTG teardown time: " << ptg_teardown_time << std::endl;
 }

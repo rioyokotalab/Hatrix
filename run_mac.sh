@@ -25,7 +25,7 @@ cd $ROOT
 
 make -j H2_construct
 
-for N in 1024; do
+for N in 512; do
     for MAX_RANK in 30; do
         NLEAF=128
         NDIM=1
@@ -34,7 +34,7 @@ for N in 1024; do
 
         # Laplace kernel paramters
         p1=1e-3
-        mpirun -n 4 ./bin/H2_construct --N $N \
+        mpirun -n 2 ./bin/H2_construct --N $N \
                --ndim $NDIM \
                --nleaf $NLEAF \
                --max_rank $MAX_RANK \
@@ -44,6 +44,6 @@ for N in 1024; do
                --admis $ADMIS_VALUE \
                --geometry_file C60_fcc.xyz \
                --param_1 $p1 \
-               --use_nested_basis 0
+               --use_nested_basis 1
     done
 done
