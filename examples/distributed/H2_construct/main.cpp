@@ -248,6 +248,7 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
   Matrix dense(block_size, block_size);
 
 
+#pragma omp parallel for collapse(2)
   for (int64_t local_i = 0; local_i < block_size; ++local_i) {
     for (int64_t local_j = 0; local_j < block_size; ++local_j) {
       long int global_i = i * block_size + local_i;
@@ -336,6 +337,7 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
   // Allgather the bases for generation of skeleton blocks.
   int temp_blocks = nblocks < MPISIZE ? MPISIZE  : (nblocks / MPISIZE + 1) * MPISIZE;
 
+  auto start_all_gather = std::chrono::system_clock::now();
   std::vector<double> temp_bases(opts.nleaf * opts.max_rank * temp_blocks, 0);
   for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
     int64_t temp_bases_offset = ((i / MPISIZE) * MPISIZE) * opts.nleaf * opts.max_rank;
@@ -348,6 +350,9 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                   MPI_DOUBLE,
                   MPI_COMM_WORLD);
   }
+  auto stop_all_gather = std::chrono::system_clock::now();
+  auto all_gather_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_all_gather - start_all_gather).count();
+  std::cout << "### all gather time<leaf> : " << all_gather_time << std::endl;
 
   for (int64_t i = MPIRANK; i < nblocks; i += MPISIZE) {
     for (int64_t j = 0; j < nblocks; ++j) {
