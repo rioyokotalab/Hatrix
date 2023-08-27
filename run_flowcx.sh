@@ -1,7 +1,7 @@
 #!/bin/bash
 #PJM -L "node=16"
 #PJM -L "rscgrp=cx-middle"
-#PJM -L "elapse=2:00:00"
+#PJM -L "elapse=12:00:00"
 #PJM -e error.log
 #PJM -j
 
@@ -41,7 +41,7 @@ make -j H2_construct
 
 export MKL_NUM_THREADS=40
 
-for N in 16384 65536 262144 1048576; do
+for N in 262144 1048576; do
     nx=1
     ny=1
     nz=1

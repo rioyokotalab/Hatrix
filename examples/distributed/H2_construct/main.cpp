@@ -698,8 +698,11 @@ int main(int argc, char* argv[]) {
 
   global_is_admissible.deep_copy(A.is_admissible);
   // A.print_structure();
+  if (!MPIRANK) { std::cout << "start H2 construction.\n"; }
   construct_H2_matrix(A, domain, opts);
   auto stop_construct = std::chrono::system_clock::now();
+  if (!MPIRANK) { std::cout << "stop H2 construction.\n"; }
+
   double construct_time = std::chrono::duration_cast<
     std::chrono::milliseconds>(stop_construct - start_construct).count();
 
@@ -762,7 +765,7 @@ int main(int argc, char* argv[]) {
 #endif
     omp_set_num_threads(1);
 
-    parsec = parsec_init( 1, NULL, NULL );
+    parsec = parsec_init( -1, NULL, NULL );
     construct_h2_matrix_graph_structures(A, domain, opts);
 
     bool singular = false;
