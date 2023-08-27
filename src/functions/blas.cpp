@@ -1,5 +1,3 @@
-#include "Hatrix/functions/blas.h"
-
 #include <cassert>
 #include <iostream>
 
@@ -9,7 +7,8 @@
 #include "cblas.h"
 #endif
 
-#include "Hatrix/classes/Matrix.h"
+#include "Hatrix/classes/Matrix.hpp"
+#include "Hatrix/functions/blas.hpp"
 
 namespace Hatrix {
 

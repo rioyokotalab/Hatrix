@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <random>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 namespace Hatrix {
   Cell::Cell(int64_t ndim) {

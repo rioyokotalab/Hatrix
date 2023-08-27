@@ -2,7 +2,7 @@
 #include <vector>
 #include <chrono>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "distributed/distributed.hpp"
 
 using namespace Hatrix;

@@ -4,7 +4,7 @@
 #include <cmath>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "distributed/distributed.hpp"
 #include "factorize_noparsec.hpp"
 

@@ -2,7 +2,7 @@
 
 #include <unordered_map>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "distributed/distributed.hpp"
 
 #include "parsec.h"

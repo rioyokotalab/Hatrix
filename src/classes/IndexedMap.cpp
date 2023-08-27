@@ -1,4 +1,4 @@
-#include "Hatrix/classes/IndexedMap.h"
+#include "Hatrix/classes/IndexedMap.hpp"
 
 namespace Hatrix {
 

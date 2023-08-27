@@ -6,7 +6,7 @@
 #include <random>
 #include <cassert>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 namespace Hatrix {
   void

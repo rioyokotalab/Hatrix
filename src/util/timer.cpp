@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "Hatrix/util/timer.h"
+#include "Hatrix/util/timer.hpp"
 
 namespace Hatrix {
 namespace timing {

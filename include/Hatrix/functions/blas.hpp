@@ -1,6 +1,7 @@
 #pragma once
-#include "Hatrix/classes/Matrix.h"
-#include "Hatrix/functions/math_common.h"
+#include "Hatrix/classes/Matrix.hpp"
+
+#include "Hatrix/functions/math_common.hpp"
 
 namespace Hatrix {
 void swap_row(Matrix& A, int64_t r1, int64_t r2);

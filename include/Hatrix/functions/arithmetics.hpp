@@ -1,5 +1,5 @@
 #pragma once
-#include "Hatrix/classes/Matrix.h"
+#include "Hatrix/classes/Matrix.hpp"
 
 namespace Hatrix {
 

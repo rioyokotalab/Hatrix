@@ -11,7 +11,7 @@
 #include <iomanip>
 #include <random>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "distributed/distributed.hpp"
 
 #include "factorize_noparsec.hpp"
@@ -603,7 +603,6 @@ construct_h2_matrix_graph_structures(const SymmetricSharedBasisMatrix& A,
 
 
 int main(int argc, char* argv[]) {
-  Hatrix::Context::init();
   Args opts(argc, argv);
   const double ev_tol = 1e-7;
   int N = opts.N;

@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "Hatrix/classes/Matrix.h"
+#include "Hatrix/classes/Matrix.hpp"
 
 namespace Hatrix {
 

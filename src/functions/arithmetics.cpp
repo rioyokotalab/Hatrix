@@ -1,12 +1,12 @@
-#include "Hatrix/functions/arithmetics.h"
-
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
 
-#include "Hatrix/classes/Matrix.h"
-#include "Hatrix/functions/blas.h"
+#include "Hatrix/classes/Matrix.hpp"
+
+#include "Hatrix/functions/blas.hpp"
+#include "Hatrix/functions/arithmetics.hpp"
 
 namespace Hatrix {
 

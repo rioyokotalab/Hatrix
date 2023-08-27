@@ -5,7 +5,7 @@
 #include <iostream>
 #include <set>
 
-#include "Hatrix/classes/Matrix.h"
+#include "Hatrix/classes/Matrix.hpp"
 
 namespace std {
 

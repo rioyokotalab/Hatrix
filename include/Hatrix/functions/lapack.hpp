@@ -2,8 +2,8 @@
 #include <cstdint>
 #include <tuple>
 
-#include "Hatrix/classes/Matrix.h"
-#include "Hatrix/functions/math_common.h"
+#include "Hatrix/classes/Matrix.hpp"
+#include "Hatrix/functions/math_common.hpp"
 
 namespace Hatrix {
 
