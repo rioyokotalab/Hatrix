@@ -33,6 +33,8 @@ extern "C" {
 
 using namespace Hatrix;
 
+ColLevelMap US;
+
 constexpr double EPS = 1e-13;// std::numeric_limits<double>::epsilon();
 static const int BEGIN_PROW = 0, BEGIN_PCOL = 0;
 const int ONE = 1;
@@ -245,7 +247,7 @@ Matrix
 generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
                           const Domain& domain,
                           const SymmetricSharedBasisMatrix& A) {
-  int64_t block_size = opts.N / A.num_blocks[level];
+  int64_t block_size = opts.N / pow(2, level);
   Matrix dense(block_size, block_size);
 
 #pragma omp parallel for collapse(2)
@@ -278,7 +280,7 @@ generate_p2p_interactions(int64_t i, int64_t j, int64_t level, const Args& opts,
 
 void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
                          const Domain& domain, const Args& opts) {
-  int64_t nblocks = A.num_blocks[A.max_level];
+  int64_t nblocks = pow(2, A.max_level);
   int64_t block_size = opts.N / nblocks;
 
   // Generate dense blocks and store them in the appropriate structure.
@@ -331,7 +333,7 @@ void generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
     std::tie(Ui, Si, _V, error) = truncated_svd(AY, opts.max_rank);
 
     A.U.insert(i, A.max_level, std::move(Ui));
-    A.US.insert(i, A.max_level, std::move(Si));
+    US.insert(i, A.max_level, std::move(Si));
   }
 
   // Allgather the bases for generation of skeleton blocks.
@@ -741,8 +743,6 @@ int main(int argc, char* argv[]) {
 
   int64_t construct_max_rank;
 
-  A.num_blocks.resize(A.max_level+1);
-  A.num_blocks[A.max_level] = opts.N/opts.nleaf;
   if (opts.admis_kind == GEOMETRY) {
     init_geometry_admis(A, domain, opts); // init admissiblity conditions with DTT
   }
