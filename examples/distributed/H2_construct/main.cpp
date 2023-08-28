@@ -438,7 +438,12 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   } // for (i = MPIRANK .. leaf_nblocks)
 
   std::cout << "nblocks per non leaf: " << nblocks_per_non_leaf << std::endl;
+  // Outer loop goes over the chunks of the child bases that need to be gathered into a root.
   for (int64_t chunk = 0; chunk < leaf_nblocks; chunk += nblocks_per_non_leaf) {
+    int64_t j = chunk / nblocks_per_non_leaf;
+    int root_proc = mpi_rank(j);
+
+    std::vector<double> pre_svd_chunk(opts.max_rank * nblocks_per_non_leaf * opts.nleaf, 0);
 
   }
 
