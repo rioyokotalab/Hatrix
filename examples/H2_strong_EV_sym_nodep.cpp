@@ -850,8 +850,6 @@ int main(int argc, char ** argv) {
   const std::string file_name = argc > 21 ? std::string(argv[21]) : "";
   const int64_t sort_bodies = argc > 22 ? atol(argv[22]) : 0;
 
-  Hatrix::Context::init();
-
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
@@ -1160,6 +1158,5 @@ int main(int argc, char ** argv) {
 #endif
   }
 
-  Hatrix::Context::finalize();
   return 0;
 }

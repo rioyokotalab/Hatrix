@@ -91,8 +91,6 @@ int main(int argc, char ** argv) {
   // ELSES Input Files
   const std::string file_name = argc > 12 ? std::string(argv[12]) : "";
 
-  Hatrix::Context::init();
-
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
@@ -279,7 +277,6 @@ int main(int argc, char ** argv) {
 #endif
   }
 
-  Hatrix::Context::finalize();
   return 0;
 }
 

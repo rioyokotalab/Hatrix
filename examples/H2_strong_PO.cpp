@@ -1649,8 +1649,6 @@ int main(int argc, char ** argv) {
   // 1: H2
   const int64_t matrix_type = argc > 10 ? atol(argv[10]) : 1;
 
-  Hatrix::Context::init();
-
   Hatrix::set_kernel_constants(1e-4, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
@@ -1763,6 +1761,5 @@ int main(int argc, char ** argv) {
             << " solve_error=" << solve_error
             << std::endl;
 
-  Hatrix::Context::finalize();
   return 0;
 }

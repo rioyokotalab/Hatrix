@@ -97,7 +97,6 @@ else()
     src/functions/arithmetics.cpp
     src/functions/blas.cpp
     src/functions/lapack.cpp
-    src/util/context.cpp
   )
   target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} OpenMP::OpenMP_CXX)
 endif()

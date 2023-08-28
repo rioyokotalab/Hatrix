@@ -1614,8 +1614,6 @@ int main(int argc, char ** argv) {
   // 0: BLR2
   constexpr int64_t matrix_type = 0;
 
-  Hatrix::Context::init();
-
   const auto start_particles = std::chrono::system_clock::now();
   constexpr int64_t ndim = 3;
   Hatrix::Domain domain(N, ndim);
@@ -1650,8 +1648,6 @@ int main(int argc, char ** argv) {
                             (solve_stop - solve_start).count();
   Hatrix::Matrix x_solve = ldl_solve(Adense, b);
   solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
-
-  Hatrix::Context::finalize();
 
   std::cout << "N=" << N
             << " admis=" << admis << std::setw(3)

@@ -12,7 +12,6 @@ class ErrorIDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t, 
 using namespace Hatrix;
 
 TEST_P(InterpolateTests, interpolate_rank) {
-  Hatrix::Context::init();
   int64_t m, n, rank = 10;
   std::tie(m, n) = GetParam();
 
@@ -45,12 +44,9 @@ TEST_P(InterpolateTests, interpolate_rank) {
   }
 
   EXPECT_NEAR(Hatrix::norm(result - Arank_pivoted) / Hatrix::norm(result), 0, 1e-12);
-
-  Hatrix::Context::finalize();
 }
 
 TEST_P(InterpolateTests, interpolate_error) {
-  Hatrix::Context::init();
   int64_t m, n;
   std::tie(m, n) = GetParam();
 
@@ -87,12 +83,9 @@ TEST_P(InterpolateTests, interpolate_error) {
   }
 
   EXPECT_NEAR(Hatrix::norm(result - A_error_pivoted) / Hatrix::norm(result), 0, 1e-12);
-
-  Hatrix::Context::finalize();
 }
 
 TEST_P(TruncatedIDTests, truncated_id_row) {
-  Hatrix::Context::init();
   int64_t m, n, rank;
   std::tie(m, n, rank) = GetParam();
 
@@ -122,11 +115,9 @@ TEST_P(TruncatedIDTests, truncated_id_row) {
   const double eps = 1e-13;
   const double error = Hatrix::norm(D - Hatrix::matmul(U, A_skel_rows));
   EXPECT_NEAR(error, 0, eps);
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ErrorIDTests, error_id_row) {
-  Hatrix::Context::init();
   int64_t m, n;
   double eps;
   bool relative;
@@ -157,7 +148,6 @@ TEST_P(ErrorIDTests, error_id_row) {
   const double diff = Hatrix::norm(D - Hatrix::matmul(U, A_skel_rows));
   const double error = relative ? diff / dnorm : diff;
   EXPECT_NEAR(error, 0, eps);
-  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(

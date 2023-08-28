@@ -351,4 +351,6 @@ int main() {
     error += Hatrix::norm(b[i] - x[i]);
   }
   std::cout << "Solution error: " << error << "\n";
+
+  return 0;
 }

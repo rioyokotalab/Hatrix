@@ -1315,8 +1315,6 @@ int main(int argc, char ** argv) {
   const std::string file_name = argc > 19 ? std::string(argv[19]) : "";
   const int64_t sort_bodies = argc > 20 ? atol(argv[20]) : 0;
 
-  Hatrix::Context::init();
-
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
@@ -1620,7 +1618,6 @@ int main(int argc, char ** argv) {
   }
   PRINT_TIME("get_mth_eigenvalue", 6);
 
-  Hatrix::Context::finalize();
   return 0;
 }
 

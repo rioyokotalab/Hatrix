@@ -284,15 +284,12 @@ int main(int argc, char *argv[]) {
     abort();
   }
 
-  Hatrix::Context::init();
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
   Hatrix::HSS A(randvec, N, rank, height);
   double error = A.construction_relative_error(randvec);
-
-  Hatrix::Context::finalize();
-
   std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;
 
+  return 0;
 }

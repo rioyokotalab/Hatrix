@@ -8,7 +8,6 @@
 class CholeskyTests : public testing::TestWithParam<std::tuple<int64_t>> {};
 
 TEST_P(CholeskyTests, cholesky) {
-  Hatrix::Context::init();
   int64_t m;
   std::tie(m) = GetParam();
 
@@ -39,7 +38,6 @@ TEST_P(CholeskyTests, cholesky) {
 }
 
 TEST_P(CholeskyTests, block_cholesky) {
-  Hatrix::Context::init();
   int64_t m;
   std::tie(m) = GetParam();
 

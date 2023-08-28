@@ -500,8 +500,6 @@ int main(int argc, char ** argv) {
   // Empty string: do not write JSON file
   const std::string out_filename = argc > 14 ? std::string(argv[14]) : "";
 
-  Hatrix::Context::init();
-
   Hatrix::set_kernel_constants(1e-3 / (double)N, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
@@ -624,6 +622,5 @@ int main(int argc, char ** argv) {
             << " construct_error=" << std::scientific << construct_error
             << std::endl;
 
-  Hatrix::Context::finalize();
   return 0;
 }

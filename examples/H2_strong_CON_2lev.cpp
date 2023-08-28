@@ -300,7 +300,6 @@ int main(int argc, char* argv[]) {
     abort();
   }
 
-  Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
@@ -309,8 +308,8 @@ int main(int argc, char* argv[]) {
   Hatrix::H2 A(randpts, N, rank, admis, 2);
   double error = A.construction_relative_error(randpts);
 
-  Hatrix::Context::finalize();
-
   std::cout << "N=" << N << " rank=" << rank << " admis="
             << admis <<  " construction error=" << error << std::endl;
+
+  return 0;
 }

@@ -241,8 +241,6 @@ int main(int argc, char** argv) {
   randvec_t randpts;
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
-  Hatrix::Context::init();
-
   BLR2_SPD A(randpts, N, block_size, rank, 0);
   Hatrix::Matrix A_dense = Hatrix::generate_laplacend_matrix(randpts, N, N, 0, 0);
   Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
@@ -254,6 +252,5 @@ int main(int argc, char** argv) {
   double substitution_error = rel_error(x, b);
   std::cout <<"Solve Error : " <<substitution_error <<"\n";
 
-  Hatrix::Context::finalize();
   return 0;
 }

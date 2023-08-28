@@ -9,7 +9,6 @@ class RQTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, int64_t>> {};
 
 TEST_P(RQTests, rq) {
-  Hatrix::Context::init();
   int64_t m, n, k;
   std::tie(m, n, k) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
@@ -33,8 +32,6 @@ TEST_P(RQTests, rq) {
         EXPECT_NEAR(QQt(i, j), 0.0, 1e-12);
     }
   }
-
-  Hatrix::Context::finalize();
 }
 
 

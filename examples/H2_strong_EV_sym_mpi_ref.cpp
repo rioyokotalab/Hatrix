@@ -1194,8 +1194,6 @@ int main(int argc, char ** argv) {
   const std::string file_name = argc > 18 ? std::string(argv[18]) : "";
   const int64_t sort_bodies = argc > 19 ? atol(argv[19]) : 0;
 
-  Hatrix::Context::init();
-
   Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
@@ -1471,7 +1469,6 @@ int main(int argc, char ** argv) {
     }
   }
 
-  Hatrix::Context::finalize();
   MPI_Comm_free(&comm);
   MPI_Finalize();
   return 0;

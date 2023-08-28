@@ -58,7 +58,8 @@ double yukawa_kernel(const Domain& domain,
   return out;
 }
 
-double matern_kernel(const Body& source, const Body& target) {
+double matern_kernel(const Domain& domain,
+                     const Body& source, const Body& target) {
   double sigma = 1.0, nu = 0.03, smoothness = 0.5;
 
   double expr = 0.0;

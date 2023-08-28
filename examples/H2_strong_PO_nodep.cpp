@@ -794,8 +794,6 @@ int main(int argc, char ** argv) {
   // 1: H2
   const int64_t matrix_type = argc > 14 ? atol(argv[14]) : 1;
 
-  Hatrix::Context::init();
-
   Hatrix::set_kernel_constants(1.e-3 / (double)N, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
@@ -921,6 +919,5 @@ int main(int argc, char ** argv) {
             << " solve_error=" << std::scientific << solve_error
             << std::defaultfloat << std::endl;
 
-  Hatrix::Context::finalize();
   return 0;
 }

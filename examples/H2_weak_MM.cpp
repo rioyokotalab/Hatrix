@@ -458,7 +458,6 @@ int main(int argc, char** argv) {
     abort();
   }
 
-  Hatrix::Context::init();
   randvec_t A_randpts, B_randpts, C_randpts;
   A_randpts.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
   B_randpts.push_back(equally_spaced_vector(N, 1.0, 2.0)); // 1D
@@ -481,6 +480,5 @@ int main(int argc, char** argv) {
   std::cout <<"N=" <<N <<", rank=" <<rank <<", height=" <<height;
   std::cout <<", construction error=" <<construction_error <<", matmul error=" <<matmul_error <<"\n";
 
-  Hatrix::Context::finalize();
   return 0;
 }

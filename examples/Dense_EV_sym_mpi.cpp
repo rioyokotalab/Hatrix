@@ -114,7 +114,6 @@ int main(int argc, char ** argv) {
   const int64_t print_csv_header = argc > 6 ? atol(argv[6]) : 1;
   // ELSES Input Files
   const std::string file_name = argc > 7 ? std::string(argv[7]) : "";
-  Hatrix::Context::init();
   // Choose kernel
   Hatrix::set_kernel_constants(1e-3, 1.);
   std::string kernel_name = "";
@@ -251,7 +250,6 @@ int main(int argc, char ** argv) {
 #endif
   }
 
-  Hatrix::Context::finalize();
   Cblacs_gridexit(blacs_context);
   Cblacs_exit(1);
   MPI_Finalize();

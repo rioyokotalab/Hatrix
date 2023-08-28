@@ -1704,7 +1704,6 @@ int main(int argc, char** argv) {
 
   double factorize_error;
 
-  Hatrix::Context::init();
   Hatrix::Domain domain(N, ndim);
   domain.generate_particles(0.0, 1.0 * N);
   domain.divide_domain_and_create_particle_boxes(nleaf);
@@ -1778,8 +1777,6 @@ int main(int argc, char** argv) {
 
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
-  Hatrix::Context::finalize();
-
   std::cout << "N: " << N << " rank: " << rank << " nleaf: " << nleaf
             << " admis: " <<  admis << " ndim: " << ndim
             << " construct error: " << construct_error
@@ -1788,4 +1785,6 @@ int main(int argc, char** argv) {
             << " LR%: " << A.low_rank_block_ratio() * 100 << "%"
             << " admis kind: " << admis_kind
             <<  "\n";
+
+  return 0;
 }

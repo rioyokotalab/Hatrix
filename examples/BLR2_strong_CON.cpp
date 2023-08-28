@@ -464,7 +464,6 @@ int main(int argc, char** argv) {
   double admis = atof(argv[4]);
   int64_t ndim = atoi(argv[5]);
 
-  Hatrix::Context::init();
   Hatrix::Domain domain(N, ndim);
   domain.generate_particles(0.0, 1.0 * N);
   domain.divide_domain_and_create_particle_boxes(nleaf);
@@ -480,8 +479,8 @@ int main(int argc, char** argv) {
 
   Hatrix::Matrix dense = Hatrix::generate_laplacend_matrix(domain.particles, N, N, 1);
 
-  Hatrix::Context::finalize();
-
   std::cout << "N: " << N << " rank: " << rank << " nleaf: " << nleaf << " admis: " <<  admis
             << " construct error: " << construct_error << " LR ratio: " << A.low_rank_block_ratio() <<  "\n";
+
+  return 0;
 }

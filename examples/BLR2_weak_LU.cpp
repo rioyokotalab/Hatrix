@@ -409,7 +409,6 @@ int main(int argc, char *argv[]) {
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
   randpts.push_back(Hatrix::equally_spaced_vector(N, 0.0, 1.0 * N)); // 3D
 
-  Hatrix::Context::init();
   const Hatrix::Matrix _b = Hatrix::generate_random_matrix(N, 1);
   Hatrix::UMV::Vector b(_b, N, block_size, nblocks, rank);
 
@@ -444,8 +443,6 @@ int main(int argc, char *argv[]) {
        << subs_time << std::endl;
 
   file.close();
-
-  Hatrix::Context::finalize();
 
   return 0;
 }

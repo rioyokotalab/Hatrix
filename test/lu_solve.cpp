@@ -9,7 +9,6 @@
 class LU_SolveTests : public testing::TestWithParam<std::tuple<int64_t>> {};
 
 TEST_P(LU_SolveTests, lu_solve) {
-  Hatrix::Context::init();
   int64_t m;
   std::tie(m) = GetParam();
 
@@ -26,8 +25,6 @@ TEST_P(LU_SolveTests, lu_solve) {
   double rel_error = norm(product - b) / norm(b);
 
   EXPECT_NEAR(rel_error, 0, 1e-13);
-
-  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(

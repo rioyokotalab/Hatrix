@@ -13,7 +13,6 @@ TEST_P(ScaleTests, Scaling) {
   int64_t m, n;
   double alpha;
   std::tie(m, n, alpha) = GetParam();
-  Hatrix::Context::init();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
   Hatrix::Matrix A_copy(A);
 
@@ -23,14 +22,12 @@ TEST_P(ScaleTests, Scaling) {
       EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
     }
   }
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ScaleTests, ScalingPart) {
   int64_t m, n;
   double alpha;
   std::tie(m, n, alpha) = GetParam();
-  Hatrix::Context::init();
   Hatrix::Matrix A_big = Hatrix::generate_random_matrix(2*m, 2*n);
   std::vector<Hatrix::Matrix> A_split = A_big.split(2, 2);
   Hatrix::Matrix A_copy(A_split[0], true);
@@ -41,14 +38,12 @@ TEST_P(ScaleTests, ScalingPart) {
       EXPECT_EQ(A_big(i, j), A_copy(i, j) * alpha);
     }
   }
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ScaleTests, RowScaling) {
   int64_t m, n;
   double alpha;
   std::tie(m, n, alpha) = GetParam();
-  Hatrix::Context::init();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
   Hatrix::Matrix A_copy(A);
   Hatrix::Matrix D = Hatrix::generate_random_matrix(m, m);
@@ -59,14 +54,12 @@ TEST_P(ScaleTests, RowScaling) {
       EXPECT_EQ(A(i, j), A_copy(i, j) * D(i, i));
     }
   }
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ScaleTests, ColumnScaling) {
   int64_t m, n;
   double alpha;
   std::tie(m, n, alpha) = GetParam();
-  Hatrix::Context::init();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
   Hatrix::Matrix A_copy(A);
   Hatrix::Matrix D = Hatrix::generate_random_matrix(n, n);
@@ -77,7 +70,6 @@ TEST_P(ScaleTests, ColumnScaling) {
       EXPECT_EQ(A(i, j), A_copy(i, j) * D(j, j));
     }
   }
-  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(

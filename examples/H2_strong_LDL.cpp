@@ -1511,8 +1511,6 @@ int main(int argc, char ** argv) {
   const std::string file_name = argc > 13 ? std::string(argv[13]) : "";
   const int64_t sort_bodies = argc > 14 ? atol(argv[14]) : 0;
 
-  Hatrix::Context::init();
-
 #ifdef OUTPUT_CSV
   if (print_csv_header == 1) {
     // Print CSV header
@@ -1737,6 +1735,5 @@ int main(int argc, char ** argv) {
   // std::cout << std::endl;
   // Hatrix::timing::printTime("generalized_ldl_factorize", 5);
 
-  Hatrix::Context::finalize();
   return 0;
 }

@@ -350,6 +350,7 @@ int main(int argc, char** argv) {
       diff += fdiff * fdiff;
     }
   }
-  std::cout << "Exact Matmul Relative Error: " << std::sqrt(diff/norm) << "\n";  
+  std::cout << "Exact Matmul Relative Error: " << std::sqrt(diff/norm) << "\n";
+
   return 0;
 }

@@ -526,7 +526,6 @@ int main(int argc, char *argv[]) {
     abort();
   }
 
-  Hatrix::Context::init();
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
 
@@ -557,7 +556,5 @@ int main(int argc, char *argv[]) {
             << "\t" << std::chrono::duration_cast<std::chrono::milliseconds>(stop_factorize - start_factorize).count()
             << "\t" << std::chrono::duration_cast<std::chrono::milliseconds>(stop_solve - start_solve).count() << std::endl;
 
-  Hatrix::Context::finalize();
-
-
+  return 0;
 }

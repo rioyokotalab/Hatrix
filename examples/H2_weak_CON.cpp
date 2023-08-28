@@ -349,7 +349,6 @@ int main(int argc, char *argv[]) {
     abort();
   }
 
-  Hatrix::Context::init();
   randvec_t randvec;
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
   randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 2D
@@ -359,10 +358,7 @@ int main(int argc, char *argv[]) {
   auto start_construct = std::chrono::system_clock::now();
   Hatrix::HSS A(randvec, N, rank, height);
   auto stop_construct = std::chrono::system_clock::now();
-
   double error = A.construction_relative_error(randvec);
-
-  Hatrix::Context::finalize();
 
   std::ofstream file;
   file.open("output.txt", std::ios::app | std::ios::out);
@@ -370,4 +366,5 @@ int main(int argc, char *argv[]) {
             << " height=" << height <<  " const. error=" << error << std::endl;
   file.close();
 
+  return 0;
 }

@@ -124,5 +124,6 @@ int main() {
   Hatrix::Matrix Id =
       Hatrix::generate_identity_matrix(Dense_QTQ.rows, Dense_QTQ.cols);
   std::cout << "norm(I-Q^T*Q) = " << Hatrix::norm(Id - Dense_QTQ) << std::endl;
+
   return 0;
 }

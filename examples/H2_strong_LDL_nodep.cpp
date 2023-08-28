@@ -904,8 +904,6 @@ int main(int argc, char ** argv) {
   const std::string file_name = argc > 15 ? std::string(argv[15]) : "";
   const int64_t sort_bodies = argc > 16 ? atol(argv[16]) : 0;
 
-  Hatrix::Context::init();
-
   Hatrix::set_kernel_constants(1.e-3 / (double)N, 1.);
   std::string kernel_name = "";
   switch (kernel_type) {
@@ -1117,6 +1115,5 @@ int main(int argc, char ** argv) {
             << std::endl;
 #endif
 
-  Hatrix::Context::finalize();
   return 0;
 }

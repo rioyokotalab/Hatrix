@@ -1262,7 +1262,6 @@ int main(int argc, char *argv[]) {
 
   randvec_t randpts;
 
-  Hatrix::Context::init();
   switch(kernel_func) {
   case 0: {
     global_matrix.read_file("dense_matrix.data");
@@ -1304,7 +1303,6 @@ int main(int argc, char *argv[]) {
   double solve_error =  Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
 
   int leaf = int(N / pow(2, height));
-  Hatrix::Context::finalize();
 
   std::ofstream file;
   file.open("H2_UMV.csv", std::ios::app | std::ios::out);
@@ -1332,4 +1330,5 @@ int main(int argc, char *argv[]) {
        << std::endl;
 
   file.close();
+  return 0;
 }

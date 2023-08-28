@@ -437,7 +437,6 @@ int main(int argc, char** argv) {
     abort();
   }
 
-  Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(equally_spaced_vector(N, 0.0, 10.0)); // 1D
   Hatrix::HSS_SPD A(randpts, N, rank, height);
@@ -454,6 +453,5 @@ int main(int argc, char** argv) {
   std::cout <<", construction error=" <<construction_error;
   std::cout <<", solve error=" <<solve_error <<"\n";
 
-  Hatrix::Context::finalize();
   return 0;
 }

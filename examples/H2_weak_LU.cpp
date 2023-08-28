@@ -564,7 +564,6 @@ int main(int argc, char* argv[]) {
     abort();
   }
 
-  Hatrix::Context::init();
   randvec_t randpts;
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 1D
   randpts.push_back(equally_spaced_vector(N, 0.0, 1.0 * N)); // 2D
@@ -590,7 +589,6 @@ int main(int argc, char* argv[]) {
   double solve_error = Hatrix::norm(x - x_solve) / Hatrix::norm(x_solve);
   int leaf = int(N / pow(2, height));
 
-  Hatrix::Context::finalize();
   std::cout << "N= " << N << " rank= " << rank << " height=" << height
             << " construction error=" << construct_error
             << " solve error=" << solve_error << std::endl;
@@ -601,4 +599,6 @@ int main(int argc, char* argv[]) {
   file << N << "," << rank << "," << admis << "," << leaf << ","
        << height << "," << construct_error << "," << solve_error << std::endl;
   file.close();
+
+  return 0;
 }
