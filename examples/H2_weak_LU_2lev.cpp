@@ -4,7 +4,7 @@
 #include <cassert>
 #include <chrono>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 using randvec_t = std::vector<std::vector<double> >;
 

@@ -16,7 +16,7 @@
 #include <chrono>
 #include <stdexcept>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "common/functions.hpp"
 #include "common/Domain.hpp"
 

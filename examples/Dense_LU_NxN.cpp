@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 class BlockDense {
  private:

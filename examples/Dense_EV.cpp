@@ -17,7 +17,7 @@
 #include <stdexcept>
 #include <cstdio>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "Domain.hpp"
 #include "functions.hpp"
 

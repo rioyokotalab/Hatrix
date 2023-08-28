@@ -10,7 +10,7 @@
 #include <random>
 #include <string>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 

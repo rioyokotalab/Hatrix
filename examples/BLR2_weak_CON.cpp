@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 // BLR2 compression scheme using randomization and multiplying each row/col block
 // into another to generate the shared bases.

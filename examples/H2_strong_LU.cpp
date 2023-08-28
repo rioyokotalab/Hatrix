@@ -7,7 +7,7 @@
 #include <numeric>
 #include <functional>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 using namespace Hatrix;
 

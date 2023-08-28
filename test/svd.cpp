@@ -2,7 +2,7 @@
 #include <cassert>
 #include <tuple>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class SVDTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {};

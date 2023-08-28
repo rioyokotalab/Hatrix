@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 // ( A00 ) = I - ( Y00 ) * T * ( Y00^T Y10^T ) * ( A00 )
 // ( A10 )       ( Y10 )                         ( A10 )

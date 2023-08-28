@@ -8,7 +8,7 @@
 #include <vector>
 #include <cassert>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 using vec = std::vector<int64_t>;
 using randvec_t = std::vector<std::vector<double> >;

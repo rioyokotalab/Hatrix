@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 class BLR_2x2 {
  private:

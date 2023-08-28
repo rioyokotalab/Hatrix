@@ -3,7 +3,7 @@
 #include <tuple>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class ScaleTests

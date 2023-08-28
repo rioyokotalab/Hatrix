@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 Hatrix::BLR construct_BLR(int64_t block_size, int64_t n_blocks, int64_t rank) {
   Hatrix::BLR A;

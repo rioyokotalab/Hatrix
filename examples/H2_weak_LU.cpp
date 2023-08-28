@@ -5,7 +5,7 @@
 #include <chrono>
 #include <fstream>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 // UMV factorization and substitution of N-level HSS matrix. Compression
 // done by following the technique in the Miro board. Implementation in

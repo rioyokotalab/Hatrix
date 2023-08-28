@@ -12,7 +12,7 @@
 #include <iomanip>
 #include <cassert>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 // Construction of BLR2 strong admis matrix based on geometry based admis condition.
 double PV = 1e-3;

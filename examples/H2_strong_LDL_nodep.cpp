@@ -21,7 +21,7 @@
 #include "nlohmann/json.hpp"
 #endif
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "Domain.hpp"
 #include "functions.hpp"
 

@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 std::vector<double> equally_spaced_vector(int64_t N, double minVal, double maxVal) {
   std::vector<double> res(N, 0.0);

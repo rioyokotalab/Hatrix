@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "Body.hpp"
 #include "Cell.hpp"
 

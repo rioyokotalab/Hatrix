@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 int main() {
   Hatrix::Context::init();

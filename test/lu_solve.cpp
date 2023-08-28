@@ -3,7 +3,7 @@
 #include <tuple>
 #include <random>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class LU_SolveTests : public testing::TestWithParam<std::tuple<int64_t>> {};

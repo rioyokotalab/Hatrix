@@ -15,7 +15,7 @@
 #include <fstream>
 #include <chrono>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 using vec = std::vector<int64_t>;
 
