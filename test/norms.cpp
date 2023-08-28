@@ -3,7 +3,7 @@
 #include <string>
 #include <tuple>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class NormTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {
@@ -12,7 +12,6 @@ class NormTests : public testing::TestWithParam<std::tuple<int64_t, int64_t>> {
 TEST_P(NormTests, norm) {
   int64_t m, n;
   std::tie(m, n) = GetParam();
-  Hatrix::Context::init();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
 
   double norm = 0;
@@ -24,7 +23,6 @@ TEST_P(NormTests, norm) {
   norm = std::sqrt(norm);
 
   EXPECT_FLOAT_EQ(norm, Hatrix::norm(A));
-  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(

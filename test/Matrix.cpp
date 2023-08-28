@@ -3,7 +3,7 @@
 #include <vector>
 #include <iostream>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 TEST(MatrixTests, Constructor) {

@@ -2,7 +2,7 @@
 #include <iostream>
 #include <tuple>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class QRTests
@@ -15,7 +15,6 @@ class ApplyBlockReflectorTests
     : public testing::TestWithParam<std::tuple<int64_t, int64_t, int, bool>> {};
 
 TEST_P(QRTests, qr) {
-  Hatrix::Context::init();
   int64_t m, n, k;
   std::tie(m, n, k) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
@@ -24,7 +23,6 @@ TEST_P(QRTests, qr) {
   Hatrix::qr(A, Q, R);
   Hatrix::Matrix QR(m, n);
   Hatrix::matmul(Q, R, QR, false, false, 1., 0.);
-  Hatrix::Context::join();
   // Check accuracy
   for (int64_t i = 0; i < QR.rows; i++) {
     for (int64_t j = 0; j < QR.cols; j++) {
@@ -42,12 +40,9 @@ TEST_P(QRTests, qr) {
         EXPECT_NEAR(QTQ(i, j), 0.0, 10e-14);
     }
   }
-
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ErrorPivotedQRTests, ThresholdBasedTruncation) {
-  Hatrix::Context::init();
   int64_t m, n;
   double eps;
   std::tie(m, n, eps) = GetParam();
@@ -67,11 +62,9 @@ TEST_P(ErrorPivotedQRTests, ThresholdBasedTruncation) {
   // Check compression error
   const double error = Hatrix::norm(D - Hatrix::matmul(Q, RP));
   EXPECT_NEAR(error, 0, eps);
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ErrorPivotedQRTests, ZeroMatrixHandler) {
-  Hatrix::Context::init();
   int64_t m, n;
   double eps;
   std::tie(m, n, eps) = GetParam();
@@ -101,7 +94,6 @@ TEST_P(ErrorPivotedQRTests, ZeroMatrixHandler) {
   for(int64_t j = 0; j < RP.cols; j++) {
     EXPECT_NEAR(RP(0, j), 0.0, EPS);
   }
-  Hatrix::Context::finalize();
 }
 
 TEST_P(HouseholderQRCompactWYTests, HouseholderQRCompactWY) {

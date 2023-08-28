@@ -2,7 +2,7 @@
 #include <string>
 #include <tuple>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class LDLTests
@@ -11,7 +11,6 @@ class SolveDiagonalTests :
   public testing::TestWithParam<std::tuple<int64_t, int64_t, Hatrix::Side, double>> {};
 
 TEST_P(LDLTests, ldl) {
-  Hatrix::Context::init();
   int64_t m;
   std::tie(m) = GetParam();
 
@@ -40,12 +39,9 @@ TEST_P(LDLTests, ldl) {
       EXPECT_FLOAT_EQ(A_rebuilt(i, j), A_copy(i, j));
     }
   }
-
-  Hatrix::Context::finalize();
 }
 
 TEST_P(SolveDiagonalTests, solve_diagonal) {
-  Hatrix::Context::init();
   int64_t m, n;
   Hatrix::Side side;
   double alpha;
@@ -71,8 +67,6 @@ TEST_P(SolveDiagonalTests, solve_diagonal) {
       EXPECT_NEAR(B_copy(i, j), val, 1e-14);
     }
   }
-
-  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -3,7 +3,7 @@
 #include <sstream>
 #include <tuple>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class MatMulTests
@@ -11,7 +11,6 @@ class MatMulTests
           std::tuple<int64_t, int64_t, int64_t, bool, bool, double, double>> {};
 
 TEST_P(MatMulTests, matmul) {
-  Hatrix::Context::init();
   int64_t M, N, K;
   bool transA, transB;
   double alpha, beta;
@@ -23,7 +22,6 @@ TEST_P(MatMulTests, matmul) {
   Hatrix::Matrix C = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix C_check(C);
   Hatrix::matmul(A, B, C, transA, transB, alpha, beta);
-  Hatrix::Context::join();
 
   // Manual matmul
   for (int64_t i = 0; i < M; ++i) {
@@ -44,11 +42,9 @@ TEST_P(MatMulTests, matmul) {
       EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
     }
   }
-  Hatrix::Context::finalize();
 }
 
 TEST_P(MatMulTests, matmulReturn) {
-  Hatrix::Context::init();
   int64_t M, N, K;
   bool transA, transB;
   double alpha, _;
@@ -58,7 +54,6 @@ TEST_P(MatMulTests, matmulReturn) {
   Hatrix::Matrix B =
       Hatrix::generate_random_matrix(transB ? N : K, transB ? K : N);
   Hatrix::Matrix C = Hatrix::matmul(A, B, transA, transB, alpha);
-  Hatrix::Context::join();
 
   // Manual matmul
   Hatrix::Matrix C_check(C.rows, C.cols);
@@ -77,11 +72,9 @@ TEST_P(MatMulTests, matmulReturn) {
       EXPECT_NEAR(C_check(i, j), C(i, j), 10e-14);
     }
   }
-  Hatrix::Context::finalize();
 }
 
 TEST(MatMulViewTests, matmulView) {
-  Hatrix::Context::init();
   int64_t block = 100, sub_block = 25;
   int64_t splits = block / sub_block;
   Hatrix::Matrix A = Hatrix::generate_random_matrix(block, block);
@@ -104,8 +97,6 @@ TEST(MatMulViewTests, matmulView) {
   for (int64_t i = 0; i < block; ++i) {
     EXPECT_NEAR(b_result(i, 0), b(i, 0), 1e-13);
   }
-
-  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -1,66 +1,41 @@
 add_subdirectory(common)
 include_directories(common)
 
-if(USE_CUDA)
-  list(APPEND HATRIX_EXAMPLES
-    NxN_BlockDense_LU
-  )
-else()
-  list(APPEND HATRIX_EXAMPLES
-    2x2_BLR_weak_GEMM
-    2x2_BLR_LU
-    2x2_BLR_weak_QR
-    2x2_BlockDense_LU
-    2x2_BlockDense_QR
-    NxN_BLR_weak_GEMM
-    NxN_BLR_strong_GEMM
-    NxN_BlockDense_LU
-    NxN_BLR_LU
-    NxN_BLR_weak_QR
-    NxN_BLR_strong_LU
-    HSS_2level_construct
-    HSS_Nlevel_construct
-    HSS_Nlevel_construct_chandrasekaran
-    HSS_Nlevel_construct_miro
-    GEMM_weak_2level
-    GEMM_weak_Nlevel
-    UMV_weak_2level
-    UMV_weak_1level
-    UMV_weak_Nlevel
-    BLR2_construct
-    UMV_strong_1level
-    H2_matrix_2level_construct
-    LDL_weak_1level
-    BLR2_strong_far_dense_construct
-    LDL_weak_Nlevel
-    H2_strong_N_level
-    UMV_strong_1level_debug
-    UMV_strong_chained_product
-    UMV_strong_H2_3level_hss_chain_product
-    UMV_strong_H2_3level_chain_product
-    UMV_strong_H2_Nlevel
-    UMV_strong_1level_better_index
-    UMV_BLR2_far_dense
-    H2_far_dense_construct
-    LDL_strong_1level
-    LDL_strong_Nlevel
-    Construction_H2_Nlevel
-    UMV_H2_Nlevel
-    Construction_SymmetricH2_Nlevel_with_sampling
-    LDL_SymmetricH2_Nlevel
-    LDL_SymmetricH2_Nlevel_Ma2019
-    ULV_SymmetricH2_Nlevel_nodependency
-    LDL_SymmetricH2_Nlevel_nodependency
-    LDL_SymmetricH2_Nlevel_nodependency_directschur
-    Eigen_Dense
-    Eigen_Dense_DSYEV
-    Eigen_Dense_DSYEVX
-    Eigen_SymmetricH2_Nlevel
-    Eigen_SymmetricH2_Nlevel_Ma2019
-    Eigen_SymmetricH2_Nlevel_nodependency
-    Eigen_SymmetricH2_Nlevel_nodependency_directschur
-  )
-endif()
+list(APPEND HATRIX_EXAMPLES
+  BLR2_weak_CON
+  BLR2_strong_CON
+  H2_weak_CON_2lev
+  H2_weak_CON
+  H2_strong_CON_2lev
+  H2_strong_CON
+  H2_strong_CON_sym_ID
+  Dense_LU_2x2
+  Dense_QR_2x2
+  Dense_EV
+  Dense_LU_NxN
+  BLR2_weak_LU_2x2_noumv
+  BLR2_weak_LU_noumv
+  BLR2_strong_LU_noumv
+  BLR2_weak_LDL
+  BLR2_strong_LDL
+  BLR2_strong_LU
+  BLR2_weak_LU
+  H2_weak_LDL
+  H2_weak_LU
+  H2_weak_LU_2lev
+  H2_strong_LDL
+  H2_strong_LDL_nodep
+  H2_strong_PO_nodep
+  H2_strong_PO
+  H2_strong_LU
+  BLR2_weak_MM_2x2
+  BLR2_strong_MM
+  BLR2_weak_MM
+  H2_weak_MM_2lev
+  H2_weak_MM
+  H2_strong_EV_sym
+  H2_strong_EV_sym_nodep
+)
 
 foreach(EXAMPLE ${HATRIX_EXAMPLES})
   add_executable(${EXAMPLE} ${EXAMPLE}.cpp)
@@ -72,22 +47,17 @@ endforeach()
 
 find_package(MPI)
 if(MPI_FOUND)
-  add_executable(SymmH2_ULV_SC22 SymmH2_ULV_SC22.cpp)
-  target_compile_options(SymmH2_ULV_SC22 PRIVATE -DUSE_MKL -D_PROF)
-  target_link_libraries(SymmH2_ULV_SC22 MPI::MPI_CXX Hatrix)
+  add_executable(H2_strong_PO_nodep_mpi H2_strong_PO_nodep_mpi.cpp)
+  target_compile_options(H2_strong_PO_nodep_mpi PRIVATE -DUSE_MKL -D_PROF)
+  target_link_libraries(H2_strong_PO_nodep_mpi MPI::MPI_CXX Hatrix)
 
-  add_executable(ParSlicing ParSlicing.cpp)
-  target_link_libraries(ParSlicing MPI::MPI_CXX)
+  add_executable(H2_strong_EV_sym_mpi_ref H2_strong_EV_sym_mpi_ref.cpp)
+  target_link_libraries(H2_strong_EV_sym_mpi_ref Hatrix MPI::MPI_CXX)
 
-  add_executable(MSParEigen_SymmetricH2_Nlevel MSParEigen_SymmetricH2_Nlevel.cpp)
-  target_link_libraries(MSParEigen_SymmetricH2_Nlevel Hatrix MPI::MPI_CXX)
+  add_executable(H2_strong_EV_sym_mpi H2_strong_EV_sym_mpi.cpp)
+  target_link_libraries(H2_strong_EV_sym_mpi Hatrix MPI::MPI_CXX)
 
-  add_executable(ParEigen_SymmetricH2_Nlevel ParEigen_SymmetricH2_Nlevel.cpp)
-  target_link_libraries(ParEigen_SymmetricH2_Nlevel Hatrix MPI::MPI_CXX)
-
-  add_executable(ParEigen_Dense_PDSYEV ParEigen_Dense_PDSYEV.cpp)
-  target_link_libraries(ParEigen_Dense_PDSYEV Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
-
-  add_executable(ParEigen_Dense_PDSYEVX ParEigen_Dense_PDSYEVX.cpp)
-  target_link_libraries(ParEigen_Dense_PDSYEVX Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
+  # Requires ScaLAPACK
+  add_executable(Dense_EV_sym_mpi Dense_EV_sym_mpi.cpp)
+  target_link_libraries(Dense_EV_sym_mpi Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
 endif()

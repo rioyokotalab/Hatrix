@@ -3,9 +3,9 @@
 #include "classes/BLR.hpp"
 #include "classes/IndexedMap.hpp"
 #include "classes/Matrix.hpp"
-#include "classes/Particle.hpp"
-#include "classes/Cell.hpp"
-#include "classes/Domain.hpp"
+// #include "classes/Particle.hpp"
+// #include "classes/Cell.hpp"
+// #include "classes/Domain.hpp"
 
 #include "functions/math_common.hpp"
 #include "functions/arithmetics.hpp"

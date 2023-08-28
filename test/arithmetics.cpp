@@ -3,7 +3,7 @@
 #include <string>
 #include <tuple>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class ArithmeticTests
@@ -110,14 +110,12 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(MatMulOperatorTests, MultiplicationOperator) {
   int64_t M, N, K;
-  Hatrix::Context::init();
   std::tie(M, K, N) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(M, K);
   Hatrix::Matrix B = Hatrix::generate_random_matrix(K, N);
   Hatrix::Matrix C(M, N);
   Hatrix::Matrix C_check = A * B;
   Hatrix::matmul(A, B, C, false, false, 1, 0);
-  Hatrix::Context::join();
 
   // Check result
   for (int64_t i = 0; i < M; ++i) {
@@ -125,7 +123,6 @@ TEST_P(MatMulOperatorTests, MultiplicationOperator) {
       EXPECT_FLOAT_EQ(C_check(i, j), C(i, j));
     }
   }
-  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -142,7 +139,6 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(ScalarMulOperatorTests, ScalarMultiplicationOperator) {
   int64_t M, N;
   double alpha;
-  Hatrix::Context::init();
   std::tie(M, N, alpha) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix B = A * alpha;
@@ -156,13 +152,11 @@ TEST_P(ScalarMulOperatorTests, ScalarMultiplicationOperator) {
       EXPECT_EQ(A(i, j), B(i, j));
     }
   }
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ScalarMulOperatorTests, ScalarMultiplicationEqualsOperator) {
   int64_t M, N;
   double alpha;
-  Hatrix::Context::init();
   std::tie(M, N, alpha) = GetParam();
   Hatrix::Matrix A = Hatrix::generate_random_matrix(M, N);
   Hatrix::Matrix A_copy(A);
@@ -174,7 +168,6 @@ TEST_P(ScalarMulOperatorTests, ScalarMultiplicationEqualsOperator) {
       EXPECT_EQ(A(i, j), A_copy(i, j) * alpha);
     }
   }
-  Hatrix::Context::finalize();
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -189,7 +182,6 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(ArithmeticTests, Transpose) {
   int64_t m, n;
-  Hatrix::Context::init();
   std::tie(m, n) = GetParam();
 
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
@@ -202,12 +194,10 @@ TEST_P(ArithmeticTests, Transpose) {
       EXPECT_EQ(A(i, j), A_trans(j, i));
     }
   }
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ArithmeticTests, LowerTriangularPart) {
   int64_t m = 10, n = 10;
-  Hatrix::Context::init();
   // std::tie(m, n) = GetParam();
 
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
@@ -235,12 +225,10 @@ TEST_P(ArithmeticTests, LowerTriangularPart) {
       }
     }
   }
-  Hatrix::Context::finalize();
 }
 
 TEST_P(ArithmeticTests, UpperTriangularPart) {
   int64_t m, n;
-  Hatrix::Context::init();
   std::tie(m, n) = GetParam();
 
   Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
@@ -267,5 +255,4 @@ TEST_P(ArithmeticTests, UpperTriangularPart) {
       }
     }
   }
-  Hatrix::Context::finalize();
 }
