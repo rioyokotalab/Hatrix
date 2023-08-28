@@ -16,21 +16,6 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
-option(Hatrix_CPU_ONLY "Build Hatrix without GPU usage." ON)
-
-if(Hatrix_CPU_ONLY)
-  message(STATUS "Will not compile code for GPU.")
-else()
-  include(CheckLanguage)
-  check_language(CUDA)
-  if(CMAKE_CUDA_COMPILER)
-    enable_language(CUDA)
-    message(STATUS "CUDA ${CUDA_VERSION} detected - compiling GPU code.")
-    set(USE_CUDA ON)
-  else()
-    message(STATUS "CUDA not detected - building for CPU only.")
-  endif()
-endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_options(-g)
@@ -58,11 +43,6 @@ target_include_directories(Hatrix
     ${BLAS_INCLUDE_DIR}
 )
 
-option(USE_OPENMP "Multithreading with OpenMP" ON)
-if(USE_OPENMP)
-  find_package(OpenMP REQUIRED)
-endif()
-
 option(USE_PAPI "Use PAPI to get CPU performance counters" OFF)
 if(USE_PAPI)
   find_package(PkgConfig REQUIRED)
@@ -77,28 +57,22 @@ if(USE_PAPI)
   endif()
 endif()
 
-if(USE_CUDA)
-  find_package(CUDA REQUIRED)
-  target_sources(Hatrix PRIVATE
-    src/classes/Matrix.cu
-    src/functions/arithmetics.cpp
-    src/functions/blas.cu
-    src/functions/lapack.cu
-    src/util/context.cu
-  )
-  set_target_properties(Hatrix PROPERTIES CUDA_ARCHITECTURES 60 70 75)
-  target_link_libraries(Hatrix cublas cusolver curand)
-else()
-  find_package(BLAS REQUIRED)
-  find_package(LAPACK REQUIRED)
-  target_sources(Hatrix PRIVATE
-    src/classes/IndexedMap.cpp
-    src/classes/Matrix.cpp
-    src/functions/arithmetics.cpp
-    src/functions/blas.cpp
-    src/functions/lapack.cpp
-  )
-  target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} OpenMP::OpenMP_CXX)
+# Find BLAS and LAPACK
+find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
+target_sources(Hatrix PRIVATE
+  src/classes/IndexedMap.cpp
+  src/classes/Matrix.cpp
+  src/functions/arithmetics.cpp
+  src/functions/blas.cpp
+  src/functions/lapack.cpp
+)
+target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+
+option(USE_OPENMP "Multithreading with OpenMP" ON)
+if(USE_OPENMP)
+  find_package(OpenMP REQUIRED)
+  target_link_libraries(Hatrix OpenMP::OpenMP_CXX)
 endif()
 
 find_package(GSL REQUIRED)    # See below (2)
