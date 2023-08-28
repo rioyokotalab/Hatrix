@@ -20,7 +20,7 @@ SLATE_LIB      = -L/Users/sameer/gitrepos/slate/build/lib -lslate -llapackpp -lb
 SCALAPACK_LIB   = -L/opt/homebrew/Cellar/scalapack/2.2.0_1/lib -lscalapack
 PARSEC_INCLUDE = $(shell pkg-config --cflags parsec)
 PARSEC_LIB     = $(shell pkg-config --libs parsec) \
-               -rpath /Users/sameer/gitrepos/parsec/build/lib
+               -rpath /Users/sameer/gitrepos/parsec/install/lib
 RM           = rm -rf
 AR           = ar
 ARFLAGS      = -rv

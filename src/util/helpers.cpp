@@ -1,4 +1,4 @@
-#include "Hatrix/util/matrix_generators.h"
+#include "Hatrix/util/matrix_generators.hpp"
 
 #include <vector>
 #include <cassert>

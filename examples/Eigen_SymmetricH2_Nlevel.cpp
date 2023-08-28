@@ -1024,7 +1024,8 @@ void SymmetricH2::factorize(const Domain& domain) {
           const int64_t ip = i / 2;
           const int64_t jp = j / 2;
           if ((!is_admissible.exists(ip, jp, parent_level)) ||
-              (is_admissible.exists(ip, jp, parent_level) && is_admissible(ip, jp, parent_level))) {
+              (is_admissible.exists(ip, jp, parent_level) &&
+               is_admissible(ip, jp, parent_level))) {
             parent_fill_in_neighbors(ip).insert(jp);
           }
         }
@@ -1152,26 +1153,26 @@ void SymmetricH2::factorize(const Domain& domain) {
   const auto num_nodes = level_blocks[level];
   START_TIMER("factorize_remaining_blocks");
   for (int64_t k = 0; k < num_nodes; k++) {
-    ldl(D(k, k, level));
+    // ldl(D(k, k, level));
     // Lower elimination
     #pragma omp parallel for
     for (int64_t i = k + 1; i < num_nodes; i++) {
-      solve_triangular(D(k, k, level), D(i, k, level), Hatrix::Right, Hatrix::Lower, true, true);
-      solve_diagonal(D(k, k, level), D(i, k, level), Hatrix::Right);
+      // solve_triangular(D(k, k, level), D(i, k, level), Hatrix::Right, Hatrix::Lower, true, true);
+      // solve_diagonal(D(k, k, level), D(i, k, level), Hatrix::Right);
     }
     // Right elimination
     #pragma omp parallel for
     for (int64_t j = k + 1; j < num_nodes; j++) {
-      solve_triangular(D(k, k, level), D(k, j, level), Hatrix::Left, Hatrix::Lower, true, false);
-      solve_diagonal(D(k, k, level), D(k, j, level), Hatrix::Left);
+      // solve_triangular(D(k, k, level), D(k, j, level), Hatrix::Left, Hatrix::Lower, true, false);
+      // solve_diagonal(D(k, k, level), D(k, j, level), Hatrix::Left);
     }
     // Schur's complement
     #pragma omp parallel for collapse(2)
     for (int64_t i = k + 1; i < num_nodes; i++) {
       for (int64_t j = k + 1; j < num_nodes; j++) {
         Matrix Dik(D(i, k, level), true);  // Deep-copy
-        column_scale(Dik, D(k, k, level));  // LD
-        matmul(Dik, D(k, j, level), D(i, j, level), false, false, -1, 1);
+        // column_scale(Dik, D(k, k, level));  // LD
+        // matmul(Dik, D(k, j, level), D(i, j, level), false, false, -1, 1);
       }
     }
   }
@@ -1397,11 +1398,16 @@ int main(int argc, char ** argv) {
     domain.read_bodies_ELSES(file_name + ".xyz", num_electrons_per_atom);
     assert(N == domain.N);
 
-    if (sort_bodies) {
+    if (sort_bodies) {          // this is called. Good compression.
+      // Assigns the Hilbert indices and sorts the geometry.
       domain.sort_bodies_ELSES(molecule_size);
       geom_name = geom_name + "_sorted";
     }
+    // Generates a tree with bottom-up traversal.
     domain.build_tree_from_sorted_bodies(leaf_size, std::vector<int64_t>(N / leaf_size, leaf_size));
+
+    // Because there is no Green's function available for the ELSES so read the data
+    // file and obtain the matrix values from the file.
     if (kernel_type == 2) {
       domain.read_p2p_matrix_ELSES(file_name + ".dat");
     }
@@ -1409,6 +1415,8 @@ int main(int argc, char ** argv) {
   else {
     domain.build_tree(leaf_size);
   }
+
+  // This will setup the admissibility condition between all blocks on the same level of the tree.
   domain.build_interactions(admis, admis_variant);
   domain.build_sample_bodies(N, N, N, 0, geom_type == 3);  // No sampling, use all bodies
 
@@ -1623,4 +1631,3 @@ int main(int argc, char ** argv) {
   Hatrix::Context::finalize();
   return 0;
 }
-

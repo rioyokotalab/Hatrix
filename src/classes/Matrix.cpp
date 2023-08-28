@@ -1,6 +1,6 @@
-#include "Hatrix/classes/Matrix.h"
-#include "Hatrix/functions/lapack.h"
-#include "Hatrix/functions/blas.h"
+#include "Hatrix/classes/Matrix.hpp"
+#include "Hatrix/functions/lapack.hpp"
+#include "Hatrix/functions/blas.hpp"
 
 #include <algorithm>
 #include <cassert>

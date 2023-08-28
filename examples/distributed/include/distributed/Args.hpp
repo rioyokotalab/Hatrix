@@ -9,6 +9,7 @@ namespace Hatrix {
     std::string geometry_to_string(KIND_OF_GEOMETRY geometry);
     std::string admis_kind_to_string(ADMIS_KIND admis_kind);
     std::string construct_algorithm_to_string(CONSTRUCT_ALGORITHM construct_algorithm);
+    void check_args();
   public:
     int64_t N;                      // problem size
     int64_t nleaf;                  // leaf size

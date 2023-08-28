@@ -253,6 +253,8 @@ class Domain {
                        const int64_t grid_algo = 0,
                        const bool ELSES_GEOM = false) {
     const int64_t nbodies = bodies_idx.size();
+
+    // For ICPP2023 ELSES code, this condition is always true.
     if (sample_size >= nbodies) {
       return bodies_idx;
     }
@@ -1159,6 +1161,11 @@ class Domain {
     // Every leaf_size consecutive electrons comprise a molecule
     const auto nmols = N / molecule_size;
     std::vector<Body> mol_centers(nmols);  // Center of each molecule
+
+    // Subdivide the domain into 'nmols' molecules so that you can call each
+    // molecule into a single box which can then be used as the basic building
+    // block for sorting. Note that this loop assumes that a single molecule has
+    // all its constituent atoms stored in contiguous locations.
     for (int64_t i = 0; i < nmols; i++) {
       Cell cell;
       cell.body_offset = i * molecule_size;
@@ -1170,12 +1177,15 @@ class Domain {
       }
       mol_centers[i].value = (double)i;
     }
-    // Partition until each box contain only one molecule
+    // Partition until each box contain only one molecule.
+    // This partitioning is done using the Hilbert curve at the leaf level.
+    // This assigns numbers to each box on the leaf level.
     std::vector<Body> buffer = mol_centers;
     std::vector<Cell> mol_cells(1);
     const int64_t leaf_box_size = 1;
-    mol_cells.reserve(nmols*(32/leaf_box_size+1));
-    build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0], mol_cells, leaf_box_size, X0, R0);
+    mol_cells.reserve(nmols * (32 / leaf_box_size + 1));
+    build_cells(&mol_centers[0], &buffer[0], 0, nmols, &mol_cells[0],
+                mol_cells, leaf_box_size, X0, R0);
     int64_t max_level = 0;
     for (int64_t i = 0; i < mol_cells.size(); i++) {
       if (mol_cells[i].nchilds == 0) {

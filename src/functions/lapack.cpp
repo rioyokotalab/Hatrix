@@ -1,8 +1,3 @@
-#include "Hatrix/functions/arithmetics.h"
-#include "Hatrix/functions/math_common.h"
-#include "Hatrix/functions/lapack.h"
-#include "Hatrix/util/matrix_generators.h"
-
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -19,8 +14,14 @@
 #include "lapacke.h"
 #endif
 
-#include "Hatrix/classes/Matrix.h"
-#include "Hatrix/functions/blas.h"
+#include "Hatrix/functions/arithmetics.hpp"
+#include "Hatrix/functions/math_common.hpp"
+#include "Hatrix/functions/lapack.hpp"
+
+#include "Hatrix/util/matrix_generators.hpp"
+
+#include "Hatrix/classes/Matrix.hpp"
+#include "Hatrix/functions/blas.hpp"
 
 namespace Hatrix {
 

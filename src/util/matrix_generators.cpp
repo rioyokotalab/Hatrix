@@ -1,5 +1,5 @@
-#include "Hatrix/util/matrix_generators.h"
-#include "Hatrix/functions/blas.h"
+#include "Hatrix/util/matrix_generators.hpp"
+#include "Hatrix/functions/blas.hpp"
 
 #include <cmath>
 #include <cstdint>

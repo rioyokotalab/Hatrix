@@ -1,5 +1,5 @@
 extern "C" %{
-
+  {}
   #include "math.h"
   #include "parsec.h"
   #include "h2_ptg_internal.h"
@@ -150,7 +150,7 @@ BODY
   double *_TR = (double*)TR;
   double *_BL = (double*)BL;
   double *_BR = (double*)BR;
-
+  {{}}
   /* copy top left block. */
   for (int i = 0; i < h2_params->max_rank; ++i) {
     for (int j = 0; j < h2_params->max_rank; ++j) {

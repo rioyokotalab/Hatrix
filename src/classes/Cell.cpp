@@ -4,10 +4,23 @@
 #include <algorithm>
 #include <random>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 namespace Hatrix {
-  Cell::Cell() : start_index(-1), end_index(-1), level(-1), radius(-1) {}
+  Cell::Cell(int64_t ndim) {
+    center.resize(ndim);
+    radii.resize(ndim);
+    start_index = 0;
+    end_index = 0;
+    level = 0;
+    radius = 0;
+    nchild = 0;
+    key = -999;
+    child = nullptr;
+  }
+
+  Cell::Cell() : start_index(0), end_index(0), level(0), radius(0),
+                 nchild(0), key(-999), child(nullptr) {}
 
   Cell::Cell(std::vector<double> _center, int64_t pstart,
              int64_t pend, double _radius) :

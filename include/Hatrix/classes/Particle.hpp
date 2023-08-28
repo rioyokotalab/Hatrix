@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <cstdint>
 
 namespace Hatrix {
   class Particle {
@@ -9,6 +10,8 @@ namespace Hatrix {
     double value;
 
     void print();
+    Particle();
+    Particle (int64_t ndim);
     Particle(double x, double _value);
     Particle(double x, double y, double _value);
     Particle(double x, double y, double z, double _value);

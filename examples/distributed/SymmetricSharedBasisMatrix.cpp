@@ -1,6 +1,7 @@
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "distributed/distributed.hpp"
 
+#include <cassert>
 #include <cmath>
 
 using namespace Hatrix;
@@ -72,7 +73,7 @@ void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
 
   std::cout << std::endl;
 
-  if (level == min_level) { return; }
+  if (level <= min_level) { return; }
 
   actually_print_structure(level-1);
 }
@@ -80,6 +81,24 @@ void SymmetricSharedBasisMatrix::actually_print_structure(int64_t level) {
 void
 SymmetricSharedBasisMatrix::print_structure() {
   actually_print_structure(max_level);
+}
+
+double
+SymmetricSharedBasisMatrix::Csp(int64_t level) {
+  assert(level >= min_level && level <= max_level);
+
+  int64_t nblocks = pow(2, level);
+  double avg_csp = 0;
+  for (int64_t i = 0; i < nblocks; ++i) {
+    int64_t i_dense = 0;
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (is_admissible.exists(i, j, level) && !is_admissible(i, j, level)) {
+        avg_csp++;
+      }
+    }
+  }
+
+  return avg_csp / nblocks;
 }
 
 int64_t
@@ -105,6 +124,17 @@ SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix(const SymmetricSharedBasi
   S.deep_copy(A.S);
   D.deep_copy(A.D);
   U.deep_copy(A.U);
+  num_blocks = A.num_blocks;
 }
 
 SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix() {}
+
+extern "C" int
+H2_max_level(SymmetricSharedBasisMatrix* A) {
+  return A->max_level;
+}
+
+extern "C" int
+H2_min_level(SymmetricSharedBasisMatrix* A) {
+  return A->min_level;
+}

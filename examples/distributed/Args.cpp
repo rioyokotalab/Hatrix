@@ -3,6 +3,7 @@
 #include <cstring>
 #include <string>
 #include <getopt.h>
+#include <cassert>
 
 namespace Hatrix {
   static struct option long_options[] = {
@@ -24,7 +25,7 @@ namespace Hatrix {
     {"qr_accuracy",         required_argument, 0, 'q'},
     {"parsec_cores",        required_argument, 0, 'i'},
     {"kind_of_recompression", required_argument, 0, 's'},
-    {"use_nested_basis",    no_argument,       0, 'b'},
+    {"use_nested_basis",    required_argument,       0, 'b'},
     {"verbose",             no_argument,       0, 'v'},
     {"help",                no_argument,       0, 'h'},
     {0,                     0,                 0,  0},
@@ -60,6 +61,13 @@ namespace Hatrix {
     }
   }
 
+  void
+  Args::check_args() {
+    if (kernel_verbose == "elses_c60") {
+      assert(kind_of_geometry == ELSES_C60_GEOMETRY);
+    }
+  }
+
   Args::Args(int argc, char** argv)
     : N(1000),
       nleaf(10),
@@ -81,10 +89,10 @@ namespace Hatrix {
       is_symmetric(false),
       parsec_cores(-1)
   {
-    KERNEL_FUNC kfunc;
+    KERNEL_FUNC kfunc = LAPLACE;
     while(1) {
       int option_index;
-      int c = getopt_long(argc, argv, "n:l:k:g:f:d:r:e:a:p:m:c:x:y:z:q:i:s:bvh",
+      int c = getopt_long(argc, argv, "n:l:k:g:f:d:r:e:a:p:m:c:x:y:z:q:i:s:b:vh",
                           long_options, &option_index);
 
       if (c == -1) break;
@@ -115,10 +123,15 @@ namespace Hatrix {
           kernel_verbose = std::string(optarg);
           is_symmetric = true;
         }
+        else if (!strcmp(optarg, "elses_c60")) {
+          kfunc = ELSES_C60;
+          kernel_verbose = std::string(optarg);
+          is_symmetric = true;
+        }
         else {
           throw std::invalid_argument("Cannot support "
                                       + std::string(optarg)
-                                      + " for --kind_of_kernel (-k).");
+                                      + " for --kernel_func (-k).");
         }
         break;
       case 'g':
@@ -130,6 +143,9 @@ namespace Hatrix {
         }
         else if (!strcmp(optarg, "col_file")) {
           kind_of_geometry = COL_FILE;
+        }
+        else if (!strcmp(optarg, "elses_c60_geometry")) {
+          kind_of_geometry = ELSES_C60_GEOMETRY;
         }
         else {
           throw std::invalid_argument("Cannot support " +
@@ -197,7 +213,7 @@ namespace Hatrix {
         param_3 = std::stod(optarg);
         break;
       case 'b':
-        use_nested_basis = true;
+        use_nested_basis = std::stoi(optarg) == 1 ? true : false;
         break;
       case 'v':
         verbose = true;
@@ -241,6 +257,8 @@ namespace Hatrix {
         return Hatrix::greens_functions::yukawa_kernel(c_row, c_col, param_1, param_2); // alpha, singularity
       };
     }
+
+    check_args();
   }
 
   void
@@ -248,16 +266,16 @@ namespace Hatrix {
     fprintf(stderr,
             "Usage: %s [options]\n"
             "Long option (short option)                  : Description (Default value)\n"
-            "--N (-n)                                    : Number of points to consider (%lld).\n"
-            "--nleaf (-l)                                : Max. number of points in a leaf node (%lld).\n"
+            "--N (-n)                                    : Number of points to consider (%ld).\n"
+            "--nleaf (-l)                                : Max. number of points in a leaf node (%ld).\n"
             "--kernel_func (-k) [laplace]                : Kernel function to use (%s).\n"
             "--kind_of_geometry (-g) [circular|grid|       \n"
             " col_file]                                  : Kind of geometry of the points (%s). \n"
             "                                              If specifying col_file you must specify a geometry \n"
             "                                              file with fields <x y z> using --geometry_file or -f. \n"
             "--geometry_file (-f)                        : Geometry file. Reader format determined by --kind_of_geometry (%s). \n"
-            "--ndim (-d)                                 : Number of dimensions of the geometry (%lld).\n"
-            "--max_rank (-r)                             : Maximum rank (%lld).\n"
+            "--ndim (-d)                                 : Number of dimensions of the geometry (%ld).\n"
+            "--max_rank (-r)                             : Maximum rank (%ld).\n"
             "--accuracy (-e)                             : Desired accuracy for construction. > 0 for constant rank construction. (%lf).\n"
             "--qr_accuracy (-q)                          : Desired accuracy for QR. (%lf).\n"
             "--kind_of_recompression (-s)                : Recompression scheme (0,1,2,3) (%d). \n"

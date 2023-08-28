@@ -9,7 +9,7 @@
 #include "Body.hpp"
 #include "Cell.hpp"
 #include "Domain.hpp"
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_sf_bessel.h>

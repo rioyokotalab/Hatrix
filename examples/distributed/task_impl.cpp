@@ -1,7 +1,8 @@
 #include <cassert>
+#include <vector>
 #include <chrono>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "distributed/distributed.hpp"
 
 using namespace Hatrix;
@@ -33,41 +34,112 @@ public:
   }
 };
 
-void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols,
-                              int64_t D_row_rank, int64_t D_col_rank,
-                              int64_t U_nrows, int64_t U_ncols,
-                              double* _D, double* _U, char which) {
-  // auto start_t = std::chrono::system_clock::now();
-  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+void CORE_make_complement(int64_t U_nrows, int64_t U_ncols, double* _U,
+                          int64_t U_F_nrows, int64_t U_F_ncols, double *_U_F) {
   MatrixWrapper U(_U, U_nrows, U_ncols, U_nrows);
+  Matrix U_F = make_complement(U);
 
-  Matrix UF = make_complement(U);
-  Matrix product;
-  std::vector<Matrix> D_splits;
+  for (int64_t i = 0; i < U_F_nrows; ++i) {
+    for (int64_t j = 0; j < U_F_ncols; ++j) {
+      _U_F[i + j * U_F_nrows] = U_F(i, j);
+    }
+  }
+}
+
+void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols, int64_t max_rank, double* _D,
+                              int64_t U_F_nrows, int64_t U_F_ncols, double* _U_F,
+                              char which) {
+  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+  MatrixWrapper U_F(_U_F, U_F_nrows, U_F_ncols, U_F_nrows);
 
   if (which == 'F') {           // multiply complements from the left and right
-    for (int i = 0; i < D.rows; ++i) {
-      for (int j = i+1; j < D.cols; ++j) {
-        D(i, j) = D(j, i);
-      }
-    }
-    Matrix product = matmul(matmul(UF, D, true), UF);
+    Matrix product = matmul(matmul(U_F, D, true), U_F);
     D.copy_mem(product);
   }
   else if (which == 'L') {      // left multiplication
     auto D_splits = D.split({},
                             std::vector<int64_t>(1,
-                                                 D_ncols - D_col_rank));
-    D_splits[1] = matmul(UF, D_splits[1], true);
+                                                 D_ncols - max_rank));
+    D_splits[1] = matmul(U_F, D_splits[1], true);
   }
   else if (which == 'R') {      // right multiplication
-    Matrix product = matmul(D, UF);
+    Matrix product = matmul(D, U_F);
     D.copy_mem(product);
   }
-  // auto stop_t = std::chrono::system_clock::now();
-  // double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
+}
 
-  // task_time[0] += t;
+void
+CORE_factorize_diagonal(int64_t D_nrows, int64_t D_ncols,
+                        int64_t max_rank, double* _D) {
+  const int64_t node_c_size = D_nrows - max_rank;
+  MatrixWrapper D_node(_D, D_nrows, D_ncols, D_nrows);
+
+  auto D_node_splits = D_node.split(std::vector<int64_t>{node_c_size},
+                                    std::vector<int64_t>{node_c_size});
+
+  Matrix& D_node_cc = D_node_splits[0];
+  ldl(D_node_cc);
+
+  Matrix& D_node_oc = D_node_splits[2];
+  solve_triangular(D_node_cc, D_node_oc, Hatrix::Right, Hatrix::Lower, true, true);
+  solve_diagonal(D_node_cc, D_node_oc, Hatrix::Right);
+
+  Matrix& D_node_co = D_node_splits[1];
+  solve_triangular(D_node_cc, D_node_co, Hatrix::Left, Hatrix::Lower, true, false);
+  solve_diagonal(D_node_cc, D_node_co, Hatrix::Left);
+
+  Matrix D_node_oc_copy(D_node_oc, true);  // Deep-copy
+  Matrix& D_node_oo = D_node_splits[3];
+  column_scale(D_node_oc_copy, D_node_cc);  // LD
+  matmul(D_node_oc_copy, D_node_co, D_node_oo, false, false, -1, 1);  // LDL^T
+}
+
+void
+CORE_ldl_full(int64_t D_nrows, int64_t D_ncols, double* _D) {
+  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+  ldl(D);
+}
+
+void
+CORE_final_trsm_u(int64_t D_kk_nrows, int64_t D_kk_ncols, double* _D_kk,
+                  int64_t D_kj_nrows, int64_t D_kj_ncols, double* _D_kj) {
+  MatrixWrapper D_kk(_D_kk, D_kk_nrows, D_kk_ncols, D_kk_nrows);
+  MatrixWrapper D_kj(_D_kj, D_kj_nrows, D_kj_ncols, D_kj_nrows);
+
+  solve_triangular(D_kk, D_kj, Hatrix::Left, Hatrix::Lower, true, false);
+  solve_diagonal(D_kk, D_kj, Hatrix::Left);
+}
+
+void
+CORE_final_trsm_l(int64_t D_kk_nrows, int64_t D_kk_ncols, double* _D_kk,
+                  int64_t D_ik_nrows, int64_t D_ik_ncols, double* _D_ik) {
+  MatrixWrapper D_kk(_D_kk, D_kk_nrows, D_kk_ncols, D_kk_nrows);
+  MatrixWrapper D_ik(_D_ik, D_ik_nrows, D_ik_ncols, D_ik_nrows);
+
+  solve_triangular(D_kk, D_ik, Hatrix::Right, Hatrix::Lower, true, true);
+  solve_diagonal(D_kk, D_ik, Hatrix::Right);
+}
+
+void CORE_matmul_full(int64_t D_ik_nrows, int64_t D_ik_ncols, double* _D_ik,
+                      int64_t D_kj_nrows, int64_t D_kj_ncols, double* _D_kj,
+                      int64_t D_kk_nrows, int64_t D_kk_ncols, double* _D_kk,
+                      int64_t D_ij_nrows, int64_t D_ij_ncols, double* _D_ij) {
+
+  MatrixWrapper D_ik(_D_ik, D_ik_nrows, D_ik_ncols, D_ik_nrows);
+  MatrixWrapper D_kj(_D_kj, D_kj_nrows, D_kj_ncols, D_kj_nrows);
+  MatrixWrapper D_kk(_D_kk, D_kk_nrows, D_kk_ncols, D_kk_nrows);
+  MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
+
+  Matrix D_ik_copy(D_ik, true);
+  column_scale(D_ik_copy, D_kk);
+  matmul(D_ik_copy, D_kj, D_ij, false, false, -1.0, 1.0);
+}
+
+double
+CORE_norm(int64_t D_nrows, int64_t D_ncols, double* _D) {
+  MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
+
+  return norm(D);
 }
 
 void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
@@ -81,10 +153,6 @@ void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D) {
   solve_triangular(D_splits[0], D_splits[2], Hatrix::Right, Hatrix::Lower,
                    false, true, 1.0);
   syrk(D_splits[2], D_splits[3], Hatrix::Lower, false, -1, 1);
-
-  // auto stop_t = std::chrono::system_clock::now();
-  // double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
-  // task_time[1] += t;
 }
 
 void CORE_cholesky_full(int64_t D_nrows, int64_t D_ncols, double* _D) {
@@ -92,9 +160,6 @@ void CORE_cholesky_full(int64_t D_nrows, int64_t D_ncols, double* _D) {
   MatrixWrapper D(_D, D_nrows, D_ncols, D_nrows);
 
   cholesky(D, Hatrix::Lower);
-  // auto stop_t = std::chrono::system_clock::now();
-  // double t = std::chrono::duration_cast<std::chrono::nanoseconds>(stop_t - start_t).count();
-  // task_time[2] += t;
 }
 
 void CORE_solve_triangular_full(int64_t D_dd_nrows, int64_t D_dd_ncols, double* _D_dd,
@@ -111,17 +176,6 @@ void CORE_syrk_full(int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
   MatrixWrapper D_ij(_D_ij, D_ij_nrows, D_ij_ncols, D_ij_nrows);
 
   syrk(D_id, D_ij, Hatrix::Lower, false, -1.0, 1.0);
-}
-
-void CORE_matmul_full(int64_t D_jd_nrows, int64_t D_jd_ncols, double* _D_jd,
-                      int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
-                      int64_t D_ji_nrows, int64_t D_ji_ncols, double* _D_ji) {
-
-  MatrixWrapper D_jd(_D_jd, D_jd_nrows, D_jd_ncols, D_jd_nrows);
-  MatrixWrapper D_id(_D_id, D_id_nrows, D_id_ncols, D_id_nrows);
-  MatrixWrapper D_ji(_D_ji, D_ji_nrows, D_ji_ncols, D_ji_nrows);
-
-  matmul(D_jd, D_id, D_ji, false, true, -1.0, 1.0);
 }
 
 void CORE_trsm(int64_t D_rows, int64_t D_cols,

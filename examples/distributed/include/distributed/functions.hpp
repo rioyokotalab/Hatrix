@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 
 #include "internal_types.hpp"
 #include "SymmetricSharedBasisMatrix.hpp"

@@ -4,10 +4,27 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-  void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols, int64_t D_row_rank, int64_t D_col_rank,
-                                int64_t U_nrows, int64_t U_ncols, double* _D, double* _U, char which);
 
-  void CORE_factorize_diagonal(int64_t D_nrows, int64_t rank_nrows, double *_D);
+  void
+  CORE_make_complement(int64_t U_nrows, int64_t U_ncols, double* U,
+                       int64_t U_F_nrows, int64_t U_F_ncols, double *U_F);
+
+  void CORE_multiply_complement(int64_t D_nrows, int64_t D_ncols, int64_t max_rank, double* _D,
+                                int64_t U_F_nrows, int64_t U_F_ncols,  double* _U_F,
+                                char which);
+
+  void CORE_factorize_diagonal(int64_t D_nrows, int64_t D_ncols,
+                               int64_t max_rank, double *_D);
+
+  void CORE_ldl_full(int64_t D_nrows, int64_t D_ncols, double* _D);
+
+  void CORE_final_trsm_u(int64_t D_kk_nrows, int64_t D_kk_ncols, double* _D_kk,
+                         int64_t D_ik_nrows, int64_t D_ik_ncols, double* _D_ik);
+
+  void CORE_final_trsm_l(int64_t D_kk_nrows, int64_t D_kk_ncols, double* _D_kk,
+                         int64_t D_kj_nrows, int64_t D_kj_ncols, double* _D_kj);
+
+  double CORE_norm(int64_t D_nrows, int64_t D_ncols, double* _D);
 
   void CORE_cholesky_full(int64_t D_nrows, int64_t D_ncols, double* _D);
 
@@ -17,8 +34,9 @@ extern "C" {
   void CORE_syrk_full(int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
                       int64_t D_ij_nrows, int64_t D_ij_ncols, double* _D_ij);
 
-  void CORE_matmul_full(int64_t D_id_nrows, int64_t D_id_ncols, double* _D_id,
-                        int64_t D_jd_nrows, int64_t D_jd_ncols, double* _D_jd,
+  void CORE_matmul_full(int64_t D_ik_nrows, int64_t D_ik_ncols, double* _D_ik,
+                        int64_t D_kj_nrows, int64_t D_kj_ncols, double* _D_kj,
+                        int64_t D_kk_nrows, int64_t D_kk_ncols, double* _D_kk,
                         int64_t D_ij_nrows, int64_t D_ij_ncols, double* _D_ij);
 
   void CORE_trsm(int64_t D_rows, int64_t D_cols, int64_t D_row_rank, int64_t D_col_rank, double* _diagonal,

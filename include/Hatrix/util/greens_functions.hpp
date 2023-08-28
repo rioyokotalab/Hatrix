@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
+
 namespace Hatrix {
   namespace greens_functions {
     double laplace_2d_kernel(const std::vector<double>& coords_row,

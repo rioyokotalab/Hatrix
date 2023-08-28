@@ -20,3 +20,9 @@ Dense
 
 make.inc
 
+*xml
+*xyz
+*txt
+
+examples/distributed/H2_construct/h2_factorize_flows.c
+examples/distributed/H2_construct/h2_factorize_flows.h

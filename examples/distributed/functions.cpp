@@ -1,4 +1,6 @@
 #include <vector>
+#include <iostream>
+#include <iomanip>
 #include <cassert>
 #include <cmath>
 #include "distributed/distributed.hpp"
@@ -7,7 +9,6 @@
 Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;
 
 namespace Hatrix {
-
   std::vector<Hatrix::Matrix>
   split_dense(const Hatrix::Matrix& dense, int64_t row_split, int64_t col_split) {
     return dense.split(std::vector<int64_t>(1, row_split),
@@ -63,28 +64,41 @@ namespace Hatrix {
   }
 
   static void
-  dual_tree_traversal(SymmetricSharedBasisMatrix& A, const Cell& Ci, const Cell& Cj,
+  dual_tree_traversal(SymmetricSharedBasisMatrix& A, const int64_t& Ci_index, const int64_t& Cj_index,
                       const Domain& domain, const Args& opts) {
-    int64_t i_level = Ci.level;
-    int64_t j_level = Cj.level;
+    const Cell& Ci = domain.tree_list[Ci_index];
+    const Cell& Cj = domain.tree_list[Cj_index];
+    const int64_t i_level = Ci.level;
+    const int64_t j_level = Cj.level;
 
     bool well_separated = false;
     if (i_level == j_level &&
-        ((!opts.use_nested_basis && i_level == A.max_level) ||
-         opts.use_nested_basis)) {
+        ((!opts.use_nested_basis && i_level == A.max_level) || opts.use_nested_basis)) {
       double distance = 0;
+
       for (int64_t k = 0; k < opts.ndim; ++k) {
         distance += pow(Ci.center[k] - Cj.center[k], 2);
       }
       distance = sqrt(distance);
 
-      if (distance >= ((Ci.radius + Cj.radius) * opts.admis + opts.perturbation)) {
-        // well-separated blocks.
+      double ci_size = 0, cj_size = 0;
+      ci_size = Ci.radius;
+      cj_size = Cj.radius;
+      // for (int axis = 0; axis < opts.ndim; ++axis) {
+      //   ci_size += pow(Ci.radii[axis], 2);
+      //   cj_size += pow(Cj.radii[axis], 2);
+      // }
+      // ci_size = sqrt(ci_size);
+      // cj_size = sqrt(cj_size);
+
+      // std::cout << "d: " << distance
+      //           << " value: " << ((ci_size + cj_size) * opts.admis) << std::endl;
+      if (distance >= ((ci_size + cj_size) * opts.admis)) {
         well_separated = true;
       }
 
       bool val = well_separated;
-      A.is_admissible.insert(Ci.level_index, Cj.level_index, i_level, std::move(val));
+      A.is_admissible.insert(Ci.key, Cj.key, i_level, std::move(val));
     }
 
     // Only descend down the tree if you are currently at a higher level and the blocks
@@ -94,16 +108,21 @@ namespace Hatrix {
     // Alternatively, to create a BLR2 matrix you want to down to the finest level of granularity
     // anyway and populate the blocks at that level. So that puts another OR condition to check
     // if the use of nested basis is enabled.
-    if (i_level <= j_level && Ci.cells.size() > 0 && (!well_separated || !opts.use_nested_basis)) {
-      // j is at a higher level and i is not leaf.
-      dual_tree_traversal(A, Ci.cells[0], Cj, domain, opts);
-      dual_tree_traversal(A, Ci.cells[1], Cj, domain, opts);
-    }
-    else if (j_level <= i_level && Cj.cells.size() > 0 &&
-             (!well_separated || !opts.use_nested_basis)) {
-      // i is at a higheer level and j is not leaf.
-      dual_tree_traversal(A, Ci, Cj.cells[0], domain, opts);
-      dual_tree_traversal(A, Ci, Cj.cells[1], domain, opts);
+    if (!well_separated || !opts.use_nested_basis) {
+      if (i_level <= j_level && Ci.nchild > 0) {
+        // j is at a higher level and i is not leaf.
+        const int64_t c1_index = pow(2, i_level+1) - 1 + Ci.key * 2;
+        const int64_t c2_index = pow(2, i_level+1) - 1 + Ci.key * 2 + 1;
+        dual_tree_traversal(A, c1_index, Cj_index, domain, opts);
+        dual_tree_traversal(A, c2_index, Cj_index, domain, opts);
+      }
+      else if (j_level <= i_level && Cj.nchild > 0) {
+        // i is at a higheer level and j is not leaf.
+        const int64_t c1_index = pow(2, j_level+1) - 1 + Cj.key * 2;
+        const int64_t c2_index = pow(2, j_level+1) - 1 + Cj.key * 2 + 1;
+        dual_tree_traversal(A, Ci_index, c1_index, domain, opts);
+        dual_tree_traversal(A, Ci_index, c2_index, domain, opts);
+      }
     }
   }
 
@@ -142,10 +161,10 @@ namespace Hatrix {
     }
   }
 
-  void init_geometry_admis(SymmetricSharedBasisMatrix& A,
-                           const Domain& domain, const Args& opts) {
-    A.max_level = domain.tree.height() - 1;
-    dual_tree_traversal(A, domain.tree, domain.tree, domain, opts);
+  void
+  init_geometry_admis(SymmetricSharedBasisMatrix& A,
+                      const Domain& domain, const Args& opts) {
+    dual_tree_traversal(A, 0, 0, domain, opts);
     // Using BLR2 so need an 'artificial' dense matrix level at max_level-1
     // for accumulation of the partial factorization.
     if (!opts.use_nested_basis) {
@@ -171,7 +190,7 @@ namespace Hatrix {
     }
 
     if (A.max_level != A.min_level) { A.min_level++; }
-    populate_near_far_lists(A);
+    // populate_near_far_lists(A);
   }
 
   static void
