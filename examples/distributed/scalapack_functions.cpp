@@ -17,6 +17,8 @@
 
 using namespace Hatrix;
 
+ColLevelMap  A_US;
+
 const char ALL_GRID = 'A';
 
 double *U_MEM, *U_REAL_MEM;
@@ -167,11 +169,10 @@ generate_leaf_nodes(SymmetricSharedBasisMatrix& A,
       // Init US from the row vector.
       Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
       for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
-      A.US.insert(block, A.max_level, std::move(US));
+      A_US.insert(block, A.max_level, std::move(US));
     }
 
     int64_t rank = opts.max_rank;
-    A.ranks.insert(block, A.max_level, std::move(rank));
 
     delete[] S_MEM;
     if (MPIRANK == IMAP[0]) {
@@ -488,15 +489,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
         // Init US from the row vector.
         Matrix US(U_LOCAL_ncols, U_LOCAL_ncols);
         for (int64_t i = 0; i < U_LOCAL_ncols; ++i) { US(i,i) = S_MEM[i]; }
-        A.US.insert(block, level, std::move(US));
+        A_US.insert(block, level, std::move(US));
       }
       else {
         A.U.insert(block, level, generate_identity_matrix(block_nrows, rank));
-        A.US.insert(block, level, generate_identity_matrix(rank, rank));
+        A_US.insert(block, level, generate_identity_matrix(rank, rank));
       }
     }
-
-    A.ranks.insert(block, level, std::move(rank));
 
     delete[] S_MEM;
     if (IMAP[0] == MPIRANK) {
@@ -777,13 +776,11 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
     int64_t c1 = block * 2;
     int64_t c2 = block * 2 + 1;
     int64_t rank = opts.max_rank;
-    int64_t block_size = A.ranks(c1, child_level) + A.ranks(c2, child_level);
+    int64_t block_size = opts.max_rank * 2;
 
     if (mpi_rank(block) == MPIRANK) {
       A.U.insert(block, level, generate_identity_matrix(block_size, opts.max_rank));
-      A.US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
+      A_US.insert(block, level, generate_identity_matrix(opts.max_rank, opts.max_rank));
     }
-
-    A.ranks.insert(block, level, std::move(rank));
   }
 }

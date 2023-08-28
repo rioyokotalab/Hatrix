@@ -3,7 +3,6 @@
 #include "Hatrix/Hatrix.hpp"
 
 #include "internal_types.hpp"
-#include "SymmetricSharedBasisMatrix.hpp"
 
 // storage for near and far blocks at each level.
 extern Hatrix::RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;  // This is actually RowLevelMap
