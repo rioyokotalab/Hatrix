@@ -836,61 +836,61 @@ int main(int argc, char* argv[]) {
 
   double kth_value_time;
   // Intervals within which the eigen values should be searched.
-//   {
-// #ifdef USE_MKL
-//     mkl_set_num_threads(1);
-// #endif
-//     omp_set_num_threads(1);
+  {
+#ifdef USE_MKL
+    mkl_set_num_threads(1);
+#endif
+    omp_set_num_threads(1);
 
-//     parsec = parsec_init( -1, NULL, NULL );
+    parsec = parsec_init( 1, NULL, NULL );
 
-//     bool singular = false;
-//     std::vector<int64_t> target_m;
-//     int64_t m_begin = N/2, m_end = N/2;
-//     // find eigen values from m_begin to m_end.
-//     for (int64_t m = m_begin; m <= m_end; ++m) {
-//       target_m.push_back(m);
-//     }
+    bool singular = false;
+    std::vector<int64_t> target_m;
+    int64_t m_begin = N/2, m_end = N/2;
+    // find eigen values from m_begin to m_end.
+    for (int64_t m = m_begin; m <= m_end; ++m) {
+      target_m.push_back(m);
+    }
 
-//     double b = N * (1 / opts.param_1); // default values from ridwan.
-//     double a = -b;
+    double b = N * (1 / opts.param_1); // default values from ridwan.
+    double a = -b;
 
-//     int64_t v_a = 0, v_b = N, temp1, temp2;
-//     // std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
-//     // std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
+    int64_t v_a = 0, v_b = N, temp1, temp2;
+    // std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
+    // std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
 
-//     if(v_a != 0 || v_b != N) {
-//       std::cout << std::endl
-//                 << "Warning: starting interval does not contain the whole spectrum "
-//                 << "(v(a)=v(" << a << ")=" << v_a << ","
-//                 << " v(b)=v(" << b << ")=" << v_b << ")"
-//                 << std::endl;
-//     }
+    if(v_a != 0 || v_b != N) {
+      std::cout << std::endl
+                << "Warning: starting interval does not contain the whole spectrum "
+                << "(v(a)=v(" << a << ")=" << v_a << ","
+                << " v(b)=v(" << b << ")=" << v_b << ")"
+                << std::endl;
+    }
 
-//     auto start_kth_value_time = std::chrono::system_clock::now();
-//     for (int64_t k : target_m) {
-//       double h2_mth_eigv, max_rank_shift;
-//       int64_t ldl_min_rank, ldl_max_rank;
+    auto start_kth_value_time = std::chrono::system_clock::now();
+    for (int64_t k : target_m) {
+      double h2_mth_eigv, max_rank_shift;
+      int64_t ldl_min_rank, ldl_max_rank;
 
-//       std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
-//         get_mth_eigenvalue(A, domain, opts, k, ev_tol, a, b);
+      std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
+        get_mth_eigenvalue(A, domain, opts, k, ev_tol, a, b);
 
-//       const double dense_mth_eigv = DENSE_EIGENVALUES[k-1];
-//       const double eigv_abs_error = std::abs(dense_mth_eigv - h2_mth_eigv);
+      const double dense_mth_eigv = DENSE_EIGENVALUES[k-1];
+      const double eigv_abs_error = std::abs(dense_mth_eigv - h2_mth_eigv);
 
-//       std::cout << "Compute eigenvalue k: " << k
-//                 << " abs_error: " << eigv_abs_error
-//                 << " check: " << (eigv_abs_error < 0.5 * ev_tol)
-//                 << " dense: " << dense_mth_eigv
-//                 << " H2   : " << h2_mth_eigv
-//                 << std::endl;
-//     }
-//     auto stop_kth_value_time = std::chrono::system_clock::now();
-//     kth_value_time = std::chrono::duration_cast<
-//       std::chrono::milliseconds>(stop_kth_value_time - start_kth_value_time).count();
+      std::cout << "Compute eigenvalue k: " << k
+                << " abs_error: " << eigv_abs_error
+                << " check: " << (eigv_abs_error < 0.5 * ev_tol)
+                << " dense: " << dense_mth_eigv
+                << " H2   : " << h2_mth_eigv
+                << std::endl;
+    }
+    auto stop_kth_value_time = std::chrono::system_clock::now();
+    kth_value_time = std::chrono::duration_cast<
+      std::chrono::milliseconds>(stop_kth_value_time - start_kth_value_time).count();
 
-//     parsec_fini(&parsec);
-//   }
+    parsec_fini(&parsec);
+  }
 
   if (!MPIRANK) {
     double diff = global_norm[0];
