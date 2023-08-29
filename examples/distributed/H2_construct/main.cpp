@@ -437,15 +437,49 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     Utransfer_temp.insert(i, A.max_level, matmul(U_leaf_level(i, A.max_level), AY, true, false));
   } // for (i = MPIRANK .. leaf_nblocks)
 
-  std::cout << "nblocks per non leaf: " << nblocks_per_non_leaf << std::endl;
+  MPI_Group world_group;
+  MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+
   // Outer loop goes over the chunks of the child bases that need to be gathered into a root.
-  for (int64_t chunk = 0; chunk < leaf_nblocks; chunk += nblocks_per_non_leaf) {
-    int64_t j = chunk / nblocks_per_non_leaf;
-    int root_proc = mpi_rank(j);
+  // for (int64_t chunk = 0; chunk < leaf_nblocks; chunk += nblocks_per_non_leaf) {
+  //   int64_t j = chunk / nblocks_per_non_leaf;
+  //   int root_proc = mpi_rank(j);
+  //   int nrows = opts.max_rank * nblocks_per_non_leaf;
 
-    std::vector<double> pre_svd_chunk(opts.max_rank * nblocks_per_non_leaf * opts.nleaf, 0);
+  //   std::vector<double> pre_svd_matrix(nrows * opts.nleaf, 0);
 
-  }
+  //   MPI_Datatype pre_svd_chunk;
+  //   MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &pre_svd_chunk);
+  //   MPI_Type_commit(&pre_svd_chunk);
+
+  //   int num_gather_ops = nblocks_per_non_leaf >= MPISIZE ?
+  //     nblocks_per_non_leaf / MPISIZE : (nblocks_per_non_leaf + MPISIZE) / MPISIZE;
+
+  //   std::vector<int> gather_ranks;
+  //   gather_ranks.push_back(root_proc);
+
+  //   for (int gather_op = 0; gather_op < num_gather_ops; ++gather_op) {
+  //     // Choose the number of bases that will be calling the Gather.
+  //     int num_bases = (gather_op * MPISIZE > nblocks_per_non_leaf) ?
+  //       (nblocks_per_non_leaf - gather_op * MPISIZE) : MPISIZE;
+
+  //     for (int b = 0; b < num_bases; ++b) {
+  //       int index = chunk + gather_op * MPISIZE + b;
+  //       int basis_rank = mpi_rank(index);
+  //       if (basis_rank != root_proc) {
+  //         gather_ranks.push_back(basis_rank);
+  //       }
+  //     }
+
+  //     MPI_Group chunk_gather_group;
+  //     MPI_Group_incl(world_group, gather_ranks.size(), gather_ranks.data(), &chunk_gather_group);
+
+  //     MPI_Comm chunk_gather_comm;
+  //     MPI_Comm_create(MPI_COMM_WORLD, chunk_gather_group, &chunk_gather_comm);
+
+  //     MPI_Gather();
+  //   }
+  // }
 
   return Ubig_parent;
 }
@@ -836,61 +870,61 @@ int main(int argc, char* argv[]) {
 
   double kth_value_time;
   // Intervals within which the eigen values should be searched.
-  {
-#ifdef USE_MKL
-    mkl_set_num_threads(1);
-#endif
-    omp_set_num_threads(1);
+//   {
+// #ifdef USE_MKL
+//     mkl_set_num_threads(1);
+// #endif
+//     omp_set_num_threads(1);
 
-    parsec = parsec_init( 1, NULL, NULL );
+//     parsec = parsec_init( 1, NULL, NULL );
 
-    bool singular = false;
-    std::vector<int64_t> target_m;
-    int64_t m_begin = N/2, m_end = N/2;
-    // find eigen values from m_begin to m_end.
-    for (int64_t m = m_begin; m <= m_end; ++m) {
-      target_m.push_back(m);
-    }
+//     bool singular = false;
+//     std::vector<int64_t> target_m;
+//     int64_t m_begin = N/2, m_end = N/2;
+//     // find eigen values from m_begin to m_end.
+//     for (int64_t m = m_begin; m <= m_end; ++m) {
+//       target_m.push_back(m);
+//     }
 
-    double b = N * (1 / opts.param_1); // default values from ridwan.
-    double a = -b;
+//     double b = N * (1 / opts.param_1); // default values from ridwan.
+//     double a = -b;
 
-    int64_t v_a = 0, v_b = N, temp1, temp2;
-    // std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
-    // std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
+//     int64_t v_a = 0, v_b = N, temp1, temp2;
+//     // std::tie(v_a, temp1, temp2, singular) = inertia(A, domain, opts, a);
+//     // std::tie(v_b, temp1, temp2, singular) = inertia(A, domain, opts, b);
 
-    if(v_a != 0 || v_b != N) {
-      std::cout << std::endl
-                << "Warning: starting interval does not contain the whole spectrum "
-                << "(v(a)=v(" << a << ")=" << v_a << ","
-                << " v(b)=v(" << b << ")=" << v_b << ")"
-                << std::endl;
-    }
+//     if(v_a != 0 || v_b != N) {
+//       std::cout << std::endl
+//                 << "Warning: starting interval does not contain the whole spectrum "
+//                 << "(v(a)=v(" << a << ")=" << v_a << ","
+//                 << " v(b)=v(" << b << ")=" << v_b << ")"
+//                 << std::endl;
+//     }
 
-    auto start_kth_value_time = std::chrono::system_clock::now();
-    for (int64_t k : target_m) {
-      double h2_mth_eigv, max_rank_shift;
-      int64_t ldl_min_rank, ldl_max_rank;
+//     auto start_kth_value_time = std::chrono::system_clock::now();
+//     for (int64_t k : target_m) {
+//       double h2_mth_eigv, max_rank_shift;
+//       int64_t ldl_min_rank, ldl_max_rank;
 
-      std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
-        get_mth_eigenvalue(A, domain, opts, k, ev_tol, a, b);
+//       std::tie(h2_mth_eigv, ldl_min_rank, ldl_max_rank, max_rank_shift) =
+//         get_mth_eigenvalue(A, domain, opts, k, ev_tol, a, b);
 
-      const double dense_mth_eigv = DENSE_EIGENVALUES[k-1];
-      const double eigv_abs_error = std::abs(dense_mth_eigv - h2_mth_eigv);
+//       const double dense_mth_eigv = DENSE_EIGENVALUES[k-1];
+//       const double eigv_abs_error = std::abs(dense_mth_eigv - h2_mth_eigv);
 
-      std::cout << "Compute eigenvalue k: " << k
-                << " abs_error: " << eigv_abs_error
-                << " check: " << (eigv_abs_error < 0.5 * ev_tol)
-                << " dense: " << dense_mth_eigv
-                << " H2   : " << h2_mth_eigv
-                << std::endl;
-    }
-    auto stop_kth_value_time = std::chrono::system_clock::now();
-    kth_value_time = std::chrono::duration_cast<
-      std::chrono::milliseconds>(stop_kth_value_time - start_kth_value_time).count();
+//       std::cout << "Compute eigenvalue k: " << k
+//                 << " abs_error: " << eigv_abs_error
+//                 << " check: " << (eigv_abs_error < 0.5 * ev_tol)
+//                 << " dense: " << dense_mth_eigv
+//                 << " H2   : " << h2_mth_eigv
+//                 << std::endl;
+//     }
+//     auto stop_kth_value_time = std::chrono::system_clock::now();
+//     kth_value_time = std::chrono::duration_cast<
+//       std::chrono::milliseconds>(stop_kth_value_time - start_kth_value_time).count();
 
-    parsec_fini(&parsec);
-  }
+//     parsec_fini(&parsec);
+//   }
 
   if (!MPIRANK) {
     double diff = global_norm[0];

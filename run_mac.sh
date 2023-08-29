@@ -44,6 +44,6 @@ for N in 512; do
                --admis $ADMIS_VALUE \
                --geometry_file C60_fcc.xyz \
                --param_1 $p1 \
-               --use_nested_basis 0
+               --use_nested_basis 1
     done
 done
