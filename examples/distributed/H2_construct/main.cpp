@@ -515,10 +515,32 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     int nrows = opts.max_rank * nblocks_per_non_leaf;
     std::vector<double> pre_svd_matrix(nrows * opts.nleaf, 0);
 
+    // strided type for receiving data.
     MPI_Datatype pre_svd_chunk;
     MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &pre_svd_chunk);
     MPI_Type_commit(&pre_svd_chunk);
 
+    // contiguous type for sending data.
+    MPI_Datatype send_chunk;
+    MPI_Type_contiguous(opts.nleaf * opts.max_rank, MPI_DOUBLE, &send_chunk);
+    MPI_Type_commit(&send_chunk);
+
+    std::vector<int> sendcounts(MPISIZE, 0);
+    for (int i = block * nblocks_per_non_leaf; i < (block+1) * nblocks_per_non_leaf; ++i) {
+      if (mpi_rank(i) == MPIRANK) {
+        sendcounts[MPIRANK]++;
+      }
+    }
+
+
+    while (1) {
+      if (std::all_of(sendcounts.begin(), sendcounts.end(),
+                      [](int x) { return x == 0; })) {
+        break;
+      }
+    }
+
+    // std::vector<double> send_vector();
   }
 
 
