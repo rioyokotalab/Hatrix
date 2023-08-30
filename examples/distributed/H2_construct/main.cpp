@@ -480,6 +480,8 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   //     MPI_Gather();
   //   }
   // }
+
+  // Prepare groups and communicators for communication of chunks of applied blocks.
   std::vector<MPI_Group> groups;
   std::vector<MPI_Comm> communicators;
 
@@ -505,6 +507,20 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     groups.push_back(block_group);
     communicators.push_back(block_comm);
   }
+
+  for (int64_t block = 0; block < nblocks; ++block) {
+    MPI_Group block_group = groups[block];
+    MPI_Comm block_comm = communicators[block];
+
+    int nrows = opts.max_rank * nblocks_per_non_leaf;
+    std::vector<double> pre_svd_matrix(nrows * opts.nleaf, 0);
+
+    MPI_Datatype pre_svd_chunk;
+    MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &pre_svd_chunk);
+    MPI_Type_commit(&pre_svd_chunk);
+
+  }
+
 
   return Ubig_parent;
 }
