@@ -480,6 +480,31 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   //     MPI_Gather();
   //   }
   // }
+  std::vector<MPI_Group> groups;
+  std::vector<MPI_Comm> communicators;
+
+  for (int64_t block = 0; block < nblocks; ++block) {
+    int root_proc = mpi_rank(block);
+
+    std::vector<int> ranks;
+    ranks.push_back(root_proc);
+
+    for (int64_t leaf_index = block * nblocks_per_non_leaf; leaf_index < (block+1) * nblocks_per_non_leaf; ++leaf_index) {
+      int leaf_rank = mpi_rank(leaf_index);
+      if (leaf_rank != root_proc) {
+        ranks.push_back(leaf_rank);
+      }
+    }
+
+    MPI_Group block_group;
+    MPI_Group_incl(world_group, ranks.size(), ranks.data(), &block_group);
+
+    MPI_Comm block_comm;
+    MPI_Comm_create(MPI_COMM_WORLD, block_group, &block_comm);
+
+    groups.push_back(block_group);
+    communicators.push_back(block_comm);
+  }
 
   return Ubig_parent;
 }
