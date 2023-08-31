@@ -11,7 +11,7 @@
 template <typename DT>
 class TypedDenseTests : public testing::Test {};
 
-// template types used in the following tests
+// template types used in the tests
 // should cover all instantiated types
 using Types = ::testing::Types<float, double, std::complex<float>, std::complex<double>>;
 TYPED_TEST_SUITE(TypedDenseTests, Types);
@@ -30,8 +30,8 @@ TYPED_TEST(TypedDenseTests, DefaultConstructor) {
 }
 
 TYPED_TEST(TypedDenseTests, RowColConstructor) {
-  const unsigned int M = 3;
-  const unsigned int N = 5;
+  const int M = 3;
+  const int N = 5;
 
   Hatrix::Dense<TypeParam> A(M, N, false);
   EXPECT_EQ(A.rows, M);
@@ -57,8 +57,8 @@ TYPED_TEST(TypedDenseTests, RowColConstructor) {
 }
 
 TYPED_TEST(TypedDenseTests, RowColConstructorInit) {
-  const unsigned int M = 3;
-  const unsigned int N = 5;
+  const int M = 5;
+  const int N = 3;
 
   // check that default is 0-initialized
   Hatrix::Dense<TypeParam> A(M, N);
@@ -67,8 +67,8 @@ TYPED_TEST(TypedDenseTests, RowColConstructorInit) {
   EXPECT_EQ(A.is_view, false);
   EXPECT_EQ(typeid(&A), typeid(TypeParam*));
   EXPECT_NE(&A, nullptr);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       EXPECT_EQ((TypeParam) 0, *(&A + j * A.rows + i));
     }
   }
@@ -79,8 +79,8 @@ TYPED_TEST(TypedDenseTests, RowColConstructorInit) {
   EXPECT_EQ(B.is_view, false);
   EXPECT_EQ(typeid(&B), typeid(TypeParam*));
   EXPECT_NE(&B, nullptr);
-  for (unsigned int j = 0; j < B.cols; ++j) {
-    for (unsigned int i = 0; i < B.rows; ++i) {
+  for (int j = 0; j < B.cols; ++j) {
+    for (int i = 0; i < B.rows; ++i) {
       EXPECT_EQ((TypeParam) 0, *(&B + j * B.rows + i));
     }
   }
@@ -95,12 +95,12 @@ TYPED_TEST(TypedDenseTests, RowColConstructorInit) {
 }
 
 TYPED_TEST(TypedDenseTests, CopyConstructor) {
-  const unsigned int M = 8;
-  const unsigned int N = 5;
+  const int M = 8;
+  const int N = 5;
 
   Hatrix::Dense<TypeParam> A(M, N);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       *(&A + j * A.rows + i) = (TypeParam) (i * A.cols + j);
     }
   }
@@ -110,11 +110,11 @@ TYPED_TEST(TypedDenseTests, CopyConstructor) {
   EXPECT_EQ(A_copy.rows, A.rows);
   EXPECT_EQ(A_copy.cols, A.cols);
   EXPECT_EQ(A_copy.is_view, A.is_view);
-  EXPECT_EQ(typeid(&A), typeid(&A_copy));
-  EXPECT_NE(&A, &A_copy);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
-      EXPECT_EQ(*(&A_copy + j * A.rows + i), *(&A + j * A.rows + i));
+  EXPECT_EQ(typeid(&A_copy), typeid(&A));
+  EXPECT_NE(&A_copy, &A);
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(*(&A_copy + j * A_copy.rows + i), *(&A + j * A.rows + i));
     }
   }
   // Verify that a deep copy is created
@@ -129,19 +129,19 @@ TYPED_TEST(TypedDenseTests, CopyConstructor) {
   EXPECT_EQ(A_view.rows, A.rows);
   EXPECT_EQ(A_view.cols, A.cols);
   EXPECT_EQ(A_view.is_view, true);
-  EXPECT_EQ(&A, &A_view);
+  EXPECT_EQ(&A_view, &A);
   // Verify that a shallow copy is created
   *&A_view = (TypeParam) 1;
   EXPECT_EQ(*&A, (TypeParam) 1);
 }
 
 TYPED_TEST(TypedDenseTests, ExplicitCopyConstructor) {
-  const unsigned int M = 5;
-  const unsigned int N = 8;
+  const int M = 5;
+  const int N = 8;
 
   Hatrix::Dense<TypeParam> A(M, N);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       *(&A + j * A.rows + i) = (TypeParam) (i * A.cols + j);
     }
   }
@@ -151,11 +151,11 @@ TYPED_TEST(TypedDenseTests, ExplicitCopyConstructor) {
   EXPECT_EQ(A_copy.rows, A.rows);
   EXPECT_EQ(A_copy.cols, A.cols);
   EXPECT_EQ(A_copy.is_view, false);
-  EXPECT_EQ(typeid(&A), typeid(&A_copy));
-  EXPECT_NE(&A, &A_copy);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
-      EXPECT_EQ(*(&A_copy + j * A.rows + i), *(&A + j * A.rows + i));
+  EXPECT_EQ(typeid(&A_copy), typeid(&A));
+  EXPECT_NE(&A_copy, &A);
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(*(&A_copy + j * A_copy.rows + i), *(&A + j * A.rows + i));
     }
   }
   // Verify that a deep copy is created
@@ -169,11 +169,11 @@ TYPED_TEST(TypedDenseTests, ExplicitCopyConstructor) {
   EXPECT_EQ(A_copy2.rows, A.rows);
   EXPECT_EQ(A_copy2.cols, A.cols);
   EXPECT_EQ(A_copy2.is_view, false);
-  EXPECT_EQ(typeid(&A), typeid(&A_copy2));
-  EXPECT_NE(&A, &A_copy2);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
-      EXPECT_EQ(*(&A_copy2+ j * A.rows + i), *(&A + j * A.rows + i));
+  EXPECT_EQ(typeid(&A_copy2), typeid(&A));
+  EXPECT_NE(&A_copy2, &A);
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(*(&A_copy2+ j * A_copy2.rows + i), *(&A + j * A.rows + i));
     }
   }
   // Verify that a deep copy is created
@@ -185,7 +185,7 @@ TYPED_TEST(TypedDenseTests, ExplicitCopyConstructor) {
   EXPECT_EQ(A_view.rows, A.rows);
   EXPECT_EQ(A_view.cols, A.cols);
   EXPECT_EQ(A_view.is_view, true);
-  EXPECT_EQ(&A, &A_view);
+  EXPECT_EQ(&A_view, &A);
   // Verify that a shallow copy is created
   *&A_view = (TypeParam) 1;
   EXPECT_EQ(*&A, (TypeParam) 1);
@@ -195,8 +195,8 @@ TYPED_TEST(TypedDenseTests, ExplicitCopyConstructor) {
   EXPECT_EQ(A_view2.rows, A_view.rows);
   EXPECT_EQ(A_view2.cols, A_view.cols);
   EXPECT_EQ(A_view2.is_view, true);
-  EXPECT_EQ(&A_view, &A_view2);
-  EXPECT_EQ(&A, &A_view2);
+  EXPECT_EQ(&A_view2, &A_view);
+  EXPECT_EQ(&A_view2, &A);
   // Verify that a shallow copy is created
   *&A_view2 = (TypeParam) 2;
   EXPECT_EQ(*&A_view, (TypeParam) 2);
@@ -204,12 +204,12 @@ TYPED_TEST(TypedDenseTests, ExplicitCopyConstructor) {
 }
 
 TYPED_TEST(TypedDenseTests, MoveConstructor) {
-  const unsigned int M = 7;
-  const unsigned int N = 4;
+  const int M = 7;
+  const int N = 3;
 
   Hatrix::Dense<TypeParam> A(M, N);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       *(&A + j * A.rows + i) = (TypeParam) (i * A.cols + j);
     }
   }
@@ -219,13 +219,13 @@ TYPED_TEST(TypedDenseTests, MoveConstructor) {
   EXPECT_EQ(B.rows, M);
   EXPECT_EQ(B.cols, N);
   EXPECT_EQ(B.is_view, false);
-  EXPECT_EQ(typeid(&A), typeid(TypeParam*));
+  EXPECT_EQ(typeid(&B), typeid(TypeParam*));
   EXPECT_EQ(A.rows, 0);
   EXPECT_EQ(A.cols, 0);
   EXPECT_EQ(A.is_view, false);
   EXPECT_EQ(&A, nullptr);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       EXPECT_EQ(*(&B + j * B.rows + i), (TypeParam) (i * B.cols + j));
     }
   }
@@ -233,8 +233,8 @@ TYPED_TEST(TypedDenseTests, MoveConstructor) {
   // Move a view
   Hatrix::Dense<TypeParam> B_view(B, false);
   Hatrix::Dense<TypeParam> C(std::move(B_view));
-  EXPECT_EQ(B_view.rows, C.rows);
-  EXPECT_EQ(B_view.cols, C.cols);
+  EXPECT_EQ(C.rows, B_view.rows);
+  EXPECT_EQ(C.cols, B_view.cols);
   EXPECT_EQ(C.is_view, B_view.is_view);
   EXPECT_EQ(C.is_view, true);
   EXPECT_EQ(typeid(&C), typeid(TypeParam*));
@@ -246,12 +246,12 @@ TYPED_TEST(TypedDenseTests, MoveConstructor) {
 
 /*
 TYPED_TEST(TypedDenseTests, ConstructorViews) {
-  const unsigned int m = 8;
-  const unsigned int n = 5;
+  const int m = 8;
+  const int n = 5;
 
   Hatrix::Dense<TypeParam> A(m, n);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       *(&A + j * A.rows + i) = (TypeParam) (i * A.cols + j);
     }
   }
@@ -262,8 +262,8 @@ TYPED_TEST(TypedDenseTests, ConstructorViews) {
   EXPECT_EQ(A_copy.cols, n);
   EXPECT_EQ(A_copy.is_view, false);
   EXPECT_EQ(typeid(&A), typeid(&A_copy));
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       EXPECT_EQ(*(&A_copy + j * A.rows + i), (TypeParam) (i * A.cols + j));
     }
   }
@@ -276,8 +276,8 @@ TYPED_TEST(TypedDenseTests, ConstructorViews) {
   EXPECT_EQ(A_copy_exp.cols, n);
   EXPECT_EQ(A_copy_exp.is_view, false);
   EXPECT_EQ(typeid(&A), typeid(&A_copy_exp));
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       EXPECT_EQ(*(&A_copy_exp + j * A.rows + i), (TypeParam) (i * A.cols + j));
     }
   }
@@ -316,8 +316,8 @@ TYPED_TEST(TypedDenseTests, ConstructorViews) {
   EXPECT_EQ(A_copy2.rows, m);
   EXPECT_EQ(A_copy2.cols, n);
   EXPECT_EQ(A_copy2.is_view, false);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
       EXPECT_EQ(*(&A_copy2+ j * A.rows + i), (TypeParam) (i * A.cols + j));
     }
   }
@@ -326,24 +326,65 @@ TYPED_TEST(TypedDenseTests, ConstructorViews) {
 }
 */
 TYPED_TEST(TypedDenseTests, CopyAssignment) {
-  const unsigned int m = 8;
-  const unsigned int n = 5;
-
-  Hatrix::Dense<TypeParam> A(m, n);
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
-      *(&A + j * A.rows + i) = (TypeParam) (i * A.cols + j);
-    }
-  }
+  const int M = 3;
+  const int N = 7;
   
-  // TODO allow different size?
-  Hatrix::Dense<TypeParam> B(m, n);
-  B = A;
-  for (unsigned int j = 0; j < A.cols; ++j) {
-    for (unsigned int i = 0; i < A.rows; ++i) {
-      EXPECT_EQ(*(&B+ j * A.rows + i), *(&A+ j * A.rows + i));
+  Hatrix::Dense<TypeParam> A;
+  Hatrix::Dense<TypeParam> B(M, N);
+  for (int j = 0; j < B.cols; ++j) {
+    for (int i = 0; i < B.rows; ++i) {
+      *(&B + j * B.rows + i) = (TypeParam) (i * B.cols + j);
     }
   }
+
+  // non view = non view
+  A = B;
+  EXPECT_EQ(A.rows, B.rows);
+  EXPECT_EQ(A.cols, B.cols);
+  EXPECT_EQ(A.is_view, B.is_view);
+  EXPECT_EQ(A.is_view, false);
+  EXPECT_EQ(typeid(&A), typeid(&B));
+  EXPECT_NE(&A, &B);
+  for (int j = 0; j < A.cols; ++j) {
+    for (int i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(*(&A+ j * A.rows + i), *(&B+ j * B.rows + i));
+    }
+  }
+
+  // non view = view
+  Hatrix::Dense<TypeParam> B_view(B, false);
+  Hatrix::Dense<TypeParam> C(2, 2);
+  C = B_view;
+  EXPECT_EQ(C.rows, B_view.rows);
+  EXPECT_EQ(C.cols, B_view.cols);
+  EXPECT_EQ(C.is_view, B_view.is_view);
+  EXPECT_EQ(C.is_view, true);
+  EXPECT_EQ(&C, &B_view);
+
+  // view = non view
+  Hatrix::Dense<TypeParam> D(2, 2);
+  B_view = D;
+  EXPECT_EQ(B_view.rows, D.rows);
+  EXPECT_EQ(B_view.cols, D.cols);
+  EXPECT_EQ(B_view.is_view, D.is_view);
+  EXPECT_EQ(B_view.is_view, false);
+  EXPECT_EQ(typeid(&B_view), typeid(&D));
+  EXPECT_NE(&B_view, &D);
+  for (int j = 0; j < D.cols; ++j) {
+    for (int i = 0; i < D.rows; ++i) {
+      EXPECT_EQ(*(&B_view+ j * B_view.rows + i), *(&D+ j * D.rows + i));
+    }
+  }
+
+  // view = view
+  Hatrix::Dense<TypeParam> A_view(A, false);
+  Hatrix::Dense<TypeParam> D_view(D, false);
+  A_view = D_view;
+  EXPECT_EQ(A_view.rows, D_view.rows);
+  EXPECT_EQ(A_view.cols, D_view.cols);
+  EXPECT_EQ(A_view.is_view, D_view.is_view);
+  EXPECT_EQ(A_view.is_view, true);
+  EXPECT_EQ(&A_view, &D_view);
 }
 
 /*
