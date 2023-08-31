@@ -4,65 +4,247 @@
 //#include <vector>
 //#include <iostream>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/classes/Dense.hpp"
 #include "gtest/gtest.h"
 
-TEST(DenseTests, DefaultConstructor) {
-  Hatrix::Dense<double> A;
-  EXPECT_EQ(A.rows, 0);
-  EXPECT_EQ(A.cols, 0);
-  EXPECT_EQ(A.is_view, false);
-  EXPECT_EQ(&A, nullptr);
-
-  Hatrix::Dense B;
-  EXPECT_EQ(typeid(A), typeid(B));
-  EXPECT_EQ(A.rows, B.rows);
-  EXPECT_EQ(A.cols, B.cols);
-  EXPECT_EQ(A.is_view, B.is_view);
-  EXPECT_EQ(&A, &B);
-}
 
 template <typename DT>
 class TypedDenseTests : public testing::Test {};
 
 // template types used in the following tests
-// includes all intantiated types
+// should cover all instantiated types
 using Types = ::testing::Types<float, double, std::complex<float>, std::complex<double>>;
 TYPED_TEST_SUITE(TypedDenseTests, Types);
 
-TYPED_TEST(TypedDenseTests, Constructor) {
-  const unsigned int m = 8;
-  const unsigned int n = 5;
+TYPED_TEST(TypedDenseTests, DefaultConstructor) {
+  Hatrix::Dense<TypeParam> A;
+  EXPECT_EQ(A.rows, 0);
+  EXPECT_EQ(A.cols, 0);
+  EXPECT_EQ(A.is_view, false);
+  EXPECT_EQ(&A, nullptr);
+  EXPECT_EQ(typeid(&A), typeid(TypeParam*));
 
-  Hatrix::Dense<TypeParam> A(m, n);
-  EXPECT_EQ(A.rows, m);
-  EXPECT_EQ(A.cols, n);
+  // check default template type
+  Hatrix::Dense B;
+  EXPECT_EQ(typeid(&B), typeid(double*));
+}
+
+TYPED_TEST(TypedDenseTests, RowColConstructor) {
+  const unsigned int M = 3;
+  const unsigned int N = 5;
+
+  Hatrix::Dense<TypeParam> A(M, N, false);
+  EXPECT_EQ(A.rows, M);
+  EXPECT_EQ(A.cols, N);
   EXPECT_EQ(A.is_view, false);
   EXPECT_EQ(typeid(&A), typeid(TypeParam*));
+  EXPECT_NE(&A, nullptr);
+
+  Hatrix::Dense<TypeParam> B(N, M, false);
+  EXPECT_EQ(B.rows, N);
+  EXPECT_EQ(B.cols, M);
+  EXPECT_EQ(B.is_view, false);
+  EXPECT_EQ(typeid(&B), typeid(TypeParam*));
+  EXPECT_NE(&B, nullptr);
+
+  // this should be equal to default constructor
+  Hatrix::Dense<TypeParam> C(0, 0, false);
+  EXPECT_EQ(C.rows, 0);
+  EXPECT_EQ(C.cols, 0);
+  EXPECT_EQ(C.is_view, false);
+  EXPECT_EQ(typeid(&C), typeid(TypeParam*));
+  EXPECT_EQ(&C, nullptr);
+}
+
+TYPED_TEST(TypedDenseTests, RowColConstructorInit) {
+  const unsigned int M = 3;
+  const unsigned int N = 5;
+
+  // check that default is 0-initialized
+  Hatrix::Dense<TypeParam> A(M, N);
+  EXPECT_EQ(A.rows, M);
+  EXPECT_EQ(A.cols, N);
+  EXPECT_EQ(A.is_view, false);
+  EXPECT_EQ(typeid(&A), typeid(TypeParam*));
+  EXPECT_NE(&A, nullptr);
   for (unsigned int j = 0; j < A.cols; ++j) {
     for (unsigned int i = 0; i < A.rows; ++i) {
       EXPECT_EQ((TypeParam) 0, *(&A + j * A.rows + i));
     }
   }
 
-  Hatrix::Dense<TypeParam> B(n, m);
-  EXPECT_EQ(B.rows, n);
-  EXPECT_EQ(B.cols, m);
+  Hatrix::Dense<TypeParam> B(N, M, true);
+  EXPECT_EQ(B.rows, N);
+  EXPECT_EQ(B.cols, M);
   EXPECT_EQ(B.is_view, false);
   EXPECT_EQ(typeid(&B), typeid(TypeParam*));
+  EXPECT_NE(&B, nullptr);
   for (unsigned int j = 0; j < B.cols; ++j) {
     for (unsigned int i = 0; i < B.rows; ++i) {
       EXPECT_EQ((TypeParam) 0, *(&B + j * B.rows + i));
     }
   }
 
-  Hatrix::Dense<TypeParam> C(0, 0);
+  // this should not allocate memory
+  Hatrix::Dense<TypeParam> C(0, M, true);
   EXPECT_EQ(C.rows, 0);
-  EXPECT_EQ(C.cols, 0);
+  EXPECT_EQ(C.cols, M);
   EXPECT_EQ(C.is_view, false);
   EXPECT_EQ(typeid(&C), typeid(TypeParam*));
+  EXPECT_EQ(&C, nullptr);
 }
 
+TYPED_TEST(TypedDenseTests, CopyConstructor) {
+  const unsigned int M = 8;
+  const unsigned int N = 5;
+
+  Hatrix::Dense<TypeParam> A(M, N);
+  for (unsigned int j = 0; j < A.cols; ++j) {
+    for (unsigned int i = 0; i < A.rows; ++i) {
+      *(&A + j * A.rows + i) = (TypeParam) (i * A.cols + j);
+    }
+  }
+
+  // Deep copy
+  Hatrix::Dense<TypeParam> A_copy = A;  // copy constructor
+  EXPECT_EQ(A_copy.rows, A.rows);
+  EXPECT_EQ(A_copy.cols, A.cols);
+  EXPECT_EQ(A_copy.is_view, A.is_view);
+  EXPECT_EQ(typeid(&A), typeid(&A_copy));
+  EXPECT_NE(&A, &A_copy);
+  for (unsigned int j = 0; j < A.cols; ++j) {
+    for (unsigned int i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(*(&A_copy + j * A.rows + i), *(&A + j * A.rows + i));
+    }
+  }
+  // Verify that a deep copy is created
+  *&A_copy = (TypeParam) 1;
+  EXPECT_EQ(*&A, (TypeParam) 0);
+
+  // View (i.e. shallow copy)
+  // TODO overthink this
+  A.is_view = true;
+  Hatrix::Dense<TypeParam> A_view(A);
+  A.is_view = false;
+  EXPECT_EQ(A_view.rows, A.rows);
+  EXPECT_EQ(A_view.cols, A.cols);
+  EXPECT_EQ(A_view.is_view, true);
+  EXPECT_EQ(&A, &A_view);
+  // Verify that a shallow copy is created
+  *&A_view = (TypeParam) 1;
+  EXPECT_EQ(*&A, (TypeParam) 1);
+}
+
+TYPED_TEST(TypedDenseTests, ExplicitCopyConstructor) {
+  const unsigned int M = 5;
+  const unsigned int N = 8;
+
+  Hatrix::Dense<TypeParam> A(M, N);
+  for (unsigned int j = 0; j < A.cols; ++j) {
+    for (unsigned int i = 0; i < A.rows; ++i) {
+      *(&A + j * A.rows + i) = (TypeParam) (i * A.cols + j);
+    }
+  }
+
+  // Explicit deep copy of non view
+  Hatrix::Dense<TypeParam> A_copy(A, true);
+  EXPECT_EQ(A_copy.rows, A.rows);
+  EXPECT_EQ(A_copy.cols, A.cols);
+  EXPECT_EQ(A_copy.is_view, false);
+  EXPECT_EQ(typeid(&A), typeid(&A_copy));
+  EXPECT_NE(&A, &A_copy);
+  for (unsigned int j = 0; j < A.cols; ++j) {
+    for (unsigned int i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(*(&A_copy + j * A.rows + i), *(&A + j * A.rows + i));
+    }
+  }
+  // Verify that a deep copy is created
+  *&A_copy = (TypeParam) 1;
+  EXPECT_EQ(*&A, (TypeParam) 0);
+  
+  // Explicit deep copy of a view
+  A.is_view = true;
+  Hatrix::Dense<TypeParam> A_copy2(A, true);
+  A.is_view = false;
+  EXPECT_EQ(A_copy2.rows, A.rows);
+  EXPECT_EQ(A_copy2.cols, A.cols);
+  EXPECT_EQ(A_copy2.is_view, false);
+  EXPECT_EQ(typeid(&A), typeid(&A_copy2));
+  EXPECT_NE(&A, &A_copy2);
+  for (unsigned int j = 0; j < A.cols; ++j) {
+    for (unsigned int i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(*(&A_copy2+ j * A.rows + i), *(&A + j * A.rows + i));
+    }
+  }
+  // Verify that a deep copy is created
+  *&A_copy2 = (TypeParam) 1;
+  EXPECT_EQ(*&A, (TypeParam) 0);
+
+  // View (i.e. shallow copy) of a non view
+  Hatrix::Dense<TypeParam> A_view(A, false);
+  EXPECT_EQ(A_view.rows, A.rows);
+  EXPECT_EQ(A_view.cols, A.cols);
+  EXPECT_EQ(A_view.is_view, true);
+  EXPECT_EQ(&A, &A_view);
+  // Verify that a shallow copy is created
+  *&A_view = (TypeParam) 1;
+  EXPECT_EQ(*&A, (TypeParam) 1);
+
+  // View (i.e. shallow copy) of a view
+  Hatrix::Dense<TypeParam> A_view2(A_view, false);
+  EXPECT_EQ(A_view2.rows, A_view.rows);
+  EXPECT_EQ(A_view2.cols, A_view.cols);
+  EXPECT_EQ(A_view2.is_view, true);
+  EXPECT_EQ(&A_view, &A_view2);
+  EXPECT_EQ(&A, &A_view2);
+  // Verify that a shallow copy is created
+  *&A_view2 = (TypeParam) 2;
+  EXPECT_EQ(*&A_view, (TypeParam) 2);
+  EXPECT_EQ(*&A, (TypeParam) 2);
+}
+
+TYPED_TEST(TypedDenseTests, MoveConstructor) {
+  const unsigned int M = 7;
+  const unsigned int N = 4;
+
+  Hatrix::Dense<TypeParam> A(M, N);
+  for (unsigned int j = 0; j < A.cols; ++j) {
+    for (unsigned int i = 0; i < A.rows; ++i) {
+      *(&A + j * A.rows + i) = (TypeParam) (i * A.cols + j);
+    }
+  }
+  
+  // Move a non-view
+  Hatrix::Dense<TypeParam> B = std::move(A);  // move constructor
+  EXPECT_EQ(B.rows, M);
+  EXPECT_EQ(B.cols, N);
+  EXPECT_EQ(B.is_view, false);
+  EXPECT_EQ(typeid(&A), typeid(TypeParam*));
+  EXPECT_EQ(A.rows, 0);
+  EXPECT_EQ(A.cols, 0);
+  EXPECT_EQ(A.is_view, false);
+  EXPECT_EQ(&A, nullptr);
+  for (unsigned int j = 0; j < A.cols; ++j) {
+    for (unsigned int i = 0; i < A.rows; ++i) {
+      EXPECT_EQ(*(&B + j * B.rows + i), (TypeParam) (i * B.cols + j));
+    }
+  }
+  
+  // Move a view
+  Hatrix::Dense<TypeParam> B_view(B, false);
+  Hatrix::Dense<TypeParam> C(std::move(B_view));
+  EXPECT_EQ(B_view.rows, C.rows);
+  EXPECT_EQ(B_view.cols, C.cols);
+  EXPECT_EQ(C.is_view, B_view.is_view);
+  EXPECT_EQ(C.is_view, true);
+  EXPECT_EQ(typeid(&C), typeid(TypeParam*));
+  EXPECT_EQ(&C, &B_view);
+  // Verify that a shallow copy is created
+  *&C = (TypeParam) 1;
+  EXPECT_EQ(*&B, (TypeParam) 1);
+}
+
+/*
 TYPED_TEST(TypedDenseTests, ConstructorViews) {
   const unsigned int m = 8;
   const unsigned int n = 5;
@@ -142,7 +324,7 @@ TYPED_TEST(TypedDenseTests, ConstructorViews) {
   A_copy2(0, 0) = (TypeParam) 1;
   EXPECT_EQ(A_view(0, 0), (TypeParam) 0);
 }
-
+*/
 TYPED_TEST(TypedDenseTests, CopyAssignment) {
   const unsigned int m = 8;
   const unsigned int n = 5;

@@ -5,13 +5,14 @@ namespace Hatrix {
 template <typename DT = double>
 class Dense {
  public:
-  unsigned int rows = 0;
-  unsigned int cols = 0;
+   // TODO maybe change this datatype
+  int rows = 0;
+  int cols = 0;
   // Shows whether a Matrix is a view of another matrix or actually owns the data
   bool is_view = false;
 
  protected:
-  DT* data_ptr = nullptr;
+  DT* data = nullptr;
 
  public:
   Dense();
@@ -30,7 +31,7 @@ class Dense {
   // Copy constructor for Matrix. 
   // If copy is true, a deep copy off all matrix entries is performed
   // A view is created otherwise
-  Dense(const Dense& A, bool copy);
+  Dense(const Dense& A, const bool copy);
 
   Dense& operator=(const Dense& A);
 
@@ -38,7 +39,7 @@ class Dense {
 
   Dense(Dense&& A);
 
-  Dense(unsigned int rows, unsigned int cols);
+  Dense(const int rows, const int cols, const bool init=true);
 
   const Dense& operator=(const DT a);
 
@@ -142,7 +143,7 @@ class Dense {
   // does not deallocate memory
   void empty();
   // allocates a new data_ptr of size rows * cols
-  void allocate();
+  void allocate(const bool init);
   // deallocates memory if matrix is not a view and it owns memory
   void deallocate();
   // copies all the values assuming equal sizes
