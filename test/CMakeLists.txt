@@ -2,6 +2,7 @@ include(GoogleTest)
 
 list(APPEND GTEST_TESTS
   Matrix
+  Dense
   arithmetics
   matmul
   triangular_matmul
