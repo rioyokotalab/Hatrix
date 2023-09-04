@@ -61,69 +61,27 @@ Dense<DT>::Dense(const Dense<DT>& A, const bool copy) :
 // If B is not a view, A is a deep copy of the data
 template <typename DT>
 Dense<DT>& Dense<DT>::operator=(const Dense<DT>& A) {
-  // protect against invalid self-assignment
-  //if (this != &A) {
-    rows = A.rows;
-    cols = A.cols;
+  // TODO this can be a potentially breaking operation, as it would be possible to assign
+  // assign A_view (which is a submatrix of the larger matrix A) onto A itself, thus 
+  // deallocating the memory it actually points to
+  const int N = this->rows * this->cols;
+  if (A.is_view || N != A.rows * A.cols) {
+    this->deallocate();
+  }
+  bool needs_allocation = this->is_view || N != A.rows * A.cols;
+  this->rows = A.rows;
+  this->cols = A.cols;
+  this->is_view = A.is_view;
+
     
-    if (A.is_view) {
-      deallocate();
-      data = A.data;
-    } else {
-      if (rows * cols != A.rows * A.cols) {
-        deallocate();
-      }
-      if (is_view || rows * cols != A.rows * A.cols) {
-        allocate(false);
-      }
-      copy_values(A);
-    }
-    is_view = A.is_view;
-  //}
-  /*
-  if (this->is_view) {
-    if (A.is_view) {
-      this->rows = A.rows;
-      this->cols = A.cols;
-      this->data = A.data;
-    } else {
-      this->rows = A.rows;
-      this->cols = A.cols;
-      is_view = false;
-      allocate();
-      // TODO this should really be handled by cblas (which might provide parallelism) or memset
-      for (int i = 0; i < A.rows; ++i) {
-        for (int j = 0; j < A.cols; ++j) {
-          (*this)(i, j) = A(i, j);
-        }
-      }
-    }
+  if (A.is_view) {
+    this->data = A.data;
   } else {
-    if (A.is_view) {
-      if (data) {
-        delete[] data;
-      }
-      this->rows = A.rows;
-      this->cols = A.cols;
-      this->data = A.data;
-      is_view = A.is_view;
-    } else {
-      if (rows * cols != A.rows * A.cols) {
-        if (data) {
-          delete[] data;
-        }
-        allocate();
-      }
-      this->rows = A.rows;
-      this->cols = A.cols;
-      // TODO this should really be handled by cblas (which might provide parallelism) or memset
-      for (int i = 0; i < A.rows; ++i) {
-        for (int j = 0; j < A.cols; ++j) {
-          (*this)(i, j) = A(i, j);
-        }
-      }
+    if (needs_allocation) {
+      this->allocate(false);
     }
-  }*/
+    this->copy_values(A);
+  }
 
   return *this;
 }
@@ -144,16 +102,19 @@ Dense<DT>::Dense(Dense<DT>&& A)
 // Deallocates memory for this, if necessary
 template <typename DT>
 Dense<DT>& Dense<DT>::operator=(Dense<DT>&& A) {
-  // Protect against invalid self move-assignment
-  //if (this != &A) {
-    deallocate();
-    rows = A.rows;
-    cols = A.cols;
-    is_view = A.is_view;
-    data = A.data;
-    // Leave A empty (assures it does not deallocate memory)
-    A.empty();
-  //}
+  // TODO this can be a potentially breaking operation, as it would be possible to assign
+  // move A_view (which is a submatrix of the larger matrix A) onto A itself, thus 
+  // deallocating the memory it actually points to
+  // TODO Protect against invalid self move-assignment
+  this->deallocate();
+  this->rows = A.rows;
+  this->cols = A.cols;
+  this->is_view = A.is_view;
+  this->data = A.data;
+  // Leave A empty (assures it does not deallocate memory)
+  if (!A.is_view) {
+      A.empty();
+  }
 
   return *this;
 }
@@ -428,16 +389,16 @@ template <typename DT>
 void Dense<DT>::allocate(const bool init) {
   assert(!this->is_view);
 
-  unsigned int n = this->rows * this->cols;
-  if (n < 1) {
-    this->data = nullptr;
+  const unsigned int N = this->rows * this->cols;
+  if (N < 1) {
+    this->empty();
     return;
   }
   try {
     if (init) {
-      this->data = new DT[n]();
+      this->data = new DT[N]();
     } else {
-      this->data = new DT[n];
+      this->data = new DT[N];
     }
   }
   catch (std::bad_alloc& e) {
@@ -449,17 +410,24 @@ void Dense<DT>::allocate(const bool init) {
 
 template <typename DT>
 void Dense<DT>::deallocate() {
-  if (!is_view && data) {
-      delete[] data;
+  if (!this->is_view) {
+    if (this->data) {
+      delete[] this->data;
+      this->data = nullptr;
+    } else {
+      assert(this->rows == 0);
+      assert(this->cols == 0);
+    }
   }
 }
 
 template <typename DT>
 void Dense<DT>::copy_values(const Dense<DT>& A) {
   assert(this->rows == A.rows);
-  assert(this->cols == A.rows);
+  assert(this->cols == A.cols);
 
   // TODO Should this be handled by cblas (which might provide parallelism)?
+  // Should not do any work when there are 0 elements
   std::memcpy(this->data, A.data, A.rows * A.cols * sizeof(DT));
 }
 
