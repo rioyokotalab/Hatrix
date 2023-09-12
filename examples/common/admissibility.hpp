@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <vector>
+
 #include "Cell.hpp"
 #include "Domain.hpp"
 #include "functions.hpp"
