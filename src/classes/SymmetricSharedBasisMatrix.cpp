@@ -1,4 +1,4 @@
-#include "Hatrix/Hatrix.hpp"
+#include "Hatrix/classes/SymmetricSharedBasisMatrix.hpp"
 
 #include <cassert>
 #include <cmath>

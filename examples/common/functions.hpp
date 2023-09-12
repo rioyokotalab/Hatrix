@@ -106,6 +106,14 @@ Matrix generate_p2p_matrix(const Domain& domain,
 }
 
 Matrix generate_p2p_matrix(const Domain& domain,
+                           const int64_t source_cell_idx,
+                           const int64_t target_cell_idx) {
+  const auto& Ci = domain.cells[source_cell_idx];
+  const auto& Cj = domain.cells[target_cell_idx];
+  return generate_p2p_matrix(domain, Ci.get_bodies(), Cj.get_bodies());
+}
+
+Matrix generate_p2p_matrix(const Domain& domain,
                            const int64_t row, const int64_t col,
                            const int64_t level) {
   const auto source_idx = domain.get_cell_idx(row, level);

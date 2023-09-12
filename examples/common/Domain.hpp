@@ -31,6 +31,7 @@ class Domain {
   double X0[MAX_NDIM], X0_min[MAX_NDIM], X0_max[MAX_NDIM], R0[MAX_NDIM];  // Root level bounding box
   std::vector<Body> bodies;
   std::vector<Cell> cells;
+  std::vector<int64_t> level_offset;
   Matrix p2p_matrix;
 
   static int64_t get_cell_idx(const int64_t block_index, const int64_t level) {
@@ -549,6 +550,10 @@ class Domain {
     }
   }
 
+  int64_t get_cell_index(const int64_t block_index, const int64_t level) const {
+    return level_offset[level] + block_index;
+  }
+
   void build_tree(const int64_t leaf_size) {
     // Assume balanced binary tree
     tree_height = (int64_t)std::log2((double)N / (double)leaf_size);
@@ -558,6 +563,14 @@ class Domain {
     cells.resize(ncells);
     // Partition
     cardinal_recursive_bisection(bodies, cells, 0, N, leaf_size, 0, 0);
+    // Get tree level offset
+    // Assume that tree of cells are stored as flattened 1D array
+    level_offset.resize(tree_height + 2);
+    int64_t level = 0;
+    for (int64_t i = 0; i < ncells; i++) {
+      if (cells[i].level == level) level_offset[level++] = i;
+    }
+    level_offset[tree_height + 1] = ncells;
   }
 
   void build_interactions(const double theta, const int64_t admis_variant = 0) {
@@ -1289,9 +1302,9 @@ class Domain {
     int64_t count = 0;
     for (int64_t level = tree_height; level >= 0; level--) {
       const auto level_ncells = (int64_t)1 << level;
-      const auto level_offset = level_ncells - 1;
+      const auto offset = level_ncells - 1;
       for (int64_t node = 0; node < level_ncells; node++) {
-        auto& cell = cells[level_offset + node];
+        auto& cell = cells[offset + node];
         cell.level = level;
         cell.block_index = node;
         if (level == tree_height) {
@@ -1313,8 +1326,8 @@ class Domain {
           cell.body_offset = child1.body_offset;
           cell.nbodies = child1.nbodies + child2.nbodies;
           // Set parent
-          child1.parent = level_offset + node;
-          child2.parent = level_offset + node;
+          child1.parent = offset + node;
+          child2.parent = offset + node;
         }
         // Calculate cell center and radius
         for (int64_t axis = 0; axis < ndim; axis++) {
@@ -1327,6 +1340,16 @@ class Domain {
       }
     }
     cells[0].parent = -1; //  Root has no parent
+    // Get tree level offset
+    // Assume that tree of cells are stored as flattened 1D array
+    {
+      level_offset.resize(tree_height + 2);
+      int64_t level = 0;
+      for (int64_t i = 0; i < ncells; i++) {
+        if (cells[i].level == level) level_offset[level++] = i;
+      }
+      level_offset[tree_height + 1] = ncells;
+    }
   }
 
   void read_p2p_matrix_ELSES(const std::string& file_name) {
