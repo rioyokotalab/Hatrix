@@ -46,7 +46,7 @@ bool row_has_admissible_block(const SymmetricSharedBasisMatrix& A,
 
 void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& R_row,
                             RowColMap<std::vector<int64_t>>& skeleton_rows,
-                            const Domain& domain, const CellInteractionLists& interactions,
+                            const Domain& domain, const Admissibility::CellInteractionLists& interactions,
                             const double err_tol, const int64_t max_rank,
                             const bool is_rel_tol) {
   // Bottom up pass
@@ -145,33 +145,17 @@ void generate_near_coupling_matrices(SymmetricSharedBasisMatrix& A,
   }
 }
 
-void construct_H2(SymmetricSharedBasisMatrix& A,
-                  const Domain& domain, const double admis,
-                  const double err_tol, const int64_t max_rank,
-                  const int64_t sampling_algo,
-                  const int64_t sample_local_size, const int64_t sample_far_size,
-                  const bool is_rel_tol = false) {
+int64_t construct_H2(SymmetricSharedBasisMatrix& A,
+                     const Domain& domain, const double admis,
+                     const double err_tol, const int64_t max_rank,
+                     const int64_t sampling_algo,
+                     const int64_t sample_local_size, const int64_t sample_far_size,
+                     const bool is_rel_tol = false) {
   // Initialize cell interactions for admissibility
-  CellInteractionLists interactions;
+  Admissibility::CellInteractionLists interactions;
   Admissibility::build_cell_interactions(interactions, domain, admis);
-  // TODO change this to assemble farfield sample
-  Admissibility::assemble_farfields(interactions, domain);
-  // if (sampling_algo == 3) {
-  //   // It is also possible to determine the minimum sample size to reach a desired accuracy.
-  //   // The HiDR paper does this by increasing the sample_size until the accuracy of 1e-2 * err_tol is reached.
-  //   // However, a good geometry partitioning technique is required for the estimate sample_size to work,
-  //   // because it assumes that each cluster contain uniformly distributed points, which may not be
-  //   // be produced by our current, simple partitioning method
-  //   const double ID_compress_tol = accuracy * 1e-1;
-  //   const double sampling_stop_tol = accuracy * 1e-2;
-  //   const auto r =
-  //       adaptive_anchor_grid_size(domain, Hatrix::kernel_function, leaf_size,
-  //                                 admis, ID_compress_tol, sampling_stop_tol);
-  //   sample_local_size = r;
-  //   sample_far_size = r > 3 ? std::max(r + 3, (int64_t)10) : r + 3;
-  // }
-  // domain.build_sample_bodies(sample_local_size, sample_far_size, sampling_algo);
-
+  Admissibility::assemble_farfields_sample(interactions, domain,
+                                           sampling_algo, sample_local_size, sample_far_size);
   // Initialize matrix block structure and admissibility
   Admissibility::init_block_structure(A, domain);
   Admissibility::init_geometry_admissibility(A, interactions, domain, admis);
@@ -181,6 +165,12 @@ void construct_H2(SymmetricSharedBasisMatrix& A,
   generate_cluster_bases(A, R_row, skeleton_rows, domain, interactions, err_tol, max_rank, is_rel_tol);
   generate_far_coupling_matrices(A, R_row, skeleton_rows, domain);
   generate_near_coupling_matrices(A, domain);
+  // Count maximum farfield size
+  int64_t max_farfield_size = -1;
+  for (const auto& farfield: interactions.far_particles) {
+    max_farfield_size = std::max(max_farfield_size, (int64_t)farfield.size());
+  }
+  return max_farfield_size;
 }
 
 Matrix get_Ubig(const SymmetricSharedBasisMatrix& A,
@@ -414,6 +404,10 @@ int main(int argc, char ** argv) {
       sampling_algo_name = "anchor_net";
       break;
     }
+    default: {
+      sampling_algo_name = "no_sample";
+      break;
+    }
   }
   // Pre-processing step for ELSES geometry
   if (geom_type == 3) {
@@ -436,8 +430,9 @@ int main(int argc, char ** argv) {
 
   SymmetricSharedBasisMatrix A;
   const auto start_construct = std::chrono::system_clock::now();
-  construct_H2(A, domain, admis, err_tol, max_rank,
-               sampling_algo, sample_local_size, sample_far_size, is_rel_tol);
+  const auto max_farfield_size = construct_H2(
+      A, domain, admis, err_tol, max_rank,
+      sampling_algo, sample_local_size, sample_far_size, is_rel_tol);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
@@ -449,12 +444,12 @@ int main(int argc, char ** argv) {
 
   const std::string err_prefix = (is_rel_tol ? "rel" : "abs");
   printf("N=%" PRId64 " leaf_size=%d %s_err_tol=%.1e max_rank=%d admis=%.2lf kernel=%s geometry=%s\n"
-         "sampling_algo=%s sample_local_size=%d sample_far_size=%d\n"
+         "sampling_algo=%s sample_local_size=%d sample_far_size=%d max_farfield_size=%" PRId64 "\n"
          "h2_height=%d construct_min_rank=%d construct_max_rank=%d construct_avg_rank=%.2lf "
          "construct_time=%e construct_%s_err=%e\n",
          N, (int)leaf_size, err_prefix.c_str(), err_tol, (int)max_rank, admis,
          kernel_name.c_str(), geom_name.c_str(),
-         sampling_algo_name.c_str(), (int)sample_local_size, (int)sample_far_size,
+         sampling_algo_name.c_str(), (int)sample_local_size, (int)sample_far_size, max_farfield_size,
          (int)A.max_level, (int)construct_min_rank, (int)construct_max_rank, construct_avg_rank,
          construct_time, err_prefix.c_str(), construct_error);
 

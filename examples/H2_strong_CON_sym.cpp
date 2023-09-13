@@ -46,7 +46,7 @@ bool row_has_admissible_block(const SymmetricSharedBasisMatrix& A,
 }
 
 void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& Ubig,
-                            const Domain& domain, const CellInteractionLists& interactions,
+                            const Domain& domain, const Admissibility::CellInteractionLists& interactions,
                             const double err_tol, const int64_t max_rank,
                             const bool is_rel_tol) {
   // Bottom up pass
@@ -139,7 +139,7 @@ void construct_H2(SymmetricSharedBasisMatrix& A,
                   const double err_tol, const int64_t max_rank,
                   const bool is_rel_tol = false) {
   // Initialize cell interactions for admissibility
-  CellInteractionLists interactions;
+  Admissibility::CellInteractionLists interactions;
   Admissibility::build_cell_interactions(interactions, domain, admis);
   Admissibility::assemble_farfields(interactions, domain);
   // Initialize matrix block structure and admissibility
