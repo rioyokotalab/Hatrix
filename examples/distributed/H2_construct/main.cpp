@@ -440,109 +440,93 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   MPI_Group world_group;
   MPI_Comm_group(MPI_COMM_WORLD, &world_group);
 
-  // Outer loop goes over the chunks of the child bases that need to be gathered into a root.
-  // for (int64_t chunk = 0; chunk < leaf_nblocks; chunk += nblocks_per_non_leaf) {
-  //   int64_t j = chunk / nblocks_per_non_leaf;
-  //   int root_proc = mpi_rank(j);
-  //   int nrows = opts.max_rank * nblocks_per_non_leaf;
-
-  //   std::vector<double> pre_svd_matrix(nrows * opts.nleaf, 0);
-
-  //   MPI_Datatype pre_svd_chunk;
-  //   MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &pre_svd_chunk);
-  //   MPI_Type_commit(&pre_svd_chunk);
-
-  //   int num_gather_ops = nblocks_per_non_leaf >= MPISIZE ?
-  //     nblocks_per_non_leaf / MPISIZE : (nblocks_per_non_leaf + MPISIZE) / MPISIZE;
-
-  //   std::vector<int> gather_ranks;
-  //   gather_ranks.push_back(root_proc);
-
-  //   for (int gather_op = 0; gather_op < num_gather_ops; ++gather_op) {
-  //     // Choose the number of bases that will be calling the Gather.
-  //     int num_bases = (gather_op * MPISIZE > nblocks_per_non_leaf) ?
-  //       (nblocks_per_non_leaf - gather_op * MPISIZE) : MPISIZE;
-
-  //     for (int b = 0; b < num_bases; ++b) {
-  //       int index = chunk + gather_op * MPISIZE + b;
-  //       int basis_rank = mpi_rank(index);
-  //       if (basis_rank != root_proc) {
-  //         gather_ranks.push_back(basis_rank);
-  //       }
-  //     }
-
-  //     MPI_Group chunk_gather_group;
-  //     MPI_Group_incl(world_group, gather_ranks.size(), gather_ranks.data(), &chunk_gather_group);
-
-  //     MPI_Comm chunk_gather_comm;
-  //     MPI_Comm_create(MPI_COMM_WORLD, chunk_gather_group, &chunk_gather_comm);
-
-  //     MPI_Gather();
-  //   }
-  // }
-
-  // Prepare groups and communicators for communication of chunks of applied blocks.
-  std::vector<MPI_Group> groups;
-  std::vector<MPI_Comm> communicators;
-
   for (int64_t block = 0; block < nblocks; ++block) {
-    int root_proc = mpi_rank(block);
-
     std::vector<int> ranks;
-    ranks.push_back(root_proc);
-
-    for (int64_t leaf_index = block * nblocks_per_non_leaf; leaf_index < (block+1) * nblocks_per_non_leaf; ++leaf_index) {
-      int leaf_rank = mpi_rank(leaf_index);
-      if (leaf_rank != root_proc) {
-        ranks.push_back(leaf_rank);
-      }
+    int start_index = block * nblocks_per_non_leaf;
+    int end_index = (block+1) * nblocks_per_non_leaf;
+    int limit = MPISIZE > (end_index - start_index) ? end_index : MPISIZE;
+    for (int i = start_index; i < limit; ++i) {
+      ranks.push_back(mpi_rank(i));
     }
 
-    MPI_Group block_group;
-    MPI_Group_incl(world_group, ranks.size(), ranks.data(), &block_group);
+    MPI_Group MPI_GROUP_BLOCK;
+    MPI_Group_incl(world_group, ranks.size(), ranks.data(), &MPI_GROUP_BLOCK);
+    MPI_Comm MPI_COMM_BLOCK;
+    MPI_Comm_create(MPI_COMM_WORLD, MPI_GROUP_BLOCK, &MPI_COMM_BLOCK);
 
-    MPI_Comm block_comm;
-    MPI_Comm_create(MPI_COMM_WORLD, block_group, &block_comm);
+    int64_t nrows = opts.max_rank * nblocks_per_non_leaf;
+    std::vector<double> transfer_temp_gather_memory(nrows * opts.nleaf, 0);
 
-    groups.push_back(block_group);
-    communicators.push_back(block_comm);
-  }
+    // Strided type for receiving data.
+    MPI_Datatype strided_chunk;
+    MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &strided_chunk);
+    MPI_Type_commit(&strided_chunk);
 
-  for (int64_t block = 0; block < nblocks; ++block) {
-    MPI_Group block_group = groups[block];
-    MPI_Comm block_comm = communicators[block];
-
-    int nrows = opts.max_rank * nblocks_per_non_leaf;
-    std::vector<double> pre_svd_matrix(nrows * opts.nleaf, 0);
-
-    // strided type for receiving data.
-    MPI_Datatype pre_svd_chunk;
-    MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &pre_svd_chunk);
-    MPI_Type_commit(&pre_svd_chunk);
-
-    // contiguous type for sending data.
+    // Contiguous type for sending data.
     MPI_Datatype send_chunk;
     MPI_Type_contiguous(opts.nleaf * opts.max_rank, MPI_DOUBLE, &send_chunk);
     MPI_Type_commit(&send_chunk);
 
-    std::vector<int> sendcounts(MPISIZE, 0);
-    for (int i = block * nblocks_per_non_leaf; i < (block+1) * nblocks_per_non_leaf; ++i) {
-      if (mpi_rank(i) == MPIRANK) {
-        sendcounts[MPIRANK]++;
-      }
+    int BLOCK_COMM_RANK, BLOCK_COMM_SIZE;
+    if (MPI_COMM_BLOCK != MPI_COMM_NULL) {
+      MPI_Comm_rank(MPI_COMM_BLOCK, &BLOCK_COMM_RANK);
+      MPI_Comm_size(MPI_COMM_BLOCK, &BLOCK_COMM_SIZE);
     }
 
 
-    while (1) {
-      if (std::all_of(sendcounts.begin(), sendcounts.end(),
-                      [](int x) { return x == 0; })) {
-        break;
-      }
-    }
-
-    // std::vector<double> send_vector();
   }
 
+  // for (int64_t block = 0; block < nblocks; ++block) {
+  //   int root_proc = mpi_rank(block);
+  //   MPI_Group MPI_BLOCK_GROUP = groups[block];
+  //   MPI_Comm MPI_BLOCK_COMM = communicators[block];
+
+  //   int nrows = opts.max_rank * nblocks_per_non_leaf;
+  //   std::vector<double> pre_svd_matrix(nrows * opts.nleaf, 0);
+
+  //   // strided type for receiving data.
+  //   MPI_Datatype pre_svd_chunk;
+  //   MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &pre_svd_chunk);
+  //   MPI_Type_commit(&pre_svd_chunk);
+
+  //   // contiguous type for sending data.
+  //   MPI_Datatype send_chunk;
+  //   MPI_Type_contiguous(opts.nleaf * opts.max_rank, MPI_DOUBLE, &send_chunk);
+  //   MPI_Type_commit(&send_chunk);
+
+  //   std::vector<int> sendcounts(MPISIZE, 0);
+  //   for (int i = block * nblocks_per_non_leaf; i < (block+1) * nblocks_per_non_leaf; ++i) {
+  //     if (mpi_rank(i) == MPIRANK) {
+  //       sendcounts[MPIRANK]++;
+  //     }
+  //   }
+
+  //   int leaf_block = block * nblocks_per_non_leaf;
+  //   int start_index = leaf_block + (MPIRANK - mpi_rank(block * nblocks_per_non_leaf));
+  //   bool send_something = start_index >= leaf_block ? true : false;
+
+  //   std::vector<int> counts_recv(MPISIZE, 0);
+  //   std::vector<int> displ(MPISIZE, 0);
+
+  //   int start_displ = 0;
+  //   for (int i = leaf_block; i < leaf_block + (MPISIZE - mpi_rank(leaf_block)); ++i) {
+  //     int rank_i = mpi_rank(i);
+  //     counts_recv[rank_i]++;
+  //     displ[rank_i] = start_displ;
+  //     start_displ += counts_recv[rank_i];
+  //   }
+
+  //   if (MPI_BLOCK_COMM != MPI_COMM_NULL) {
+  //     MPI_Gatherv(Utransfer_temp(start_index, A.max_level).data_ptr,
+  //                 send_something ? 1 : 0,
+  //                 send_chunk,
+  //                 pre_svd_matrix.data(),
+  //                 counts_recv.data(),
+  //                 displ.data(),
+  //                 pre_svd_chunk,
+  //                 root_proc,
+  //                 MPI_BLOCK_COMM);
+  //   }
 
   return Ubig_parent;
 }

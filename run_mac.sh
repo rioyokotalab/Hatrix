@@ -25,7 +25,7 @@ cd $ROOT
 
 make -j H2_construct
 
-for N in 512; do
+for N in 2048; do
     for MAX_RANK in 30; do
         NLEAF=128
         NDIM=1
