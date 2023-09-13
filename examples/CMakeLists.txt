@@ -1,5 +1,5 @@
-add_subdirectory(common)
-include_directories(common)
+add_subdirectory(include)
+include_directories(include)
 
 list(APPEND HATRIX_EXAMPLES
   BLR2_weak_CON

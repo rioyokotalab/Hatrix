@@ -17,8 +17,8 @@
 #include <stdexcept>
 
 #include "Hatrix/Hatrix.hpp"
-#include "common/functions.hpp"
-#include "common/Domain.hpp"
+#include "functions.hpp"
+#include "Domain.hpp"
 
 
 using vec = std::vector<int64_t>;
