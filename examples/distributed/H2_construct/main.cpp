@@ -471,9 +471,14 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     if (MPI_COMM_BLOCK != MPI_COMM_NULL) {
       MPI_Comm_rank(MPI_COMM_BLOCK, &BLOCK_COMM_RANK);
       MPI_Comm_size(MPI_COMM_BLOCK, &BLOCK_COMM_SIZE);
+
+      // TODO: This approach might fail for non-even number of processes.
+      for (int64_t index = BLOCK_COMM_RANK; index < nblocks_per_non_leaf; index += BLOCK_COMM_SIZE) {
+        int64_t block_index = index + start_index;
+        int global_mpi_rank = mpi_rank(block_index);
+        int local_mpi_rank = mpi_rank(index);
+      }
     }
-
-
   }
 
   // for (int64_t block = 0; block < nblocks; ++block) {
@@ -483,16 +488,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
 
   //   int nrows = opts.max_rank * nblocks_per_non_leaf;
   //   std::vector<double> pre_svd_matrix(nrows * opts.nleaf, 0);
-
-  //   // strided type for receiving data.
-  //   MPI_Datatype pre_svd_chunk;
-  //   MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &pre_svd_chunk);
-  //   MPI_Type_commit(&pre_svd_chunk);
-
-  //   // contiguous type for sending data.
-  //   MPI_Datatype send_chunk;
-  //   MPI_Type_contiguous(opts.nleaf * opts.max_rank, MPI_DOUBLE, &send_chunk);
-  //   MPI_Type_commit(&send_chunk);
 
   //   std::vector<int> sendcounts(MPISIZE, 0);
   //   for (int i = block * nblocks_per_non_leaf; i < (block+1) * nblocks_per_non_leaf; ++i) {
