@@ -1,5 +1,6 @@
 .vscode
 .dir-locals.el
+.clang_complete
 
 build
 dependencies
