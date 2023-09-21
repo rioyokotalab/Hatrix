@@ -32,18 +32,6 @@ using vec = std::vector<int64_t>;
 
 namespace {
 
-bool row_has_admissible_block(const SymmetricSharedBasisMatrix& A,
-                              const int64_t i, const int64_t level) {
-  bool has_admis = false;
-  for (int64_t j = 0; j < A.level_nblocks[level]; j++) {
-    if ((!A.is_admissible.exists(i, j, level)) || // part of upper level admissible block
-        (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level))) {
-      has_admis = true;
-    }
-  }
-  return has_admis;
-}
-
 void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& R_row,
                             RowColMap<std::vector<int64_t>>& skeleton_rows,
                             const Domain& domain, const Admissibility::CellInteractionLists& interactions,
@@ -52,8 +40,8 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& R_row,
   // Bottom up pass
   for (int64_t level = A.max_level; level >= A.min_level; level--) {
     for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
-      if (row_has_admissible_block(A, i, level)) {
-        const auto ii = domain.get_cell_index(i, level);
+      const auto ii = domain.get_cell_index(i, level);
+      if (interactions.far_particles[ii].size() > 0) {  // If row has admissible blocks
         const auto& Ci = domain.cells[ii];
         std::vector<int64_t> skeleton;
         if (level == A.max_level) {
@@ -282,6 +270,32 @@ double get_basis_avg_rank(const SymmetricSharedBasisMatrix& A,
   return sum_rank / num_bases;
 }
 
+// Return memory usage (in bytes)
+int64_t get_memory_usage(const SymmetricSharedBasisMatrix& A) {
+  int64_t mem = 0;
+  for (int64_t level = A.max_level; level >= A.min_level; level--) {
+    for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
+      if (A.U.exists(i, level)) {
+        mem += A.U(i, level).memory_used();
+      }
+      if (A.US_row.exists(i, level)) {
+        mem += A.US_row(i, level).memory_used();
+      }
+      for (auto j: A.inadmissible_cols(i, level)) {
+        if (A.D.exists(i, j, level)) {
+          mem += A.D(i, j, level).memory_used();
+        }
+      }
+      for (auto j: A.admissible_cols(i, level)) {
+        if (A.S.exists(i, j, level)) {
+          mem += A.S(i, j, level).memory_used();
+        }
+      }
+    }
+  }
+  return mem;
+}
+
 }  // namespace
 
 int main(int argc, char ** argv) {
@@ -441,17 +455,18 @@ int main(int argc, char ** argv) {
   const auto construct_min_rank = get_basis_min_rank(A);
   const auto construct_max_rank = get_basis_max_rank(A);
   const auto construct_avg_rank = get_basis_avg_rank(A);
+  const auto construct_mem = static_cast<double>(get_memory_usage(A)) * 1e-9;
 
   const std::string err_prefix = (is_rel_tol ? "rel" : "abs");
   printf("N=%" PRId64 " leaf_size=%d %s_err_tol=%.1e max_rank=%d admis=%.2lf kernel=%s geometry=%s\n"
          "sampling_algo=%s sample_local_size=%d sample_far_size=%d max_farfield_size=%" PRId64 "\n"
          "h2_height=%d construct_min_rank=%d construct_max_rank=%d construct_avg_rank=%.2lf "
-         "construct_time=%e construct_%s_err=%e\n",
+         "construct_time=%e[ms] construct_mem=%e[GB] construct_%s_err=%e\n",
          N, (int)leaf_size, err_prefix.c_str(), err_tol, (int)max_rank, admis,
          kernel_name.c_str(), geom_name.c_str(),
          sampling_algo_name.c_str(), (int)sample_local_size, (int)sample_far_size, max_farfield_size,
          (int)A.max_level, (int)construct_min_rank, (int)construct_max_rank, construct_avg_rank,
-         construct_time, err_prefix.c_str(), construct_error);
+         construct_time, construct_mem, err_prefix.c_str(), construct_error);
 
   return 0;
 }
