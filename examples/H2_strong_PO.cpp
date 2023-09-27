@@ -443,7 +443,7 @@ void partial_factorize_diagonal(SymmetricSharedBasisMatrix& A,
   if (diag_c_size > 0) {
     auto D_diag_splits = D_diag.split(vec{diag_c_size}, vec{diag_c_size});
     Matrix& D_diag_cc = D_diag_splits[0];
-    lu(D_diag_cc);
+    cholesky(D_diag_cc, Hatrix::Lower);
 
     // Lower elimination
     #pragma omp parallel for
@@ -456,10 +456,10 @@ void partial_factorize_diagonal(SymmetricSharedBasisMatrix& A,
       auto D_i_splits = D_i.split(vec{lower_c_size}, vec{diag_c_size});
       if (i > k && lower_c_size > 0) {
         Matrix& D_i_cc = D_i_splits[0];
-        solve_triangular(D_diag_cc, D_i_cc, Hatrix::Right, Hatrix::Upper, false, false);
+        solve_triangular(D_diag_cc, D_i_cc, Hatrix::Right, Hatrix::Lower, false, true);
       }
       Matrix& D_i_oc = D_i_splits[2];
-      solve_triangular(D_diag_cc, D_i_oc, Hatrix::Right, Hatrix::Upper, false, false);
+      solve_triangular(D_diag_cc, D_i_oc, Hatrix::Right, Hatrix::Lower, false, true);
     }
 
     // Right elimination
@@ -473,10 +473,10 @@ void partial_factorize_diagonal(SymmetricSharedBasisMatrix& A,
       auto D_j_splits  = D_j.split(vec{diag_c_size}, vec{right_c_size});
       if (j > k && right_c_size > 0) {
         Matrix& D_j_cc = D_j_splits[0];
-        solve_triangular(D_diag_cc, D_j_cc, Hatrix::Left, Hatrix::Lower, true, false);
+        solve_triangular(D_diag_cc, D_j_cc, Hatrix::Left, Hatrix::Lower, false, false);
       }
       Matrix& D_j_co = D_j_splits[1];
-      solve_triangular(D_diag_cc, D_j_co, Hatrix::Left, Hatrix::Lower, true, false);
+      solve_triangular(D_diag_cc, D_j_co, Hatrix::Left, Hatrix::Lower, false, false);
     }
 
     // Schur's complement into inadmissible block
@@ -757,16 +757,16 @@ void factorize_remaining_as_dense(SymmetricSharedBasisMatrix& A) {
   // Factorize remaining blocks (on min_adm_level-1) as block dense
   const auto level = A.min_adm_level - 1;
   for (int64_t k = 0; k < A.level_nblocks[level]; k++) {
-    lu(A.D(k, k, level));
+    cholesky(A.D(k, k, level), Hatrix::Lower);
     // Lower elimination
     #pragma omp parallel for
     for (int64_t i = k + 1; i < A.level_nblocks[level]; i++) {
-      solve_triangular(A.D(k, k, level), A.D(i, k, level), Hatrix::Right, Hatrix::Upper, false, false);
+      solve_triangular(A.D(k, k, level), A.D(i, k, level), Hatrix::Right, Hatrix::Lower, false, true);
     }
     // Right elimination
     #pragma omp parallel for
     for (int64_t j = k + 1; j < A.level_nblocks[level]; j++) {
-      solve_triangular(A.D(k, k, level), A.D(k, j, level), Hatrix::Left, Hatrix::Lower, true, false);
+      solve_triangular(A.D(k, k, level), A.D(k, j, level), Hatrix::Left, Hatrix::Lower, false, false);
     }
     // Schur's complement
     #pragma omp parallel for collapse(2)
@@ -889,7 +889,7 @@ void solve_forward_level(Matrix& x_level,
     auto x_k_splits = x_k.split(vec{diag_col_split}, vec{});
     // Solve forward with diagonal L
     auto L_k_splits = A.D(k, k, level).split(vec{diag_row_split}, vec{diag_col_split});
-    solve_triangular(L_k_splits[0], x_k_splits[0], Hatrix::Left, Hatrix::Lower, true, false);
+    solve_triangular(L_k_splits[0], x_k_splits[0], Hatrix::Left, Hatrix::Lower, false, false);
     // Forward substitution with oc block on the diagonal
     matmul(L_k_splits[2], x_k_splits[0], x_k_splits[1], false, false, -1.0, 1.0);
     // Forward substitution with cc and oc blocks below the diagonal
@@ -958,7 +958,7 @@ void solve_backward_level(Matrix& x_level,
     // Solve backward with diagonal L
     auto L_k_splits = A.D(k, k, level).split(vec{diag_row_split}, vec{diag_col_split});
     matmul(L_k_splits[1], x_k_splits[1], x_k_splits[0], false, false, -1.0, 1.0);
-    solve_triangular(L_k_splits[0], x_k_splits[0], Hatrix::Left, Hatrix::Upper, false, false);
+    solve_triangular(L_k_splits[0], x_k_splits[0], Hatrix::Left, Hatrix::Lower, false, true);
     // Multiply with U_F
     const Matrix U_F = prepend_complement_basis(A.U(k, level));
     x_k = matmul(U_F, x_k);
@@ -1005,7 +1005,7 @@ Matrix solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
   auto x_last_splits = x_last.split(last_row_offsets, vec{});
   // Forward with last blocks
   for (int64_t k = 0; k < last_nblocks; k++) {
-    solve_triangular(A.D(k, k, level), x_last_splits[k], Hatrix::Left, Hatrix::Lower, true, false);
+    solve_triangular(A.D(k, k, level), x_last_splits[k], Hatrix::Left, Hatrix::Lower, false, false);
     for (int64_t i = k + 1; i < last_nblocks; i++) {
       matmul(A.D(i, k, level), x_last_splits[k], x_last_splits[i], false, false, -1, 1);
     }
@@ -1015,7 +1015,7 @@ Matrix solve(const SymmetricSharedBasisMatrix& A, const Matrix& b) {
     for (int64_t j = k + 1; j < last_nblocks; j++) {
       matmul(A.D(k, j, level), x_last_splits[j], x_last_splits[k], false, false, -1, 1);
     }
-    solve_triangular(A.D(k, k, level), x_last_splits[k], Hatrix::Left, Hatrix::Upper, false, false);
+    solve_triangular(A.D(k, k, level), x_last_splits[k], Hatrix::Left, Hatrix::Lower, false, true);
   }
 
   x_splits[1] = x_last;
