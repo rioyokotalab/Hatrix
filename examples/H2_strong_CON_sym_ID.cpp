@@ -69,6 +69,16 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& R_row,
         // Fixed-accuracy with bounded rank
         rank = max_rank > 0 ? std::min(max_rank, rank) : rank;
         Ui.shrink(Ui.rows, rank);
+        // Construct right factor (skeleton rows) from ID
+        Matrix SV(rank, far_blocks.cols);
+        for (int64_t r = 0; r < rank; r++) {
+          for (int64_t c = 0; c < far_blocks.cols; c++) {
+            SV(r, c) = far_blocks(ipiv_rows[r], c);
+          }
+        }
+        Matrix Si(rank, rank);
+        Matrix Vi(rank, SV.cols);
+        rq(SV, Si, Vi);
         // Convert ipiv to node skeleton rows to be used by parent
         std::vector<int64_t> skel_rows;
         skel_rows.reserve(rank);
@@ -88,6 +98,7 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& R_row,
           triangular_matmul(R_row(child2, child_level), Ui_splits[1],
                             Hatrix::Left, Hatrix::Upper, false, false, 1);
         }
+        A.US_row.insert(i, level, matmul(Ui, Si)); // For ULV bases construction
         // Orthogonalize basis with QR
         Matrix Q(Ui.rows, Ui.cols);
         Matrix R(Ui.cols, Ui.cols);
