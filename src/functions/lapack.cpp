@@ -719,7 +719,7 @@ std::tuple<Matrix, std::vector<int64_t>> truncated_id_row(Matrix& A, int64_t ran
   return std::make_tuple(std::move(PU), std::move(skel_rows));
 }
 
-std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double eps, bool relative) {
+std::tuple<Matrix, std::vector<int64_t>> error_id_row(const Matrix& A, double eps, bool relative) {
   // Perform partial pivoted qr on A^T
   Matrix ATrans = transpose(A);
   int64_t rank;
