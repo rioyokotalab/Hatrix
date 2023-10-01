@@ -32,7 +32,7 @@ for N in 2048; do
         KERNEL_FUNC=laplace
         ADMIS_VALUE=0.3
 
-        # Laplace kernel paramters
+        # Laplace kernel parameters
         p1=1e-3
         mpirun -n 2 ./bin/H2_construct --N $N \
                --ndim $NDIM \

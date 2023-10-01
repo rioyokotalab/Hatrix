@@ -388,140 +388,72 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
                            const int64_t level,
                            const Args& opts,
                            const Domain& domain,
-                           const RowLevelMap& U_leaf_level) {
+                           const RowLevelMap& Ubig_child) {
   RowLevelMap Ubig_parent, Utransfer_temp;
 
+  const int64_t child_level = level + 1;
   const int64_t leaf_nblocks = pow(2, A.max_level);
   const int64_t nblocks = pow(2, level);
-  const int64_t nblocks_per_non_leaf = leaf_nblocks / nblocks;
+  const int64_t child_nblocks = pow(2, child_level);
+  const int64_t leaf_nblocks_per_non_leaf = leaf_nblocks / child_nblocks;
 
-  // Project the child basis onto the large block.
+  // Project the full child basis onto the large block.
+  for (int block = MPIRANK; block < child_nblocks; block += MPISIZE) {
+    const int64_t block_nrows = opts.N / child_nblocks;
+    Matrix& Ubig_child_block = Ubig_child(block, level);
+    Matrix Utransfer_temp_block(opts.max_rank, opts.nleaf);
 
-  // Accumulate the low rank block at 'level' into a block AY.
-  for (int64_t i = MPIRANK; i < leaf_nblocks; i += MPISIZE) {
-    const int64_t level_index_i = i / nblocks;
-    Matrix AY(opts.nleaf, opts.nleaf);
+    // Iterate over the columns at this level that correspond to admissible blocks.
+    for (int col = 0; col < child_nblocks; ++col) {
+      if (A.is_admissible.exists(block, col, level) &&
+          A.is_admissible(block, col, level)) {
+        // Perform the product in splits of (NB * nleaf) in order to save memory.
+        int start_leaf_block = col * leaf_nblocks_per_non_leaf;
+        int end_leaf_block = (col + 1) * leaf_nblocks_per_non_leaf;
 
-    for (int64_t j = 0; j < nblocks; ++j) {
-      if (!A.is_admissible.exists(level_index_i, j, level) ||
-          (A.is_admissible.exists(level_index_i, j, level) &&
-           A.is_admissible(level_index_i, j, level))) {
-        for (int64_t leaf_j = j * nblocks_per_non_leaf; leaf_j < (j+1) * nblocks_per_non_leaf; ++leaf_j) {
-
+        for (int slice_j = start_leaf_block; slice_j < end_leaf_block; ++slice_j) {
+          Matrix Utemp_block(block_nrows, opts.nleaf);
+          // Generate the matrix block here.
 #pragma omp parallel for collapse(2)
-          for (int64_t ii = 0; ii < opts.nleaf; ++ii) {
-            for (int64_t jj = 0; jj < opts.nleaf; ++jj) {
-              double value;
-              if (opts.kernel_verbose == "elses_c60") {
-                const int global_i = ii + 1;
-                const int global_j = jj + 1;
-#ifdef HAS_ELSES_ENABLED
-                get_elses_matrix_value(&global_i, &global_j, &value);
-#else
-                abort();
-#endif
-              }
-              else {
-                value = opts.kernel(domain.particles[ii].coords,
-                                    domain.particles[jj].coords);
-              }
+          for (int i = 0; i < block_nrows; ++i) {
+            for (int j = 0; j < opts.nleaf; ++j) {
+              int glob_i = block * block_nrows + i;
+              int glob_j = col * block_nrows + slice_j * opts.nleaf + j;
 
-              AY(ii, jj) += value;
+              Utemp_block(i, j) = opts.kernel(domain.particles[glob_i].particles,
+                                              domain.particles[glob_j].particles);
             }
           }
+
+          matmul(Ubig_child_block, Utemp_block, Utransfer_temp_block, true, false, 1, 1);
         }
-      }
-    } // for (j = 0 .. nblocks)
-
-    // Project the bases onto the accumulated block.
-    Utransfer_temp.insert(i, A.max_level, matmul(U_leaf_level(i, A.max_level), AY, true, false));
-  } // for (i = MPIRANK .. leaf_nblocks)
-
-  MPI_Group world_group;
-  MPI_Comm_group(MPI_COMM_WORLD, &world_group);
-
-  for (int64_t block = 0; block < nblocks; ++block) {
-    std::vector<int> ranks;
-    int start_index = block * nblocks_per_non_leaf;
-    int end_index = (block+1) * nblocks_per_non_leaf;
-    int limit = MPISIZE > (end_index - start_index) ? end_index : MPISIZE;
-    for (int i = start_index; i < limit; ++i) {
-      ranks.push_back(mpi_rank(i));
-    }
-
-    MPI_Group MPI_GROUP_BLOCK;
-    MPI_Group_incl(world_group, ranks.size(), ranks.data(), &MPI_GROUP_BLOCK);
-    MPI_Comm MPI_COMM_BLOCK;
-    MPI_Comm_create(MPI_COMM_WORLD, MPI_GROUP_BLOCK, &MPI_COMM_BLOCK);
-
-    int64_t nrows = opts.max_rank * nblocks_per_non_leaf;
-    std::vector<double> transfer_temp_gather_memory(nrows * opts.nleaf, 0);
-
-    // Strided type for receiving data.
-    MPI_Datatype strided_chunk;
-    MPI_Type_vector(opts.nleaf, opts.max_rank, nrows, MPI_DOUBLE, &strided_chunk);
-    MPI_Type_commit(&strided_chunk);
-
-    // Contiguous type for sending data.
-    MPI_Datatype send_chunk;
-    MPI_Type_contiguous(opts.nleaf * opts.max_rank, MPI_DOUBLE, &send_chunk);
-    MPI_Type_commit(&send_chunk);
-
-    int BLOCK_COMM_RANK, BLOCK_COMM_SIZE;
-    if (MPI_COMM_BLOCK != MPI_COMM_NULL) {
-      MPI_Comm_rank(MPI_COMM_BLOCK, &BLOCK_COMM_RANK);
-      MPI_Comm_size(MPI_COMM_BLOCK, &BLOCK_COMM_SIZE);
-
-      // TODO: This approach might fail for non-even number of processes.
-      for (int64_t index = BLOCK_COMM_RANK; index < nblocks_per_non_leaf; index += BLOCK_COMM_SIZE) {
-        int64_t block_index = index + start_index;
-        int global_mpi_rank = mpi_rank(block_index);
-        int local_mpi_rank = mpi_rank(index);
       }
     }
   }
 
-  // for (int64_t block = 0; block < nblocks; ++block) {
-  //   int root_proc = mpi_rank(block);
-  //   MPI_Group MPI_BLOCK_GROUP = groups[block];
-  //   MPI_Comm MPI_BLOCK_COMM = communicators[block];
+  // Strided type for receiving data.
+  MPI_Datatype strided_chunk;
+  MPI_Type_vector(2 * opts.max_rank, opts.nleaf, 2 * opts.max_rank, MPI_DOUBLE, &strided_chunk);
+  MPI_Type_commit(&strided_chunk);
 
-  //   int nrows = opts.max_rank * nblocks_per_non_leaf;
-  //   std::vector<double> pre_svd_matrix(nrows * opts.nleaf, 0);
+  // Contiguous type for sending data.
+  MPI_Datatype send_chunk;
+  MPI_Type_contiguous(opts.max_rank * opts.nleaf, MPI_DOUBLE, &send_chunk);
+  MPI_Type_commit(&send_chunk);
 
-  //   std::vector<int> sendcounts(MPISIZE, 0);
-  //   for (int i = block * nblocks_per_non_leaf; i < (block+1) * nblocks_per_non_leaf; ++i) {
-  //     if (mpi_rank(i) == MPIRANK) {
-  //       sendcounts[MPIRANK]++;
-  //     }
-  //   }
+  // Collate the partial transfer matrix products and generate something to do an SVD on.
+  for (int block = 0; block < child_nblocks; ++block) {
+    int block_mpi_rank = mpi_rank(block);
 
-  //   int leaf_block = block * nblocks_per_non_leaf;
-  //   int start_index = leaf_block + (MPIRANK - mpi_rank(block * nblocks_per_non_leaf));
-  //   bool send_something = start_index >= leaf_block ? true : false;
+    if (block % 2 == 0 && block_mpi_rank == MPIRANK) {
+      MPI_Recv();
+    }
+    else if (block % 2 == 1 && block_mpi_rank == MPIRANK) {
+      MPI_Isend();
+    }
+  }
 
-  //   std::vector<int> counts_recv(MPISIZE, 0);
-  //   std::vector<int> displ(MPISIZE, 0);
 
-  //   int start_displ = 0;
-  //   for (int i = leaf_block; i < leaf_block + (MPISIZE - mpi_rank(leaf_block)); ++i) {
-  //     int rank_i = mpi_rank(i);
-  //     counts_recv[rank_i]++;
-  //     displ[rank_i] = start_displ;
-  //     start_displ += counts_recv[rank_i];
-  //   }
-
-  //   if (MPI_BLOCK_COMM != MPI_COMM_NULL) {
-  //     MPI_Gatherv(Utransfer_temp(start_index, A.max_level).data_ptr,
-  //                 send_something ? 1 : 0,
-  //                 send_chunk,
-  //                 pre_svd_matrix.data(),
-  //                 counts_recv.data(),
-  //                 displ.data(),
-  //                 pre_svd_chunk,
-  //                 root_proc,
-  //                 MPI_BLOCK_COMM);
-  //   }
 
   return Ubig_parent;
 }
