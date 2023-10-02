@@ -503,6 +503,27 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   }
 
   // Obtain the big bases for 'level' from the generated transfer matrices.
+  for (int block = 0; block < nblocks; ++block) {
+    int child1 = block * 2;
+    int child2 = block * 2 + 1;
+    int child_nrows = opts.N / child_nblocks;
+
+    // Send the child2 bases to the basis with child1.
+    if (mpi_rank(child2) == MPIRANK) {
+      MPI_Request request;
+      MPI_Isend(Ubig_child(child2, child_level),
+                child_nrows * opts.max_rank, MPI_DOUBLE,
+                mpi_rank(child1), child1, MPI_COMM_WORLD, &request);
+    }
+    if (mpi_rank(child1) == MPIRANK) {
+      MPI_Status status;
+      Matrix Ubig_child2(child_nrows, opts.max_rank);
+
+      MPI_Recv(Ubig_child2.data_ptr, child_nrows * opts.max_rank,
+               MPI_DOUBLE, mpi_rank(child2), child1, MPI_COMM_WORLD,
+               &status);
+    }
+  }
 
   return Ubig_parent;
 }

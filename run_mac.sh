@@ -2,7 +2,7 @@
 
 PARSEC_PATH=/Users/sameer/gitrepos/parsec/install
 
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PARSEC_PATH/lib/pkgconfig:/Users/sameer/gitrepos/gsl-2.7.1/build/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PARSEC_PATH/lib/pkgconfig:/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib/pkgconfig
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PARSEC_PATH/lib
 export PATH=$PARSEC_PATH/bin:$PATH
 
