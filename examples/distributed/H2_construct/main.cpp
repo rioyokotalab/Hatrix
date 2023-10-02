@@ -429,11 +429,13 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
         }
       }
     }
+
+    Utransfer_temp.insert(block, level, std::move(Utransfer_temp));
   }
 
   // Strided type for receiving data.
   MPI_Datatype strided_chunk;
-  MPI_Type_vector(2 * opts.max_rank, opts.nleaf, 2 * opts.max_rank, MPI_DOUBLE, &strided_chunk);
+  MPI_Type_vector(opts.max_rank, opts.nleaf, 2 * opts.max_rank, MPI_DOUBLE, &strided_chunk);
   MPI_Type_commit(&strided_chunk);
 
   // Contiguous type for sending data.
@@ -441,19 +443,66 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
   MPI_Type_contiguous(opts.max_rank * opts.nleaf, MPI_DOUBLE, &send_chunk);
   MPI_Type_commit(&send_chunk);
 
+  // Temp storage for Utransfer matrix.
+  RowLevelMap Utransfer;
+
   // Collate the partial transfer matrix products and generate something to do an SVD on.
   for (int block = 0; block < child_nblocks; ++block) {
     int block_mpi_rank = mpi_rank(block);
 
     if (block % 2 == 0 && block_mpi_rank == MPIRANK) {
-      MPI_Recv();
+      Matrix Utransfer_pre_svd(opts.max_rank * 2, opts.nleaf);
+      MPI_Status status;
+
+      for (int i = 0; i < opts.max_rank; ++i) {
+        for (int j = 0; j < opts.nleaf; ++j) {
+          Utransfer_pre_svd(i, j) = Utransfer_temp(block, level)(i, j);
+        }
+      }
+
+      // Receive the block here and then perform an SVD.
+      MPI_Recv(Utransfer_pre_svd.data_ptr + opts.max_rank,
+               1, strided_chunk, mpi_rank(block+1), block+1,
+               MPI_COMM_WORLD, &status);
+
+      Matrix U_block, S_block, _V;
+      double error;
+      std::tie(U_block, S_block, _V, error) =
+        truncated_svd(Utransfer_pre_svd, opts.max_rank);
+
+      // Save the generated transfer matrix temporarily.
+      Utransfer.insert(block, level, std::move(U_block));
     }
     else if (block % 2 == 1 && block_mpi_rank == MPIRANK) {
-      MPI_Isend();
+      MPI_Request request;
+      MPI_Isend(Utransfer_temp(block, level).data_ptr,
+                1, send_chunk, mpi_rank(block-1), block,
+                MPI_COMM_WORLD, &request);
     }
   }
 
+  // Put the transfer matrices on the correct processes.
+  for (int block = 0; block < child_nblocks; ++block) {
+    int block_mpi_rank = mpi_rank(block);
 
+    if (block % 2 == 0 && block_mpi_rank == MPIRANK) {
+      MPI_Request request;
+      MPI_Isend(Utransfer(block, level).data_ptr,
+                2 * opts.max_rank * opts.max_rank, MPI_DOUBLE,
+                mpi_rank(block/2), block/2, MPI_COMM_WORLD, &request);
+    }
+  }
+
+  for (int block = 0; block < nblocks; ++block) {
+    MPI_Status status;
+    int block_mpi_rank = mpi_rank(block);
+    Matrix Utransfer_block(2 * opts.max_rank, opts.max_rank);
+
+    MPI_Recv(Utransfer_block.data_ptr, 2 * opts.max_rank * opts.max_rank,
+             MPI_DOUBLE, mpi_rank(block), MPI_COMM_WORLD, &status);
+  }
+
+  // Obtain the big bases for 'level' from the generated transfer matrices.
 
   return Ubig_parent;
 }
