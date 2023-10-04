@@ -32,32 +32,39 @@ using vec = std::vector<int64_t>;
 
 namespace {
 
-void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& R_row,
-                            RowColMap<std::vector<int64_t>>& skeleton_rows,
-                            const Domain& domain, const Admissibility::CellInteractionLists& interactions,
+std::vector<int64_t> get_skeleton_particles(const SymmetricSharedBasisMatrix& A,
+                                            const Domain& domain,
+                                            const int64_t i, const int64_t level) {
+  std::vector<int64_t> skeleton;
+  if (level == A.max_level) {
+    // Leaf level: use all bodies as skeleton
+    const auto& Ci = domain.cells[domain.get_cell_index(i, level)];
+    skeleton = Ci.get_bodies();
+  }
+  else {
+    // Non-leaf level: gather children's multipoles
+    const auto child_level = level + 1;
+    const auto child1 = 2 * i + 0;
+    const auto child2 = 2 * i + 1;
+    const auto& child1_multipoles = A.multipoles(child1, child_level);
+    const auto& child2_multipoles = A.multipoles(child2, child_level);
+    skeleton.insert(skeleton.end(), child1_multipoles.begin(), child1_multipoles.end());
+    skeleton.insert(skeleton.end(), child2_multipoles.begin(), child2_multipoles.end());
+  }
+  return skeleton;
+}
+
+void generate_cluster_bases(SymmetricSharedBasisMatrix& A,
+                            const Domain& domain,
+                            const Admissibility::CellInteractionLists& interactions,
                             const double err_tol, const int64_t max_rank,
                             const bool is_rel_tol) {
   // Bottom up pass
-  for (int64_t level = A.max_level; level >= A.min_level; level--) {
+  for (int64_t level = A.max_level; level >= A.min_adm_level; level--) {
     for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
       const auto ii = domain.get_cell_index(i, level);
       if (interactions.far_particles[ii].size() > 0) {  // If row has admissible blocks
-        const auto& Ci = domain.cells[ii];
-        std::vector<int64_t> skeleton;
-        if (level == A.max_level) {
-          // Leaf level: use all bodies as skeleton
-          skeleton = Ci.get_bodies();
-        }
-        else {
-          // Non-leaf level: gather children's skeleton
-          const auto child_level = level + 1;
-          const auto child1 = 2 * i + 0;
-          const auto child2 = 2 * i + 1;
-          const auto& child1_skeleton = skeleton_rows(child1, child_level);
-          const auto& child2_skeleton = skeleton_rows(child2, child_level);
-          skeleton.insert(skeleton.end(), child1_skeleton.begin(), child1_skeleton.end());
-          skeleton.insert(skeleton.end(), child2_skeleton.begin(), child2_skeleton.end());
-        }
+        const auto skeleton = get_skeleton_particles(A, domain, i, level);
         // Key to order N complexity is here:
         // The size of far_blocks is always constant: rank x sample_size
         Matrix far_blocks = generate_p2p_matrix(domain, skeleton, interactions.far_particles[ii]);
@@ -69,7 +76,7 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& R_row,
         // Fixed-accuracy with bounded rank
         rank = max_rank > 0 ? std::min(max_rank, rank) : rank;
         Ui.shrink(Ui.rows, rank);
-        // Construct right factor (skeleton rows) from ID
+        // Construct right factor (skeleton rows) from Interpolative Decomposition (ID)
         Matrix SV(rank, far_blocks.cols);
         for (int64_t r = 0; r < rank; r++) {
           for (int64_t c = 0; c < far_blocks.cols; c++) {
@@ -79,55 +86,64 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& R_row,
         Matrix Si(rank, rank);
         Matrix Vi(rank, SV.cols);
         rq(SV, Si, Vi);
-        // Convert ipiv to node skeleton rows to be used by parent
-        std::vector<int64_t> skel_rows;
-        skel_rows.reserve(rank);
+        // Convert ipiv to multipoles to be used by parent
+        std::vector<int64_t> multipoles_i;
+        multipoles_i.reserve(rank);
         for (int64_t j = 0; j < rank; j++) {
-          skel_rows.push_back(skeleton[ipiv_rows[j]]);
+          multipoles_i.push_back(skeleton[ipiv_rows[j]]);
         }
         // Multiply U with child R
         if (level < A.max_level) {
           const auto child_level = level + 1;
           const auto child1 = 2 * i + 0;
           const auto child2 = 2 * i + 1;
-          const auto& child1_skeleton = skeleton_rows(child1, child_level);
-          const auto& child2_skeleton = skeleton_rows(child2, child_level);
-          auto Ui_splits = Ui.split(vec{(int64_t)child1_skeleton.size()}, {});
-          triangular_matmul(R_row(child1, child_level), Ui_splits[0],
+          const auto& child1_multipoles = A.multipoles(child1, child_level);
+          auto Ui_splits = Ui.split(vec{(int64_t)child1_multipoles.size()}, {});
+          triangular_matmul(A.R_row(child1, child_level), Ui_splits[0],
                             Hatrix::Left, Hatrix::Upper, false, false, 1);
-          triangular_matmul(R_row(child2, child_level), Ui_splits[1],
+          triangular_matmul(A.R_row(child2, child_level), Ui_splits[1],
                             Hatrix::Left, Hatrix::Upper, false, false, 1);
         }
-        A.US_row.insert(i, level, matmul(Ui, Si)); // For ULV bases construction
         // Orthogonalize basis with QR
-        Matrix Q(Ui.rows, Ui.cols);
-        Matrix R(Ui.cols, Ui.cols);
-        qr(Ui, Q, R);
-        A.U.insert(i, level, std::move(Q));
-        R_row.insert(i, level, std::move(R));
-        skeleton_rows.insert(i, level, std::move(skel_rows));
+        Matrix Q(Ui.rows, Ui.rows);
+        Matrix R(Ui.rows, rank);
+        Matrix Ui_copy(Ui);
+        qr(Ui_copy, Q, R);
+        // Separate Q into original and complement part
+        auto Q_splits = Q.split(vec{}, vec{rank});
+        Matrix Qo(Q_splits[0], true);
+        Matrix Qc = rank < Ui.rows ? Matrix(Q_splits[1], true) : Matrix(Ui.rows, 0);
+        R.shrink(rank, rank);
+        // Insert
+        A.U.insert(i, level, std::move(Qo));
+        A.Uc.insert(i, level, std::move(Qc));
+        A.US_row.insert(i, level, matmul(Ui, Si));  // for ULV update basis operation
+        A.R_row.insert(i, level, std::move(R));
+        A.multipoles.insert(i, level, std::move(multipoles_i));
       }
     }
   }
 }
 
-void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A, const RowLevelMap& R_row,
-                                    const RowColMap<std::vector<int64_t>>& skeleton_rows,
+void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A,
+                                    const Domain& domain, const int64_t level) {
+  for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
+    for (int64_t j: A.admissible_cols(i, level)) {
+      Matrix Sij = generate_p2p_matrix(domain, A.multipoles(i, level), A.multipoles(j, level));
+      // Multiply with R from left and right
+      triangular_matmul(A.R_row(i, level), Sij,
+                        Hatrix::Left, Hatrix::Upper, false, false, 1);
+      triangular_matmul(A.R_row(j, level), Sij,
+                        Hatrix::Right, Hatrix::Upper, true, false, 1);
+      A.S.insert(i, j, level, std::move(Sij));
+    }
+  }
+}
+
+void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A,
                                     const Domain& domain) {
   for (int64_t level = A.max_level; level >= A.min_adm_level; level--) {
-    for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
-      for (int64_t j: A.admissible_cols(i, level)) {
-        const auto& skeleton_i = skeleton_rows(i, level);
-        const auto& skeleton_j = skeleton_rows(j, level);
-        Matrix skeleton_matrix = generate_p2p_matrix(domain, skeleton_i, skeleton_j);
-        // Multiply with R from left and right
-        triangular_matmul(R_row(i, level), skeleton_matrix,
-                          Hatrix::Left, Hatrix::Upper, false, false, 1);
-        triangular_matmul(R_row(j, level), skeleton_matrix,
-                          Hatrix::Right, Hatrix::Upper, true, false, 1);
-        A.S.insert(i, j, level, std::move(skeleton_matrix));
-      }
-    }
+    generate_far_coupling_matrices(A, domain, level);
   }
 }
 
@@ -144,14 +160,14 @@ void generate_near_coupling_matrices(SymmetricSharedBasisMatrix& A,
   }
 }
 
-int64_t construct_H2(SymmetricSharedBasisMatrix& A,
-                     const Domain& domain, const double admis,
-                     const double err_tol, const int64_t max_rank,
-                     const int64_t sampling_algo,
-                     const int64_t sample_local_size, const int64_t sample_far_size,
-                     const bool is_rel_tol = false) {
+void construct_H2(SymmetricSharedBasisMatrix& A,
+                  Admissibility::CellInteractionLists& interactions,
+                  const Domain& domain, const double admis,
+                  const double err_tol, const int64_t max_rank,
+                  const int64_t sampling_algo,
+                  const int64_t sample_local_size, const int64_t sample_far_size,
+                  const bool is_rel_tol = false) {
   // Initialize cell interactions for admissibility
-  Admissibility::CellInteractionLists interactions;
   Admissibility::build_cell_interactions(interactions, domain, admis);
   Admissibility::assemble_farfields_sample(interactions, domain,
                                            sampling_algo, sample_local_size, sample_far_size);
@@ -159,17 +175,9 @@ int64_t construct_H2(SymmetricSharedBasisMatrix& A,
   Admissibility::init_block_structure(A, domain);
   Admissibility::init_geometry_admissibility(A, interactions, domain, admis);
   // Generate cluster bases and coupling matrices
-  RowLevelMap R_row;
-  RowColMap<std::vector<int64_t>> skeleton_rows;
-  generate_cluster_bases(A, R_row, skeleton_rows, domain, interactions, err_tol, max_rank, is_rel_tol);
-  generate_far_coupling_matrices(A, R_row, skeleton_rows, domain);
+  generate_cluster_bases(A, domain, interactions, err_tol, max_rank, is_rel_tol);
+  generate_far_coupling_matrices(A, domain);
   generate_near_coupling_matrices(A, domain);
-  // Count maximum farfield size
-  int64_t max_farfield_size = -1;
-  for (const auto& farfield: interactions.far_particles) {
-    max_farfield_size = std::max(max_farfield_size, (int64_t)farfield.size());
-  }
-  return max_farfield_size;
 }
 
 Matrix get_Ubig(const SymmetricSharedBasisMatrix& A,
@@ -454,14 +462,18 @@ int main(int argc, char ** argv) {
   }
 
   SymmetricSharedBasisMatrix A;
+  Admissibility::CellInteractionLists interactions;
   const auto start_construct = std::chrono::system_clock::now();
-  const auto max_farfield_size = construct_H2(
-      A, domain, admis, err_tol, max_rank,
-      sampling_algo, sample_local_size, sample_far_size, is_rel_tol);
+  construct_H2(A, interactions, domain, admis, err_tol, max_rank,
+               sampling_algo, sample_local_size, sample_far_size, is_rel_tol);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                 (stop_construct - start_construct).count();
-
+  // Count maximum farfield size in interaction lists
+  int64_t max_farfield_size = -1;
+  for (const auto& farfield: interactions.far_particles) {
+    max_farfield_size = std::max(max_farfield_size, (int64_t)farfield.size());
+  }
   const auto construct_error = construction_error(A, domain, is_rel_tol);
   const auto construct_min_rank = get_basis_min_rank(A);
   const auto construct_max_rank = get_basis_max_rank(A);
