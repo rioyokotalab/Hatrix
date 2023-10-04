@@ -44,6 +44,10 @@ Matrix cholesky_solve(const Matrix& A, const Matrix& b, const Mode uplo);
 // Compute the in-place non-pivoted LDLT factorization of A.
 void ldl(Matrix& A);
 
+void pivoted_ldl(Matrix& A, std::vector<int>& ipiv);
+
+void pivoted_ldl_solve(const Matrix& A, const std::vector<int>& ipiv, Matrix& B);
+
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
 // Return <Q, pivots>

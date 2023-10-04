@@ -167,6 +167,17 @@ void ldl(Matrix& A) {
   }
 }
 
+void pivoted_ldl(Matrix& A, std::vector<int>& ipiv) {
+  assert(A.rows == A.cols);
+  ipiv.resize(A.rows);
+  LAPACKE_dsytrf(LAPACK_COL_MAJOR, 'L', A.rows, &A, A.stride, ipiv.data());
+}
+
+void pivoted_ldl_solve(const Matrix& A, const std::vector<int>& ipiv, Matrix& B) {
+  assert(A.cols == B.rows);
+  LAPACKE_dsytrs(LAPACK_COL_MAJOR, 'L', A.rows, B.cols, &A, A.stride, ipiv.data(), &B, B.stride);
+}
+
 
 void qr(Matrix& A, Matrix& Q, Matrix& R) {
   // check dimensions
