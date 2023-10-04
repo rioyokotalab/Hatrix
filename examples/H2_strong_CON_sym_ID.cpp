@@ -61,6 +61,7 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A,
                             const bool is_rel_tol) {
   // Bottom up pass
   for (int64_t level = A.max_level; level >= A.min_adm_level; level--) {
+    #pragma omp parallel for
     for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
       const auto ii = domain.get_cell_index(i, level);
       if (interactions.far_particles[ii].size() > 0) {  // If row has admissible blocks
@@ -115,11 +116,14 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A,
         Matrix Qc = rank < Ui.rows ? Matrix(Q_splits[1], true) : Matrix(Ui.rows, 0);
         R.shrink(rank, rank);
         // Insert
-        A.U.insert(i, level, std::move(Qo));
-        A.Uc.insert(i, level, std::move(Qc));
-        A.US_row.insert(i, level, matmul(Ui, Si));  // for ULV update basis operation
-        A.R_row.insert(i, level, std::move(R));
-        A.multipoles.insert(i, level, std::move(multipoles_i));
+        #pragma omp critical
+        {
+          A.U.insert(i, level, std::move(Qo));
+          A.Uc.insert(i, level, std::move(Qc));
+          A.US_row.insert(i, level, matmul(Ui, Si));  // for ULV update basis operation
+          A.R_row.insert(i, level, std::move(R));
+          A.multipoles.insert(i, level, std::move(multipoles_i));
+        }
       }
     }
   }
@@ -127,6 +131,7 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A,
 
 void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A,
                                     const Domain& domain, const int64_t level) {
+  #pragma omp parallel for
   for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
     for (int64_t j: A.admissible_cols(i, level)) {
       Matrix Sij = generate_p2p_matrix(domain, A.multipoles(i, level), A.multipoles(j, level));
@@ -135,7 +140,10 @@ void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A,
                         Hatrix::Left, Hatrix::Upper, false, false, 1);
       triangular_matmul(A.R_row(j, level), Sij,
                         Hatrix::Right, Hatrix::Upper, true, false, 1);
-      A.S.insert(i, j, level, std::move(Sij));
+      #pragma omp critical
+      {
+        A.S.insert(i, j, level, std::move(Sij));
+      }
     }
   }
 }
@@ -150,12 +158,16 @@ void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A,
 void generate_near_coupling_matrices(SymmetricSharedBasisMatrix& A,
                                      const Domain& domain) {
   const int64_t level = A.max_level;  // Only generate inadmissible leaf blocks
+  #pragma omp parallel for
   for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
     for (int64_t j: A.inadmissible_cols(i, level)) {
-      A.D.insert(i, j, level,
-                 generate_p2p_matrix(domain,
-                                     domain.get_cell_index(i, level),
-                                     domain.get_cell_index(j, level)));
+      Matrix Dij = generate_p2p_matrix(domain,
+                                       domain.get_cell_index(i, level),
+                                       domain.get_cell_index(j, level));
+      #pragma omp critical
+      {
+        A.D.insert(i, j, level, std::move(Dij));
+      }
     }
   }
 }

@@ -62,6 +62,7 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A,
                             const bool is_rel_tol) {
   // Bottom up pass
   for (int64_t level = A.max_level; level >= A.min_adm_level; level--) {
+    #pragma omp parallel for
     for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
       const auto ii = domain.get_cell_index(i, level);
       if (interactions.far_particles[ii].size() > 0) {  // If row has admissible blocks
@@ -116,11 +117,14 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A,
         Matrix Qc = rank < Ui.rows ? Matrix(Q_splits[1], true) : Matrix(Ui.rows, 0);
         R.shrink(rank, rank);
         // Insert
-        A.U.insert(i, level, std::move(Qo));
-        A.Uc.insert(i, level, std::move(Qc));
-        A.US_row.insert(i, level, matmul(Ui, Si));  // for ULV update basis operation
-        A.R_row.insert(i, level, std::move(R));
-        A.multipoles.insert(i, level, std::move(multipoles_i));
+        #pragma omp critical
+        {
+          A.U.insert(i, level, std::move(Qo));
+          A.Uc.insert(i, level, std::move(Qc));
+          A.US_row.insert(i, level, matmul(Ui, Si));  // for ULV update basis operation
+          A.R_row.insert(i, level, std::move(R));
+          A.multipoles.insert(i, level, std::move(multipoles_i));
+        }
       }
     }
   }
@@ -128,6 +132,7 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A,
 
 void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A,
                                     const Domain& domain, const int64_t level) {
+  #pragma omp parallel for
   for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
     for (int64_t j: A.admissible_cols(i, level)) {
       Matrix Sij = generate_p2p_matrix(domain, A.multipoles(i, level), A.multipoles(j, level));
@@ -136,7 +141,10 @@ void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A,
                         Hatrix::Left, Hatrix::Upper, false, false, 1);
       triangular_matmul(A.R_row(j, level), Sij,
                         Hatrix::Right, Hatrix::Upper, true, false, 1);
-      A.S.insert(i, j, level, std::move(Sij));
+      #pragma omp critical
+      {
+        A.S.insert(i, j, level, std::move(Sij));
+      }
     }
   }
 }
@@ -151,12 +159,16 @@ void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A,
 void generate_near_coupling_matrices(SymmetricSharedBasisMatrix& A,
                                      const Domain& domain) {
   const int64_t level = A.max_level;  // Only generate inadmissible leaf blocks
+  #pragma omp parallel for
   for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
     for (int64_t j: A.inadmissible_cols(i, level)) {
-      A.D.insert(i, j, level,
-                 generate_p2p_matrix(domain,
-                                     domain.get_cell_index(i, level),
-                                     domain.get_cell_index(j, level)));
+      Matrix Dij = generate_p2p_matrix(domain,
+                                       domain.get_cell_index(i, level),
+                                       domain.get_cell_index(j, level));
+      #pragma omp critical
+      {
+        A.D.insert(i, j, level, std::move(Dij));
+      }
     }
   }
 }
@@ -329,6 +341,7 @@ void precompute_fill_in(const SymmetricSharedBasisMatrix& A,
                         RowColLevelMap<Matrix>& F,
                         RowColMap<std::vector<int64_t>>& fill_in_cols,
                         const Domain& domain, const int64_t level) {
+  #pragma omp parallel for
   for (int64_t k = 0; k < A.level_nblocks[level]; k++) {
     Matrix Dkk = get_skeleton_matrix(A, domain, k, k, level);
     cholesky(Dkk, Hatrix::Lower);
@@ -339,8 +352,11 @@ void precompute_fill_in(const SymmetricSharedBasisMatrix& A,
         Matrix Dkj = get_skeleton_matrix(A, domain, k, j, level);
         solve_triangular(Dkk, Dkj, Hatrix::Left, Hatrix::Lower, false, false, 1);
         solve_triangular(Dkk, Dkj, Hatrix::Left, Hatrix::Lower, false, true,  1);
-        F.insert(j, k, level, transpose(Dkj));
-        fill_in_cols(j, level).push_back(k);
+        #pragma omp critical
+        {
+          F.insert(j, k, level, transpose(Dkj));
+          fill_in_cols(j, level).push_back(k);
+        }
       }
     }
   }
@@ -354,6 +370,7 @@ void generate_composite_bases(SymmetricSharedBasisMatrix& A,
                               const int64_t level,
                               const double err_tol, const int64_t max_rank,
                               const bool is_rel_tol) {
+  #pragma omp parallel for
   for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
     const bool has_fill_in = (fill_in_cols(i, level).size() > 0);
     if (has_fill_in) {
@@ -414,48 +431,31 @@ void generate_composite_bases(SymmetricSharedBasisMatrix& A,
       Matrix Qo(Q_splits[0], true);
       Matrix Qc = rank < Ui.rows ? Matrix(Q_splits[1], true) : Matrix(Ui.rows, 0);
       R.shrink(rank, rank);
-      // Erase existing
-      A.U.erase(i, level);
-      A.Uc.erase(i, level);
-      A.R_row.erase(i, level);
-      A.multipoles.erase(i, level);
-      // Insert new
-      A.U.insert(i, level, std::move(Qo));
-      A.Uc.insert(i, level, std::move(Qc));
-      A.R_row.insert(i, level, std::move(R));
-      A.multipoles.insert(i, level, std::move(multipoles_i));
+      #pragma omp critical
+      {
+        // Erase existing
+        A.U.erase(i, level);
+        A.Uc.erase(i, level);
+        A.R_row.erase(i, level);
+        A.multipoles.erase(i, level);
+        // Insert new
+        A.U.insert(i, level, std::move(Qo));
+        A.Uc.insert(i, level, std::move(Qc));
+        A.R_row.insert(i, level, std::move(R));
+        A.multipoles.insert(i, level, std::move(multipoles_i));
+      }
     }
   }
 }
 
 void apply_UF(SymmetricSharedBasisMatrix& A,
               const int64_t k, const int64_t level) {
-  Matrix U_F = concat(A.Uc(k, level), A.U(k, level), 1);
-  // Multiply to dense blocks along the row
-  for (int64_t idx_j = 0; idx_j < A.inadmissible_cols(k, level).size(); idx_j++) {
-    const auto j = A.inadmissible_cols(k, level)[idx_j];
-    if (j < k) {
-      // Do not touch the eliminated part (cc and oc)
-      const auto left_col_split = A.D(k, j, level).cols - A.U(j, level).cols;
-      auto D_splits = A.D(k, j, level).split(vec{}, vec{left_col_split});
-      D_splits[1] = matmul(U_F, D_splits[1], true);
-    }
-    else {
-      A.D(k, j, level) = matmul(U_F, A.D(k, j, level), true);
-    }
-  }
-  // Multiply to dense blocks along the column
+  const Matrix UF_k = concat(A.Uc(k, level), A.U(k, level), 1);
+  // Multiply from both sides to dense blocks along the column
   for (int64_t idx_i = 0; idx_i < A.inadmissible_cols(k, level).size(); idx_i++) {
     const auto i = A.inadmissible_cols(k, level)[idx_i];
-    if (i < k) {
-      // Do not touch the eliminated part (cc and co)
-      const auto top_row_split = A.D(i, k, level).rows - A.U(i, level).cols;
-      auto D_splits = A.D(i, k, level).split(vec{top_row_split}, vec{});
-      D_splits[1] = matmul(D_splits[1], U_F);
-    }
-    else {
-      A.D(i, k, level) = matmul(A.D(i, k, level), U_F);
-    }
+    const Matrix UF_i = concat(A.Uc(i, level), A.U(i, level), 1);
+    A.D(i, k, level) = matmul(UF_i, matmul(A.D(i, k, level), UF_k), true, false);
   }
 }
 
@@ -533,6 +533,7 @@ void permute_and_merge(SymmetricSharedBasisMatrix& A,
 
 void factorize_level(SymmetricSharedBasisMatrix& A,
                      const int64_t level) {
+  #pragma omp parallel for
   for (int64_t k = 0; k < A.level_nblocks[level]; k++) {
     apply_UF(A, k, level);
     partial_factorize_diagonal(A, k, level);

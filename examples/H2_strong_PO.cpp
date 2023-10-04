@@ -40,6 +40,7 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& Ubig,
                             const bool is_rel_tol) {
   // Bottom up pass
   for (int64_t level = A.max_level; level >= A.min_level; level--) {
+    #pragma omp parallel for
     for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
       const auto ii = domain.get_cell_index(i, level);
       if (interactions.far_particles[ii].size() > 0) {  // If row has admissible blocks
@@ -58,12 +59,16 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& Ubig,
           auto Ui_splits = Ui.split(vec{}, vec{rank});
           Matrix Uo(Ui_splits[0], true);  // Deep-copy
           Matrix Uc = rank < Ui.rows ? Matrix(Ui_splits[1], true) : Matrix(Ui.rows, 0);
-          A.U.insert(i, level, std::move(Uo));
-          A.Uc.insert(i, level, std::move(Uc));
-          A.US_row.insert(i, level, matmul(Ui, Si)); // Save full basis for ULV update basis operation
           // Save actual basis (Ubig) for upper level bases construction
-          Matrix Ubig_i(A.U(i, level));
-          Ubig.insert(i, level, std::move(Ubig_i));
+          Matrix Ubig_i(Uo);
+          // Insert
+          #pragma omp critical
+          {
+            A.U.insert(i, level, std::move(Uo));
+            A.Uc.insert(i, level, std::move(Uc));
+            A.US_row.insert(i, level, matmul(Ui, Si)); // Save full basis for ULV update basis operation
+            Ubig.insert(i, level, std::move(Ubig_i));
+          }
         }
         else {
           // Non-leaf level: project with children's bases then SVD to generate transfer matrix
@@ -87,16 +92,20 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& Ubig,
           auto Ui_splits = Ui.split(vec{}, vec{rank});
           Matrix Uo(Ui_splits[0], true);  // Deep-copy
           Matrix Uc = rank < Ui.rows ? Matrix(Ui_splits[1], true) : Matrix(Ui.rows, 0);
-          A.U.insert(i, level, std::move(Uo));
-          A.Uc.insert(i, level, std::move(Uc));
-          A.US_row.insert(i, level, matmul(Ui, Si)); // Save full basis for ULV update basis operation
           // Save actual basis (Ubig) for upper level bases construction
-          Matrix Ubig_i(Ubig_child1.rows + Ubig_child2.rows, A.U(i, level).cols);
-          auto Uo_splits = A.U(i, level).split(vec{Ubig_child1.cols}, {});
+          Matrix Ubig_i(Ubig_child1.rows + Ubig_child2.rows, Uo.cols);
+          auto Uo_splits = Uo.split(vec{Ubig_child1.cols}, {});
           auto Ubig_i_splits = Ubig_i.split(vec{Ubig_child1.rows}, {});
           matmul(Ubig_child1, Uo_splits[0], Ubig_i_splits[0]);
           matmul(Ubig_child2, Uo_splits[1], Ubig_i_splits[1]);
-          Ubig.insert(i, level, std::move(Ubig_i));
+          // Insert
+          #pragma omp critical
+          {
+            A.U.insert(i, level, std::move(Uo));
+            A.Uc.insert(i, level, std::move(Uc));
+            A.US_row.insert(i, level, matmul(Ui, Si)); // Save full basis for ULV update basis operation
+            Ubig.insert(i, level, std::move(Ubig_i));
+          }
         }
       }
     }
@@ -106,13 +115,17 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& Ubig,
 void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A, const RowLevelMap& Ubig,
                                     const Domain& domain) {
   for (int64_t level = A.max_level; level >= A.min_adm_level; level--) {
+    #pragma omp parallel for
     for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
       for (int64_t j: A.admissible_cols(i, level)) {
         const Matrix Dij = generate_p2p_matrix(domain,
                                                domain.get_cell_index(i, level),
                                                domain.get_cell_index(j, level));
-        A.S.insert(i, j, level,
-                   matmul(matmul(Ubig(i, level), Dij, true, false), Ubig(j, level)));
+        Matrix Sij = matmul(matmul(Ubig(i, level), Dij, true, false), Ubig(j, level));
+        #pragma omp critical
+        {
+          A.S.insert(i, j, level, std::move(Sij));
+        }
       }
     }
   }
@@ -121,12 +134,16 @@ void generate_far_coupling_matrices(SymmetricSharedBasisMatrix& A, const RowLeve
 void generate_near_coupling_matrices(SymmetricSharedBasisMatrix& A,
                                      const Domain& domain) {
   const int64_t level = A.max_level;  // Only generate inadmissible leaf blocks
+  #pragma omp parallel for
   for (int64_t i = 0; i < A.level_nblocks[level]; i++) {
     for (int64_t j: A.inadmissible_cols(i, level)) {
-      A.D.insert(i, j, level,
-                 generate_p2p_matrix(domain,
-                                     domain.get_cell_index(i, level),
-                                     domain.get_cell_index(j, level)));
+      Matrix Dij = generate_p2p_matrix(domain,
+                                       domain.get_cell_index(i, level),
+                                       domain.get_cell_index(j, level));
+      #pragma omp critical
+      {
+        A.D.insert(i, j, level, std::move(Dij));
+      }
     }
   }
 }
