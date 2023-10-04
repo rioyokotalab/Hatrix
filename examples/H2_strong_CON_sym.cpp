@@ -51,11 +51,15 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& Ubig,
           Matrix Ui, Si, Vi;
           int64_t rank;
           std::tie(Ui, Si, Vi, rank) = error_svd(far_blocks, err_tol, is_rel_tol, false);
-          A.US_row.insert(i, level, matmul(Ui, Si)); // Save full basis for ULV update basis operation
           // Fixed-accuracy with bounded rank
           rank = max_rank > 0 ? std::min(max_rank, rank) : rank;
-          Ui.shrink(Ui.rows, rank);
-          A.U.insert(i, level, std::move(Ui));
+          // Separate U into original and complement part
+          auto Ui_splits = Ui.split(vec{}, vec{rank});
+          Matrix Uo(Ui_splits[0], true);  // Deep-copy
+          Matrix Uc = rank < Ui.rows ? Matrix(Ui_splits[1], true) : Matrix(Ui.rows, 0);
+          A.U.insert(i, level, std::move(Uo));
+          A.Uc.insert(i, level, std::move(Uc));
+          A.US_row.insert(i, level, matmul(Ui, Si)); // Save full basis for ULV update basis operation
           // Save actual basis (Ubig) for upper level bases construction
           Matrix Ubig_i(A.U(i, level));
           Ubig.insert(i, level, std::move(Ubig_i));
@@ -76,17 +80,21 @@ void generate_cluster_bases(SymmetricSharedBasisMatrix& A, RowLevelMap& Ubig,
           Matrix Ui, Si, Vi;
           int64_t rank;
           std::tie(Ui, Si, Vi, rank) = error_svd(proj_far_blocks, err_tol, is_rel_tol, false);
-          A.US_row.insert(i, level, matmul(Ui, Si)); // Save full basis for ULV update basis operation
           // Fixed-accuracy with bounded rank
           rank = max_rank > 0 ? std::min(max_rank, rank) : rank;
-          Ui.shrink(Ui.rows, rank);
-          A.U.insert(i, level, std::move(Ui));
+          // Separate U into original and complement part
+          auto Ui_splits = Ui.split(vec{}, vec{rank});
+          Matrix Uo(Ui_splits[0], true);  // Deep-copy
+          Matrix Uc = rank < Ui.rows ? Matrix(Ui_splits[1], true) : Matrix(Ui.rows, 0);
+          A.U.insert(i, level, std::move(Uo));
+          A.Uc.insert(i, level, std::move(Uc));
+          A.US_row.insert(i, level, matmul(Ui, Si)); // Save full basis for ULV update basis operation
           // Save actual basis (Ubig) for upper level bases construction
           Matrix Ubig_i(Ubig_child1.rows + Ubig_child2.rows, A.U(i, level).cols);
-          auto Ui_splits = A.U(i, level).split(vec{Ubig_child1.cols}, {});
+          auto Uo_splits = A.U(i, level).split(vec{Ubig_child1.cols}, {});
           auto Ubig_i_splits = Ubig_i.split(vec{Ubig_child1.rows}, {});
-          matmul(Ubig_child1, Ui_splits[0], Ubig_i_splits[0]);
-          matmul(Ubig_child2, Ui_splits[1], Ubig_i_splits[1]);
+          matmul(Ubig_child1, Uo_splits[0], Ubig_i_splits[0]);
+          matmul(Ubig_child2, Uo_splits[1], Ubig_i_splits[1]);
           Ubig.insert(i, level, std::move(Ubig_i));
         }
       }
