@@ -11,6 +11,8 @@ project(Hatrix
   LANGUAGES CXX
 )
 
+set(CMAKE_BUILD_TYPE Debug)
+
 # Use Release build by default
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -76,8 +78,8 @@ if(USE_OPENMP)
   target_link_libraries(Hatrix OpenMP::OpenMP_CXX)
 endif()
 
-find_package(GSL REQUIRED)    # See below (2)
-target_link_libraries(Hatrix GSL::gsl)
+#find_package(GSL REQUIRED)    # See below (2)
+#target_link_libraries(Hatrix GSL::gsl)
 
 include(find_or_download)
 # JSON writer
@@ -87,7 +89,7 @@ if(USE_JSON)
   add_definitions(-DUSE_JSON)
 endif()
 
-add_subdirectory(examples)
+#add_subdirectory(examples)
 
 if(${Hatrix_BUILD_TESTS})
   enable_testing()

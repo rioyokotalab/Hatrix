@@ -8,11 +8,11 @@ class Dense {
    // TODO maybe change this datatype
   int rows = 0;
   int cols = 0;
-  // Shows whether a Matrix is a view of another matrix or actually owns the data
-  bool is_view = false;
 
  protected:
   DT* data = nullptr;
+  // Shows whether a Matrix is a view of another matrix or actually owns the data
+  bool view = false;
 
  public:
   Dense();
@@ -48,6 +48,8 @@ class Dense {
 
   DT& operator()(unsigned int i, unsigned int j);
   const DT& operator()(unsigned int i, unsigned int j) const;
+
+  inline bool is_view() const {return this->view;};
   /*
   // WARNING: does not deallocate the extra data!
   void shrink(int64_t rows, int64_t cols);

@@ -19,7 +19,7 @@ namespace Hatrix {
 
 template <typename DT>
 Dense<DT>::Dense() :
-  rows(0), cols(0), is_view(false), data(nullptr){}
+  rows(0), cols(0), view(false), data(nullptr){}
 
 // TODO check
 template <typename DT>
@@ -29,8 +29,8 @@ Dense<DT>::~Dense() {
 
 template <typename DT>
 Dense<DT>::Dense(const Dense<DT>& A) :
-  rows(A.rows), cols(A.cols),  is_view(A.is_view) {
-  if (this->is_view) {
+  rows(A.rows), cols(A.cols),  view(A.is_view()) {
+  if (this->is_view()) {
     // shallow copy
     this->data = A.data;
   } else {
@@ -42,7 +42,7 @@ Dense<DT>::Dense(const Dense<DT>& A) :
 
 template <typename DT>
 Dense<DT>::Dense(const Dense<DT>& A, const bool copy) :
-  rows(A.rows), cols(A.cols), is_view(!copy) {
+  rows(A.rows), cols(A.cols), view(!copy) {
   if (!copy) {
     // shallow copy (creates a view)
     this->data = A.data;
@@ -65,16 +65,16 @@ Dense<DT>& Dense<DT>::operator=(const Dense<DT>& A) {
   // assign A_view (which is a submatrix of the larger matrix A) onto A itself, thus 
   // deallocating the memory it actually points to
   const int N = this->rows * this->cols;
-  if (A.is_view || N != A.rows * A.cols) {
+  if (A.is_view() || N != A.rows * A.cols) {
     this->deallocate();
   }
-  bool needs_allocation = this->is_view || N != A.rows * A.cols;
+  bool needs_allocation = this->view || N != A.rows * A.cols;
   this->rows = A.rows;
   this->cols = A.cols;
-  this->is_view = A.is_view;
+  this->view = A.is_view();
 
     
-  if (A.is_view) {
+  if (A.is_view()) {
     this->data = A.data;
   } else {
     if (needs_allocation) {
@@ -90,9 +90,9 @@ Dense<DT>& Dense<DT>::operator=(const Dense<DT>& A) {
 template <typename DT>
 Dense<DT>::Dense(Dense<DT>&& A)
   : rows(A.rows), cols(A.cols),
-  is_view(A.is_view), data(A.data) {
+  view(A.is_view()), data(A.data) {
     // TODO maybe A should be emptied even if it is a view
-    if (!A.is_view) {
+    if (!A.is_view()) {
       A.empty();
     }
 }
@@ -109,10 +109,10 @@ Dense<DT>& Dense<DT>::operator=(Dense<DT>&& A) {
   this->deallocate();
   this->rows = A.rows;
   this->cols = A.cols;
-  this->is_view = A.is_view;
+  this->view = A.is_view();
   this->data = A.data;
   // Leave A empty (assures it does not deallocate memory)
-  if (!A.is_view) {
+  if (!A.is_view()) {
       A.empty();
   }
 
@@ -122,7 +122,7 @@ Dense<DT>& Dense<DT>::operator=(Dense<DT>&& A) {
 
 template <typename DT>
 Dense<DT>::Dense(const int rows, const int cols, const bool init)
-    : rows(rows), cols(cols), is_view(false) {
+    : rows(rows), cols(cols), view(false) {
   this->allocate(init);
 }
 
@@ -165,6 +165,7 @@ const DT& Dense<DT>::operator()(unsigned int i, unsigned int j) const {
   }
   return data[i + j * rows];
 }
+
 /*
 void Matrix::shrink(int64_t new_rows, int64_t new_cols) {
   assert(new_rows <= rows);
@@ -381,13 +382,13 @@ template <typename DT>
 void Dense<DT>::empty() {
   this->rows = 0;
   this->cols = 0;
-  this->is_view = false;
+  this->view = false;
   this->data = nullptr;
 }
 
 template <typename DT>
 void Dense<DT>::allocate(const bool init) {
-  assert(!this->is_view);
+  assert(!this->is_view());
 
   const unsigned int N = this->rows * this->cols;
   if (N < 1) {
@@ -410,7 +411,7 @@ void Dense<DT>::allocate(const bool init) {
 
 template <typename DT>
 void Dense<DT>::deallocate() {
-  if (!this->is_view) {
+  if (!this->is_view()) {
     if (this->data) {
       delete[] this->data;
       this->data = nullptr;
