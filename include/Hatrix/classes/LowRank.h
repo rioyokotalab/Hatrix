@@ -55,6 +55,10 @@ class LowRank {
 
   void print() const;
 
+  void print_approx() const;
+
+  int64_t get_rank(DT error) const;
+
   // WARNING: does not deallocate the extra data!
   // TODO might be useful
   //void shrink(int64_t rows, int64_t cols);
