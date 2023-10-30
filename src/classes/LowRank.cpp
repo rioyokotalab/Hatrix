@@ -47,6 +47,7 @@ LowRank<DT>::LowRank(const Matrix<DT>& A, int64_t rank)
     this->V = Matrix<DT>(sample_size, QtA.cols);
     svd(QtA, Ub, S, V);
 
+    this->error = S(rank, rank);
     this->U = matmul(Q, Ub);
     this->U.shrink(U.rows, rank);
     this->S.shrink(rank, rank);
@@ -85,6 +86,30 @@ void LowRank<DT>::print() const {
   std::cout<<"V:"<<std::endl;
   V.print();
 };
+
+template <typename DT>
+void LowRank<DT>::print_approx() const {
+  std::cout<<"Singular Values:"<<std::endl;
+  for (int64_t i = 0; i < rank; ++i) {
+    std::cout<<S(i, i)<<std::endl;
+  }
+  std::cout<<"Error: "<<error<<std::endl;
+};
+
+template <typename DT>
+int64_t LowRank<DT>::get_rank(DT error) const {
+  int64_t l = 0;
+  int64_t r = rank - 1;
+  while (l < r) {
+    int64_t m = (l + r) / 2;
+    if (S(m, m) < error) {
+      r = m;
+    } else {
+      l = m + 1;
+    }
+  }
+  return r + 1;
+}
 
 template <typename DT>
 const DT& LowRank<DT>::operator()(int64_t i, int64_t j) const {
