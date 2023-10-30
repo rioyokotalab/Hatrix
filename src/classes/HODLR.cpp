@@ -13,7 +13,7 @@
 namespace Hatrix {
 
 template <typename DT>
-HODLR<DT>::HODLR(const Matrix<DT>& A, int leaf_size, int rank) : leaf_size(leaf_size), rank(rank), max_level(0) {
+HODLR<DT>::HODLR(const Matrix<DT>& A, int leaf_size, int rank) : leaf_size(leaf_size), rank(rank), max_level(0), rows(A.rows) {
   int size = A.rows;
   while (leaf_size < size){
     size = size>>1;
@@ -58,6 +58,50 @@ void HODLR<DT>::spawn_lr_children(int row, int col, int level) {
     low_rank.insert(child_row, child_col+1, level+1, LowRank<DT>(low_rank(row, col, level).U, low_rank(row, col, level).S, children[1], false));
     spawn_lr_children(child_row, child_col+1, level+1);
   }
+}
+
+template <typename DT>
+void HODLR<DT>::materialize_low_rank(Matrix<DT>& A, int row, int col, int level) const {
+  #pragma omp task shared(low_rank)
+  {
+    Hatrix::Matrix<DT> B = low_rank(row, col, level).make_dense();
+    for (int i=0; i<A.rows; ++i)
+      for (int j=0; j<A.cols; ++j)
+        A(i,j) = B(i,j);
+  }
+}
+
+template <typename DT>
+void HODLR<DT>::materialize(Matrix<DT>& A, int row, int col, int level) const {
+  int start = row * 2;
+  if (level < max_level) {
+    std::vector<Matrix<DT>> A_split = A.split(2,2);
+    materialize_low_rank(A_split[1], start, start+1, level+1);
+    materialize_low_rank(A_split[2], start+1, start, level+1);
+    materialize(A_split[0], start, start, level+1);
+    materialize(A_split[3], start+1, start+1, level+1);
+  } else {
+    #pragma omp task shared(dense)
+    {
+      for (int i=0; i<A.rows; ++i)
+        for (int j=0; j<A.cols; ++j)
+          A(i,j) = dense(row, col, level)(i,j);
+    }
+  }
+
+}
+
+template <typename DT>
+Matrix<DT> HODLR<DT>::make_dense() const {
+  Matrix<DT> A(rows, rows);
+  #pragma omp parallel
+  {
+    #pragma omp single
+    {
+      materialize(A, 0, 0, 0);
+    }
+  }
+  return A;
 }
   
 template <typename DT>
@@ -336,8 +380,8 @@ void HODLR<DT>::lu() {
 
 template <typename DT>
 void HODLR<DT>::solve(Matrix<DT>& B) const {
-  trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Upper);
   trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Lower);
+  trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Upper);
 }
 
 template <typename DT>
