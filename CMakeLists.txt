@@ -69,6 +69,10 @@ target_sources(Hatrix PRIVATE
 )
 target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 
+if (LAPACKE_FOUND)
+  target_link_libraries(Hatrix ${LAPACKE_LIBRARY})
+endif()
+
 option(USE_OPENMP "Multithreading with OpenMP" ON)
 if(USE_OPENMP)
   find_package(OpenMP REQUIRED)

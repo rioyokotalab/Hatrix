@@ -24,7 +24,9 @@ cmake .. \
       -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp /opt/homebrew/opt/libomp/lib/libomp.dylib -I/opt/homebrew/opt/libomp/include" \
       -DOpenMP_CXX_LIB_NAMES="libomp" \
       -DGSL_INCLUDE_DIR="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/include" \
-      -DGSL_LIBRARY="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib"
+      -DGSL_LIBRARY="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib" \
+      -DLAPACKE_INCLUDE_DIR="/opt/homebrew/opt/lapack/include" \
+      -DLAPACKE_LIBRARIES="/opt/homebrew/opt/lapack/lib"
 
 
 # export OMP_NUM_THREADS=16

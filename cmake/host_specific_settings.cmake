@@ -11,6 +11,14 @@ function(host_specific_settings)
     return()
   elseif(APPLE)
     set(BLA_VENDOR Apple)
+    find_path(LAPACKE_INCLUDE_DIR "lapacke.h" REQUIRED)
+    find_library(LAPACKE_LIBRARY
+      NAMES lapacke
+      PATHS ${LAPACKE_LIBRARIES}
+      REQUIRED)
+    message("Found LAPACKE.")
+    message(${LAPACKE_LIBRARY})
+    set(LAPACKE_FOUND true PARENT_SCOPE)
     return()
   endif()
   # Default fallback. Note that all if-functions above call return()
