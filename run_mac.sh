@@ -18,12 +18,13 @@ cd build
 
 cmake .. \
       -DCMAKE_EXE_LINKER_FLAGS=" -L/opt/homebrew/opt/libomp/lib" \
+      -DCMAKE_CXX_FLAGS=" -I/opt/homebrew/opt/libomp/include " \
       -DGSL_INCLUDE_DIR="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/include" \
       -DGSL_LIBRARY="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib/libgsl.27.dylib" \
       -DLAPACKE_INCLUDE_DIR="/opt/homebrew/opt/lapack/include" \
       -DLAPACKE_LIBRARIES="/opt/homebrew/opt/lapack/lib"
 
-make VERBOSE=1
+make -j VERBOSE=1
 
 # cmake .. \
 #       -DCMAKE_EXE_LINKER_FLAGS=" -L/opt/homebrew/opt/libomp/lib -lomp " \

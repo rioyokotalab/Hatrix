@@ -18,23 +18,23 @@ list(APPEND HATRIX_EXAMPLES
   BLR2_strong_LU_noumv
   # BLR2_weak_LDL
   # BLR2_strong_LDL
-  BLR2_strong_LU
+  # BLR2_strong_LU
   BLR2_weak_LU
   # H2_weak_LDL
   H2_weak_LU
   H2_weak_LU_2lev
   # H2_strong_LDL
   # H2_strong_LDL_nodep
-  H2_strong_PO_nodep
-  H2_strong_PO
-  H2_strong_LU
-  BLR2_weak_MM_2x2
-  BLR2_strong_MM
-  BLR2_weak_MM
-  H2_weak_MM_2lev
-  H2_weak_MM
-  H2_strong_EV_sym
-  H2_strong_EV_sym_nodep
+  # H2_strong_PO_nodep
+  # H2_strong_PO
+  # H2_strong_LU
+  # BLR2_weak_MM_2x2
+  # BLR2_strong_MM
+  # BLR2_weak_MM
+  # H2_weak_MM_2lev
+  # H2_weak_MM
+  # H2_strong_EV_sym
+  # H2_strong_EV_sym_nodep
 )
 
 foreach(EXAMPLE ${HATRIX_EXAMPLES})
@@ -45,19 +45,18 @@ foreach(EXAMPLE ${HATRIX_EXAMPLES})
   endif()
 endforeach()
 
-find_package(MPI)
-if(MPI_FOUND)
-  add_executable(H2_strong_PO_nodep_mpi H2_strong_PO_nodep_mpi.cpp)
-  target_compile_options(H2_strong_PO_nodep_mpi PRIVATE -DUSE_MKL -D_PROF)
-  target_link_libraries(H2_strong_PO_nodep_mpi MPI::MPI_CXX Hatrix)
+# find_package(MPI)
+# if(MPI_FOUND)
+#   add_executable(H2_strong_PO_nodep_mpi H2_strong_PO_nodep_mpi.cpp)
+#   target_link_libraries(H2_strong_PO_nodep_mpi MPI::MPI_CXX Hatrix)
 
-  add_executable(H2_strong_EV_sym_mpi_ref H2_strong_EV_sym_mpi_ref.cpp)
-  target_link_libraries(H2_strong_EV_sym_mpi_ref Hatrix MPI::MPI_CXX)
+#   add_executable(H2_strong_EV_sym_mpi_ref H2_strong_EV_sym_mpi_ref.cpp)
+#   target_link_libraries(H2_strong_EV_sym_mpi_ref Hatrix MPI::MPI_CXX)
 
-  add_executable(H2_strong_EV_sym_mpi H2_strong_EV_sym_mpi.cpp)
-  target_link_libraries(H2_strong_EV_sym_mpi Hatrix MPI::MPI_CXX)
+#   add_executable(H2_strong_EV_sym_mpi H2_strong_EV_sym_mpi.cpp)
+#   target_link_libraries(H2_strong_EV_sym_mpi Hatrix MPI::MPI_CXX)
 
-  # Requires ScaLAPACK
-  add_executable(Dense_EV_sym_mpi Dense_EV_sym_mpi.cpp)
-  target_link_libraries(Dense_EV_sym_mpi Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
-endif()
+#   # Requires ScaLAPACK
+#   add_executable(Dense_EV_sym_mpi Dense_EV_sym_mpi.cpp)
+#   target_link_libraries(Dense_EV_sym_mpi Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
+# endif()
