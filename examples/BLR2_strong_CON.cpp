@@ -39,9 +39,10 @@ int main(int argc, char** argv) {
 
   // Initialize a Symmetric shared basis matrix container.
   Hatrix::SymmetricSharedBasisMatrix A;
+  A.max_level = log2(N / nleaf);
 
   // Perform a dual tree traversal and initialize the is_admissibile property of the matrix.
-  A.generate_admissibility(domain, false, Hatrix::ADMIS_TYPE::DUAL_TREE_TRAVERSAL);
+  A.generate_admissibility(domain, false, Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
 
   // Call a custom construction routine.
   construct_strong_BLR2(A, domain, N, nleaf, rank, admis);

@@ -64,6 +64,10 @@ find_package(LAPACK REQUIRED)
 target_sources(Hatrix PRIVATE
   src/classes/IndexedMap.cpp
   src/classes/Matrix.cpp
+  src/classes/Particle.cpp
+  src/classes/Cell.cpp
+  src/classes/Domain.cpp
+  src/classes/SymmetricSharedBasisMatrix.cpp
   src/functions/arithmetics.cpp
   src/functions/blas.cpp
   src/functions/lapack.cpp
