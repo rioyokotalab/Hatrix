@@ -10,9 +10,9 @@ export PATH=$PARSEC_PATH/bin:$PATH
 export TMPDIR=/tmp
 ROOT=$PWD
 
-set -e
+# set -e
 
-rm -rf build
+# rm -rf build
 mkdir build
 cd build
 
