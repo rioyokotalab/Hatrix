@@ -12,21 +12,31 @@ ROOT=$PWD
 
 set -e
 
+rm -rf build
 mkdir build
 cd build
 
 cmake .. \
-      -DOpenMP_C_FLAGS=-fopenmp=lomp \
-      -DOpenMP_CXX_FLAGS=-fopenmp=lomp \
-      -DOpenMP_C_LIB_NAMES="libomp" \
-      -DOpenMP_CXX_LIB_NAMES="libomp" \
-      -DOpenMP_libomp_LIBRARY="/opt/local/lib/libomp.dylib" \
-      -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp /opt/homebrew/opt/libomp/lib/libomp.dylib -I/opt/homebrew/opt/libomp/include" \
-      -DOpenMP_CXX_LIB_NAMES="libomp" \
+      -DCMAKE_EXE_LINKER_FLAGS=" -L/opt/homebrew/opt/libomp/lib" \
       -DGSL_INCLUDE_DIR="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/include" \
-      -DGSL_LIBRARY="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib" \
+      -DGSL_LIBRARY="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib/libgsl.27.dylib" \
       -DLAPACKE_INCLUDE_DIR="/opt/homebrew/opt/lapack/include" \
       -DLAPACKE_LIBRARIES="/opt/homebrew/opt/lapack/lib"
+
+make VERBOSE=1
+
+# cmake .. \
+#       -DCMAKE_EXE_LINKER_FLAGS=" -L/opt/homebrew/opt/libomp/lib -lomp " \
+#       -DOpenMP_C_FLAGS="-fopenmp=lomp" \
+#       -DOpenMP_CXX_FLAGS="-fopenmp=lomp" \
+#       -DOpenMP_C_LIB_NAMES="libomp" \
+#       -DOpenMP_CXX_LIB_NAMES="libomp" \
+#       -DOpenMP_libomp_LIBRARY="/opt/local/lib/libomp.dylib" \
+#       -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp  -I/opt/homebrew/opt/libomp/include" \
+#       -DGSL_INCLUDE_DIR="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/include" \
+#       -DGSL_LIBRARY="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib" \
+#       -DLAPACKE_INCLUDE_DIR="/opt/homebrew/opt/lapack/include" \
+#       -DLAPACKE_LIBRARIES="/opt/homebrew/opt/lapack/lib"
 
 
 # export OMP_NUM_THREADS=16

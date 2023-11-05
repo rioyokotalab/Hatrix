@@ -10,6 +10,7 @@
 #include "mkl_cblas.h"
 #include "mkl_lapacke.h"
 #elif __APPLE__
+#define __CLAPACK_H             // Prioritize the netlib lapacke interaface over apple.
 #include <Accelerate/Accelerate.h>
 #include "lapacke.h"
 #else

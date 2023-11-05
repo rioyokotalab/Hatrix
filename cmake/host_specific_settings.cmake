@@ -10,14 +10,12 @@ function(host_specific_settings)
     set(BLAS_INCLUDE_DIR $ENV{FJSVXTCLANGA}/include PARENT_SCOPE)
     return()
   elseif(APPLE)
-    set(BLA_VENDOR Apple)
+    set(BLA_VENDOR NAS)
     find_path(LAPACKE_INCLUDE_DIR "lapacke.h" REQUIRED)
     find_library(LAPACKE_LIBRARY
       NAMES lapacke
       PATHS ${LAPACKE_LIBRARIES}
       REQUIRED)
-    message("Found LAPACKE.")
-    message(${LAPACKE_LIBRARY})
     set(LAPACKE_FOUND true PARENT_SCOPE)
     return()
   endif()
