@@ -23,6 +23,7 @@ class HODLR {
 
   void lu();
   void solve(Matrix<DT>& B) const;
+  void matmul(const Matrix<DT>& B, Matrix<DT>& C, double alpha=1, double beta=0) const;
 
  private:
   void add_admissibility(int row=0, int col=0, int level=0);
@@ -39,6 +40,7 @@ class HODLR {
   void matmul(int row, int col, int level, LowRank<DT>& temp);
   void getrf(int row, int col, int level, LowRank<DT>& temp);
   void trsm_solve(int row, int col, int level, Matrix<DT>& B, Side side, Mode uplo) const;
+  void matmul(int row, int col, int level, const Matrix<DT>& B, Matrix<DT>& C, double alpha, double beta) const;
 
 };
 

@@ -361,6 +361,33 @@ void HODLR<DT>::trsm_solve(int row, int col, int level, Matrix<DT>& B, Side side
   }
 }
 
+template <typename DT>
+void HODLR<DT>::matmul(int row, int col, int level, const Matrix<DT>& B, Matrix<DT>& C, double alpha, double beta) const {
+  if (level < max_level) {
+    int start = row * 2;
+    std::vector<Matrix<DT>> B_split = B.split(2, 1);
+    std::vector<Matrix<DT>> C_split = C.split(2, 1);
+
+
+    #pragma omp task shared(dense, low_rank, B, C)
+    {
+      matmul(start, start, level+1, B_split[0], C_split[0], alpha, beta);
+      //std::cout<<"Calc matmul for row="<<start<<" col="<<start+1<<" level="<<level+1<<std::endl;
+      #pragma omp taskwait
+      Hatrix::matmul(low_rank(start, start+1, level+1), B_split[1], C_split[0], false, false, 1, 1);
+    }
+    #pragma omp task shared(dense, low_rank, B, C)
+    {
+      matmul(start+1, start+1, level+1, B_split[1], C_split[1], alpha, beta);
+      //std::cout<<"Calc matmul for row="<<start+1<<" col="<<start<<" level="<<level+1<<std::endl;
+      #pragma omp taskwait
+      Hatrix::matmul(low_rank(start+1, start, level+1), B_split[0], C_split[1], false, false, 1, 1);
+    }
+  } else {
+      Hatrix::matmul(dense(row, col, level), B, C, false, false, alpha, beta);
+  }
+}
+
 // explicit instantiation (these are the only available data-types)
 template class HODLR<float>;
 template class HODLR<double>;
