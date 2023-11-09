@@ -20,17 +20,24 @@ class HODLR {
   RowColLevelMap<LowRank<DT>> low_rank;
 
   HODLR(const Matrix<DT>& A, int leaf_size, int rank);
+  template <typename OT>
+  HODLR(const HODLR<OT>& A);
   ~HODLR() = default;
 
   void lu();
   void solve(Matrix<DT>& B) const;
   Matrix<DT> make_dense() const;
+  void matmul(const Matrix<DT>& B, Matrix<DT>& C, double alpha=1, double beta=0) const;
 
  private:
   void add_admissibility(int row=0, int col=0, int level=0);
   bool insert_block(int row, int col, int level);
   void add_children(int row, int col, int level);
   void add_dense_blocks(const Matrix<DT>& A, omp_lock_t& lock);
+  template <typename OT>
+  void add_dense_blocks(const HODLR<OT>& A, omp_lock_t& lock);
+  template <typename OT>
+  void add_lr_block(const HODLR<OT>& A, omp_lock_t& lock, int row=0, int col=0, int level=0);
   void add_lr_block(const Matrix<DT>& A, omp_lock_t& lock, int row=0, int col=0, int level=0);
   void spawn_lr_children(int row, int col, int level);
   void empty_task();
@@ -43,6 +50,7 @@ class HODLR {
   void trsm_solve(int row, int col, int level, Matrix<DT>& B, Side side, Mode uplo) const;
   void materialize(Matrix<DT>& A, int row, int col, int level) const;
   void materialize_low_rank(Matrix<DT>& A, int row, int col, int level) const;
+  void matmul(int row, int col, int level, const Matrix<DT>& B, Matrix<DT>& C, double alpha, double beta) const;
 };
 
 }  // namespace Hatrix

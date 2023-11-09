@@ -37,6 +37,29 @@ HODLR<DT>::HODLR(const Matrix<DT>& A, int leaf_size, int rank) : leaf_size(leaf_
   //add_lr_block(A, lr_lock); 
 }
 
+template<typename DT> template<typename OT>
+HODLR<DT>::HODLR(const HODLR<OT>& A): leaf_size(A.leaf_size), max_level(A.max_level), rank(A.rank), rows(A.rows) {
+  //TODO is this a good solution?
+  omp_lock_t lr_lock;
+  omp_init_lock(&lr_lock);
+  omp_lock_t dense_lock;
+  omp_init_lock(&dense_lock);
+
+  #pragma omp parallel
+  {
+    #pragma omp single 
+    {
+      #pragma omp task shared(is_admissible, A)
+      {
+        is_admissible.deep_copy(A.is_admissible);
+      }
+      add_dense_blocks(A, dense_lock);
+      add_lr_block(A, lr_lock);     
+    }
+  }
+
+}
+
 template<typename DT>
 void HODLR<DT>::spawn_lr_children(int row, int col, int level) {
   if (level >= max_level)
@@ -128,6 +151,29 @@ void HODLR<DT>::add_lr_block(const Matrix<DT>& A, omp_lock_t& lock, int row, int
   }
 }
 
+template <typename DT> template <typename OT>
+void HODLR<DT>::add_lr_block(const HODLR<OT>& A, omp_lock_t& lock, int row, int col, int level) {
+  if (level > max_level)
+    return;
+
+  if (A.is_admissible(row, col, level)) {
+    #pragma omp task shared(low_rank, A, lock)
+    {
+      LowRank<DT> LR(A.low_rank(row, col, level));
+      omp_set_lock(&lock);
+      low_rank.insert(row, col, level, std::move(LR));
+      spawn_lr_children(row, col, level);
+      omp_unset_lock(&lock);
+    }
+  } else {
+    int start = row * 2;
+    add_lr_block(A, lock, start, start, level+1);
+    add_lr_block(A, lock, start, start+1, level+1);
+    add_lr_block(A, lock, start+1, start, level+1);
+    add_lr_block(A, lock, start+1, start+1, level+1);
+  }
+}
+
 template <typename DT>
 void HODLR<DT>::add_dense_blocks(const Matrix<DT>& A, omp_lock_t& lock) {
   int num_blocks = A.rows / leaf_size;
@@ -141,6 +187,21 @@ void HODLR<DT>::add_dense_blocks(const Matrix<DT>& A, omp_lock_t& lock) {
           block_copy(k,l) = A(i*leaf_size+k, i*leaf_size+l);
         }
       }
+      omp_set_lock(&lock);
+      dense.insert(i, i, max_level, std::move(block_copy));
+      omp_unset_lock(&lock);
+    }
+  }
+}
+
+template <typename DT> template <typename OT>
+void HODLR<DT>::add_dense_blocks(const HODLR<OT>& A, omp_lock_t& lock) {
+  int num_blocks = A.rows / A.leaf_size;
+
+  for (int i=0; i<num_blocks; ++i) {
+    #pragma omp task shared(dense, A, lock)
+    {
+      Matrix<DT> block_copy(A.dense(i, i, max_level));
       omp_set_lock(&lock);
       dense.insert(i, i, max_level, std::move(block_copy));
       omp_unset_lock(&lock);
@@ -330,6 +391,44 @@ void HODLR<DT>::add(int row, int col, int level, LowRank<DT>& temp, int block_st
   }
 
 template <typename DT>
+void HODLR<DT>::matmul(const Matrix<DT>& B, Matrix<DT>& C, double alpha, double beta) const {
+  #pragma omp parallel
+  {
+    #pragma omp single 
+    {
+      matmul(0, 0, 0, B, C, alpha, beta);
+    }
+  }
+}
+
+template <typename DT>
+void HODLR<DT>::matmul(int row, int col, int level, const Matrix<DT>& B, Matrix<DT>& C, double alpha, double beta) const {
+  if (level < max_level) {
+    int start = row * 2;
+    std::vector<Matrix<DT>> B_split = B.split(2, 1);
+    std::vector<Matrix<DT>> C_split = C.split(2, 1);
+      
+      
+    #pragma omp task shared(dense, low_rank, B, C)
+    {
+      matmul(start, start, level+1, B_split[0], C_split[0], alpha, beta);
+      //std::cout<<"Calc matmul for row="<<start<<" col="<<start+1<<" level="<<level+1<<std::endl;
+      #pragma omp taskwait
+      Hatrix::matmul(low_rank(start, start+1, level+1), B_split[1], C_split[0], false, false, 1, 1);
+    }
+    #pragma omp task shared(dense, low_rank, B, C)
+    {
+      matmul(start+1, start+1, level+1, B_split[1], C_split[1], alpha, beta);
+      //std::cout<<"Calc matmul for row="<<start+1<<" col="<<start<<" level="<<level+1<<std::endl;
+      #pragma omp taskwait
+      Hatrix::matmul(low_rank(start+1, start, level+1), B_split[0], C_split[1], false, false, 1, 1);
+    }
+  } else {
+      Hatrix::matmul(dense(row, col, level), B, C, false, false, alpha, beta);
+  }
+}
+
+template <typename DT>
 void HODLR<DT>::matmul(int row, int col, int level, Hatrix::LowRank<DT>& temp) {
   if (level < max_level) {
     // wait for all tasks on children of the input low-rank blocks
@@ -408,5 +507,7 @@ void HODLR<DT>::trsm_solve(int row, int col, int level, Matrix<DT>& B, Side side
 // explicit instantiation (these are the only available data-types)
 template class HODLR<float>;
 template class HODLR<double>;
+template HODLR<float>::HODLR(const HODLR<double>&);
+template HODLR<double>::HODLR(const HODLR<float>&);
 
 }  // namespace Hatrix

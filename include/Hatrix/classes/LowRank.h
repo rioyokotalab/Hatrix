@@ -39,6 +39,10 @@ class LowRank {
 
   LowRank(const Matrix<DT>& U, const Matrix<DT>& S, const Matrix<DT>& V, bool copy=false);
 
+  // explicit copy intended for type conversion
+  template <typename OT>
+  LowRank(const LowRank<OT>& A);
+
   LowRank(Matrix<DT>&& U, Matrix<DT>&& S, Matrix<DT>&& V);
 
   LowRank& operator=(const LowRank& A) = default;

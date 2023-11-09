@@ -38,6 +38,10 @@ class Matrix {
   // https://stackoverflow.com/questions/40457302/c-vector-emplace-back-calls-copy-constructor
   Matrix(const Matrix& A, bool copy);
 
+  // always copy, only intended for non-views
+  template <typename OT>
+  Matrix(const Matrix<OT>& A);
+
   Matrix& operator=(const Matrix& A);
 
   Matrix& operator=(Matrix&& A);
