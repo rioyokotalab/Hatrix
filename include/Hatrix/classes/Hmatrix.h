@@ -19,6 +19,8 @@ class Hmatrix {
   RowColLevelMap<LowRank2<DT>> low_rank;
 
   Hmatrix(const Matrix<DT>& A, int leaf_size, int rank);
+  template <typename OT>
+  explicit Hmatrix(const Hmatrix<OT>& A);
   ~Hmatrix() = default;
 
   void lu();
@@ -29,6 +31,10 @@ class Hmatrix {
   bool insert_block(int row, int col, int level);
   void add_children(int row, int col, int level);
   void add_dense_blocks(const Matrix<DT>& A, omp_lock_t& lock);
+  template <typename OT>
+  void add_dense_blocks(const Hmatrix<OT>& A, omp_lock_t& lock);
+  template <typename OT>
+  void add_lr_block(const Hmatrix<OT>& A, omp_lock_t& lock, int row=0, int col=0, int level=0);
   void add_lr_block(const Matrix<DT>& A, omp_lock_t& lock, int row=0, int col=0, int level=0);
   void spawn_lr_children(int row, int col, int level);
   void empty_task();

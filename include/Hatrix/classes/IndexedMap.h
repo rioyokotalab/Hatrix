@@ -137,6 +137,8 @@ public:
 
   // Destructively clear all keys in the map.
   void erase_all();
+
+  size_t size() const;
 };
 
 }  // namespace Hatrix

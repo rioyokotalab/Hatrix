@@ -336,8 +336,8 @@ void HODLR<DT>::lu() {
 
 template <typename DT>
 void HODLR<DT>::solve(Matrix<DT>& B) const {
-  trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Upper);
   trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Lower);
+  trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Upper);
 }
 
 template <typename DT>

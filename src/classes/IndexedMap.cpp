@@ -214,6 +214,11 @@ bool RowColLevelMap<T>::exists(int64_t row, int64_t col, int64_t level) const {
   return map.count({row, col, level}) == 0 ? false : true;
 }
 
+template <class T>
+size_t RowColLevelMap<T>::size() const {
+  return map.size();
+}
+
 // explicit instatiation
 template class RowColLevelMap<bool>;
 template class RowColLevelMap<Matrix<float>>;

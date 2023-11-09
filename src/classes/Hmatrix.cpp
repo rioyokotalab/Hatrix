@@ -12,6 +12,29 @@
 
 namespace Hatrix {
 
+template<typename DT> template<typename OT>
+Hmatrix<DT>::Hmatrix(const Hmatrix<OT>& A): leaf_size(A.leaf_size), max_level(A.max_level), rank(A.rank) {
+  //TODO is this a good solution?
+  omp_lock_t lr_lock;
+  omp_init_lock(&lr_lock);
+  omp_lock_t dense_lock;
+  omp_init_lock(&dense_lock);
+
+  #pragma omp parallel
+  {
+    #pragma omp single 
+    {
+      #pragma omp task shared(is_admissible, A)
+      {
+        is_admissible.deep_copy(A.is_admissible);
+      }
+      add_dense_blocks(A, dense_lock);
+      add_lr_block(A, lr_lock);     
+    }
+  }
+
+}
+
 template <typename DT>
 Hmatrix<DT>::Hmatrix(const Matrix<DT>& A, int leaf_size, int rank) : leaf_size(leaf_size), rank(rank), max_level(0) {
   int size = A.rows;
@@ -101,6 +124,44 @@ void Hmatrix<DT>::add_dense_blocks(const Matrix<DT>& A, omp_lock_t& lock) {
       dense.insert(i, i, max_level, std::move(block_copy));
       omp_unset_lock(&lock);
     }
+  }
+}
+
+template <typename DT> template <typename OT>
+void Hmatrix<DT>::add_dense_blocks(const Hmatrix<OT>& A, omp_lock_t& lock) {
+  size_t num_blocks = A.dense.size();
+
+  for (size_t i=0; i<num_blocks; ++i) {
+    #pragma omp task shared(dense, A, lock)
+    {
+      Matrix<DT> block_copy(A.dense(i, i, max_level));
+      omp_set_lock(&lock);
+      dense.insert(i, i, max_level, std::move(block_copy));
+      omp_unset_lock(&lock);
+    }
+  }
+}
+
+template <typename DT> template <typename OT>
+void Hmatrix<DT>::add_lr_block(const Hmatrix<OT>& A, omp_lock_t& lock, int row, int col, int level) {
+  if (level > max_level)
+    return;
+
+  if (A.is_admissible(row, col, level)) {
+    #pragma omp task shared(low_rank, A, lock)
+    {
+      LowRank2<DT> LR(A.low_rank(row, col, level));
+      omp_set_lock(&lock);
+      low_rank.insert(row, col, level, std::move(LR));
+      spawn_lr_children(row, col, level);
+      omp_unset_lock(&lock);
+    }
+  } else {
+    int start = row * 2;
+    add_lr_block(A, lock, start, start, level+1);
+    add_lr_block(A, lock, start, start+1, level+1);
+    add_lr_block(A, lock, start+1, start, level+1);
+    add_lr_block(A, lock, start+1, start+1, level+1);
   }
 }
 
@@ -336,8 +397,8 @@ void Hmatrix<DT>::lu() {
 
 template <typename DT>
 void Hmatrix<DT>::solve(Matrix<DT>& B) const {
-  trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Upper);
   trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Lower);
+  trsm_solve(0, 0, 0, B, Hatrix::Left, Hatrix::Upper);
 }
 
 template <typename DT>
@@ -364,5 +425,7 @@ void Hmatrix<DT>::trsm_solve(int row, int col, int level, Matrix<DT>& B, Side si
 // explicit instantiation (these are the only available data-types)
 template class Hmatrix<float>;
 template class Hmatrix<double>;
+template Hmatrix<float>::Hmatrix(const Hmatrix<double>&);
+template Hmatrix<double>::Hmatrix(const Hmatrix<float>&);
 
 }  // namespace Hatrix

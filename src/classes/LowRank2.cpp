@@ -54,6 +54,15 @@ LowRank2<DT>::LowRank2(const Matrix<DT>& A, int64_t rank)
     this->V.shrink(rank, V.cols);
   }
 
+template <typename DT> template <typename OT>
+LowRank2<DT>::LowRank2(const LowRank2<OT>& A)
+: rows(A.rows), cols(A.cols), rank(A.rank), error(A.error),
+  U(A.U), S(A.S), V(A.V) {
+    assert(U.cols == S.rows);
+    assert(S.rows == S.cols);
+    assert(S.cols == V.rows);
+}
+
 template <typename DT>
 LowRank2<DT>::LowRank2(const Matrix<DT>& U, const Matrix<DT>& S, const Matrix<DT>& V, bool copy)
 : rows(U.rows), cols(V.cols), rank(S.rows),
@@ -147,5 +156,7 @@ void Matrix<DT>::shrink(int64_t new_rows, int64_t new_cols) {
 // explicit instantiation (these are the only available data-types)
 template class LowRank2<float>;
 template class LowRank2<double>;
+template LowRank2<double>::LowRank2(const LowRank2<float>&);
+template LowRank2<float>::LowRank2(const LowRank2<double>&);
 
 }  // namespace Hatrix

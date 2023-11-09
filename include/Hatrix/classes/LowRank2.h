@@ -37,6 +37,9 @@ class LowRank2 {
   // https://stackoverflow.com/questions/40457302/c-vector-emplace-back-calls-copy-constructor
   //Matrix(const Matrix& A, bool copy);
 
+  template <typename OT>
+  explicit LowRank2(const LowRank2<OT>& A);
+
   LowRank2(const Matrix<DT>& U, const Matrix<DT>& S, const Matrix<DT>& V, bool copy=false);
 
   LowRank2(Matrix<DT>&& U, Matrix<DT>&& S, Matrix<DT>&& V);
