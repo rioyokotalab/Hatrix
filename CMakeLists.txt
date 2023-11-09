@@ -74,7 +74,9 @@ else()
   target_sources(Hatrix PRIVATE
     src/classes/IndexedMap.cpp
     src/classes/HODLR.cpp
+    src/classes/Hmatrix.cpp
     src/classes/LowRank.cpp
+    src/classes/LowRank2.cpp
     src/classes/Matrix.cpp
     src/functions/arithmetics.cpp
     src/functions/blas.cpp

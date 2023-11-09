@@ -1,6 +1,7 @@
 #pragma once
 #include "Hatrix/classes/Matrix.h"
 #include "Hatrix/classes/LowRank.h"
+#include "Hatrix/classes/LowRank2.h"
 #include "Hatrix/functions/math_common.h"
 
 namespace Hatrix {
@@ -33,6 +34,29 @@ void matmul(const LowRank<DT>& A, const LowRank<DT>& B, LowRank<DT>& C, bool tra
 template <typename DT>
 LowRank<DT> matmul(const LowRank<DT>& A, const LowRank<DT>& B, bool transA = false,
             bool transB = false, double alpha = 1.0);
+
+
+template <typename DT>
+void matmul(const LowRank2<DT>& A, const Matrix<DT>& B, Matrix<DT>& C, bool transA = false,
+            bool transB = false, double alpha = 1.0, double beta = 1.0);
+
+template <typename DT>
+void matmul(const Matrix<DT>& A, const LowRank2<DT>& B, Matrix<DT>& C, bool transA = false,
+            bool transB = false, double alpha = 1.0, double beta = 1.0);
+
+template <typename DT>
+void matmul(const LowRank2<DT>& A, const LowRank2<DT>& B, Matrix<DT>& C, bool transA = false,
+            bool transB = false, double alpha = 1.0, double beta = 1.0);
+
+template <typename DT>
+void matmul(const LowRank2<DT>& A, const LowRank2<DT>& B, LowRank2<DT>& C, bool transA = false,
+            bool transB = false, double alpha = 1.0, double beta = 1.0, bool add=true);
+
+template <typename DT>
+LowRank2<DT> matmul(const LowRank2<DT>& A, const LowRank2<DT>& B, bool transA = false,
+            bool transB = false, double alpha = 1.0);
+
+
 
 template <typename DT>
 Matrix<DT> matmul(const Matrix<DT>& A, const Matrix<DT>& B, bool transA = false,

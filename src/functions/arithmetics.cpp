@@ -7,6 +7,7 @@
 
 #include "Hatrix/classes/Matrix.h"
 #include "Hatrix/classes/LowRank.h"
+#include "Hatrix/classes/LowRank2.h"
 #include "Hatrix/functions/blas.h"
 #include "Hatrix/functions/lapack.h"
 
@@ -29,7 +30,79 @@ Matrix<DT>& operator+=(Matrix<DT>& A, const LowRank<DT>& B) {
 }
 
 template <typename DT>
+Matrix<DT>& operator+=(Matrix<DT>& A, const LowRank2<DT>& B) {
+  A += B.make_dense();
+  return A;
+}
+
+template <typename DT>
 LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B) {
+ 
+  // Merge Column Basis
+  assert(A.U.rows == B.U.rows);
+  int64_t rank = A.U.cols;
+  assert(rank == B.U.cols);
+
+  Matrix<DT> InnerU(rank+rank, rank);
+  std::vector<Matrix<DT>> InnerH = InnerU.split(2, 1);
+  matmul(A.U, B.U, InnerH[0], true, false, 1, 0); 
+  
+  Matrix<DT> Bu_AuAtBu(B.U, true);
+  matmul(A.U, InnerH[0], Bu_AuAtBu, false, false, -1, 1);
+  Matrix<DT> OuterU_1(A.U.rows, rank);
+  qr(Bu_AuAtBu, OuterU_1, InnerH[1]); 
+
+  // changed to copy here because move would change the pre-allocated view
+  Matrix<DT> OuterU_0(A.U, true);
+ 
+  // Merge row basis
+  assert(A.V.cols == B.V.cols);
+  rank = A.V.rows;
+  assert(rank == B.V.rows);
+  Matrix<DT> InnerV(rank, rank+rank);
+  InnerH = InnerV.split(1,2);
+  matmul(B.V, A.V, InnerH[0], false, true, 1, 0);
+  Matrix<DT> Bv_BvAvtAv(B.V, true);
+  matmul(InnerH[0], A.V, Bv_BvAvtAv, false, false, -1, 1);
+  Matrix<DT> OuterV_1(rank, A.V.cols);
+  rq(Bv_BvAvtAv, InnerH[1], OuterV_1);
+
+  // changed to copy here because move would change the pre-allocated view
+  Matrix<DT> OuterV_0(A.V, true);
+ 
+  // Merge S
+  rank = A.S.rows;
+  assert(rank == A.S.cols);
+  Matrix<DT> InnerUBs = matmul(InnerU, B.S);
+  Matrix<DT> M = matmul(InnerUBs, InnerV);
+  std::vector<Matrix<DT>> MH = M.split(2,2);
+  MH[0] += A.S;
+  Matrix<DT> Uhat(M.rows, M.rows);
+  Matrix<DT> Shat(M.rows, M.cols);
+  Matrix<DT> Vhat(M.cols, M.cols);
+  svd(M, Uhat, Shat, Vhat);
+  Uhat.shrink(Uhat.rows, rank);
+  Shat.shrink(rank, rank);
+  Vhat.shrink(rank, Vhat.cols);
+
+
+  //A.U = Matrix<DT>(A.rows, rank);
+  //A.V = Matrix<DT>(rank, A.cols);
+  // This should be save since all views point to the same S
+  A.S = std::move(Shat);
+  std::vector<Matrix<DT>> Uhat_split = Uhat.split(2,1);
+  matmul(OuterU_0, Uhat_split[0], A.U, false, false, 1, 0);
+  matmul(OuterU_1, Uhat_split[1], A.U);
+
+  std::vector<Matrix<DT>> Vhat_split = Vhat.split(1,2);
+  matmul(Vhat_split[0], OuterV_0, A.V, false, false, 1, 0);
+  matmul(Vhat_split[1], OuterV_1, A.V);
+  
+  return A;
+}
+
+template <typename DT>
+LowRank2<DT>& operator+=(LowRank2<DT>& A, const LowRank2<DT>& B) {
  
   // Merge Column Basis
   assert(A.U.rows == B.U.rows);
@@ -214,9 +287,14 @@ template Matrix<double> operator+(const Matrix<double>& A, const Matrix<double>&
 template Matrix<float>& operator+=(Matrix<float>& A, const LowRank<float>& B);
 template Matrix<double>& operator+=(Matrix<double>& A, const LowRank<double>& B);
 
+template Matrix<float>& operator+=(Matrix<float>& A, const LowRank2<float>& B);
+template Matrix<double>& operator+=(Matrix<double>& A, const LowRank2<double>& B);
 
 template LowRank<float>& operator+=(LowRank<float>& A, const LowRank<float>& B);
 template LowRank<double>& operator+=(LowRank<double>& A, const LowRank<double>& B);
+
+template LowRank2<float>& operator+=(LowRank2<float>& A, const LowRank2<float>& B);
+template LowRank2<double>& operator+=(LowRank2<double>& A, const LowRank2<double>& B);
 
 template Matrix<float>& operator-=(Matrix<float>& A, const Matrix<float>& B);
 template Matrix<float> operator-(const Matrix<float>& A, const Matrix<float>& B);

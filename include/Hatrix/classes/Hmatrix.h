@@ -1,7 +1,7 @@
 #pragma once
 #include "Hatrix/classes/IndexedMap.h"
 #include "Hatrix/classes/Matrix.h"
-#include "Hatrix/classes/LowRank.h"
+#include "Hatrix/classes/LowRank2.h"
 #include "Hatrix/functions/math_common.h"
 
 #include <omp.h>
@@ -16,7 +16,7 @@ class Hmatrix {
   int rank;
   RowColLevelMap<bool> is_admissible;
   RowColLevelMap<Matrix<DT>> dense;
-  RowColLevelMap<LowRank<DT>> low_rank;
+  RowColLevelMap<LowRank2<DT>> low_rank;
 
   Hmatrix(const Matrix<DT>& A, int leaf_size, int rank);
   ~Hmatrix() = default;
@@ -35,9 +35,9 @@ class Hmatrix {
   void update_children(int row, int col, int level);
   void update_parent(int row, int col, int level);
   void trsm(int row, int col, int level, Side side, Mode uplo);
-  void add(int row, int col, int level, LowRank<DT>& temp, int block_start, int block_size);
-  void matmul(int row, int col, int level, LowRank<DT>& temp);
-  void getrf(int row, int col, int level, LowRank<DT>& temp);
+  void add(int row, int col, int level, LowRank2<DT>& temp, int block_start, int block_size);
+  void matmul(int row, int col, int level, LowRank2<DT>& temp);
+  void getrf(int row, int col, int level, LowRank2<DT>& temp);
   void trsm_solve(int row, int col, int level, Matrix<DT>& B, Side side, Mode uplo) const;
 
 };

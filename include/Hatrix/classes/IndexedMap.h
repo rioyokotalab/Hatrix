@@ -6,6 +6,7 @@
 
 #include "Hatrix/classes/Matrix.h"
 #include "Hatrix/classes/LowRank.h"
+#include "Hatrix/classes/LowRank2.h"
 
 namespace std {
 

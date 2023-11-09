@@ -12,3 +12,5 @@
 #include "util/matrix_generators.h"
 #include "util/helpers.h"
 #include "classes/HODLR.h"
+#include "classes/Hmatrix.h"
+#include "classes/LowRank2.h"

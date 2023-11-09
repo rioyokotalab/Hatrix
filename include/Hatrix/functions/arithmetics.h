@@ -1,6 +1,7 @@
 #pragma once
 #include "Hatrix/classes/Matrix.h"
 #include "Hatrix/classes/LowRank.h"
+#include "Hatrix/classes/LowRank2.h"
 
 namespace Hatrix {
 
@@ -11,9 +12,13 @@ Matrix<DT> operator+(const Matrix<DT>& A, const Matrix<DT>& B);
 
 template <typename DT>
 Matrix<DT>& operator+=(Matrix<DT>& A, const LowRank<DT>& B);
+template <typename DT>
+Matrix<DT>& operator+=(Matrix<DT>& A, const LowRank2<DT>& B);
 
 template <typename DT>
 LowRank<DT>& operator+=(LowRank<DT>& A, const LowRank<DT>& B);
+template <typename DT>
+LowRank2<DT>& operator+=(LowRank2<DT>& A, const LowRank2<DT>& B);
 
 template <typename DT>
 Matrix<DT>& operator-=(Matrix<DT>& A, const Matrix<DT>& B);

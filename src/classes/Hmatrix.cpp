@@ -1,6 +1,6 @@
 #include "Hatrix/classes/Hmatrix.h"
 #include "Hatrix/classes/Matrix.h"
-#include "Hatrix/classes/LowRank.h"
+#include "Hatrix/classes/LowRank2.h"
 #include "Hatrix/functions/lapack.h"
 #include "Hatrix/functions/blas.h"
 #include "Hatrix/functions/arithmetics.h"
@@ -47,15 +47,15 @@ void Hmatrix<DT>::spawn_lr_children(int row, int col, int level) {
   // S and non-split U/V are currently not used, but might be useful in the future for GEMM split
   if (col > row) {
     std::vector<Matrix<DT>> children = low_rank(row, col, level).U.split(2,1);
-    low_rank.insert(child_row, child_col, level+1, LowRank<DT>(children[0], low_rank(row, col, level).S, low_rank(row, col, level).V, false));
+    low_rank.insert(child_row, child_col, level+1, LowRank2<DT>(children[0], low_rank(row, col, level).S, low_rank(row, col, level).V, false));
     spawn_lr_children(child_row, child_col, level+1);
-    low_rank.insert(child_row+1, child_col, level+1, LowRank<DT>(children[1], low_rank(row, col, level).S, low_rank(row, col, level).V, false));
+    low_rank.insert(child_row+1, child_col, level+1, LowRank2<DT>(children[1], low_rank(row, col, level).S, low_rank(row, col, level).V, false));
     spawn_lr_children(child_row+1, child_col, level+1);
   } else {
     std::vector<Matrix<DT>> children = low_rank(row, col, level).V.split(1,2);
-    low_rank.insert(child_row, child_col, level+1, LowRank<DT>(low_rank(row, col, level).U, low_rank(row, col, level).S, children[0], false));
+    low_rank.insert(child_row, child_col, level+1, LowRank2<DT>(low_rank(row, col, level).U, low_rank(row, col, level).S, children[0], false));
     spawn_lr_children(child_row, child_col, level+1);
-    low_rank.insert(child_row, child_col+1, level+1, LowRank<DT>(low_rank(row, col, level).U, low_rank(row, col, level).S, children[1], false));
+    low_rank.insert(child_row, child_col+1, level+1, LowRank2<DT>(low_rank(row, col, level).U, low_rank(row, col, level).S, children[1], false));
     spawn_lr_children(child_row, child_col+1, level+1);
   }
 }
@@ -68,7 +68,7 @@ void Hmatrix<DT>::add_lr_block(const Matrix<DT>& A, omp_lock_t& lock, int row, i
   if (is_admissible(row, col, level)) {
     #pragma omp task shared(low_rank, lock)
     {
-      LowRank<DT> LR(A, rank);
+      LowRank2<DT> LR(A, rank);
       omp_set_lock(&lock);
       low_rank.insert(row, col, level, std::move(LR));
       spawn_lr_children(row, col, level);
@@ -250,7 +250,7 @@ void Hmatrix<DT>::trsm(int row, int col, int level, Side side, Mode uplo) {
 }
 
 template <typename DT>
-void Hmatrix<DT>::add(int row, int col, int level, LowRank<DT>& temp, int block_start, int block_size) {
+void Hmatrix<DT>::add(int row, int col, int level, LowRank2<DT>& temp, int block_start, int block_size) {
     if (level < max_level) {
       int start = row * 2;
       block_size = block_size/2;
@@ -262,7 +262,7 @@ void Hmatrix<DT>::add(int row, int col, int level, LowRank<DT>& temp, int block_
       {
         Matrix<DT> U = temp.U.get_row_block(block_start, block_size);
         Matrix<DT> V = temp.V.get_col_block(block_start+block_size, block_size);
-        LowRank<DT> T(U, temp.S, V, false);
+        LowRank2<DT> T(U, temp.S, V, false);
         low_rank(start, start+1, level+1) += T;
       }
       update_children(start, start+1, level+1);
@@ -270,7 +270,7 @@ void Hmatrix<DT>::add(int row, int col, int level, LowRank<DT>& temp, int block_
       {
         Matrix<DT> U = temp.U.get_row_block(block_start+block_size, block_size);
         Matrix<DT> V = temp.V.get_col_block(block_start, block_size);
-        LowRank<DT> T(U, temp.S, V, false);
+        LowRank2<DT> T(U, temp.S, V, false);
         low_rank(start+1, start, level+1) += T;
       }
       update_children(start+1, start, level+1);
@@ -279,14 +279,14 @@ void Hmatrix<DT>::add(int row, int col, int level, LowRank<DT>& temp, int block_
       {
         Matrix<DT> U = temp.U.get_row_block(block_start, block_size);
         Matrix<DT> V = temp.V.get_col_block(block_start, block_size);
-        LowRank<DT> T(U, temp.S, V, false);
+        LowRank2<DT> T(U, temp.S, V, false);
         dense(row, col, level) += T;
       }
     }
   }
 
 template <typename DT>
-void Hmatrix<DT>::matmul(int row, int col, int level, Hatrix::LowRank<DT>& temp) {
+void Hmatrix<DT>::matmul(int row, int col, int level, Hatrix::LowRank2<DT>& temp) {
   if (level < max_level) {
     // wait for all tasks on children of the input low-rank blocks
     update_parent(row, col-1, level);
@@ -306,7 +306,7 @@ void Hmatrix<DT>::matmul(int row, int col, int level, Hatrix::LowRank<DT>& temp)
 }
 
 template <typename DT>
-void Hmatrix<DT>::getrf(int row, int col, int level, Hatrix::LowRank<DT>& temp) {
+void Hmatrix<DT>::getrf(int row, int col, int level, Hatrix::LowRank2<DT>& temp) {
   int start = row * 2;
   if (level < max_level) {
     getrf(start, start, level+1, temp);
@@ -324,7 +324,7 @@ void Hmatrix<DT>::getrf(int row, int col, int level, Hatrix::LowRank<DT>& temp) 
 
 template <typename DT>
 void Hmatrix<DT>::lu() {
-  Hatrix::LowRank<DT> temp;
+  Hatrix::LowRank2<DT> temp;
   #pragma omp parallel
   {
     #pragma omp single 

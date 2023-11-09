@@ -218,8 +218,10 @@ bool RowColLevelMap<T>::exists(int64_t row, int64_t col, int64_t level) const {
 template class RowColLevelMap<bool>;
 template class RowColLevelMap<Matrix<float>>;
 template class RowColLevelMap<LowRank<float>>;
+template class RowColLevelMap<LowRank2<float>>;
 template class RowColLevelMap<Matrix<double>>;
 template class RowColLevelMap<LowRank<double>>;
+template class RowColLevelMap<LowRank2<double>>;
 
 
 }  // namespace Hatrix

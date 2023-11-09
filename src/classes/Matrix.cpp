@@ -63,6 +63,31 @@ Matrix<DT>::Matrix(const Matrix<DT>& A) : rows(A.rows), cols(A.cols) {
   }
 }
 
+template <typename DT> template <typename OT>
+Matrix<DT>::Matrix(const Matrix<OT>& A)
+    : rows(A.rows),
+      cols(A.cols) {
+
+  assert(!A.is_view);
+  try {
+    data_ptr = new DT[rows * cols]();
+  }
+  catch (std::bad_alloc& e) {
+    std::cout << "Matrix(const Matrix& A, bool copy) -> "
+              << e.what()
+              << " rows= " << rows
+              << " cols= " << cols
+              << std::endl;
+  }
+  is_view = false;
+  stride = A.rows;
+  for (int i = 0; i < A.rows; ++i) {
+    for (int j = 0; j < A.cols; ++j) {
+      (*this)(i, j) = (DT) A(i, j);
+    }
+  }
+}
+
 // Copy constructor if you want to explicitly make a copy.
 template <typename DT>
 Matrix<DT>::Matrix(const Matrix<DT>& A, bool copy)
@@ -470,5 +495,7 @@ void Matrix<DT>::destructive_resize(const int64_t nrows, const int64_t ncols) {
 // explicit instantiation (these are the only available data-types)
 template class Matrix<float>;
 template class Matrix<double>;
+template Matrix<float>::Matrix(const Matrix<double>&);
+template Matrix<double>::Matrix(const Matrix<float>&);
 
 }  // namespace Hatrix

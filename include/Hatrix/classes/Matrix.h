@@ -38,6 +38,9 @@ class Matrix {
   // https://stackoverflow.com/questions/40457302/c-vector-emplace-back-calls-copy-constructor
   Matrix(const Matrix& A, bool copy);
 
+  template <typename OT>
+  explicit Matrix(const Matrix<OT>& A);
+
   Matrix& operator=(const Matrix& A);
 
   Matrix& operator=(Matrix&& A);
@@ -61,8 +64,6 @@ class Matrix {
 
   Matrix<DT> get_row_block(const int64_t start, const int64_t size) const;
   Matrix<DT> get_col_block(const int64_t start, const int64_t size) const;
-
-
 
   // Split the matrix into n_row_splits * n_col_splits blocks.
   // n_row_splits is the number of blocks in the row dimension and

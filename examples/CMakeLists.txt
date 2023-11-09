@@ -57,6 +57,7 @@ else()
     HODLR_Nlevel_parallel
     HODLR_Nlevel_parallel_interleaved
     HODLR_Nlevel_test
+    Hmatrix_simple_test
     #Construction_SymmetricH2_Nlevel_with_sampling
   )
 endif()
