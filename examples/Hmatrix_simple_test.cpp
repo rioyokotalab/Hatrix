@@ -54,7 +54,7 @@ int main() {
   Hatrix::Matrix residual(n, 1);
   Hatrix::matmul(D, b_dense, residual, false, false, 1, 0);
   residual -= b;
-  std::cout<<std::setprecision(16)<<"Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
+  std::cout<<std::setprecision(16)<<"Solve Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
 
   tic = get_time();   
   Hatrix::HODLR<double> hodlr(D, leaf_size, rank);
@@ -67,13 +67,15 @@ int main() {
   hodlr.lu();
   toc = get_time();
   std::cout<<"Factorization Time: "<<toc-tic<<std::endl;
+  Hatrix::Matrix<double> hodlr_lu_dense = hodlr.make_dense();
+  std::cout<<"Factorization Error: "<<Hatrix::norm(D_dense - hodlr_lu_dense)<<std::endl;
   tic = get_time();
   hodlr.solve(b_hodlr);
   toc = get_time();
   std::cout<<"Solution Time: "<<toc-tic<<std::endl;
   Hatrix::matmul(D, b_hodlr, residual, false, false, 1, 0);
   residual -= b;
-  std::cout<<"Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
+  std::cout<<"Solve Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
 
   tic = get_time();   
   Hatrix::Hmatrix<double> hmatrix(D_hmatrix, leaf_size, rank);
@@ -88,24 +90,30 @@ int main() {
   hmatrix.lu();
   toc = get_time();
   std::cout<<"Factorization Time: "<<toc-tic<<std::endl;
+  Hatrix::Matrix<double> hmatrix_lu_dense = hmatrix.make_dense();
+  std::cout<<"Factorization Error: "<<Hatrix::norm(D_dense - hmatrix_lu_dense)<<std::endl;
   tic = get_time();
   hmatrix.solve(b_hmatrix);
   toc = get_time();
   std::cout<<"Solution Time: "<<toc-tic<<std::endl;
   Hatrix::matmul(D, b_hmatrix, residual, false, false, 1, 0);
   residual -= b;
-  std::cout<<"Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
+  std::cout<<"SolveError: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
   
   // single precision
   Hatrix::Matrix<float> D_dense_f(D);
   Hatrix::Matrix<float> b_dense_f(b);
   Hatrix::Matrix<float> b_hmatrix_f(b);
 
+  std::cout<<"Dense (single precision): "<<std::endl;
+  Hatrix::Matrix<double> D_dense_d(D_dense_f);
+  std::cout<<"Construction Error: "<<Hatrix::norm(D - D_dense_d)<<std::endl;
   tic = get_time();
   lu_nopiv(D_dense_f);
   toc = get_time();
-  std::cout<<"Dense (single precision): "<<std::endl;
   std::cout<<"Factorization Time: "<<toc-tic<<std::endl;
+  Hatrix::Matrix<double> D_dense_lu_d(D_dense_f);
+  std::cout<<"Factorization Error: "<<Hatrix::norm(D_dense - D_dense_lu_d)<<std::endl;
   tic = get_time();
   Hatrix::solve_triangular(D_dense_f, b_dense_f, Hatrix::Left, Hatrix::Lower, true, false);
   Hatrix::solve_triangular(D_dense_f, b_dense_f, Hatrix::Left, Hatrix::Upper, false, false);
@@ -114,7 +122,7 @@ int main() {
   Hatrix::Matrix<double> x_dense(b_dense_f);
   Hatrix::matmul(D, x_dense, residual, false, false, 1, 0);
   residual -= b;
-  std::cout<<"Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
+  std::cout<<"Solve Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
 
   std::cout<<"H-matrix (single precision): "<<std::endl;
   Hatrix::Matrix<float> hmatrix_dense_f = hmatrix_f.make_dense();
@@ -124,6 +132,9 @@ int main() {
   hmatrix_f.lu();
   toc = get_time();
   std::cout<<"Factorization Time: "<<toc-tic<<std::endl;
+  Hatrix::Matrix<float> hmatrix_dense_lu_f = hmatrix_f.make_dense();
+  Hatrix::Matrix<double> hmatrix_dense_lu_f_d(hmatrix_dense_lu_f);
+  std::cout<<"Factorization Error: "<<Hatrix::norm(D_dense - hmatrix_dense_lu_f_d)<<std::endl;
   tic = get_time();
   hmatrix_f.solve(b_hmatrix_f);
   toc = get_time();
@@ -131,7 +142,7 @@ int main() {
   Hatrix::Matrix<double> x_hmatrix(b_hmatrix_f);
   Hatrix::matmul(D, x_hmatrix, residual, false, false, 1, 0);
   residual -= b;
-  std::cout<<"Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
+  std::cout<<"Solve Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
   
   return 0;
 }
