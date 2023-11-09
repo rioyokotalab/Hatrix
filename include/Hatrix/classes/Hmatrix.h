@@ -24,6 +24,7 @@ class Hmatrix {
   ~Hmatrix() = default;
 
   void lu();
+  Matrix<DT> make_dense() const;
   void solve(Matrix<DT>& B) const;
 
  private:
@@ -45,6 +46,8 @@ class Hmatrix {
   void matmul(int row, int col, int level, LowRank2<DT>& temp);
   void getrf(int row, int col, int level, LowRank2<DT>& temp);
   void trsm_solve(int row, int col, int level, Matrix<DT>& B, Side side, Mode uplo) const;
+  void materialize(Matrix<DT>& A, int row, int col, int level) const;
+  void materialize_low_rank(Matrix<DT>& A, int row, int col, int level) const;
 
 };
 

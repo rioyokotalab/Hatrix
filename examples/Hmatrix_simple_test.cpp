@@ -61,8 +61,8 @@ int main() {
   toc = get_time();
   std::cout<<"HODLR: "<<std::endl;
   std::cout<<"Construction Time: "<<toc-tic<<std::endl;
-  //Hatrix::Matrix<double> hodlr_dense = hodlr.make_dense(),
-  //std::cout<<"Error: "<<Hatrix::norm(b_copy - b)<<std::endl;
+  Hatrix::Matrix<double> hodlr_dense = hodlr.make_dense();
+  std::cout<<"Construction Error: "<<Hatrix::norm(D - hodlr_dense)<<std::endl;
   tic = get_time();    
   hodlr.lu();
   toc = get_time();
@@ -82,6 +82,8 @@ int main() {
   toc = get_time();
   std::cout<<"H-matrix: "<<std::endl;
   std::cout<<"Construction Time: "<<toc-tic<<std::endl;
+  Hatrix::Matrix<double> hmatrix_dense = hmatrix.make_dense();
+  std::cout<<"Construction Error: "<<Hatrix::norm(D - hmatrix_dense)<<std::endl;
   tic = get_time();    
   hmatrix.lu();
   toc = get_time();
@@ -115,6 +117,9 @@ int main() {
   std::cout<<"Error: "<<Hatrix::norm(residual)<<std::endl<<std::endl;
 
   std::cout<<"H-matrix (single precision): "<<std::endl;
+  Hatrix::Matrix<float> hmatrix_dense_f = hmatrix_f.make_dense();
+  Hatrix::Matrix<double> hmatrix_dense_f_d(hmatrix_dense_f);
+  std::cout<<"Construction Error: "<<Hatrix::norm(D - hmatrix_dense_f_d)<<std::endl;
   tic = get_time();    
   hmatrix_f.lu();
   toc = get_time();

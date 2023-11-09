@@ -422,6 +422,51 @@ void Hmatrix<DT>::trsm_solve(int row, int col, int level, Matrix<DT>& B, Side si
   }
 }
 
+template <typename DT>
+void Hmatrix<DT>::materialize_low_rank(Matrix<DT>& A, int row, int col, int level) const {
+  #pragma omp task shared(low_rank)
+  {
+    Hatrix::Matrix<DT> B = low_rank(row, col, level).make_dense();
+    for (int i=0; i<A.rows; ++i)
+      for (int j=0; j<A.cols; ++j)
+        A(i,j) = B(i,j);
+  }
+}
+
+template <typename DT>
+void Hmatrix<DT>::materialize(Matrix<DT>& A, int row, int col, int level) const {
+  int start = row * 2;
+  if (level < max_level) {
+    std::vector<Matrix<DT>> A_split = A.split(2,2);
+    materialize_low_rank(A_split[1], start, start+1, level+1);
+    materialize_low_rank(A_split[2], start+1, start, level+1);
+    materialize(A_split[0], start, start, level+1);
+    materialize(A_split[3], start+1, start+1, level+1);
+  } else {
+    #pragma omp task shared(dense)
+    {
+      for (int i=0; i<A.rows; ++i)
+        for (int j=0; j<A.cols; ++j)
+          A(i,j) = dense(row, col, level)(i,j);
+    }
+  }
+
+}
+
+template <typename DT>
+Matrix<DT> Hmatrix<DT>::make_dense() const {
+  int rows = dense.size() * leaf_size;
+  Matrix<DT> A(rows, rows);
+  #pragma omp parallel
+  {
+    #pragma omp single
+    {
+      materialize(A, 0, 0, 0);
+    }
+  }
+  return A;
+}
+
 // explicit instantiation (these are the only available data-types)
 template class Hmatrix<float>;
 template class Hmatrix<double>;
