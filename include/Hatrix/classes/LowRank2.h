@@ -8,6 +8,8 @@
 
 namespace Hatrix {
 
+enum class Approx {SVD, RSVD};
+
 template <typename DT = double>
 class LowRank2 {
  public:
@@ -50,7 +52,7 @@ class LowRank2 {
 
   LowRank2(LowRank2&& A) = default;
 
-  LowRank2(const Matrix<DT>& A, int64_t rank);
+  LowRank2(const Matrix<DT>& A, int64_t rank, Approx scheme=Approx::RSVD);
 
   const DT& operator()(int64_t i, int64_t j) const;
 

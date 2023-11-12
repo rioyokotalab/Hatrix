@@ -19,20 +19,24 @@
 namespace Hatrix {
 
 template <typename DT>
-LowRank2<DT>::LowRank2(const Matrix<DT>& A, int64_t rank)
+LowRank2<DT>::LowRank2(const Matrix<DT>& A, int64_t rank, Approx scheme)
     : rows(A.rows),
       cols(A.cols),
       rank(rank) {
-    /*int64_t dmin = A.min_dim();
-    Matrix<DT> U(A.rows, dmin);
-    Matrix<DT> S(dmin, dmin);
-    Matrix<DT> V(dmin, A.cols);
+  if (scheme == Approx::SVD) {
+    std::cout<<"Not implemented"<<std::endl;
+  }
+  /*int64_t dmin = A.min_dim();
+  Matrix<DT> U(A.rows, dmin);
+  Matrix<DT> S(dmin, dmin);
+  Matrix<DT> V(dmin, A.cols);
 
-    this->error = truncated_svd(A, U, S, V, rank);
-    //TODO move?
-    this->U = U;
-    this->S = S;
-    this->V = transpose(V);*/
+  this->error = truncated_svd(A, U, S, V, rank);
+  //TODO move?
+  this->U = U;
+  this->S = S;
+  this->V = transpose(V);*/
+  else {
     int sample_size = rank + 5;
     Matrix<DT> RN = generate_random_matrix<DT>(A.cols, sample_size);
 
@@ -53,6 +57,7 @@ LowRank2<DT>::LowRank2(const Matrix<DT>& A, int64_t rank)
     this->S.shrink(rank, rank);
     this->V.shrink(rank, V.cols);
   }
+}
 
 template <typename DT> template <typename OT>
 LowRank2<DT>::LowRank2(const LowRank2<OT>& A)
