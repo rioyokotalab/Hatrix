@@ -28,8 +28,9 @@ LowRank2<DT>::LowRank2(const Matrix<DT>& A, int64_t rank, Approx scheme)
     Matrix<DT> U(A.rows, dmin);
     Matrix<DT> S(dmin, dmin);
     Matrix<DT> V(dmin, A.cols);
+    Matrix<DT> A_copy(A, true);
 
-    this->error = truncated_svd(A, U, S, V, rank);
+    this->error = truncated_svd(A_copy, U, S, V, rank);
     this->U = std::move(U);
     this->S = std::move(S);
     this->V = std::move(V);

@@ -36,7 +36,7 @@ Hmatrix<DT>::Hmatrix(const Hmatrix<OT>& A): leaf_size(A.leaf_size), max_level(A.
 }
 
 template <typename DT>
-Hmatrix<DT>::Hmatrix(const Matrix<DT>& A, int leaf_size, int rank) : leaf_size(leaf_size), rank(rank), max_level(0) {
+Hmatrix<DT>::Hmatrix(const Matrix<DT>& A, int leaf_size, int rank, Approx scheme) : leaf_size(leaf_size), rank(rank), max_level(0) {
   int size = A.rows;
   while (leaf_size < size){
     size = size>>1;
@@ -54,7 +54,7 @@ Hmatrix<DT>::Hmatrix(const Matrix<DT>& A, int leaf_size, int rank) : leaf_size(l
     #pragma omp single 
     {
       add_dense_blocks(A, dense_lock);
-      add_lr_block(A, lr_lock);     
+      add_lr_block(A, lr_lock, scheme);     
     }
   }
   //add_lr_block(A, lr_lock); 
@@ -84,14 +84,14 @@ void Hmatrix<DT>::spawn_lr_children(int row, int col, int level) {
 }
   
 template <typename DT>
-void Hmatrix<DT>::add_lr_block(const Matrix<DT>& A, omp_lock_t& lock, int row, int col, int level) {
+void Hmatrix<DT>::add_lr_block(const Matrix<DT>& A, omp_lock_t& lock, Approx scheme, int row, int col, int level) {
   if (A.rows < leaf_size)
     return;
 
   if (is_admissible(row, col, level)) {
     #pragma omp task shared(low_rank, lock)
     {
-      LowRank2<DT> LR(A, rank);
+      LowRank2<DT> LR(A, rank, scheme);
       omp_set_lock(&lock);
       low_rank.insert(row, col, level, std::move(LR));
       spawn_lr_children(row, col, level);
@@ -100,10 +100,10 @@ void Hmatrix<DT>::add_lr_block(const Matrix<DT>& A, omp_lock_t& lock, int row, i
   } else {
     int start = row * 2;
     std::vector<Hatrix::Matrix<DT>> A_split = A.split(2, 2);
-    add_lr_block(A_split[0], lock, start, start, level+1);
-    add_lr_block(A_split[1], lock, start, start+1, level+1);
-    add_lr_block(A_split[2], lock, start+1, start, level+1);
-    add_lr_block(A_split[3], lock, start+1, start+1, level+1);
+    add_lr_block(A_split[0], lock, scheme, start, start, level+1);
+    add_lr_block(A_split[1], lock, scheme, start, start+1, level+1);
+    add_lr_block(A_split[2], lock, scheme, start+1, start, level+1);
+    add_lr_block(A_split[3], lock, scheme, start+1, start+1, level+1);
   }
 }
 
