@@ -62,6 +62,8 @@ class Matrix {
 
   void create_view(const Matrix<DT>& A);
 
+  DT get_error(const Matrix<DT>& A) const;
+
   Matrix<DT> get_row_block(const int64_t start, const int64_t size) const;
   Matrix<DT> get_col_block(const int64_t start, const int64_t size) const;
 

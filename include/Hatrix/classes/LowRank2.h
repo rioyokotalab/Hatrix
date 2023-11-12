@@ -62,6 +62,8 @@ class LowRank2 {
 
   void print_approx() const;
 
+  DT get_error(const Matrix<DT>& A) const;
+
   int64_t get_rank(DT error) const;
 };
 

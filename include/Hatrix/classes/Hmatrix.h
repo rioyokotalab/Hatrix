@@ -26,6 +26,7 @@ class Hmatrix {
   void lu();
   Matrix<DT> make_dense() const;
   void solve(Matrix<DT>& B) const;
+  void print_error(const Matrix<DT>& A) const;
 
  private:
   void add_admissibility(int row=0, int col=0, int level=0);
@@ -48,7 +49,8 @@ class Hmatrix {
   void trsm_solve(int row, int col, int level, Matrix<DT>& B, Side side, Mode uplo) const;
   void materialize(Matrix<DT>& A, int row, int col, int level) const;
   void materialize_low_rank(Matrix<DT>& A, int row, int col, int level) const;
-
+  void print_lr_error(const Matrix<DT>& A, int row, int col, int level) const;
+  void print_block_error(const Matrix<DT>& A, int row, int col, int level) const;
 };
 
 }  // namespace Hatrix

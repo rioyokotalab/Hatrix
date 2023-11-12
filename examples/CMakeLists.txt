@@ -59,6 +59,7 @@ else()
     HODLR_Nlevel_test
     Hmatrix_simple_test
     Hmatrix_simple_svd_test
+    Hmatrix_simple_construction_test
     #Construction_SymmetricH2_Nlevel_with_sampling
   )
 endif()

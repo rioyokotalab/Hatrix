@@ -109,6 +109,14 @@ void LowRank2<DT>::print_approx() const {
 };
 
 template <typename DT>
+DT LowRank2<DT>::get_error(const Matrix<DT>& A) const {
+  assert(A.rows == this->rows);
+  assert(A.colss == this->cols);
+
+  return norm(A - this->make_dense());
+};
+
+template <typename DT>
 int64_t LowRank2<DT>::get_rank(DT error) const {
   int64_t l = 0;
   int64_t r = rank - 1;

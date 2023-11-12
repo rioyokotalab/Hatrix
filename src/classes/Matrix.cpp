@@ -1,6 +1,7 @@
 #include "Hatrix/classes/Matrix.h"
 #include "Hatrix/functions/lapack.h"
 #include "Hatrix/functions/blas.h"
+#include "Hatrix/functions/arithmetics.h"
 
 #include <algorithm>
 #include <cassert>
@@ -490,6 +491,13 @@ void Matrix<DT>::destructive_resize(const int64_t nrows, const int64_t ncols) {
   stride = nrows;
   is_view = false;
   data_ptr = new DT[rows * cols];
+}
+
+template <typename DT>
+DT Matrix<DT>::get_error(const Matrix<DT>& A) const {
+  assert(A.rows == this->rows);
+  assert(A.cols == this->cols);
+  return norm(A - *this);
 }
 
 // explicit instantiation (these are the only available data-types)

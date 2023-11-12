@@ -450,6 +450,28 @@ void Hmatrix<DT>::materialize(Matrix<DT>& A, int row, int col, int level) const 
           A(i,j) = dense(row, col, level)(i,j);
     }
   }
+}
+template <typename DT>
+void Hmatrix<DT>::print_lr_error(const Matrix<DT>& A, int row, int col, int level) const {
+  std::cout << "Block (" << row << ", " << col << ", " << level << "): ";
+  std::cout << low_rank(row, col, level).get_error(A) << "(k = ";
+  std::cout << low_rank(row, col, level).rank << ")" << std::endl;
+}
+
+// non parallel
+template <typename DT>
+void Hmatrix<DT>::print_block_error(const Matrix<DT>& A, int row, int col, int level) const {
+  int start = row * 2;
+  if (level < max_level) {
+    std::vector<Matrix<DT>> A_split = A.split(2,2);
+    print_block_error(A_split[0], start, start, level+1);
+    print_lr_error(A_split[1], start, start+1, level+1);
+    print_lr_error(A_split[2], start+1, start, level+1);
+    print_block_error(A_split[3], start+1, start+1, level+1);
+  } else {
+    std::cout << "Block (" << row << ", " << col << ", " << level << "): ";
+    std::cout << dense(row, col, level).get_error(A) << std::endl;
+  }
 
 }
 
@@ -465,6 +487,11 @@ Matrix<DT> Hmatrix<DT>::make_dense() const {
     }
   }
   return A;
+}
+
+template <typename DT>
+void Hmatrix<DT>::print_error(const Matrix<DT>& A) const {
+  print_block_error(A, 0, 0, 0);
 }
 
 // explicit instantiation (these are the only available data-types)
