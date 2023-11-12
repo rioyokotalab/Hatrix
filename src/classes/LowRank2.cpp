@@ -24,19 +24,16 @@ LowRank2<DT>::LowRank2(const Matrix<DT>& A, int64_t rank, Approx scheme)
       cols(A.cols),
       rank(rank) {
   if (scheme == Approx::SVD) {
-    std::cout<<"Not implemented"<<std::endl;
-  }
-  /*int64_t dmin = A.min_dim();
-  Matrix<DT> U(A.rows, dmin);
-  Matrix<DT> S(dmin, dmin);
-  Matrix<DT> V(dmin, A.cols);
+    int64_t dmin = A.min_dim();
+    Matrix<DT> U(A.rows, dmin);
+    Matrix<DT> S(dmin, dmin);
+    Matrix<DT> V(dmin, A.cols);
 
-  this->error = truncated_svd(A, U, S, V, rank);
-  //TODO move?
-  this->U = U;
-  this->S = S;
-  this->V = transpose(V);*/
-  else {
+    this->error = truncated_svd(A, U, S, V, rank);
+    this->U = std::move(U);
+    this->S = std::move(S);
+    this->V = std::move(V);
+  } else {
     int sample_size = rank + 5;
     Matrix<DT> RN = generate_random_matrix<DT>(A.cols, sample_size);
 
