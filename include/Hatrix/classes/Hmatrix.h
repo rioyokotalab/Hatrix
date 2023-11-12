@@ -27,6 +27,8 @@ class Hmatrix {
   Matrix<DT> make_dense() const;
   void solve(Matrix<DT>& B) const;
   void print_error(const Matrix<DT>& A) const;
+  template <typename OT>
+  void print_error(const Matrix<OT>& A) const;
   void print_error() const;
 
  private:

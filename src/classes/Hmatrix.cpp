@@ -516,6 +516,12 @@ void Hmatrix<DT>::print_error(const Matrix<DT>& A) const {
   print_block_error(A, 0, 0, 0);
 }
 
+template <typename DT> template <typename OT>
+void Hmatrix<DT>::print_error(const Matrix<OT>& A) const {
+  Hmatrix<OT> copy(*this);
+  copy.print_error(A);
+}
+
 template <typename DT>
 void Hmatrix<DT>::print_error() const {
   print_block_error(0, 0, 0);
@@ -526,5 +532,6 @@ template class Hmatrix<float>;
 template class Hmatrix<double>;
 template Hmatrix<float>::Hmatrix(const Hmatrix<double>&);
 template Hmatrix<double>::Hmatrix(const Hmatrix<float>&);
+template void Hmatrix<float>::print_error(const Matrix<double>& A) const;
 
 }  // namespace Hatrix

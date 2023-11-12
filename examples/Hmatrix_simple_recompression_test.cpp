@@ -55,7 +55,7 @@ int main() {
   std::cout<<"Construction Time: "<<toc-tic<<std::endl;
   Hatrix::Matrix<double> hodlr_dense = hodlr.make_dense();
   std::cout<<"Construction Error: "<<Hatrix::norm(D - hodlr_dense)<<std::endl;
-  
+  /*
   tic = get_time();   
   Hatrix::Hmatrix<double> hmatrix(D_hmatrix, leaf_size, rank);
   toc = get_time();
@@ -67,6 +67,7 @@ int main() {
   std::cout<<std::endl;
   hmatrix.print_error(D);
   std::cout<<std::endl;
+  */
 
   tic = get_time();   
   Hatrix::Hmatrix<double> hmatrix2(D_hmatrix, leaf_size, rank, Hatrix::Approx::SVD);
@@ -77,26 +78,11 @@ int main() {
   std::cout<<"Construction Time: "<<toc-tic<<std::endl;
   Hatrix::Matrix<double> hmatrix2_dense = hmatrix2.make_dense();
   std::cout<<"Construction Error: "<<Hatrix::norm(D - hmatrix2_dense)<<std::endl;
-  hmatrix2.print_error();
-  std::cout<<std::endl;
-  hmatrix2.print_error(D);
-  std::cout<<std::endl;
-
-  Hatrix::Hmatrix<float> hmatrix_f(hmatrix);
-  Hatrix::Hmatrix<float> hmatrix2_f(hmatrix2);
-
-  std::cout<<"H-matrix (single precision, RSVD): "<<std::endl;
-  Hatrix::Matrix<float> hmatrix_dense_f = hmatrix_f.make_dense();
-  Hatrix::Matrix<double> hmatrix_dense_f_d(hmatrix_dense_f);
-  std::cout<<"Construction Error: "<<Hatrix::norm(D - hmatrix_dense_f_d)<<std::endl;
-  hmatrix_f.print_error(D);
-  std::cout<<std::endl;
-
-  std::cout<<"H-matrix (single precision, SVD): "<<std::endl;
-  Hatrix::Matrix<float> hmatrix2_dense_f = hmatrix2_f.make_dense();
-  Hatrix::Matrix<double> hmatrix2_dense_f_d(hmatrix_dense_f);
-  std::cout<<"Construction Error: "<<Hatrix::norm(D - hmatrix2_dense_f_d)<<std::endl;
-  hmatrix2_f.print_error(D);
+  //hmatrix2.print_error();
+  //std::cout<<std::endl;
+  //hmatrix2.print_error(D);
+  //std::cout<<std::endl;
+  hmatrix2.lu();
 
   return 0;
 }

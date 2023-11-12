@@ -147,6 +147,12 @@ LowRank2<DT>& operator+=(LowRank2<DT>& A, const LowRank2<DT>& B) {
   Matrix<DT> Shat(M.rows, M.cols);
   Matrix<DT> Vhat(M.cols, M.cols);
   svd(M, Uhat, Shat, Vhat);
+  // TODO, this is where the recompression takes place and the ranks increase
+  std::cout<<"Addition: " << A.error << "(before) vs ";
+  double expected_err = 0;
+  for (int64_t k = rank; k < Shat.min_dim(); ++k)
+    expected_err += Shat(k, k) * Shat(k, k);
+  std::cout << std::sqrt(expected_err) << "(afer)" <<std::endl;
   Uhat.shrink(Uhat.rows, rank);
   Shat.shrink(rank, rank);
   Vhat.shrink(rank, Vhat.cols);
