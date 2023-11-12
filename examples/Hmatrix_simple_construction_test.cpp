@@ -65,6 +65,8 @@ int main() {
   std::cout<<"Construction Time: "<<toc-tic<<std::endl;
   Hatrix::Matrix<double> hmatrix_dense = hmatrix.make_dense();
   std::cout<<"Construction Error: "<<Hatrix::norm(D - hmatrix_dense)<<std::endl;
+  hmatrix.print_error();
+  std::cout<<std::endl;
   hmatrix.print_error(D);
   std::cout<<std::endl;
 
@@ -77,7 +79,10 @@ int main() {
   std::cout<<"Construction Time: "<<toc-tic<<std::endl;
   Hatrix::Matrix<double> hmatrix2_dense = hmatrix2.make_dense();
   std::cout<<"Construction Error: "<<Hatrix::norm(D - hmatrix2_dense)<<std::endl;
+  hmatrix2.print_error();
+  std::cout<<std::endl;
   hmatrix2.print_error(D);
+
   // single precision
   /*Hatrix::Matrix<float> D_dense_f(D);
   Hatrix::Matrix<float> b_dense_f(b);

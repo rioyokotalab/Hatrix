@@ -49,7 +49,8 @@ LowRank2<DT>::LowRank2(const Matrix<DT>& A, int64_t rank, Approx scheme)
     this->V = Matrix<DT>(sample_size, QtA.cols);
     svd(QtA, Ub, S, V);
 
-    this->error = S(rank, rank);
+    // We don't really know the error at this point
+    this->error = -1;
     this->U = matmul(Q, Ub);
     this->U.shrink(U.rows, rank);
     this->S.shrink(rank, rank);
@@ -114,6 +115,14 @@ DT LowRank2<DT>::get_error(const Matrix<DT>& A) const {
   assert(A.colss == this->cols);
 
   return norm(A - this->make_dense());
+};
+
+template <typename DT>
+DT LowRank2<DT>::get_error() const {
+  assert(A.rows == this->rows);
+  assert(A.colss == this->cols);
+
+  return this->error;
 };
 
 template <typename DT>

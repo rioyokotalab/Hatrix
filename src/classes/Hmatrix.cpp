@@ -451,11 +451,34 @@ void Hmatrix<DT>::materialize(Matrix<DT>& A, int row, int col, int level) const 
     }
   }
 }
+
+template <typename DT>
+void Hmatrix<DT>::print_lr_error(int row, int col, int level) const {
+  std::cout << "Block (" << row << ", " << col << ", " << level << "): ";
+  std::cout << low_rank(row, col, level).get_error() << "(k = ";
+  std::cout << low_rank(row, col, level).rank << ")" << std::endl;
+}
+
 template <typename DT>
 void Hmatrix<DT>::print_lr_error(const Matrix<DT>& A, int row, int col, int level) const {
   std::cout << "Block (" << row << ", " << col << ", " << level << "): ";
   std::cout << low_rank(row, col, level).get_error(A) << "(k = ";
   std::cout << low_rank(row, col, level).rank << ")" << std::endl;
+}
+
+// non parallel
+template <typename DT>
+void Hmatrix<DT>::print_block_error(int row, int col, int level) const {
+  int start = row * 2;
+  if (level < max_level) {
+    print_block_error(start, start, level+1);
+    print_lr_error(start, start+1, level+1);
+    print_lr_error(start+1, start, level+1);
+    print_block_error(start+1, start+1, level+1);
+  } else {
+    std::cout << "Block (" << row << ", " << col << ", " << level << "): ";
+    std::cout << "Dense" << std::endl;
+  }
 }
 
 // non parallel
@@ -472,7 +495,6 @@ void Hmatrix<DT>::print_block_error(const Matrix<DT>& A, int row, int col, int l
     std::cout << "Block (" << row << ", " << col << ", " << level << "): ";
     std::cout << dense(row, col, level).get_error(A) << std::endl;
   }
-
 }
 
 template <typename DT>
@@ -492,6 +514,11 @@ Matrix<DT> Hmatrix<DT>::make_dense() const {
 template <typename DT>
 void Hmatrix<DT>::print_error(const Matrix<DT>& A) const {
   print_block_error(A, 0, 0, 0);
+}
+
+template <typename DT>
+void Hmatrix<DT>::print_error() const {
+  print_block_error(0, 0, 0);
 }
 
 // explicit instantiation (these are the only available data-types)

@@ -64,6 +64,8 @@ class LowRank2 {
 
   DT get_error(const Matrix<DT>& A) const;
 
+  DT get_error() const;
+
   int64_t get_rank(DT error) const;
 };
 
