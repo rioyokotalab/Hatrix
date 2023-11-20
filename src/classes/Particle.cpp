@@ -1,6 +1,7 @@
-#include "Hatrix/classes/Particle.hpp"
 #include <vector>
 #include <iostream>
+
+#include "Hatrix/classes/Particle.hpp"
 
 namespace Hatrix {
   Particle::Particle() {

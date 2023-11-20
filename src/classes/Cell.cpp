@@ -1,10 +1,7 @@
+#include <cstdint>
 #include <vector>
-#include <string>
-#include <fstream>
-#include <algorithm>
-#include <random>
 
-#include "Hatrix/Hatrix.hpp"
+#include "Hatrix/classes/Cell.hpp"
 
 namespace Hatrix {
   Cell::Cell(int64_t ndim) {

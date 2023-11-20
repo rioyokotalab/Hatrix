@@ -67,12 +67,19 @@ SymmetricSharedBasisMatrix::leaf_dense_blocks() {
   return ndense_blocks;
 }
 
-SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix(const SymmetricSharedBasisMatrix& A) :
-  min_level(A.min_level), max_level(A.max_level) {
-  is_admissible.deep_copy(A.is_admissible);
-  S.deep_copy(A.S);
-  D.deep_copy(A.D);
-  U.deep_copy(A.U);
-}
-
 SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix() {}
+
+SymmetricSharedBasisMatrix::SymmetricSharedBasisMatrix(const SymmetricSharedBasisMatrix& A) :
+  min_level(A.min_level), max_level(A.max_level), min_adm_level(A.min_adm_level) {
+  level_nblocks = A.level_nblocks;
+  U.deep_copy(A.U);
+  Uc.deep_copy(A.Uc);
+  D.deep_copy(A.D);
+  S.deep_copy(A.S);
+  is_admissible.deep_copy(A.is_admissible);
+  admissible_cols.deep_copy(A.admissible_cols);
+  inadmissible_cols.deep_copy(A.inadmissible_cols);
+  US_row.deep_copy(A.US_row);
+  multipoles.deep_copy(A.multipoles);
+  R_row.deep_copy(A.R_row);
+}
