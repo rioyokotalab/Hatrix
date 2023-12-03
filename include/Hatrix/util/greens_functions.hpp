@@ -1,9 +1,16 @@
 #pragma once
 
-#include "Hatrix/Hatrix.hpp"
+#include <vector>
+#include <functional>
 
 namespace Hatrix {
   namespace greens_functions {
+    // Common type for kernel functions that can be used with lambda for currying the
+    // constants of the Green's function.
+    using kernel_function_t =
+      std::function<double(const std::vector<double>& coords_row,
+                           const std::vector<double>& coords_col)>;
+
     double laplace_2d_kernel(const std::vector<double>& coords_row,
                           const std::vector<double>& coords_col,
                           const double eta);

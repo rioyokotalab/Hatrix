@@ -60,6 +60,42 @@ Matrix generate_identity_matrix(int64_t rows, int64_t cols) {
   return out;
 }
 
+Matrix generate_p2p_interactions(const Domain& domain,
+                                 const int64_t irow, const int64_t nrows,
+                                 const int64_t jcol, const int64_t ncols,
+                                 const greens_functions::kernel_function_t& kernel) {
+  Matrix out(nrows, ncols);
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < nrows; ++i) {
+#pragma omp parallel for
+    for (int64_t j = 0; j < ncols; ++j) {
+      out(i, j) = kernel(domain.particles[i + irow].coords,
+                         domain.particles[j + jcol].coords);
+    }
+  }
+
+  return out;
+}
+
+Matrix generate_p2p_interactions(const Domain& domain,
+                                 const greens_functions::kernel_function_t& kernel) {
+  int64_t rows =  domain.particles.size();
+  int64_t cols =  domain.particles.size();
+  Matrix out(rows, cols);
+
+#pragma omp parallel for
+  for (int64_t i = 0; i < rows; ++i) {
+#pragma omp parallel for
+    for (int64_t j = 0; j < cols; ++j) {
+      out(i, j) = kernel(domain.particles[i].coords,
+                         domain.particles[j].coords);
+    }
+  }
+
+  return out;
+}
+
 Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
 				 int64_t rows, int64_t cols,
 				 int64_t row_start, int64_t col_start, double pv) {

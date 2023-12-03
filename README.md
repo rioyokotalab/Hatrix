@@ -18,9 +18,7 @@ Hatrix is useful for a large variety of programs as a result of its small and ni
 | File name                      | Description                                                                                                                           |
 |--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
 | examples/BLR2\_strong\_CON.cpp | Construct a strongly admissible BLR2 matrix and apply a matrix vector product to check the accuracy of construction using serial C++. |
-|                                |                                                                                                                                       |
-|                                |                                                                                                                                       |
-|                                |                                                                                                                                       |
+
 
 # Important types
 

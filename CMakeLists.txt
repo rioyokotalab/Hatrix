@@ -29,6 +29,7 @@ endif()
 
 add_library(Hatrix
   src/util/matrix_generators.cpp
+  src/util/greens_functions.cpp
   src/util/helpers.cpp
   src/util/profiling.cpp
   src/util/timer.cpp

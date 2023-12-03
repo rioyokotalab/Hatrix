@@ -13,8 +13,8 @@
 #include "functions/blas.hpp"
 #include "functions/lapack.hpp"
 
+#include "util/greens_functions.hpp"
 #include "util/matrix_generators.hpp"
 #include "util/helpers.hpp"
 #include "util/profiling.hpp"
-#include "util/greens_functions.hpp"
 #include "util/timer.hpp"

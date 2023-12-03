@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Hatrix/Hatrix.hpp"
+#include "Domain.hpp"
 
 namespace Hatrix {
   enum ADMIS_ALGORITHM { DUAL_TREE_TRAVERSAL, DIAGONAL_ADMIS };
@@ -19,13 +19,13 @@ namespace Hatrix {
     SymmetricSharedBasisMatrix(const SymmetricSharedBasisMatrix& A); // deep copy
 
     void
-    generate_admissibility(const Hatrix::Domain& domain, const bool use_nested_basis,
+    generate_admissibility(const Domain& domain, const bool use_nested_basis,
                            const ADMIS_ALGORITHM admis_algorithm,
                            const double admis);
 
   private:
     void actually_print_structure(int64_t level);
-    void dual_tree_traversal(const Hatrix::Domain& domain,
+    void dual_tree_traversal(const Domain& domain,
                              const int64_t Ci_index,
                              const int64_t Cj_index,
                              const bool use_nested_basis,

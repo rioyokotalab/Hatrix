@@ -3,8 +3,6 @@
 #include <vector>
 #include "Particle.hpp"
 
-#include "Hatrix/Hatrix.hpp"
-
 namespace Hatrix {
   // A single cell that contains indices for references lists of particles
   // within the sorted domain.
