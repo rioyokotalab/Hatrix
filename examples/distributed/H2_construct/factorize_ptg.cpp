@@ -335,27 +335,27 @@ h2_factorize_ptg_New(SymmetricSharedBasisMatrix& A,
                                   A.min_level);
 
   // Create arena type for the leaf dense block.
-  parsec_add2arena(&taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_ADT_IDX],
-                   parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
-                   opts.nleaf, opts.nleaf, opts.nleaf,
-                   PARSEC_ARENA_ALIGNMENT_SSE, -1);
+  // parsec_add2arena(&taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_ADT_IDX],
+  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+  //                  opts.nleaf, opts.nleaf, opts.nleaf,
+  //                  PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
   // Create arena type for the leaf bases block.
-  parsec_add2arena(&taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_LEAF_BASES_ADT_IDX],
-                   parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
-                   opts.nleaf, opts.max_rank, opts.nleaf,
-                   PARSEC_ARENA_ALIGNMENT_SSE, -1);
+  // parsec_add2arena(&taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_LEAF_BASES_ADT_IDX],
+  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+  //                  opts.nleaf, opts.max_rank, opts.nleaf,
+  //                  PARSEC_ARENA_ALIGNMENT_SSE, -1);
+
+  // Create arena type for skeleton blocks.
+  // parsec_add2arena(&taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_S_BLOCK_TILE_ADT_IDX],
+  //                  parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
+  //                  opts.max_rank, opts.max_rank, opts.max_rank,
+  //                  PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
   // Create arena type for the non-leaf dense block.
   parsec_add2arena(&taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_NON_LEAF_TILE_ADT_IDX],
                    parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
                    opts.max_rank * 2, opts.max_rank * 2, opts.max_rank * 2,
-                   PARSEC_ARENA_ALIGNMENT_SSE, -1);
-
-  // Create arena type for skeleton blocks.
-  parsec_add2arena(&taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_S_BLOCK_TILE_ADT_IDX],
-                   parsec_datatype_double_t, PARSEC_MATRIX_FULL, 1,
-                   opts.max_rank, opts.max_rank, opts.max_rank,
                    PARSEC_ARENA_ALIGNMENT_SSE, -1);
 
   // Set the default data type to the leaf dense block.
@@ -368,27 +368,27 @@ h2_factorize_ptg_New(SymmetricSharedBasisMatrix& A,
                          PARSEC_ARENA_ALIGNMENT_SSE);
 
   // TILE_LOWER_RIGHT_CORNER type
-  MPI_Datatype MPI_TILE_LOWER_RIGHT_CORNER;
-  int nleaf = opts.nleaf, max_rank = opts.max_rank;
-  const int array_of_sizes_br[2] = {nleaf, nleaf};
-  const int array_of_subsizes_br[2] = {max_rank, max_rank};
-  const int array_of_starts_br[2] =
-    {nleaf - max_rank, nleaf - max_rank};
-  MPI_Type_create_subarray(2,
-                           array_of_sizes_br,
-                           array_of_subsizes_br,
-                           array_of_starts_br,
-                           MPI_ORDER_FORTRAN,
-                           MPI_DOUBLE,
-                           &MPI_TILE_LOWER_RIGHT_CORNER);
-  MPI_Type_commit(&MPI_TILE_LOWER_RIGHT_CORNER);
-  taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_LOWER_RIGHT_CORNER_ADT_IDX].opaque_dtt =
-    MPI_TILE_LOWER_RIGHT_CORNER;
-  taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_LOWER_RIGHT_CORNER_ADT_IDX].arena =
-    PARSEC_OBJ_NEW(parsec_arena_t);
-  parsec_arena_construct(taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_LOWER_RIGHT_CORNER_ADT_IDX].arena,
-                         max_rank * max_rank,
-                         PARSEC_ARENA_ALIGNMENT_SSE);
+  // MPI_Datatype MPI_TILE_LOWER_RIGHT_CORNER;
+  // int nleaf = opts.nleaf, max_rank = opts.max_rank;
+  // const int array_of_sizes_br[2] = {nleaf, nleaf};
+  // const int array_of_subsizes_br[2] = {max_rank, max_rank};
+  // const int array_of_starts_br[2] =
+  //   {nleaf - max_rank, nleaf - max_rank};
+  // MPI_Type_create_subarray(2,
+  //                          array_of_sizes_br,
+  //                          array_of_subsizes_br,
+  //                          array_of_starts_br,
+  //                          MPI_ORDER_FORTRAN,
+  //                          MPI_DOUBLE,
+  //                          &MPI_TILE_LOWER_RIGHT_CORNER);
+  // MPI_Type_commit(&MPI_TILE_LOWER_RIGHT_CORNER);
+  // taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_LOWER_RIGHT_CORNER_ADT_IDX].opaque_dtt =
+  //   MPI_TILE_LOWER_RIGHT_CORNER;
+  // taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_LOWER_RIGHT_CORNER_ADT_IDX].arena =
+  //   PARSEC_OBJ_NEW(parsec_arena_t);
+  // parsec_arena_construct(taskpool->arenas_datatypes[PARSEC_h2_factorize_flows_TILE_LOWER_RIGHT_CORNER_ADT_IDX].arena,
+  //                        max_rank * max_rank,
+  //                        PARSEC_ARENA_ALIGNMENT_SSE);
 
   return taskpool;
 }

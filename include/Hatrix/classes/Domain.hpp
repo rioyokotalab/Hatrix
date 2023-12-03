@@ -3,8 +3,7 @@
 #include <vector>
 
 #include "Particle.hpp"
-
-#include "Hatrix/Hatrix.hpp"
+#include "Cell.hpp"
 
 namespace Hatrix {
   class Domain {
