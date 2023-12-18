@@ -20,6 +20,14 @@ namespace Hatrix {
       return std::sqrt(rij);
     }
 
+    double laplace_1d_kernel(const std::vector<double>& coords_row,
+                             const std::vector<double>& coords_col,
+                             const double eta) {
+      assert(coords_row.size() == coords_col.size());
+      const double dist = distance(coords_row, coords_col);
+      return (dist + eta) / 2;
+    }
+
     double laplace_2d_kernel(const std::vector<double>& coords_row,
                           const std::vector<double>& coords_col,
                           const double eta) {

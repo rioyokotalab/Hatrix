@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
   };
 
   // Define a 2D grid geometry using the Domain class.
-  const int64_t ndim = 1;
+  const int64_t ndim = 2;
   Hatrix::Domain domain(N, ndim);
   domain.generate_grid_particles();
   domain.cardinal_sort_and_cell_generation(nleaf);

@@ -26,4 +26,4 @@ cmake .. \
 make -j VERBOSE=1
 popd
 
-./build/examples/BLR2_strong_CON 1024 128 30 0.3
+./build/examples/BLR2_weak_CON 1024 128 30
