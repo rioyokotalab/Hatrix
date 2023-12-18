@@ -139,7 +139,50 @@ SymmetricSharedBasisMatrix::dual_tree_traversal(const Hatrix::Domain& domain,
       dual_tree_traversal(domain, Ci_index, c2_index, use_nested_basis, admis);
     }
   }
+}
 
+void
+SymmetricSharedBasisMatrix::compute_matrix_structure(int64_t level, const double admis) {
+  if (level == 0) { return; }
+  int64_t nodes = pow(2, level);
+  if (level == max_level) {
+    for (int i = 0; i < nodes; ++i) {
+      for (int j = 0; j < nodes; ++j) {
+        is_admissible.insert(i, j, level, std::abs(i - j) > admis);
+      }
+    }
+  }
+  else {
+    int64_t child_level = level + 1;
+    for (int i = 0; i < nodes; ++i) {
+      std::vector<int> row_children({i * 2, i * 2 + 1});
+      for (int j = 0; j < nodes; ++j) {
+        std::vector<int> col_children({j * 2, j * 2 + 1});
+
+        bool admis_block = true;
+        for (int c1 = 0; c1 < 2; ++c1) {
+          for (int c2 = 0; c2 < 2; ++c2) {
+            if (is_admissible.exists(row_children[c1], col_children[c2], child_level) &&
+                !is_admissible(row_children[c1], col_children[c2], child_level)) {
+              admis_block = false;
+            }
+          }
+        }
+
+        if (admis_block) {
+          for (int c1 = 0; c1 < 2; ++c1) {
+            for (int c2 = 0; c2 < 2; ++c2) {
+              is_admissible.erase(row_children[c1], col_children[c2], child_level);
+            }
+          }
+        }
+
+        is_admissible.insert(i, j, level, std::move(admis_block));
+      }
+    }
+  }
+
+  compute_matrix_structure(level-1, admis);
 }
 
 void
@@ -152,7 +195,54 @@ SymmetricSharedBasisMatrix::generate_admissibility(const Hatrix::Domain& domain,
     dual_tree_traversal(domain, 0, 0, use_nested_basis, admis);
   }
   else if (admis_algorithm == Hatrix::ADMIS_ALGORITHM::DIAGONAL_ADMIS) {
+    if (use_nested_basis) {
+      compute_matrix_structure(max_level, admis);
+    }
+    else {
+      int64_t level = max_level;
+      int64_t nodes = pow(2, level);
+      for (int i = 0; i < nodes; ++i) {
+        for (int j = 0; j < nodes; ++j) {
+          is_admissible.insert(i, j, level, std::abs(i - j) > admis);
+        }
+      }
 
+      // dense level for BLR2 matrix.
+      level--;
+      nodes = pow(2, level);
+      for (int i = 0; i < nodes; ++i) {
+        for (int j = 0; j < nodes; ++j) {
+          is_admissible.insert(i, j, level, false);
+        }
+      }
+    }
+    min_level = -1;
+
+    for (int64_t l = max_level; l > 0; --l) {
+      int64_t nblocks = pow(2, l);
+      bool all_dense = true;
+      for (int64_t i = 0; i < nblocks; ++i) {
+        for (int64_t j = 0; j < nblocks; ++j) {
+          if ((is_admissible.exists(i, j, l) &&
+               is_admissible(i, j, l)) || !is_admissible.exists(i, j, l)) {
+            all_dense = false;
+          }
+        }
+      }
+
+      if (all_dense) {
+        min_level = l;
+        break;
+      }
+    }
+
+    if ((max_level != min_level) && min_level != -1) { min_level++; }
+    if (min_level == -1) {
+      min_level = 1; // HSS matrix detected.
+    }
+    if (use_nested_basis && min_level == 1) {
+      is_admissible.insert(0, 0, 0, false);
+    }
   }
   else {
     abort();

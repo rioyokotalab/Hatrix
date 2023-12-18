@@ -174,7 +174,7 @@ int main(int argc, char** argv) {
   int64_t N = atoi(argv[1]);
   int64_t nleaf = atoi(argv[2]);
   int64_t rank = atoi(argv[3]);
-  const double admis = 1;
+  const double admis = 0;
 
   if (N % nleaf != 0) {
     std::cout << "N % nleaf != 0. Aborting.\n";

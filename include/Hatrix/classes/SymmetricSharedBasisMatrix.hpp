@@ -30,6 +30,8 @@ namespace Hatrix {
                              const int64_t Cj_index,
                              const bool use_nested_basis,
                              const double admis);
+    void compute_matrix_structure(int64_t level,
+                                  const double admis);
 
   } SymmetricSharedBasisMatrix;
 }
