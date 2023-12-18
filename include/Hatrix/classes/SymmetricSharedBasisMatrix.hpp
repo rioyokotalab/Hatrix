@@ -3,7 +3,14 @@
 #include "Domain.hpp"
 
 namespace Hatrix {
-  enum ADMIS_ALGORITHM { DUAL_TREE_TRAVERSAL, DIAGONAL_ADMIS };
+  // Algorithms that can be used for calculation of admissiblity.
+  //
+  // Use DUAL_TREE_TRAVERSAL for a geometry-based admissibilty condition and DIAGONAL_ADMIS
+  // for a distance-from-the-diagonal admissibility condition.
+  enum ADMIS_ALGORITHM {
+    DUAL_TREE_TRAVERSAL,
+    DIAGONAL_ADMIS
+  };
   typedef struct SymmetricSharedBasisMatrix {
     int64_t min_level, max_level;
     ColLevelMap U;

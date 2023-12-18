@@ -22,7 +22,8 @@ cmake .. \
       -DGSL_INCLUDE_DIR="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/include" \
       -DGSL_LIBRARY="/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib/libgsl.27.dylib" \
       -DLAPACKE_INCLUDE_DIR="/opt/homebrew/opt/lapack/include" \
-      -DLAPACKE_LIBRARIES="/opt/homebrew/opt/lapack/lib"
+      -DLAPACKE_LIBRARIES="/opt/homebrew/opt/lapack/lib" \
+      -DCMAKE_BUILD_TYPE=Debug
 make -j VERBOSE=1
 popd
 

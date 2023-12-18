@@ -168,6 +168,74 @@ construct_weak_BLR2(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domai
     A.D.insert(i, i, A.max_level, std::move(Aij));
   }
 
+  Hatrix::Matrix Utemp, Stemp, Vtemp;
+  double error;
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    Hatrix::Matrix AY(nleaf, nleaf);
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (i != j) {
+        Hatrix::Matrix dense = generate_p2p_interactions(domain,
+                                                         i * nleaf, nleaf,
+                                                         j * nleaf, nleaf,
+                                                         kernel);
+        AY += dense;
+      }
+    }
+    std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+    A.U.insert(i, A.max_level, std::move(Utemp));
+  }
+
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < i; ++j) {
+      if (i != j) {
+        Hatrix::Matrix dense = generate_p2p_interactions(domain,
+                                                         i * nleaf, nleaf,
+                                                         j * nleaf, nleaf,
+                                                         kernel);
+        A.S.insert(i, j, A.max_level,
+                   Hatrix::matmul(Hatrix::matmul(A.U(i, A.max_level), dense, true), A.U(j, A.max_level)));
+      }
+    }
+  }
+}
+
+Hatrix::Matrix
+matmul(const Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Matrix& x,
+       const int64_t N, const int64_t rank) {
+  int64_t leaf_nblocks = pow(2, A.max_level);
+  Matrix b(N, 1);
+
+  std::vector<Matrix> x_hat, b_hat;
+  auto x_splits = x.split(leaf_nblocks, 1);
+  auto b_splits = b.split(leaf_nblocks, 1);
+
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    x_hat.push_back(matmul(A.U(i, A.max_level), x_splits[i], true, false, 1.0));
+  }
+
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    b_hat.push_back(Hatrix::Matrix(rank, 1));
+  }
+
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (i != j) {
+        matmul(A.S(i, j, A.max_level), x_hat[j], b_hat[i]);
+        matmul(A.S(i, j, A.max_level), x_hat[i], b_hat[j], true, false, 1, 1);
+      }
+    }
+  }
+
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    matmul(A.U(i, A.max_level), b_hat[i], b_splits[i]);
+  }
+
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    matmul(A.D(i, i, A.max_level), x_splits[i], b_splits[i]);
+  }
+
+  return b;
 }
 
 int main(int argc, char** argv) {
@@ -203,14 +271,24 @@ int main(int argc, char** argv) {
   // at 0 since this is a weakly admissible code.
   A.generate_admissibility(domain, false, Hatrix::ADMIS_ALGORITHM::DIAGONAL_ADMIS, admis);
 
-
-  // std::cout << "N: " << N << " rank: " << rank << " nblocks: " << nblocks << " admis: " <<  admis
-  //           << " construct error: " << construct_error << "\n";
-
   A.print_structure();
 
   // Call a custom construction routine.
   construct_weak_BLR2(A, domain, N, nleaf, rank, admis);
+
+  // Call a custom matvec routine.
+  Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
+
+  // Low rank matrix-vector product.
+  Hatrix::Matrix b_lowrank = matmul(A, x, N, rank);
+
+  // Generate a dense matrix for verification.
+  Hatrix::Matrix A_dense = Hatrix::generate_p2p_interactions(domain, kernel);
+  Hatrix::Matrix b_dense = Hatrix::matmul(A_dense, x);
+  Hatrix::Matrix diff = b_dense - b_lowrank;
+  double rel_error = Hatrix::norm(diff) / Hatrix::norm(b_dense);
+
+  std::cout << "Error : " << rel_error << std::endl;
 
   return 0;
 }
