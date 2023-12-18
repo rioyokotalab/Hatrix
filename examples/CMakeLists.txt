@@ -41,6 +41,7 @@ list(APPEND HATRIX_EXAMPLES
 foreach(EXAMPLE ${HATRIX_EXAMPLES})
   add_executable(${EXAMPLE} ${EXAMPLE}.cpp)
   target_link_libraries(${EXAMPLE} Hatrix)
+  target_link_libraries(${EXAMPLE} ${ELSES_ROOT}/src/src.a ${ELSES_ROOT}/xmlf90-1.2g-elses/macros/lib/libflib.a)
   if(USE_JSON)
     target_link_libraries(${EXAMPLE} nlohmann_json::nlohmann_json)
   endif()
@@ -51,14 +52,24 @@ if(MPI_FOUND)
   add_executable(H2_strong_PO_nodep_mpi H2_strong_PO_nodep_mpi.cpp)
   target_compile_options(H2_strong_PO_nodep_mpi PRIVATE -DUSE_MKL -D_PROF)
   target_link_libraries(H2_strong_PO_nodep_mpi MPI::MPI_CXX Hatrix)
+  target_link_libraries(H2_strong_PO_nodep_mpi ${ELSES_ROOT}/src/src.a ${ELSES_ROOT}/xmlf90-1.2g-elses/macros/lib/libflib.a)
 
   add_executable(H2_strong_EV_sym_mpi_ref H2_strong_EV_sym_mpi_ref.cpp)
   target_link_libraries(H2_strong_EV_sym_mpi_ref Hatrix MPI::MPI_CXX)
+  target_link_libraries(H2_strong_EV_sym_mpi_ref ${ELSES_ROOT}/src/src.a ${ELSES_ROOT}/xmlf90-1.2g-elses/macros/lib/libflib.a)
 
   add_executable(H2_strong_EV_sym_mpi H2_strong_EV_sym_mpi.cpp)
   target_link_libraries(H2_strong_EV_sym_mpi Hatrix MPI::MPI_CXX)
+  target_link_libraries(H2_strong_EV_sym_mpi ${ELSES_ROOT}/src/src.a ${ELSES_ROOT}/xmlf90-1.2g-elses/macros/lib/libflib.a)
 
   # Requires ScaLAPACK
   add_executable(Dense_EV_sym_mpi Dense_EV_sym_mpi.cpp)
   target_link_libraries(Dense_EV_sym_mpi Hatrix MPI::MPI_CXX ${SCALAPACK_LIBS})
+  target_link_libraries(Dense_EV_sym_mpi ${ELSES_ROOT}/src/src.a ${ELSES_ROOT}/xmlf90-1.2g-elses/macros/lib/libflib.a)
 endif()
+
+
+# H2-Construction with ELSES wrapper
+add_executable(H2_strong_CON_sym_elses H2_strong_CON_sym_elses.cpp)
+target_link_libraries(H2_strong_CON_sym_elses Hatrix)
+target_link_libraries(H2_strong_CON_sym_elses ${ELSES_ROOT}/src/src.a ${ELSES_ROOT}/xmlf90-1.2g-elses/macros/lib/libflib.a)

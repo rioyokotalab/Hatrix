@@ -14,6 +14,10 @@
 #include <gsl/gsl_sf_gamma.h>
 #include <gsl/gsl_sf_bessel.h>
 
+extern "C" {
+#include "elses.h"
+}
+
 namespace Hatrix {
 
 using kernel_func_t =
@@ -85,6 +89,15 @@ double ELSES_dense_input(const Domain& domain,
   const auto row = (int64_t)source.value;
   const auto col = (int64_t)target.value;
   return domain.p2p_matrix(row, col);
+}
+
+double ELSES_kernel(const Domain &domain,
+                    const Body &source, const Body &target) {
+    long int row = static_cast<long int>(source.value + 1);
+    long int col = static_cast<long int>(target.value + 1);
+    double val;
+    get_elses_matrix_value(&row, &col, &val);
+    return val;
 }
 
 Matrix generate_p2p_matrix(const Domain& domain,

@@ -43,6 +43,11 @@ target_include_directories(Hatrix
     ${BLAS_INCLUDE_DIR}
 )
 
+# ELSES Wrapper
+set(ELSES_ROOT "/home/ridwan/git-repositories/ELSES_with_wrapper")
+target_include_directories(Hatrix PUBLIC ${ELSES_ROOT})
+target_link_options(Hatrix PUBLIC -lgfortran)
+
 option(USE_PAPI "Use PAPI to get CPU performance counters" OFF)
 if(USE_PAPI)
   find_package(PkgConfig REQUIRED)
