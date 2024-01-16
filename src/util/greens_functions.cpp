@@ -2,8 +2,8 @@
 #include <cassert>
 #include <cstdint>
 #include <random>
-#include <gsl/gsl_sf_gamma.h>
-#include <gsl/gsl_sf_bessel.h>
+//#include <gsl/gsl_sf_gamma.h>
+//#include <gsl/gsl_sf_bessel.h>
 
 #include "Hatrix/util/greens_functions.hpp"
 
@@ -54,13 +54,13 @@ namespace Hatrix {
       double sigma_square = sigma*sigma;
       double dist = distance(coords_row, coords_col);
 
-      con = pow(2, (smoothness - 1)) * gsl_sf_gamma(smoothness);
+      con = pow(2, (smoothness - 1)) * std::tgamma(smoothness);//gsl_sf_gamma(smoothness);
       con = 1.0 / con;
       con = sigma_square * con;
 
       if (dist != 0) {
         expr = dist / nu;
-        return con * pow(expr, smoothness) * gsl_sf_bessel_Knu(smoothness, expr);
+        return con * pow(expr, smoothness) * std::cyl_bessel_k(smoothness, expr); //gsl_sf_bessel_Knu(smoothness, expr);
       }
       else {
         return sigma_square;

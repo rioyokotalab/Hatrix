@@ -34,7 +34,7 @@ add_library(Hatrix
   src/util/profiling.cpp
   src/util/timer.cpp
 )
-target_compile_features(Hatrix PUBLIC cxx_std_11)
+target_compile_features(Hatrix PUBLIC cxx_std_17)
 
 target_include_directories(Hatrix
   PUBLIC
@@ -92,8 +92,8 @@ if(USE_OPENMP)
   target_link_libraries(Hatrix OpenMP::OpenMP_CXX)
 endif()
 
-find_package(GSL REQUIRED)    # See below (2)
-target_link_libraries(Hatrix GSL::gsl)
+#find_package(GSL REQUIRED)    # See below (2)
+#target_link_libraries(Hatrix GSL::gsl)
 
 include(find_or_download)
 # JSON writer
