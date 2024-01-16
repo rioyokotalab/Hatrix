@@ -1,8 +1,11 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <cassert>
 
 #include "Hatrix/Hatrix.hpp"
+using namespace Hatrix;
+Hatrix::greens_functions::kernel_function_t kernel;
 
 using randvec_t = std::vector<std::vector<double> >;
 
@@ -274,22 +277,62 @@ std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal) {
   return res;
 }
 
-int main(int argc, char *argv[]) {
-  int N = atoi(argv[1]);
-  int rank = atoi(argv[2]);
-  int height = 2;
+void
+construct_H2_weak_2level_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                                    int64_t N, int64_t nleaf, int64_t rank) {
+  const int64_t nblocks = N / nleaf;
+  // populate diagonal blocks.
+  for (int64_t i = 0; i < nblocks; ++i) {
+    Hatrix::Matrix Aij = generate_p2p_interactions(domain,
+                                                   i * nleaf, nleaf,
+                                                   i * nleaf, nleaf,
+                                                   kernel);
+    A.D.insert(i, i, A.max_level, std::move(Aij));
+  }
+}
 
-  if (N % int(pow(height, 2)) != 0 || rank > int(N / pow(height, 2))) {
-    std::cout << N << " % " << pow(height, 2) << " != 0 || rank > leaf(" << int(N / pow(height, 2))  << ")\n";
+void
+construct_H2_weak_2level(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                         int64_t N, int64_t nleaf, int64_t rank, double admis) {
+  construct_H2_weak_2level_leaf_nodes(A, domain, N, nleaf, rank);
+}
+
+int main(int argc, char *argv[]) {
+  int64_t N = atoi(argv[1]);
+  int64_t nleaf = atoi(argv[2]);
+  int64_t rank = atoi(argv[3]);
+  const double admis = 0;
+
+  assert(N / nleaf == 4);
+
+  if (N % nleaf != 0) {
+    std::cout << "N % nleaf != 0. Aborting.\n";
     abort();
   }
 
-  randvec_t randvec;
-  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
+  // Assign kernel function
+  double add_diag = 1e-9;
+  kernel = [&](const std::vector<double>& c_row,
+               const std::vector<double>& c_col) {
+    return Hatrix::greens_functions::laplace_2d_kernel(c_row, c_col, add_diag);
+  };
 
-  Hatrix::HSS A(randvec, N, rank, height);
-  double error = A.construction_relative_error(randvec);
-  std::cout << "N=" << N << " rank=" << rank << " construction error : " << error << std::endl;
+  // Define a 1D grid geometry using the Domain class.
+  const int64_t ndim = 1;
+  Hatrix::Domain domain(N, ndim);
+  domain.generate_grid_particles();
+  domain.cardinal_sort_and_cell_generation(nleaf);
+
+  // Initialize a Symmetric shared basis matrix container.
+  Hatrix::SymmetricSharedBasisMatrix A;
+  A.max_level = log2(N / nleaf);
+
+  // Use a simple distance from diagonal based admissibility condition. admis is kept
+  // at 0 since this is a weakly admissible code.
+  A.generate_admissibility(domain, false, Hatrix::ADMIS_ALGORITHM::DIAGONAL_ADMIS, admis);
+
+
+  construct_H2_weak_2level(A, domain, N, nleaf, rank, admis);
 
   return 0;
 }

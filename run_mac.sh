@@ -28,3 +28,4 @@ make -j VERBOSE=1
 popd
 
 ./build/examples/BLR2_weak_CON 1024 128 30
+./build/examples/H2_weak_CON_2lev 128 32 20
