@@ -344,16 +344,16 @@ void
 generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                            const int64_t N, const int64_t nleaf, const int64_t rank) {
   Matrix Ui, Si, _Vi; double error;
-  int64_t nleaf = N / 2;
+  int64_t block_size = N / 2;
   int64_t nblocks = pow(2, A.max_level-1);
-  Matrix AY(nleaf, nleaf);
+  Matrix AY(block_size, block_size);
 
   for (int64_t row = 0; row < nblocks; ++row) {
-    for (int64_t col = 0; col < nblocks) {
-      if (i != j) {             // admit only admissible blocks.
+    for (int64_t col = 0; col < nblocks; ++col) {
+      if (row != col) {             // admit only admissible blocks.
         Hatrix::Matrix dense = generate_p2p_interactions(domain,
-                                                         row * nleaf, nleaf,
-                                                         col * nleaf, nleaf,
+                                                         row * block_size, block_size,
+                                                         col * block_size, block_size,
                                                          kernel);
         AY += dense;
       }
@@ -363,21 +363,21 @@ generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain
     int child2 = row * 2 + 1;
 
     // Generate U transfer matrix.
-    Matrix& Uchild_upper = A.U(child1, A.max_level);
-    Matrix& Uchild_lower = A.U(child2, A.max_level);
-    Matrix Uchild_concat(Uchild_upper.rows + Uchild_lower.rows, Uchild_upper.cols);
-    std::vector<Matrix> Uchild_slices = Uchild_concat.split(2, 1);
-    Uchild_slices[0] = Uchild_upper;
-    Uchild_slices[1] = Uchild_lower;
+    Matrix& Ubig_child1 = A.U(child1, A.max_level);
+    Matrix& Ubig_child2 = A.U(child2, A.max_level);
+    Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
+    std::vector<Matrix> temp_splits = temp.split(2, 1);
+    std::vector<Matrix> AY_splits = AY.split(2, 1);
 
-    std::tie(Ui, Si, _Vi, error) = truncated_svd(Uchild_concat, rank);
+    matmul(Ubig_child1, AY_splits[0], temp_splits[0], true, false, 1, 0);
+    matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
 
-    A.U.insert(p, A.max_level-1, std::move(Ui));
+    std::tie(Ui, Si, _Vi, error) = truncated_svd(temp, rank);
+    A.U.insert(row, A.max_level-1, std::move(Ui));
   }
 
   for (int64_t row = 0; row < 2; ++row) {
-    int64_t col = row % 2 ? row + 1 : row - 1;
-    int64_t nleaf = N / 2;
+    int64_t col = (row % 2 == 0) ? row + 1 : row - 1;
     Matrix Urow_actual = generate_actual_bases(A, N, row, rank);
     Matrix Ucol_actual = generate_actual_bases(A, N, col, rank);
   }

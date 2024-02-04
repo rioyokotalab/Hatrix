@@ -27,4 +27,4 @@ cmake .. \
 make -j VERBOSE=1
 popd
 
-lldb -- ./build/examples/H2_weak_CON_2lev 128 32 20
+./build/examples/H2_weak_CON_2lev 128 32 20
