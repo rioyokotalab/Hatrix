@@ -496,7 +496,8 @@ int main(int argc, char **argv)
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>(stop_construct - start_construct).count();
 
-  const auto construct_error = construction_error(A, domain, is_rel_tol);
+  const auto construct_abs_error = construction_error(A, domain, false);
+  const auto construct_rel_error = construction_error(A, domain, true);
   const auto construct_min_rank = get_basis_min_rank(A);
   const auto construct_max_rank = get_basis_max_rank(A);
   const auto construct_avg_rank = get_basis_avg_rank(A);
@@ -508,12 +509,12 @@ int main(int argc, char **argv)
   const std::string err_prefix = (is_rel_tol ? "rel" : "abs");
   printf("N=%" PRId64 " leaf_size=%d %s_err_tol=%.1e max_rank=%d admis=%.2lf kernel=%s geometry=%s\n"
          "h2_height=%d construct_min_rank=%d construct_max_rank=%d construct_avg_rank=%.2lf "
-         "construct_time=%e[ms] construct_mem=%e[GB] construct_%s_err=%e\n"
+         "construct_time=%e[ms] construct_mem=%e[GB] construct_abs_err=%e construct_rel_err=%e\n"
          "overall_time=%e[ms]\n",
          N, (int)leaf_size, err_prefix.c_str(), err_tol, (int)max_rank, admis,
          kernel_name.c_str(), geom_name.c_str(),
          (int)A.max_level, (int)construct_min_rank, (int)construct_max_rank, construct_avg_rank,
-         construct_time, construct_mem, err_prefix.c_str(), construct_error,
+         construct_time, construct_mem, err_prefix.c_str(), construct_abs_error, construct_rel_error,
          overall_time);
 
   return 0;
