@@ -7,11 +7,6 @@
 using namespace Hatrix;
 Hatrix::greens_functions::kernel_function_t kernel;
 
-double rel_error(const double A_norm, const double B_norm) {
-  double diff = A_norm - B_norm;
-  return std::sqrt((diff * diff) / (B_norm * B_norm));
-}
-
 void
 construct_H2_weak_2level_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
                                     int64_t N, int64_t nleaf, int64_t rank) {
@@ -123,7 +118,7 @@ generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain
                                              kernel);
 
     Matrix S_block = matmul(matmul(Urow_actual, dense, true), Ucol_actual);
-    A.S.insert(row, col, level, std::move(dense));
+    A.S.insert(row, col, level, std::move(S_block));
   }
 }
 
