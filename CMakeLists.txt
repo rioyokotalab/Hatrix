@@ -92,8 +92,10 @@ if(USE_OPENMP)
   target_link_libraries(Hatrix OpenMP::OpenMP_CXX)
 endif()
 
-#find_package(GSL REQUIRED)    # See below (2)
-#target_link_libraries(Hatrix GSL::gsl)
+if (APPLE)
+find_package(GSL REQUIRED)    # See below (2)
+target_link_libraries(Hatrix GSL::gsl)
+endif()
 
 include(find_or_download)
 # JSON writer

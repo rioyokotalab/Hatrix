@@ -27,5 +27,4 @@ cmake .. \
 make -j VERBOSE=1
 popd
 
-./build/examples/H2_weak_CON 1024 2 6
-./build/examples/Dense_LU_2x2
+./build/examples/Dense_QR_2x2
