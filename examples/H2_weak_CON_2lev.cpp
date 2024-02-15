@@ -421,7 +421,6 @@ static Matrix
 matmul(SymmetricSharedBasisMatrix& A, Matrix& x, int64_t N, int64_t rank) {
   std::vector<Matrix> x_hat;
   const int64_t leaf_nblocks = pow(2, A.max_level);
-  Matrix b(N, 1);
   auto x_splits = x.split(leaf_nblocks, 1);
 
   for (int i = 0; i < leaf_nblocks; ++i) {
@@ -457,6 +456,50 @@ matmul(SymmetricSharedBasisMatrix& A, Matrix& x, int64_t N, int64_t rank) {
   int64_t b_hat_offset = 0;
   multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset, A.min_level);
 
+  for (int64_t level = A.min_level; level < A.max_level; ++level) {
+    int64_t nblocks = pow(2, level);
+    int64_t child_level = level+1;
+
+    x_hat_offset -= pow(2, child_level);
+
+    for (int64_t row = 0; row < nblocks; ++row) {
+      int c_r1 = row * 2, c_r2 = row * 2 + 1;
+      Matrix Ub = matmul(A.U(row, level),
+                         b_hat[b_hat_offset + row]);
+      auto Ub_splits = Ub.split(std::vector<int64_t>(1, A.U(c_r1, child_level).cols),
+                                {});
+
+      b_hat.push_back(Matrix(Ub_splits[0], true));
+      b_hat.push_back(Matrix(Ub_splits[1], true));
+    }
+    multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset + nblocks, child_level);
+    b_hat_offset += nblocks;
+  }
+
+  // Multiply with the leaf level transfer matrices to generate the product matrix.
+  Matrix b(x.rows, 1);
+  auto b_splits = b.split(leaf_nblocks, 1);
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    matmul(A.U(i, A.max_level), b_hat[b_hat_offset + i], b_splits[i]);
+  }
+
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    for (int64_t j = 0; j <= i; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
+        // TODO: make the diagonal tringular and remove this.
+        if (i == j) {
+          matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+        }
+        else {
+          matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+          matmul(A.D(i, j, A.max_level), x_splits[i], b_splits[j], true, false);
+        }
+      }
+    }
+  }
+
+
   return b;
 }
 
@@ -475,7 +518,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Assign kernel function
-  double add_diag = 1e-9;
+  double add_diag = 1e-4;
   kernel = [&](const std::vector<double>& c_row,
                const std::vector<double>& c_col) {
     return Hatrix::greens_functions::laplace_1d_kernel(c_row, c_col, add_diag);
