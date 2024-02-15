@@ -4,51 +4,58 @@
 
 #include "Hatrix/Hatrix.hpp"
 
+// Simple demo of a 2x2 dense LU factorization using the Hatrix API.
+// We initialize a SymmetricSharedBasisMatrix class and only make use
+// of the D map within the class.
+
 int main() {
+  Hatrix::SymmetricSharedBasisMatrix A;
   int64_t block_size = 16;
-  std::vector<std::vector<Hatrix::Matrix>> A(2);
-  A[0] = std::vector<Hatrix::Matrix>{
-      Hatrix::generate_random_matrix(block_size, block_size),
-      Hatrix::generate_random_matrix(block_size, block_size)};
-  A[1] = std::vector<Hatrix::Matrix>{
-      Hatrix::generate_random_matrix(block_size, block_size),
-      Hatrix::generate_random_matrix(block_size, block_size)};
-  // Add Large values to diagonal to assure no pivoting
+  int64_t nblocks = 2;
   double d = 4 * block_size * block_size;
-  for (int64_t i = 0; i < block_size; ++i) {
-    A[0][0](i, i) += d--;
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      Hatrix::Matrix mat = Hatrix::generate_random_matrix(block_size, block_size);
+      if (i == j) {
+        // Add Large values to diagonal to assure no pivoting
+        for (int64_t ii = 0; ii < block_size; ++ii) {
+          mat(ii, ii) += d;
+        }
+      }
+
+      A.D.insert(i, j, 0, std::move(mat));
+    }
   }
-  for (int64_t i = 0; i < block_size; ++i) {
-    A[1][1](i, i) += d--;
-  }
+
 
   // b = A*x
   Hatrix::Matrix x0 = Hatrix::generate_random_matrix(block_size, 1);
   Hatrix::Matrix x1 = Hatrix::generate_random_matrix(block_size, 1);
   Hatrix::Matrix b0(block_size, 1), b1(block_size, 1);
-  Hatrix::matmul(A[0][0], x0, b0, false, false, 1, 0);
-  Hatrix::matmul(A[0][1], x1, b0, false, false, 1, 1);
-  Hatrix::matmul(A[1][0], x0, b1, false, false, 1, 0);
-  Hatrix::matmul(A[1][1], x1, b1, false, false, 1, 1);
+  Hatrix::matmul(A.D(0, 0, 0), x0, b0, false, false, 1, 0);
+  Hatrix::matmul(A.D(0, 1, 0), x1, b0, false, false, 1, 1);
+  Hatrix::matmul(A.D(1, 0, 0), x0, b1, false, false, 1, 0);
+  Hatrix::matmul(A.D(1, 1, 0), x1, b1, false, false, 1, 1);
 
   // Block LU
   Hatrix::Matrix L0(block_size, block_size);
   Hatrix::Matrix U0(block_size, block_size);
-  Hatrix::lu(A[0][0], L0, U0);
-  Hatrix::solve_triangular(L0, A[0][1], Hatrix::Left, Hatrix::Lower, true);
-  Hatrix::solve_triangular(U0, A[1][0], Hatrix::Right, Hatrix::Upper, false);
-  Hatrix::matmul(A[1][0], A[0][1], A[1][1], false, false, -1, 1);
+  Hatrix::lu(A.D(0, 0, 0), L0, U0);
+  Hatrix::solve_triangular(L0, A.D(0, 1, 0), Hatrix::Left, Hatrix::Lower, true);
+  Hatrix::solve_triangular(U0, A.D(1, 0, 0), Hatrix::Right, Hatrix::Upper, false);
+  Hatrix::matmul(A.D(1, 0, 0), A.D(0, 1, 0), A.D(1, 1, 0), false, false, -1, 1);
   Hatrix::Matrix L1(block_size, block_size);
   Hatrix::Matrix U1(block_size, block_size);
-  Hatrix::lu(A[1][1], L1, U1);
+  Hatrix::lu(A.D(1, 1, 0), L1, U1);
 
   // Forward substitution
   Hatrix::solve_triangular(L0, b0, Hatrix::Left, Hatrix::Lower, true);
-  Hatrix::matmul(A[1][0], b0, b1, false, false, -1, 1);
+  Hatrix::matmul(A.D(1, 0, 0), b0, b1, false, false, -1, 1);
   Hatrix::solve_triangular(L1, b1, Hatrix::Left, Hatrix::Lower, true);
   // Backward substitution
   Hatrix::solve_triangular(U1, b1, Hatrix::Left, Hatrix::Upper, false);
-  Hatrix::matmul(A[0][1], b1, b0, false, false, -1, 1);
+  Hatrix::matmul(A.D(0, 1, 0), b1, b0, false, false, -1, 1);
   Hatrix::solve_triangular(U0, b0, Hatrix::Left, Hatrix::Upper, false);
 
   // Check accuracy
