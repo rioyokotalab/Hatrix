@@ -27,5 +27,4 @@ cmake .. \
 make -j VERBOSE=1
 popd
 
-./build/examples/H2_weak_CON_2lev 128 32 10
-./build/examples/H2_weak_CON 1024 10 4
+./build/examples/H2_weak_CON 1024 2 6

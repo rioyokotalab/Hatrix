@@ -118,7 +118,7 @@ generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain
                                              kernel);
 
     Matrix S_block = matmul(matmul(Urow_actual, dense, true), Ucol_actual);
-    A.S.insert(row, col, level, std::move(dense));
+    A.S.insert(row, col, level, std::move(S_block));
   }
 }
 
