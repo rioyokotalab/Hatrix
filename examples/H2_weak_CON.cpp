@@ -6,6 +6,8 @@
 #include <fstream>
 
 #include "Hatrix/Hatrix.hpp"
+using namespace Hatrix;
+Hatrix::greens_functions::kernel_function_t kernel;
 
 using randvec_t = std::vector<std::vector<double> >;
 
@@ -338,33 +340,204 @@ namespace Hatrix {
   };
 } // namespace Hatrix
 
-int main(int argc, char *argv[]) {
-  int N = atoi(argv[1]);
-  int rank = atoi(argv[2]);
-  int height = atoi(argv[3]);
+static Matrix
+generate_actual_bases(Hatrix::SymmetricSharedBasisMatrix& A, const int64_t N,
+                      const int64_t p, const int64_t rank) {
+  int64_t child1 = p * 2;
+  int64_t child2 = p * 2 + 1;
+  int64_t leaf_size = N / 2;
+  Matrix Ubig(leaf_size, rank);
 
-  if (rank > int(N / pow(2, height))) {
-    std::cout << N << " % " << pow(2, height)
-              << " != 0 || rank > leaf(" << int(N / pow(2, height))  << ")\n";
+  std::vector<Matrix> Ubig_splits = Ubig.split(2, 1);
+  std::vector<Matrix> U_splits = A.U(p, A.max_level-1).split(2, 1);
+
+  matmul(A.U(child1, A.max_level), U_splits[0], Ubig_splits[0]);
+  matmul(A.U(child2, A.max_level), U_splits[1], Ubig_splits[1]);
+
+  return Ubig;
+}
+
+static void
+construct_H2_weak_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                             int64_t N, int64_t nleaf, int64_t rank) {
+  Hatrix::Matrix Utemp, Stemp, Vtemp;
+  double error;
+  const int64_t nblocks = pow(2, A.max_level);
+  // populate diagonal blocks.
+  for (int64_t i = 0; i < nblocks; ++i) {
+    Hatrix::Matrix Aij = generate_p2p_interactions(domain,
+                                                   i * nleaf, nleaf,
+                                                   i * nleaf, nleaf,
+                                                   kernel);
+    A.D.insert(i, i, A.max_level, std::move(Aij));
+  }
+
+  // populate leaf level shared bases.
+  for (int64_t i = 0; i < nblocks; ++i) {
+    Hatrix::Matrix AY(nleaf, nleaf);
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (i != j) {
+        Hatrix::Matrix dense = generate_p2p_interactions(domain,
+                                                         i * nleaf, nleaf,
+                                                         j * nleaf, nleaf,
+                                                         kernel);
+        AY += dense;
+      }
+    }
+    std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+    A.U.insert(i, A.max_level, std::move(Utemp));
+  }
+
+  // Update S blocks.
+  for (int i = 0; i < nblocks; ++i) {
+    for (int j = 0; j < i; ++j) {
+      if (A.is_admissible(i, j, A.max_level)) {
+        Hatrix::Matrix dense = generate_p2p_interactions(domain,
+                                                         i * nleaf, nleaf,
+                                                         j * nleaf, nleaf,
+                                                         kernel);
+        A.S.insert(i, j, A.max_level,
+                   Hatrix::matmul(Hatrix::matmul(A.U(i, A.max_level), dense, true), A.U(j, A.max_level)));
+      }
+    }
+  }
+}
+
+static RowLevelMap
+generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                           const int64_t N, const int64_t nleaf, const int64_t rank, const int64_t level) {
+  Matrix Ui, Si, _Vi; double error;
+  const int64_t nblocks = pow(2, level);
+  const int64_t block_size = N / nblocks;
+  Matrix AY(block_size, block_size);
+  RowLevelMap Ubig_parent;
+
+  for (int64_t row = 0; row < nblocks; ++row) {
+    for (int64_t col = 0; col < nblocks; ++col) {
+      if (row != col) {             // admit only admissible blocks.
+        Hatrix::Matrix dense = generate_p2p_interactions(domain,
+                                                         row * block_size, block_size,
+                                                         col * block_size, block_size,
+                                                         kernel);
+        AY += dense;
+      }
+    }
+
+    int child1 = row * 2;
+    int child2 = row * 2 + 1;
+
+    // Generate U transfer matrix.
+    Matrix& Ubig_child1 = A.U(child1, A.max_level);
+    Matrix& Ubig_child2 = A.U(child2, A.max_level);
+    Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
+    std::vector<Matrix> temp_splits = temp.split(2, 1);
+    std::vector<Matrix> AY_splits = AY.split(2, 1);
+
+    matmul(Ubig_child1, AY_splits[0], temp_splits[0], true, false, 1, 0);
+    matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
+
+    std::tie(Ui, Si, _Vi, error) = truncated_svd(temp, rank);
+
+    // Generate the full basis to pass to the next level.
+    auto Utransfer_splits = Ui.split(std::vector<int64_t>{rank}, {});
+
+    Matrix Ubig(block_size, rank);
+    auto Ubig_splits = Ubig.split(2, 1);
+    matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
+    matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
+
+    A.U.insert(row, level, std::move(Ui));
+    Ubig_parent.insert(row, level, std::move(Ubig));
+  }
+
+  for (int64_t row = 0; row < nblocks; ++row) {
+    int64_t col = (row % 2 == 0) ? row + 1 : row - 1;
+    Matrix Urow_actual = generate_actual_bases(A, N, row, rank);
+    Matrix Ucol_actual = generate_actual_bases(A, N, col, rank);
+
+    Matrix dense = generate_p2p_interactions(domain,
+                                             row * block_size, block_size,
+                                             col * block_size, block_size,
+                                             kernel);
+
+    Matrix S_block = matmul(matmul(Urow_actual, dense, true), Ucol_actual);
+    A.S.insert(row, col, level, std::move(dense));
+  }
+
+  return Ubig_parent;
+}
+
+static void
+construct_H2_weak(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
+                  const int64_t N, const int64_t nleaf, const int64_t rank) {
+  construct_H2_weak_leaf_nodes(A, domain, N, nleaf, rank);
+
+  RowLevelMap Uchild = A.U;
+  for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
+    Uchild = generate_transfer_matrices(A, domain, N, nleaf, rank, level);
+  }
+}
+
+static Matrix
+matmul(SymmetricSharedBasisMatrix& A, Matrix& x, int64_t N, int64_t rank) {
+  std::vector<Matrix> x_hat;
+  const int64_t leaf_nblocks = pow(2, A.max_level);
+  auto x_splits = x.split(leaf_nblocks, 1);
+
+  Matrix b(x.rows, 1);
+
+  return b;
+}
+
+int main(int argc, char *argv[]) {
+  const int64_t N = atoll(argv[1]);
+  const int64_t rank = atoll(argv[2]);
+  const int64_t height = atoll(argv[3]);
+  const double admis = 0;
+  const int64_t nleaf = N / pow(2, height);
+
+  if (N % nleaf != 0) {
+    std::cout << "N % nleaf != 0. Aborting.\n";
     abort();
   }
 
-  randvec_t randvec;
-  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 1D
-  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 2D
-  randvec.push_back(equally_spaced_vector(N, 0.0, 1.0)); // 3D
-  PV = 1e-3 * (1 / pow(10, height));
+  // Assign kernel function
+  double add_diag = 1e-4;
+  kernel = [&](const std::vector<double>& c_row,
+               const std::vector<double>& c_col) {
+    return Hatrix::greens_functions::laplace_1d_kernel(c_row, c_col, add_diag);
+  };
 
-  auto start_construct = std::chrono::system_clock::now();
-  Hatrix::HSS A(randvec, N, rank, height);
-  auto stop_construct = std::chrono::system_clock::now();
-  double error = A.construction_relative_error(randvec);
+  // Define a 1D grid geometry using the Domain class.
+  const int64_t ndim = 1;
+  Hatrix::Domain domain(N, ndim);
+  domain.generate_grid_particles();
+  domain.cardinal_sort_and_cell_generation(nleaf);
 
-  std::ofstream file;
-  file.open("output.txt", std::ios::app | std::ios::out);
-  std::cout << "N= " << N << " rank= " << rank
-            << " height=" << height <<  " const. error=" << error << std::endl;
-  file.close();
+  // Initialize a Symmetric shared basis matrix container.
+  Hatrix::SymmetricSharedBasisMatrix A;
+  A.max_level = height;
+
+  // Use a simple distance from diagonal based admissibility condition. admis is kept
+  // at 0 since this is a weakly admissible code.
+  A.generate_admissibility(domain, false, Hatrix::ADMIS_ALGORITHM::DIAGONAL_ADMIS, admis);
+
+  // Construct a weak admissibility H2 matrix (HSS matrix).
+  construct_H2_weak(A, domain, N, nleaf, rank);
+
+  // Verification of the construction with a matvec product.
+  Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
+
+  // Low rank matrix-vector product.
+  Hatrix::Matrix b_lowrank = matmul(A, x, N, rank);
+
+  // Generate a dense matrix.
+  Matrix A_dense = Hatrix::generate_p2p_interactions(domain, kernel);
+  Matrix b_dense = Hatrix::matmul(A_dense, x);
+  Matrix diff = b_dense - b_lowrank;
+  double rel_error = Hatrix::norm(diff) / Hatrix::norm(b_dense);
+
+  std::cout << "Error : " << rel_error << std::endl;
 
   return 0;
 }
