@@ -345,7 +345,8 @@ generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain
                            const int64_t N, const int64_t nleaf, const int64_t rank) {
   Matrix Ui, Si, _Vi; double error;
   int64_t block_size = N / 2;
-  int64_t nblocks = pow(2, A.max_level-1);
+  int64_t level = A.max_level - 1;
+  int64_t nblocks = pow(2, level);
   Matrix AY(block_size, block_size);
 
   for (int64_t row = 0; row < nblocks; ++row) {
@@ -373,13 +374,21 @@ generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain
     matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
 
     std::tie(Ui, Si, _Vi, error) = truncated_svd(temp, rank);
-    A.U.insert(row, A.max_level-1, std::move(Ui));
+    A.U.insert(row, level, std::move(Ui));
   }
 
   for (int64_t row = 0; row < 2; ++row) {
     int64_t col = (row % 2 == 0) ? row + 1 : row - 1;
     Matrix Urow_actual = generate_actual_bases(A, N, row, rank);
     Matrix Ucol_actual = generate_actual_bases(A, N, col, rank);
+
+    Matrix dense = generate_p2p_interactions(domain,
+                                             row * block_size, block_size,
+                                             col * block_size, block_size,
+                                             kernel);
+
+    Matrix S_block = matmul(matmul(Urow_actual, dense, true), Ucol_actual);
+    A.S.insert(row, col, level, std::move(dense));
   }
 }
 
@@ -388,6 +397,67 @@ construct_H2_weak_2level(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& 
                          int64_t N, int64_t nleaf, int64_t rank, double admis) {
   construct_H2_weak_2level_leaf_nodes(A, domain, N, nleaf, rank);
   generate_transfer_matrices(A, domain, N, nleaf, rank);
+}
+
+static void
+multiply_S(const Hatrix::SymmetricSharedBasisMatrix& A,
+           std::vector<Matrix>& x_hat, std::vector<Matrix>& b_hat,
+           int64_t x_hat_offset, int64_t b_hat_offset, int64_t level) {
+  int64_t nblocks = pow(2, level);
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
+        matmul(A.S(i, j, level), x_hat[x_hat_offset + j], b_hat[b_hat_offset + i]);
+        matmul(A.S(i, j, level), x_hat[x_hat_offset + i], b_hat[b_hat_offset + j],
+               true, false);
+      }
+    }
+  }
+}
+
+
+static Matrix
+matmul(SymmetricSharedBasisMatrix& A, Matrix& x, int64_t N, int64_t rank) {
+  std::vector<Matrix> x_hat;
+  const int64_t leaf_nblocks = pow(2, A.max_level);
+  Matrix b(N, 1);
+  auto x_splits = x.split(leaf_nblocks, 1);
+
+  for (int i = 0; i < leaf_nblocks; ++i) {
+    x_hat.push_back(matmul(A.U(i, A.max_level), x_splits[i], true, false, 1.0));
+  }
+
+  int64_t x_hat_offset = 0;
+  for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
+    int64_t child_level = level + 1;
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      int64_t c1 = i * 2;
+      int64_t c2 = i * 2 + 1;
+
+      Matrix xtemp = Matrix(A.U(i, level).rows, 1);
+      auto xtemp_splits = xtemp.split(std::vector<int64_t>(1, rank),
+                                      {});
+      xtemp_splits[0] = x_hat[x_hat_offset + c1];
+      xtemp_splits[1] = x_hat[x_hat_offset + c2];
+
+      x_hat.push_back(matmul(A.U(i, level), xtemp, true, false, 1.0));
+    }
+
+    x_hat_offset += pow(2, child_level);
+  }
+
+  std::vector<Matrix> b_hat;
+  for (int64_t i = 0; i < pow(2, A.min_level); ++i) {
+    b_hat.push_back(Matrix(rank, 1));
+  }
+
+  int64_t b_hat_offset = 0;
+  multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset, A.min_level);
+
+  return b;
 }
 
 int main(int argc, char *argv[]) {
@@ -428,6 +498,19 @@ int main(int argc, char *argv[]) {
   // Construct a 2-level weak admissibility H2 matrix.
   construct_H2_weak_2level(A, domain, N, nleaf, rank, admis);
 
+  // Verification of the construction with a matvec product.
+  Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
+
+  // Low rank matrix-vector product.
+  Hatrix::Matrix b_lowrank = matmul(A, x, N, rank);
+
+  // Generate a dense matrix.
+  Matrix A_dense = Hatrix::generate_p2p_interactions(domain, kernel);
+  Matrix b_dense = Hatrix::matmul(A_dense, x);
+  Matrix diff = b_dense - b_lowrank;
+  double rel_error = Hatrix::norm(diff) / Hatrix::norm(b_dense);
+
+  std::cout << "Error : " << rel_error << std::endl;
 
   return 0;
 }
