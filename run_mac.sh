@@ -28,3 +28,4 @@ make -j VERBOSE=1
 popd
 
 ./build/examples/Dense_QR_2x2
+./build/examples/H2_strong_CON

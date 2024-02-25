@@ -46,7 +46,7 @@ namespace Hatrix {
     void sector_sort(const int64_t nleaf);
     int64_t build_bottom_up_binary_tree(const int64_t molecule_size);
 
-    void generate_circular_particles(double min_val, double max_val);
+    void generate_circular_particles();
     void generate_grid_particles();
     void read_col_file_3d(const std::string& geometry_file);
     void read_col_file_2d(const std::string& geometry_file);

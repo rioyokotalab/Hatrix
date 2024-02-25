@@ -81,8 +81,8 @@ namespace Hatrix {
     }
 
     double yukawa_kernel(const std::vector<double>& coords_row,
-                  const std::vector<double>& coords_col,
-                  const double alpha, const double singularity) {
+                         const std::vector<double>& coords_col,
+                         const double alpha, const double singularity) {
       assert(coords_row.size() == coords_col.size());
       double dist = distance(coords_row, coords_col);
       double r = dist + singularity;

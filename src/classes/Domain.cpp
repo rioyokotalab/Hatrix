@@ -91,18 +91,41 @@ namespace Hatrix {
       }
     }
     else if (ndim == 2) {
-      // Generate a uniform grid of 'N' points.
-      int64_t M = ceil(N / sqrt(N));
-      int64_t Q = N / M;
-      int count = 0;
-      for (int64_t i = 0; i < M; ++i) {
-        for (int64_t j = 0; j < Q; ++j) {
-          if ((i+1) * (j+1) <= N) {
-            Hatrix::Particle p({(double)i/M, (double)j/Q}, count);
-            particles[count] = p;
-            count++;
-          }
-        }
+      double px, py, pval;
+      // Generate a unit square with N points on the sides
+      if (N < 4) {
+        std::cout << "N has to be >=4 for unit square mesh" << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      // Taken from H2Lib: Library/curve2d.c
+      const double a = 0.5;
+      const int64_t top = N / 4;
+      const int64_t left = N / 2;
+      const int64_t bottom = 3 * N / 4;
+      int64_t i = 0;
+      for (i = 0; i < top; i++) {
+        px = a - 2.0 * a * i / top;
+        py = a;
+        pval = (double)i / (double)N;
+        particles[i] = Hatrix::Particle(px, py, pval);
+      }
+      for (; i < left; i++) {
+        px = -a;
+        py = a - 2.0 * a * (i - top) / (left - top);
+        pval = (double)i / (double)N;
+        particles[i]= Hatrix::Particle(px, py, pval);
+      }
+      for (; i < bottom; i++) {
+        px = -a + 2.0 * a * (i - left) / (bottom - left);
+        py = -a;
+        pval = (double)i / (double)N;
+        particles[i]= Hatrix::Particle(px, py, pval);
+      }
+      for (; i < N; i++) {
+        px = a;
+        py = -a + 2.0 * a * (i - bottom) / (N - bottom);
+        pval = (double)i / (double)N;
+        particles[i] = Hatrix::Particle(px, py, pval);
       }
     }
     else if (ndim == 3) {
@@ -178,7 +201,9 @@ namespace Hatrix {
     }
   }
 
-  void Domain::generate_circular_particles(double min_val, double max_val) {
+  void Domain::generate_circular_particles() {
+    const double min_val = 0;
+    const double max_val = N;
     double range = max_val - min_val;
 
     if (ndim == 1) {

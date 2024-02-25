@@ -636,6 +636,13 @@ double H2::low_rank_block_ratio() const {
 } // namespace Hatrix
 
 int main(int argc, char ** argv) {
+  if (argc == 1) {
+    std::cout << "HELP SCREEN FOR H2_strong_CON.cpp" << std::endl;
+    std::cout << "Specify arguments as follows: " << std::endl;
+    std::cout << "N leaf_size accuracy max_rank random_matrix_size admis kernel_type geom_type ndim matrix_type" << std::endl;
+    return;
+  }
+
   const int64_t N = argc > 1 ? atol(argv[1]) : 256;
   const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
   const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-5;
@@ -714,7 +721,7 @@ int main(int argc, char ** argv) {
   Hatrix::H2 A(domain, rand, N, leaf_size, accuracy, max_rank, admis, matrix_type);
   const auto stop_construct = std::chrono::system_clock::now();
   const double construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
-                                (stop_construct - start_construct).count();  
+                                (stop_construct - start_construct).count();
   double construct_error = A.construction_absolute_error(domain);
   double lr_ratio = A.low_rank_block_ratio();
 
