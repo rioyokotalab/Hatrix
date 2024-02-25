@@ -9,20 +9,140 @@
 using namespace Hatrix;
 static Hatrix::greens_functions::kernel_function_t kernel;
 
+static bool
+row_has_admissible_blocks(const Hatrix::SymmetricSharedBasisMatrix& A,
+                          const int64_t row, const int64_t level) {
+  bool has_admis = false;
+  for (int64_t col = 0; col < pow(2, level); col++) {
+    if ((!A.is_admissible.exists(row, col, level)) || // part of upper level admissible block
+        (A.is_admissible.exists(row, col, level) && A.is_admissible(row, col, level))) {
+      has_admis = true;
+      break;
+    }
+  }
+
+  return has_admis;
+}
+
 static RowLevelMap
 generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
                                      RowLevelMap Uchild,
                                      const Hatrix::Domain& domain,
                                      const int64_t N, const int64_t nleaf, const int64_t rank,
                                      const int64_t level) {
+  Matrix Ui, Si, _Vi; double error;
+  const int64_t nblocks = pow(2, level);
+  const int64_t block_size = N / nblocks;
+  Matrix AY(block_size, block_size);
+  RowLevelMap Ubig_parent;
 
+  for (int64_t row = 0; row < nblocks; ++row) {
+    if (row_has_admissible_blocks(A, row, level)) {
+      for (int64_t col = 0; col < nblocks; ++col) {
+        if (A.is_admissible.exists(row, col, level) &&
+            A.is_admissible(row, col, level)) {
+          Hatrix::Matrix dense = generate_p2p_interactions(domain,
+                                                           row * block_size, block_size,
+                                                           col * block_size, block_size,
+                                                           kernel);
+          AY += dense;
+        }
+      }
+
+      int64_t child1 = row * 2;
+      int64_t child2 = row * 2 + 1;
+
+      // Generate U transfer matrix.
+      Matrix& Ubig_child1 = A.U(child1, A.max_level);
+      Matrix& Ubig_child2 = A.U(child2, A.max_level);
+      Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
+      std::vector<Matrix> temp_splits = temp.split(2, 1);
+      std::vector<Matrix> AY_splits = AY.split(2, 1);
+
+      matmul(Ubig_child1, AY_splits[0], temp_splits[0], true, false, 1, 0);
+      matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
+
+      std::tie(Ui, Si, _Vi, error) = truncated_svd(temp, rank);
+
+      // Generate the full basis to pass to the next level.
+      auto Utransfer_splits = Ui.split(std::vector<int64_t>{rank}, {});
+
+      Matrix Ubig(block_size, rank);
+      auto Ubig_splits = Ubig.split(2, 1);
+      matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
+      matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
+
+      A.U.insert(row, level, std::move(Ui));
+      Ubig_parent.insert(row, level, std::move(Ubig));
+    }
+  }
+
+  for (int64_t row = 0; row < nblocks; ++row) {
+    for (int64_t col = 0; col < row; ++col) {
+      if (A.is_admissible.exists(row, col, level) && A.is_admissible(row, col, level)) {
+        Matrix& Urow_actual = Ubig_parent(row, level);
+        Matrix& Ucol_actual = Ubig_parent(col, level);
+
+        Matrix dense = generate_p2p_interactions(domain,
+                                                 row * block_size, block_size,
+                                                 col * block_size, block_size,
+                                                 kernel);
+        Matrix S_block = matmul(matmul(Urow_actual, dense, true), Ucol_actual);
+        A.S.insert(row, col, level, std::move(S_block));
+      }
+    }
+  }
+
+  return Ubig_parent;
 }
 
 static void
 construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
                                const Hatrix::Domain& domain,
                                const int64_t N, const int64_t nleaf, const int64_t rank) {
+  Hatrix::Matrix Utemp, Stemp, Vtemp; double error;
+  const int64_t nblocks = pow(2, A.max_level);
 
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) && !A.is_admissible(i, j, A.max_level)) {
+        Hatrix::Matrix Aij = generate_p2p_interactions(domain,
+                                                       i * nleaf, nleaf,
+                                                       j * nleaf, nleaf,
+                                                       kernel);
+        A.D.insert(i, j, A.max_level, std::move(Aij));
+      }
+    }
+  }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    Hatrix::Matrix AY(nleaf, nleaf);
+    for (int64_t j = 0; j < nblocks; ++j) {
+      if (!A.is_admissible.exists(i, j, A.max_level) ||
+          (A.is_admissible.exists(i, j, A.max_level) && A.is_admissible(i, j, A.max_level))) {
+        Hatrix::Matrix Aij = generate_p2p_interactions(domain,
+                                                       i * nleaf, nleaf,
+                                                       j * nleaf, nleaf,
+                                                       kernel);
+        AY += Aij;
+      }
+    }
+
+    std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+    A.U.insert(i, A.max_level, std::move(Utemp));
+  }
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      Hatrix::Matrix dense = generate_p2p_interactions(domain,
+                                                       i * nleaf, nleaf,
+                                                       j * nleaf, nleaf,
+                                                       kernel);
+      A.S.insert(i, j, A.max_level,
+                   Hatrix::matmul(Hatrix::matmul(A.U(i, A.max_level), dense, true),
+                                  A.U(j, A.max_level)));
+    }
+  }
 }
 
 static void
@@ -112,4 +232,5 @@ int main(int argc, char ** argv) {
 
   construct_H2_strong(A, domain, N, leaf_size, max_rank);
 
+  return 0;
 }
