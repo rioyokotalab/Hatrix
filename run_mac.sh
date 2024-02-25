@@ -27,5 +27,5 @@ cmake .. \
 make -j VERBOSE=1
 popd
 
-./build/examples/Dense_QR_2x2
-./build/examples/H2_strong_CON
+# ./build/examples/Dense_QR_2x2
+./build/examples/H2_strong_CON_sameer 1024 64 1e-5 30 50 0.4 1 1 3 1

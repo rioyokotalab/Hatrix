@@ -7,7 +7,34 @@
 
 #include "Hatrix/Hatrix.hpp"
 using namespace Hatrix;
-Hatrix::greens_functions::kernel_function_t kernel;
+static Hatrix::greens_functions::kernel_function_t kernel;
+
+static RowLevelMap
+generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
+                                     RowLevelMap Uchild,
+                                     const Hatrix::Domain& domain,
+                                     const int64_t N, const int64_t nleaf, const int64_t rank,
+                                     const int64_t level) {
+
+}
+
+static void
+construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
+                               const Hatrix::Domain& domain,
+                               const int64_t N, const int64_t nleaf, const int64_t rank) {
+
+}
+
+static void
+construct_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain& domain,
+                    const int64_t N, const int64_t nleaf, const int64_t rank) {
+  construct_H2_strong_leaf_nodes(A, domain, N, nleaf, rank);
+  RowLevelMap Uchild = A.U;
+
+  for (int64_t level = A.max_level - 1; level > 0; --level) {
+    Uchild = generate_H2_strong_transfer_matrices(A, Uchild, domain, N, nleaf, rank, level);
+  }
+}
 
 int main(int argc, char ** argv) {
   if (argc == 1) {
@@ -32,9 +59,9 @@ int main(int argc, char ** argv) {
   // Specify underlying geometry
   // 0: Unit Circular
   // 1: Unit Cubical
-  // 2: StarsH Uniform Grid
   const int64_t geom_type = argc > 8 ? atol(argv[8]) : 0;
   const int64_t ndim  = argc > 9 ? atol(argv[9]) : 2;
+  assert(ndim >= 1 && ndim <= 3);
 
   // Specify compressed representation
   // 0: BLR2
@@ -60,7 +87,7 @@ int main(int argc, char ** argv) {
       else if (ndim == 2) {
         return Hatrix::greens_functions::laplace_2d_kernel(c_row, c_col, add_diag);
       }
-      else if (ndim == 3) {
+      else {
         return Hatrix::greens_functions::laplace_3d_kernel(c_row, c_col, add_diag);
       }
     };
@@ -74,4 +101,15 @@ int main(int argc, char ** argv) {
   default:                      // circle / sphere mesh
     domain.generate_circular_particles();
   }
+  domain.cardinal_sort_and_cell_generation(leaf_size);
+
+  // Initialize H2 matrix class.
+  Hatrix::SymmetricSharedBasisMatrix A;
+  A.max_level = log2(N / leaf_size);
+
+  A.generate_admissibility(domain, matrix_type == 1, Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
+  A.print_structure();
+
+  construct_H2_strong(A, domain, N, leaf_size, max_rank);
+
 }
