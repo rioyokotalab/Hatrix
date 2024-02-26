@@ -24,17 +24,33 @@ row_has_admissible_blocks(const Hatrix::SymmetricSharedBasisMatrix& A,
   return has_admis;
 }
 
+static std::tuple<Matrix, Matrix, Matrix, int64_t>
+svd_like_compression(Matrix& matrix,
+                     const int64_t max_rank,
+                     const double accuracy) {
+  Matrix Ui, Si, Vi;
+  int64_t rank;
+  std::tie(Ui, Si, Vi, rank) = error_svd(matrix, accuracy, false, false);
+
+  // Assume fixed rank if accuracy==0.
+  rank = accuracy == 0. ? max_rank : std::min(max_rank, rank);
+
+  return std::make_tuple(std::move(Ui), std::move(Si), std::move(Vi), std::move(rank));
+}
+
+
 static RowLevelMap
 generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
                                      RowLevelMap Uchild,
                                      const Hatrix::Domain& domain,
-                                     const int64_t N, const int64_t nleaf, const int64_t rank,
-                                     const int64_t level) {
+                                     const int64_t N, const int64_t nleaf, const int64_t max_rank,
+                                     const int64_t level, const double accuracy) {
   Matrix Ui, Si, _Vi; double error;
   const int64_t nblocks = pow(2, level);
   const int64_t block_size = N / nblocks;
   Matrix AY(block_size, block_size);
   RowLevelMap Ubig_parent;
+  const int64_t child_level = level + 1;
 
   for (int64_t row = 0; row < nblocks; ++row) {
     if (row_has_admissible_blocks(A, row, level)) {
@@ -53,8 +69,8 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
       int64_t child2 = row * 2 + 1;
 
       // Generate U transfer matrix.
-      Matrix& Ubig_child1 = A.U(child1, A.max_level);
-      Matrix& Ubig_child2 = A.U(child2, A.max_level);
+      Matrix& Ubig_child1 = Uchild(child1, child_level);
+      Matrix& Ubig_child2 = Uchild(child2, child_level);
       Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
       std::vector<Matrix> temp_splits = temp.split(2, 1);
       std::vector<Matrix> AY_splits = AY.split(2, 1);
@@ -62,13 +78,15 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
       matmul(Ubig_child1, AY_splits[0], temp_splits[0], true, false, 1, 0);
       matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
 
-      std::tie(Ui, Si, _Vi, error) = truncated_svd(temp, rank);
+      // std::tie(Ui, Si, _Vi, error) = truncated_svd(temp, rank);
+      std::tie(Ui, Si, _Vi, error) = svd_like_compression(matrix, max_rank, accuracy);
 
       // Generate the full basis to pass to the next level.
-      auto Utransfer_splits = Ui.split(std::vector<int64_t>{rank}, {});
+      auto Utransfer_splits = Ui.split(std::vector<int64_t>{Ubig_child1.cols}, {});
 
-      Matrix Ubig(block_size, rank);
-      auto Ubig_splits = Ubig.split(2, 1);
+      Matrix Ubig(block_size, Ubig_child1.cols + Ubig_child2.cols);
+      auto Ubig_splits = Ubig.split(std::vector<int64_t>{Ubig_child1.cols},
+                                    {});
       matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
 
@@ -99,9 +117,12 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
 static void
 construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
                                const Hatrix::Domain& domain,
-                               const int64_t N, const int64_t nleaf, const int64_t rank) {
-  Hatrix::Matrix Utemp, Stemp, Vtemp; double error;
+                               const int64_t N, const int64_t nleaf,
+                               const int64_t max_rank, const double accuracy) {
+  Hatrix::Matrix Utemp, Stemp, Vtemp;
+  int64_t rank;
   const int64_t nblocks = pow(2, A.max_level);
+
 
   for (int64_t i = 0; i < nblocks; ++i) {
     for (int64_t j = 0; j < nblocks; ++j) {
@@ -128,7 +149,8 @@ construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
       }
     }
 
-    std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+    // std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
+    std::tie(Utemp, Stemp, Vtemp, rank) = svd_like_compression(AY, max_rank, accuracy);
     A.U.insert(i, A.max_level, std::move(Utemp));
   }
 
@@ -147,12 +169,12 @@ construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
 
 static void
 construct_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain& domain,
-                    const int64_t N, const int64_t nleaf, const int64_t rank) {
-  construct_H2_strong_leaf_nodes(A, domain, N, nleaf, rank);
+                    const int64_t N, const int64_t nleaf, const int64_t max_rank, const double accuracy) {
+  construct_H2_strong_leaf_nodes(A, domain, N, nleaf, max_rank, accuracy);
   RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.max_level - 1; level > 0; --level) {
-    Uchild = generate_H2_strong_transfer_matrices(A, Uchild, domain, N, nleaf, rank, level);
+    Uchild = generate_H2_strong_transfer_matrices(A, Uchild, domain, N, nleaf, max_rank, level, accuracy);
   }
 }
 
@@ -225,35 +247,34 @@ int main(int argc, char ** argv) {
   if (argc == 1) {
     std::cout << "HELP SCREEN FOR H2_strong_CON.cpp" << std::endl;
     std::cout << "Specify arguments as follows: " << std::endl;
-    std::cout << "N leaf_size accuracy max_rank random_matrix_size admis kernel_type geom_type ndim matrix_type" << std::endl;
+    std::cout << "N leaf_size accuracy max_rank admis kernel_type geom_type ndim matrix_type" << std::endl;
     return 0;
   }
 
   const int64_t N = argc > 1 ? atol(argv[1]) : 256;
   const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
-  const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-5;
+  const double accuracy = argc > 3 ? atof(argv[3]) : 1.e-9;
   const int64_t max_rank = argc > 4 ? atol(argv[4]) : 30;
-  const int64_t random_matrix_size = argc > 5 ? atol(argv[5]) : 100;
-  const double admis = argc > 6 ? atof(argv[6]) : 1.0;
+  const double admis = argc > 5 ? atof(argv[5]) : 1.0;
 
   // Specify kernel function
   // 0: Laplace Kernel
   // 1: Yukawa Kernel
-  const int64_t kernel_type = argc > 7 ? atol(argv[7]) : 0;
+  const int64_t kernel_type = argc > 6 ? atol(argv[6]) : 0;
 
   // Specify underlying geometry
   // 0: Unit Circular
   // 1: Unit Cubical
-  const int64_t geom_type = argc > 8 ? atol(argv[8]) : 0;
-  const int64_t ndim  = argc > 9 ? atol(argv[9]) : 2;
+  const int64_t geom_type = argc > 7 ? atol(argv[7]) : 0;
+  const int64_t ndim  = argc > 8 ? atol(argv[8]) : 2;
   assert(ndim >= 1 && ndim <= 3);
 
   // Specify compressed representation
   // 0: BLR2
   // 1: H2
-  const int64_t matrix_type = argc > 10 ? atol(argv[10]) : 1;
+  const int64_t matrix_type = argc > 9 ? atol(argv[9]) : 1;
 
-  const double add_diag = 1e-3 / N;
+  const double add_diag = 1e-6 / N;
   const double alpha = 1;
   // Setup the kernel.
   switch (kernel_type) {
@@ -295,7 +316,7 @@ int main(int argc, char ** argv) {
   A.generate_admissibility(domain, matrix_type == 1, Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
   A.print_structure();
 
-  construct_H2_strong(A, domain, N, leaf_size, max_rank);
+  construct_H2_strong(A, domain, N, leaf_size, max_rank, accuracy);
 
   double error = construction_absolute_error(A, leaf_size, domain);
 
