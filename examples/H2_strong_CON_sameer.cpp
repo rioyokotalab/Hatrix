@@ -156,6 +156,71 @@ construct_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain&
   }
 }
 
+static Matrix get_Ubig(const Hatrix::SymmetricSharedBasisMatrix& A,
+                       const int64_t node, const int64_t level) {
+  if (level == A.max_level) {
+    return A.U(node, level);
+  }
+
+  const int64_t child1 = node * 2;
+  const int64_t child2 = node * 2 + 1;
+  const Matrix Ubig_child1 = get_Ubig(A, child1, level + 1);
+  const Matrix Ubig_child2 = get_Ubig(A, child2, level + 1);
+
+  const int64_t block_size = Ubig_child1.rows + Ubig_child2.rows;
+  Matrix Ubig(block_size, A.U(node, level).cols);
+  auto Ubig_splits = Ubig.split(std::vector<int64_t>{Ubig_child1.rows},
+                                std::vector<int64_t>{});
+  auto U_splits = A.U(node, level).split(std::vector<int64_t>{Ubig_child1.cols},
+                                         std::vector<int64_t>{});
+
+  matmul(Ubig_child1, U_splits[0], Ubig_splits[0]);
+  matmul(Ubig_child2, U_splits[1], Ubig_splits[1]);
+  return Ubig;
+}
+
+static double construction_absolute_error(const Hatrix::SymmetricSharedBasisMatrix& A,
+                                          const int64_t nleaf,
+                                          const Domain& domain) {
+  double error = 0;
+  const int64_t leaf_nblocks = pow(2, A.max_level);
+  // Inadmissible blocks (only at leaf level)
+  for (int64_t i = 0; i < leaf_nblocks; i++) {
+    for (int64_t j = 0; j < leaf_nblocks; j++) {
+      if (A.is_admissible.exists(i, j, A.max_level) && !A.is_admissible(i, j, A.max_level)) {
+        const Matrix actual = generate_p2p_interactions(domain,
+                                                        i * nleaf, nleaf,
+                                                        j * nleaf, nleaf,
+                                                        kernel);
+        const Matrix expected = A.D(i, j, A.max_level);
+        error += pow(norm(actual - expected), 2);
+      }
+    }
+  }
+  // Admissible blocks
+  for (int64_t level = A.max_level; level > 0; level--) {
+    const int64_t nblocks = pow(2, level);
+    for (int64_t i = 0; i < nblocks; i++) {
+      for (int64_t j = 0; j < i; j++) {
+        if (A.is_admissible.exists(i, j, level) &&
+            A.is_admissible(i, j, level)) {
+          const int64_t block_size = domain.N / pow(2, level);
+          const Matrix Ubig = get_Ubig(A, i, level);
+          const Matrix Vbig = get_Ubig(A, j, level);
+          const Matrix expected_matrix = matmul(matmul(Ubig, A.S(i, j, level)), Vbig, false, true);
+          const Matrix actual_matrix =
+            generate_p2p_interactions(domain,
+                                      i * block_size, block_size,
+                                      j * block_size, block_size,
+                                      kernel);
+          error += pow(norm(expected_matrix - actual_matrix), 2);
+        }
+      }
+    }
+  }
+  return std::sqrt(error);
+}
+
 int main(int argc, char ** argv) {
   if (argc == 1) {
     std::cout << "HELP SCREEN FOR H2_strong_CON.cpp" << std::endl;
@@ -231,6 +296,10 @@ int main(int argc, char ** argv) {
   A.print_structure();
 
   construct_H2_strong(A, domain, N, leaf_size, max_rank);
+
+  double error = construction_absolute_error(A, leaf_size, domain);
+
+  std::cout << "Construction absolute error: " << error << std::endl;
 
   return 0;
 }
