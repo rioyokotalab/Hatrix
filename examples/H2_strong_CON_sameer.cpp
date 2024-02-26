@@ -55,8 +55,8 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
   for (int64_t row = 0; row < nblocks; ++row) {
     if (row_has_admissible_blocks(A, row, level)) {
       for (int64_t col = 0; col < nblocks; ++col) {
-        if (A.is_admissible.exists(row, col, level) &&
-            A.is_admissible(row, col, level)) {
+        if (!A.is_admissible.exists(row, col, level) ||
+            (A.is_admissible.exists(row, col, level) && A.is_admissible(row, col, level))) {
           Hatrix::Matrix dense = generate_p2p_interactions(domain,
                                                            row * block_size, block_size,
                                                            col * block_size, block_size,
@@ -74,13 +74,11 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
       Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
       std::vector<Matrix> temp_splits = temp.split(std::vector<int64_t>{Ubig_child1.cols},
                                                    std::vector<int64_t>{});
-      std::vector<Matrix> AY_splits = AY.split(std::vector<int64_t>{Ubig_child1.rows},
-                                               std::vector<int64_t>{});
+      std::vector<Matrix> AY_splits = AY.split(2, 1);
 
       matmul(Ubig_child1, AY_splits[0], temp_splits[0], true, false, 1, 0);
       matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
 
-      // std::tie(Ui, Si, _Vi, error) = truncated_svd(temp, rank);
       std::tie(Ui, Si, _Vi, rank) = svd_like_compression(temp, max_rank, accuracy);
       Ui.shrink(Ui.rows, rank);
       std::cout << "rank: " << rank << std::endl;
