@@ -45,7 +45,7 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
                                      const Hatrix::Domain& domain,
                                      const int64_t N, const int64_t nleaf, const int64_t max_rank,
                                      const int64_t level, const double accuracy) {
-  Matrix Ui, Si, _Vi; double error;
+  Matrix Ui, Si, _Vi; double error; int64_t rank;
   const int64_t nblocks = pow(2, level);
   const int64_t block_size = N / nblocks;
   Matrix AY(block_size, block_size);
@@ -72,20 +72,24 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
       Matrix& Ubig_child1 = Uchild(child1, child_level);
       Matrix& Ubig_child2 = Uchild(child2, child_level);
       Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
-      std::vector<Matrix> temp_splits = temp.split(2, 1);
-      std::vector<Matrix> AY_splits = AY.split(2, 1);
+      std::vector<Matrix> temp_splits = temp.split(std::vector<int64_t>{Ubig_child1.cols},
+                                                   std::vector<int64_t>{});
+      std::vector<Matrix> AY_splits = AY.split(std::vector<int64_t>{Ubig_child1.rows},
+                                               std::vector<int64_t>{});
 
       matmul(Ubig_child1, AY_splits[0], temp_splits[0], true, false, 1, 0);
       matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
 
       // std::tie(Ui, Si, _Vi, error) = truncated_svd(temp, rank);
-      std::tie(Ui, Si, _Vi, error) = svd_like_compression(matrix, max_rank, accuracy);
+      std::tie(Ui, Si, _Vi, rank) = svd_like_compression(temp, max_rank, accuracy);
+      Ui.shrink(Ui.rows, rank);
+      std::cout << "rank: " << rank << std::endl;
 
       // Generate the full basis to pass to the next level.
       auto Utransfer_splits = Ui.split(std::vector<int64_t>{Ubig_child1.cols}, {});
 
-      Matrix Ubig(block_size, Ubig_child1.cols + Ubig_child2.cols);
-      auto Ubig_splits = Ubig.split(std::vector<int64_t>{Ubig_child1.cols},
+      Matrix Ubig(block_size, rank);
+      auto Ubig_splits = Ubig.split(std::vector<int64_t>{Ubig_child1.rows},
                                     {});
       matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
@@ -151,6 +155,8 @@ construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
 
     // std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
     std::tie(Utemp, Stemp, Vtemp, rank) = svd_like_compression(AY, max_rank, accuracy);
+    Utemp.shrink(Utemp.rows, rank);
+    std::cout << "leaf rank: " << rank << std::endl;
     A.U.insert(i, A.max_level, std::move(Utemp));
   }
 
