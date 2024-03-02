@@ -79,7 +79,6 @@ namespace Hatrix {
       temp_N = sides[k];
     }
     for (int k = 1; k < ndim; ++k) { total += sides[k]; }
-    int64_t extra = N - total;
     particles.resize(N, Particle(std::vector<double>(ndim), 0));
 
     if (ndim == 1) {
@@ -127,6 +126,9 @@ namespace Hatrix {
         pval = (double)i / (double)N;
         particles[i] = Hatrix::Particle(px, py, pval);
       }
+      std::cout << "Domain N: " << N
+                << " part.size= " <<  particles.size()
+                << std::endl;
     }
     else if (ndim == 3) {
       // Generate a unit cube mesh with N points around the surface

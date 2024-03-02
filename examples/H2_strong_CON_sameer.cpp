@@ -81,7 +81,6 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
 
       std::tie(Ui, Si, _Vi, rank) = svd_like_compression(temp, max_rank, accuracy);
       Ui.shrink(Ui.rows, rank);
-      std::cout << "rank: " << rank << std::endl;
 
       // Generate the full basis to pass to the next level.
       auto Utransfer_splits = Ui.split(std::vector<int64_t>{Ubig_child1.cols}, {});
@@ -94,6 +93,10 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
 
       A.U.insert(row, level, std::move(Ui));
       Ubig_parent.insert(row, level, std::move(Ubig));
+    }
+    else {                      // insert an identity block if there are no admissible blocks.
+      A.U.insert(row, level, generate_identity_matrix(max_rank * 2, max_rank));
+      Ubig_parent.insert(row, level, generate_identity_matrix(block_size, max_rank));
     }
   }
 
@@ -151,10 +154,8 @@ construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
       }
     }
 
-    // std::tie(Utemp, Stemp, Vtemp, error) = Hatrix::truncated_svd(AY, rank);
     std::tie(Utemp, Stemp, Vtemp, rank) = svd_like_compression(AY, max_rank, accuracy);
     Utemp.shrink(Utemp.rows, rank);
-    std::cout << "leaf rank: " << rank << std::endl;
     A.U.insert(i, A.max_level, std::move(Utemp));
   }
 
@@ -173,12 +174,14 @@ construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
 
 static void
 construct_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain& domain,
-                    const int64_t N, const int64_t nleaf, const int64_t max_rank, const double accuracy) {
+                    const int64_t N, const int64_t nleaf, const int64_t max_rank,
+                    const double accuracy) {
   construct_H2_strong_leaf_nodes(A, domain, N, nleaf, max_rank, accuracy);
   RowLevelMap Uchild = A.U;
 
   for (int64_t level = A.max_level - 1; level > 0; --level) {
-    Uchild = generate_H2_strong_transfer_matrices(A, Uchild, domain, N, nleaf, max_rank, level, accuracy);
+    Uchild = generate_H2_strong_transfer_matrices(A, Uchild, domain, N, nleaf,
+                                                  max_rank, level, accuracy);
   }
 }
 
@@ -205,46 +208,107 @@ static Matrix get_Ubig(const Hatrix::SymmetricSharedBasisMatrix& A,
   return Ubig;
 }
 
-static double construction_absolute_error(const Hatrix::SymmetricSharedBasisMatrix& A,
-                                          const int64_t nleaf,
-                                          const Domain& domain) {
-  double error = 0;
-  const int64_t leaf_nblocks = pow(2, A.max_level);
-  // Inadmissible blocks (only at leaf level)
-  for (int64_t i = 0; i < leaf_nblocks; i++) {
-    for (int64_t j = 0; j < leaf_nblocks; j++) {
-      if (A.is_admissible.exists(i, j, A.max_level) && !A.is_admissible(i, j, A.max_level)) {
-        const Matrix actual = generate_p2p_interactions(domain,
-                                                        i * nleaf, nleaf,
-                                                        j * nleaf, nleaf,
-                                                        kernel);
-        const Matrix expected = A.D(i, j, A.max_level);
-        error += pow(norm(actual - expected), 2);
+static void
+multiply_S(const Hatrix::SymmetricSharedBasisMatrix& A,
+           std::vector<Matrix>& x_hat, std::vector<Matrix>& b_hat,
+           int64_t x_hat_offset, int64_t b_hat_offset, int64_t level) {
+  int64_t nblocks = pow(2, level);
+
+  for (int64_t i = 0; i < nblocks; ++i) {
+    for (int64_t j = 0; j < i; ++j) {
+      if (A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level)) {
+        matmul(A.S(i, j, level), x_hat[x_hat_offset + j], b_hat[b_hat_offset + i]);
+        matmul(A.S(i, j, level), x_hat[x_hat_offset + i], b_hat[b_hat_offset + j],
+               true, false);
       }
     }
   }
-  // Admissible blocks
-  for (int64_t level = A.max_level; level > 0; level--) {
-    const int64_t nblocks = pow(2, level);
-    for (int64_t i = 0; i < nblocks; i++) {
-      for (int64_t j = 0; j < i; j++) {
-        if (A.is_admissible.exists(i, j, level) &&
-            A.is_admissible(i, j, level)) {
-          const int64_t block_size = domain.N / pow(2, level);
-          const Matrix Ubig = get_Ubig(A, i, level);
-          const Matrix Vbig = get_Ubig(A, j, level);
-          const Matrix expected_matrix = matmul(matmul(Ubig, A.S(i, j, level)), Vbig, false, true);
-          const Matrix actual_matrix =
-            generate_p2p_interactions(domain,
-                                      i * block_size, block_size,
-                                      j * block_size, block_size,
-                                      kernel);
-          error += pow(norm(expected_matrix - actual_matrix), 2);
+}
+
+
+static Matrix
+matmul(const SymmetricSharedBasisMatrix& A, Matrix& x, int64_t N, int64_t rank) {
+  std::vector<Matrix> x_hat;
+  const int64_t leaf_nblocks = pow(2, A.max_level);
+  auto x_splits = x.split(leaf_nblocks, 1);
+
+  for (int i = 0; i < leaf_nblocks; ++i) {
+    x_hat.push_back(matmul(A.U(i, A.max_level), x_splits[i], true, false, 1.0));
+  }
+
+  int64_t x_hat_offset = 0;
+  for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
+    int64_t nblocks = pow(2, level);
+    int64_t child_level = level + 1;
+
+    for (int64_t i = 0; i < nblocks; ++i) {
+      int64_t c1 = i * 2;
+      int64_t c2 = i * 2 + 1;
+
+      Matrix xtemp = Matrix(A.U(i, level).rows, 1);
+      auto xtemp_splits = xtemp.split(std::vector<int64_t>(1, rank),
+                                      {});
+      xtemp_splits[0] = x_hat[x_hat_offset + c1];
+      xtemp_splits[1] = x_hat[x_hat_offset + c2];
+
+      x_hat.push_back(matmul(A.U(i, level), xtemp, true, false, 1.0));
+    }
+
+    x_hat_offset += pow(2, child_level);
+  }
+
+  std::vector<Matrix> b_hat;
+  for (int64_t i = 0; i < pow(2, A.min_level); ++i) {
+    b_hat.push_back(Matrix(rank, 1));
+  }
+
+  int64_t b_hat_offset = 0;
+  multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset, A.min_level);
+
+  for (int64_t level = A.min_level; level < A.max_level; ++level) {
+    int64_t nblocks = pow(2, level);
+    int64_t child_level = level+1;
+
+    x_hat_offset -= pow(2, child_level);
+
+    for (int64_t row = 0; row < nblocks; ++row) {
+      int c_r1 = row * 2, c_r2 = row * 2 + 1;
+      Matrix Ub = matmul(A.U(row, level),
+                         b_hat[b_hat_offset + row]);
+      auto Ub_splits = Ub.split(std::vector<int64_t>(1, A.U(c_r1, child_level).cols),
+                                {});
+
+      b_hat.push_back(Matrix(Ub_splits[0], true));
+      b_hat.push_back(Matrix(Ub_splits[1], true));
+    }
+    multiply_S(A, x_hat, b_hat, x_hat_offset, b_hat_offset + nblocks, child_level);
+    b_hat_offset += nblocks;
+  }
+
+  // Multiply with the leaf level transfer matrices to generate the product matrix.
+  Matrix b(x.rows, 1);
+  auto b_splits = b.split(leaf_nblocks, 1);
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    matmul(A.U(i, A.max_level), b_hat[b_hat_offset + i], b_splits[i]);
+  }
+
+  for (int64_t i = 0; i < leaf_nblocks; ++i) {
+    for (int64_t j = 0; j <= i; ++j) {
+      if (A.is_admissible.exists(i, j, A.max_level) &&
+          !A.is_admissible(i, j, A.max_level)) {
+        // TODO: make the diagonal tringular and remove this.
+        if (i == j) {
+          matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+        }
+        else {
+          matmul(A.D(i, j, A.max_level), x_splits[j], b_splits[i]);
+          matmul(A.D(i, j, A.max_level), x_splits[i], b_splits[j], true, false);
         }
       }
     }
   }
-  return std::sqrt(error);
+
+  return b;
 }
 
 int main(int argc, char ** argv) {
@@ -308,6 +372,7 @@ int main(int argc, char ** argv) {
   switch(geom_type) {
   case 1:                       // cube mesh
     domain.generate_grid_particles();
+    break;
   default:                      // circle / sphere mesh
     domain.generate_circular_particles();
   }
@@ -316,15 +381,25 @@ int main(int argc, char ** argv) {
   // Initialize H2 matrix class.
   Hatrix::SymmetricSharedBasisMatrix A;
   A.max_level = log2(N / leaf_size);
-
-  A.generate_admissibility(domain, matrix_type == 1, Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
+  A.generate_admissibility(domain, matrix_type == 1,
+                           Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
   A.print_structure();
-
+  // Construct H2 strong admis matrix.
   construct_H2_strong(A, domain, N, leaf_size, max_rank, accuracy);
 
-  double error = construction_absolute_error(A, leaf_size, domain);
+  // Verification of the construction with a matvec product.
+  Hatrix::Matrix x = Hatrix::generate_random_matrix(N, 1);
 
-  std::cout << "Construction absolute error: " << error << std::endl;
+  // Low rank matrix-vector product.
+  Hatrix::Matrix b_lowrank = matmul(A, x, N, max_rank);
+
+  // Generate a dense matrix.
+  Matrix A_dense = Hatrix::generate_p2p_interactions(domain, kernel);
+  Matrix b_dense = Hatrix::matmul(A_dense, x);
+  Matrix diff = b_dense - b_lowrank;
+  double rel_error = Hatrix::norm(diff) / Hatrix::norm(b_dense);
+
+  std::cout << "Error : " << rel_error << std::endl;
 
   return 0;
 }
