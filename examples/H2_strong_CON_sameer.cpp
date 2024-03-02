@@ -30,10 +30,16 @@ svd_like_compression(Matrix& matrix,
                      const double accuracy) {
   Matrix Ui, Si, Vi;
   int64_t rank;
-  std::tie(Ui, Si, Vi, rank) = error_svd(matrix, accuracy, false, false);
+  std::tie(Ui, Si, Vi, rank) = error_svd(matrix, accuracy, true, false);
+
+  // std::cout << "singular values: ";
+  // for (int i = 0; i < Si.rows; ++i) {
+  //   std::cout << Si(i, i) << " ";
+  // }
+  // std::cout << std::endl;
 
   // Assume fixed rank if accuracy==0.
-  rank = accuracy == 0. ? max_rank : std::min(max_rank, rank);
+  rank = accuracy == 0. ? max_rank : std::min(max_rank, rank + 3);
 
   return std::make_tuple(std::move(Ui), std::move(Si), std::move(Vi), std::move(rank));
 }
@@ -53,6 +59,13 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
   const int64_t child_level = level + 1;
 
   for (int64_t row = 0; row < nblocks; ++row) {
+    int64_t child1 = row * 2;
+    int64_t child2 = row * 2 + 1;
+
+    // Generate U transfer matrix.
+    Matrix& Ubig_child1 = Uchild(child1, child_level);
+    Matrix& Ubig_child2 = Uchild(child2, child_level);
+
     if (row_has_admissible_blocks(A, row, level)) {
       for (int64_t col = 0; col < nblocks; ++col) {
         if (!A.is_admissible.exists(row, col, level) ||
@@ -65,12 +78,6 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
         }
       }
 
-      int64_t child1 = row * 2;
-      int64_t child2 = row * 2 + 1;
-
-      // Generate U transfer matrix.
-      Matrix& Ubig_child1 = Uchild(child1, child_level);
-      Matrix& Ubig_child2 = Uchild(child2, child_level);
       Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
       std::vector<Matrix> temp_splits = temp.split(std::vector<int64_t>{Ubig_child1.cols},
                                                    std::vector<int64_t>{});
@@ -82,9 +89,10 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
       std::tie(Ui, Si, _Vi, rank) = svd_like_compression(temp, max_rank, accuracy);
       std::cout << "rank: "<< rank << std::endl;
       Ui.shrink(Ui.rows, rank);
+      A.U.insert(row, level, std::move(Ui));
 
       // Generate the full basis to pass to the next level.
-      auto Utransfer_splits = Ui.split(std::vector<int64_t>{Ubig_child1.cols}, {});
+      auto Utransfer_splits = A.U(row, level).split(std::vector<int64_t>{Ubig_child1.cols}, {});
 
       Matrix Ubig(block_size, rank);
       auto Ubig_splits = Ubig.split(std::vector<int64_t>{Ubig_child1.rows},
@@ -92,7 +100,6 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
       matmul(Ubig_child1, Utransfer_splits[0], Ubig_splits[0]);
       matmul(Ubig_child2, Utransfer_splits[1], Ubig_splits[1]);
 
-      A.U.insert(row, level, std::move(Ui));
       Ubig_parent.insert(row, level, std::move(Ubig));
     }
     else {                      // insert an identity block if there are no admissible blocks.
@@ -157,6 +164,7 @@ construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
 
     std::tie(Utemp, Stemp, Vtemp, rank) = svd_like_compression(AY, max_rank, accuracy);
     Utemp.shrink(Utemp.rows, rank);
+    std::cout << "leaf rank: " <<  rank << std::endl;
     A.U.insert(i, A.max_level, std::move(Utemp));
   }
 

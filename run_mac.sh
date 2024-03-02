@@ -28,7 +28,7 @@ make -j VERBOSE=1
 popd
 
 # ./build/examples/Dense_QR_2x2
-./build/examples/H2_strong_CON_sameer \
-    256 64 0 30 0.5 0 1 1 1
+lldb -- ./build/examples/H2_strong_CON_sameer \
+    1024 64 1e-8 40 0.5 0 1 2 1
 
 # N nleaf acc max_rank admis kernel geom ndim matrix_type
