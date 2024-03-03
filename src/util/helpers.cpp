@@ -1,8 +1,8 @@
-#include "Hatrix/util/matrix_generators.hpp"
-
 #include <vector>
 #include <cassert>
 #include <iostream>
+
+#include "Hatrix/classes/Matrix.hpp"
 
 namespace Hatrix {
   std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal, bool endpoint) {

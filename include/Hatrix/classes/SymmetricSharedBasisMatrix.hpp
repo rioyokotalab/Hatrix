@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Domain.hpp"
+// #include "Domain.hpp"
 
 namespace Hatrix {
   // Algorithms that can be used for calculation of admissiblity.

@@ -193,6 +193,16 @@ SymmetricSharedBasisMatrix::generate_admissibility(const Hatrix::Domain& domain,
   assert(max_level != -1);
   if (admis_algorithm == Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL) {
     dual_tree_traversal(domain, 0, 0, use_nested_basis, admis);
+    if (use_nested_basis) {
+      min_level = 1;
+    }
+    else {
+      min_level = max_level;
+    }
+
+    if (use_nested_basis && min_level == 1) {
+      is_admissible.insert(0, 0, 0, false);
+    }
   }
   else if (admis_algorithm == Hatrix::ADMIS_ALGORITHM::DIAGONAL_ADMIS) {
     if (use_nested_basis) {

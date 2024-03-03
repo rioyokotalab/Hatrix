@@ -6,11 +6,10 @@ list(APPEND HATRIX_EXAMPLES
   BLR2_strong_CON
   H2_weak_CON_2lev
   H2_weak_CON
-  H2_strong_CON_2lev
-  # H2_strong_CON code of ridwan.
+  H2_strong_CON
   # H2_strong_CON_sym_ID
   Dense_LU_2x2
-  Dense_QR_2x2
+  # Dense_QR_2x2
   # Dense_EV
   Dense_LU_NxN
   BLR2_weak_LU_2x2_noumv

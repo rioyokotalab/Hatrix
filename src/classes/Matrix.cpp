@@ -412,4 +412,42 @@ Matrix Matrix::tril(const int64_t diag) {
 
   return out;
 }
+
+Matrix Matrix::pad(const int64_t pad_width_rows, const int64_t pad_width_cols) const {
+  assert(pad_width_rows >= 0);
+  assert(pad_width_cols >= 0);
+  const int64_t new_rows = rows + pad_width_rows;
+  const int64_t new_cols = cols + pad_width_cols;
+
+  Matrix out(new_rows, new_cols);
+
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      out(i, j) = (*this)(i, j);
+    }
+  }
+
+  // Pad rows
+  for (int64_t i = rows; i < new_rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      out(i, j) = 0;
+    }
+  }
+
+  // Pad cols
+  for (int64_t j = cols; j < new_cols; ++j) {
+    for (int64_t i = 0; i < rows; ++i) {
+      out(i, j) = 0;
+    }
+  }
+
+  // Pad lower right corner
+  for (int64_t i = rows; i < new_rows; ++i) {
+    for (int64_t j = cols; j < new_cols; ++j) {
+      out(i, j) = 0;
+    }
+  }
+
+  return out;
+}
 }  // namespace Hatrix

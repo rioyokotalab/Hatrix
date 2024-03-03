@@ -79,31 +79,54 @@ namespace Hatrix {
       temp_N = sides[k];
     }
     for (int k = 1; k < ndim; ++k) { total += sides[k]; }
-    int64_t extra = N - total;
     particles.resize(N, Particle(std::vector<double>(ndim), 0));
 
     if (ndim == 1) {
-      double space_0 = 1.0 / N;
-      for (int64_t i = 0; i < sides[0]; ++i) {
-        std::vector<double> point(ndim);
-        point[0] = i * space_0;
-        particles[i] = Hatrix::Particle(point, i);
+      const auto x = equally_spaced_vector(N, 0, 1);
+      for (int64_t i = 0; i < N; ++i) {
+        particles[i] = Hatrix::Particle(x[i], i);
       }
     }
     else if (ndim == 2) {
-      // Generate a uniform grid of 'N' points.
-      int64_t M = ceil(N / sqrt(N));
-      int64_t Q = N / M;
-      int count = 0;
-      for (int64_t i = 0; i < M; ++i) {
-        for (int64_t j = 0; j < Q; ++j) {
-          if ((i+1) * (j+1) <= N) {
-            Hatrix::Particle p({(double)i/M, (double)j/Q}, count);
-            particles[count] = p;
-            count++;
-          }
-        }
+      double px, py, pval;
+      // Generate a unit square with N points on the sides
+      if (N < 4) {
+        std::cout << "N has to be >=4 for unit square mesh" << std::endl;
+        exit(EXIT_FAILURE);
       }
+      // Taken from H2Lib: Library/curve2d.c
+      const double a = 0.5;
+      const int64_t top = N / 4;
+      const int64_t left = N / 2;
+      const int64_t bottom = 3 * N / 4;
+      int64_t i = 0;
+      for (i = 0; i < top; i++) {
+        px = a - 2.0 * a * i / top;
+        py = a;
+        pval = (double)i / (double)N;
+        particles[i] = Hatrix::Particle(px, py, pval);
+      }
+      for (; i < left; i++) {
+        px = -a;
+        py = a - 2.0 * a * (i - top) / (left - top);
+        pval = (double)i / (double)N;
+        particles[i]= Hatrix::Particle(px, py, pval);
+      }
+      for (; i < bottom; i++) {
+        px = -a + 2.0 * a * (i - left) / (bottom - left);
+        py = -a;
+        pval = (double)i / (double)N;
+        particles[i]= Hatrix::Particle(px, py, pval);
+      }
+      for (; i < N; i++) {
+        px = a;
+        py = -a + 2.0 * a * (i - bottom) / (N - bottom);
+        pval = (double)i / (double)N;
+        particles[i] = Hatrix::Particle(px, py, pval);
+      }
+      std::cout << "Domain N: " << N
+                << " part.size= " <<  particles.size()
+                << std::endl;
     }
     else if (ndim == 3) {
       // Generate a unit cube mesh with N points around the surface
@@ -178,7 +201,9 @@ namespace Hatrix {
     }
   }
 
-  void Domain::generate_circular_particles(double min_val, double max_val) {
+  void Domain::generate_circular_particles() {
+    const double min_val = 0;
+    const double max_val = N;
     double range = max_val - min_val;
 
     if (ndim == 1) {

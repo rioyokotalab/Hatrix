@@ -57,7 +57,8 @@ construct_H2_weak_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Doma
 
 static RowLevelMap
 generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
-                           const int64_t N, const int64_t nleaf, const int64_t rank, const int64_t level) {
+                           const int64_t N, const int64_t nleaf, const int64_t rank,
+                           const int64_t level, RowLevelMap Uchild) {
   Matrix Ui, Si, _Vi; double error;
   const int64_t nblocks = pow(2, level);
   const int64_t block_size = N / nblocks;
@@ -79,8 +80,8 @@ generate_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain
     int child2 = row * 2 + 1;
 
     // Generate U transfer matrix.
-    Matrix& Ubig_child1 = A.U(child1, A.max_level);
-    Matrix& Ubig_child2 = A.U(child2, A.max_level);
+    const Matrix& Ubig_child1 = Uchild(child1, A.max_level);
+    const Matrix& Ubig_child2 = Uchild(child2, A.max_level);
     Matrix temp(Ubig_child1.cols + Ubig_child2.cols, AY.cols);
     std::vector<Matrix> temp_splits = temp.split(2, 1);
     std::vector<Matrix> AY_splits = AY.split(2, 1);
@@ -126,7 +127,7 @@ construct_H2_weak(Hatrix::SymmetricSharedBasisMatrix& A, Hatrix::Domain& domain,
 
   RowLevelMap Uchild = A.U;
   for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
-    Uchild = generate_transfer_matrices(A, domain, N, nleaf, rank, level);
+    Uchild = generate_transfer_matrices(A, domain, N, nleaf, rank, level, Uchild);
   }
 }
 

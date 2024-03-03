@@ -142,6 +142,8 @@ class Matrix {
   void destructive_resize(const int64_t nrows, const int64_t ncols);
 
   Matrix tril(const int64_t diag);
+
+  Matrix pad(const int64_t pad_width_rows, const int64_t pad_width_cols) const;
 };
 
 }  // namespace Hatrix

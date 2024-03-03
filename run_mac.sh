@@ -27,4 +27,9 @@ cmake .. \
 make -j VERBOSE=1
 popd
 
-./build/examples/Dense_QR_2x2
+# N nleaf acc max_rank admis kernel geom ndim matrix_type
+
+for N in 512 2048; do
+    ./build/examples/H2_strong_CON_sameer \
+        $N 64 0 40 0.5 0 1 3 1
+done
