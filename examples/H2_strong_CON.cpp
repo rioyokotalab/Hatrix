@@ -16,9 +16,22 @@
 #include <chrono>
 #include <stdexcept>
 
-#include "Hatrix/Hatrix.hpp"
-#include "Domain.hpp"
+// #include "Hatrix/Hatrix.hpp"
+// #include "Domain.hpp"
 #include "functions.hpp"
+
+Hatrix::Matrix generate_random_matrix(int64_t rows, int64_t cols) {
+  std::mt19937 gen(100);
+  std::uniform_real_distribution<double> dist(0.0, 1.0);
+  Hatrix::Matrix out(rows, cols);
+  for (int64_t i = 0; i < rows; ++i) {
+    for (int64_t j = 0; j < cols; ++j) {
+      out(i, j) = dist(gen);
+    }
+  }
+  return out;
+}
+
 
 using vec = std::vector<int64_t>;
 
@@ -640,7 +653,7 @@ int main(int argc, char ** argv) {
     std::cout << "HELP SCREEN FOR H2_strong_CON.cpp" << std::endl;
     std::cout << "Specify arguments as follows: " << std::endl;
     std::cout << "N leaf_size accuracy max_rank random_matrix_size admis kernel_type geom_type ndim matrix_type" << std::endl;
-    return;
+    return 0;
   }
 
   const int64_t N = argc > 1 ? atol(argv[1]) : 256;
@@ -716,7 +729,7 @@ int main(int argc, char ** argv) {
   const double particle_construct_time = std::chrono::duration_cast<std::chrono::milliseconds>
                                          (stop_particles - start_particles).count();
 
-  Hatrix::Matrix rand = Hatrix::generate_random_matrix(N, random_matrix_size);
+  Hatrix::Matrix rand = generate_random_matrix(N, random_matrix_size);
   const auto start_construct = std::chrono::system_clock::now();
   Hatrix::H2 A(domain, rand, N, leaf_size, accuracy, max_rank, admis, matrix_type);
   const auto stop_construct = std::chrono::system_clock::now();
