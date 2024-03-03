@@ -33,7 +33,7 @@ popd
 
 # N nleaf acc max_rank admis kernel geom ndim matrix_type
 
-for N in 1024; do
+for N in 512 1024 2048; do
     ./build/examples/H2_strong_CON_sameer \
-        $N 64 0 40 0.5 0 1 1 1
+        $N 64 0 40 0.5 0 1 3 1
 done

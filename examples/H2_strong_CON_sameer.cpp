@@ -459,16 +459,14 @@ int main(int argc, char ** argv) {
   Matrix diff = b_dense - b_lowrank;
   double rel_error = Hatrix::norm(diff) / Hatrix::norm(b_dense);
 
-  std::cout << "Error : " << rel_error << std::endl;
-
   std::cout << "N=" << N << " nleaf=" << leaf_size << " acc=" << accuracy
             << " max_rank=" << max_rank << " admis=" << admis
             << " kernel= " << (kernel_type == 0 ? "laplace" : "yukawa")
             << " geom_type= " << (geom_type == 0 ? "circle" : "grid")
             << " ndim= " << ndim
-            << " matrix_type= " << (matrix_type == 1 ? "H2" : "BLR2") << std::endl;
-
-  std::cout << "const error: " << construction_absolute_error(A, leaf_size, domain) << std::endl;
+            << " matrix_type= " << (matrix_type == 1 ? "H2" : "BLR2")
+            << "Error : " << rel_error
+            << std::endl;
 
   return 0;
 }
