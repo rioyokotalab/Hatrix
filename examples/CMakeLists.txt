@@ -4,25 +4,24 @@ include_directories(common)
 list(APPEND HATRIX_EXAMPLES
   BLR2_weak_CON
   BLR2_strong_CON
-  # H2_weak_CON_2lev
-  # H2_weak_CON
-  # H2_strong_CON
-  H2_strong_CON_sameer
+  H2_weak_CON_2lev
+  H2_weak_CON
+  H2_strong_CON
   # H2_strong_CON_sym_ID
-  # Dense_LU_2x2
+  Dense_LU_2x2
   # Dense_QR_2x2
   # Dense_EV
-  # Dense_LU_NxN
-  # BLR2_weak_LU_2x2_noumv
-  # BLR2_weak_LU_noumv
-  # BLR2_strong_LU_noumv
+  Dense_LU_NxN
+  BLR2_weak_LU_2x2_noumv
+  BLR2_weak_LU_noumv
+  BLR2_strong_LU_noumv
   # BLR2_weak_LDL
   # BLR2_strong_LDL
   # BLR2_strong_LU
-  # BLR2_weak_LU
+  BLR2_weak_LU
   # H2_weak_LDL
-  # H2_weak_LU
-  # H2_weak_LU_2lev
+  H2_weak_LU
+  H2_weak_LU_2lev
   # H2_strong_LDL
   # H2_strong_LDL_nodep
   # H2_strong_PO_nodep
