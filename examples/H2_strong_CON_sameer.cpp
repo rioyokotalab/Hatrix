@@ -32,14 +32,8 @@ svd_like_compression(Matrix& matrix,
   int64_t rank;
   std::tie(Ui, Si, Vi, rank) = error_svd(matrix, accuracy, true, false);
 
-  // std::cout << "singular values: ";
-  // for (int i = 0; i < Si.rows; ++i) {
-  //   std::cout << Si(i, i) << " ";
-  // }
-  // std::cout << std::endl;
-
   // Assume fixed rank if accuracy==0.
-  rank = accuracy == 0. ? max_rank : std::min(max_rank, rank + 3);
+  rank = accuracy == 0. ? max_rank : std::min(max_rank, rank);
 
   return std::make_tuple(std::move(Ui), std::move(Si), std::move(Vi), std::move(rank));
 }
@@ -279,14 +273,13 @@ static Matrix
 matmul(const SymmetricSharedBasisMatrix& A, Matrix& x, int64_t N, int64_t rank) {
   std::vector<Matrix> x_hat;
   const int64_t leaf_nblocks = pow(2, A.max_level);
-  // std::vector<int64_t> split_indices;
-  // for (int64_t i = 0; i < leaf_nblocks-1; ++i) {
-  //   int64_t prev = i == 0 ? 0 : split_indices[i-1];
-  //   split_indices.push_back(A.U(i, A.max_level).rows + prev);
-  // }
+  std::vector<int64_t> split_indices;
+  for (int64_t i = 0; i < leaf_nblocks-1; ++i) {
+    int64_t prev = i == 0 ? 0 : split_indices[i-1];
+    split_indices.push_back(A.U(i, A.max_level).rows + prev);
+  }
 
-  // auto x_splits = x.split(split_indices, {});
-  auto x_splits = x.split(leaf_nblocks, 1);
+  auto x_splits = x.split(split_indices, {});
 
   for (int i = 0; i < leaf_nblocks; ++i) {
     x_hat.push_back(matmul(A.U(i, A.max_level), x_splits[i], true, false, 1.0));
@@ -307,7 +300,10 @@ matmul(const SymmetricSharedBasisMatrix& A, Matrix& x, int64_t N, int64_t rank) 
       xtemp_splits[0] = x_hat[x_hat_offset + c1];
       xtemp_splits[1] = x_hat[x_hat_offset + c2];
 
-      x_hat.push_back(matmul(A.U(i, level), xtemp, true, false, 1.0));
+      int64_t pad_rows = A.U(i, level).rows - xtemp.rows;
+      int64_t pad_cols = 0;
+      const Matrix xtemp_pad = xtemp.pad(pad_rows, pad_cols);
+      x_hat.push_back(matmul(A.U(i, level), xtemp_pad, true, false, 1.0));
     }
 
     x_hat_offset += pow(2, child_level);
@@ -343,8 +339,7 @@ matmul(const SymmetricSharedBasisMatrix& A, Matrix& x, int64_t N, int64_t rank) 
 
   // Multiply with the leaf level transfer matrices to generate the product matrix.
   Matrix b(x.rows, 1);
-  auto b_splits = b.split(leaf_nblocks, 1);
-  // auto b_splits = b.split(split_indices, {});
+  auto b_splits = b.split(split_indices, {});
   for (int64_t i = 0; i < leaf_nblocks; ++i) {
     matmul(A.U(i, A.max_level), b_hat[b_hat_offset + i], b_splits[i]);
   }
@@ -440,7 +435,6 @@ int main(int argc, char ** argv) {
   A.max_level = log2(N / leaf_size);
   A.generate_admissibility(domain, matrix_type == 1,
                            Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
-  A.print_structure();
   // Construct H2 strong admis matrix.
   construct_H2_strong(A, domain, N, leaf_size, max_rank, accuracy);
 
@@ -462,7 +456,7 @@ int main(int argc, char ** argv) {
             << " geom_type= " << (geom_type == 0 ? "circle" : "grid")
             << " ndim= " << ndim
             << " matrix_type= " << (matrix_type == 1 ? "H2" : "BLR2")
-            << "Error : " << rel_error
+            << " Error : " << rel_error
             << std::endl;
 
   return 0;
