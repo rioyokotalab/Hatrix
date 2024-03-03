@@ -59,12 +59,12 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
   const int64_t child_level = level + 1;
 
   for (int64_t row = 0; row < nblocks; ++row) {
-    int64_t child1 = row * 2;
-    int64_t child2 = row * 2 + 1;
+    const int64_t child1 = row * 2;
+    const int64_t child2 = row * 2 + 1;
 
     // Generate U transfer matrix.
-    Matrix& Ubig_child1 = Uchild(child1, child_level);
-    Matrix& Ubig_child2 = Uchild(child2, child_level);
+    const Matrix& Ubig_child1 = Uchild(child1, child_level);
+    const Matrix& Ubig_child2 = Uchild(child2, child_level);
 
     if (row_has_admissible_blocks(A, row, level)) {
       for (int64_t col = 0; col < nblocks; ++col) {
@@ -117,13 +117,13 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
                                                  row * block_size, block_size,
                                                  col * block_size, block_size,
                                                  kernel);
-        Matrix S_block = matmul(matmul(Urow_actual, dense, true), Ucol_actual);
+        Matrix S_block = matmul(matmul(Urow_actual, dense, true, false), Ucol_actual);
         A.S.insert(row, col, level, std::move(S_block));
       }
     }
   }
 
-  return Ubig_parent;
+  return std::move(Ubig_parent);
 }
 
 static void
@@ -249,9 +249,6 @@ static double construction_absolute_error(const Hatrix::SymmetricSharedBasisMatr
                                       i * block_size, block_size,
                                       j * block_size, block_size,
                                       kernel);
-
-          std::cout << "i: " << i << " j: " << j << " level: " << level << " actual: " << norm(actual_matrix)
-                    << " expected: " << norm(expected_matrix) << " diff: " << norm(expected_matrix - actual_matrix) << std::endl;
           error += pow(norm(expected_matrix - actual_matrix), 2);
         }
       }
@@ -443,7 +440,7 @@ int main(int argc, char ** argv) {
   A.max_level = log2(N / leaf_size);
   A.generate_admissibility(domain, matrix_type == 1,
                            Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
-  // A.print_structure();
+  A.print_structure();
   // Construct H2 strong admis matrix.
   construct_H2_strong(A, domain, N, leaf_size, max_rank, accuracy);
 
