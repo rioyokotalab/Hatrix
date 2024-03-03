@@ -87,7 +87,6 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
       matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
 
       std::tie(Ui, Si, _Vi, rank) = svd_like_compression(temp, max_rank, accuracy);
-      // std::cout << "rank: "<< rank << std::endl;
       Ui.shrink(Ui.rows, rank);
       A.U.insert(row, level, std::move(Ui));
 
@@ -164,7 +163,6 @@ construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
 
     std::tie(Utemp, Stemp, Vtemp, rank) = svd_like_compression(AY, max_rank, accuracy);
     Utemp.shrink(Utemp.rows, rank);
-    // std::cout << "leaf rank: " <<  rank << std::endl;
     A.U.insert(i, A.max_level, std::move(Utemp));
   }
 
@@ -251,6 +249,9 @@ static double construction_absolute_error(const Hatrix::SymmetricSharedBasisMatr
                                       i * block_size, block_size,
                                       j * block_size, block_size,
                                       kernel);
+
+          std::cout << "i: " << i << " j: " << j << " level: " << level << " actual: " << norm(actual_matrix)
+                    << " expected: " << norm(expected_matrix) << " diff: " << norm(expected_matrix - actual_matrix) << std::endl;
           error += pow(norm(expected_matrix - actual_matrix), 2);
         }
       }
@@ -401,7 +402,7 @@ int main(int argc, char ** argv) {
   // 1: H2
   const int64_t matrix_type = argc > 9 ? atol(argv[9]) : 1;
 
-  const double add_diag = 1e-6 / N;
+  const double add_diag = 1e-3 / N;
   const double alpha = 1;
   // Setup the kernel.
   switch (kernel_type) {
@@ -459,6 +460,13 @@ int main(int argc, char ** argv) {
   double rel_error = Hatrix::norm(diff) / Hatrix::norm(b_dense);
 
   std::cout << "Error : " << rel_error << std::endl;
+
+  std::cout << "N=" << N << " nleaf=" << leaf_size << " acc=" << accuracy
+            << " max_rank=" << max_rank << " admis=" << admis
+            << " kernel= " << (kernel_type == 0 ? "laplace" : "yukawa")
+            << " geom_type= " << (geom_type == 0 ? "circle" : "grid")
+            << " ndim= " << ndim
+            << " matrix_type= " << (matrix_type == 1 ? "H2" : "BLR2") << std::endl;
 
   std::cout << "const error: " << construction_absolute_error(A, leaf_size, domain) << std::endl;
 

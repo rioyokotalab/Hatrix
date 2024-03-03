@@ -29,7 +29,7 @@ namespace Hatrix {
                              const double eta) {
       assert(coords_row.size() == coords_col.size());
       const double dist = distance(coords_row, coords_col);
-      return (dist + eta) / 2;
+      return 1 / ((dist + eta) / 2);
     }
 
     double laplace_2d_kernel(const std::vector<double>& coords_row,

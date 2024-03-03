@@ -82,11 +82,9 @@ namespace Hatrix {
     particles.resize(N, Particle(std::vector<double>(ndim), 0));
 
     if (ndim == 1) {
-      double space_0 = 1.0 / N;
-      for (int64_t i = 0; i < sides[0]; ++i) {
-        std::vector<double> point(ndim);
-        point[0] = i * space_0;
-        particles[i] = Hatrix::Particle(point, i);
+      const auto x = equally_spaced_vector(N, 0, 1);
+      for (int64_t i = 0; i < N; ++i) {
+        particles[i] = Hatrix::Particle(x[i], i);
       }
     }
     else if (ndim == 2) {
