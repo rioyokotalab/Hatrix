@@ -87,7 +87,7 @@ generate_H2_strong_transfer_matrices(Hatrix::SymmetricSharedBasisMatrix& A,
       matmul(Ubig_child2, AY_splits[1], temp_splits[1], true, false, 1, 0);
 
       std::tie(Ui, Si, _Vi, rank) = svd_like_compression(temp, max_rank, accuracy);
-      std::cout << "rank: "<< rank << std::endl;
+      // std::cout << "rank: "<< rank << std::endl;
       Ui.shrink(Ui.rows, rank);
       A.U.insert(row, level, std::move(Ui));
 
@@ -164,7 +164,7 @@ construct_H2_strong_leaf_nodes(Hatrix::SymmetricSharedBasisMatrix& A,
 
     std::tie(Utemp, Stemp, Vtemp, rank) = svd_like_compression(AY, max_rank, accuracy);
     Utemp.shrink(Utemp.rows, rank);
-    std::cout << "leaf rank: " <<  rank << std::endl;
+    // std::cout << "leaf rank: " <<  rank << std::endl;
     A.U.insert(i, A.max_level, std::move(Utemp));
   }
 
@@ -188,7 +188,7 @@ construct_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain&
   construct_H2_strong_leaf_nodes(A, domain, N, nleaf, max_rank, accuracy);
   RowLevelMap Uchild = A.U;
 
-  for (int64_t level = A.max_level - 1; level > 0; --level) {
+  for (int64_t level = A.max_level - 1; level >= A.min_level; --level) {
     Uchild = generate_H2_strong_transfer_matrices(A, Uchild, domain, N, nleaf,
                                                   max_rank, level, accuracy);
   }
@@ -236,7 +236,7 @@ static double construction_absolute_error(const Hatrix::SymmetricSharedBasisMatr
     }
   }
   // Admissible blocks
-  for (int64_t level = A.max_level; level > 0; level--) {
+  for (int64_t level = A.max_level; level >= A.min_level; level--) {
     const int64_t nblocks = pow(2, level);
     for (int64_t i = 0; i < nblocks; i++) {
       for (int64_t j = 0; j < i; j++) {
@@ -442,7 +442,7 @@ int main(int argc, char ** argv) {
   A.max_level = log2(N / leaf_size);
   A.generate_admissibility(domain, matrix_type == 1,
                            Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
-  A.print_structure();
+  // A.print_structure();
   // Construct H2 strong admis matrix.
   construct_H2_strong(A, domain, N, leaf_size, max_rank, accuracy);
 
