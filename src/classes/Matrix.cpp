@@ -370,6 +370,7 @@ Matrix Matrix::block_ranks(int64_t nblocks, double accuracy) const {
 }
 
 Matrix Matrix::swap_rows(const std::vector<int64_t>& row_indices) {
+  assert(row_indices.size() == rows);
   Matrix out(rows, cols);
 
   for (int64_t i = 0; i < rows; ++i) {
@@ -382,6 +383,8 @@ Matrix Matrix::swap_rows(const std::vector<int64_t>& row_indices) {
 }
 
 Matrix Matrix::swap_cols(const std::vector<int64_t>& col_indices) {
+  assert(col_indices.size() == cols);
+
   Matrix out(rows, cols);
 
   for (int64_t i = 0; i < rows; ++i) {
