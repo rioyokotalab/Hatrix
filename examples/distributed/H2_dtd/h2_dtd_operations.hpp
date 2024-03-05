@@ -2,7 +2,7 @@
 
 #include <unordered_map>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "distributed/distributed.hpp"
 
 #include "parsec/data_dist/matrix/two_dim_rectangle_cyclic.h"

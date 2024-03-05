@@ -1,10 +1,10 @@
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "distributed/scalapack_functions.hpp"
 
 int BLACS_CONTEXT;
-int ZERO = 0;
-int ONE = 1;
-int MINUS_ONE = -1;
+const int ZERO = 0;
+const int ONE = 1;
+const int MINUS_ONE = -1;
 
 const char NOTRANS = 'N';
 const char TRANS = 'T';

@@ -11,16 +11,16 @@ CXXFLAGS       = -O0 -g -Wall --std=c++14 -Xpreprocessor \
                  -I. -I$(TOPSRCDIR)/include/ $(BLAS_INCLUDE) $(LAPACK_INCLUDE) \
                  $(shell pkg-config --cflags gtest gtest_main) \
                  -I"$(shell brew --prefix libomp)/include" \
-                 -I/Users/sameer/gitrepos/gsl-2.7.1/build/include
+                 -I/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/include
 LDFLAGS        = $(shell pkg-config --libs gtest_main gtest) \
-                 $(LAPACK_LIB) $(BLAS_LIB) -L/Users/sameer/gitrepos/gsl-2.7.1/build/lib -lgsl -lm \
+                 $(LAPACK_LIB) $(BLAS_LIB) -L/Users/sameerdeshmukh/gitrepos/gsl-2.7.1/build/lib -lgsl -lm \
                  -L"$(shell brew --prefix libomp)/lib" -lomp
-SLATE_LIB      = -L/Users/sameer/gitrepos/slate/build/lib -lslate -llapackpp -lblaspp \
-	         -rpath /Users/sameer/gitrepos/slate/build/lib
+SLATE_LIB      = -L/Users/sameerdeshmukh/gitrepos/slate/build/lib -lslate -llapackpp -lblaspp \
+	         -rpath /Users/sameerdeshmukh/gitrepos/slate/build/lib
 SCALAPACK_LIB   = -L/opt/homebrew/Cellar/scalapack/2.2.0_1/lib -lscalapack
 PARSEC_INCLUDE = $(shell pkg-config --cflags parsec)
 PARSEC_LIB     = $(shell pkg-config --libs parsec) \
-               -rpath /Users/sameer/gitrepos/parsec/install/lib
+               -rpath /Users/sameerdeshmukh/gitrepos/parsec/install/lib
 RM           = rm -rf
 AR           = ar
 ARFLAGS      = -rv

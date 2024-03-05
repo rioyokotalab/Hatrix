@@ -235,9 +235,6 @@ void
 generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
                            const Domain& domain, const Args& opts,
                            int64_t level) {
-  if (!MPIRANK) {
-    std::cout << "generate transfer matrices level=" << level << std::endl;
-  }
   int INFO;
   int N = opts.N;
   int64_t child_level = level + 1;
@@ -333,10 +330,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     int ITEMP = c1 * rank + 1;
     int JTEMP = 1;
 
-    // std::cout << "FIRST IU: " << IU << " JU: " << JU
-    //           << " IA: " << IA << " JA: " << JA
-    //           << " ITEMP: " << ITEMP << " JTEMP: " << JTEMP
-    //           << std::endl;
     pdgemm_(&TRANS, &NOTRANS,
             &rank, &level_block_size, &child_block_size,
             &ALPHA,
@@ -360,10 +353,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
             AY_MEM, &IA, &JA, AY,
             &BETA,
             TEMP_MEM, &ITEMP, &JTEMP, TEMP);
-  }
-
-  if (!MPIRANK) {
-    // std::cout << "\t Apply real basis U.\n" << std::endl;
   }
 
   delete[] AY_MEM;
@@ -560,10 +549,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
               &BETA,
               U_REAL_MEM, &IU_REAL, &JU_REAL, U_REAL);
     }
-
-    if (!MPIRANK) {
-      // std::cout << "\t Generate transfer matrix block= " << block << std::endl;
-    }
   }
   // Free the real basis of the child level and set the U_REAL to real basis.
   delete[] UTRANSFER_MEM;
@@ -644,10 +629,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
     }
   }
 
-  if (!MPIRANK) {
-    // std::cout << "\t Done DENSE_MEM generation." << std::endl;
-  }
-
   for (int64_t i = 0; i < nblocks; ++i) {
     int ITEMP_PRODUCT = 1;
     int IU = i * level_block_size + 1;
@@ -680,10 +661,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
                 U_MEM, &IU, &JU, U,
                 &BETA,
                 S_BLOCKS_MEM, &IS_BLOCKS, &JS_BLOCKS, S_BLOCKS);
-
-        if (!MPIRANK) {
-          // std::cout << "\t Done TEMP_PRODUCT : " << i << " " << j << std::endl;
-        }
       }
     }
   }
@@ -732,10 +709,6 @@ generate_transfer_matrices(SymmetricSharedBasisMatrix& A,
           A.S.insert(i, j, level, std::move(S_LOCAL_MEM));
           Cblacs_gridexit(S_LOCAL_CONTEXT);
         }
-
-        if (!MPIRANK) {
-          // std::cout << "\t Done S_LOCAL : " << i << " " << j << std::endl;
-        }
       }
     }
   }
@@ -757,10 +730,6 @@ construct_h2_matrix(SymmetricSharedBasisMatrix& A, const Domain& domain,
 
 
   generate_leaf_nodes(A, domain, opts);
-
-  if (!MPIRANK) {
-    // std::cout << "FINISH LEAF NODE\n";
-  }
 
   for (int64_t level = A.max_level-1; level >= A.min_level; --level) {
     generate_transfer_matrices(A, domain, opts, level);
