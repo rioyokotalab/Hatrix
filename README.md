@@ -2,30 +2,45 @@
 
 Hatrix is meant to be a library for fast algorithms on structured dense matrices using the shared basis.
 
-Hatrix lets you build your matrix factorization routines from a pre-defined set of easy-to-use routines that make minimum assumptions about how they are used. It makes sure that you, as the scientist, are fully in control of your programs.
+Hatrix lets you build fast matrix routines from a pre-defined set of easy-to-use routines with a focus on customizatibility. The minimal building blocks provided by Hatrix make sure that the user is in full control of their algorithms.
 
 # Basic Usage
 
-Lets assume you want to generate and factorize a dense co-efficient matrix arising out of a Boundary Element Method for a 2D laplace Green's function on a uniform grid. The basic workflow for doing this is as follows:
+Use the `Domain` class to generate a square with uniformly spaced points along the boundary.
+Then sort
+``` cpp
+Hatrix::Domain domain(N, ndim);
+domain.generate_grid_particles();
+domain.cardinal_sort_and_cell_generation(leaf_size);
+```
 
-1. Define a geometry using the `Domain` class.
-2. Define a Green's function using the definition of `kernel_function`.
-3. Write a construction routine for generation of symmetric H2-matrix using the `SymmetricSharedBasisMatrix** class.
-4. Write a factorization routine.
+Generate a dense matrix using a 2D laplace function provided under the `greens_functions` namespace.
+``` cpp
+double diagonal_constant = 1e-6;
+Hatrix::greens_functions::kernel_function_t kernel;
+kernel = [&](const std::vector<double>& c_row,
+    const std::vector<double>& c_col) {
+    return Hatrix::greens_functions::laplace_2d_kernel(c_row, c_col, diagonal_constant);
+};
+```
 
-Hatrix is useful for a large variety of programs as a result of its small and nimble interface. You can see various examples making use of the above workflow in some of the example files below:
+Generate a random matrix vector for verificiation using a matrix generator and multiply it with
+the dense matrix for verification.
+``` cpp
+Hatrix::Matrix A_dense = Hatrix::generate_p2p_interactions(domain, kernel);
+```
 
-| File name                      | Description                                                                                                                           |
-|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| examples/BLR2\_strong\_CON.cpp | Construct a strongly admissible BLR2 matrix and apply a matrix vector product to check the accuracy of construction using serial C++. |
+Use the `SymmetricSharedBasisMatrix` type for representing a symmetric shared basis matrix.
+Initilialize the number of levels, and setup conditions of admissibility using the dual
+tree traversal algorithm.
+```
+```
+
+Generate an H2-matrix with strong admissibility as shown in the `H2_strong_CON.cpp` file
+using the `construct_H2_strong` function, and perform a matrix-vector multiplication with
+the previously generated random vector `x`.
+```
+```
 
 
-# Important types
-
-## Domain
-
-## SymmetricSharedBasisMatrix
-
-This type provides some basic routines for storage and generation of a geometry for a matrix using a shared basis. It allows you to define a symmetric
-shared basis type and generate the far and near blocks for each level of the tree. While it provides structures for storage of data, it does provide
-any routines for computation of that data.
+# Example files
