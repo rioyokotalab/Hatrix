@@ -38,16 +38,6 @@ H2_dtd : % : dirs examples/distributed/H2_dtd
 	$(MV) $@ bin/
 
 
-# parsec H2 matrix with PTG
-.PHONY: examples/distributed/H2_ptg
-examples/distributed/H2_ptg:
-	$(MAKE) -C $@
-
-H2_ptg : % : dirs examples/distributed/H2_ptg
-	$(MPICXX) libH2_ptg.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
-	mkdir -p bin; \
-	$(MV) $@ bin/
-
 # non-distributed H2 code
 .PHONY: examples/distributed/H2
 examples/distributed/H2:

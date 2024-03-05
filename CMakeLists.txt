@@ -92,7 +92,7 @@ if(USE_OPENMP)
   target_link_libraries(Hatrix OpenMP::OpenMP_CXX)
 endif()
 
-if (APPLE)
+if (APPLE OR WITH_FUJITSU_COMPILER)
 find_package(GSL REQUIRED)    # See below (2)
 target_link_libraries(Hatrix GSL::gsl)
 endif()
