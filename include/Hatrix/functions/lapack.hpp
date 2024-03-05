@@ -44,6 +44,7 @@ Matrix cholesky_solve(const Matrix& A, const Matrix& b, const Mode uplo);
 // Compute the in-place non-pivoted LDLT factorization of A.
 void ldl(Matrix& A);
 
+// Compute the QR factorization of matrix A, and return the result in Q and R.
 void qr(Matrix& A, Matrix& Q, Matrix& R);
 
 // Return <Q, pivots>
@@ -67,14 +68,12 @@ std::tuple<Matrix, Matrix> qr(const Matrix& A,
 
 std::vector<double> get_singular_values(Matrix& A);
 
-void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, bool compute_U = true, bool compute_V = true);
+void svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, bool compute_U = true,
+         bool compute_V = true);
 
 double truncated_svd(Matrix& A, Matrix& U, Matrix& S, Matrix& V, int64_t rank);
 
 std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix& A,
-                                                         int64_t rank);
-
-std::tuple<Matrix, Matrix, Matrix, double> truncated_svd(Matrix&& A,
                                                          int64_t rank);
 
 /*
@@ -105,17 +104,18 @@ std::tuple<Matrix, Matrix, int64_t> error_svd_U(Matrix& A, double eps,
   @param A The matrix to be approximated
   @param eps The desired accuracy threshold
   @param relative If true use relative error, otherwise use absolute error
-  @param ret_truncated If true return truncated Q and R, otherwise return full, non-truncated Q and R
+  @param ret_truncated If true return truncated Q and R, otherwise return full,
+  non-truncated Q and R
   @return tuple(Q, R, rank)
 */
 std::tuple<Matrix, Matrix, int64_t> error_pivoted_qr(Matrix& A, double eps,
                                                      bool relative=true,
                                                      bool ret_truncated=true);
 
-// Compute the Frobenius norm of a matrix
+// Compute the Frobenius norm of a matrix using dlange.
 double norm(const Matrix& A);
 
-// Compute the Frobenius norm of a matrix
+// Compute the one-norm of a matrix using dlange.
 double one_norm(const Matrix& A);
 
 void householder_qr_compact_wy(Matrix& A, Matrix& T);
@@ -136,20 +136,28 @@ std::tuple<Matrix, std::vector<int64_t>, int64_t> error_interpolate(Matrix& A, d
 // Returns
 // -------
 //
-// std::tuple<Matrix, Matrix> - The first Matrix is a (A.rows x rank) block with the interpolation
-// matrix obtained from the left-sided QR decomposition of A. The second Matrix is a (rankx1) vector
-// denoting the first rank pivot columns from A that are chosen as the basis vectors.
+// std::tuple<Matrix, Matrix> - The first Matrix is a (A.rows x rank) block with
+// the interpolation matrix obtained from the left-sided QR decomposition of A.
+// The second Matrix is a (rankx1) vector denoting the first rank pivot columns
+// from A that are chosen as the basis vectors.
 std::tuple<Matrix, Matrix> truncated_interpolate(Matrix& A, int64_t rank);
 
 void id_row(Matrix& U, std::vector<int64_t>& ipiv);
 std::tuple<Matrix, std::vector<int64_t>> truncated_id_row(Matrix& A, int64_t rank);
 std::tuple<Matrix, std::vector<int64_t>> error_id_row(Matrix& A, double error, bool relative);
 
+// Obtain an array of eigen values of the matrix A computed using the dsyev function.
 std::vector<double> get_eigenvalues(Matrix& A);
-std::vector<double> get_selected_eigenvalues(Matrix& A, const int64_t k0, const int64_t k1,
+
+// Obtain an array of selected eigenvalues between the k0'th and the k1'th
+// eigenvalue using the syevx function.
+std::vector<double> get_selected_eigenvalues(Matrix& A, const int64_t k0,
+                                             const int64_t k1,
                                              const double abs_tol);
 
-std::tuple<int64_t, std::vector<int64_t>, std::vector<double>> partial_pivoted_qr(Matrix& A, const int64_t rank);
+std::tuple<int64_t, std::vector<int64_t>, std::vector<double>>
+partial_pivoted_qr(Matrix& A, const int64_t rank);
+
 std::tuple<Matrix, Matrix> truncated_pivoted_qr(Matrix& A, const int64_t rank);
 
 }  // namespace Hatrix
