@@ -133,16 +133,27 @@ class Matrix {
   // this function returns only the memory consumed by the view.
   size_t memory_used() const;
 
+  // Split the matrix of size (rows, cols) into nblocksxnblocks where each
+  // block is of the same size. Returns a nblocksxnblocks matrix that contains
+  // the rank obtained from an SVD of each individual block.
   Matrix block_ranks(int64_t nblocks, double accuracy) const;
 
+  // Swap the i'th row with the row_indices[i]'th row of the matrix.
   Matrix swap_rows(const std::vector<int64_t>& row_indices);
+
+  // Swap the j'th column with the col_indicies[j]'th column of the matrix.
   Matrix swap_cols(const std::vector<int64_t>& col_indices);
 
-  // Destructively resize.
+  // Destructively resize. Does not preserve the data of the matrix.
   void destructive_resize(const int64_t nrows, const int64_t ncols);
 
+  // Return the lower triangular matrix after `diag` diagonals.
+  // For example, passing diag=-1 will return the strict lower triangular
+  // matrix, and diag=0 will return the lower triangular matrix with the
+  // diagonal included.
   Matrix tril(const int64_t diag);
 
+  // Pad an extra pad_width_rows rows, and pad_width_cols columns on the matrix.
   Matrix pad(const int64_t pad_width_rows, const int64_t pad_width_cols) const;
 };
 

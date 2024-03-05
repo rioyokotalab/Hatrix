@@ -124,9 +124,6 @@ namespace Hatrix {
         pval = (double)i / (double)N;
         particles[i] = Hatrix::Particle(px, py, pval);
       }
-      std::cout << "Domain N: " << N
-                << " part.size= " <<  particles.size()
-                << std::endl;
     }
     else if (ndim == 3) {
       // Generate a unit cube mesh with N points around the surface
@@ -405,12 +402,6 @@ namespace Hatrix {
       buffer[counter[octant]].value = bodies[i].value;
       counter[octant]++;        // move to the next location in the sorted octant/quadrant.
     }
-
-    // std::cout << "level: " << level << " size: ";
-    // for (int ax = 0; ax < domain_divs; ++ax) {
-    //   std::cout << size[ax] << " ";
-    // }
-    // std::cout << std::endl;
 
     for (int i = 0; i < cell.nchild; ++i) { cell_list.push_back(Cell(ndim));}
     Cell& first_child = cell_list[cell_list.size() - cell.nchild];
@@ -692,7 +683,6 @@ namespace Hatrix {
         // Find the longest axis
         int longest_axis = 0;
         double longest_axis_len = std::numeric_limits<double>::min();
-        // std::cout << "\t";
         for (int axis = 0; axis < ndim; ++axis) {
           double min_c = std::numeric_limits<double>::max(),
             max_c = std::numeric_limits<double>::min();

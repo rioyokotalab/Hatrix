@@ -5,7 +5,8 @@
 #include "Hatrix/classes/Matrix.hpp"
 
 namespace Hatrix {
-  std::vector<double> equally_spaced_vector(int N, double minVal, double maxVal, bool endpoint) {
+  std::vector<double> equally_spaced_vector(int N, double minVal,
+                                            double maxVal, bool endpoint) {
     // Behave similarly to numpy linspace
     // https://numpy.org/doc/stable/reference/generated/numpy.linspace.html
     std::vector<double> res(N, 0.0);

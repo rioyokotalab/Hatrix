@@ -24,7 +24,9 @@ Matrix generate_p2p_interactions(const Domain& domain,
                                  const greens_functions::kernel_function_t& kernel);
 
 // Generate P2P interactions for a subset of particles in the rows and columns and
-// return a block matrix of size nrows x ncols.
+// return a block matrix of size nrows x ncols. The row of the matrix with be the
+// irow'th particle in the domain, and the column of the matrix with the icol'th
+// particle in the domain.
 Matrix generate_p2p_interactions(const Domain& domain,
                                  const int64_t irow, const int64_t nrows,
                                  const int64_t icol, const int64_t ncols,
@@ -33,11 +35,4 @@ Matrix generate_p2p_interactions(const Domain& domain,
 Matrix generate_laplacend_matrix(const std::vector<std::vector<double>>& x,
 				 int64_t rows, int64_t cols,
 				 int64_t row_start, int64_t col_start, double pv=1e-3);
-
-// Sqr. Exp. function copied from stars-H.
-Matrix generate_sqrexpnd_matrix(const std::vector<std::vector<double>>& x,
-                                int64_t rows, int64_t cols,
-                                int64_t row_start, int64_t col_start,
-                                double beta=0.1, double nu=0.5, double noise=1.e-1,
-                                double sigma=1.0);
 }  // namespace Hatrix
