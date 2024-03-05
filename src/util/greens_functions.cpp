@@ -2,7 +2,7 @@
 #include <cassert>
 #include <cstdint>
 #include <random>
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(WITH_FUJITSU_COMPILER)
 #include "gsl/gsl_sf_gamma.h"
 #include "gsl/gsl_sf_bessel.h"
 #else
@@ -58,7 +58,7 @@ namespace Hatrix {
       double sigma_square = sigma*sigma;
       double dist = distance(coords_row, coords_col);
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(WITH_FUJITSU_COMPILER)
       con = pow(2, (smoothness - 1)) * gsl_sf_gamma(smoothness);
 #else
       con = pow(2, (smoothness - 1)) * std::tgamma(smoothness);
@@ -69,7 +69,7 @@ namespace Hatrix {
 
       if (dist != 0) {
         expr = dist / nu;
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(WITH_FUJITSU_COMPILER)
         return con * pow(expr, smoothness) * gsl_sf_bessel_Knu(smoothness, expr);
 #else
         return con * pow(expr, smoothness) * std::cyl_bessel_k(smoothness, expr);
