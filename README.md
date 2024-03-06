@@ -70,8 +70,36 @@ double rel_error = Hatrix::norm(b_dense - b_lowrank) / Hatrix::norm(b_dense);
 
 # Compiling and building
 
-We use cmake for compiling.
+We use cmake for compiling. Run the following command in the command line:
+``` bash
+mkdir build
+cd build
+cmake ..
+make -j
+./build/examples/H2_strong_CON 1024 64 0 40 0.5 0 1 3 1
+```
+
+You need to have the following libaries in your `$PKG_CONFIG_PATH`:
+1. [gsl-2.7.1](https://www.gnu.org/software/gsl/).
+
+The above command will compile and execute a program called `H2_strong_CON`
+in order to generate and verify a strongly admissible H2 matrix using a unit
+sphere geometry. Check out the file in `examples/H2_strong_CON.cpp` for further
+details.
 
 # Example files
 
-Usage of the library can be learnt from various
+Usage of the library can be learnt from various example files in the `examples/` folder.
+More such examples will be added as Hatrix grows and can be used for more use cases of
+low rank matrix approximation. The following examples can be seen to gain a deeper understanding
+of the usage of Hatrix:
+| File                   | Details                                                   |
+|------------------------|-----------------------------------------------------------|
+| `BLR2_weak_CON.cpp`    | Construction of a BLR2 matrix with weak admissibility.    |
+| `BLR2_strong_CON.cpp`  | Construction of a BLR2 matrix with strong admissibility.  |
+| `H2_weak_CON_2lev.cpp` | Construction of a 2 level HSS matrix.                     |
+| `H2_weak_CON.cpp`      | Construction of a N-level HSS matrix.                     |
+| `H2_strong_CON.cpp`    | Construction of a N-level H2-matrix.                      |
+| `Dense_LU_2x2.cpp`     | Dense block LU factorization of a 2x2 block dense matrix. |
+| `Dense_QR_2x2.cpp`     | Dense block QR factorization of a 2x2 block dense matrix. |
+| `H2_strong_PO.cpp`     | Construction and ULV factorization of a H2-matrix.        |
