@@ -198,11 +198,89 @@ construct_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain&
   }
 }
 
+static Matrix
+prepend_complement_basis(const Matrix &Q) {
+  Matrix Q_F(Q.rows, Q.rows);
+  Matrix Q_full, R;
+  std::tie(Q_full, R) =
+      qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+
+  for (int64_t i = 0; i < Q_F.rows; i++) {
+    for (int64_t j = 0; j < Q_F.cols - Q.cols; j++) {
+      Q_F(i, j) = Q_full(i, j + Q.cols);
+    }
+  }
+  for (int64_t i = 0; i < Q_F.rows; i++) {
+    for (int64_t j = 0; j < Q.cols; j++) {
+      Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
+    }
+  }
+  return Q_F;
+}
+
+
 static void
-factorize_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A,
+factorize_level(SymmetricSharedBasisMatrix& A,
+                const int64_t level,
+                const int64_t nblocks,
+                RowColLevelMap<Matrix>& F,
+                RowMap<Matrix>& r,
+                RowMap<Matrix>& t) {
+  const int64_t parent_level = level - 1;
+  for (int64_t block = 0; block < nblocks; ++block) {
+    const int64_t parent_node = block / 2;
+
+    // Multiplication with U_F and V_F
+    Matrix U_F = prepend_complement_basis(A.U(block, level));
+
+    for (int j = 0; j < nblocks; ++j) {
+      if (A.is_admissible.exists(block, j, level) &&
+          !A.is_admissible(block, j, level)) {
+        if (j < block) {
+          // Do not touch the eliminated part (cc and oc)
+          int64_t left_col_split = A.D(block, j, level).cols - A.U(j, level).cols;
+          auto D_splits = A.D(block, j, level).split({},
+                                                     std::vector<int64_t>{left_col_split});
+          D_splits[1] = matmul(U_F, D_splits[1], true);
+        }
+        else {
+          A.D(block, j, level) = matmul(U_F, A.D(block, j, level), true);
+        }
+      }
+    }
+
+    // Multiply U_F to dense blocks along the column in current level
+    for (int i = 0; i < nblocks; ++i) {
+      if (A.is_admissible.exists(i, block, level) &&
+          !A.is_admissible(i, block, level)) {
+        if (i < block) {
+          // Do not touch the eliminated part (cc and co)
+          int64_t up_row_split = A.D(i, block, level).rows - A.U(i, level).cols;
+          auto D_splits = A.D(i, block, level).split(std::vector<int64_t>{up_row_split},
+                                                     {});
+          D_splits[1] = matmul(D_splits[1], U_F);
+        }
+        else {
+          A.D(i, block, level) = matmul(A.D(i, block, level), U_F);
+        }
+      }
+    }
+
+  }
+}
+
+static void
+factorize_H2_strong(SymmetricSharedBasisMatrix& A,
                     const int64_t N, const int64_t nleaf, const int64_t max_rank,
                     const double accuracy) {
+  int64_t level = A.max_level;
+  RowColLevelMap<Matrix> F;
 
+  for (; level >= A.min_level; --level) {
+    RowMap<Matrix> r, t;
+    const int64_t nblocks = pow(2, level);
+    factorize_level(A, level, nblocks, F, r, t);
+  }
 }
 
 static Matrix
