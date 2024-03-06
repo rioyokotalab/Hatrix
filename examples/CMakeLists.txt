@@ -26,6 +26,7 @@ list(APPEND HATRIX_EXAMPLES
   # H2_strong_LDL_nodep
   # H2_strong_PO_nodep
   # H2_strong_PO
+  H2_strong_PO_sameer
   # H2_strong_LU
   # BLR2_weak_MM_2x2
   # BLR2_strong_MM
