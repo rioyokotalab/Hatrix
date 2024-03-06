@@ -198,6 +198,20 @@ construct_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain&
   }
 }
 
+static void
+factorize_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A,
+                    const int64_t N, const int64_t nleaf, const int64_t max_rank,
+                    const double accuracy) {
+
+}
+
+static Matrix
+solve_H2_strong(SymmetricSharedBasisMatrix& A, Matrix& b) {
+  Matrix x(b);
+
+  return x;
+}
+
 int main(int argc, char ** argv) {
   const int64_t N = argc > 1 ? atol(argv[1]) : 256;
   const int64_t leaf_size = argc > 2 ? atol(argv[2]) : 32;
@@ -276,6 +290,17 @@ int main(int argc, char ** argv) {
                            Hatrix::ADMIS_ALGORITHM::DUAL_TREE_TRAVERSAL, admis);
   // Construct H2 strong admis matrix.
   construct_H2_strong(A, domain, N, leaf_size, max_rank, accuracy);
+
+  // Factorize the strong admissiblity H2 matrix.
+  factorize_H2_strong(A, N, leaf_size, max_rank, accuracy);
+
+  // Generate verfication vector from a full-accuracy dense matrix.
+  Matrix A_dense = Hatrix::generate_p2p_interactions(domain, kernel);
+  Matrix x = Hatrix::generate_random_matrix(N, 1);
+  Matrix b = Hatrix::matmul(A_dense, x);
+  Matrix x_solve = solve_H2_strong(A, b);
+
+  double rel_error = Hatrix::norm(x_solve - x) / Hatrix::norm(x);
 
   return 0;
 }
