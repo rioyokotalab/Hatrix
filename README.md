@@ -81,11 +81,17 @@ make -j
 
 You need to have the following libaries in your `$PKG_CONFIG_PATH`:
 1. [gsl-2.7.1](https://www.gnu.org/software/gsl/).
+   - The GSL dependency is only needed if your C++ compiler does not have the
+   `<numbers>` header file.
 
 The above command will compile and execute a program called `H2_strong_CON`
 in order to generate and verify a strongly admissible H2 matrix using a unit
-sphere geometry. Check out the file in `examples/H2_strong_CON.cpp` for further
-details.
+cube geometry. It should print out the following line:
+```
+N=1024 nleaf=64 acc=0 max_rank=40 admis=0.5 kernel= laplace geom_type= grid ndim= 3 matrix_type= H2 Error : 7.85359e-06
+```
+
+Check out the file in `examples/H2_strong_CON.cpp` for further details.
 
 # Example files
 
