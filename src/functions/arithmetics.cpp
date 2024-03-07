@@ -1,11 +1,12 @@
-#include "Hatrix/functions/arithmetics.h"
-
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <iostream>
 
-#include "Hatrix/classes/Matrix.h"
-#include "Hatrix/functions/blas.h"
+#include "Hatrix/classes/Matrix.hpp"
+
+#include "Hatrix/functions/blas.hpp"
+#include "Hatrix/functions/arithmetics.hpp"
 
 namespace Hatrix {
 
@@ -19,7 +20,7 @@ Matrix& operator+=(Matrix& A, const Matrix& B) {
 }
 
 Matrix operator+(const Matrix& A, const Matrix& B) {
-  Matrix C(A);
+  Matrix C(A, true);
   C += B;
   return C;
 }
@@ -34,15 +35,13 @@ Matrix& operator-=(Matrix& A, const Matrix& B) {
 }
 
 Matrix operator-(const Matrix& A, const Matrix& B) {
-  Matrix C(A);
+  Matrix C(A, true);
   C -= B;
   return C;
 }
 
 Matrix operator*(const Matrix& A, const Matrix& B) {
-  Matrix C(A.rows, B.cols);
-  Hatrix::matmul(A, B, C, false, false, 1, 0);
-  return C;
+  return Hatrix::matmul(A, B, false, false, 1);
 }
 
 Matrix& operator*=(Matrix& A, double alpha) {
@@ -50,14 +49,19 @@ Matrix& operator*=(Matrix& A, double alpha) {
   return A;
 }
 
+Matrix& operator/=(Matrix& A, double alpha) {
+  Hatrix::scale(A, 1/alpha);
+  return A;
+}
+
 Matrix operator*(const Matrix& A, double alpha) {
-  Matrix C(A);
+  Matrix C(A, true);
   C *= alpha;
   return C;
 }
 
 Matrix operator*(double alpha, const Matrix& A) {
-  Matrix C(A);
+  Matrix C(A, true);
   C *= alpha;
   return C;
 }
@@ -77,5 +81,27 @@ Matrix transpose(const Matrix& A) {
 
   return A_trans;
 }
+
+Matrix lower_tri(const Matrix& A, bool diag) {
+  Matrix A_lower(A.rows, A.cols);
+  for(int64_t i = 0; i < A.rows; i++) {
+    for(int64_t j = 0; j < std::min(i+1, A.cols); j++) {
+      A_lower(i, j) = (i == j && diag ? 1. : A(i, j));
+    }
+  }
+
+  return A_lower;
+}
+
+Matrix upper_tri(const Matrix& A, bool diag) {
+  Matrix A_upper(A.rows, A.cols);
+  for(int64_t i = 0; i < A.rows; i++) {
+    for(int64_t j = i; j < A.cols; j++) {
+      A_upper(i, j) = (i == j && diag ? 1. : A(i, j));
+    }
+  }
+  return A_upper;
+}
+
 
 }  // namespace Hatrix

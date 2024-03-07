@@ -1,4 +1,4 @@
 TOPSRCDIR = ..
-SOURCES := gemm.cpp getrf.cpp qr.cpp block_dense_lu.cpp
+SOURCES :=  $(wildcard *.cpp)
 
 include $(TOPSRCDIR)/common.mk

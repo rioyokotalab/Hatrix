@@ -1,41 +1,73 @@
 TOPSRCDIR = .
-include $(TOPSRCDIR)/make.inc
+include $(TOPSRCDIR)/common.mk
 
-DIRS := src/classes src/functions
-OBJLIBS := libclasses.a libfunctions.a
-TEST := test
-EXECUTABLES := matmul lu qr block_dense_lu Matrix
+DIRS := src/classes src/functions src/util examples/distributed
+OBJLIBS := libclasses.a libfunctions.a libutil.a
+EXAMPLES := examples
 
 .PHONY: dirs $(DIRS)
 dirs: $(DIRS)
 
-all: $(EXECUTABLES)
-
 $(DIRS):
 	$(MAKE) -C $@
 
-LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS)  -o $@; \
+LINK_EXECUTABLE = $(CXX) $< $(OBJLIBS) $(LDFLAGS) -o $@; \
 	mkdir -p bin; \
 	$(MV) $@ bin/
 
-matmul: $(TEST)/matmul.o dirs
-	$(LINK_EXECUTABLE)
+# H2 matrix distributed construction.
+.PHONY: examples/distributed/H2_construct
+examples/distributed/H2_construct:
+	$(MAKE) -C $@
 
-lu: $(TEST)/lu.o dirs
-	$(LINK_EXECUTABLE)
+H2_construct : % : dirs examples/distributed/H2_construct
+	$(MPICXX) libH2_construct.a libdistributed.a $(OBJLIBS) $(LDFLAGS) \
+	$(PARSEC_LIB) $(SCALAPACK_LIB) $(ELSES_OBJ) \
+	-o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
 
-qr: $(TEST)/qr.o dirs
-	$(LINK_EXECUTABLE)
+# parsec H2 matrix
+.PHONY: examples/distributed/H2_dtd
+examples/distributed/H2_dtd:
+	$(MAKE) -C $@
 
-Matrix: $(TEST)/Matrix.o dirs
-	$(LINK_EXECUTABLE)
+H2_dtd : % : dirs examples/distributed/H2_dtd
+	$(MPICXX) libH2_dtd.a libdistributed.a $(OBJLIBS) $(LDFLAGS) $(PARSEC_LIB) $(SCALAPACK_LIB) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
 
-block_dense_lu: $(TEST)/block_dense_lu.o dirs
-	$(LINK_EXECUTABLE)
+
+# non-distributed H2 code
+.PHONY: examples/distributed/H2
+examples/distributed/H2:
+	$(MAKE) -C $@
+
+H2_main : % : dirs examples/distributed/H2
+	$(CXX) libH2_main.a libdistributed.a  $(OBJLIBS) $(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
+
+# non-distributed H2 code
+.PHONY: examples/distributed/H2_eigen
+examples/distributed/H2_eigen:
+	$(MAKE) -C $@
+
+H2_eigen : % : dirs examples/distributed/H2_eigen
+	$(CXX) libH2_eigen.a libdistributed.a $(OBJLIBS) \
+	/home/sameer.deshmukh/ELSES_mat_calc-master/src/src.a \
+	/home/sameer.deshmukh/ELSES_mat_calc-master/xmlf90-1.2g-elses/macros/lib/libflib.a \
+	$(LDFLAGS) -o $@; \
+	mkdir -p bin; \
+	$(MV) $@ bin/
 
 .PHONY: clean
+.SILENT: clean
 clean:
-	for dir in $(DIRS) test; do \
+	for dir in $(DIRS)  \
+		examples/distributed/H2 examples/distributed/H2_construct \
+		examples/distributed/H2_dtd examples/distributed/H2_ptg \
+		$(TEST) $(EXAMPLES); do \
 		$(MAKE) -C $$dir -f Makefile $@; \
 	done
-	$(RM) $(OBJLIBS) bin/
+	$(RM) $(OBJLIBS) bin/ *.a

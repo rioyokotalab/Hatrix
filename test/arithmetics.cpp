@@ -3,7 +3,7 @@
 #include <string>
 #include <tuple>
 
-#include "Hatrix/Hatrix.h"
+#include "Hatrix/Hatrix.hpp"
 #include "gtest/gtest.h"
 
 class ArithmeticTests
@@ -24,6 +24,13 @@ TEST_P(ArithmeticTests, PlusOperator) {
   for (int64_t i = 0; i < A.rows; ++i)
     for (int64_t j = 0; j < A.cols; ++j) {
       EXPECT_EQ(C(i, j), A(i, j) + B(i, j));
+    }
+
+  // Check that A and B are unmodified.
+  for (int64_t i = 0; i < A.rows; ++i)
+    for (int64_t j = 0; j < A.cols; ++j) {
+      EXPECT_NE(C(i, j), A(i, j));
+      EXPECT_NE(C(i, j), B(i, j));
     }
 }
 
@@ -53,6 +60,13 @@ TEST_P(ArithmeticTests, MinusOperator) {
   for (int64_t i = 0; i < A.rows; ++i)
     for (int64_t j = 0; j < A.cols; ++j) {
       EXPECT_EQ(C(i, j), A(i, j) - B(i, j));
+    }
+
+  // Check that A and B are unmodified.
+  for (int64_t i = 0; i < A.rows; ++i)
+    for (int64_t j = 0; j < A.cols; ++j) {
+      EXPECT_NE(C(i, j), A(i, j));
+      EXPECT_NE(C(i, j), B(i, j));
     }
 }
 
@@ -178,6 +192,67 @@ TEST_P(ArithmeticTests, Transpose) {
   for (int64_t i = 0; i < m; ++i) {
     for (int64_t j = 0; j < n; ++j) {
       EXPECT_EQ(A(i, j), A_trans(j, i));
+    }
+  }
+}
+
+TEST_P(ArithmeticTests, LowerTriangularPart) {
+  int64_t m = 10, n = 10;
+  // std::tie(m, n) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_nounit_lower = lower_tri(A);
+  Hatrix::Matrix A_unit_lower = lower_tri(A, true);
+
+  EXPECT_EQ(A_nounit_lower.rows, m);
+  EXPECT_EQ(A_nounit_lower.cols, n);
+  EXPECT_EQ(A_unit_lower.rows, m);
+  EXPECT_EQ(A_unit_lower.cols, n);
+
+  for (int64_t i = 0; i < m; ++i) {
+    for (int64_t j = 0; j < n; ++j) {
+      if(i == j) {
+        EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
+        EXPECT_EQ(1., A_unit_lower(i, j));
+      }
+      else if(i > j) {
+        EXPECT_EQ(A(i, j), A_nounit_lower(i, j));
+        EXPECT_EQ(A(i, j), A_unit_lower(i, j));
+      }
+      else {
+        EXPECT_EQ(0., A_nounit_lower(i, j));
+        EXPECT_EQ(0., A_unit_lower(i, j));
+      }
+    }
+  }
+}
+
+TEST_P(ArithmeticTests, UpperTriangularPart) {
+  int64_t m, n;
+  std::tie(m, n) = GetParam();
+
+  Hatrix::Matrix A = Hatrix::generate_random_matrix(m, n);
+  Hatrix::Matrix A_nounit_upper = upper_tri(A);
+  Hatrix::Matrix A_unit_upper = upper_tri(A, true);
+
+  EXPECT_EQ(A_nounit_upper.rows, m);
+  EXPECT_EQ(A_nounit_upper.cols, n);
+  EXPECT_EQ(A_unit_upper.rows, m);
+  EXPECT_EQ(A_unit_upper.cols, n);
+  for (int64_t i = 0; i < m; ++i) {
+    for (int64_t j = 0; j < n; ++j) {
+      if(i == j) {
+	EXPECT_EQ(A(i, j), A_nounit_upper(i, j));
+	EXPECT_EQ(1., A_unit_upper(i, j));
+      }
+      else if(i > j) {
+	EXPECT_EQ(0., A_nounit_upper(i, j));
+	EXPECT_EQ(0., A_unit_upper(i, j));
+      }
+      else {
+	EXPECT_EQ(A(i, j), A_nounit_upper(i, j));
+	EXPECT_EQ(A(i, j), A_unit_upper(i, j));
+      }
     }
   }
 }
