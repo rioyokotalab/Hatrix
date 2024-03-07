@@ -557,6 +557,57 @@ multiply_complements(SymmetricSharedBasisMatrix& A,
 }
 
 static void
+factorize_diagonal(SymmetricSharedBasisMatrix& A,
+                   const int64_t block,
+                   const int64_t level,
+                   const int64_t max_rank) {
+  int nleaf = A.D(block, block, level).rows, rank = max_rank;
+  Matrix& diagonal = A.D(block, block, level);
+  auto diagonal_splits = split_dense(diagonal,
+                                     nleaf-rank,
+                                     nleaf-rank);
+  cholesky(diagonal_splits[0], Hatrix::Lower);
+  solve_triangular(diagonal_splits[0], diagonal_splits[2], Hatrix::Right, Hatrix::Lower,
+                   false, true, 1.0);
+  syrk(diagonal_splits[2], diagonal_splits[3], Hatrix::Lower, false, -1, 1);
+}
+
+static void
+triangle_reduction(SymmetricSharedBasisMatrix& A,
+                   const int64_t block,
+                   const int64_t level,
+                   const int64_t max_rank) {
+  Matrix& diagonal = A.D(block, block, level);
+  auto diagonal_splits = split_dense(diagonal,
+                                     diagonal.rows - max_rank,
+                                     diagonal.cols - max_rank);
+  const Matrix& Dcc = diagonal_splits[0];
+  const int64_t nblocks = pow(2, level);
+
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (exists_and_inadmissible(A, i, block, level)) {
+      auto D_i_block_splits =
+        A.D(i, block, level).split(
+                                   {},
+                                   std::vector<int64_t>{
+                                     A.D(i, block, level).cols - max_rank});
+      solve_triangular(Dcc, D_i_block_splits[0], Hatrix::Right, Hatrix::Lower, false, true, 1);
+    }
+  }
+
+  // TRSM with co blocks behind the diagonal on the 'block' row.
+  for (int64_t j = 0; j < block; ++j) {
+    if (exists_and_inadmissible(A, block, j, level)) {
+      auto D_block_j_splits =
+        A.D(block, j, level).split(std::vector<int64_t>{A.D(block, j, level).rows - max_rank},
+                                   std::vector<int64_t>{A.D(block, j, level).cols - max_rank});
+      solve_triangular(Dcc, D_block_j_splits[1], Hatrix::Left, Hatrix::Lower, false, false, 1.0);
+    }
+  }
+}
+
+
+static void
 factorize_level(SymmetricSharedBasisMatrix& A,
                 const int64_t level,
                 const int64_t max_rank,
@@ -574,8 +625,8 @@ factorize_level(SymmetricSharedBasisMatrix& A,
                                           level, max_rank, accuracy);
 
     multiply_complements(A, block, level, max_rank);
-    // factorize_diagonal(A, block, level);
-    // triangle_reduction(A, block, level);
+    factorize_diagonal(A, block, level, max_rank);
+    triangle_reduction(A, block, level, max_rank);
     // compute_schurs_complement(A, block, level);
     // compute_fill_ins(A, block, level, F);
   } // for (int block = 0; block < nblocks; ++block)
