@@ -28,13 +28,19 @@ Hatrix::RowLevelMap US;
 // near_neighbours and far_neighbours, respectively.
 RowColMap<std::vector<int64_t>> near_neighbours, far_neighbours;
 
-bool
+static std::vector<Hatrix::Matrix>
+split_dense(const Hatrix::Matrix& dense, int64_t row_split, int64_t col_split) {
+  return dense.split(std::vector<int64_t>(1, row_split),
+                     std::vector<int64_t>(1, col_split));
+}
+
+static bool
 exists_and_inadmissible(const Hatrix::SymmetricSharedBasisMatrix& A,
                         const int64_t i, const int64_t j, const int64_t level) {
   return A.is_admissible.exists(i, j, level) && !A.is_admissible(i, j, level);
 }
 
-bool
+static bool
 exists_and_admissible(const Hatrix::SymmetricSharedBasisMatrix& A,
                       const int64_t i, const int64_t j, const int64_t level) {
   return A.is_admissible.exists(i, j, level) && A.is_admissible(i, j, level);
@@ -241,19 +247,21 @@ construct_H2_strong(Hatrix::SymmetricSharedBasisMatrix& A, const Hatrix::Domain&
 }
 
 static Matrix
-prepend_complement_basis(const Matrix &Q) {
-  Matrix Q_F(Q.rows, Q.rows);
-  Matrix Q_full, R;
-  std::tie(Q_full, R) =
-      qr(Q, Hatrix::Lapack::QR_mode::Full, Hatrix::Lapack::QR_ret::OnlyQ);
+make_complement(const Matrix& Q) {
+  Hatrix::Matrix Q_F(Q.rows, Q.rows);
+  Hatrix::Matrix Q_full, R;
+  std::tie(Q_full, R) = qr(Q,
+                           Hatrix::Lapack::QR_mode::Full,
+                           Hatrix::Lapack::QR_ret::OnlyQ);
 
-  for (int64_t i = 0; i < Q_F.rows; i++) {
-    for (int64_t j = 0; j < Q_F.cols - Q.cols; j++) {
+  for (int64_t i = 0; i < Q_F.rows; ++i) {
+    for (int64_t j = 0; j < Q_F.cols - Q.cols; ++j) {
       Q_F(i, j) = Q_full(i, j + Q.cols);
     }
   }
-  for (int64_t i = 0; i < Q_F.rows; i++) {
-    for (int64_t j = 0; j < Q.cols; j++) {
+
+  for (int64_t i = 0; i < Q_F.rows; ++i) {
+    for (int64_t j = 0; j < Q.cols; ++j) {
       Q_F(i, j + (Q_F.cols - Q.cols)) = Q(i, j);
     }
   }
@@ -510,6 +518,43 @@ update_col_cluster_basis_and_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
   }
 }
 
+static void
+multiply_complements(SymmetricSharedBasisMatrix& A,
+                     const int64_t block,
+                     const int64_t level,
+                     const int64_t max_rank) {
+
+  // left multiply with the complement along the (symmetric) row.
+  auto diagonal_splits = split_dense(A.D(block, block, level),
+                                     A.D(block, block, level).rows - max_rank,
+                                     A.D(block, block, level).cols - max_rank);
+
+  // copy the upper triangle into the lower triangle.
+  for (int i = 0; i < A.D(block, block, level).rows; ++i) {
+    for (int j = i+1; j < A.D(block, block, level).cols; ++j) {
+      A.D(block, block, level)(i,j) = A.D(block, block, level)(j,i);
+    }
+  }
+
+  auto U_F = make_complement(A.U(block, level));
+  A.D(block, block, level) = matmul(matmul(U_F, A.D(block, block, level), true), U_F);
+
+  for (int64_t j = 0; j < block; ++j) {
+    if (exists_and_inadmissible(A, block, j, level)) {
+      auto D_splits =
+        A.D(block, j, level).split({},
+                                   std::vector<int64_t>{A.D(block, j, level).cols -
+                                                        max_rank});
+      D_splits[1] = matmul(U_F, D_splits[1], true);
+    }
+  }
+
+  for (int64_t i = block+1; i < pow(2, level); ++i) {
+    if (exists_and_inadmissible(A, i, block, level)) {
+      A.D(i, block, level) = matmul(A.D(i, block, level), U_F);
+    }
+  }
+}
 
 static void
 factorize_level(SymmetricSharedBasisMatrix& A,
@@ -528,7 +573,7 @@ factorize_level(SymmetricSharedBasisMatrix& A,
     update_col_cluster_basis_and_S_blocks(A, F, t, block,
                                           level, max_rank, accuracy);
 
-    // multiply_complements(A, block, level);
+    multiply_complements(A, block, level, max_rank);
     // factorize_diagonal(A, block, level);
     // triangle_reduction(A, block, level);
     // compute_schurs_complement(A, block, level);
