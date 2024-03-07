@@ -380,6 +380,135 @@ update_row_cluster_basis_and_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
   }
 }
 
+static void
+update_col_cluster_basis(SymmetricSharedBasisMatrix& A,
+                         const int64_t block,
+                         const int64_t level,
+                         const int64_t max_rank,
+                         const double accuracy,
+                         RowColLevelMap<Matrix>& F,
+                         RowMap<Matrix>& t) {
+  const int64_t nblocks = pow(2, level);
+  const int64_t block_size = A.D(block, block, level).cols;
+
+  Matrix fill_in(block_size, block_size);
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (exists_and_admissible(A, i, block, level) && F.exists(i, block, level)) {
+      fill_in += matmul(F(i, block, level), F(i, block, level), true, false);
+      // F.erase(i, block, level);
+    }
+  }
+
+  fill_in += matmul(A.U(block, level),
+                    matmul(US(block, level), A.U(block, level), false, true));
+
+  Matrix col_concat_T = transpose(fill_in);
+  Matrix Q,R;
+  Matrix Si, Vi;
+
+  int64_t rank;
+  std::tie(Q, R, rank) = error_pivoted_qr(col_concat_T,
+                                          accuracy * 1e-1,
+                                          false, false);
+
+  Q.shrink(A.U(block,level).rows, max_rank);
+  R.shrink(max_rank, max_rank);
+
+  Vi.destructive_resize(R.rows, R.cols);
+  Si.destructive_resize(R.rows, R.rows);
+
+  rq(R, Si, Vi);
+
+
+  US.erase(block, level);
+  US.insert(block, level, std::move(Si));
+
+  // update the projection of the new basis on the old.
+  Matrix t_row = matmul(Q, A.U(block, level), true, false);
+  if (t.exists(block)) { t.erase(block); }
+  t.insert(block, std::move(t_row));
+
+  // update the transfer matrix on this row.
+  A.U.erase(block, level);
+  A.U.insert(block, level, std::move(Q));
+}
+
+static void
+update_col_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
+                    const int64_t block,
+                    const int64_t level,
+                    const Hatrix::RowMap<Hatrix::Matrix>& t) {
+  int64_t nblocks = pow(2, level);
+  // update the S blocks in this column.
+  for (int64_t i : far_neighbours(block, level)) {
+    if (i > block) {
+      A.S(i, block, level) = matmul(A.S(i, block, level), t(block), false, true);
+    }
+  }
+}
+
+static void
+update_col_transfer_basis(Hatrix::SymmetricSharedBasisMatrix& A,
+                          const int64_t block,
+                          const int64_t level,
+                          Hatrix::RowMap<Hatrix::Matrix>& t) {
+  // update the transfer matrices one level higher
+  const int64_t parent_level = level - 1;
+  const int64_t parent_block = block / 2;
+  if (parent_level > 0) {
+    const int64_t c1 = parent_block * 2;
+    const int64_t c2 = parent_block * 2 + 1;
+
+    Matrix& Utransfer = A.U(parent_block, parent_level);
+    Matrix Utransfer_new(A.U(c1, level).cols + A.U(c2, level).cols,
+                         Utransfer.cols);
+
+    auto Utransfer_splits = Utransfer.split(std::vector<int64_t>(1, A.U(c1, level).cols),
+                                            {});
+    auto Utransfer_new_splits = Utransfer_new.split(std::vector<int64_t>(1,
+                                                                         A.U(c1, level).cols),
+                                                    {});
+    if (block == c1) {
+      matmul(t(c1), Utransfer_splits[0], Utransfer_new_splits[0], false, false, 1, 0);
+      Utransfer_new_splits[1] = Utransfer_splits[1];
+      t.erase(c1);
+    }
+    else {
+      matmul(t(c2), Utransfer_splits[1], Utransfer_new_splits[1], false, false, 1, 0);
+      Utransfer_new_splits[0] = Utransfer_splits[0];
+      t.erase(c2);
+    }
+
+    A.U.erase(parent_block, parent_level);
+    A.U.insert(parent_block, parent_level, std::move(Utransfer_new));
+  }
+}
+
+
+static void
+update_col_cluster_basis_and_S_blocks(Hatrix::SymmetricSharedBasisMatrix& A,
+                                      Hatrix::RowColLevelMap<Hatrix::Matrix>& F,
+                                      Hatrix::RowMap<Hatrix::Matrix>& t,
+                                      const int64_t block,
+                                      const int64_t level,
+                                      const int64_t max_rank,
+                                      const double accuracy) {
+  bool found_col_fill_in = false;
+  int64_t nblocks = pow(2, level);
+
+  for (int64_t i = block+1; i < nblocks; ++i) {
+    if (F.exists(i, block, level)) {
+      found_col_fill_in = true;
+      break;
+    }
+  }
+
+  if (found_col_fill_in) {
+    update_col_cluster_basis(A, block, level, max_rank, accuracy, F, t);
+    update_col_S_blocks(A, block, level, t);
+    update_col_transfer_basis(A, block, level, t);
+  }
+}
 
 
 static void
@@ -396,7 +525,8 @@ factorize_level(SymmetricSharedBasisMatrix& A,
   for (int64_t block = 0; block < nblocks; ++block) {
     update_row_cluster_basis_and_S_blocks(A, F, r, block,
                                           level, max_rank, accuracy);
-    // update_col_cluster_basis_and_S_blocks(A, F, t, block, level);
+    update_col_cluster_basis_and_S_blocks(A, F, t, block,
+                                          level, max_rank, accuracy);
 
     // multiply_complements(A, block, level);
     // factorize_diagonal(A, block, level);
