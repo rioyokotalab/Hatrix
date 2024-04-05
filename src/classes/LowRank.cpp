@@ -47,7 +47,7 @@ LowRank<DT>::LowRank(const Matrix<DT>& A, int64_t rank)
     this->V = Matrix<DT>(sample_size, QtA.cols);
     svd(QtA, Ub, S, V);
 
-    this->error = S(rank, rank);
+    this->error = S(rank+1, rank+1);
     this->U = matmul(Q, Ub);
     this->U.shrink(U.rows, rank);
     this->S.shrink(rank, rank);
