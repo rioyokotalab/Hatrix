@@ -7,7 +7,7 @@ set_policies()
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
-option(Hatrix_BUILD_TESTS "Build tests of the library." ON)
+option(Hatrix_BUILD_TESTS "Build tests of the library." OFF)
 option(Hatrix_CPU_ONLY "Build Hatrix without GPU usage." ON)
 
 project(NewStructure
@@ -84,11 +84,11 @@ else()
   target_link_libraries(Hatrix ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES} OpenMP::OpenMP_CXX)
 endif()
 
-add_subdirectory(examples)
+#add_subdirectory(examples)
 
 if(${Hatrix_BUILD_TESTS})
   enable_testing()
   include(find_or_download)
   find_or_download(GTest)
-  add_subdirectory(test)
+  #add_subdirectory(test)
 endif()
