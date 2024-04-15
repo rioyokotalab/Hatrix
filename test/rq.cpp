@@ -10,14 +10,12 @@ class RqTests : public testing::Test {
   protected:
   // Matrix dimensions used in the tests
   std::vector<int64_t> sizes = {8, 16};
-  std::vector<std::tuple<int64_t, int64_t, int64_t>> dims;
+  std::vector<std::tuple<int64_t, int64_t>> dims;
 
   void SetUp() override {
     for (size_t i = 0; i < sizes.size(); ++i) {
       for (size_t j = 0; j < sizes.size(); ++j) {
-        for (size_t k = 0; k < sizes.size(); ++k) {
-          dims.push_back(std::make_tuple(sizes[i], sizes[j], sizes[k]));
-        }
+        dims.push_back(std::make_tuple(sizes[i], sizes[j]));
       }
     }
   }
@@ -27,10 +25,10 @@ class RqTests : public testing::Test {
 template <typename DT>
 void inline expect_fp_eq(const DT a, const DT b, const std::basic_string<char>& err_msg) {
   if (std::is_same<DT, double>::value){
-    EXPECT_NEAR(a, b, 10e-14) << err_msg;
+    EXPECT_NEAR(a, b, 10e-15) << err_msg;
   }     
   else {
-    EXPECT_NEAR(a, b, 10e-6) << err_msg;
+    EXPECT_NEAR(a, b, 10e-7) << err_msg;
   }                                        
 }
 
@@ -39,7 +37,8 @@ using Types = ::testing::Types<float, double>;
 TYPED_TEST_SUITE(RqTests, Types);
 
 TYPED_TEST(RqTests, Rq) {
-  for (auto const& [m, n, k] : this->dims) {
+  for (auto const& [m, n] : this->dims) {
+    auto k = m > n ? n : m;
     Hatrix::Matrix<TypeParam> A = Hatrix::generate_random_matrix<TypeParam>(m, n);
     Hatrix::Matrix<TypeParam> R(m, k), Q(k, n);
     Hatrix::Matrix<TypeParam> A_copy(A);

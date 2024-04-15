@@ -490,11 +490,39 @@ namespace Hatrix {
       Hatrix::solve_triangular(dense_map(row, col, level), B, side, uplo, diag, false);
     }
   }
+
+  template <typename DT>
+  void matmul(Hatrix::RowColLevelMap<Hatrix::Matrix<DT>>& dense_map, Hatrix::RowColLevelMap<Hatrix::LowRank<DT>>& lr_map, int row, int col, int level, int max_level, Hatrix::Matrix<DT>& B, Hatrix::Matrix<DT>& C, double alpha=1, double beta=0) {
+    //std::cout<<"Called matmul for row="<<row<<" col="<<col<<" level="<<level<<std::endl;
+    if (level < max_level) {
+      int start = row * 2;
+      std::vector<Hatrix::Matrix<DT>> B_split = B.split(2, 1);
+      std::vector<Hatrix::Matrix<DT>> C_split = C.split(2, 1);
+      
+      
+      #pragma omp task shared(dense_map, lr_map, B, C)
+      {
+        matmul(dense_map, lr_map, start, start, level+1, max_level, B_split[0], C_split[0]);
+        //std::cout<<"Calc matmul for row="<<start<<" col="<<start+1<<" level="<<level+1<<std::endl;
+        #pragma omp taskwait
+        matmul(lr_map(start, start+1, level+1), B_split[1], C_split[0], false, false, 1, 1);
+      }
+      #pragma omp task shared(dense_map, lr_map, B, C)
+      {
+        matmul(dense_map, lr_map, start+1, start+1, level+1, max_level, B_split[1], C_split[1]);
+        //std::cout<<"Calc matmul for row="<<start+1<<" col="<<start<<" level="<<level+1<<std::endl;
+        #pragma omp taskwait
+        matmul(lr_map(start+1, start, level+1), B_split[0], C_split[1], false, false, 1, 1);
+      }
+    } else {
+      matmul(dense_map(row, col, level), B, C, false, false, alpha, beta);
+    }
+  }
 }
 
 int main() {
-  int n = 1024;
-  int leaf_size = 32;
+  int n = 512;
+  int leaf_size = 256;
   int num_blocks = n / leaf_size;
   int rank = 16;
 
@@ -518,8 +546,59 @@ int main() {
   Hatrix::RowColLevelMap<Hatrix::LowRank<double>> lr_map = Hatrix::create_lr_map(D, is_admissible, leaf_size, rank, max_level);
   double toc = get_time();
   std::cout<<"Time (Construction): "<<toc-tic<<std::endl;
+  /*
+  Hatrix::Matrix b = Hatrix::generate_random_matrix(n,1);
+  Hatrix::Matrix c(n, 1);
+  Hatrix:matmul(D_copy, b, c, false, false, 1, 0);
+  Hatrix::Matrix c1(n, 1);
+  #pragma omp parallel
+  {
+    #pragma omp single 
+    {
+      Hatrix::matmul(dense_map, lr_map, 0, 0, 0, max_level, b, c1);
+    }
+  }*/
+  
+
+  //Hatrix::Matrix q(leaf_size, 1);
+  //std::vector<Hatrix::Matrix<double>> B_split = b.split(2, 1);
+  //b.print();
+  //B_split[0].print();
+  //Hatrix::matmul(dense_map(0, 0, 1), B_split[0], q, false, false, 1, 0);
+  //Hatrix::matmul(lr_map(0, 1, 1), B_split[1], q, false, false, 1, 1);
+  //q.print();
+  
+  /*
+  double error = Hatrix::norm(c - c1);
+  std::cout<<"Error: "<<error<<std::endl;
+  Hatrix::HODLR<double> test(D, leaf_size, rank);
+  //Hatrix::Matrix test_dense = test.make_dense();
+  Hatrix::Matrix c2(n, 1);
+  test.matmul(b, c2);
+  //Hatrix::matmul(test_dense, b, c2, false, false, 1, 0);
+  error = Hatrix::norm(c - c2);
+  std::cout<<"Error: "<<error<<std::endl;
+
+  omp_set_num_threads(2);
+  Hatrix::HODLR<float> test2(test);
+  test.lu();
+  test2.lu();
+  Hatrix::Matrix x = Hatrix::generate_random_matrix(n,1);
+  Hatrix::Matrix x_copy(b, true);
+  test.solve(x_copy);
+  Hatrix::Matrix<float> x_copy2(b, true);
+  test2.solve(x_copy2);
+  Hatrix::Matrix<double> x_conv(x_copy2);
+
+  error = Hatrix::norm(x_copy - x_conv);
+  std::cout<<"Error: "<<error<<std::endl;
+  */
 
   Hatrix::HODLR<double> test(D, leaf_size, rank);
+  Hatrix::Matrix check = test.make_dense();
+  double error = Hatrix::norm(D_copy - check);
+  std::cout<<"Error: "<<error<<std::endl;
+
   tic = get_time();    
   test.lu();
   toc = get_time();
@@ -545,6 +624,7 @@ int main() {
   std::cout<<"Time: "<<toc-tic<<std::endl;
   
   Hatrix::Matrix b = Hatrix::generate_random_matrix(n,1);
+  std::cout<<"Norm: "<<norm(b)<<std::endl;
   Hatrix::Matrix b_copy(b, true);
   Hatrix::Matrix b_copy2(b, true);
   test.solve(b_copy2);
@@ -553,8 +633,8 @@ int main() {
   {
     #pragma omp single 
     {
-      Hatrix::trsm_solve<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Upper);
       Hatrix::trsm_solve<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Lower);
+      Hatrix::trsm_solve<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Upper);
     }
   }
   //b.print();
@@ -562,15 +642,16 @@ int main() {
 
   lu_nopiv(D_copy);
   //D_copy.print();
+  Hatrix::solve_triangular(D_copy, b_copy, Hatrix::Left, Hatrix::Lower, true, false);
   Hatrix::solve_triangular(D_copy, b_copy, Hatrix::Left, Hatrix::Upper, false, false);
   //b_copy.print();
-  Hatrix::solve_triangular(D_copy, b_copy, Hatrix::Left, Hatrix::Lower, true, false);
+  
 
-  double error = Hatrix::norm(b_copy - b);
+  error = Hatrix::norm(b_copy - b);
   std::cout<<"Error: "<<error<<std::endl;
   error = Hatrix::norm(b_copy2 - b_copy);
   std::cout<<"Error: "<<error<<std::endl;
-
+  
   // TODO the LU error seems to be good, but there is still a problem in the solve
   /*std::vector<Hatrix::Matrix<double>> lu_blocks1 = D_copy.split(2,2);
   std::vector<Hatrix::Matrix<double>> lu_blocks2 = lu_blocks1[0].split(2,2);

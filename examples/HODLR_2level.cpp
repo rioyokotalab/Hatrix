@@ -217,8 +217,8 @@ int main() {
   {
     #pragma omp single 
     {
-      Hatrix::trsm<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Upper);
       Hatrix::trsm<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Lower);
+      Hatrix::trsm<double>(dense_map, lr_map, 0, 0, 0, max_level, b, Hatrix::Left, Hatrix::Upper);
     }
   }
   //b.print();
@@ -226,9 +226,9 @@ int main() {
 
   lu_nopiv(D_copy);
   //D_copy.print();
+  Hatrix::solve_triangular(D_copy, b_copy, Hatrix::Left, Hatrix::Lower, true, false);
   Hatrix::solve_triangular(D_copy, b_copy, Hatrix::Left, Hatrix::Upper, false, false);
   //b_copy.print();
-  Hatrix::solve_triangular(D_copy, b_copy, Hatrix::Left, Hatrix::Lower, true, false);
 
   double error = Hatrix::norm(b_copy - b);
   std::cout<<"Error: "<<error<<std::endl;
